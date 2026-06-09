@@ -9,12 +9,15 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.TelescopeConfigGeneratorRole
@@ -35,6 +38,11 @@ sealed trait Flamingos2ImagingService[F[_]]:
     input:  Flamingos2ImagingInput.Create,
     reqEtm: Option[ExposureTimeMode],
     which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
+
+  def update(
+    SET:   Flamingos2ImagingInput.Edit,
+    which: List[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
 
   def delete(
@@ -107,6 +115,69 @@ object Flamingos2ImagingService:
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         session.exec(Statements.delete(which))
+
+      override def update(
+        SET:   Flamingos2ImagingInput.Edit,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        NonEmptyList.fromList(which).fold(().success.pure): oids =>
+
+          val modeUpdates =
+            NonEmptyList
+              .fromList(
+                Statements.commonUpdates(SET) ++
+                SET.variant.toList.flatMap(Statements.variantUpdates)
+              )
+              .traverse_ : us =>
+                session.exec:
+                  sql"UPDATE #${Flamingos2ImagingService.ModeTableName} SET "(Void) |+|
+                    us.intercalate(void", ")                                       |+|
+                    void" WHERE "                                                  |+|
+                    observationIdIn(oids)
+
+          // Replace the current filters and their ETMs
+          val filterUpdates =
+            SET.filters.fold(ResultT.unit): fs =>
+              for
+                _   <- ResultT.liftF(session.exec(Statements.deleteCurrentFiltersAndEtms(oids)))
+                // Insert the acquisition and science filters (current / mutable version)
+                r   <- ResultT(services.exposureTimeModeService.resolve("Flamingos2 Imaging", none, fs.map(f => (f.filter, f.exposureTimeMode)), none, which))
+                ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
+                cur  = stripAcquisition(ids)
+                _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
+              yield ()
+
+          def updateOffsetForRole(
+            input:   Nullable[TelescopeConfigGeneratorInput],
+            variant: ImagingVariantType,
+            role:    TelescopeConfigGeneratorRole
+          ): F[Unit] =
+            input.toOptionOption.fold(
+              // the offset generator field was Absent, which means we should
+              // default it to no generator when switching variants.
+              services.telescopeConfigGeneratorService.resetWhenVariantNotMatching(
+                oids,
+                Flamingos2ImagingService.ModeTableName,
+                variant,
+                role
+              )
+            ): in =>
+              services.telescopeConfigGeneratorService.replace(oids, in, role)
+
+          val offsetUpdates =
+            SET.variant.fold(().pure[F]): v =>
+              val (o, s) = v match
+                case ImagingVariantInput.Grouped(_, offsets, _, skyOffsets)  => (offsets, skyOffsets)
+                case ImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
+                case _                                                       => (Nullable.Null, Nullable.Null)
+              updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
+              updateOffsetForRole(s, v.variantType, TelescopeConfigGeneratorRole.Sky)
+
+          (for
+            _ <- ResultT.liftF(offsetUpdates)
+            _ <- ResultT.liftF(modeUpdates)
+            _ <- filterUpdates
+          yield ()).value
 
   object Statements:
 
@@ -196,3 +267,120 @@ object Flamingos2ImagingService:
           sql"""($observation_id, $flamingos_2_filter, $observing_mode_row_version, $exposure_time_mode_id)"""(oid, filter, version, eid)
 
       insertInto |+| filterEntries.intercalate(void", ")
+
+    def commonUpdates(
+      input: Flamingos2ImagingInput.Edit
+    ): List[AppliedFragment] =
+      val upReadMode    = sql"c_read_mode    = ${flamingos_2_read_mode.opt}"
+      val upReads       = sql"c_reads        = ${flamingos_2_reads.opt}"
+      val upDecker      = sql"c_decker       = ${flamingos_2_decker.opt}"
+      val upReadoutMode = sql"c_readout_mode = ${flamingos_2_readout_mode.opt}"
+      List(
+        input.explicitReadMode.toOptionOption.map(upReadMode),
+        input.explicitReads.toOptionOption.map(upReads),
+        input.explicitDecker.toOptionOption.map(upDecker),
+        input.explicitReadoutMode.toOptionOption.map(upReadoutMode)
+      ).flatten
+
+    def variantUpdates(
+      input: ImagingVariantInput
+    ): List[AppliedFragment] =
+      val upVariant = sql"c_variant = $imaging_variant"
+
+      def upSkyCount(variant: ImagingVariantType, skyCount: Option[NonNegInt]): AppliedFragment =
+        (variant, skyCount) match
+          case (ImagingVariantType.PreImaging, _) =>
+            sql"c_sky_count = $int4_nonneg"(NonNegInt.MinValue)
+          case (v, None)                          =>
+            sql"""
+              c_sky_count =
+                CASE
+                  WHEN c_variant = $imaging_variant THEN c_sky_count
+                  ELSE $int4_nonneg
+                END
+            """.apply(v, NonNegInt.MinValue)
+          case (_, Some(sc))                      =>
+            sql"c_sky_count = $int4_nonneg"(sc)
+
+      def grouped: List[AppliedFragment] =
+        val upOrder = sql"c_wavelength_order = ${wavelength_order}"
+        input match
+          case ImagingVariantInput.Grouped(order, _, skyCount, _) =>
+            List(
+              upVariant(ImagingVariantType.Grouped),
+              upSkyCount(ImagingVariantType.Grouped, skyCount)
+            ) ++ order.map(upOrder).toList
+          case _                                                  =>
+            List(upOrder(WavelengthOrder.Increasing))
+
+      def interleaved: List[AppliedFragment] =
+        input match
+          case ImagingVariantInput.Interleaved(_, skyCount, _) =>
+            List(
+              upVariant(ImagingVariantType.Interleaved),
+              upSkyCount(ImagingVariantType.Interleaved, skyCount)
+            )
+          case _                                               =>
+            Nil
+
+      def preImaging: List[AppliedFragment] =
+        val upPre1p = sql"c_pre_imaging_off1_p = ${angle_µas}"
+        val upPre1q = sql"c_pre_imaging_off1_q = ${angle_µas}"
+        val upPre2p = sql"c_pre_imaging_off2_p = ${angle_µas}"
+        val upPre2q = sql"c_pre_imaging_off2_q = ${angle_µas}"
+        val upPre3p = sql"c_pre_imaging_off3_p = ${angle_µas}"
+        val upPre3q = sql"c_pre_imaging_off3_q = ${angle_µas}"
+        val upPre4p = sql"c_pre_imaging_off4_p = ${angle_µas}"
+        val upPre4q = sql"c_pre_imaging_off4_q = ${angle_µas}"
+        input match
+          case ImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
+            upSkyCount(ImagingVariantType.PreImaging, None) :: List(
+              upVariant(ImagingVariantType.PreImaging).some,
+              o1.map(o => upPre1p(o.p.toAngle)),
+              o1.map(o => upPre1q(o.q.toAngle)),
+              o2.map(o => upPre2p(o.p.toAngle)),
+              o2.map(o => upPre2q(o.q.toAngle)),
+              o3.map(o => upPre3p(o.p.toAngle)),
+              o3.map(o => upPre3q(o.q.toAngle)),
+              o4.map(o => upPre4p(o.p.toAngle)),
+              o4.map(o => upPre4q(o.q.toAngle))
+            ).flatten
+          case _                                              =>
+            List(
+              upPre1p(Offset.Zero.p.toAngle),
+              upPre1q(Offset.Zero.q.toAngle),
+              upPre2p(Offset.Zero.p.toAngle),
+              upPre2q(Offset.Zero.q.toAngle),
+              upPre3p(Offset.Zero.p.toAngle),
+              upPre3q(Offset.Zero.q.toAngle),
+              upPre4p(Offset.Zero.p.toAngle),
+              upPre4q(Offset.Zero.q.toAngle)
+            )
+
+      grouped ++ interleaved ++ preImaging
+
+    def deleteCurrentFiltersAndEtms(
+      which: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      // Deleting the exposure-time-mode rows cascades to the filter rows.
+      sql"""
+        DELETE FROM t_exposure_time_mode m
+          WHERE m.c_observation_id IN ${observation_id.list(which.length).values}
+          AND (
+            m.c_role = $exposure_time_mode_role OR
+            (
+              m.c_role = $exposure_time_mode_role AND
+              EXISTS (
+                SELECT 1
+                FROM #${Flamingos2ImagingService.FilterTableName} f
+                WHERE f.c_exposure_time_mode_id = m.c_exposure_time_mode_id
+                  AND f.c_version = ${observing_mode_row_version}
+              )
+            )
+          )
+      """.apply(
+        which.toList,
+        ExposureTimeModeRole.Acquisition,
+        ExposureTimeModeRole.Science,
+        ObservingModeRowVersion.Current
+      )
