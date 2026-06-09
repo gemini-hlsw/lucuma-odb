@@ -11,7 +11,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import lucuma.core.enums.ImagingVariantType
-import lucuma.core.enums.Site
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.TelescopeConfigGeneratorType
 import lucuma.core.geom.OffsetGenerator
@@ -56,10 +55,10 @@ sealed trait TelescopeConfigGeneratorService[F[_]]:
   ): F[Unit]
 
   def resetWhenVariantNotMatching(
-    oids:       NonEmptyList[Observation.Id],
-    site:       Site,
-    newVariant: ImagingVariantType,
-    role:       TelescopeConfigGeneratorRole
+    oids:          NonEmptyList[Observation.Id],
+    modeTableName: String,
+    newVariant:    ImagingVariantType,
+    role:          TelescopeConfigGeneratorRole
   ): F[Unit]
 
   def replace(
@@ -138,15 +137,15 @@ object TelescopeConfigGeneratorService:
         session.exec(Statements.deleteOffsetGenerator(oids, role)) // cascades to enumerated offsets
 
       def resetWhenVariantNotMatching(
-        oids:       NonEmptyList[Observation.Id],
-        site:       Site,
-        newVariant: ImagingVariantType,
-        role:       TelescopeConfigGeneratorRole
+        oids:          NonEmptyList[Observation.Id],
+        modeTableName: String,
+        newVariant:    ImagingVariantType,
+        role:          TelescopeConfigGeneratorRole
       ): F[Unit] =
         session.exec:
           Statements.resetWhenVariantNotMatching(
             oids,
-            GmosImagingService.modeTableName(site),
+            modeTableName,
             newVariant,
             role
           )

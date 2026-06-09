@@ -314,7 +314,7 @@ object GmosImagingService:
                 .telescopeConfigGeneratorService
                 .resetWhenVariantNotMatching(
                   oids,
-                  site,
+                  GmosImagingService.modeTableName(site),
                   variant,
                   role
                 )
