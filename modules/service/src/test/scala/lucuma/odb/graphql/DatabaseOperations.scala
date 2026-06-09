@@ -1280,7 +1280,6 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Flamingos2Imaging =>
-        val offsetsField = offsets.fold("")(offsets => s"explicitSpatialOffsets: $offsets")
         s"""{
           flamingos2Imaging: {
             filters: [
@@ -1290,7 +1289,18 @@ trait DatabaseOperations { this: OdbSuite =>
             explicitReadMode: BRIGHT
             explicitDecker: IMAGING
             explicitReadoutMode: SCIENCE
-            $offsetsField
+            variant: {
+              grouped: {
+                offsets: {
+                  enumerated: {
+                    values: [
+                      { offset: { p: { microarcseconds: 10000000 }, q: { microarcseconds:         0 } } },
+                      { offset: { p: { microarcseconds:        0 }, q: { microarcseconds: -10000000 } } }
+                    ]
+                  }
+                }
+              }
+            }
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>

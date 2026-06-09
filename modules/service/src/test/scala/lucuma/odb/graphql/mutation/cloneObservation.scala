@@ -1432,6 +1432,27 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     readoutMode
                     defaultReadoutMode
                     explicitReadoutMode
+                    variant {
+                      variantType
+                      grouped {
+                        order
+                        skyCount
+                        offsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { microarcseconds }
+                                q { microarcseconds }
+                              }
+                            }
+                          }
+                        }
+                        skyOffsets {
+                          generatorType
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -1456,7 +1477,26 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                       "explicitDecker": "IMAGING",
                       "readoutMode": "SCIENCE",
                       "defaultReadoutMode": "SCIENCE",
-                      "explicitReadoutMode": "SCIENCE"
+                      "explicitReadoutMode": "SCIENCE",
+                      "variant": {
+                        "variantType": "GROUPED",
+                        "grouped": {
+                          "order": "INCREASING",
+                          "skyCount": 0,
+                          "offsets": {
+                            "generatorType": "ENUMERATED",
+                            "enumerated": {
+                              "values": [
+                                { "offset": { "p": { "microarcseconds": 10000000 }, "q": { "microarcseconds": 0 } } },
+                                { "offset": { "p": { "microarcseconds": 0 }, "q": { "microarcseconds": -10000000 } } }
+                              ]
+                            }
+                          },
+                          "skyOffsets": {
+                            "generatorType": "NONE"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -1542,6 +1582,293 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                 }
               """.asRight
             )
+
+  test("clone Flamingos2 imaging observation preserves offset generator"):
+    val inputsAndResults = List(
+      s"""
+        {
+          enumerated: {
+            values: [
+              {
+                offset: {
+                  p: { arcseconds: 10.0 }
+                  q: { arcseconds: 11.0 }
+                }
+                guiding: ENABLED
+              },
+              {
+                offset: {
+                  p: { arcseconds: 12.0 }
+                  q: { arcseconds: 13.0 }
+                }
+                guiding: ENABLED
+              }
+            ]
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": {
+            "values": [
+              {
+                "offset": {
+                  "p": { "arcseconds": 10 },
+                  "q": { "arcseconds": 11 }
+                },
+                "guiding": "ENABLED"
+              },
+              {
+                "offset": {
+                  "p": { "arcseconds": 12 },
+                  "q": { "arcseconds": 13 }
+                },
+                "guiding": "ENABLED"
+              }
+            ]
+          },
+          "uniform": null,
+          "random": null,
+          "spiral": null
+        }
+      """,
+      s"""
+        {
+          uniform: {
+            cornerA: {
+              p: { arcseconds: 14.0 }
+              q: { arcseconds: 15.0 }
+            }
+            cornerB: {
+              p: { arcseconds: 16.0 }
+              q: { arcseconds: 17.0 }
+            }
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": null,
+          "uniform": {
+            "cornerA": {
+              "p": { "arcseconds":  14 },
+              "q": { "arcseconds":  15 }
+            },
+            "cornerB": {
+              "p": { "arcseconds":  16 },
+              "q": { "arcseconds":  17 }
+            }
+          },
+          "random": null,
+          "spiral": null
+        }
+      """,
+      s"""
+        {
+          random: {
+            size: { arcseconds: 18.0 }
+            center: {
+              p: { arcseconds: 19.0 }
+              q: { arcseconds: 20.0 }
+            }
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": null,
+          "uniform": null,
+          "random": {
+            "size": { "arcseconds": 18 },
+            "center": {
+              "p": { "arcseconds": 19 },
+              "q": { "arcseconds": 20 }
+            }
+          },
+          "spiral": null
+        }
+      """,
+      s"""
+        {
+          spiral: {
+            size: { arcseconds: 21.0 }
+            center: {
+              p: { arcseconds: 22.0 }
+              q: { arcseconds: 23.0 }
+            }
+          }
+        }
+      """ -> json"""
+        {
+          "enumerated": null,
+          "uniform": null,
+          "random": null,
+          "spiral": {
+            "size": { "arcseconds": 21 },
+            "center": {
+              "p": { "arcseconds": 22 },
+              "q": { "arcseconds": 23 }
+            }
+          }
+        }
+      """
+    )
+
+    def createObservation(
+      pid: Program.Id,
+      tid: Target.Id,
+      obj: String,
+      sky: String
+    ): IO[Observation.Id] =
+      query(
+        user  = pi,
+        query =
+          s"""
+            mutation {
+              createObservation(input: {
+              programId: "$pid",
+                SET: {
+                  targetEnvironment: {
+                    asterism: ["$tid"]
+                  }
+                  scienceRequirements: ${scienceRequirementsObject(ObservingModeType.Flamingos2Imaging)}
+                  observingMode: {
+                    flamingos2Imaging: {
+                      filters: [
+                        { filter: Y },
+                        { filter: J }
+                      ]
+                      variant: {
+                        grouped: {
+                          offsets: $obj
+                          skyOffsets: $sky
+                        }
+                      }
+                    }
+                  }
+                  constraintSet: {
+                    imageQuality: ${ImageQuality.Preset.PointEight.tag.toScreamingSnakeCase}
+                  }
+                }
+              }) {
+                observation { id }
+              }
+            }
+          """
+        ).map: json =>
+          json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
+
+    inputsAndResults.zip(inputsAndResults.tail).traverse:
+      case ((objIn, objRes), (skyIn, skyRes)) =>
+        createProgramAs(pi).flatMap: pid =>
+          createTargetAs(pi, pid).flatMap: tid =>
+            createObservation(pid, tid, objIn, skyIn).flatMap: oid =>
+              expect(
+                user  = pi,
+                query = s"""
+                  mutation {
+                    cloneObservation(input: {
+                      observationId: "$oid"
+                    }) {
+                      newObservation {
+                        observingMode {
+                          flamingos2Imaging {
+                            variant {
+                              grouped {
+                                offsets {
+                                  enumerated {
+                                    values {
+                                      offset {
+                                        p { arcseconds }
+                                        q { arcseconds }
+                                      }
+                                      guiding
+                                    }
+                                  }
+                                  uniform {
+                                    cornerA {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                    cornerB {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                  random {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                  spiral {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                }
+                                skyOffsets {
+                                  enumerated {
+                                    values {
+                                      offset {
+                                        p { arcseconds }
+                                        q { arcseconds }
+                                      }
+                                      guiding
+                                    }
+                                  }
+                                  uniform {
+                                    cornerA {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                    cornerB {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                  random {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                  spiral {
+                                    size { arcseconds }
+                                    center {
+                                      p { arcseconds }
+                                      q { arcseconds }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = json"""
+                  {
+                    "cloneObservation": {
+                      "newObservation": {
+                        "observingMode": {
+                          "flamingos2Imaging": {
+                            "variant": {
+                              "grouped": {
+                                "offsets": $objRes,
+                                "skyOffsets": $skyRes
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """.asRight
+              )
 
   test("clone IGRINS-2 long slit observation preserves spatial offsets"):
     for {

@@ -120,7 +120,8 @@ object Flamingos2ImagingService:
         etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
       )(using Transaction[F]): F[Unit] =
         session.exec(Statements.clone(observationId, newObservationId))                       *>
-        session.exec(Statements.cloneFiltersAndEtms(observationId, newObservationId, etms))
+          session.exec(Statements.cloneFiltersAndEtms(observationId, newObservationId, etms)) *>
+          services.telescopeConfigGeneratorService.clone(observationId, newObservationId)
 
   object Statements:
 
@@ -203,7 +204,17 @@ object Flamingos2ImagingService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_offsets
+          c_variant,
+          c_wavelength_order,
+          c_sky_count,
+          c_pre_imaging_off1_p,
+          c_pre_imaging_off1_q,
+          c_pre_imaging_off2_p,
+          c_pre_imaging_off2_q,
+          c_pre_imaging_off3_p,
+          c_pre_imaging_off3_q,
+          c_pre_imaging_off4_p,
+          c_pre_imaging_off4_q
         )
         SELECT
           $observation_id,
@@ -212,7 +223,17 @@ object Flamingos2ImagingService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_offsets
+          c_variant,
+          c_wavelength_order,
+          c_sky_count,
+          c_pre_imaging_off1_p,
+          c_pre_imaging_off1_q,
+          c_pre_imaging_off2_p,
+          c_pre_imaging_off2_q,
+          c_pre_imaging_off3_p,
+          c_pre_imaging_off3_q,
+          c_pre_imaging_off4_p,
+          c_pre_imaging_off4_q
         FROM #${Flamingos2ImagingService.ModeTableName}
         WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)
