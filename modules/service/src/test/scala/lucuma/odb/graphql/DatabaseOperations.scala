@@ -808,6 +808,9 @@ trait DatabaseOperations { this: OdbSuite =>
     ): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2LongSlit, iq, offsets, tids*)
 
+  def createFlamingos2ImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2Imaging, ImageQuality.Preset.PointEight, None, tids*)
+
   def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -954,6 +957,15 @@ trait DatabaseOperations { this: OdbSuite =>
 
   protected def scienceRequirementsObject(observingMode: ObservingModeType): String =
     observingMode match
+      case ObservingModeType.Flamingos2Imaging =>
+        """{
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 500.0 }
+            }
+          }
+        }"""
       case ObservingModeType.Flamingos2LongSlit =>
         """{
           exposureTimeMode: {
@@ -1265,6 +1277,20 @@ trait DatabaseOperations { this: OdbSuite =>
               { filter: R_PRIME },
               { filter: G_PRIME }
             ]
+          }
+        }"""
+      case ObservingModeType.Flamingos2Imaging =>
+        val offsetsField = offsets.fold("")(offsets => s"explicitSpatialOffsets: $offsets")
+        s"""{
+          flamingos2Imaging: {
+            filters: [
+              { filter: Y },
+              { filter: J }
+            ]
+            explicitReadMode: BRIGHT
+            explicitDecker: IMAGING
+            explicitReadoutMode: SCIENCE
+            $offsetsField
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>

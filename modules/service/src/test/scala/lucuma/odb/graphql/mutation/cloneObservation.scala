@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ImageQuality
@@ -1410,6 +1411,137 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               )
             )
       } yield ()
+
+  test("clone Flamingos2 imaging observation preserves filters and configuration"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        createFlamingos2ImagingObservationAs(pi, pid, tid).flatMap: oid =>
+          cloneObservationAs(pi, oid).flatMap: oid2 =>
+            val graph =
+              s"""
+              {
+                observingMode {
+                  flamingos2Imaging {
+                    ${filtersQuery("filters")}
+                    ${filtersQuery("initialFilters")}
+                    defaultReadMode
+                    explicitReadMode
+                    decker
+                    defaultDecker
+                    explicitDecker
+                    readoutMode
+                    defaultReadoutMode
+                    explicitReadoutMode
+                  }
+                }
+              }
+              """
+            val expectedMode =
+              json"""
+                {
+                  "observingMode": {
+                    "flamingos2Imaging": {
+                      "filters": [
+                        ${filterJson(Flamingos2Filter.Y, 100, 500)},
+                        ${filterJson(Flamingos2Filter.J, 100, 500)}
+                      ],
+                      "initialFilters": [
+                        ${filterJson(Flamingos2Filter.Y, 100, 500)},
+                        ${filterJson(Flamingos2Filter.J, 100, 500)}
+                      ],
+                      "defaultReadMode": "FAINT",
+                      "explicitReadMode": "BRIGHT",
+                      "decker": "IMAGING",
+                      "defaultDecker": "IMAGING",
+                      "explicitDecker": "IMAGING",
+                      "readoutMode": "SCIENCE",
+                      "defaultReadoutMode": "SCIENCE",
+                      "explicitReadoutMode": "SCIENCE"
+                    }
+                  }
+                }
+              """
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  originalObservation: observation(observationId: "$oid") $graph
+                  newObservation: observation(observationId: "$oid2") $graph
+                }
+              """,
+              expected = Right(
+                json"""
+                  {
+                    "originalObservation": $expectedMode,
+                    "newObservation": $expectedMode
+                  }
+                """
+              )
+            )
+
+  test("clone Flamingos2 imaging observation has independent filters and ETMs"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        createFlamingos2ImagingObservationAs(pi, pid, tid).flatMap: oid =>
+          cloneObservationAs(pi, oid).flatMap: oid2 =>
+            // Deleting the original's observing mode (and its ETMs) must not
+            // affect the clone, proving the clone has its own filter/ETM rows.
+            expect(
+              user  = pi,
+              query = s"""
+                mutation {
+                  updateObservations(input: {
+                    SET: { observingMode: null }
+                    WHERE: { id: { EQ: ${oid.asJson} } }
+                  }) {
+                    observations {
+                      observingMode { mode }
+                    }
+                  }
+                }
+              """,
+              expected = json"""
+                {
+                  "updateObservations": {
+                    "observations": [
+                      { "observingMode": null }
+                    ]
+                  }
+                }
+              """.asRight
+            ) *> expect(
+              user  = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid2") {
+                    observingMode {
+                      flamingos2Imaging {
+                        ${filtersQuery("filters")}
+                        ${filtersQuery("initialFilters")}
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = json"""
+                {
+                  "observation": {
+                    "observingMode": {
+                      "flamingos2Imaging": {
+                        "filters": [
+                          ${filterJson(Flamingos2Filter.Y, 100, 500)},
+                          ${filterJson(Flamingos2Filter.J, 100, 500)}
+                        ],
+                        "initialFilters": [
+                          ${filterJson(Flamingos2Filter.Y, 100, 500)},
+                          ${filterJson(Flamingos2Filter.J, 100, 500)}
+                        ]
+                      }
+                    }
+                  }
+                }
+              """.asRight
+            )
 
   test("clone IGRINS-2 long slit observation preserves spatial offsets"):
     for {
