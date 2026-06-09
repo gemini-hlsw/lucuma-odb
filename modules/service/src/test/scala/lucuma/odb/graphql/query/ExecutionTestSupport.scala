@@ -325,7 +325,7 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
         .toList
 
     Json.obj(
-      "description"  -> UnsplittableAtom.Descripton.value.asJson,
+      "description"  -> UnsplittableAtom.Description.value.asJson,
       "observeClass" -> ObserveClass.Science.tag.toScreamingSnakeCase.asJson,
       "steps"        -> steps.asJson
     )

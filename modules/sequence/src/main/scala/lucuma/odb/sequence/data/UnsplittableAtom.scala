@@ -12,7 +12,7 @@ object UnsplittableAtom:
    * Default title for the single atom that appears in the science sequence of
    * an unsplittable observation.
    */
-  val Descripton: NonEmptyString =
+  val Description: NonEmptyString =
     NonEmptyString.unsafeFrom("Unsplittable Science Atom")
 
   /**

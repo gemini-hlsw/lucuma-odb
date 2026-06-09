@@ -32,5 +32,5 @@ class executionSci_TooLongToBeUnsplittable extends ExecutionTestSupportForGmos:
       expect(
         user     = pi,
         query    = gmosNorthScienceQuery(oid),
-        expected = List("Unsplittable observation contains too many (> 2048) steps.").asLeft
+        expected = List(s"Unsplittable observation contains too many (> ${UnsplittableAtom.StepLimit.value}) steps.").asLeft
       )

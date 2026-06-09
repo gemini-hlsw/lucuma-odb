@@ -52,16 +52,16 @@ object StreamingExecutionConfig:
      */
     def unsplit(
       observationId: Observation.Id,
-      description: NonEmptyString = UnsplittableAtom.Descripton,
+      description: NonEmptyString = UnsplittableAtom.Description,
       stepLimit: PosInt           = UnsplittableAtom.StepLimit
     ): Either[OdbError, StreamingExecutionConfig[Pure, S, D]]  =
-      self.science.toList match
-        case Nil          =>
+      self.science.take(1).toList match
+        case Nil       =>
           self.asRight
-        case head :: tail =>
+        case head :: _ =>
           val allSteps =
-            (Stream.emits(head.steps.toList) ++
-             Stream.emits(tail).flatMap(a => Stream.emits(a.steps.toList)))
+            self.science
+              .flatMap(a => Stream.emits(a.steps.toList))
               .take(stepLimit.value.toLong + 1)
               .toList
           Either.cond(
