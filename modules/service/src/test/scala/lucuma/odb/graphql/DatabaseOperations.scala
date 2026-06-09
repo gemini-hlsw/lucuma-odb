@@ -4384,4 +4384,31 @@ trait DatabaseOperations { this: OdbSuite =>
   |""".stripMargin
   )
 
+  def setIsSplittableAs(
+    user:         User,
+    oid:          Observation.Id,
+    isSplittable: Boolean
+  ): IO[Unit] =
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              schedulingConstraints: {
+                isSplittable: $isSplittable
+              }
+            }
+            WHERE: {
+              id: { EQ: "$oid" }
+            }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
 }

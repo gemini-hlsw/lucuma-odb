@@ -76,6 +76,26 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
+  test("[gnirs] short camera default offsets, exposureCount=3 -> 1 cycle of 4, unsplittable"):
+    for
+      o <- gnirsObs
+      _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      _ <- expect(
+        user     = pi,
+        query    = gnirsScienceQuery(o),
+        expected = expectedUnsplittableExecutionConfig(
+          "gnirs",
+          gnirsExpectedScienceAtom(
+            DynamicSnapshot,
+            (0,  2, Enabled),
+            (0, -4, Enabled),
+            (0, -4, Enabled),
+            (0,  2, Enabled)
+          )
+        ).asRight
+      )
+    yield ()
+
   test("[gnirs] materialized sequence round-trips through t_gnirs_dynamic"):
     // Recording a visit materializes the science sequence into the DB.  The
     // subsequent query must then read it back (via SelectGnirsSequence) and

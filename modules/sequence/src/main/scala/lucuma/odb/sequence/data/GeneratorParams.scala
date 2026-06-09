@@ -23,7 +23,8 @@ case class GeneratorParams(
   calibrationRole:  Option[CalibrationRole],
   declaredState:    Option[DeclaredExecutionState],
   executionState:   ExecutionState,
-  stepCount:        Long
+  stepCount:        Long,
+  isSplittable:     Boolean
 )
 
 object GeneratorParams:
@@ -37,7 +38,8 @@ object GeneratorParams:
         a.calibrationRole,
         a.declaredState,
         a.executionState,
-        a.stepCount
+        a.stepCount,
+        a.isSplittable
       )
 
   given HashBytes[GeneratorParams] with
@@ -49,5 +51,6 @@ object GeneratorParams:
         a.calibrationRole.hashBytes,
         a.declaredState.hashBytes,
         a.executionState.hashBytes,
-        a.stepCount.hashBytes
+        a.stepCount.hashBytes,
+        a.isSplittable.hashBytes
       )
