@@ -231,7 +231,7 @@ object GmosImagingService:
               fs.toList.map: (filter, eid) =>
                 (oid, filter, eid)
           .traverse_ : rs =>
-            session.exec(Statements.insertFilters(filterTableName(site), filterCodec, rs, version))
+            session.exec(ImagingStatements.insertFilters(filterTableName(site), filterCodec, rs, version))
 
       override def deleteNorth(
         which: List[Observation.Id]
@@ -279,7 +279,7 @@ object GmosImagingService:
             NonEmptyList
               .fromList(
                 Statements.commonUpdates(edit.common) ++
-                edit.variant.toList.flatMap(Statements.variantUpdates)
+                edit.variant.toList.flatMap(ImagingStatements.variantUpdates)
                )
               .traverse_ : us =>
                 session.exec:
@@ -291,7 +291,7 @@ object GmosImagingService:
           val filterUpdates =
             edit.filters.fold(ResultT.unit): fs =>
               for
-                _ <- ResultT.liftF(session.exec(Statements.deleteCurrentFiltersAndEtms(filterTableName(site), oids)))
+                _ <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentFiltersAndEtms(filterTableName(site), oids)))
 
                 // Resolve the exposure time modes for acquisition and science
                 r   <- ResultT(services.exposureTimeModeService.resolve(modeName, none, fs.map(f => (f.filter, f.exposureTimeMode)), newRequirement, which))
@@ -639,141 +639,3 @@ object GmosImagingService:
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
         input.explicitRoi.toOptionOption.map(upRoi)
       ).flatten
-
-    def variantUpdates(
-      input: ImagingVariantInput
-    ): List[AppliedFragment] =
-      val upVariant  = sql"c_variant   = $imaging_variant"
-
-      // Sky count requires special handling because it is used by two different
-      // modes.  If we are simply updating an existing mode, then we don't
-      // change the sky count value unless it is explicitly set.  If we are
-      // switching modes, then we reset the value if it is not explicitly set.
-      def upSkyCount(variant: ImagingVariantType, skyCount: Option[NonNegInt]): AppliedFragment =
-        (variant, skyCount) match
-          case (ImagingVariantType.PreImaging, _) =>
-            sql"c_sky_count = $int4_nonneg"(NonNegInt.MinValue)
-
-          case (v, None)                   =>
-            sql"""
-              c_sky_count =
-                CASE
-                  WHEN c_variant = $imaging_variant THEN c_sky_count
-                  ELSE $int4_nonneg
-                END
-            """.apply(v, NonNegInt.MinValue)
-
-          case (_, Some(sc))               =>
-            sql"c_sky_count = $int4_nonneg"(sc)
-
-      def grouped: List[AppliedFragment] =
-        val upOrder = sql"c_wavelength_order = ${wavelength_order}"
-
-        input match
-          case ImagingVariantInput.Grouped(order, _, skyCount, _) =>
-            List(
-              upVariant(ImagingVariantType.Grouped),
-              upSkyCount(ImagingVariantType.Grouped, skyCount)
-            ) ++ order.map(upOrder).toList
-          case _                                                         =>
-            List(upOrder(Variant.Grouped.Default.order))
-
-      def interleaved: List[AppliedFragment] =
-        input match
-          case ImagingVariantInput.Interleaved(_, skyCount, _) =>
-            List(
-              upVariant(ImagingVariantType.Interleaved),
-              upSkyCount(ImagingVariantType.Interleaved, skyCount)
-            )
-          case _                                      =>
-            Nil
-
-      def preImaging: List[AppliedFragment] =
-        val upPre1p = sql"c_pre_imaging_off1_p = ${angle_µas}"
-        val upPre1q = sql"c_pre_imaging_off1_q = ${angle_µas}"
-        val upPre2p = sql"c_pre_imaging_off2_p = ${angle_µas}"
-        val upPre2q = sql"c_pre_imaging_off2_q = ${angle_µas}"
-        val upPre3p = sql"c_pre_imaging_off3_p = ${angle_µas}"
-        val upPre3q = sql"c_pre_imaging_off3_q = ${angle_µas}"
-        val upPre4p = sql"c_pre_imaging_off4_p = ${angle_µas}"
-        val upPre4q = sql"c_pre_imaging_off4_q = ${angle_µas}"
-
-        input match
-          case ImagingVariantInput.PreImaging(o1, o2, o3, o4) =>
-            upSkyCount(ImagingVariantType.PreImaging, None) :: List(
-              upVariant(ImagingVariantType.PreImaging).some,
-              o1.map(o => upPre1p(o.p.toAngle)),
-              o1.map(o => upPre1q(o.q.toAngle)),
-              o2.map(o => upPre2p(o.p.toAngle)),
-              o2.map(o => upPre2q(o.q.toAngle)),
-              o3.map(o => upPre3p(o.p.toAngle)),
-              o3.map(o => upPre3q(o.q.toAngle)),
-              o4.map(o => upPre4p(o.p.toAngle)),
-              o4.map(o => upPre4q(o.q.toAngle))
-            ).flatten
-          case _                                                     =>
-            val zero = Variant.PreImaging.Default
-            List(
-              upPre1p(zero.offset1.p.toAngle),
-              upPre1q(zero.offset1.q.toAngle),
-              upPre2p(zero.offset2.p.toAngle),
-              upPre2q(zero.offset2.q.toAngle),
-              upPre3p(zero.offset3.p.toAngle),
-              upPre3q(zero.offset3.q.toAngle),
-              upPre4p(zero.offset4.p.toAngle),
-              upPre4q(zero.offset4.q.toAngle)
-            )
-
-      grouped ++ interleaved ++ preImaging
-
-
-    def deleteCurrentFiltersAndEtms(
-      tableName: String,
-      which:     NonEmptyList[Observation.Id]
-    ): AppliedFragment =
-      // deletion cascades to the filters
-      sql"""
-        DELETE FROM t_exposure_time_mode m
-          WHERE m.c_observation_id IN ${observation_id.list(which.length).values}
-          AND (
-            m.c_role = $exposure_time_mode_role OR
-            (
-              m.c_role = $exposure_time_mode_role AND
-              EXISTS (
-                SELECT 1
-                FROM #$tableName f
-                WHERE f.c_exposure_time_mode_id = m.c_exposure_time_mode_id
-                  AND f.c_version = ${observing_mode_row_version}
-              )
-            )
-          )
-      """.apply(
-        which.toList,
-        ExposureTimeModeRole.Acquisition,
-        ExposureTimeModeRole.Science,
-        ObservingModeRowVersion.Current
-      )
-
-    def insertFilters[L](
-      tableName:   String,
-      filterCodec: Codec[L],
-      rows:        NonEmptyList[(Observation.Id, L, ExposureTimeModeId)],
-      version:     ObservingModeRowVersion
-    ): AppliedFragment =
-      def insertFilters: AppliedFragment =
-        sql"""
-          INSERT INTO #$tableName (
-            c_observation_id,
-            c_filter,
-            c_version,
-            c_exposure_time_mode_id
-          ) VALUES
-        """(Void)
-
-      def filterEntries =
-        rows.map: (oid, filter, eid) =>
-          sql"""($observation_id, $filterCodec, $observing_mode_row_version, $exposure_time_mode_id)"""(oid, filter, version, eid)
-
-      val filterValues: AppliedFragment = filterEntries.intercalate(void", ")
-
-      insertFilters |+| filterValues
