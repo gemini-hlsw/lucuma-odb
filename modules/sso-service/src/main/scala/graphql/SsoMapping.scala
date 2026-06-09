@@ -222,7 +222,7 @@ object SsoMapping {
                     Result.fromOption(lucuma.core.model.User.Id.parse(id), s"Not a valid user id: $id"),
                     Result.fromOption(RT.parse(roleType), s"Not a valid role type: $roleType"),
                     pValue match
-                      case EnumValue(name) => Result.fromOption(Partner.values.find(_.tag.equalsIgnoreCase(id)), s"Not a valid partner: $id").map(_.some)
+                      case EnumValue(name) => Result.fromOption(Partner.values.find(_.tag.equalsIgnoreCase(name)), s"Not a valid partner: $name").map(_.some)
                       case AbsentValue | NullValue => Result.success(None)
                       case _ => Result.internalError("Unpossible; validation should disallow these cases.")                
                   ) .parTupled
