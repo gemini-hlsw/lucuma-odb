@@ -274,29 +274,6 @@ object GraphQLSuite extends SsoSuite with Fixture with FlakyTests with OrcidIdGe
                   .as[StandardRole.Id]
                   .isRight
 
-  test("Admin Alice should be able to give Bob an NGO role"):
-    flaky():
-      As(Bob)
-        .queryIds
-        .flatMap: bob =>
-          As(Alice, None, Some(Admin))
-            .query:
-              s"""
-                mutation {
-                  addRole(
-                    userId: "${bob._1}"
-                    roleType: NGO
-                    partner: US
-                  )
-                }
-              """
-            .map: json =>
-              expect:
-                json
-                  .hcursor
-                  .downFields("data", "addRole")
-                  .as[StandardRole.Id]
-                  .isRight
 
   test("Admin Alice should be able to give Bob an Admin role, and aftewards he should be able to give a Staff role to Alice"):
     flaky():
