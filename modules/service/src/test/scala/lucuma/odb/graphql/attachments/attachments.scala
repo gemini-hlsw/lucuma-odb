@@ -16,8 +16,9 @@ import lucuma.core.model.User
 import lucuma.odb.FMain
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.util.Codecs.*
-import natchez.Trace.Implicits.noop
 import org.http4s.*
+import org.typelevel.otel4s.metrics.Meter.Implicits.noop
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.*
 import skunk.syntax.all.*
 

@@ -48,7 +48,7 @@ trait Phase0Table[A] {
     s"COPY $name ( ${(indexColumn :: columns).mkString("\n", ",", "\n")} ) FROM STDIN WITH ( DELIMITER '|', NULL 'NULL' )"
 
   def stdinLine(a: A, index: PosInt): String =
-    (int4_pos *: encoder).encode((index, a)).map(_.getOrElse("NULL")).intercalate("|")
+    (int4_pos *: encoder).encode((index, a)).map(_.fold("NULL")(_.value)).intercalate("|")
 
   def deleteFrom(inst: Instrument): String =
     s"""

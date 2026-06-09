@@ -42,7 +42,7 @@ class SmartGcalLoader[A](
       files
         .map { case (name, is) => fs2.io.readInputStream(is, ByteChunkSize, closeAfterUse = true).through(pipe(name)) }
         .reduce
-        .map(a => encoder.encode(a).map(_.getOrElse("NULL")).intercalate("|"))
+        .map(a => encoder.encode(a).map(_.fold("NULL")(_.value)).intercalate("|"))
         .append(Stream("\\.\n"))
         .intersperse("\n")
         .through(fs2.text.utf8.encode)

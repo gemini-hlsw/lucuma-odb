@@ -49,6 +49,7 @@ import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -177,21 +178,13 @@ object FMain extends MainParams {
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Trace: Network: Console: Logger](
+  def databasePoolResource[F[_]: Temporal: Tracer: Meter: Network: Console: Logger](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] =
     Resource.eval(AtomicCell[F].of(config.maxConnections)).flatMap: cell =>
-      Session.pooled(
-        host     = config.host,
-        port     = config.port,
-        user     = config.user,
-        password = Some(config.password),
-        database = config.database,
-        ssl      = SSL.Trusted.withFallback(true),
-        max      = config.maxConnections,
-        strategy = Strategy.SearchPath,
-        // debug    = true,
-      ).map: rsrc =>
+      dbSessionBuilder(config)
+        .pooled(config.maxConnections)
+      .map: rsrc =>
         rsrc
           .preAllocate(cell.updateAndGet(_ - 1).flatMap(n => Logger[F].debug(s"acquiring session (should be $n remaining)")))
           .onFinalize(cell.updateAndGet(_ + 1).flatMap(n => Logger[F].debug(s"released session (should be $n remaining)")))
@@ -208,7 +201,7 @@ object FMain extends MainParams {
       .resource
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Compression: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Compression: Async: Parallel: Trace: Tracer: TracerProvider: Meter: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(
@@ -230,7 +223,7 @@ object FMain extends MainParams {
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: Meter: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     databaseConfig:       Config.Database,
     awsConfig:            Config.Aws,
     emailConfig:          Config.Email,
@@ -284,23 +277,26 @@ object FMain extends MainParams {
         .migrate()
     }
 
-  def singleSession[F[_]: Async: Console: Network](
+  private def dbSessionBuilder[F[_]: Temporal: Console: Network: Meter](
+    config: Config.Database,
+    database: Option[String] = None
+  ) =
+    Session.Builder[F]
+      .withHost(config.host)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password)
+      .withDatabase(database.getOrElse(config.database))
+      .withSSL(SSL.Trusted.withFallback(true))
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      // .withDebug(true)
+
+  def singleSession[F[_]: Temporal: Console: Network](
     config:   Config.Database,
     database: Option[String] = None
-  ): Resource[F, Session[F]] = {
-
-    import natchez.Trace.Implicits.noop
-
-    Session.single[F](
-      host     = config.host,
-      port     = config.port,
-      user     = config.user,
-      database = database.getOrElse(config.database),
-      password = config.password.some,
-      ssl      = SSL.Trusted.withFallback(true),
-      strategy = Strategy.SearchPath
-    )
-  }
+  ): Resource[F, Session[F]] =
+    import Meter.Implicits.noop
+    import Tracer.Implicits.noop
+    dbSessionBuilder(config, database).single
 
   def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {
 
@@ -345,6 +341,7 @@ object FMain extends MainParams {
       ot <- OdbTelemetry.otel(ServiceName, c)
       given Tracer[F]         = ot.tracer
       given Trace[F]          = ot.trace
+      given Meter[F]          = ot.meter
       given TracerProvider[F] = ot.tracerProvider
       given MeterProvider[F]  = ot.meterProvider
       ap <- routesResource(c).map(_.map(_.orNotFound))
