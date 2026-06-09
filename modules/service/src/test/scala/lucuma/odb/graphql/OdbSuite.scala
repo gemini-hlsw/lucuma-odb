@@ -104,6 +104,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -405,7 +406,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val horizonsClient: HorizonsClient[IO] =
     HorizonsClient.forTesting(horizonsFixture)
 
-  private def httpApp(using Trace[IO], Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(using Tracer[IO], TracerProvider[IO], Meter[IO], MeterProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -425,7 +426,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
-  def mapping(using Trace[IO], Tracer[IO]): Resource[IO, Mapping[IO]] =
+  def mapping(using Tracer[IO], Meter[IO]): Resource[IO, Mapping[IO]] =
     for {
       db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
@@ -443,12 +444,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def tracerProvider: Resource[IO, TracerProvider[IO]] =
     Resource.pure(TracerProvider.noop)
 
+  protected def meterProvider: Resource[IO, MeterProvider[IO]] =
+    Resource.pure(MeterProvider.noop)
+
   protected def server: Resource[IO, Server] =
     for {
       given Trace[IO]          <- trace
       given TracerProvider[IO] <- tracerProvider
       given Tracer[IO]         <- tracerProvider.evalMap(_.get("test-tracer"))
-      given MeterProvider[IO]   = MeterProvider.noop[IO]
+      given MeterProvider[IO]  <- meterProvider
+      given Meter[IO]          <- meterProvider.evalMap(_.get("test-meter"))
       a                        <- httpApp
       s                        <- BlazeServerBuilder[IO]
                                     .withHttpWebSocketApp(a)
@@ -524,7 +529,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     super.beforeAll()
 
     dbInitialization.foreach { init =>
-      import Trace.Implicits.noop
+      import Tracer.Implicits.noop
+      import Meter.Implicits.noop
       FMain
         .databasePoolResource[IO](databaseConfig)
         .flatten
@@ -744,8 +750,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     }
 
   def servicesFor(u: User): Resource[IO, Session[IO] => Services[IO]] =
-    import Trace.Implicits.noop
     import Tracer.Implicits.noop
+    import Meter.Implicits.noop
 
     for
       db   <- FMain.databasePoolResource[IO](databaseConfig)
@@ -790,8 +796,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // to perform the observation workflow calculation (which uses the configuration service
   // which in turn does a GraphQL call).
   def withServicesForObscalc[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
-    import Trace.Implicits.noop
     import Tracer.Implicits.noop
+    import Meter.Implicits.noop
 
     val res =
       for

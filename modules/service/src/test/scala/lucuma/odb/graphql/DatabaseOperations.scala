@@ -84,7 +84,8 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
-import natchez.Trace.Implicits.noop
+import org.typelevel.otel4s.metrics.Meter.Implicits.noop
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.syntax.all.*

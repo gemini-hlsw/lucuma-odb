@@ -6,6 +6,7 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GnirsCodecs.*
+import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
 trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
@@ -72,3 +73,6 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     // Effective grating/prism: COALESCE(explicit, initial)
     val GratingEffective: ColumnRef = col("c_grating_effective", gnirs_grating)
     val PrismEffective: ColumnRef   = col("c_prism_effective", gnirs_prism)
+
+    // Telluric type (stored as jsonb)
+    val TelluricType: ColumnRef     = col("c_telluric_type", jsonb)

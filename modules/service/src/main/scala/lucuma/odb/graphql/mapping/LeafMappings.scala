@@ -18,6 +18,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ImagingCapability
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -138,7 +139,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GmosCustomSlitWidth](GmosCustomSlitWidthType),
       LeafMapping[GmosDtax](GmosDtaxType),
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
-      LeafMapping[GmosImagingVariantType](GmosImagingVariantTypeType),
+      LeafMapping[ImagingVariantType](ImagingVariantTypeType),
       LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),

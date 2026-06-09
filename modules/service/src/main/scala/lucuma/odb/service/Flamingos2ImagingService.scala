@@ -6,18 +6,25 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.WavelengthOrder
+import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
+import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
+import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.Flamingos2ImagingInput
+import lucuma.odb.graphql.input.ImagingVariantInput
+import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import monocle.Optional
 import skunk.*
-import skunk.codec.text.text
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -64,6 +71,15 @@ object Flamingos2ImagingService:
         reqEtm: Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
+
+        def offsetInput(
+          in: Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]]
+        ): TelescopeConfigGeneratorInput =
+          in.getOption(input.variant).flatMap(_.toOption).getOrElse(TelescopeConfigGeneratorInput.NoGeneratorInput)
+
+        val offsets    = offsetInput(ImagingVariantInput.offsets)
+        val skyOffsets = offsetInput(ImagingVariantInput.skyOffsets)
+
         NonEmptyList
           .fromList(which)
           .fold(ResultT.unit[F]): oids =>
@@ -80,6 +96,10 @@ object Flamingos2ImagingService:
               // Insert the science filters
               cur <- ResultT.liftF(services.exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
               _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
+
+              // Insert the offset generators
+              _   <- ResultT.liftF(services.telescopeConfigGeneratorService.insert(oids, offsets, TelescopeConfigGeneratorRole.Object))
+              _   <- ResultT.liftF(services.telescopeConfigGeneratorService.insert(oids, skyOffsets, TelescopeConfigGeneratorRole.Sky))
             yield ()
           .value
 
@@ -103,7 +123,13 @@ object Flamingos2ImagingService:
             ${flamingos_2_reads.opt},
             ${flamingos_2_decker.opt},
             ${flamingos_2_readout_mode.opt},
-            ${text.opt}
+            $imaging_variant,
+            $wavelength_order,
+            $int4_nonneg,
+            $offset,
+            $offset,
+            $offset,
+            $offset
           )"""(
             oid,
             oid,
@@ -111,7 +137,13 @@ object Flamingos2ImagingService:
             input.explicitReads,
             input.explicitDecker,
             input.explicitReadoutMode,
-            input.formattedOffsets
+            input.variant.variantType,
+            ImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(WavelengthOrder.Increasing),
+            ImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset1).getOrElse(Offset.Zero),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset2).getOrElse(Offset.Zero),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset3).getOrElse(Offset.Zero),
+            ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset4).getOrElse(Offset.Zero)
           )
 
       sql"""
@@ -122,7 +154,17 @@ object Flamingos2ImagingService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_offsets
+          c_variant,
+          c_wavelength_order,
+          c_sky_count,
+          c_pre_imaging_off1_p,
+          c_pre_imaging_off1_q,
+          c_pre_imaging_off2_p,
+          c_pre_imaging_off2_q,
+          c_pre_imaging_off3_p,
+          c_pre_imaging_off3_q,
+          c_pre_imaging_off4_p,
+          c_pre_imaging_off4_q
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
 

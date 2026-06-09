@@ -6,5 +6,5 @@ package resource.model
 import lucuma.core.util.Enumerated
 
 enum TelescopeAvailability(val tag: String) derives Enumerated:
-  case Open   extends TelescopeAvailability("OPEN")
-  case Closed extends TelescopeAvailability("CLOSED")
+  case Open   extends TelescopeAvailability("Open")
+  case Closed extends TelescopeAvailability("Closed")

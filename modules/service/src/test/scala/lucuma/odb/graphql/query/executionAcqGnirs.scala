@@ -90,20 +90,33 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
   def tc(pArc: Int, qArc: Int, guiding: StepGuideState): TelescopeConfig =
     telescopeConfig(pArc, qArc, guiding)
 
-  def slitImgStep(expUs: Long, coadds: Int, filter: String, readMode: String) =
-    acqStep(expUs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
+  def slitImgStep(expµs: Long, coadds: Int, filter: String, readMode: String) =
+    acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
       tc(10, 0, StepGuideState.Disabled))
 
-  def fieldStep(expUs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int) =
-    acqStep(expUs, coadds, filter, "ACQUISITION", none, "ACQUISITION".some, readMode,
+  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int) =
+    acqStep(expµs, coadds, filter, "ACQUISITION", none, "ACQUISITION".some, readMode,
       tc(pArc, qArc, StepGuideState.Enabled))
 
-  def throughSlitStep(expUs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
-    acqStep(expUs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
+  def throughSlitStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
+    acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
       tc(pArc, qArc, StepGuideState.Enabled), breakpoint)
 
+  // Fixed FPU-image (first acquisition step) exposure times for the short camera
+  // (SHORT_BLUE): X=10s, J=15s, H=3s, K=3s. All fall in the BRIGHT read-mode range.
+  val XShortµs: Long = 10_000_000L
+  val JShortµs: Long = 15_000_000L
+  val HShortµs: Long =  3_000_000L
+  val KShortµs: Long =  3_000_000L
+
+  // Fixed FPU-image exposure times for the long camera (LONG_BLUE): H=15s, K=15s (both
+  // BRIGHT), PAH=0.5s (VERY_BRIGHT). X, J and H2 all fall back to H (15s) on the long camera.
+  val HLongµs:   Long = 15_000_000L
+  val KLongµs:   Long = 15_000_000L
+  val PahLongµs: Long =    500_000L
+
   // 5_000_000 µs = 5 s  → Bright (1s < 5s ≤ 10s), readMode=BRIGHT
-  val BrightUs: Long = 5_000_000L
+  val Brightµs: Long = 5_000_000L
 
   test("Bright acquisition — initial atom (3 steps, no sky)"):
     val setup: IO[Observation.Id] =
@@ -128,9 +141,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                     "description": "Initial Acquisition",
                     "observeClass": "ACQUISITION",
                     "steps": [
-                      ${slitImgStep(BrightUs, 1, "ORDER4", "BRIGHT")},
-                      ${fieldStep(BrightUs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                      ${throughSlitStep(BrightUs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
+                      ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
+                      ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
+                      ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
                     ]
                   },
                   "possibleFuture": ${brightFineAdjustments(RepeatingAtomCount)},
@@ -149,14 +162,14 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
           "description": "Fine Adjustments",
           "observeClass": "ACQUISITION",
           "steps": [
-            ${throughSlitStep(BrightUs, 1, "ORDER4", "BRIGHT", 0, 0)}
+            ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)}
           ]
         }
       """
     .asJson
 
   // 30_000_000 µs = 30 s → Faint (> 10s), readMode=FAINT
-  val FaintUs: Long = 30_000_000L
+  val Faintµs: Long = 30_000_000L
 
   test("Faint acquisition with sky offset — initial atom (5 steps with sky subtraction)"):
     val setup: IO[Observation.Id] =
@@ -182,11 +195,11 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                     "description": "Initial Acquisition",
                     "observeClass": "ACQUISITION",
                     "steps": [
-                      ${slitImgStep(FaintUs, 1, "ORDER4", "FAINT")},
-                      ${fieldStep(FaintUs, 1, "ORDER4", "FAINT", 0, 10)},
-                      ${fieldStep(FaintUs, 1, "ORDER4", "FAINT", 0, 0)},
-                      ${throughSlitStep(FaintUs, 1, "ORDER4", "FAINT", 0, 10)},
-                      ${throughSlitStep(FaintUs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")}
+                      ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
+                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
+                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
+                      ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
+                      ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")}
                     ]
                   },
                   "possibleFuture": ${faintFineAdjustments(RepeatingAtomCount)},
@@ -205,14 +218,14 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
           "description": "Fine Adjustments",
           "observeClass": "ACQUISITION",
           "steps": [
-            ${throughSlitStep(FaintUs, 1, "ORDER4", "FAINT", 0, 0)}
+            ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)}
           ]
         }
       """
     .asJson
 
   // 500_000 µs = 0.5 s → VeryBright (< 1s), readMode=VERY_BRIGHT
-  val VeryBrightUs: Long = 500_000L
+  val VeryBrightµs: Long = 500_000L
 
   test("VeryBright acquisition (< 1s) — VERY_BRIGHT readMode"):
     val setup: IO[Observation.Id] =
@@ -251,15 +264,15 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                   "nextAtom": {
                     "steps": [
                       {
-                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightUs }, "readMode": "VERY_BRIGHT", "filter": "ORDER4" },
+                        "instrumentConfig": { "exposure": { "microseconds": $HShortµs }, "readMode": "BRIGHT", "filter": "ORDER4" },
                         "telescopeConfig": { "offset": { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "DISABLED" }
                       },
                       {
-                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightUs }, "readMode": "VERY_BRIGHT", "filter": "H2" },
+                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightµs }, "readMode": "VERY_BRIGHT", "filter": "H2" },
                         "telescopeConfig": { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
                       },
                       {
-                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightUs }, "readMode": "VERY_BRIGHT", "filter": "H2" },
+                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightµs }, "readMode": "VERY_BRIGHT", "filter": "H2" },
                         "telescopeConfig": { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
                       }
                     ]
@@ -299,8 +312,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       yield o
 
     // 5s exposure × 7 coadds = 35s integration ≥ 10s ⇒ AUTO resolves to FAINT
-    // (a sky frame is added, so 5 steps); every step takes its coadds from the
-    // acquisition config (7), not from the ITC.
+    // (a sky frame is added, so 5 steps); every step except the FPU image takes its
+    // coadds from the acquisition config (7), not from the ITC. The FPU image (first
+    // step) always uses a single coadd.
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -326,7 +340,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                 "acquisition": {
                   "nextAtom": {
                     "steps": [
-                      { "instrumentConfig": { "coadds": 7 } },
+                      { "instrumentConfig": { "coadds": 1 } },
                       { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } },
@@ -339,3 +353,117 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
           }
         """.asRight
       )
+
+  // Focused query checking the first-atom step exposure/coadds/filter/readMode.
+  def firstAtomConfigQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        executionConfig(observationId: "$oid") {
+          gnirs { acquisition { nextAtom { steps {
+            instrumentConfig { exposure { microseconds } coadds filter readMode }
+          } } } }
+        }
+      }
+    """
+
+  def firstAtomConfig(expµs: Long, coadds: Int, filter: String, readMode: String): Json =
+    json"""{ "instrumentConfig": { "exposure": { "microseconds": $expµs }, "coadds": $coadds, "filter": $filter, "readMode": $readMode } }"""
+
+  // The FPU image (first step) filter and exposure as a function of (camera, selected
+  // acquisition filter), in Bright mode (5s ITC). The first step always uses 1 coadd and
+  // a read mode derived from its fixed exposure; the remaining steps keep the selected
+  // filter and the ITC exposure/coadds (BRIGHT). Columns:
+  //   camera, selected filter, FPU-image filter, FPU-image exposure µs, FPU-image readMode
+  List(
+    // Short camera: X=10s, J=15s, H=3s, K=3s, H2→H(3s). All BRIGHT.
+    ("SHORT_BLUE", "ORDER6", "ORDER6", XShortµs,  "BRIGHT"),      // X stays X
+    ("SHORT_BLUE", "J",      "J",      JShortµs,  "BRIGHT"),      // J stays J
+    ("SHORT_BLUE", "ORDER4", "ORDER4", HShortµs,  "BRIGHT"),      // H
+    ("SHORT_BLUE", "K",      "K",      KShortµs,  "BRIGHT"),      // K stays K
+    ("SHORT_BLUE", "H2",     "ORDER4", HShortµs,  "BRIGHT"),      // H2 → H
+    // Long camera: X→H, J→H, H=15s, K=15s, H2→H(15s), PAH=0.5s.
+    ("LONG_BLUE",  "ORDER6", "ORDER4", HLongµs,   "BRIGHT"),      // X → H
+    ("LONG_BLUE",  "J",      "ORDER4", HLongµs,   "BRIGHT"),      // J → H
+    ("LONG_BLUE",  "ORDER4", "ORDER4", HLongµs,   "BRIGHT"),      // H
+    ("LONG_BLUE",  "K",      "K",      KLongµs,   "BRIGHT"),      // K stays K
+    ("LONG_BLUE",  "H2",     "ORDER4", HLongµs,   "BRIGHT"),      // H2 → H
+    ("LONG_BLUE",  "PAH",    "PAH",    PahLongµs, "VERY_BRIGHT")  // PAH, 0.5s ⇒ VERY_BRIGHT
+  ).foreach: (camera, selected, fpuFilter, fpuµs, fpuReadMode) =>
+    test(s"$camera Bright acquisition with $selected filter — FPU image filter/exposure"):
+      val setup: IO[Observation.Id] =
+        for
+          p <- createProgram
+          t <- createTargetWithProfileAs(pi, p)
+          o <- createGnirsLongSlitObservationAs(pi, p, t)
+          _ <- setCamera(o, camera)
+          _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+          _ <- setAcquisitionFilter(o, selected)
+        yield o
+
+      setup.flatMap: oid =>
+        expect(
+          user     = pi,
+          query    = firstAtomConfigQuery(oid),
+          expected = json"""
+            {
+              "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
+                ${firstAtomConfig(fpuµs,    1, fpuFilter, fpuReadMode)},
+                ${firstAtomConfig(Brightµs, 1, selected,  "BRIGHT")},
+                ${firstAtomConfig(Brightµs, 1, selected,  "BRIGHT")}
+              ] } } } }
+            }
+          """.asRight
+        )
+
+  test("VeryBright acquisition forces the FPU image to H even with an explicit non-H filter"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionTimeAndCount(o, 0.5, 1, 1645) // 0.5s ⇒ VeryBright
+        _ <- setAcquisitionFilter(o, "ORDER6")           // X would otherwise be 10s on the short camera
+      yield o
+
+    // VeryBright always images the FPU in H (Order4) at the short-camera H exposure (3s);
+    // the remaining steps still use the selected X filter at the ITC (VeryBright) exposure.
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = firstAtomConfigQuery(oid),
+        expected = json"""
+          {
+            "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
+              ${firstAtomConfig(HShortµs,     1, "ORDER4", "BRIGHT")},
+              ${firstAtomConfig(VeryBrightµs, 1, "ORDER6", "VERY_BRIGHT")},
+              ${firstAtomConfig(VeryBrightµs, 1, "ORDER6", "VERY_BRIGHT")}
+            ] } } } }
+          }
+        """.asRight
+      )
+
+  // PAH on the short camera is always an error, regardless of mode (including VeryBright,
+  // which otherwise images the FPU in H). Columns: ITC seconds, acquisition-type label.
+  List(
+    (5.0, "Bright"),     // 5s   ⇒ Bright
+    (30.0, "Faint"),     // 30s  ⇒ Faint
+    (0.5, "Very Bright") // 0.5s ⇒ VeryBright
+  ).foreach: (seconds, acqType) =>
+    test(s"PAH acquisition filter cannot be used with the short camera ($acqType)"):
+      val setup: IO[Observation.Id] =
+        for
+          p <- createProgram
+          t <- createTargetWithProfileAs(pi, p)
+          o <- createGnirsLongSlitObservationAs(pi, p, t)
+          _ <- setAcquisitionTimeAndCount(o, seconds, 1, 1645)
+          _ <- setAcquisitionFilter(o, "PAH")
+        yield o
+
+      setup.flatMap: oid =>
+        expect(
+          user     = pi,
+          query    = firstAtomConfigQuery(oid),
+          expected = List(
+            s"Could not generate a sequence for $oid: PAH acquisition filter cannot be used with short camera"
+          ).asLeft
+        )

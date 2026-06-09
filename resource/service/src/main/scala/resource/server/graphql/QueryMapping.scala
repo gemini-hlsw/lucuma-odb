@@ -3,56 +3,53 @@
 
 package resource.server.graphql
 
-import cats.effect.Sync
 import cats.syntax.all.*
+import grackle.Predicate.*
+import grackle.Query.*
 import grackle.QueryCompiler.Elab
-import grackle.Result
-import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.Site
 import lucuma.odb.graphql.binding.*
-import resource.model.*
-import resource.server.DummyData
+import org.typelevel.cats.time.*
+import resource.server.graphql.table.*
 
-import java.time.LocalDate
-
-trait QueryMapping[F[_]: Sync] extends BaseMapping[F] {
+trait QueryMapping[F[_]] extends TelescopeNightTimelineTable[F] {
 
   private val SiteParam           = "site"
   private val ObservingNightParam = "observingNight"
 
-  val QueryType: TypeRef = schema.ref("Query")
-
   lazy val QueryMapping: ObjectMapping =
     ObjectMapping(QueryType)(
-      RootEffect.computeEncodable("telescopeNightTimeline")(telescopeNightTimeline)
+      SqlObject("telescopeNightTimeline")
     )
 
   lazy val QueryElaborator: ElaboratorPF = List(
     TelescopeNightTimelineE
   ).combineAll
 
-  val telescopeNightTimeline: ComputeF[Option[TelescopeNightTimeline]] = (_, env) =>
-    (env.getR[Site](SiteParam), env.getR[LocalDate](ObservingNightParam))
-      .mapN: (site, observingNight) =>
-        DummyData.mockTelescopeNightTimelines
-          .find(t => t.site === site && t.observingNight.equals(observingNight))
-      .pure[F]
-
   private lazy val TelescopeNightTimelineE: ElaboratorPF =
-    case (QueryType,
-          "telescopeNightTimeline",
-          List(
-            SiteBinding(SiteParam, rSite),
-            DateBinding(ObservingNightParam, rObservingNight)
-          )
-        ) =>
-      Elab
-        .liftR((rSite, rObservingNight).parTupled)
-        .flatMap: (site, observingNight) =>
-          Elab.env(
-            SiteParam           -> site,
-            ObservingNightParam -> observingNight
-          )
+    case (QueryType, "telescopeNightTimeline", args) =>
+      val rSite           = SiteBinding.unapply(args.find(_.name == SiteParam).get) match {
+        case Some((_, r)) => r
+      }
+      val rObservingNight =
+        DateBinding.unapply(args.find(_.name == ObservingNightParam).get) match {
+          case Some((_, r)) => r
+        }
+      Elab.transformChild { child =>
+        rSite.flatMap { site =>
+          rObservingNight.map { observingNight =>
+            Unique(
+              Filter(
+                And(
+                  Eql(TelescopeNightTimelineType / "site", Const(site)),
+                  Eql(TelescopeNightTimelineType / "observingNight", Const(observingNight))
+                ),
+                child
+              )
+            )
+          }
+        }
+      }
 
 }

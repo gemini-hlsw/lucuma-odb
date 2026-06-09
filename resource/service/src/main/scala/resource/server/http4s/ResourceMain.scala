@@ -7,6 +7,7 @@ import buildinfo.BuildInfo
 import cats.effect.*
 import cats.effect.std.Console
 import cats.effect.syntax.all.*
+import cats.syntax.all.*
 import com.comcast.ip4s.*
 import fs2.*
 import fs2.compression.Compression
@@ -16,12 +17,14 @@ import grackle.Schema
 import grackle.skunk.SkunkMonitor
 import lucuma.otel.OtelSetup
 import natchez.Trace
+import org.flywaydb.core.Flyway
 import org.http4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -34,9 +37,13 @@ object ResourceMain extends IOApp.Simple {
 
   def webServer[F[_]: {Async, LiftIO, Compression, Console, Files, Network}]: Resource[F, Server] =
     for
-      given Logger[F]         = Slf4jLogger.getLoggerFromName[F]("resource")
-      conf                   <- ResourceConfiguration.fromCiris.load[F].toResource
-      _                      <- printBanner(conf).toResource
+      given Logger[F] = Slf4jLogger.getLoggerFromName[F]("resource")
+      conf           <- ResourceConfiguration.fromCiris.load[F].toResource
+      _              <- printBanner(conf).toResource
+
+      _ <- resetDatabase(conf.database).toResource
+      _ <- migrateDatabase(conf.database.jdbcUrl, conf.database).toResource
+
       otel                   <- OtelSetup.resource(
                                   "lucuma-resource",
                                   BuildInfo.gitHeadCommit.getOrElse("000000"),
@@ -44,6 +51,7 @@ object ResourceMain extends IOApp.Simple {
                                 )
       given Trace[F]          = otel.trace
       given Tracer[F]         = otel.tracer
+      given Meter[F]          = otel.meter
       given TracerProvider[F] = otel.tracerProvider
       given MeterProvider[F]  = otel.meterProvider
       r                      <- routesResource[F](conf.database)
@@ -60,7 +68,7 @@ object ResourceMain extends IOApp.Simple {
   )
 
   def routesResource[
-    F[_]: {Async, Trace, Tracer, TracerProvider, MeterProvider, Logger, Console, Network, Files,
+    F[_]: {Async, Tracer, TracerProvider, Meter, MeterProvider, Logger, Console, Network, Files,
       Compression}
   ](
     databaseConfig: DatabaseConfiguration
@@ -82,18 +90,36 @@ object ResourceMain extends IOApp.Simple {
     .withHttpWebSocketApp(wsb => app(wsb).orNotFound)
     .build
 
-  def databasePool[F[_]: {Temporal, Trace, Console, Network}](
+  def databasePool[F[_]: {Temporal, Tracer, Meter, Console, Network}](
     config: DatabaseConfiguration
   ): Resource[F, Resource[F, Session[F]]] =
-    Session.pooled[F](
-      host = config.host.renderString,
-      port = config.port.value,
-      user = config.user,
-      password = Some(config.password),
-      database = config.database,
-      ssl = SSL.Trusted.withFallback(true),
-      max = config.maxConnections
-    )
+    Session
+      .Builder[F]
+      .withHost(config.host.renderString)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password)
+      .withDatabase(config.database)
+      .withSSL(SSL.Trusted.withFallback(true))
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      // .withDebug(true)
+      .pooled(config.maxConnections)
+
+  def singleSession[F[_]: {Temporal, Console, Network}](
+    config:   DatabaseConfiguration,
+    database: Option[String] = None
+  ): Resource[F, Session[F]] =
+    import Meter.Implicits.noop
+    import Tracer.Implicits.noop
+    Session
+      .Builder[F]
+      .withHost(config.host.renderString)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password)
+      .withDatabase(database.getOrElse(config.database))
+      .withSSL(SSL.Trusted.withFallback(true))
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      // .withDebug(true)
+      .single
 
   private def printBanner[F[_]: {Logger as L}](conf: ResourceConfiguration): F[Unit] = {
     val runtime    = Runtime.getRuntime
@@ -129,5 +155,45 @@ object ResourceMain extends IOApp.Simple {
 
     L.info(banner + msg)
   }
+
+  /**
+   * Drop and recreate the database.
+   */
+  def resetDatabase[F[_]: {Temporal, Console, Network, Logger}](
+    config: DatabaseConfiguration
+  ): F[Unit] =
+    import skunk.*
+    import skunk.implicits.*
+
+    val drop   = sql"""DROP DATABASE IF EXISTS "#${config.database}"""".command
+    val create = sql"""CREATE DATABASE "#${config.database}"""".command
+
+    (Logger[F].warn(s"Resetting database '${config.database}'") *>
+      singleSession(config, "postgres".some).use: s =>
+        s.execute(drop) *>
+          s.execute(create).void).whenA(config.resetDatabase)
+
+  /**
+   * A startup action that runs database migrations using Flyway.
+   */
+  def migrateDatabase[F[_]: {Sync, Logger}](
+    jdbcUrl: String,
+    config:  DatabaseConfiguration
+  ): F[Unit] =
+    Sync[F]
+      .delay {
+        Flyway
+          .configure()
+          .loggers("slf4j")
+          .dataSource(jdbcUrl, config.user, config.password)
+          .baselineOnMigrate(true)
+          .load()
+          .migrate()
+      }
+      .flatMap: result =>
+        Logger[F].info(
+          s"Database migration completed with ${result.migrationsExecuted} migrations applied"
+        )
+      .unlessA(config.skipMigration)
 
 }

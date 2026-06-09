@@ -6,8 +6,8 @@ package resource.model
 import lucuma.core.util.Enumerated
 
 enum TelescopeModeType(val tag: String) derives Enumerated:
-  case Queue           extends TelescopeModeType("QUEUE")
-  case Classical       extends TelescopeModeType("CLASSICAL")
-  case PriorityVisitor extends TelescopeModeType("PRIORITY_VISITOR")
-  case Engineering     extends TelescopeModeType("ENGINEERING")
-  case Commissioning   extends TelescopeModeType("COMMISSIONING")
+  case Queue           extends TelescopeModeType("Queue")
+  case Classical       extends TelescopeModeType("Classical")
+  case PriorityVisitor extends TelescopeModeType("PriorityVisitor")
+  case Engineering     extends TelescopeModeType("Engineering")
+  case Commissioning   extends TelescopeModeType("Commissioning")

@@ -47,6 +47,7 @@ import org.http4s.server.middleware.Metrics
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
@@ -214,6 +215,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       otel                    <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel)
       given Trace[IO]          = otel.trace
       given Tracer[IO]         = otel.tracer
+      given Meter[IO]          = otel.meter
       given TracerProvider[IO] = otel.tracerProvider
       given MeterProvider[IO]  = otel.meterProvider
       ap                      <- routes[IO](cfg).map(_.map(_.orNotFound))

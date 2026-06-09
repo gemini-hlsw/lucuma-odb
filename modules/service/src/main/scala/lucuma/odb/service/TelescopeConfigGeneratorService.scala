@@ -10,7 +10,7 @@ import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
-import lucuma.core.enums.GmosImagingVariantType
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.Site
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.TelescopeConfigGeneratorType
@@ -24,12 +24,12 @@ import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
 import lucuma.odb.util.Codecs.angle_µas
 import lucuma.odb.util.Codecs.guide_state
+import lucuma.odb.util.Codecs.imaging_variant
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.offset
 import lucuma.odb.util.Codecs.offset_generator_role
 import lucuma.odb.util.Codecs.telescope_config
 import lucuma.odb.util.Codecs.telescope_config_generator_type
-import lucuma.odb.util.GmosCodecs.gmos_imaging_variant
 import skunk.*
 import skunk.codec.numeric.int4
 import skunk.codec.numeric.int8
@@ -58,7 +58,7 @@ sealed trait TelescopeConfigGeneratorService[F[_]]:
   def resetWhenVariantNotMatching(
     oids:       NonEmptyList[Observation.Id],
     site:       Site,
-    newVariant: GmosImagingVariantType,
+    newVariant: ImagingVariantType,
     role:       TelescopeConfigGeneratorRole
   ): F[Unit]
 
@@ -140,7 +140,7 @@ object TelescopeConfigGeneratorService:
       def resetWhenVariantNotMatching(
         oids:       NonEmptyList[Observation.Id],
         site:       Site,
-        newVariant: GmosImagingVariantType,
+        newVariant: ImagingVariantType,
         role:       TelescopeConfigGeneratorRole
       ): F[Unit] =
         session.exec:
@@ -283,7 +283,7 @@ object TelescopeConfigGeneratorService:
     def resetWhenVariantNotMatching(
       which:        NonEmptyList[Observation.Id],
       imgTableName: String,
-      newVariant:   GmosImagingVariantType,
+      newVariant:   ImagingVariantType,
       role:         TelescopeConfigGeneratorRole
     ): AppliedFragment =
       val input = TelescopeConfigGeneratorInput.NoGeneratorInput
@@ -305,7 +305,7 @@ object TelescopeConfigGeneratorService:
             SELECT 1
             FROM #$imgTableName im
             WHERE im.c_observation_id = og.c_observation_id
-              AND im.c_variant IS DISTINCT FROM $gmos_imaging_variant
+              AND im.c_variant IS DISTINCT FROM $imaging_variant
           )
       """(
         input.generatorType,

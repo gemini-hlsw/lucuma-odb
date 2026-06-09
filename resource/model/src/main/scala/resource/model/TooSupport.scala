@@ -6,7 +6,7 @@ package resource.model
 import lucuma.core.util.Enumerated
 
 enum TooSupport(val tag: String) derives Enumerated:
-  case Standard  extends TooSupport("STANDARD")
-  case Interrupt extends TooSupport("INTERRUPT")
-  case Rapid     extends TooSupport("RAPID")
-  case None      extends TooSupport("NONE")
+  case Standard  extends TooSupport("Standard")
+  case Interrupt extends TooSupport("Interrupt")
+  case Rapid     extends TooSupport("Rapid")
+  case None      extends TooSupport("None")

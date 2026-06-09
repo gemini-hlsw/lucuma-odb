@@ -20,7 +20,7 @@ object NewUserSuite extends SsoSuite with Fixture with FlakyTests {
 
           // stage1 auth should redirect
           res <- sso.get(stage1)(_.pure[IO])
-          _   <- expect(res.status == Status.Found).failFast
+          _   <- expect.same(Status.Found, res.status).failFast
           loc  = res.headers.get[Location].map(_.uri)
           _   <- expect(loc.isDefined).failFast
 
@@ -32,8 +32,8 @@ object NewUserSuite extends SsoSuite with Fixture with FlakyTests {
 
           bob  <- db.use(_.getStandardUserFromToken(tok))
 
-          _ <- expect(bob.role.access == Access.Pi).failFast
-          _ <- expect(bob.profile.profile.familyName == Bob.name.familyName).failFast
+          _ <- expect.same(Access.Pi, bob.role.access).failFast
+          _ <- expect.same(Bob.name.familyName, bob.profile.profile.familyName).failFast
 
         } yield success
       }

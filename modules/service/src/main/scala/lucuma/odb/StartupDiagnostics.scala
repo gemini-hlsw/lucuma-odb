@@ -79,7 +79,7 @@ object StartupDiagnostics:
             StateT.modify[F, DiagState]: ds =>
               ds.updated(Type("e_ghost_fiber_agitator"))
           },
-          checkPostgresEnum(gmos_imaging_variant),
+          checkPostgresEnum(imaging_variant),
           checkPostgresEnum(gmos_long_slit_acquisition_roi),
           checkPostgresEnum(gender),
           checkPostgresEnum(guide_state),
@@ -177,7 +177,7 @@ object StartupDiagnostics:
 
         )
 
-      def runAllDiagnostics(fatal: Boolean): F[Unit] = 
+      def runAllDiagnostics(fatal: Boolean): F[Unit] =
         Logger[F].info("Running startup diagnostics.") >>
           allDiagnostics.sequence.runS(DiagState(Nil, Nil)).map(_.errors).flatMap: errors =>
           errors.traverse_(Logger[F].error(_)) >>
@@ -220,7 +220,7 @@ object StartupDiagnostics:
        * its database tag.
        */
       def databaseTag[A](codec: Codec[A])(tag: String)(using e: Enumerated[A]): String =
-        e.fromTag(tag).flatMap(codec.encode(_).headOption.flatten).getOrElse(tag)
+        e.fromTag(tag).flatMap(codec.encode(_).headOption.flatten).fold(tag)(_.value)
 
       def align[A](codec: Codec[A], where: String)(found: List[String])(using e: Enumerated[A], tn: TypeName[A]): List[String] =
         val expected = e.all.map(e.tag).map(databaseTag(codec)).toSet

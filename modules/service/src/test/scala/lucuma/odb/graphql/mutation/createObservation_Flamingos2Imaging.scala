@@ -103,7 +103,109 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
           }
         """.asRight)
 
-  test("create Flamingos2 imaging with arbitrary offsets"):
+  test("create Flamingos2 imaging with a grouped enumerated offset generator"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi, s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { nanometers: 500.0 }
+                    }
+                  }
+                }
+                observingMode: {
+                  flamingos2Imaging: {
+                    variant: {
+                      grouped: {
+                        offsets: {
+                          enumerated: {
+                            values: [
+                              { offset: { p: { microarcseconds:  10000000 }, q: { microarcseconds:         0 } } },
+                              { offset: { p: { microarcseconds:         0 }, q: { microarcseconds: -10000000 } } }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                    filters: [
+                      { filter: Y }
+                    ]
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  flamingos2Imaging {
+                    variant {
+                      variantType
+                      grouped {
+                        order
+                        skyCount
+                        offsets {
+                          generatorType
+                          enumerated {
+                            values {
+                              offset {
+                                p { microarcseconds }
+                                q { microarcseconds }
+                              }
+                            }
+                          }
+                        }
+                        skyOffsets {
+                          generatorType
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "flamingos2Imaging": {
+                    "variant": {
+                      "variantType": "GROUPED",
+                      "grouped": {
+                        "order": "INCREASING",
+                        "skyCount": 0,
+                        "offsets": {
+                          "generatorType": "ENUMERATED",
+                          "enumerated": {
+                            "values": [
+                              { "offset": { "p": { "microarcseconds": 10000000 }, "q": { "microarcseconds": 0 } } },
+                              { "offset": { "p": { "microarcseconds": 0 }, "q": { "microarcseconds": -10000000 } } }
+                            ]
+                          }
+                        },
+                        "skyOffsets": {
+                          "generatorType": "NONE"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+
+  test("create Flamingos2 imaging without a variant uses the defaults"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(pi, s"""
@@ -127,10 +229,6 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
                     filters: [
                       { filter: Y }
                     ]
-                    explicitSpatialOffsets: [
-                      { p: { microarcseconds:  10000000 }, q: { microarcseconds:         0 } },
-                      { p: { microarcseconds:         0 }, q: { microarcseconds: -10000000 } }
-                    ]
                   }
                 }
               }
@@ -138,13 +236,21 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
               observation {
                 observingMode {
                   flamingos2Imaging {
-                    spatialOffsets {
-                      p { microarcseconds }
-                      q { microarcseconds }
-                    }
-                    explicitSpatialOffsets {
-                      p { microarcseconds }
-                      q { microarcseconds }
+                    variant {
+                      variantType
+                      grouped {
+                        order
+                        skyCount
+                        offsets {
+                          generatorType
+                          spiral {
+                            size { arcseconds }
+                          }
+                        }
+                        skyOffsets {
+                          generatorType
+                        }
+                      }
                     }
                   }
                 }
@@ -158,14 +264,22 @@ class createObservation_Flamingos2Imaging extends OdbSuite:
               "observation": {
                 "observingMode": {
                   "flamingos2Imaging": {
-                    "spatialOffsets": [
-                      { "p": { "microarcseconds": 10000000 }, "q": { "microarcseconds": 0 } },
-                      { "p": { "microarcseconds": 0 }, "q": { "microarcseconds": -10000000 } }
-                    ],
-                    "explicitSpatialOffsets": [
-                      { "p": { "microarcseconds": 10000000 }, "q": { "microarcseconds": 0 } },
-                      { "p": { "microarcseconds": 0 }, "q": { "microarcseconds": -10000000 } }
-                    ]
+                    "variant": {
+                      "variantType": "GROUPED",
+                      "grouped": {
+                        "order": "INCREASING",
+                        "skyCount": 0,
+                        "offsets": {
+                          "generatorType": "SPIRAL",
+                          "spiral": {
+                            "size": { "arcseconds": 30 }
+                          }
+                        },
+                        "skyOffsets": {
+                          "generatorType": "NONE"
+                        }
+                      }
+                    }
                   }
                 }
               }

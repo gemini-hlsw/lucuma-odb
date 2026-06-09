@@ -11,7 +11,6 @@ import grackle.Value.*
 import io.circe.Encoder
 
 trait MutationMapping[F[_]] extends BaseMapping[F] {
-  val MutationType: TypeRef = schema.ref("Mutation")
 
   lazy val MutationMapping =
     ObjectMapping(MutationType)(

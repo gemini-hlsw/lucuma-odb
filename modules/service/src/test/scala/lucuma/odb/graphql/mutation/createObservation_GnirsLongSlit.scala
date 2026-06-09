@@ -874,7 +874,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               }
             """,
           expected = Left(List(
-            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: J, ORDER4, H2, K, PAH"
+            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER6, J, ORDER4, H2, K, PAH"
           ))
         )
 
@@ -1028,6 +1028,123 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         "explicitAcquisitionType": "BRIGHT",
                         "skyOffset": null
                       }
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  test("create GNIRS Long Slit — telluricType defaults to HOT"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        exposureTimeMode: {
+                          timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsLongSlit { telluricType { tag starTypes } }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsLongSlit": {
+                      "telluricType": { "tag": "HOT", "starTypes": null }
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  test("create GNIRS Long Slit — explicit telluricType is stored"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: SINGLE_SLIT
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsLongSlit: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        fpu: LONG_SLIT_0_30
+                        filter: ORDER3
+                        telluricType: { tag: SOLAR }
+                        exposureTimeMode: {
+                          timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsLongSlit { telluricType { tag starTypes } }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsLongSlit": {
+                      "telluricType": { "tag": "SOLAR", "starTypes": null }
                     }
                   }
                 }

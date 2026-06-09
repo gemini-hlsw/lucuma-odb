@@ -29,6 +29,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
+import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
@@ -129,7 +130,8 @@ object GnirsLongSlitInput:
     explicitReadMode:             Option[GnirsReadMode]            = None,
     explicitWellDepth:            Option[GnirsWellDepth]           = None,
     explicitTelescopeConfigs:     Option[SlitTelescopeConfigs]     = None,
-    acquisition:                  Option[AcquisitionInput]         = None
+    acquisition:                  Option[AcquisitionInput]         = None,
+    telluricType:                 TelluricType                     = TelluricType.Hot
   ):
     def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
 
@@ -155,17 +157,19 @@ object GnirsLongSlitInput:
           GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
           SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rExplTelescope),
-          AcquisitionInput.Binding.Option("acquisition", rAcq)
+          AcquisitionInput.Binding.Option("acquisition", rAcq),
+          TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
            rDecker, rGratingWavelength, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq).parMapN:
+           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parMapN:
             (etm, coadds, filter, fpu, camera, grating, prism,
              decker, gratingWavelength, explGrating, explPrism,
-             focus, readMode, wellDepth, explTelescope, acq) =>
+             focus, readMode, wellDepth, explTelescope, acq, telluricType) =>
               Create(etm, coadds, filter, fpu, camera, grating, prism,
                      decker, gratingWavelength, explGrating, explPrism,
-                     focus, readMode, wellDepth, explTelescope, acq)
+                     focus, readMode, wellDepth, explTelescope, acq,
+                     telluricType.getOrElse(TelluricType.Hot))
 
   case class Edit(
     exposureTimeMode:          Option[ExposureTimeMode],
@@ -183,7 +187,8 @@ object GnirsLongSlitInput:
     explicitReadMode:          Nullable[GnirsReadMode],
     explicitWellDepth:         Nullable[GnirsWellDepth],
     explicitTelescopeConfigs:  Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
-    acquisition:               Option[AcquisitionInput]
+    acquisition:               Option[AcquisitionInput],
+    telluricType:              Option[TelluricType]            // Option: set or skip; cannot be unset
   ):
     def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
     def updatesAcquisition: Boolean = acquisition.isDefined
@@ -208,7 +213,8 @@ object GnirsLongSlitInput:
                    explicitDecker.toOption, explicitGratingWavelength.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
-                   explicitTelescopeConfigs.toOption, acquisition)
+                   explicitTelescopeConfigs.toOption, acquisition,
+                   telluricType.getOrElse(TelluricType.Hot))
 
   object Edit:
     val Binding: Matcher[Edit] =
@@ -229,8 +235,9 @@ object GnirsLongSlitInput:
           GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
           SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rExplTelescope),
-          AcquisitionInput.Binding.Option("acquisition", rAcq)
+          AcquisitionInput.Binding.Option("acquisition", rAcq),
+          TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
            rDecker, rGratingWavelength, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq).parMapN(Edit.apply)
+           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parMapN(Edit.apply)

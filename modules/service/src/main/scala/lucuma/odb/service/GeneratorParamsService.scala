@@ -350,7 +350,7 @@ object GeneratorParamsService {
           case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
             val sciReadMode  = f2.exposureTimeMode match
                                  case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                   Flamingos2ReadMode.Bright // In practice thil will be ignored by the ITC
+                                   Flamingos2ReadMode.Bright // In practice this will be ignored by the ITC
                                  case ExposureTimeMode.TimeAndCountMode(time = time) =>
                                    f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
 
@@ -418,23 +418,27 @@ object GeneratorParamsService {
 
           case gn: gnirs.longslit.Config =>
             for
-              etm       <- ExposureTimeMode.timeAndCount.getOption(gn.exposureTimeMode)
-                             .toRight(Error.MisconfiguredObservation(obsParams.observationId, "GNIRS requires a TimeAndCount exposure time mode"))
               // Acquisition (imaging) filter for the ITC: the explicit acquisition
               // filter if set, otherwise the default for the spectroscopy wavelength.
               acqFilter <- gn.acquisition.explicitFilter
                              .fold(GnirsFilter.fromSpectroscopyWavelength(gn.gratingWavelength))(_.asRight[String])
                              .leftMap(msg => Error.MisconfiguredObservation(obsParams.observationId, msg))
             yield
+              val sciReadMode = gn.exposureTimeMode match
+                                  case ExposureTimeMode.SignalToNoiseMode(_, _) =>
+                                    GnirsReadMode.Bright // In practice this will be ignored by the ITC, which derives the read mode itself in S/N mode
+                                  case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                                    gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+
               val sciMode = InstrumentMode.GnirsSpectroscopy(
-                exposureTimeMode  = etm,
+                exposureTimeMode  = gn.exposureTimeMode,
                 centralWavelength = gn.filter.centralWavelength,
                 filter            = gn.filter,
                 slitWidth         = gn.fpu,
                 prism             = gn.prism,
                 grating           = gn.grating,
                 camera            = gn.camera,
-                readMode          = gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(etm.time)),
+                readMode          = sciReadMode,
                 wellDepth         = gn.wellDepth
               )
               spectroscopyGeneratorParams(

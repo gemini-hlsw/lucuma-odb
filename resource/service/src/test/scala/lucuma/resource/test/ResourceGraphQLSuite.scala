@@ -54,7 +54,7 @@ trait ResourceGraphQLSuite extends ServerFixtures:
     this
       .query(query, variables, client)
       .map(_.spaces2)
-      .assertEquals(expected.spaces2) // by comparing strings we get more useful errors
+      .map(assertNoDiff(_, expected.spaces2)) // by comparing strings we get more useful errors
 
   def query(
     query:     String,

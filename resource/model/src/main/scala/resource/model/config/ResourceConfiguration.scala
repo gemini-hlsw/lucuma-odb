@@ -28,20 +28,20 @@ object ResourceConfiguration:
   ).parMapN(ResourceConfiguration.apply)
 
   private lazy val environment =
-    val ee = env("RESOURCE_ENVIRONMENT").as[ExecutionEnvironment]
+    val ee = envOrProp("RESOURCE_ENVIRONMENT").as[ExecutionEnvironment]
     inHeroku.ifM(
       ee,
       ee.default(ExecutionEnvironment.Local)
     )
 
-  private lazy val port = env("PORT").as[Port].default(port"8484")
+  private lazy val port = envOrProp("PORT").as[Port].default(port"8484")
 
   private lazy val inHeroku: ConfigValue[Effect, Boolean] =
-    env("DYNO").option.map(_.isDefined)
+    envOrProp("DYNO").option.map(_.isDefined)
 
   private lazy val otelConfig: ConfigValue[Effect, Option[OtelConfig]] =
-    val otelEndpoint = env("RESOURCE_OTEL_ENDPOINT")
-    val otelKey      = env("RESOURCE_OTEL_KEY").redacted
+    val otelEndpoint = envOrProp("RESOURCE_OTEL_ENDPOINT")
+    val otelKey      = envOrProp("RESOURCE_OTEL_KEY").redacted
     // In Heroku, otel configuration is required
     inHeroku.ifM(
       (otelEndpoint, otelKey, environment).parMapN((endpoint, key, env) =>
@@ -54,3 +54,6 @@ object ResourceConfiguration:
         case _                                                                               =>
           None
     )
+
+def envOrProp(name: String): ConfigValue[Effect, String] =
+  env(name).or(prop(name))

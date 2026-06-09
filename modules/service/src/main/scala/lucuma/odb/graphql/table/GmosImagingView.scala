@@ -12,7 +12,7 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
   class GmosImagingCommonColumns(implicit val tableName: TableName):
 
     val ObservationId: ColumnRef               = col("c_observation_id", observation_id)
-    val Variant: ColumnRef                     = col("c_variant", gmos_imaging_variant)
+    val Variant: ColumnRef                     = col("c_variant", imaging_variant)
 
     val ExplicitBin: ColumnRef                 = col("c_bin", gmos_binning.opt)
     val DefaultBin: ColumnRef                  = col("c_bin_default", gmos_binning)

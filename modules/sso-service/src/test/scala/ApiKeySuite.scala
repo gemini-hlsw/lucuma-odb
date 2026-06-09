@@ -124,7 +124,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
             )
           )
 
-        } yield expect(status == Status.Forbidden)
+        } yield expect.same(Status.Forbidden, status)
       } .onError(e => IO(println(e)))
     )
   }
@@ -158,7 +158,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
                   )
                 )
 
-        } yield expect(jwt.getUser == Right(user))
+        } yield expect.same(Right(user), jwt.getUser)
       } .onError(e => IO(println(e)))
     )
   }
@@ -186,7 +186,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
                     )
 
 
-        } yield expect(status == Status.Forbidden)
+        } yield expect.same(Status.Forbidden, status)
       } .onError(e => IO(println(e)))
     )
   }

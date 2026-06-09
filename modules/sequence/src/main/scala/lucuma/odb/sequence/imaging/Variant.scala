@@ -1,14 +1,14 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos.imaging
+package lucuma.odb.sequence.imaging
 
 import cats.Eq
 import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.enums.GmosImagingVariantType
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
@@ -23,11 +23,11 @@ sealed trait Variant:
 
   import Variant.*
 
-  def variantType: GmosImagingVariantType =
+  def variantType: ImagingVariantType =
     this match
-      case Grouped(_, _, _, _)    => GmosImagingVariantType.Grouped
-      case Interleaved(_, _, _)   => GmosImagingVariantType.Interleaved
-      case PreImaging(_, _, _, _) => GmosImagingVariantType.PreImaging
+      case Grouped(_, _, _, _)    => ImagingVariantType.Grouped
+      case Interleaved(_, _, _)   => ImagingVariantType.Interleaved
+      case PreImaging(_, _, _, _) => ImagingVariantType.PreImaging
   def fold[A](
     fg: Grouped     => A,
     fi: Interleaved => A,
@@ -179,7 +179,7 @@ object Variant:
     }}
 
   case class Fields(
-    variantType: GmosImagingVariantType,
+    variantType: ImagingVariantType,
     order:       WavelengthOrder,
     skyCount:    NonNegInt,
     offset1:     Offset,
@@ -192,9 +192,9 @@ object Variant:
       skyGen:    TelescopeConfigGenerator
     ): Variant =
       variantType match
-        case GmosImagingVariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen)
-        case GmosImagingVariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen)
-        case GmosImagingVariantType.PreImaging  => PreImaging(offset1, offset2, offset3, offset4)
+        case ImagingVariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen)
+        case ImagingVariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen)
+        case ImagingVariantType.PreImaging  => PreImaging(offset1, offset2, offset3, offset4)
 
 
   given HashBytes[Variant] with

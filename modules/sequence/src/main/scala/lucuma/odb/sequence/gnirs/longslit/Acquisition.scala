@@ -8,14 +8,18 @@ package longslit
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuOther
+import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
@@ -31,6 +35,8 @@ import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
@@ -44,6 +50,41 @@ import java.util.UUID
 object Acquisition:
 
   val RepeatingAtomCount: Int = 10
+
+  /**
+   * The filter and (fixed, single-coadd) exposure time for the FPU image — the first
+   * acquisition step — as a function of the acquisition mode, the camera (short =
+   * 0.15"/pix, long = 0.05"/pix) and the selected acquisition filter.
+   *
+   * PAH can never be used on the short camera (the sky is too bright), regardless of
+   * mode — that yields an error. Otherwise VeryBright always images the FPU in H
+   * (Order4), and for Bright/Faint the values come from a per-camera table:
+   *
+   *   Short:  X=10s, J=15s, H=3s, K=3s, H2→H(3s), PAH→error (sky too bright)
+   *   Long:   X→H, J→H, H=15s, K=15s, H2→H(15s), PAH=0.5s
+   * 
+   * See https://app.shortcut.com/lucuma/story/8880/gnirs-acquisition-initial-slit-image
+   *
+   * Any other filter (e.g. a user-selected filter) falls back to H.
+   */
+  private def firstStepFilterAndExposure(
+    mode:           GnirsAcquisitionMode,
+    camera:         GnirsCamera,
+    selectedFilter: GnirsFilter
+  ): Either[String, (GnirsFilter, TimeSpan)] =
+    // "Use H": image the FPU in H (Order4) at the camera's H exposure (short 3s, long 15s).
+    val useH: (GnirsFilter, TimeSpan) =
+      (GnirsFilter.Order4, if camera.pixelScale === GnirsPixelScale.PixelScale_0_05 then 15.secTimeSpan else 3.secTimeSpan)
+    (mode, selectedFilter, camera.pixelScale) match
+      case (_, GnirsFilter.PAH, GnirsPixelScale.PixelScale_0_15)    =>
+        s"PAH acquisition filter cannot be used with short camera".asLeft
+      case (GnirsAcquisitionMode.VeryBright, _, _)                  => useH.asRight
+      case (_, GnirsFilter.Order6, GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.Order6, 10.secTimeSpan).asRight // X, short
+      case (_, GnirsFilter.J,      GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.J,      15.secTimeSpan).asRight // J, short
+      case (_, GnirsFilter.K,      GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.K,       3.secTimeSpan).asRight // K, short
+      case (_, GnirsFilter.K,      GnirsPixelScale.PixelScale_0_05) => (GnirsFilter.K,      15.secTimeSpan).asRight // K, long
+      case (_, GnirsFilter.PAH,    GnirsPixelScale.PixelScale_0_05) => (GnirsFilter.PAH,    500.msTimeSpan).asRight // PAH, long
+      case _                                                        => useH.asRight // H, H2, long X/J, auto order filters, …
 
   case class Steps(
     slitImage:      ProtoStep[GnirsDynamicConfig],
@@ -71,31 +112,37 @@ object Acquisition:
 
   private object StepComputer extends GnirsSequenceState:
 
-    def compute(config: Config, mode: GnirsAcquisitionMode, selectedFilter: GnirsFilter, time: IntegrationTime): Steps =
-      val acqExposureTime = time.exposureTime
-      val readMode        = GnirsReadMode.forExposureTime(acqExposureTime)
-      val slitDecker      = GnirsDecker.forCameraAndReadMode(config.camera, GnirsPrism.Mirror)
+    def compute(
+      config:              Config,
+      mode:                GnirsAcquisitionMode,
+      fpuStepFilter:       GnirsFilter,
+      fpuStepExposureTime: TimeSpan,
+      selectedFilter:      GnirsFilter,
+      time:                IntegrationTime
+    ): Steps =
+      val acqExposureTime: TimeSpan = time.exposureTime
+      val readMode: GnirsReadMode   = GnirsReadMode.forExposureTime(acqExposureTime)
+      val slitDecker: GnirsDecker   = GnirsDecker.forCameraAndPrism(config.camera, GnirsPrism.Mirror)
 
-      // The FPU image (first step) always uses H (Order4) for VeryBright; for Bright
-      // and Faint it uses the selected filter. All other steps use the selected
-      // filter. Sky frames are generated only for Faint, at its sky offset.
-      val fpuStepFilter: GnirsFilter =
-        mode match
-          case GnirsAcquisitionMode.VeryBright => GnirsFilter.Order4
-          case _                               => selectedFilter
+      // The FPU image (first step) uses a single coadd and the fixed filter/exposure from
+      // firstStepFilterAndExposure; its read mode follows from that fixed exposure time.
+      // All other steps use the selected filter, the ITC exposure, and the configured
+      // coadds. Sky frames are generated only for Faint, at its sky offset.
+      val fpuStepReadMode: GnirsReadMode = GnirsReadMode.forExposureTime(fpuStepExposureTime)
+
       val skyOffsetOpt: Option[Offset] = GnirsAcquisitionMode.skyOffset.getOption(mode)
 
       eval:
         for
           _ <- State.modify[GnirsDynamicConfig]: dyn =>
                  dyn.copy(
-                   exposure          = acqExposureTime,
-                   coadds            = config.acquisition.coadds,
+                   exposure          = fpuStepExposureTime,
+                   coadds            = PosInt.unsafeFrom(1),
                    filter            = fpuStepFilter,
                    acquisitionMirror = GnirsAcquisitionMirrorMode.In,
                    camera            = config.camera,
                    focus             = config.focus,
-                   readMode          = readMode,
+                   readMode          = fpuStepReadMode,
                    decker            = slitDecker,
                    fpu               = Left(config.fpu)
                  )
@@ -106,9 +153,17 @@ object Acquisition:
                               ),
                               ObserveClass.Acquisition
                             )
-          // Subsequent steps switch to the acquisition decker/FPU and the selected filter.
+          // Subsequent steps switch to the acquisition decker/FPU and the selected filter,
+          // and use the ITC exposure time, read mode and configured coadds.
           _              <- State.modify[GnirsDynamicConfig]:
-                              _.copy(decker = GnirsDecker.Acquisition, fpu = Right(GnirsFpuOther.Acquisition), filter = selectedFilter)
+                              _.copy(
+                                exposure = acqExposureTime,
+                                coadds   = config.acquisition.coadds,
+                                readMode = readMode,
+                                decker   = GnirsDecker.Acquisition,
+                                fpu      = Right(GnirsFpuOther.Acquisition),
+                                filter   = selectedFilter
+                              )
           fieldSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           field          <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
@@ -146,26 +201,24 @@ object Acquisition:
     config:        Config,
     time:          Either[OdbError, IntegrationTime]
   ): Either[OdbError, SequenceGenerator[GnirsDynamicConfig]] =
+    def sequenceError(msg: String): OdbError =
+      OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: $msg".some)
+
     for
       t <- time.filterOrElse(
              _.exposureTime.toNonNegMicroseconds.value > 0,
-             OdbError.SequenceUnavailable(
-               observationId,
-               s"Could not generate a sequence for $observationId: GNIRS Long Slit requires a positive acquisition exposure time.".some
-             )
+             sequenceError("GNIRS Long Slit requires a positive acquisition exposure time.")
            )
-      // Resolve the acquisition mode (explicit or auto) and the selected filter
-      // (explicit, or auto from the mode + spectroscopy wavelength).
+      // Resolve the acquisition mode (explicit or auto), the selected filter (explicit, or
+      // auto from the mode + spectroscopy wavelength), and the FPU-image filter/exposure.
       mode       = config.acquisition.resolvedMode(t.exposureTime)
       selFilter <- config.acquisition
                      .selectedFilter(mode, config.gratingWavelength)
-                     .leftMap: msg =>
-                       OdbError.SequenceUnavailable(
-                         observationId,
-                         s"Could not generate a sequence for $observationId: $msg".some
-                       )
+                     .leftMap(sequenceError)
+      fpuStep   <- firstStepFilterAndExposure(mode, config.camera, selFilter).leftMap(sequenceError)
     yield
+      val (fpuStepFilter, fpuStepExposureTime): (GnirsFilter, TimeSpan) = fpuStep
       new Generator(
         AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-        StepComputer.compute(config, mode, selFilter, t)
+        StepComputer.compute(config, mode, fpuStepFilter, fpuStepExposureTime, selFilter, t)
       )

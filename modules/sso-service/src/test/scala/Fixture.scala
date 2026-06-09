@@ -9,9 +9,9 @@ import lucuma.core.model.*
 import lucuma.core.model.StandardRole.*
 import lucuma.sso.service.orcid.*
 import org.http4s.implicits.*
-import weaver.SimpleMutableIOSuite
+import weaver.SimpleIOSuite
 
-trait Fixture { self: SimpleMutableIOSuite =>
+trait Fixture { self: SimpleIOSuite =>
 
   val SsoRoot     = uri"https://sso.gpp.lucuma.xyz"
   val ExploreRoot = SsoRoot // uri"https://explore.lucuma.xyz"
@@ -62,11 +62,11 @@ trait Fixture { self: SimpleMutableIOSuite =>
     u match {
       case StandardUser(_, Pi(_), Nil, OrcidProfile(_, UserProfile(Some(first), Some(last), None, email))) =>
         for {
-          _ <- expect(Option(last)  === p.name.familyName).failFast
-          _ <- expect(Option(first) === p.name.givenName).failFast
+          _ <- expect.eql(Option(last), p.name.familyName).failFast
+          _ <- expect.eql(Option(first), p.name.givenName).failFast
           _ <- expect(p.emails.find(_.primary).exists(e => Option(e.email) === email)).failFast
         } yield ()
-      case _ => expect(false).failFast
+      case _ => failure("Assertion failed").failFast
     }
 
 }
