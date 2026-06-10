@@ -64,6 +64,7 @@ import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
@@ -454,6 +455,24 @@ object ObservationService {
                   Services.asSuperUser:
                     allocationService.validateBand(band, pids)
 
+            // Checks that the stored sequence, if any, for each observation is
+            // valid for an unsplittable observation.
+            val validateUnsplittableStoredSequence: ResultT[F, Unit] =
+              ResultT:
+                val af = Statements.validateUnsplittableSequence(which)
+                session
+                  .prepareR(af.fragment.query(observation_id *: text))
+                  .use: p =>
+                    p.stream(af.argument, chunkSize = 1024)
+                     .compile
+                     .toList
+                  .map: problems =>
+                    problems
+                      .map: (oid, error) =>
+                        OdbError.InvalidArgument(s"Cannot make observation $oid un-splittable: $error".some).asFailure.void
+                      .combineAllOption
+                      .getOrElse(Result.unit)
+
             // Observations in system groups (telluric, etc.) cannot be moved
             // by non-service callers.
             // doing so may introduce orphan groups, at least for tellurics.
@@ -497,6 +516,12 @@ object ObservationService {
                          )
 
                 _ <- validateBand(g.keys.toList)
+
+                // If we are trying to edit this observation to make it un-splittable,
+                // then ensure that any existing materialized sequence is compatible.
+                isSplittable = SET.scheduling.toOption.forall(_.isSplittable.forall(identity))
+                _ <- if isSplittable then ResultT.unit else validateUnsplittableStoredSequence
+
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.scheduling.flatMap(_.timingWindows).foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
@@ -1285,6 +1310,30 @@ object ObservationService {
           FROM t_observation
          WHERE c_observation_id = $observation_id
       """.query(bool)
+
+    def validateUnsplittableSequence(
+      which: AppliedFragment,
+      limit: Int = UnsplittableAtom.StepLimit.value,
+    ): AppliedFragment =
+      sql"""
+        SELECT
+          a.c_observation_id,
+          CASE
+            WHEN COUNT(DISTINCT a.c_atom_id) > 1 THEN
+              'Unsplittable observations may only contain a single atom.'
+            WHEN COUNT(s.c_step_id) > $int4 THEN
+              'An unsplittable observation''s atom may not contain more than #${limit.toString} steps.'
+            ELSE
+              NULL
+          END AS c_error_message
+        FROM t_atom a
+        LEFT JOIN t_step s ON s.c_atom_id = a.c_atom_id
+        WHERE a.c_observation_id IN (""".apply(limit) |+| which |+| sql""")
+        GROUP BY a.c_observation_id
+        HAVING
+          COUNT(DISTINCT a.c_atom_id) > 1 OR
+          COUNT(s.c_step_id) > $int4
+      """.apply(limit)
   }
 
 }

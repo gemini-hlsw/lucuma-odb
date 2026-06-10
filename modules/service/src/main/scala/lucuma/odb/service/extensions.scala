@@ -38,9 +38,10 @@ extension (self: SourceProfile)
       .getOrElse(self)
 
 def observationIdIn(
-  oids: NonEmptyList[Observation.Id]
+  oids: NonEmptyList[Observation.Id],
+  prefix: Option[String] = None
 ): AppliedFragment =
-  void"c_observation_id IN (" |+|
+  sql"#${prefix.map(p => s"$p.").getOrElse("")}c_observation_id IN ("(Void) |+|
     oids.map(sql"$observation_id").intercalate(void", ") |+|
   void")"
 
