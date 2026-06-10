@@ -296,7 +296,8 @@ object GeneratorStreaming:
         (for
           cfg <- extractMode(ObservingMode.GnirsLongSlitName, context)(_.asGnirsLongSlit)
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
-          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.gnirsStep, context.namespace, cfg, itc))
+          rol  = context.params.calibrationRole
+          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.gnirsStep, context.namespace, exp.gnirs, cfg, itc, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

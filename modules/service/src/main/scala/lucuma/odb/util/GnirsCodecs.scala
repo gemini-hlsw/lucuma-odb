@@ -13,6 +13,7 @@ import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
@@ -50,6 +51,9 @@ trait GnirsCodecs:
     enumerated(Type.varchar)
 
   val gnirs_grating: Codec[GnirsGrating] =
+    enumerated(Type.varchar)
+
+  val gnirs_pixel_scale: Codec[GnirsPixelScale] =
     enumerated(Type.varchar)
 
   val gnirs_prism: Codec[GnirsPrism] =

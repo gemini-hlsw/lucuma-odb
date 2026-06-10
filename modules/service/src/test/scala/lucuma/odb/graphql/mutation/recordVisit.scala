@@ -30,6 +30,11 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPixelScale
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.math.BoundedInterval
@@ -45,6 +50,7 @@ import lucuma.odb.data.StepExecutionState
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Gmos
+import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.odb.smartgcal.data.Igrins2
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
@@ -89,6 +95,16 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       Flamingos2Disperser.R1200HK.some,
       Flamingos2Filter.Y,
       Flamingos2Fpu.LongSlit2.some
+    )
+
+  private def gnirs_key(pixelScale: GnirsPixelScale): Gnirs.TableKey =
+    Gnirs.TableKey(
+      pixelScale,
+      GnirsGrating.D111,
+      GnirsPrism.Mirror,
+      BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max),
+      GnirsFpuSlit.LongSlit_0_30,
+      GnirsWellDepth.Shallow
     )
 
   val flat =
@@ -149,6 +165,13 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
         Igrins2.TableRow(Line1, Igrins2.TableKey, arc)
       )
 
+    val gnirs_rows: List[Gnirs.TableRow] =
+      List(GnirsPixelScale.PixelScale_0_05, GnirsPixelScale.PixelScale_0_15).flatMap: ps =>
+        List(
+          Gnirs.TableRow(Line1, gnirs_key(ps), flat),
+          Gnirs.TableRow(Line1, gnirs_key(ps), arc)
+        )
+
     servicesFor(service /* doesn't matter*/).map(_(s)).use: services =>
       services.transactionally:
 
@@ -168,7 +191,11 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
           Services.asSuperUser:
             services.smartGcalService.insertGmosSouth(i, r)
 
-        f2 *> ig2 *> north *> south
+        val gnirs = gnirs_rows.zipWithIndex.traverse_ : (r, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertGnirs(i, r)
+
+        f2 *> ig2 *> north *> south *> gnirs
 
   private def recordVisitTest(
     mode:     ObservingModeType,

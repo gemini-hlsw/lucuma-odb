@@ -61,4 +61,7 @@ object FileReader {
 
   def igrins2[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Igrins2.FileEntry)] =
     read(fileName, parsers.igrins2.fileEntry.map(Current.apply))
+
+  def gnirs[F[_]](fileName: String)(using ApplicativeError[F, Throwable]): Pipe[F, Byte, (PosLong, data.Gnirs.FileEntry)] =
+    read(fileName, parsers.gnirs.fileEntry)
 }
