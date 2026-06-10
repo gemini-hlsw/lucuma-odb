@@ -85,6 +85,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[CalibrationRole](CalibrationRoleType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[CallForProposalsType](CallForProposalsTypeType),
+      LeafMapping[CassRotator](CassRotatorType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[Long](ChronicleIdType),

@@ -6864,6 +6864,21 @@ type CatalogInfo {
 }
 
 """
+Cassegrain rotator tracking mode
+"""
+enum CassRotator {
+  """
+  The cass rotator is held at a fixed angle.
+  """
+  FIXED
+
+  """
+  The cass rotator follows the field.
+  """
+  FOLLOWING
+}
+
+"""
 Catalog name values
 """
 enum CatalogName {
@@ -16243,6 +16258,11 @@ type TargetEnvironment {
   The type of blind offset (automatic or manual) if a blind offset exists.
   """
   blindOffsetType: BlindOffsetType!
+
+  """
+  The cassegrain rotator tracking mode.
+  """
+  cassRotator: CassRotator!
 }
 
 type TargetGroup {

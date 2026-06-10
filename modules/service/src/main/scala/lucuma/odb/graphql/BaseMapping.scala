@@ -52,6 +52,7 @@ trait BaseMapping[F[_]]
   lazy val CallForProposalsPartnerType             = schema.ref("CallForProposalsPartner")
   lazy val CallsForProposalsSelectResultType       = schema.ref("CallsForProposalsSelectResult")
   lazy val CallForProposalsTypeType                = schema.ref("CallForProposalsType")
+  lazy val CassRotatorType                         = schema.ref("CassRotator")
   lazy val CategorizedTimeType                     = schema.ref("CategorizedTime")
   lazy val CatalogInfoType                         = schema.ref("CatalogInfo")
   lazy val CatalogNameType                         = schema.ref("CatalogName")
