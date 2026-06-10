@@ -13,6 +13,7 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
+import lucuma.odb.sequence.data.UnsplittableAtom
 
 class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosNorthSequenceOps:
 
@@ -135,4 +136,69 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
             }
           }
         """.asRight
+      )
+
+  test("manual sequence for unsplittable observation with multiple atoms"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(
+        oid,
+        SequenceType.Science,
+        atomInput("Atom1", stepInput(GmosNorthFilter.GPrime)),
+        atomInput("Atom2", stepInput(GmosNorthFilter.IPrime))
+      )
+
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            replaceGmosNorthSequence(input: $inputString) {
+              sequence {
+                description
+              }
+            }
+          }
+        """,
+        expected = List("Unsplittable observations may only contain a single atom.").asLeft
+      )
+
+  test("manual sequence for unsplittable observation with too many steps"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- setIsSplittableAs(pi, o, isSplittable = false)
+      yield o
+
+    setup.flatMap: oid =>
+      val step  = stepInput(GmosNorthFilter.GPrime)
+      val steps = List.fill(UnsplittableAtom.StepLimit.value + 1)(step)
+      val inputString = input(
+        oid,
+        SequenceType.Science,
+        atomInput("Atom1", steps*)
+      )
+
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            replaceGmosNorthSequence(input: $inputString) {
+              sequence {
+                description
+              }
+            }
+          }
+        """,
+        expected = List(
+          s"An unsplittable observation's atom may not contain more than ${UnsplittableAtom.StepLimit.value} steps."
+        ).asLeft
       )

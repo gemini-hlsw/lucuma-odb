@@ -55,6 +55,7 @@ import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
+import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.sequence.util.AtomBuilder
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
@@ -537,14 +538,26 @@ object SequenceService:
         sequence:         List[ProtoAtom[ProtoStep[D]]],
         insertInstConfig: Command[(Step.Id, D)],
         atomBuilder:      AtomBuilder[D]
-      ): ResultT[F, Stream[Pure, Atom[D]]] =
+      )(using Transaction[F]): ResultT[F, Stream[Pure, Atom[D]]] =
 
-        val checkLength =
+        val checkAtomLength: ResultT[F, Unit] =
           if sequence.lengthIs <= SequenceAtomLimit then ResultT.unit
           else ResultT:
             OdbError
               .InvalidArgument(s"Execution sequences containing over $SequenceAtomLimit atoms are not supported.".some)
               .asFailureF
+
+        val checkUnsplittable: ResultT[F, Unit] =
+           ResultT.liftF(observationService.selectIsSplittable(observationId)).flatMap:
+             case Some(false) => // means that the observation is not dividable into multiple atoms
+               val stepLimit = UnsplittableAtom.StepLimit.value
+               val message   = sequence match
+                 case a :: Nil => Option.when(a.steps.size > stepLimit)(s"An unsplittable observation's atom may not contain more than $stepLimit steps.")
+                 case Nil      => none
+                 case _        => s"Unsplittable observations may only contain a single atom.".some
+               message.fold(ResultT.unit)(m => ResultT(OdbError.InvalidArgument(m.some).asFailureF))
+             case _           =>
+               ResultT.unit
 
         val doReplace: F[Stream[Pure, Atom[D]]] =
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
@@ -555,7 +568,7 @@ object SequenceService:
             _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], insertInstConfig)
           yield atoms
 
-        checkLength *> ResultT.liftF(doReplace)
+        checkAtomLength *> checkUnsplittable *> ResultT.liftF(doReplace)
 
       private def selectStatic[S](
         observationId: Observation.Id,
