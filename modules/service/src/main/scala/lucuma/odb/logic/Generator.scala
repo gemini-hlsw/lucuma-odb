@@ -204,7 +204,9 @@ object Generator:
           for
             a <- EitherT(sequenceDigest(stream.acquisition))
             s <- EitherT(sequenceDigest(stream.science))
-          yield ExecutionDigest(estimator.estimateSetupTime, estimator.estimateSetupCount(s.timeEstimate.sum), a, s)
+            c  = if ctx.params.isSplittable then estimator.estimateSetupCount(s.timeEstimate.sum)
+                 else NonNegInt.unsafeFrom(1)
+          yield ExecutionDigest(estimator.estimateSetupTime, c, a, s)
 
         val done =
           EitherT.pure[F, OdbError]:
