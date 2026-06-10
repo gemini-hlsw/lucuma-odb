@@ -19,6 +19,8 @@ import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.refined.given
 import lucuma.catalog.clients.GaiaClient
+import lucuma.core.enums.CassRotator
+import lucuma.core.enums.Instrument
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -73,6 +75,15 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       SqlField("useBlindOffset", ObservationView.UseBlindOffset),
       blindOffsetTargetObject("blindOffsetTarget"),
       SqlField("blindOffsetType", ObservationView.BlindOffsetType),
+      SqlField("instrument", ObservationView.Instrument, hidden = true),
+      CursorField[CassRotator](
+        "cassRotator",
+        _.fieldAs[Option[Instrument]]("instrument").map:
+          case Some(Instrument.MaroonX) => CassRotator.Fixed
+          case _                        => CassRotator.Following
+        ,
+        List("instrument")
+      ),
       EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId")),
