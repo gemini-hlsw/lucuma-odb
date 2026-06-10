@@ -118,6 +118,10 @@ sealed trait ObservationService[F[_]] {
     oid: Observation.Id
   )(using Transaction[F]): F[Option[Instrument]]
 
+  def selectIsSplittable(
+    oid: Observation.Id
+  )(using Transaction[F]): F[Option[Boolean]]
+
 }
 
 object ObservationService {
@@ -643,6 +647,11 @@ object ObservationService {
         oid: Observation.Id
       )(using Transaction[F]): F[Option[Instrument]] =
         session.option(Statements.SelectInstrument)(oid)
+
+      override def selectIsSplittable(
+        oid: Observation.Id
+      )(using Transaction[F]): F[Option[Boolean]] =
+        session.option(Statements.SelectIsSplittable)(oid)
 
     }
 
@@ -1269,6 +1278,13 @@ object ObservationService {
           FROM t_observation
          WHERE c_observation_id = $observation_id
       """.query(instrument)
+
+    val SelectIsSplittable: Query[Observation.Id, Boolean] =
+      sql"""
+        SELECT c_is_splittable
+          FROM t_observation
+         WHERE c_observation_id = $observation_id
+      """.query(bool)
   }
 
 }
