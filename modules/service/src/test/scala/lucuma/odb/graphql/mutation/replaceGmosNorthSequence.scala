@@ -243,7 +243,7 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
         )
         _ <- failToMakeUnsplittable(
           o,
-          s"Cannot make observation $o un-splittable: Unsplittable observations may only contain a single atom."
+          s"Cannot make observation $o unsplittable: Unsplittable observations may only contain a single atom."
         )
       yield ()
 
@@ -267,6 +267,6 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
         )
         _ <- failToMakeUnsplittable(
           o,
-          s"Cannot make observation $o un-splittable: An unsplittable observation's atom may not contain more than ${UnsplittableAtom.StepLimit.value} steps."
+          s"Cannot make observation $o unsplittable: An unsplittable observation's atom may not contain more than ${UnsplittableAtom.StepLimit.value} steps."
         )
       yield ()

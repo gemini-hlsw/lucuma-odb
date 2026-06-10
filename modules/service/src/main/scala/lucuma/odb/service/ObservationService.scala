@@ -469,7 +469,7 @@ object ObservationService {
                   .map: problems =>
                     problems
                       .map: (oid, error) =>
-                        OdbError.InvalidArgument(s"Cannot make observation $oid un-splittable: $error".some).asFailure.void
+                        OdbError.InvalidArgument(s"Cannot make observation $oid unsplittable: $error".some).asFailure.void
                       .combineAllOption
                       .getOrElse(Result.unit)
 
@@ -517,7 +517,7 @@ object ObservationService {
 
                 _ <- validateBand(g.keys.toList)
 
-                // If we are trying to edit this observation to make it un-splittable,
+                // If we are trying to edit this observation to make it unsplittable,
                 // then ensure that any existing materialized sequence is compatible.
                 isSplittable = SET.scheduling.toOption.forall(_.isSplittable.forall(identity))
                 _ <- if isSplittable then ResultT.unit else validateUnsplittableStoredSequence
