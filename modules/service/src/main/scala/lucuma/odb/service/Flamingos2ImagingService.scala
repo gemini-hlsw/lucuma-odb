@@ -9,7 +9,9 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
+import grackle.syntax.*
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
@@ -35,6 +37,11 @@ sealed trait Flamingos2ImagingService[F[_]]:
     input:  Flamingos2ImagingInput.Create,
     reqEtm: Option[ExposureTimeMode],
     which:  List[Observation.Id]
+  )(using Transaction[F]): F[Result[Unit]]
+
+  def update(
+    SET:   Flamingos2ImagingInput.Edit,
+    which: List[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
 
   def delete(
@@ -64,7 +71,7 @@ object Flamingos2ImagingService:
               fs.toList.map: (filter, eid) =>
                 (oid, filter, eid)
           .traverse_ : rs =>
-            session.exec(Statements.insertFilters(rs, version))
+            session.exec(ImagingStatements.insertFilters(Flamingos2ImagingService.FilterTableName, flamingos_2_filter, rs, version))
 
       override def insert(
         input:  Flamingos2ImagingInput.Create,
@@ -107,6 +114,69 @@ object Flamingos2ImagingService:
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
         session.exec(Statements.delete(which))
+
+      override def update(
+        SET:   Flamingos2ImagingInput.Edit,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        NonEmptyList.fromList(which).fold(().success.pure): oids =>
+
+          val modeUpdates =
+            NonEmptyList
+              .fromList(
+                Statements.commonUpdates(SET) ++
+                SET.variant.toList.flatMap(ImagingStatements.variantUpdates)
+              )
+              .traverse_ : us =>
+                session.exec:
+                  sql"UPDATE #${Flamingos2ImagingService.ModeTableName} SET "(Void) |+|
+                    us.intercalate(void", ")                                       |+|
+                    void" WHERE "                                                  |+|
+                    observationIdIn(oids)
+
+          // Replace the current filters and their ETMs
+          val filterUpdates =
+            SET.filters.fold(ResultT.unit): fs =>
+              for
+                _   <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentFiltersAndEtms(Flamingos2ImagingService.FilterTableName, oids)))
+                // Insert the acquisition and science filters (current / mutable version)
+                r   <- ResultT(services.exposureTimeModeService.resolve("Flamingos2 Imaging", none, fs.map(f => (f.filter, f.exposureTimeMode)), none, which))
+                ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
+                cur  = stripAcquisition(ids)
+                _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
+              yield ()
+
+          def updateOffsetForRole(
+            input:   Nullable[TelescopeConfigGeneratorInput],
+            variant: ImagingVariantType,
+            role:    TelescopeConfigGeneratorRole
+          ): F[Unit] =
+            input.toOptionOption.fold(
+              // the offset generator field was Absent, which means we should
+              // default it to no generator when switching variants.
+              services.telescopeConfigGeneratorService.resetWhenVariantNotMatching(
+                oids,
+                Flamingos2ImagingService.ModeTableName,
+                variant,
+                role
+              )
+            ): in =>
+              services.telescopeConfigGeneratorService.replace(oids, in, role)
+
+          val offsetUpdates =
+            SET.variant.fold(().pure[F]): v =>
+              val (o, s) = v match
+                case ImagingVariantInput.Grouped(_, offsets, _, skyOffsets)  => (offsets, skyOffsets)
+                case ImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
+                case _                                                       => (Nullable.Null, Nullable.Null)
+              updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
+              updateOffsetForRole(s, v.variantType, TelescopeConfigGeneratorRole.Sky)
+
+          (for
+            _ <- ResultT.liftF(offsetUpdates)
+            _ <- ResultT.liftF(modeUpdates)
+            _ <- filterUpdates
+          yield ()).value
 
   object Statements:
 
@@ -177,22 +247,16 @@ object Flamingos2ImagingService:
       """(Void) |+| which.map(sql"$observation_id").intercalate(void",") |+|
       void""")"""
 
-    def insertFilters(
-      rows:    NonEmptyList[(Observation.Id, Flamingos2Filter, ExposureTimeModeId)],
-      version: ObservingModeRowVersion
-    ): AppliedFragment =
-      val insertInto: AppliedFragment =
-        sql"""
-          INSERT INTO #${Flamingos2ImagingService.FilterTableName} (
-            c_observation_id,
-            c_filter,
-            c_version,
-            c_exposure_time_mode_id
-          ) VALUES
-        """(Void)
-
-      val filterEntries =
-        rows.map: (oid, filter, eid) =>
-          sql"""($observation_id, $flamingos_2_filter, $observing_mode_row_version, $exposure_time_mode_id)"""(oid, filter, version, eid)
-
-      insertInto |+| filterEntries.intercalate(void", ")
+    def commonUpdates(
+      input: Flamingos2ImagingInput.Edit
+    ): List[AppliedFragment] =
+      val upReadMode    = sql"c_read_mode    = ${flamingos_2_read_mode.opt}"
+      val upReads       = sql"c_reads        = ${flamingos_2_reads.opt}"
+      val upDecker      = sql"c_decker       = ${flamingos_2_decker.opt}"
+      val upReadoutMode = sql"c_readout_mode = ${flamingos_2_readout_mode.opt}"
+      List(
+        input.explicitReadMode.toOptionOption.map(upReadMode),
+        input.explicitReads.toOptionOption.map(upReads),
+        input.explicitDecker.toOptionOption.map(upDecker),
+        input.explicitReadoutMode.toOptionOption.map(upReadoutMode)
+      ).flatten

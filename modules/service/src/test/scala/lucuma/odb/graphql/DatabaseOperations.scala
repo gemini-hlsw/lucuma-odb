@@ -987,6 +987,23 @@ trait DatabaseOperations { this: OdbSuite =>
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
+      case ObservingModeType.Flamingos2Imaging =>
+        """{
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
+          }
+          imaging: {
+            minimumFov: {
+              arcseconds: 100
+            },
+            narrowFilters: false
+            broadFilters: false
+            combinedFilters: true
+          }
+        }"""
       case ObservingModeType.GmosNorthImaging =>
         """{
           exposureTimeMode: {
