@@ -138,6 +138,17 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
         """.asRight
       )
 
+  private def replaceSequenceQuery(inputString: String): String =
+    s"""
+      mutation {
+        replaceGmosNorthSequence(input: $inputString) {
+          sequence {
+            description
+          }
+        }
+      }
+    """
+
   test("manual sequence for unsplittable observation with multiple atoms"):
     val setup: IO[Observation.Id] =
       for
@@ -156,16 +167,8 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
       )
 
       expect(
-        user  = pi,
-        query = s"""
-          mutation {
-            replaceGmosNorthSequence(input: $inputString) {
-              sequence {
-                description
-              }
-            }
-          }
-        """,
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
         expected = List("Unsplittable observations may only contain a single atom.").asLeft
       )
 
@@ -188,17 +191,82 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
       )
 
       expect(
-        user  = pi,
-        query = s"""
-          mutation {
-            replaceGmosNorthSequence(input: $inputString) {
-              sequence {
-                description
-              }
-            }
-          }
-        """,
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
         expected = List(
           s"An unsplittable observation's atom may not contain more than ${UnsplittableAtom.StepLimit.value} steps."
         ).asLeft
       )
+
+  private def failToMakeUnsplittable(
+    o: Observation.Id,
+    e: String
+  ): IO[Unit] =
+    expect(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              schedulingConstraints: {
+                isSplittable: false
+              }
+            }
+            WHERE: {
+              id: { EQ: "$o" }
+            }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """,
+      expected = List(e).asLeft
+    )
+
+  test("cannot set isSplittable=false with multi-atom materialized sequence"):
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- query(
+          user  = pi,
+          query = replaceSequenceQuery(
+            input(
+              o,
+              SequenceType.Science,
+              atomInput("Atom1", stepInput(GmosNorthFilter.GPrime)),
+              atomInput("Atom2", stepInput(GmosNorthFilter.IPrime))
+            )
+          )
+        )
+        _ <- failToMakeUnsplittable(
+          o,
+          s"Cannot make observation $o un-splittable: Unsplittable observations may only contain a single atom."
+        )
+      yield ()
+
+  test("cannot set isSplittable=false with too many steps in the materialized sequence"):
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+        _ <- query(
+          user  = pi,
+          query = replaceSequenceQuery(
+            input(
+              o,
+              SequenceType.Science,
+              atomInput(
+                "Atom",
+                List.fill(UnsplittableAtom.StepLimit.value + 1)(stepInput(GmosNorthFilter.GPrime))*
+              )
+            )
+          )
+        )
+        _ <- failToMakeUnsplittable(
+          o,
+          s"Cannot make observation $o un-splittable: An unsplittable observation's atom may not contain more than ${UnsplittableAtom.StepLimit.value} steps."
+        )
+      yield ()
