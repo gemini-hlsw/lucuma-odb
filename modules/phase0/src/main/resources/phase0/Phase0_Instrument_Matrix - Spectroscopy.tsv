@@ -395,207 +395,207 @@ GPI-2	H	ifu	Coronagraph	0.246	2.8	Prism	H	1.5	1.8	1.65	0.30	46	yes	coronagraph	s
 GPI-2	K1	ifu	Coronagraph	0.306	2.8	Prism	K1	1.9	2.19	2.045	0.29	66	yes	coronagraph	s		
 GPI-2	K2	ifu	Coronagraph	0.306	2.8	Prism	K2	2.13	2.4	2.265	0.27	79	yes	coronagraph	s		
 SCORPIO	foo	singleslit	?	0.300	180	?	dichroic	0.37	2.35	1.36	1.98	4000	no		s		
-GNIRS	SC	singleslit	0.3	0.300	99	32	X	1.03	1.17	1.1	0.331	1700	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	32	J	1.17	1.37	1.27	0.397	1600	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	32	H	1.49	1.8	1.645	0.496	1700	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	32	K	1.91	2.49	2.2	0.661	1700	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	32	L	2.8	4.2	3.5	0.992	1800	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	32	X	1.03	1.17	1.1	0.331	1133	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	32	J	1.17	1.37	1.27	0.397	1067	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	32	H	1.49	1.8	1.645	0.496	1133	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	32	K	1.91	2.49	2.2	0.661	1133	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	32	L	2.8	4.2	3.5	0.992	1200	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	32	X	1.03	1.17	1.1	0.331	756	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	32	J	1.17	1.37	1.27	0.397	711	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	32	H	1.49	1.8	1.645	0.496	756	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	32	K	1.91	2.49	2.2	0.661	756	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	32	L	2.8	4.2	3.5	0.992	800	no		n		
-GNIRS	SC	singleslit	1.0	1.000	99	32	X	1.03	1.17	1.1	0.331	510	no		n		
-GNIRS	SC	singleslit	1.0	1.000	99	32	J	1.17	1.37	1.27	0.397	480	no		n		
-GNIRS	SC	singleslit	1.0	1.000	99	32	H	1.49	1.8	1.645	0.496	510	no		n		
-GNIRS	SC	singleslit	1.0	1.000	99	32	K	1.91	2.49	2.2	0.661	510	no		n		
-GNIRS	SC	singleslit	1.0	1.000	99	32	L	2.8	4.2	3.5	0.992	540	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	111	X	1.03	1.17	1.1	0.094	6600	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	111	J	1.17	1.37	1.27	0.113	7200	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	111	H	1.49	1.8	1.645	0.142	5900	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	111	K	1.91	2.49	2.2	0.189	5900	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	111	L	2.8	4.2	3.5	0.28	6400	no		n		
-GNIRS	SC	singleslit	0.3	0.300	99	111	M	4.4	6	4.8	0.575	4300	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	111	X	1.03	1.17	1.1	0.094	4400	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	111	J	1.17	1.37	1.27	0.113	4800	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	111	H	1.49	1.8	1.645	0.142	3933	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	111	K	1.91	2.49	2.2	0.189	3933	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	111	L	2.8	4.2	3.5	0.28	4267	no		n		
-GNIRS	SC	singleslit	0.45	0.450	99	111	M	4.4	6	4.8	0.575	2867	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	111	X	1.03	1.17	1.1	0.094	2933	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	111	J	1.17	1.37	1.27	0.113	3200	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	111	H	1.49	1.8	1.645	0.142	2622	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	111	K	1.91	2.49	2.2	0.189	2622	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	111	L	2.8	4.2	3.5	0.28	2844	no		n		
-GNIRS	SC	singleslit	0.675	0.675	99	111	M	4.4	6	4.8	0.575	1911	no		n		
-GNIRS	SC	singleslit	1.00	1.000	99	111	X	1.03	1.17	1.1	0.094	1980	no		n		
-GNIRS	SC	singleslit	1.00	1.000	99	111	J	1.17	1.37	1.27	0.113	2160	no		n		
-GNIRS	SC	singleslit	1.00	1.000	99	111	H	1.49	1.8	1.645	0.142	1770	no		n		
-GNIRS	SC	singleslit	1.00	1.000	99	111	K	1.91	2.49	2.2	0.189	1770	no		n		
-GNIRS	SC	singleslit	1.00	1.000	99	111	L	2.8	4.2	3.5	0.28	1920	no		n		
-GNIRS	SC	singleslit	1.00	1.000	99	111	M	4.4	6	4.8	0.575	1290	no		n		
-GNIRS	LC	singleslit	0.10	0.100	49	10	X	1.03	1.17	1.1	0.332	2100	yes		n		
-GNIRS	LC	singleslit	0.10	0.100	49	10	J	1.17	1.37	1.27	0.398	1600	yes		n		
-GNIRS	LC	singleslit	0.10	0.100	49	10	H	1.49	1.8	1.645	0.497	1700	yes		n		
-GNIRS	LC	singleslit	0.10	0.100	49	10	K	1.91	2.49	2.2	0.663	1700	yes		n		
-GNIRS	LC	singleslit	0.10	0.100	49	10	L	2.8	4.2	3.5	0.995	1800	no		n		
-GNIRS	LC	singleslit	0.15	0.150	49	10	X	1.03	1.17	1.1	0.332	1400	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	10	J	1.17	1.37	1.27	0.398	1067	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	10	H	1.49	1.8	1.645	0.497	1133	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	10	K	1.91	2.49	2.2	0.663	1133	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	10	L	2.8	4.2	3.5	0.995	1200	no		n		
-GNIRS	LC	singleslit	0.20	0.200	49	10	X	1.03	1.17	1.1	0.332	1050	yes		n		
-GNIRS	LC	singleslit	0.20	0.200	49	10	J	1.17	1.37	1.27	0.398	800	yes		n		
-GNIRS	LC	singleslit	0.20	0.200	49	10	H	1.49	1.8	1.645	0.497	850	yes		n		
-GNIRS	LC	singleslit	0.20	0.200	49	10	K	1.91	2.49	2.2	0.663	850	yes		n		
-GNIRS	LC	singleslit	0.20	0.200	49	10	L	2.8	4.2	3.5	0.995	900	no		n		
-GNIRS	LC	singleslit	0.30	0.300	49	10	X	1.03	1.17	1.1	0.332	700	yes		n		
-GNIRS	LC	singleslit	0.30	0.300	49	10	J	1.17	1.37	1.27	0.398	533	yes		n		
-GNIRS	LC	singleslit	0.30	0.300	49	10	H	1.49	1.8	1.645	0.497	567	yes		n		
-GNIRS	LC	singleslit	0.30	0.300	49	10	K	1.91	2.49	2.2	0.663	567	yes		n		
-GNIRS	LC	singleslit	0.30	0.300	49	10	L	2.8	4.2	3.5	0.995	600	no		n		
-GNIRS	LC	singleslit	0.45	0.450	49	10	X	1.03	1.17	1.1	0.332	467	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	10	J	1.17	1.37	1.27	0.398	356	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	10	H	1.49	1.8	1.645	0.497	378	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	10	K	1.91	2.49	2.2	0.663	378	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	10	L	2.8	4.2	3.5	0.995	400	no		n		
-GNIRS	LC	singleslit	0.675	0.675	49	10	X	1.03	1.17	1.1	0.332	311	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	10	J	1.17	1.37	1.27	0.398	237	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	10	H	1.49	1.8	1.645	0.497	252	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	10	K	1.91	2.49	2.2	0.663	252	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	10	L	2.8	4.2	3.5	0.995	267	no		n		
-GNIRS	LC	singleslit	1.00	1.000	49	10	X	1.03	1.17	1.1	0.332	210	yes		n		
-GNIRS	LC	singleslit	1.00	1.000	49	10	J	1.17	1.37	1.27	0.398	160	yes		n		
-GNIRS	LC	singleslit	1.00	1.000	49	10	H	1.49	1.8	1.645	0.497	170	yes		n		
-GNIRS	LC	singleslit	1.00	1.000	49	10	K	1.91	2.49	2.2	0.663	170	yes		n		
-GNIRS	LC	singleslit	1.00	1.000	49	10	L	2.8	4.2	3.5	0.995	180	no		n		
-GNIRS	LC	singleslit	0.1	0.100	49	32	X	1.03	1.17	1.1	0.11	5100	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	32	J	1.17	1.37	1.27	0.132	4800	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	32	H	1.49	1.8	1.645	0.166	5100	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	32	K	1.91	2.49	2.2	0.221	5100	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	32	L	2.8	4.2	3.5	0.332	5400	no		n		
-GNIRS	LC	singleslit	0.1	0.100	49	32	M	4.4	6	4.8	0.66	3700	no		n		
-GNIRS	LC	singleslit	0.15	0.150	49	32	X	1.03	1.17	1.1	0.11	3400	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	32	J	1.17	1.37	1.27	0.132	3200	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	32	H	1.49	1.8	1.645	0.166	3400	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	32	K	1.91	2.49	2.2	0.221	3400	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	32	L	2.8	4.2	3.5	0.332	3600	no		n		
-GNIRS	LC	singleslit	0.15	0.150	49	32	M	4.4	6	4.8	0.66	2467	no		n		
-GNIRS	LC	singleslit	0.2	0.200	49	32	X	1.03	1.17	1.1	0.11	2550	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	32	J	1.17	1.37	1.27	0.132	2400	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	32	H	1.49	1.8	1.645	0.166	2550	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	32	K	1.91	2.49	2.2	0.221	2550	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	32	L	2.8	4.2	3.5	0.332	2700	no		n		
-GNIRS	LC	singleslit	0.2	0.200	49	32	M	4.4	6	4.8	0.66	1850	no		n		
-GNIRS	LC	singleslit	0.3	0.300	49	32	X	1.03	1.17	1.1	0.11	1700	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	32	J	1.17	1.37	1.27	0.132	1600	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	32	H	1.49	1.8	1.645	0.166	1700	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	32	K	1.91	2.49	2.2	0.221	1700	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	32	L	2.8	4.2	3.5	0.332	1800	no		n		
-GNIRS	LC	singleslit	0.3	0.300	49	32	M	4.4	6	4.8	0.66	1233	no		n		
-GNIRS	LC	singleslit	0.45	0.450	49	32	X	1.03	1.17	1.1	0.11	1133	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	32	J	1.17	1.37	1.27	0.132	1067	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	32	H	1.49	1.8	1.645	0.166	1133	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	32	K	1.91	2.49	2.2	0.221	1133	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	32	L	2.8	4.2	3.5	0.332	1200	no		n		
-GNIRS	LC	singleslit	0.45	0.450	49	32	M	4.4	6	4.8	0.66	822	no		n		
-GNIRS	LC	singleslit	0.675	0.675	49	32	X	1.03	1.17	1.1	0.11	756	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	32	J	1.17	1.37	1.27	0.132	711	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	32	H	1.49	1.8	1.645	0.166	756	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	32	K	1.91	2.49	2.2	0.221	756	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	32	L	2.8	4.2	3.5	0.332	800	no		n		
-GNIRS	LC	singleslit	0.675	0.675	49	32	M	4.4	6	4.8	0.66	548	no		n		
-GNIRS	LC	singleslit	1.0	1.000	49	32	X	1.03	1.17	1.1	0.11	510	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	32	J	1.17	1.37	1.27	0.132	480	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	32	H	1.49	1.8	1.645	0.166	510	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	32	K	1.91	2.49	2.2	0.221	510	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	32	L	2.8	4.2	3.5	0.332	540	no		n		
-GNIRS	LC	singleslit	1.0	1.000	49	32	M	4.4	6	4.8	0.66	370	no		n		
-GNIRS	LC	singleslit	0.1	0.100	49	111	X	1.03	1.17	1.1	0.0316	17800	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	111	J	1.17	1.37	1.27	0.038	17000	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	111	H	1.49	1.8	1.645	0.0475	17800	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	111	K	1.91	2.49	2.2	0.0633	17800	yes		n		
-GNIRS	LC	singleslit	0.1	0.100	49	111	L	2.8	4.2	3.5	0.0944	19000	no		n		
-GNIRS	LC	singleslit	0.1	0.100	49	111	M	4.4	6	4.8	0.192	12800	no		n		
-GNIRS	LC	singleslit	0.15	0.150	49	111	X	1.03	1.17	1.1	0.0316	11867	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	111	J	1.17	1.37	1.27	0.038	11333	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	111	H	1.49	1.8	1.645	0.0475	11867	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	111	K	1.91	2.49	2.2	0.0633	11867	yes		n		
-GNIRS	LC	singleslit	0.15	0.150	49	111	L	2.8	4.2	3.5	0.0944	12667	no		n		
-GNIRS	LC	singleslit	0.15	0.150	49	111	M	4.4	6	4.8	0.192	8533	no		n		
-GNIRS	LC	singleslit	0.2	0.200	49	111	X	1.03	1.17	1.1	0.0316	8900	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	111	J	1.17	1.37	1.27	0.038	8500	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	111	H	1.49	1.8	1.645	0.0475	8900	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	111	K	1.91	2.49	2.2	0.0633	8900	yes		n		
-GNIRS	LC	singleslit	0.2	0.200	49	111	L	2.8	4.2	3.5	0.0944	9500	no		n		
-GNIRS	LC	singleslit	0.2	0.200	49	111	M	4.4	6	4.8	0.192	6400	no		n		
-GNIRS	LC	singleslit	0.3	0.300	49	111	X	1.03	1.17	1.1	0.0316	5933	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	111	J	1.17	1.37	1.27	0.038	5667	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	111	H	1.49	1.8	1.645	0.0475	5933	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	111	K	1.91	2.49	2.2	0.0633	5933	yes		n		
-GNIRS	LC	singleslit	0.3	0.300	49	111	L	2.8	4.2	3.5	0.0944	6333	no		n		
-GNIRS	LC	singleslit	0.3	0.300	49	111	M	4.4	6	4.8	0.192	4267	no		n		
-GNIRS	LC	singleslit	0.45	0.450	49	111	X	1.03	1.17	1.1	0.0316	3956	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	111	J	1.17	1.37	1.27	0.038	3778	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	111	H	1.49	1.8	1.645	0.0475	3956	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	111	K	1.91	2.49	2.2	0.0633	3956	yes		n		
-GNIRS	LC	singleslit	0.45	0.450	49	111	L	2.8	4.2	3.5	0.0944	4222	no		n		
-GNIRS	LC	singleslit	0.45	0.450	49	111	M	4.4	6	4.8	0.192	2844	no		n		
-GNIRS	LC	singleslit	0.675	0.675	49	111	X	1.03	1.17	1.1	0.0316	2637	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	111	J	1.17	1.37	1.27	0.038	2519	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	111	H	1.49	1.8	1.645	0.0475	2637	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	111	K	1.91	2.49	2.2	0.0633	2637	yes		n		
-GNIRS	LC	singleslit	0.675	0.675	49	111	L	2.8	4.2	3.5	0.0944	2815	no		n		
-GNIRS	LC	singleslit	0.675	0.675	49	111	M	4.4	6	4.8	0.192	1896	no		n		
-GNIRS	LC	singleslit	1.0	1.000	49	111	X	1.03	1.17	1.1	0.0316	1780	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	111	J	1.17	1.37	1.27	0.038	1700	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	111	H	1.49	1.8	1.645	0.0475	1780	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	111	K	1.91	2.49	2.2	0.0633	1780	yes		n		
-GNIRS	LC	singleslit	1.0	1.000	49	111	L	2.8	4.2	3.5	0.0944	1900	no		n		
-GNIRS	LC	singleslit	1.0	1.000	49	111	M	4.4	6	4.8	0.192	1280	no		n		
-GNIRS	SC XD	singleslit	0.3	0.300	7	32	XD	0.85	2.5	1.675	2.5	1700	no		n		
-GNIRS	SC XD	singleslit	0.45	0.450	7	32	XD	0.85	2.5	1.675	2.5	1133	no		n		
-GNIRS	SC XD	singleslit	0.675	0.675	7	32	XD	0.85	2.5	1.675	2.5	756	no		n		
-GNIRS	SC XD	singleslit	1.0	1.000	7	32	XD	0.85	2.5	1.675	2.5	510	no		n		
-GNIRS	SC XD	singleslit	0.3	0.300	7	111	XD	0.85	2.5	1.675	2.5	5900	no		n		
-GNIRS	SC XD	singleslit	0.45	0.450	7	111	XD	0.85	2.5	1.675	2.5	3933	no		n		
-GNIRS	SC XD	singleslit	0.675	0.675	7	111	XD	0.85	2.5	1.675	2.5	2622	no		n		
-GNIRS	SC XD	singleslit	1.0	1.000	7	111	XD	0.85	2.5	1.675	2.5	1770	no		n		
-GNIRS	LC LXD	singleslit	0.1	0.100	5	10	XD	0.85	2.5	1.675	2.5	1700	yes		n		
-GNIRS	LC LXD	singleslit	0.3	0.300	5	10	XD	0.85	2.5	1.675	2.5	567	yes		n		
-GNIRS	LC LXD	singleslit	0.45	0.450	5	10	XD	0.85	2.5	1.675	2.5	378	yes		n		
-GNIRS	LC LXD	singleslit	0.675	0.675	5	10	XD	0.85	2.5	1.675	2.5	252	yes		n		
-GNIRS	LC LXD	singleslit	1.0	1.000	5	10	XD	0.85	2.5	1.675	2.5	170	yes		n		
-GNIRS	LC LXD	singleslit	0.1	0.100	5	32	XD	0.85	2.5	1.675	2.5	5000	yes		n		
-GNIRS	LC LXD	singleslit	0.3	0.300	5	32	XD	0.85	2.5	1.675	2.5	1667	yes		n		
-GNIRS	LC LXD	singleslit	0.45	0.450	5	32	XD	0.85	2.5	1.675	2.5	1111	yes		n		
-GNIRS	LC LXD	singleslit	0.675	0.675	5	32	XD	0.85	2.5	1.675	2.5	741	yes		n		
-GNIRS	LC LXD	singleslit	1.0	1.000	5	32	XD	0.85	2.5	1.675	2.5	500	yes		n		
-GNIRS	LC LXD	singleslit	0.1	0.100	5	111	XD	0.85	2.5	1.675	2.5	17800	yes		n		
-GNIRS	LC LXD	singleslit	0.3	0.300	5	111	XD	0.85	2.5	1.675	2.5	5933	yes		n		
-GNIRS	LC LXD	singleslit	0.45	0.450	5	111	XD	0.85	2.5	1.675	2.5	3956	yes		n		
-GNIRS	LC LXD	singleslit	0.675	0.675	5	111	XD	0.85	2.5	1.675	2.5	2637	yes		n		
-GNIRS	LC LXD	singleslit	1.0	1.000	5	111	XD	0.85	2.5	1.675	2.5	1780	yes		n		
-GNIRS	LC SXD	singleslit	0.1	0.100	7	10	XD	1.2	2.5	1.85	2.5	1700	yes		n		
-GNIRS	LC SXD	singleslit	0.3	0.300	7	10	XD	1.2	2.5	1.85	2.5	567	yes		n		
-GNIRS	LC SXD	singleslit	0.45	0.450	7	10	XD	1.2	2.5	1.85	2.5	378	yes		n		
-GNIRS	LC SXD	singleslit	0.675	0.675	7	10	XD	1.2	2.5	1.85	2.5	252	yes		n		
-GNIRS	LC SXD	singleslit	1.0	1.000	7	10	XD	1.2	2.5	1.85	2.5	170	yes		n		
-GNIRS	LC SXD	singleslit	0.1	0.100	7	32	XD	1.2	2.5	1.85	2.5	5000	yes		n		
-GNIRS	LC SXD	singleslit	0.3	0.300	7	32	XD	1.2	2.5	1.85	2.5	1667	yes		n		
-GNIRS	LC SXD	singleslit	0.45	0.450	7	32	XD	1.2	2.5	1.85	2.5	1111	yes		n		
-GNIRS	LC SXD	singleslit	0.675	0.675	7	32	XD	1.2	2.5	1.85	2.5	741	yes		n		
-GNIRS	LC SXD	singleslit	1.0	1.000	7	32	XD	1.2	2.5	1.85	2.5	500	yes		n		
-GNIRS	LC SXD	singleslit	0.1	0.100	7	111	XD	1.2	2.5	1.85	2.5	17800	yes		n		
-GNIRS	LC SXD	singleslit	0.3	0.300	7	111	XD	1.2	2.5	1.85	2.5	5933	yes		n		
-GNIRS	LC SXD	singleslit	0.45	0.450	7	111	XD	1.2	2.5	1.85	2.5	3956	yes		n		
-GNIRS	LC SXD	singleslit	0.675	0.675	7	111	XD	1.2	2.5	1.85	2.5	2637	yes		n		
-GNIRS	LC SXD	singleslit	1.0	1.000	7	111	XD	1.2	2.5	1.85	2.5	1780	yes		n		
+GNIRS	SC	singleslit	0.3	0.300	99	32	X	1.03	1.17	1.1	0.331	1700	no		n	5.49	5.05
+GNIRS	SC	singleslit	0.3	0.300	99	32	J	1.17	1.37	1.27	0.397	1600	no		n	5.61	5.38
+GNIRS	SC	singleslit	0.3	0.300	99	32	H	1.49	1.8	1.645	0.496	1700	no		n	5.39	5.37
+GNIRS	SC	singleslit	0.3	0.300	99	32	K	1.91	2.49	2.2	0.661	1700	no		n	5.36	5.4
+GNIRS	SC	singleslit	0.3	0.300	99	32	L	2.8	4.2	3.5	0.992	1800	no		n	2.34	2.42
+GNIRS	SC	singleslit	0.45	0.450	99	32	X	1.03	1.17	1.1	0.331	1133	no		n	5.73	5.28
+GNIRS	SC	singleslit	0.45	0.450	99	32	J	1.17	1.37	1.27	0.397	1067	no		n	5.85	5.61
+GNIRS	SC	singleslit	0.45	0.450	99	32	H	1.49	1.8	1.645	0.496	1133	no		n	5.63	5.61
+GNIRS	SC	singleslit	0.45	0.450	99	32	K	1.91	2.49	2.2	0.661	1133	no		n	5.56	5.6
+GNIRS	SC	singleslit	0.45	0.450	99	32	L	2.8	4.2	3.5	0.992	1200	no		n	2.55	2.62
+GNIRS	SC	singleslit	0.675	0.675	99	32	X	1.03	1.17	1.1	0.331	756	no		n	5.81	5.36
+GNIRS	SC	singleslit	0.675	0.675	99	32	J	1.17	1.37	1.27	0.397	711	no		n	5.93	5.7
+GNIRS	SC	singleslit	0.675	0.675	99	32	H	1.49	1.8	1.645	0.496	756	no		n	5.71	5.7
+GNIRS	SC	singleslit	0.675	0.675	99	32	K	1.91	2.49	2.2	0.661	756	no		n	5.57	5.61
+GNIRS	SC	singleslit	0.675	0.675	99	32	L	2.8	4.2	3.5	0.992	800	no		n	2.56	2.64
+GNIRS	SC	singleslit	1.0	1.000	99	32	X	1.03	1.17	1.1	0.331	510	no		n	5.68	5.24
+GNIRS	SC	singleslit	1.0	1.000	99	32	J	1.17	1.37	1.27	0.397	480	no		n	5.8	5.57
+GNIRS	SC	singleslit	1.0	1.000	99	32	H	1.49	1.8	1.645	0.496	510	no		n	5.59	5.57
+GNIRS	SC	singleslit	1.0	1.000	99	32	K	1.91	2.49	2.2	0.661	510	no		n	5.39	5.43
+GNIRS	SC	singleslit	1.0	1.000	99	32	L	2.8	4.2	3.5	0.992	540	no		n	2.39	2.47
+GNIRS	SC	singleslit	0.3	0.300	99	111	X	1.03	1.17	1.1	0.094	6600	no		n	4.7	4.22
+GNIRS	SC	singleslit	0.3	0.300	99	111	J	1.17	1.37	1.27	0.113	7200	no		n	4.85	4.62
+GNIRS	SC	singleslit	0.3	0.300	99	111	H	1.49	1.8	1.645	0.142	5900	no		n	4.39	4.37
+GNIRS	SC	singleslit	0.3	0.300	99	111	K	1.91	2.49	2.2	0.189	5900	no		n	4.2	4.24
+GNIRS	SC	singleslit	0.3	0.300	99	111	L	2.8	4.2	3.5	0.28	6400	no		n	1.29	1.36
+GNIRS	SC	singleslit	0.3	0.300	99	111	M	4.4	6	4.8	0.575	4300	no		n	0.64	0.72
+GNIRS	SC	singleslit	0.45	0.450	99	111	X	1.03	1.17	1.1	0.094	4400	no		n	4.93	4.46
+GNIRS	SC	singleslit	0.45	0.450	99	111	J	1.17	1.37	1.27	0.113	4800	no		n	5.09	4.86
+GNIRS	SC	singleslit	0.45	0.450	99	111	H	1.49	1.8	1.645	0.142	3933	no		n	4.63	4.61
+GNIRS	SC	singleslit	0.45	0.450	99	111	K	1.91	2.49	2.2	0.189	3933	no		n	4.4	4.45
+GNIRS	SC	singleslit	0.45	0.450	99	111	L	2.8	4.2	3.5	0.28	4267	no		n	1.49	1.57
+GNIRS	SC	singleslit	0.45	0.450	99	111	M	4.4	6	4.8	0.575	2867	no		n	99.99	99.99
+GNIRS	SC	singleslit	0.675	0.675	99	111	X	1.03	1.17	1.1	0.094	2933	no		n	5.02	4.54
+GNIRS	SC	singleslit	0.675	0.675	99	111	J	1.17	1.37	1.27	0.113	3200	no		n	5.17	4.95
+GNIRS	SC	singleslit	0.675	0.675	99	111	H	1.49	1.8	1.645	0.142	2622	no		n	4.71	4.69
+GNIRS	SC	singleslit	0.675	0.675	99	111	K	1.91	2.49	2.2	0.189	2622	no		n	4.41	4.46
+GNIRS	SC	singleslit	0.675	0.675	99	111	L	2.8	4.2	3.5	0.28	2844	no		n	1.5	1.58
+GNIRS	SC	singleslit	0.675	0.675	99	111	M	4.4	6	4.8	0.575	1911	no		n	99.99	99.99
+GNIRS	SC	singleslit	1.00	1.000	99	111	X	1.03	1.17	1.1	0.094	1980	no		n	4.89	4.42
+GNIRS	SC	singleslit	1.00	1.000	99	111	J	1.17	1.37	1.27	0.113	2160	no		n	5.04	4.82
+GNIRS	SC	singleslit	1.00	1.000	99	111	H	1.49	1.8	1.645	0.142	1770	no		n	4.59	4.57
+GNIRS	SC	singleslit	1.00	1.000	99	111	K	1.91	2.49	2.2	0.189	1770	no		n	4.23	4.27
+GNIRS	SC	singleslit	1.00	1.000	99	111	L	2.8	4.2	3.5	0.28	1920	no		n	1.32	1.39
+GNIRS	SC	singleslit	1.00	1.000	99	111	M	4.4	6	4.8	0.575	1290	no		n	99.99	99.99
+GNIRS	LC	singleslit	0.10	0.100	49	10	X	1.03	1.17	1.1	0.332	2100	yes		n	3.9	3.47
+GNIRS	LC	singleslit	0.10	0.100	49	10	J	1.17	1.37	1.27	0.398	1600	yes		n	3.78	3.54
+GNIRS	LC	singleslit	0.10	0.100	49	10	H	1.49	1.8	1.645	0.497	1700	yes		n	3.44	3.45
+GNIRS	LC	singleslit	0.10	0.100	49	10	K	1.91	2.49	2.2	0.663	1700	yes		n	3.26	3.31
+GNIRS	LC	singleslit	0.10	0.100	49	10	L	2.8	4.2	3.5	0.995	1800	no		n	0.56	0.63
+GNIRS	LC	singleslit	0.15	0.150	49	10	X	1.03	1.17	1.1	0.332	1400	yes		n	4.31	3.88
+GNIRS	LC	singleslit	0.15	0.150	49	10	J	1.17	1.37	1.27	0.398	1067	yes		n	4.19	3.95
+GNIRS	LC	singleslit	0.15	0.150	49	10	H	1.49	1.8	1.645	0.497	1133	yes		n	3.85	3.87
+GNIRS	LC	singleslit	0.15	0.150	49	10	K	1.91	2.49	2.2	0.663	1133	yes		n	3.67	3.72
+GNIRS	LC	singleslit	0.15	0.150	49	10	L	2.8	4.2	3.5	0.995	1200	no		n	0.96	1.04
+GNIRS	LC	singleslit	0.20	0.200	49	10	X	1.03	1.17	1.1	0.332	1050	yes		n	4.62	4.19
+GNIRS	LC	singleslit	0.20	0.200	49	10	J	1.17	1.37	1.27	0.398	800	yes		n	4.49	4.25
+GNIRS	LC	singleslit	0.20	0.200	49	10	H	1.49	1.8	1.645	0.497	850	yes		n	4.16	4.17
+GNIRS	LC	singleslit	0.20	0.200	49	10	K	1.91	2.49	2.2	0.663	850	yes		n	3.95	4
+GNIRS	LC	singleslit	0.20	0.200	49	10	L	2.8	4.2	3.5	0.995	900	no		n	1.25	1.32
+GNIRS	LC	singleslit	0.30	0.300	49	10	X	1.03	1.17	1.1	0.332	700	yes		n	4.93	4.5
+GNIRS	LC	singleslit	0.30	0.300	49	10	J	1.17	1.37	1.27	0.398	533	yes		n	4.81	4.57
+GNIRS	LC	singleslit	0.30	0.300	49	10	H	1.49	1.8	1.645	0.497	567	yes		n	4.48	4.49
+GNIRS	LC	singleslit	0.30	0.300	49	10	K	1.91	2.49	2.2	0.663	567	yes		n	4.25	4.3
+GNIRS	LC	singleslit	0.30	0.300	49	10	L	2.8	4.2	3.5	0.995	600	no		n	1.54	1.62
+GNIRS	LC	singleslit	0.45	0.450	49	10	X	1.03	1.17	1.1	0.332	467	yes		n	5.16	4.73
+GNIRS	LC	singleslit	0.45	0.450	49	10	J	1.17	1.37	1.27	0.398	356	yes		n	5.04	4.81
+GNIRS	LC	singleslit	0.45	0.450	49	10	H	1.49	1.8	1.645	0.497	378	yes		n	4.72	4.73
+GNIRS	LC	singleslit	0.45	0.450	49	10	K	1.91	2.49	2.2	0.663	378	yes		n	4.45	4.5
+GNIRS	LC	singleslit	0.45	0.450	49	10	L	2.8	4.2	3.5	0.995	400	no		n	1.74	1.82
+GNIRS	LC	singleslit	0.675	0.675	49	10	X	1.03	1.17	1.1	0.332	311	yes		n	5.24	4.81
+GNIRS	LC	singleslit	0.675	0.675	49	10	J	1.17	1.37	1.27	0.398	237	yes		n	5.13	4.89
+GNIRS	LC	singleslit	0.675	0.675	49	10	H	1.49	1.8	1.645	0.497	252	yes		n	4.8	4.81
+GNIRS	LC	singleslit	0.675	0.675	49	10	K	1.91	2.49	2.2	0.663	252	yes		n	4.46	4.51
+GNIRS	LC	singleslit	0.675	0.675	49	10	L	2.8	4.2	3.5	0.995	267	no		n	1.76	1.83
+GNIRS	LC	singleslit	1.00	1.000	49	10	X	1.03	1.17	1.1	0.332	210	yes		n	5.11	4.69
+GNIRS	LC	singleslit	1.00	1.000	49	10	J	1.17	1.37	1.27	0.398	160	yes		n	5	4.77
+GNIRS	LC	singleslit	1.00	1.000	49	10	H	1.49	1.8	1.645	0.497	170	yes		n	4.67	4.69
+GNIRS	LC	singleslit	1.00	1.000	49	10	K	1.91	2.49	2.2	0.663	170	yes		n	4.28	4.32
+GNIRS	LC	singleslit	1.00	1.000	49	10	L	2.8	4.2	3.5	0.995	180	no		n	1.57	1.65
+GNIRS	LC	singleslit	0.1	0.100	49	32	X	1.03	1.17	1.1	0.11	5100	yes		n	2.09	1.61
+GNIRS	LC	singleslit	0.1	0.100	49	32	J	1.17	1.37	1.27	0.132	4800	yes		n	2.21	1.99
+GNIRS	LC	singleslit	0.1	0.100	49	32	H	1.49	1.8	1.645	0.166	5100	yes		n	1.95	1.94
+GNIRS	LC	singleslit	0.1	0.100	49	32	K	1.91	2.49	2.2	0.221	5100	yes		n	2.01	2.05
+GNIRS	LC	singleslit	0.1	0.100	49	32	L	2.8	4.2	3.5	0.332	5400	no		n	-1.02	-0.94
+GNIRS	LC	singleslit	0.1	0.100	49	32	M	4.4	6	4.8	0.66	3700	no		n	-1.74	-1.66
+GNIRS	LC	singleslit	0.15	0.150	49	32	X	1.03	1.17	1.1	0.11	3400	yes		n	2.5	2.03
+GNIRS	LC	singleslit	0.15	0.150	49	32	J	1.17	1.37	1.27	0.132	3200	yes		n	2.62	2.4
+GNIRS	LC	singleslit	0.15	0.150	49	32	H	1.49	1.8	1.645	0.166	3400	yes		n	2.36	2.35
+GNIRS	LC	singleslit	0.15	0.150	49	32	K	1.91	2.49	2.2	0.221	3400	yes		n	2.41	2.46
+GNIRS	LC	singleslit	0.15	0.150	49	32	L	2.8	4.2	3.5	0.332	3600	no		n	-0.61	-0.53
+GNIRS	LC	singleslit	0.15	0.150	49	32	M	4.4	6	4.8	0.66	2467	no		n	-1.32	-1.25
+GNIRS	LC	singleslit	0.2	0.200	49	32	X	1.03	1.17	1.1	0.11	2550	yes		n	2.81	2.33
+GNIRS	LC	singleslit	0.2	0.200	49	32	J	1.17	1.37	1.27	0.132	2400	yes		n	2.93	2.7
+GNIRS	LC	singleslit	0.2	0.200	49	32	H	1.49	1.8	1.645	0.166	2550	yes		n	2.67	2.65
+GNIRS	LC	singleslit	0.2	0.200	49	32	K	1.91	2.49	2.2	0.221	2550	yes		n	2.7	2.74
+GNIRS	LC	singleslit	0.2	0.200	49	32	L	2.8	4.2	3.5	0.332	2700	no		n	-0.33	-0.25
+GNIRS	LC	singleslit	0.2	0.200	49	32	M	4.4	6	4.8	0.66	1850	no		n	-1.03	-0.96
+GNIRS	LC	singleslit	0.3	0.300	49	32	X	1.03	1.17	1.1	0.11	1700	yes		n	3.13	2.65
+GNIRS	LC	singleslit	0.3	0.300	49	32	J	1.17	1.37	1.27	0.132	1600	yes		n	3.25	3.03
+GNIRS	LC	singleslit	0.3	0.300	49	32	H	1.49	1.8	1.645	0.166	1700	yes		n	2.99	2.97
+GNIRS	LC	singleslit	0.3	0.300	49	32	K	1.91	2.49	2.2	0.221	1700	yes		n	3	3.04
+GNIRS	LC	singleslit	0.3	0.300	49	32	L	2.8	4.2	3.5	0.332	1800	no		n	-0.03	0.05
+GNIRS	LC	singleslit	0.3	0.300	49	32	M	4.4	6	4.8	0.66	1233	no		n	-0.72	-0.64
+GNIRS	LC	singleslit	0.45	0.450	49	32	X	1.03	1.17	1.1	0.11	1133	yes		n	3.36	2.89
+GNIRS	LC	singleslit	0.45	0.450	49	32	J	1.17	1.37	1.27	0.132	1067	yes		n	3.49	3.27
+GNIRS	LC	singleslit	0.45	0.450	49	32	H	1.49	1.8	1.645	0.166	1133	yes		n	3.23	3.21
+GNIRS	LC	singleslit	0.45	0.450	49	32	K	1.91	2.49	2.2	0.221	1133	yes		n	3.2	3.24
+GNIRS	LC	singleslit	0.45	0.450	49	32	L	2.8	4.2	3.5	0.332	1200	no		n	0.17	0.25
+GNIRS	LC	singleslit	0.45	0.450	49	32	M	4.4	6	4.8	0.66	822	no		n	-0.48	-0.41
+GNIRS	LC	singleslit	0.675	0.675	49	32	X	1.03	1.17	1.1	0.11	756	yes		n	3.45	2.97
+GNIRS	LC	singleslit	0.675	0.675	49	32	J	1.17	1.37	1.27	0.132	711	yes		n	3.57	3.35
+GNIRS	LC	singleslit	0.675	0.675	49	32	H	1.49	1.8	1.645	0.166	756	yes		n	3.31	3.3
+GNIRS	LC	singleslit	0.675	0.675	49	32	K	1.91	2.49	2.2	0.221	756	yes		n	3.21	3.25
+GNIRS	LC	singleslit	0.675	0.675	49	32	L	2.8	4.2	3.5	0.332	800	no		n	0.19	0.26
+GNIRS	LC	singleslit	0.675	0.675	49	32	M	4.4	6	4.8	0.66	548	no		n	-0.41	-0.34
+GNIRS	LC	singleslit	1.0	1.000	49	32	X	1.03	1.17	1.1	0.11	510	yes		n	3.32	2.85
+GNIRS	LC	singleslit	1.0	1.000	49	32	J	1.17	1.37	1.27	0.132	480	yes		n	3.44	3.22
+GNIRS	LC	singleslit	1.0	1.000	49	32	H	1.49	1.8	1.645	0.166	510	yes		n	3.19	3.17
+GNIRS	LC	singleslit	1.0	1.000	49	32	K	1.91	2.49	2.2	0.221	510	yes		n	3.02	3.06
+GNIRS	LC	singleslit	1.0	1.000	49	32	L	2.8	4.2	3.5	0.332	540	no		n	0	0.07
+GNIRS	LC	singleslit	1.0	1.000	49	32	M	4.4	6	4.8	0.66	370	no		n	-0.33	-0.25
+GNIRS	LC	singleslit	0.1	0.100	49	111	X	1.03	1.17	1.1	0.0316	17800	yes		n	1.26	0.78
+GNIRS	LC	singleslit	0.1	0.100	49	111	J	1.17	1.37	1.27	0.038	17000	yes		n	1.22	0.99
+GNIRS	LC	singleslit	0.1	0.100	49	111	H	1.49	1.8	1.645	0.0475	17800	yes		n	0.93	0.93
+GNIRS	LC	singleslit	0.1	0.100	49	111	K	1.91	2.49	2.2	0.0633	17800	yes		n	0.81	0.86
+GNIRS	LC	singleslit	0.1	0.100	49	111	L	2.8	4.2	3.5	0.0944	19000	no		n	-2.14	-2.07
+GNIRS	LC	singleslit	0.1	0.100	49	111	M	4.4	6	4.8	0.192	12800	no		n	-2.83	-2.76
+GNIRS	LC	singleslit	0.15	0.150	49	111	X	1.03	1.17	1.1	0.0316	11867	yes		n	1.67	1.19
+GNIRS	LC	singleslit	0.15	0.150	49	111	J	1.17	1.37	1.27	0.038	11333	yes		n	1.64	1.4
+GNIRS	LC	singleslit	0.15	0.150	49	111	H	1.49	1.8	1.645	0.0475	11867	yes		n	1.34	1.34
+GNIRS	LC	singleslit	0.15	0.150	49	111	K	1.91	2.49	2.2	0.0633	11867	yes		n	1.22	1.27
+GNIRS	LC	singleslit	0.15	0.150	49	111	L	2.8	4.2	3.5	0.0944	12667	no		n	-1.73	-1.66
+GNIRS	LC	singleslit	0.15	0.150	49	111	M	4.4	6	4.8	0.192	8533	no		n	-2.42	-2.35
+GNIRS	LC	singleslit	0.2	0.200	49	111	X	1.03	1.17	1.1	0.0316	8900	yes		n	1.97	1.49
+GNIRS	LC	singleslit	0.2	0.200	49	111	J	1.17	1.37	1.27	0.038	8500	yes		n	1.94	1.71
+GNIRS	LC	singleslit	0.2	0.200	49	111	H	1.49	1.8	1.645	0.0475	8900	yes		n	1.65	1.65
+GNIRS	LC	singleslit	0.2	0.200	49	111	K	1.91	2.49	2.2	0.0633	8900	yes		n	1.5	1.55
+GNIRS	LC	singleslit	0.2	0.200	49	111	L	2.8	4.2	3.5	0.0944	9500	no		n	-1.45	-1.38
+GNIRS	LC	singleslit	0.2	0.200	49	111	M	4.4	6	4.8	0.192	6400	no		n	-2.14	-2.07
+GNIRS	LC	singleslit	0.3	0.300	49	111	X	1.03	1.17	1.1	0.0316	5933	yes		n	2.29	1.82
+GNIRS	LC	singleslit	0.3	0.300	49	111	J	1.17	1.37	1.27	0.038	5667	yes		n	2.26	2.03
+GNIRS	LC	singleslit	0.3	0.300	49	111	H	1.49	1.8	1.645	0.0475	5933	yes		n	1.97	1.97
+GNIRS	LC	singleslit	0.3	0.300	49	111	K	1.91	2.49	2.2	0.0633	5933	yes		n	1.8	1.85
+GNIRS	LC	singleslit	0.3	0.300	49	111	L	2.8	4.2	3.5	0.0944	6333	no		n	-1.15	-1.08
+GNIRS	LC	singleslit	0.3	0.300	49	111	M	4.4	6	4.8	0.192	4267	no		n	-1.84	-1.76
+GNIRS	LC	singleslit	0.45	0.450	49	111	X	1.03	1.17	1.1	0.0316	3956	yes		n	2.53	2.06
+GNIRS	LC	singleslit	0.45	0.450	49	111	J	1.17	1.37	1.27	0.038	3778	yes		n	2.5	2.27
+GNIRS	LC	singleslit	0.45	0.450	49	111	H	1.49	1.8	1.645	0.0475	3956	yes		n	2.21	2.21
+GNIRS	LC	singleslit	0.45	0.450	49	111	K	1.91	2.49	2.2	0.0633	3956	yes		n	2.01	2.05
+GNIRS	LC	singleslit	0.45	0.450	49	111	L	2.8	4.2	3.5	0.0944	4222	no		n	-0.95	-0.88
+GNIRS	LC	singleslit	0.45	0.450	49	111	M	4.4	6	4.8	0.192	2844	no		n	-1.63	-1.56
+GNIRS	LC	singleslit	0.675	0.675	49	111	X	1.03	1.17	1.1	0.0316	2637	yes		n	2.62	2.14
+GNIRS	LC	singleslit	0.675	0.675	49	111	J	1.17	1.37	1.27	0.038	2519	yes		n	2.59	2.35
+GNIRS	LC	singleslit	0.675	0.675	49	111	H	1.49	1.8	1.645	0.0475	2637	yes		n	2.29	2.29
+GNIRS	LC	singleslit	0.675	0.675	49	111	K	1.91	2.49	2.2	0.0633	2637	yes		n	2.02	2.06
+GNIRS	LC	singleslit	0.675	0.675	49	111	L	2.8	4.2	3.5	0.0944	2815	no		n	-0.94	-0.86
+GNIRS	LC	singleslit	0.675	0.675	49	111	M	4.4	6	4.8	0.192	1896	no		n	-1.61	-1.54
+GNIRS	LC	singleslit	1.0	1.000	49	111	X	1.03	1.17	1.1	0.0316	1780	yes		n	2.49	2.01
+GNIRS	LC	singleslit	1.0	1.000	49	111	J	1.17	1.37	1.27	0.038	1700	yes		n	2.46	2.23
+GNIRS	LC	singleslit	1.0	1.000	49	111	H	1.49	1.8	1.645	0.0475	1780	yes		n	2.17	2.17
+GNIRS	LC	singleslit	1.0	1.000	49	111	K	1.91	2.49	2.2	0.0633	1780	yes		n	1.83	1.88
+GNIRS	LC	singleslit	1.0	1.000	49	111	L	2.8	4.2	3.5	0.0944	1900	no		n	-1.13	-1.05
+GNIRS	LC	singleslit	1.0	1.000	49	111	M	4.4	6	4.8	0.192	1280	no		n	-1.79	-1.71
+GNIRS	SC XD	singleslit	0.3	0.300	7	32	XD	0.85	2.5	1.675	2.5	1700	no		n	5.71	5.41
+GNIRS	SC XD	singleslit	0.45	0.450	7	32	XD	0.85	2.5	1.675	2.5	1133	no		n	5.95	5.64
+GNIRS	SC XD	singleslit	0.675	0.675	7	32	XD	0.85	2.5	1.675	2.5	756	no		n	6.03	5.72
+GNIRS	SC XD	singleslit	1.0	1.000	7	32	XD	0.85	2.5	1.675	2.5	510	no		n	5.91	5.6
+GNIRS	SC XD	singleslit	0.3	0.300	7	111	XD	0.85	2.5	1.675	2.5	5900	no		n	4.85	4.63
+GNIRS	SC XD	singleslit	0.45	0.450	7	111	XD	0.85	2.5	1.675	2.5	3933	no		n	5.09	4.87
+GNIRS	SC XD	singleslit	0.675	0.675	7	111	XD	0.85	2.5	1.675	2.5	2622	no		n	5.17	4.95
+GNIRS	SC XD	singleslit	1.0	1.000	7	111	XD	0.85	2.5	1.675	2.5	1770	no		n	5.05	4.82
+GNIRS	LC LXD	singleslit	0.1	0.100	5	10	XD	0.85	2.5	1.675	2.5	1700	yes		n	4.09	3.71
+GNIRS	LC LXD	singleslit	0.3	0.300	5	10	XD	0.85	2.5	1.675	2.5	567	yes		n	5.13	4.74
+GNIRS	LC LXD	singleslit	0.45	0.450	5	10	XD	0.85	2.5	1.675	2.5	378	yes		n	5.36	4.98
+GNIRS	LC LXD	singleslit	0.675	0.675	5	10	XD	0.85	2.5	1.675	2.5	252	yes		n	5.45	5.06
+GNIRS	LC LXD	singleslit	1.0	1.000	5	10	XD	0.85	2.5	1.675	2.5	170	yes		n	5.32	4.93
+GNIRS	LC LXD	singleslit	0.1	0.100	5	32	XD	0.85	2.5	1.675	2.5	5000	yes		n	2.21	1.99
+GNIRS	LC LXD	singleslit	0.3	0.300	5	32	XD	0.85	2.5	1.675	2.5	1667	yes		n	3.25	3.03
+GNIRS	LC LXD	singleslit	0.45	0.450	5	32	XD	0.85	2.5	1.675	2.5	1111	yes		n	3.49	3.27
+GNIRS	LC LXD	singleslit	0.675	0.675	5	32	XD	0.85	2.5	1.675	2.5	741	yes		n	3.57	3.35
+GNIRS	LC LXD	singleslit	1.0	1.000	5	32	XD	0.85	2.5	1.675	2.5	500	yes		n	3.45	3.22
+GNIRS	LC LXD	singleslit	0.1	0.100	5	111	XD	0.85	2.5	1.675	2.5	17800	yes		n	1.39	1.17
+GNIRS	LC LXD	singleslit	0.3	0.300	5	111	XD	0.85	2.5	1.675	2.5	5933	yes		n	2.43	2.21
+GNIRS	LC LXD	singleslit	0.45	0.450	5	111	XD	0.85	2.5	1.675	2.5	3956	yes		n	2.67	2.45
+GNIRS	LC LXD	singleslit	0.675	0.675	5	111	XD	0.85	2.5	1.675	2.5	2637	yes		n	2.76	2.53
+GNIRS	LC LXD	singleslit	1.0	1.000	5	111	XD	0.85	2.5	1.675	2.5	1780	yes		n	2.63	2.41
+GNIRS	LC SXD	singleslit	0.1	0.100	7	10	XD	1.2	2.5	1.85	2.5	1700	yes		n	4.09	3.7
+GNIRS	LC SXD	singleslit	0.3	0.300	7	10	XD	1.2	2.5	1.85	2.5	567	yes		n	5.12	4.74
+GNIRS	LC SXD	singleslit	0.45	0.450	7	10	XD	1.2	2.5	1.85	2.5	378	yes		n	5.36	4.98
+GNIRS	LC SXD	singleslit	0.675	0.675	7	10	XD	1.2	2.5	1.85	2.5	252	yes		n	5.45	5.06
+GNIRS	LC SXD	singleslit	1.0	1.000	7	10	XD	1.2	2.5	1.85	2.5	170	yes		n	5.32	4.94
+GNIRS	LC SXD	singleslit	0.1	0.100	7	32	XD	1.2	2.5	1.85	2.5	5000	yes		n	2.26	1.92
+GNIRS	LC SXD	singleslit	0.3	0.300	7	32	XD	1.2	2.5	1.85	2.5	1667	yes		n	3.3	2.96
+GNIRS	LC SXD	singleslit	0.45	0.450	7	32	XD	1.2	2.5	1.85	2.5	1111	yes		n	3.54	3.2
+GNIRS	LC SXD	singleslit	0.675	0.675	7	32	XD	1.2	2.5	1.85	2.5	741	yes		n	3.62	3.28
+GNIRS	LC SXD	singleslit	1.0	1.000	7	32	XD	1.2	2.5	1.85	2.5	500	yes		n	3.5	3.15
+GNIRS	LC SXD	singleslit	0.1	0.100	7	111	XD	1.2	2.5	1.85	2.5	17800	yes		n	1.23	0.9
+GNIRS	LC SXD	singleslit	0.3	0.300	7	111	XD	1.2	2.5	1.85	2.5	5933	yes		n	2.27	1.94
+GNIRS	LC SXD	singleslit	0.45	0.450	7	111	XD	1.2	2.5	1.85	2.5	3956	yes		n	2.51	2.18
+GNIRS	LC SXD	singleslit	0.675	0.675	7	111	XD	1.2	2.5	1.85	2.5	2637	yes		n	2.6	2.26
+GNIRS	LC SXD	singleslit	1.0	1.000	7	111	XD	1.2	2.5	1.85	2.5	1780	yes		n	2.47	2.14
 GNIRS	LR-IFU	ifu	LR-IFU	3.150	4.8	32	X	1.03	1.17	1.1	0.331	1700	yes		n		
 GNIRS	LR-IFU	ifu	LR-IFU	3.150	4.8	32	J	1.17	1.37	1.27	0.397	1600	yes		n		
 GNIRS	LR-IFU	ifu	LR-IFU	3.150	4.8	32	H	1.49	1.8	1.645	0.496	1700	yes		n		
@@ -624,10 +624,9 @@ GNIRS	HR-IFU	ifu	HR-IFU	1.250	1.8	111	H	1.49	1.8	1.645	0.0475	17800	yes		n
 GNIRS	HR-IFU	ifu	HR-IFU	1.250	1.8	111	K	1.91	2.49	2.2	0.0633	17800	yes		n		
 GNIRS	HR-IFU	ifu	HR-IFU	1.250	1.8	111	L	2.8	4.2	3.5	0.0944	19000	no		n		
 GNIRS	HR-IFU	ifu	HR-IFU	1.250	1.8	111	M	4.4	6	4.8	0.192	12800	no		n		
-IGRINS-2	H+K 45000	singleslit	slit	0.330	5	HK	HK	1.49	2.46	1.975	0.97	45000	no		n	4.72	4.71
-GHOST	SR-IFU	ifu	SR-IFU	1.20	1.20	echelle	none	0.347	1.060	0.7035	0.713	56000	no		s
-GHOST	HR-IFU	ifu	HR-IFU	1.20	1.20	echelle	none	0.347	1.060	0.7035	0.713	76000	no		s
-Visitor @ GN													yes		n
-Visitor @ GS													no		s
-MAROON-X	IFU	ifu	fiber	0.77	0.77	echelle	none	0.500	0.920	0.710	0.420	85000	no		n
-
+IGRINS-2	H+K 45000	singleslit	0.33	0.330	5	HK	HK	1.49	2.46	2.10	0.97	45000	no		n	4.72	4.71
+GHOST	SR-IFU	ifu	SR-IFU	1.20	1.20	echelle	none	0.347	1.060	0.655	0.713	56000	no		s		
+GHOST	HR-IFU	ifu	HR-IFU	1.20	1.20	echelle	none	0.347	1.060	0.655	0.713	76000	no		s		
+Visitor @ GN	Visitor @ GN												yes		n		
+Visitor @ GN	Visitor @ GS												no		s		
+MAROON-X	IFU	ifu	fiber	0.77	0.77	echelle	none	0.500	0.920	0.710	0.420	85000	no		n		
