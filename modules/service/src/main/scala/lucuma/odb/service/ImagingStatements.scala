@@ -152,3 +152,38 @@ object ImagingStatements:
         sql"""($observation_id, $filterCodec, $observing_mode_row_version, $exposure_time_mode_id)"""(oid, filter, version, eid)
 
     insertInto |+| filterEntries.intercalate(void", ")
+
+  def cloneFiltersAndEtms(
+    filterTableName: String,
+    originalId:      Observation.Id,
+    newId:           Observation.Id,
+    etms:            List[(ExposureTimeModeId, ExposureTimeModeId)]
+  ): AppliedFragment =
+    sql"""
+      WITH etm_map AS (
+        SELECT
+          old_exposure_time_mode_id,
+          new_exposure_time_mode_id
+        FROM
+          unnest(
+            ARRAY[${exposure_time_mode_id.list(etms.length)}],
+            ARRAY[${exposure_time_mode_id.list(etms.length)}]
+          ) AS map(old_exposure_time_mode_id, new_exposure_time_mode_id)
+      )
+      INSERT INTO #$filterTableName (
+        c_observation_id,
+        c_exposure_time_mode_id,
+        c_filter,
+        c_version,
+        c_role
+      )
+      SELECT
+        $observation_id,
+        e.new_exposure_time_mode_id,
+        f.c_filter,
+        f.c_version,
+        f.c_role
+      FROM #$filterTableName f
+      JOIN etm_map e ON f.c_exposure_time_mode_id = e.old_exposure_time_mode_id
+      WHERE f.c_observation_id = $observation_id
+    """.apply(etms.map(_._1), etms.map(_._2), newId, originalId)
