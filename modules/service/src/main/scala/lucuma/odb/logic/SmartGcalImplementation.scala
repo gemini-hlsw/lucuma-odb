@@ -20,6 +20,8 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth as GmosNorthDynam
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth as GmosSouthDynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosNorth as GmosNorthStaticConfig
 import lucuma.core.model.sequence.gmos.StaticConfig.GmosSouth as GmosSouthStaticConfig
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.sequence.SmartGcalExpander
@@ -29,6 +31,7 @@ import lucuma.odb.service.SmartGcalService
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.Ghost
 import lucuma.odb.smartgcal.data.Gmos
+import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.odb.smartgcal.data.Igrins2
 
 object SmartGcalImplementation {
@@ -139,6 +142,13 @@ object SmartGcalImplementation {
         (_, _) => Igrins2.TableKey,
         _.format,
         service.selectIgrins2
+      )
+
+    val gnirs: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig] =
+      new Expander[F, Gnirs.SearchKey, GnirsStaticConfig, GnirsDynamicConfig](
+        (s, d) => Gnirs.SearchKey.fromConfig(s, d),
+        _.format,
+        service.selectGnirs
       )
   }
 

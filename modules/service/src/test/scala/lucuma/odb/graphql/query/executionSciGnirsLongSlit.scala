@@ -48,6 +48,16 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       readMode            = "FAINT"
     )
 
+  // Inline "Nighttime Calibrations" for the default config (2200 nm, SHALLOW,
+  // D111, MIRROR, 0.15"/pix, 0.30" slit): one flat (20s) then one arc (10s),
+  // taken unguided at the last science offset.  See the smart gcal fixture in
+  // ExecutionTestSupportForGnirs.
+  private def calAtom(p: BigDecimal, q: BigDecimal): Json =
+    gnirsExpectedCalAtom(DynamicSnapshot, p, q, 20.secondTimeSpan, 1, 10.secondTimeSpan, 1)
+
+  // Default offset pattern's last position is q = +2.
+  val DefaultCalAtom: Json = calAtom(0, 2)
+
   private def gnirsObs: IO[Observation.Id] =
     for
       p <- createProgram
@@ -68,7 +78,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
                   "nextAtom" -> gnirsExpectedScienceAtom(DynamicSnapshot,
                     (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)
                   ),
-                  "possibleFuture" -> List.empty[Json].asJson,
+                  "possibleFuture" -> List(DefaultCalAtom).asJson,
                   "hasMore"        -> false.asJson
                 )
               )
@@ -91,7 +101,8 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
             (0, -4, Enabled),
             (0, -4, Enabled),
             (0,  2, Enabled)
-          )
+          ),
+          DefaultCalAtom
         ).asRight
       )
     yield ()
@@ -118,7 +129,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
                   "nextAtom" -> gnirsExpectedScienceAtom(DynamicSnapshot,
                     (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)
                   ),
-                  "possibleFuture" -> List.empty[Json].asJson,
+                  "possibleFuture" -> List(DefaultCalAtom).asJson,
                   "hasMore"        -> false.asJson
                 )
               )
@@ -146,7 +157,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
-                  "possibleFuture" -> List(expectedAtom).asJson,
+                  "possibleFuture" -> List(expectedAtom, DefaultCalAtom).asJson,
                   "hasMore"        -> false.asJson
                 )
               )
@@ -179,7 +190,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
-                  "possibleFuture" -> List(expectedAtom).asJson,
+                  "possibleFuture" -> List(expectedAtom, calAtom(0, 2)).asJson,
                   "hasMore"        -> false.asJson
                 )
               )
@@ -215,7 +226,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
-                  "possibleFuture" -> List(expectedAtom).asJson,
+                  "possibleFuture" -> List(expectedAtom, calAtom(0, 20)).asJson,
                   "hasMore"        -> false.asJson
                 )
               )
@@ -248,7 +259,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
-                  "possibleFuture" -> List(expectedAtom).asJson,
+                  "possibleFuture" -> List(expectedAtom, calAtom(60, 60)).asJson,
                   "hasMore"        -> false.asJson
                 )
               )

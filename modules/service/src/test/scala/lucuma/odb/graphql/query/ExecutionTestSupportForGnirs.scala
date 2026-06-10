@@ -3,17 +3,103 @@
 
 package lucuma.odb.graphql.query
 
+import cats.data.NonEmptySet
 import cats.effect.IO
+import cats.syntax.foldable.*
+import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPixelScale
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.StepGuideState
+import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Offset
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.TimeSpan
+import lucuma.odb.service.Services
+import lucuma.odb.smartgcal.data.Gnirs
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import skunk.Session
 
 trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
+
+  // GNIRS smart gcal fixture covering the science configs exercised by the
+  // GNIRS execution tests: D111 / MIRROR / 0.30" slit / SHALLOW, for both pixel
+  // scales (SHORT and LONG cameras), over a wide central-wavelength range.  Each
+  // key gets one flat (20s) and one arc (10s).
+  private def gnirsSmartKey(pixelScale: GnirsPixelScale): Gnirs.TableKey =
+    Gnirs.TableKey(
+      pixelScale,
+      GnirsGrating.D111,
+      GnirsPrism.Mirror,
+      BoundedInterval.unsafeOpenUpper(
+        Wavelength.fromIntNanometers(900).get,
+        Wavelength.fromIntNanometers(5600).get
+      ),
+      GnirsFpuSlit.LongSlit_0_30,
+      GnirsWellDepth.Shallow
+    )
+
+  val gnirsSmartFlat: SmartGcalValue.Legacy =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh),
+        GcalFilter.Nir,
+        GcalDiffuser.Ir,
+        GcalShutter.Open
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(20_000_000L))
+    )
+
+  val gnirsSmartArc: SmartGcalValue.Legacy =
+    SmartGcalValue(
+      Gcal(
+        Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.ArArc)),
+        GcalFilter.None,
+        GcalDiffuser.Ir,
+        GcalShutter.Closed
+      ),
+      GcalBaselineType.Night,
+      PosInt.unsafeFrom(1),
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(10_000_000L))
+    )
+
+  // Compose with any seeding contributed by other mixed-in support traits
+  // (e.g. Flamingos2) rather than replacing it.
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
+    val prior: IO[Unit] = super.dbInitialization.fold(IO.unit)(_(s))
+
+    val rows: List[Gnirs.TableRow] =
+      List(GnirsPixelScale.PixelScale_0_05, GnirsPixelScale.PixelScale_0_15).flatMap: ps =>
+        List(
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartFlat),
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartArc)
+        )
+
+    prior >>
+      servicesFor(pi /* doesn't matter */).map(_(s)).use: services =>
+        services.transactionally:
+          rows.zipWithIndex.traverse_ : (r, i) =>
+            Services.asSuperUser:
+              services.smartGcalService.insertGnirs(i, r)
+  }
 
   /**
    * Replace the explicit `alongSlit` telescope configs on a GNIRS LongSlit
@@ -367,4 +453,65 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       "description"  -> "Science Cycle".asJson,
       "observeClass" -> "SCIENCE".asJson,
       "steps"        -> sciSteps.asJson
+    )
+
+  /**
+   * A single inline GCAL calibration step (flat or arc): the science instrument
+   * config with its exposure replaced by the smart gcal value, taken at the
+   * given (unguided) offset.
+   */
+  protected def gnirsExpectedCal(
+    cfg:      GnirsDynamicSnapshot,
+    exposure: TimeSpan,
+    p:        BigDecimal,
+    q:        BigDecimal
+  ): Json =
+    val tc = TelescopeConfig(
+      Offset(
+        Offset.P.signedDecimalArcseconds.reverseGet(p),
+        Offset.Q.signedDecimalArcseconds.reverseGet(q)
+      ),
+      StepGuideState.Disabled
+    )
+    json"""
+      {
+        "instrumentConfig": {
+          "exposure":             { "seconds": ${exposure.toSeconds} },
+          "coadds":               ${cfg.coadds.asJson},
+          "centralWavelength":    { "nanometers": ${cfg.centralWavelengthNm.asJson} },
+          "filter":               ${cfg.filter.asJson},
+          "decker":               ${cfg.decker.asJson},
+          "fpuSlit":              ${cfg.fpuSlit.asJson},
+          "fpuOther":             ${cfg.fpuOther.asJson},
+          "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
+          "camera":               ${cfg.camera.asJson},
+          "focusMotorSteps":      ${cfg.focus.asJson},
+          "readMode":             ${cfg.readMode.asJson}
+        },
+        "stepConfig": { "stepType": "GCAL" },
+        "telescopeConfig": ${expectedTelescopeConfig(tc)},
+        "observeClass": "NIGHT_CAL",
+        "breakpoint": "DISABLED"
+      }
+    """
+
+  /**
+   * The inline "Nighttime Calibrations" atom: `flatCount` flats followed by
+   * `arcCount` arcs, all taken at the (unguided) offset (p, q).
+   */
+  protected def gnirsExpectedCalAtom(
+    cfg:          GnirsDynamicSnapshot,
+    p:            BigDecimal,
+    q:            BigDecimal,
+    flatExposure: TimeSpan,
+    flatCount:    Int,
+    arcExposure:  TimeSpan,
+    arcCount:     Int
+  ): Json =
+    val flats = List.fill(flatCount)(gnirsExpectedCal(cfg, flatExposure, p, q))
+    val arcs  = List.fill(arcCount)(gnirsExpectedCal(cfg, arcExposure, p, q))
+    Json.obj(
+      "description"  -> "Nighttime Calibrations".asJson,
+      "observeClass" -> "NIGHT_CAL".asJson,
+      "steps"        -> (flats ++ arcs).asJson
     )

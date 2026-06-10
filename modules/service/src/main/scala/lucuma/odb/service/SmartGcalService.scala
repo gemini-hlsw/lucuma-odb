@@ -24,6 +24,11 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPixelScale
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.math.BoundedInterval
@@ -34,6 +39,7 @@ import lucuma.core.model.sequence.ghost.GhostDetector
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
+import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig as Gnirs
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig as Igrins2
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services.GuestAccess
@@ -47,12 +53,15 @@ import lucuma.odb.smartgcal.data.Gmos.SearchKey.North as GmosNorthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.SearchKey.South as GmosSouthSearchKey
 import lucuma.odb.smartgcal.data.Gmos.TableRow.North as GmosNorthTableRow
 import lucuma.odb.smartgcal.data.Gmos.TableRow.South as GmosSouthTableRow
+import lucuma.odb.smartgcal.data.Gnirs.SearchKey as GnirsSearchKey
+import lucuma.odb.smartgcal.data.Gnirs.TableRow as GnirsTableRow
 import lucuma.odb.smartgcal.data.Igrins2.TableKey as Igrins2SearchKey
 import lucuma.odb.smartgcal.data.Igrins2.TableRow as Igrins2TableRow
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
@@ -130,6 +139,22 @@ trait SmartGcalService[F[_]]:
     sgt: SmartGcalType
   )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]]
 
+  /**
+   * Selects calibration information corresponding to the given search key and
+   * type.  There can be multiple steps per key.
+   *
+   * @param key GNIRS search information
+   * @param sgt SmartGcal type of interest
+   *
+   * @return list of tuples, each corresponding to a calibration step; each
+   *         tuple contains an update to the dynamic config to apply (e.g., to
+   *         set its exposure time) and the GCAL unit configuration to use
+   */
+  def selectGnirs(
+    key: GnirsSearchKey,
+    sgt: SmartGcalType
+  )(using GuestAccess): F[List[(Gnirs => Gnirs, Gcal)]]
+
   // N.B. Insertion is done by a flyway migration and not via the insert methods.
   // The insert here is intended for initializing a database for testing.
 
@@ -157,6 +182,11 @@ trait SmartGcalService[F[_]]:
   def insertIgrins2(
     id:  Int,
     row: Igrins2TableRow
+  )(using SuperUserAccess): F[Unit]
+
+  def insertGnirs(
+    id:  Int,
+    row: GnirsTableRow
   )(using SuperUserAccess): F[Unit]
 
 
@@ -228,6 +258,13 @@ object SmartGcalService:
       )(using GuestAccess): F[List[(Igrins2 => Igrins2, Gcal)]] =
         selectGcal(Statements.selectIgrins2(key, sgt)): exposureTime =>
           Igrins2.exposure.replace(exposureTime)
+
+      def selectGnirs(
+        key: GnirsSearchKey,
+        sgt: SmartGcalType
+      )(using GuestAccess): F[List[(Gnirs => Gnirs, Gcal)]] =
+        selectGcal(Statements.selectGnirs(key, sgt)): exposureTime =>
+          _.copy(exposure = exposureTime)
 
       override def insertGhost(
         id:   Int,
@@ -367,6 +404,42 @@ object SmartGcalService:
               Instrument.Igrins2                     ,
               id                                     ,
               row.line                               ,
+              row.value.instrumentConfig.exposureTime
+            )
+          ).void
+
+        for {
+          _ <- insertGcalRow
+          _ <- insertInstRow
+        } yield ()
+
+      def insertGnirs(
+        id:  Int,
+        row: GnirsTableRow
+      )(using SuperUserAccess): F[Unit] =
+        val insertGcalRow =
+          session.executeCommand(
+            Statements.InsertGcal(
+              Instrument.Gnirs,
+              id,
+              row.value.gcalConfig,
+              row.value.stepCount,
+              row.value.baselineType
+            )
+          ).void
+
+        val insertInstRow =
+          session.executeCommand(
+            Statements.InsertGnirs(
+              Instrument.Gnirs                       ,
+              id                                     ,
+              row.line                               ,
+              row.key.pixelScale                     ,
+              row.key.disperser                      ,
+              row.key.crossDispersed                 ,
+              row.key.wavelengthRange                ,
+              row.key.fpu                            ,
+              row.key.wellDepth                      ,
               row.value.instrumentConfig.exposureTime
             )
           ).void
@@ -684,6 +757,24 @@ object SmartGcalService:
       selectGcal("t_smart_igrins2", where)
     }
 
+    def selectGnirs(
+      key: GnirsSearchKey,
+      sgt: SmartGcalType
+    ): AppliedFragment =
+      val where = List(
+        sql"s.c_pixel_scale     = ${gnirs_pixel_scale}"(key.pixelScale),
+        sql"s.c_disperser       IS NOT DISTINCT FROM ${gnirs_grating.opt}"(key.disperser),
+        sql"s.c_cross_dispersed IS NOT DISTINCT FROM ${gnirs_prism.opt}"(key.crossDispersed),
+        sql"s.c_fpu             IS NOT DISTINCT FROM ${gnirs_fpu_slit.opt}"(key.fpu),
+        sql"s.c_well_depth      = ${gnirs_well_depth}"(key.wellDepth),
+        key.wavelength.fold(void"s.c_wavelength_range IS NULL")(
+          sql"s.c_wavelength_range @> ${wavelength_pm}"
+        ),
+        whereSmartGcalType(sgt),
+      )
+
+      selectGcal("t_smart_gnirs", where)
+
     val InsertIgrins2: Fragment[(
       Instrument ,
       Int        ,
@@ -700,5 +791,42 @@ object SmartGcalService:
           $instrument,
           $int4,
           $int8_pos,
+          $time_span
+      """
+
+    val InsertGnirs: Fragment[(
+      Instrument                  ,
+      Int                         ,
+      PosLong                     ,
+      GnirsPixelScale             ,
+      GnirsGrating                ,
+      GnirsPrism                  ,
+      BoundedInterval[Wavelength] ,
+      GnirsFpuSlit                ,
+      GnirsWellDepth              ,
+      TimeSpan
+    )] =
+      sql"""
+        INSERT INTO t_smart_gnirs (
+          c_instrument,
+          c_gcal_id,
+          c_step_order,
+          c_pixel_scale,
+          c_disperser,
+          c_cross_dispersed,
+          c_wavelength_range,
+          c_fpu,
+          c_well_depth,
+          c_exposure_time
+        ) SELECT
+          $instrument,
+          $int4,
+          $int8_pos,
+          $gnirs_pixel_scale,
+          $gnirs_grating,
+          $gnirs_prism,
+          $wavelength_pm_range,
+          $gnirs_fpu_slit,
+          $gnirs_well_depth,
           $time_span
       """

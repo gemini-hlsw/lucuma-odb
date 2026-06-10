@@ -4,7 +4,10 @@
 package lucuma.odb.sequence
 package gnirs.longslit
 
+import cats.Monad
+import cats.data.EitherT
 import fs2.Pure
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
@@ -20,21 +23,23 @@ object LongSlit:
   def staticFrom(config: Config): GnirsStaticConfig =
     InitialConfigs.staticFrom(config)
 
-  def instantiate(
+  def instantiate[F[_]: Monad](
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
     namespace:     UUID,
+    expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
-    itc:           Either[OdbError, Itc.Spectroscopy]
-  ): Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]] =
+    itc:           Either[OdbError, Itc.Spectroscopy],
+    calRole:       Option[CalibrationRole]
+  ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
     val static = staticFrom(config)
-    for
-      a <- Acquisition.instantiate(
+    (for
+      a <- EitherT.fromEither(Acquisition.instantiate(
              observationId, estimator, static, namespace, config,
              itc.map(_.acquisition.focus.value)
-           )
-      s <- Science.instantiate(
-             observationId, estimator, static, namespace, config,
-             itc.map(_.science.focus.value)
-           )
-    yield StreamingExecutionConfig(static, a.generate, s.generate)
+           ))
+      s <- EitherT(Science.instantiate(
+             observationId, estimator, static, namespace, expander, config,
+             itc.map(_.science.focus.value), calRole
+           ))
+    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
