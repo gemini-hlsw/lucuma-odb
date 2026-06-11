@@ -33,6 +33,7 @@ import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2ImagingConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
@@ -236,6 +237,11 @@ object CalibrationConfigSubset:
         none
       )
 
+  case class Flamingos2ImagingConfigs(
+    filters: NonEmptyList[Flamingos2Filter]
+  ) extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.Flamingos2Imaging
+
   case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit
 
@@ -297,5 +303,7 @@ object CalibrationConfigSubset:
             f2.filter,
             f2.fpu
           )
+        case f2i: Flamingos2ImagingConfig =>
+          Flamingos2ImagingConfigs(f2i.filters.map(_.filter))
         case _: Igrins2Config =>
           Igrins2Configs
