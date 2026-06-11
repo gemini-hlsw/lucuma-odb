@@ -424,59 +424,43 @@ enum Breakpoint {
 }
 
 """
-A single Call for Proposals definition.
+Observatory at which proposals will be solicited.  A Call for Proposals is
+associated with exactly one observatory, and this enum serves as a discriminator
+to determine which observatory-specific set of properties will be used (i.e.,
+non-null).
 """
-type CallForProposals {
-  """
-  The unique Call for Proposals id associated with this Call.
-  """
-  id: CallForProposalsId!
+enum Observatory {
+  GEMINI
+  KECK
+  SUBARU
+}
 
-  "The title of this Call for Proposals."
-  title: NonEmptyString!
+"""
+Partner choices for Gemini proposals made by PIs in the Keck and Subaru
+observer communities. These are only available for Gemini CfPs (that is, for
+proposals for time on the Gemini telescopes).
+"""
+enum ExchangePartner {
+  KECK
+  SUBARU
+}
+
+"""
+Gemini-specific CfP properties.  Note, properties shared across all observatories
+are found in the `CallForProposals` type.
+"""
+type GeminiCallProperties {
 
   """
-  Describes which type of proposals are being accepted.
+  Describes which type of Gemini proposals are being accepted.
   """
   type: CallForProposalsType!
 
   """
-  The semester associated with the Call.  Some types may have multiple Calls
-  per semester.
-  """
-  semester: Semester!
-
-  """
-  Coordinate limits for targets that may be observed in this Call for Proposals.
+  Coordinate limits, associated with each site, for targets that may be
+  observed in this Call for Proposals.
   """
   coordinateLimits: SiteCoordinateLimits!
-
-  """
-  The active period during which accepted observations for this call may be
-  observed.
-  """
-  active: DateInterval!
-
-  """
-  The submission deadline to use for any partners without an explicit partner
-  deadline.
-  """
-  submissionDeadlineDefault: Timestamp
-
-  """
-  Partners that may participate in this Call.
-  """
-  partners: [CallForProposalsPartner!]!
-
-  """
-  Whether this Call allows PIs without a partner to participate.
-  """
-  allowsNonPartnerPi: Boolean!
-
-  """
-  The submission deadline for non-partner PIs, when allowed to participate.
-  """
-  nonPartnerDeadline: Timestamp
 
   """
   When specified, the observations executed in this Call will only use these
@@ -491,9 +475,248 @@ type CallForProposals {
   proprietaryMonths: NonNegInt!
 
   """
+  Whether this Call allows PIs without a partner to participate.
+  """
+  allowsNonPartnerPi: Boolean!
+
+  """
+  The submission deadline for non-partner PIs, when allowed to participate.
+  """
+  nonPartnerDeadline: Timestamp
+
+  """
+  Exchange partners that may apply for Gemini time on this call, if any.
+  These partners use the `submissionDeadlineDefault` from the shared CfP
+  properties.
+  """
+  exchangePartners: [ExchangePartner!]!
+}
+
+"""
+Gemini-specific CfP properties input.
+"""
+input GeminiCallPropertiesInput {
+
+  "Type of the call. Required on create."
+  type: CallForProposalsType
+
+  """
+  Coordinate limits.  If not specified, they will default according to the
+  coordinates that are safely visible during the active period of the call.
+  """
+  coordinateLimits: SiteCoordinateLimitsInput
+
+  """
+  When specified, the call is limited to the listed instruments.  When not
+  specified, all otherwise available instruments may be used.  When editing,
+  supply the entire list of instruments to set.  Nullable on edit.
+  """
+  instruments: [Instrument!]
+
+  """
+  The default proprietary period for proposals linked to this call.  If not
+  specified, the default period for the call type will be used.
+  """
+  proprietaryMonths: NonNegInt
+
+  """
+  Exchange partners that may apply for Gemini time on this call, if any. These
+  partners use the `submissionDeadlineDefault` from the shared CfP properties.
+  This value is optional and defaults to an empty array.  It may be assigned a
+  null value to reset it to the empty array.
+  """
+  exchangePartners: [ExchangePartner!]
+
+}
+
+"""
+Instruments available at the Keck observatory for use by the Gemini community.
+"""
+enum KeckInstrument {
+  HIRES
+  OTHER
+}
+
+"""
+Keck-specific call for proposals properties.  Note, properties shared across all
+observatories are found in the `CallForProposals` type.
+"""
+type KeckCallProperties {
+
+  """
+  When specified, the observations executed in this Call will only use these
+  instruments.  When not specified, all otherwise available instruments may be
+  used.
+  """
+  instruments: [KeckInstrument!]!
+
+  """
+  Coordinate limits, associated with Keck, for targets that may be observed in
+  this Call for Proposals.
+  """
+  coordinateLimits: CoordinateLimits!
+
+}
+
+"""
+Keck-specific CfP properties input.
+"""
+input KeckCallPropertiesInput {
+
+  """
+  When specified, the call is limited to the listed instruments.  When not
+  specified, all otherwise available instruments may be used.  When editing,
+  supply the entire list of instruments to set.  Nullable on edit.
+  """
+  instruments: [KeckInstrument!]
+
+  """
+  Coordinate limits, associated with Keck, for targets that may be observed in
+  this Call for Proposals.   If not specified, they will default according to
+  the coordinates that are safely visible during the active period of the call.
+  """
+  coordinateLimits: CoordinateLimitsInput
+
+}
+
+"""
+Instruments available at the Subaru observatory for use by the Gemini community.
+"""
+enum SubaruInstrument {
+  FOCAS
+  HDS
+  HSC
+  IRCS
+  MOIRCS
+  PFS
+  VISITOR
+}
+
+"""
+Subaru call for proposals types.
+"""
+enum SubaruProposalType {
+  NORMAL
+  INTENSIVE
+}
+
+"""
+Subaru-specific CfP properties.  Note, properties shared across all observatories
+are found in the `CallForProposals` type.
+"""
+type SubaruCallProperties {
+
+  """
+  Subaru proposal type.
+  """
+  type: SubaruProposalType!
+
+  """
+  When specified, the observations executed in this Call may only use these
+  instruments.  When not specified, all otherwise available instruments may be
+  used.
+  """
+  instruments: [SubaruInstrument!]!
+
+  """
+  Coordinate limits, associated with Subaru, for targets that may be observed in
+  this Call for Proposals.
+  """
+  coordinateLimits: CoordinateLimits!
+
+}
+
+"""
+Subaru-specific call for proposals properties input.
+"""
+input SubaruCallPropertiesInput {
+
+  """
+  Subaru proposal type.  If not specified, defaults to NORMAL.
+  """
+  type: SubaruProposalType
+
+  """
+  When specified, the call is limited to the listed instruments.  When not
+  specified, all otherwise available instruments may be used.  When editing,
+  supply the entire list of instruments to set.  Nullable on edit.
+  """
+  instruments: [SubaruInstrument!]
+
+  """
+  Coordinate limits, associated with Subar, for targets that may be observed in
+  this Call for Proposals.   If not specified, they will default according to
+  the coordinates that are safely visible during the active period of the call.
+  """
+  coordinateLimits: CoordinateLimitsInput
+
+}
+
+
+"""
+A single Call for Proposals definition.
+"""
+type CallForProposals {
+
+  """
+  The unique Call for Proposals id associated with this Call.
+  """
+  id: CallForProposalsId!
+
+  "The title of this Call for Proposals."
+  title: NonEmptyString!
+
+  """
+  The semester associated with the Call.  Some types may have multiple Calls
+  per semester.
+  """
+  semester: Semester!
+
+  """
+  The active period during which accepted observations for this call may be
+  observed.
+  """
+  active: DateInterval!
+
+  """
+  Partners that may participate in this Call.
+  """
+  partners: [CallForProposalsPartner!]!
+
+  """
+  The submission deadline to use for any partners without an explicit partner
+  deadline.
+  """
+  submissionDeadlineDefault: Timestamp
+
+  """
   Whether this Call is PRESENT or has been DELETED.
   """
   existence: Existence!
+
+  """
+  The observatory for which proposals are being solicited.  Eactly one of
+  `gemini`, `keck` or `subaru` will be non-null, corresponding to this value.
+  """
+  observatory: Observatory!
+
+  """
+  Gemini-observatory-specific properties.  Non-null iff the `observatory` is
+  GEMINI.
+  """
+  gemini: GeminiCallProperties
+
+  """
+  Keck-observatory-specific properties.  Non-null iff the `observatory` is KECK.
+  """
+  keck:   KeckCallProperties
+
+  """
+  Subaru-observatory-specific properties.  Non-null iff the `observatory` is
+  SUBARU.
+  """
+  subaru: SubaruCallProperties
+
 }
 
 """
@@ -518,12 +741,6 @@ input CallForProposalsPropertiesInput {
   a null value to return to the default.
   """
   title: NonEmptyString
-
-  """
-  Coordinate limits.  If not specified, they will default according to the
-  coordinates that are safely visible during the active period of the call.
-  """
-  coordinateLimits: SiteCoordinateLimitsInput
 
   """
   Active period start date (inclusive) for this call.  The date is considered to
@@ -559,20 +776,35 @@ input CallForProposalsPropertiesInput {
   partners: [CallForProposalsPartnerInput!]
 
   """
-  When specified, the call is limited to the listed instruments.  When not
-  specified, all otherwise available instruments may be used.  When editing,
-  supply the entire list of instruments to set.  Nullable on edit.
+  Specifies a submission deadline to use for any partners without an explicit
+  partner deadline.
   """
-  instruments: [Instrument!]
-
-  """
-  The default proprietary period for proposals linked to this call.  If not
-  specified, the default period for the call type will be used.
-  """
-  proprietaryMonths: NonNegInt
+  submissionDeadlineDefault: Timestamp
 
   "DELETED or PRESENT.  On create defaults to PRESENT."
   existence: Existence
+
+  """
+  Gemini-observatory-specific properties.  Set this value for Gemini-bound
+  proposals.  If set, neither `keck` nor `subaru` may be non-null.  Exactly
+  one of `gemini`, `keck` or `subaru` must be non-null.
+  """
+  gemini: GeminiCallPropertiesInput
+
+  """
+  Keck-observatory-specific properties.  Set this value for Keck-bound
+  proposals.  If set, neither `gemini` nor `subaru` may be non-null.  Exactly
+  one of `gemini`, `keck` or `subaru` must be non-null.
+  """
+  keck:   KeckCallPropertiesInput
+
+  """
+  Subaru-observatory-specific properties.  Set this value for Subaru-bound
+  proposals.  If set, neither `gemini` nor `keck` may be non-null.  Exactly
+  one of `gemini`, `keck` or `subaru` must be non-null.
+  """
+  subaru: SubaruCallPropertiesInput
+
 }
 
 """
@@ -3859,12 +4091,15 @@ enum Partner {
 
 """
 Partner link options (and `PartnerLink` discriminator). A user / partner
-relationship is one of (a) the user is associated with a particular partner
-(i.e., `HAS_PARTNER`), (b) the user is explicitly associated with no partner
-(i.e., `HAS_NON_PARTNER`), or (c) the link is simply not set.
+relationship is one of (a) the user is associated with a particular Gemini
+partner (i.e., `HAS_PARTNER`), (b) the user is associated with a particular
+Exchange partner (i.e., `HAS_EXCHANGE_PARTNER`), (c) the user is explicitly
+associated with no partner (i.e., `HAS_NON_PARTNER`), or (d) the link is simply
+not set.
 """
 enum PartnerLinkType {
   HAS_PARTNER
+  HAS_EXCHANGE_PARTNER
   HAS_NON_PARTNER
   HAS_UNSPECIFIED_PARTNER
 }
@@ -3876,8 +4111,7 @@ interface PartnerLink {
 }
 
 """
-A `PartnerLink` employed when a user is associated with a specific
-`Partner`.
+A `PartnerLink` employed when a user is associated with a specific `Partner`.
 """
 type HasPartner implements PartnerLink {
   "Always `HAS_PARTNER`"
@@ -3888,8 +4122,19 @@ type HasPartner implements PartnerLink {
 }
 
 """
-A `PartnerLink` employed when a user is explicitly associated with
-no `Partner`.
+A `PartnerLink` employed when a user is associated with a specific
+`ExchangePartner`.
+"""
+type HasExchangePartner implements PartnerLink {
+  "Always `HAS_EXCHANGE_PARTNER`"
+  linkType: PartnerLinkType!
+
+  "The associated partner."
+  exchangePartner: ExchangePartner!
+}
+
+"""
+A `PartnerLink` employed when a user is explicitly associated with no `Partner`.
 """
 type HasNonPartner implements PartnerLink {
   "Always `HAS_NON_PARTNER"
@@ -3897,8 +4142,7 @@ type HasNonPartner implements PartnerLink {
 }
 
 """
-A `PartnerLink` employed when a user's `PartnerLink` has not
-(yet) been made.
+A `PartnerLink` employed when a user's `PartnerLink` has not (yet) been made.
 """
 type HasUnspecifiedPartner implements PartnerLink {
   "Always `HAS_UNSPECIFIED_PARTNER`"
