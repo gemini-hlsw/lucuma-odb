@@ -200,7 +200,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
       )
 
     for {
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.PoorWeather)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.PoorWeather)
       pid <- createProgramAs(pi, "My Demo Science Proposal")
       _   <- go(cid, pid)
     } yield ()
@@ -253,7 +253,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
       )
 
     for {
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.DemoScience)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.DemoScience)
       pid <- createProgramAs(pi,  "My Demo Science Proposal")
       _   <- go(cid, pid)
     } yield ()
@@ -261,7 +261,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
 
   test("✓ assign proprietary period") { // proprietary months match the call
     val months = for {
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.DemoScience)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.DemoScience)
       pid <- createProgramAs(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       m   <- getProprietaryMonths(pi, pid)

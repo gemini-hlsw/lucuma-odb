@@ -52,7 +52,7 @@ class program_configurationRequests extends OdbSuite with ObservingModeSetupOper
       )
 
     for
-      cfpid <- createCallForProposalsAs(admin)
+      cfpid <- createGeminiCallForProposalsAs(admin)
       pid   <- createProgramAs(pi, "Foo")
       _     <- addProposal(pi, pid, Some(cfpid), None)
       tid   <- createTargetWithProfileAs(pi, pid)

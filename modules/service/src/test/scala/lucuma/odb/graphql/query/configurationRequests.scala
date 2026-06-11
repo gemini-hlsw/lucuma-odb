@@ -55,7 +55,7 @@ class configurationRequests
   // set up cfp, program, and fully configured observation
   private def setupAs(user: User): IO[ConfigurationRequest.Id] =
     for
-      cfpid <- createCallForProposalsAs(admin)
+      cfpid <- createGeminiCallForProposalsAs(admin)
       pid   <- createProgramAs(user, "Foo")
       _     <- addProposal(user, pid, Some(cfpid), None)
       tid   <- createTargetWithProfileAs(user, pid)

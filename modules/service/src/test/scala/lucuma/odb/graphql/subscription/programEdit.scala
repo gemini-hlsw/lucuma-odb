@@ -319,7 +319,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap { pid =>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
-            createCallForProposalsAs(service).flatMap(addQueueProposal(pi, pid, _)) >>
+            createGeminiCallForProposalsAs(service).flatMap(addQueueProposal(pi, pid, _)) >>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
             query(
               pi,

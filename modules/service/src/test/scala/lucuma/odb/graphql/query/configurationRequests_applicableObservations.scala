@@ -94,7 +94,7 @@ class configurationRequests_applicableObservations
 
   test("applicable requests"):
     for
-      cfpid <- createCallForProposalsAs(admin)
+      cfpid <- createGeminiCallForProposalsAs(admin)
       pid   <- createProgramAs(pi, "Foo")
       _     <- addProposal(pi, pid, Some(cfpid), None)
       tid   <- createTargetWithProfileAs(pi, pid)

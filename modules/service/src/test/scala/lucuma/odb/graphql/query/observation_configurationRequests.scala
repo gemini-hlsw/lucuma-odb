@@ -220,7 +220,7 @@ class observation_configurationRequests
   // set up cfp, program, and fullt configured observation
   private def setup(too: Boolean, mode: ObservingModeType): IO[Observation.Id] =
     for
-      cfpid <- createCallForProposalsAs(admin)
+      cfpid <- createGeminiCallForProposalsAs(admin)
       pid   <- createProgramAs(pi, "Foo")
       _     <- addProposal(pi, pid, Some(cfpid), None)
       tid   <- if !too then createTargetWithProfileAs(pi, pid) else createOpportunityTargetAs(pi, pid)

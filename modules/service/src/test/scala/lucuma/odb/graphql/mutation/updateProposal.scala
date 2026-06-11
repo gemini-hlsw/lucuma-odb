@@ -474,7 +474,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("⨯ set mismatched cfp") {
-    createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         expect(
@@ -499,7 +499,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ set matching cfp") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         expect(
@@ -534,7 +534,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ set cfp on creation, default active period"):
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         assertIOBoolean(getActivePeriod(pi, pid).map(_ ===  DateInterval.between(LocalDate.of(2025, Month.FEBRUARY, 1), LocalDate.of(2025, Month.JULY, 31))))
@@ -542,7 +542,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
 
   test("✓ set cfp later, default active period"):
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(
@@ -565,7 +565,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
 
   test("⨯ invalid type change") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(
@@ -612,7 +612,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ change call and type") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(
@@ -631,7 +631,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           """
         ) *>
         assertIO(getProprietaryMonths(pi, pid), NonNegInt.unsafeFrom(12).some) *>
-        createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid2 =>
+        createGeminiCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid2 =>
           expect(
             user = pi,
             query = s"""
@@ -672,7 +672,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ delete cfp") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(

@@ -14,6 +14,7 @@ import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Partner
 import lucuma.core.enums.PartnerLinkType
 import lucuma.core.model.PartnerLink
@@ -35,7 +36,8 @@ trait ProgramUserMapping[F[_]]
       SqlField("userId", ProgramUserView.UserId, hidden = true),
       SqlField("role", ProgramUserView.Role),
       SqlField("linkType", ProgramUserView.PartnerLink, hidden = true),
-      SqlField("partner", ProgramUserView.Partner, hidden = true),
+      SqlField("geminiPartner", ProgramUserView.GeminiPartner, hidden = true),
+      SqlField("exchangePartner", ProgramUserView.ExchangePartner, hidden = true),
       SqlField("educationalStatus", ProgramUserView.EducationalStatus),
       SqlField("thesis", ProgramUserView.Thesis),
       SqlField("gender", ProgramUserView.Gender),
@@ -47,10 +49,11 @@ trait ProgramUserMapping[F[_]]
       CursorFieldJson("partnerLink", c =>
         for {
           l <- c.fieldAs[PartnerLinkType]("linkType")
-          p <- c.fieldAs[Option[Partner]]("partner")
-          r <- Result.fromEither(PartnerLink.fromLinkType(l, p))
+          p <- c.fieldAs[Option[Partner]]("geminiPartner")
+          e <- c.fieldAs[Option[ExchangePartner]]("exchangePartner")
+          r <- Result.fromEither(PartnerLink.fromLinkType(l, p, e))
         } yield r.asJson,
-        List("partner", "linkType")
+        List("geminiPartner", "exchangePartner", "linkType")
       ),
       SqlObject("program", Join(ProgramUserView.ProgramId, ProgramTable.Id)),
       SqlObject("user", Join(ProgramUserView.UserId, UserTable.UserId)),

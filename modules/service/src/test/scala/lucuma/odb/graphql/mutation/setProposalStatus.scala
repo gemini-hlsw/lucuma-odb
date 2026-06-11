@@ -47,7 +47,7 @@ class setProposalStatus extends OdbSuite
   override val httpRequestHandler = invitationEmailRequestHandler
 
   test("✓ valid submission") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramWithNonPartnerPi(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
@@ -86,7 +86,7 @@ class setProposalStatus extends OdbSuite
   }
 
   test("⨯ undefined observation") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
@@ -115,7 +115,7 @@ class setProposalStatus extends OdbSuite
   }
 
   test("⨯ missing two matching partners") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
@@ -142,7 +142,7 @@ class setProposalStatus extends OdbSuite
   }
 
   test("⨯ missing one matching partner") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
@@ -170,7 +170,7 @@ class setProposalStatus extends OdbSuite
   }
 
   test("⨯ missing partner splits (queue)") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         expect(
@@ -195,7 +195,7 @@ class setProposalStatus extends OdbSuite
   }
 
   test("✓ fast turnaround submission") {
-    createCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.FastTurnaround).flatMap { cid =>
       createProgramWithUsPi(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some, "fastTurnaround: {}".some) *>
         addCoisAs(pi, pid, List(Partner.US)) *>
@@ -462,7 +462,7 @@ class setProposalStatus extends OdbSuite
         )
 
     for {
-      c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
+      c <- createGeminiCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
       p <- createProgramWithNonPartnerPi(pi)
       _ <- addProposal(pi, p)
       _ <- setCallId(pi, p, c)
@@ -530,7 +530,7 @@ class setProposalStatus extends OdbSuite
       )
 
     for {
-      c <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
+      c <- createGeminiCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025A"))
       p <- createProgramWithNonPartnerPi(pi)
       _ <- addProposal(pi, p)
       _ <- addPartnerSplits(pi, p)
@@ -592,7 +592,7 @@ class setProposalStatus extends OdbSuite
 
   test("ensure that configuration requests are created when the proposal is submitted, but not for inactive observations or calibrations") {
     for
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid)
@@ -648,7 +648,7 @@ class setProposalStatus extends OdbSuite
 
   test("ensure that configuration requests are deleted when the proposal is withdrawn") {
     for
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid)
@@ -712,7 +712,7 @@ class setProposalStatus extends OdbSuite
   }
 
   test("✓ A partner of 'HasNonPartner' counts as a US partner for validation"):
-    createCallForProposalsAs(
+    createGeminiCallForProposalsAs(
       staff,
       CallForProposalsType.RegularSemester,
       partners = List((Partner.US, none), (Partner.CA, none))
@@ -720,7 +720,7 @@ class setProposalStatus extends OdbSuite
       createProgramWithCaPi(pi).flatMap: pid =>
         addProposal(pi, pid, cid.some) *>
         addPartnerSplits(pi, pid) *>
-        addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasPartner(Partner.CA)) *>
+        addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.CA)) *>
         addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasNonPartner) *>
         expect(
           user = pi,
@@ -752,7 +752,7 @@ class setProposalStatus extends OdbSuite
         )
 
   test("Cannot submit past deadline: PI HasNonPartner with US deadline override"):
-    createCallForProposalsAs(
+    createGeminiCallForProposalsAs(
       staff,
       CallForProposalsType.RegularSemester,
       deadline = yesterday.some,
@@ -783,7 +783,7 @@ class setProposalStatus extends OdbSuite
         )
 
   test("Cannot submit past deadline: PI HasNonPartner with default US deadline"):
-    createCallForProposalsAs(
+    createGeminiCallForProposalsAs(
       staff,
       CallForProposalsType.RegularSemester,
       partners = List((Partner.US, yesterday.some), (Partner.CA, none))
@@ -812,8 +812,8 @@ class setProposalStatus extends OdbSuite
             List(error.pastDeadline(pid).message).asLeft
         )
 
-  test("Cannot submit past deadline: PI HasPartner with default deadline"):
-    createCallForProposalsAs(
+  test("Cannot submit past deadline: PI HasGeminiPartner with default deadline"):
+    createGeminiCallForProposalsAs(
       staff,
       CallForProposalsType.RegularSemester,
       deadline = yesterday.some,
@@ -843,8 +843,8 @@ class setProposalStatus extends OdbSuite
             List(error.pastDeadline(pid).message).asLeft
         )
 
-  test("Cannot submit past deadline: PI HasPartner with deadline override"):
-    createCallForProposalsAs(
+  test("Cannot submit past deadline: PI HasGeminiPartner with deadline override"):
+    createGeminiCallForProposalsAs(
       staff,
       CallForProposalsType.RegularSemester,
       partners = List((Partner.US, none), (Partner.CA, yesterday.some))
@@ -875,7 +875,7 @@ class setProposalStatus extends OdbSuite
 
   test("Cannot submit without a PI email address"):
     for
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramAs(pi)
       mid <- piProgramUserIdAs(pi, pid)
       _   <- updateProgramUserAs(pi, mid, PartnerLink.HasNonPartner, email = none)
@@ -905,7 +905,7 @@ class setProposalStatus extends OdbSuite
 
   test("Cannot submit with an invalid PI email address"):
     for
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramAs(pi)
       mid <- piProgramUserIdAs(pi, pid)
       em   = NonEmptyString.unsafeFrom("invalid")
@@ -936,7 +936,7 @@ class setProposalStatus extends OdbSuite
 
   test("⨯ queue submission requires band 3 flag"):
     for
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some, "queue: { toOActivation: NONE, minPercentTime: 0 }".some)
       _   <- addPartnerSplits(pi, pid)
@@ -963,7 +963,7 @@ class setProposalStatus extends OdbSuite
 
   test("✓ classical submission does not take a band 3 flag"):
     for
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
+      cid <- createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some, "classical: { minPercentTime: 0 }".some)
       _   <- addPartnerSplits(pi, pid, "classical")

@@ -447,7 +447,7 @@ class updatePrograms extends OdbSuite {
       )
 
   test("changing CfP active period in non-default active period has no impact"):
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         for
           _ <- addProposal(pi, pid, cid.some).void

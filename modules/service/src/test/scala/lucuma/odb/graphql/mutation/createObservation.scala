@@ -139,7 +139,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] can create observation with a program reference") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>
@@ -172,7 +172,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] can create an observation when both ref and pid are supplied if they correspond") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>
@@ -206,7 +206,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] cannot create an observation when both ref and pid are supplied if they do not correspond") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>
@@ -236,7 +236,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] cannot create an observation without a ref or pid") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>

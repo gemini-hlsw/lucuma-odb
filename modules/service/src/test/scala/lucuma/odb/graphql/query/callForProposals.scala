@@ -14,7 +14,7 @@ import lucuma.core.enums.CallForProposalsType
 import lucuma.core.model.CallForProposals
 import lucuma.core.syntax.string.*
 
-class callForProposals extends OdbSuite {
+class callForProposals extends OdbSuite:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(3, 103)
@@ -28,10 +28,12 @@ class callForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2025-02-01"
                 activeEnd:   "2025-07-31"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) {
@@ -41,15 +43,14 @@ class callForProposals extends OdbSuite {
           }
         }
       """
-    ).flatMap {
+    ).flatMap:
       _.hcursor
        .downFields("createCallForProposals", "callForProposals", "id")
        .as[CallForProposals.Id]
        .leftMap(f => new RuntimeException(f.message))
        .liftTo[IO]
-    }
 
-  test("null result") {
+  test("null result"):
     expect(
       user  = pi,
       query = s"""
@@ -65,10 +66,9 @@ class callForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-  test("not null result") {
-    createCall.flatMap { cid =>
+  test("not null result"):
+    createCall.flatMap: cid =>
       expect(
         user  = pi,
         query = s"""
@@ -86,8 +86,6 @@ class callForProposals extends OdbSuite {
           }
         """.asRight
       )
-    }
-  }
 
   private def getTitle(
     cfpType: CallForProposalsType,
@@ -100,11 +98,13 @@ class callForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        ${cfpType.tag.toScreamingSnakeCase}
                 semester:    "2025A"
                 ${title.fold("")(title => s"title: \"$title\"")}
                 activeStart: "2025-02-01"
                 activeEnd:   "2025-07-31"
+                gemini: {
+                  type: ${cfpType.tag.toScreamingSnakeCase}
+                }
               }
             }
           ) {
@@ -114,38 +114,32 @@ class callForProposals extends OdbSuite {
           }
         }
       """
-    ).flatMap {
+    ).flatMap:
       _.hcursor
        .downFields("createCallForProposals", "callForProposals", "title")
        .as[String]
        .leftMap(f => new RuntimeException(f.message))
        .liftTo[IO]
-    }
 
-  test("demo science") {
+  test("demo science"):
     assertIO(getTitle(CallForProposalsType.DemoScience), "2025A Demo Science")
-  }
 
   test("title override"):
     assertIO(getTitle(CallForProposalsType.DemoScience, "Foo".some), "Foo")
 
-  test("director's time") {
+  test("director's time"):
     assertIO(getTitle(CallForProposalsType.DirectorsTime), "2025A Director's Time")
-  }
 
-  test("large program") {
+  test("large program"):
     assertIO(getTitle(CallForProposalsType.LargeProgram), "2025A Large Program")
-  }
 
-  test("poor weather") {
+  test("poor weather"):
     assertIO(getTitle(CallForProposalsType.PoorWeather), "2025A Poor Weather")
-  }
 
-  test("regular semester") {
+  test("regular semester"):
     assertIO(getTitle(CallForProposalsType.RegularSemester), "2025A Regular Semester")
-  }
 
-  test("fast turnaround") {
+  test("fast turnaround"):
     val title = query(
       user = staff,
       query = s"""
@@ -153,10 +147,12 @@ class callForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        FAST_TURNAROUND
                 semester:    "2025A"
                 activeStart: "2025-08-01"
                 activeEnd:   "2025-08-31"
+                gemini: {
+                  type: FAST_TURNAROUND
+                }
               }
             }
           ) {
@@ -166,22 +162,19 @@ class callForProposals extends OdbSuite {
           }
         }
       """
-    ).flatMap {
+    ).flatMap:
       _.hcursor
        .downFields("createCallForProposals", "callForProposals", "title")
        .as[String]
        .leftMap(f => new RuntimeException(f.message))
        .liftTo[IO]
-    }
 
     assertIO(title, "2025 June Fast Turnaround")
-  }
 
-  test("system verification - no instruments") {
+  test("system verification - no instruments"):
     assertIO(getTitle(CallForProposalsType.SystemVerification), "2025A System Verification")
-  }
 
-  test("system verification - one instrument") {
+  test("system verification - one instrument"):
     val title = query(
       user = staff,
       query = s"""
@@ -189,11 +182,13 @@ class callForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        SYSTEM_VERIFICATION
                 semester:    "2025A"
                 activeStart: "2025-08-01"
                 activeEnd:   "2025-08-31"
-                instruments: [GMOS_NORTH]
+                gemini: {
+                  type: SYSTEM_VERIFICATION
+                  instruments: [GMOS_NORTH]
+                }
               }
             }
           ) {
@@ -203,19 +198,16 @@ class callForProposals extends OdbSuite {
           }
         }
       """
-    ).flatMap {
+    ).flatMap:
       _.hcursor
        .downFields("createCallForProposals", "callForProposals", "title")
        .as[String]
        .leftMap(f => new RuntimeException(f.message))
        .liftTo[IO]
-    }
 
     assertIO(title, "2025A GMOS North System Verification")
 
-  }
-
-  test("system verification - two instruments") {
+  test("system verification - two instruments"):
     val title = query(
       user = staff,
       query = s"""
@@ -223,11 +215,13 @@ class callForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        SYSTEM_VERIFICATION
                 semester:    "2025A"
                 activeStart: "2025-08-01"
                 activeEnd:   "2025-08-31"
-                instruments: [GMOS_SOUTH, GMOS_NORTH]
+                gemini: {
+                  type: SYSTEM_VERIFICATION
+                  instruments: [GMOS_SOUTH, GMOS_NORTH]
+                }
               }
             }
           ) {
@@ -237,15 +231,11 @@ class callForProposals extends OdbSuite {
           }
         }
       """
-    ).flatMap {
+    ).flatMap:
       _.hcursor
        .downFields("createCallForProposals", "callForProposals", "title")
        .as[String]
        .leftMap(f => new RuntimeException(f.message))
        .liftTo[IO]
-    }
 
     assertIO(title, "2025A GMOS North, GMOS South System Verification")
-
-  }
-}

@@ -7,7 +7,7 @@ import grackle.Path
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.CallForProposalsView
 
-trait CoordinateLimitsMapping[F[_]] extends CallForProposalsView[F] {
+trait CoordinateLimitsMapping[F[_]] extends CallForProposalsView[F]:
 
   private def mappingAtPath(
     path:     Path,
@@ -23,9 +23,8 @@ trait CoordinateLimitsMapping[F[_]] extends CallForProposalsView[F] {
 
   lazy val CoordinateLimitsMappings: List[TypeMapping] =
     List(
-      mappingAtPath(CallForProposalsType / "coordinateLimits" / "north", CallForProposalsView.Id),
-      mappingAtPath(CallForProposalsType / "coordinateLimits" / "south", CallForProposalsView.Id)
+      mappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "north", CallForProposalsView.gemini.Id),
+      mappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "south", CallForProposalsView.gemini.Id),
+      mappingAtPath(KeckCallPropertiesType   / "coordinateLimits",           CallForProposalsView.keck.Id),
+      mappingAtPath(SubaruCallPropertiesType / "coordinateLimits",           CallForProposalsView.subaru.Id)
     )
-
-}
-

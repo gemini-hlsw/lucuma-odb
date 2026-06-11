@@ -15,7 +15,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   val validUsers = List(pi, admin).toList
 
   test("select configuration for fully-configured observation with sidereal target (gmos-n longslit)") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -121,7 +121,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   }
 
   test("select configuration for fully-configured observation with sidereal target (gmos-s longslit)") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -227,7 +227,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   }
 
   test("select configuration for fully-configured observation with sidereal target (gmos-n imaging)") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -336,7 +336,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   }
 
   test("select configuration for fully-configured observation with sidereal target (gmos-s imaging)") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -445,7 +445,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   }
 
   test("select configuration for fully-configured observation with sidereal target (f2 logslit)") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -551,7 +551,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   }
 
   test("select configuration for non-fully-configured observation with sidereal target (no proposal)") {
-    createCallForProposalsAs(admin).flatMap { _ =>
+    createGeminiCallForProposalsAs(admin).flatMap { _ =>
       createProgramAs(pi).flatMap { pid =>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
           createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
@@ -637,7 +637,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
   }
 
   test("select configuration for fully-configured observation with opportunity target") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createOpportunityTargetAs(pi, pid).flatMap { tid =>
@@ -740,7 +740,7 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
 
 
   test("select configuration for fully-configured observation with nonsidereal target (gmos-n longslit)") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createNonsiderealTargetAs(pi, pid).flatMap { tid =>

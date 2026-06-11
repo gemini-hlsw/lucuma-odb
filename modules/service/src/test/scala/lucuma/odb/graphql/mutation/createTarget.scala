@@ -568,7 +568,7 @@ class createTarget extends OdbSuite {
 
   test("[general] can create a target with a proposal reference") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>

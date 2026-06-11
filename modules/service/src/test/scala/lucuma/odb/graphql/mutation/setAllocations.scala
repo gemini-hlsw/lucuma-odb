@@ -244,7 +244,7 @@ class setAllocations extends OdbSuite {
 
   test("set allocations with a proposal reference"):
     val ref = for
-      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       ref <- submitProposal(pi, pid)
@@ -295,7 +295,7 @@ class setAllocations extends OdbSuite {
 
   test("set allocations with a program reference"):
     val ref = for
-      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       _   <- submitProposal(pi, pid)

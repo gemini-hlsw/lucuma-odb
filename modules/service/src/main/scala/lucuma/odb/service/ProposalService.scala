@@ -271,24 +271,22 @@ object ProposalService {
               newProprietary.exists(p => proprietary =!= p)
             )
 
-        def edit(set: ProposalPropertiesInput.Edit)(using Transaction[F]): F[Result[ProposalContext]] = {
+        def edit(set: ProposalPropertiesInput.Edit)(using Transaction[F]): F[Result[ProposalContext]] =
           val eCfp = set.callId.fold(
             ResultT.pure(none[CfpProperties]),              // delete
             ResultT.pure(cfp),                              // don't change
             id => ResultT(lookupProperties(id)).map(_.some) // update if possible
           )
 
-          val eSum = set.typeʹ.fold(splitsSum) { t =>
+          val eSum = set.typeʹ.fold(splitsSum): t =>
             t.partnerSplits.fold(0.toLong, splitsSum, m => m.values.map(_.value.toLong).sum)
-          }
 
-          (for {
+          (for
             c <- eCfp
             s <- eCfp.map(_.map(_.semester))
             t  = set.typeʹ.fold(scienceSubtype)(_.scienceSubtype.some)
-            p <- eCfp.map(_.map(_.proprietary).getOrElse(proprietary))
-          } yield copy(semester = s, scienceSubtype = t, splitsSum = eSum, proprietary = p, cfp = c)).value
-        }
+            p <- eCfp.map(_.flatMap(_.gemini).map(_.proprietary).getOrElse(proprietary))
+          yield copy(semester = s, scienceSubtype = t, splitsSum = eSum, proprietary = p, cfp = c)).value
 
         private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MMM-dd")
         private def formatDate(t: Timestamp): String = dateFormatter.format(t.toLocalDateTime)
@@ -417,8 +415,11 @@ object ProposalService {
           ResultT.fromResult(o.fold(Result.unit)(_.validateSubtype(input.SET.typeʹ.scienceSubtype)))
 
         // Update the program's science subtype and/or semester to match inputs.
-        def updateProgram(p: ProposalContext, c: Option[CfpProperties]): ResultT[F, Unit] =
-          ResultT.liftF(p.updateProgram(input.programId, input.SET.typeʹ.scienceSubtype.some, c.map(_.semester), c.map(_.proprietary)))
+        def updateProgram(
+          p: ProposalContext,
+          c: Option[CfpProperties]
+        ): ResultT[F, Unit] =
+          ResultT.liftF(p.updateProgram(input.programId, input.SET.typeʹ.scienceSubtype.some, c.map(_.semester), c.flatMap(_.gemini).map(_.proprietary)))
 
         val insert: ResultT[F, Unit] =
           val af = Statements.insertProposal(input.programId, input.SET)
@@ -717,12 +718,12 @@ object ProposalService {
                ARRAY_AGG(DISTINCT
                  CASE
                    WHEN c_partner_link = 'has_non_partner' THEN 'us'::d_tag
-                   ELSE c_partner
+                   ELSE c_gemini_partner
                  END
                )
              FROM t_program_user
              WHERE c_program_id = prog.c_program_id
-               AND (c_partner IS NOT NULL OR c_partner_link = 'has_non_partner')
+               AND (c_gemini_partner IS NOT NULL OR c_partner_link = 'has_non_partner')
             ),
             '{}'
           ) AS c_available_partners,
@@ -734,14 +735,14 @@ object ProposalService {
           LOCALTIMESTAMP,
           COALESCE(
             cfp_pi.c_deadline,
-            (SELECT cfp.c_non_partner_deadline
+            (SELECT cfp.c_gemini_non_partner_deadline
              WHERE pi.c_partner_link = 'has_non_partner')
           ) AS c_deadline,
           cfp.c_title,
           cfp.c_cfp_id,
-          cfp.c_type,
           cfp.c_semester,
-          cfp.c_proprietary,
+          cfp.c_gemini_proposal_type,
+          cfp.c_gemini_proprietary,
           prop.c_consider_for_band_3
         FROM t_program prog
         LEFT JOIN t_proposal prop
@@ -753,7 +754,7 @@ object ProposalService {
           AND pi.c_role = 'pi'
         LEFT JOIN v_cfp_partner cfp_pi
           ON cfp.c_cfp_id = cfp_pi.c_cfp_id
-          AND cfp_pi.c_partner = pi.c_partner
+          AND cfp_pi.c_partner = pi.c_gemini_partner
         WHERE
           prog.c_program_id = $program_id
       """.apply(pid) |+|

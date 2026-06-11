@@ -21,7 +21,7 @@ trait SiteCoordinateLimitsMapping[F[_]] extends CallForProposalsView[F] {
 
   lazy val SiteCoordinateLimitsMappings: List[TypeMapping] =
     List(
-      mappingAtPath(CallForProposalsType / "coordinateLimits", CallForProposalsView.Id)
+      mappingAtPath(GeminiCallPropertiesType / "coordinateLimits", CallForProposalsView.Id)
     )
 
 }

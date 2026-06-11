@@ -29,7 +29,7 @@ class ShortCut_4460 extends OdbSuite with ObservingModeSetupOperations:
     val setup: IO[Observation.Id] =
       for {
         _ <- createUsers(pi, staffCoiRo, staff)
-        c <- createCallForProposalsAs(staff, RegularSemester)
+        c <- createGeminiCallForProposalsAs(staff, RegularSemester)
         p <- createProgramWithNonPartnerPi(pi, "ShortCut 4460")
         t <- createTargetWithProfileAs(pi, p)
         o <- createObservationWithNoModeAs(pi, p, t)

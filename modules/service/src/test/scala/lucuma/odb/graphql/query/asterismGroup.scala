@@ -191,7 +191,7 @@ class asterismGroup extends OdbSuite {
   test("lookup by proposal reference should work") {
     List(pi).traverse { user =>
       for {
-        cid  <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+        cid  <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
         pid  <- createProgramWithUsPi(user)
         _    <- addDemoScienceProposal(user, pid, cid)
         _    <- submitProposal(user, pid)

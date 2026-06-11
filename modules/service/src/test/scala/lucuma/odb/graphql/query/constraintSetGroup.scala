@@ -135,7 +135,7 @@ class constraintSetGroup extends OdbSuite {
           create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
           create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
         ).parTupled.flatMap { (g1, g2, g3) =>
-          createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+          createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
            addDemoScienceProposal(user, pid, cid)
           } *>
           submitProposal(user, pid) *>

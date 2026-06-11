@@ -126,7 +126,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
       session.execute(states).map(_.toMap)
 
-  def createCallForProposalsAs(
+  def createGeminiCallForProposalsAs(
      user:        User,
      callType:    CallForProposalsType = CallForProposalsType.RegularSemester,
      semester:    Semester             = Semester.unsafeFromString("2025A"),
@@ -134,14 +134,14 @@ trait DatabaseOperations { this: OdbSuite =>
      activeEnd:   LocalDate            = LocalDate.parse("2025-07-31"),
      deadline:    Option[Timestamp]    = Timestamp.Max.some,
      partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
-     other:       Option[String]       = None
+     otherGemini: Option[String]       = None
   ): IO[CallForProposals.Id] =
     val deadlineStr = deadline.foldMap(ts => s"submissionDeadlineDefault: \"${ts.isoFormat}\"")
     val partnerList =
       partners.map((p, d) =>
         s"""
           {
-            partner: ${p.tag.toScreamingSnakeCase}
+            geminiPartner: ${p.tag.toScreamingSnakeCase}
             ${d.foldMap(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
           }
         """
@@ -151,13 +151,15 @@ trait DatabaseOperations { this: OdbSuite =>
         createCallForProposals(
           input: {
             SET: {
-              type:        ${callType.tag.toScreamingSnakeCase}
               semester:    "${semester.format}"
               activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
               activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
               $deadlineStr
               partners: $partnerList
-              ${other.getOrElse("")}
+              gemini: {
+                type: ${callType.tag.toScreamingSnakeCase}
+                ${otherGemini.getOrElse("")}
+              }
             }
           }
         ) {
@@ -221,10 +223,10 @@ trait DatabaseOperations { this: OdbSuite =>
     createProgramWithPiAffiliation(pi, PartnerLink.HasNonPartner, programName)
 
   def createProgramWithUsPi(pi: User, programName: String = null): IO[Program.Id] =
-    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.US), programName)
+    createProgramWithPiAffiliation(pi, PartnerLink.HasGeminiPartner(Partner.US), programName)
 
   def createProgramWithCaPi(pi: User, programName: String = null): IO[Program.Id] =
-    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.CA), programName)
+    createProgramWithPiAffiliation(pi, PartnerLink.HasGeminiPartner(Partner.CA), programName)
 
   def createProgramNoteAs(
     user:      User,
@@ -2557,7 +2559,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user:        User,
     pid:         Program.Id,
     role:        ProgramUserRole   = ProgramUserRole.Coi,
-    partnerLink: PartnerLink       = PartnerLink.HasPartner(Partner.US),
+    partnerLink: PartnerLink       = PartnerLink.HasGeminiPartner(Partner.US),
     preferred:   UserProfile       = UserProfile.Empty,
     education:   EducationalStatus = EducationalStatus.PhD,
     thesis:      Boolean           = false,
@@ -2577,8 +2579,9 @@ trait DatabaseOperations { this: OdbSuite =>
                 partnerLink: {
                   ${
                     partnerLink match
-                      case PartnerLink.HasPartner(partner)   => s"partner: ${partner.tag.toScreamingSnakeCase}"
-                      case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                      case PartnerLink.HasGeminiPartner(gp)   => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
+                      case PartnerLink.HasExchangePartner(xp) => s"exchangePartner: ${xp.tag.toScreamingSnakeCase}"
+                      case _                                  => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                   }
                 }
                 preferredProfile: {
@@ -2627,8 +2630,8 @@ trait DatabaseOperations { this: OdbSuite =>
               partnerLink: {
                 ${
                   partnerLink match
-                    case PartnerLink.HasPartner(partner)   => s"partner: ${partner.tag.toScreamingSnakeCase}"
-                    case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                    case PartnerLink.HasGeminiPartner(gp) => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
+                    case _                                => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                 }
               }
               $preferred
@@ -2642,7 +2645,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
     ps.traverse_ : p =>
-      addProgramUserAs(u, pid, partnerLink = PartnerLink.HasPartner(p))
+      addProgramUserAs(u, pid, partnerLink = PartnerLink.HasGeminiPartner(p))
 
   def deleteProgramUserAs(
     user: User,
