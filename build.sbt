@@ -91,8 +91,10 @@ ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
   }
 }
 
-val herokuToken = "HEROKU_API_KEY" -> "${{ secrets.HEROKU_API_KEY }}"
+val herokuToken  = "HEROKU_API_KEY"  -> "${{ secrets.HEROKU_API_KEY }}"
+val munitFlakyOk = "MUNIT_FLAKY_OK" -> "${{ vars.MUNIT_FLAKY_OK }}"
 ThisBuild / githubWorkflowEnv += herokuToken
+ThisBuild / githubWorkflowEnv += munitFlakyOk
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
