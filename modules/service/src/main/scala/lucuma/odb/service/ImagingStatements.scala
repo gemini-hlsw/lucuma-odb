@@ -23,6 +23,25 @@ import skunk.implicits.*
  */
 object ImagingStatements:
 
+  // Variant column names shared by the f2/gmos imaging mode tables
+  private val VariantColumnNames: NonEmptyList[String] = NonEmptyList.of(
+    "c_variant",
+    "c_wavelength_order",
+    "c_sky_count",
+    "c_pre_imaging_off1_p",
+    "c_pre_imaging_off1_q",
+    "c_pre_imaging_off2_p",
+    "c_pre_imaging_off2_q",
+    "c_pre_imaging_off3_p",
+    "c_pre_imaging_off3_q",
+    "c_pre_imaging_off4_p",
+    "c_pre_imaging_off4_q"
+  )
+
+  // The shared variant columns as a comma-separated SQL fragment
+  def variantColumns(prefix: String = ""): String =
+    VariantColumnNames.toList.map(prefix + _).mkString(",\n")
+
   def variantUpdates(
     input: ImagingVariantInput
   ): List[AppliedFragment] =
@@ -152,3 +171,38 @@ object ImagingStatements:
         sql"""($observation_id, $filterCodec, $observing_mode_row_version, $exposure_time_mode_id)"""(oid, filter, version, eid)
 
     insertInto |+| filterEntries.intercalate(void", ")
+
+  def cloneFiltersAndEtms(
+    filterTableName: String,
+    originalId:      Observation.Id,
+    newId:           Observation.Id,
+    etms:            List[(ExposureTimeModeId, ExposureTimeModeId)]
+  ): AppliedFragment =
+    sql"""
+      WITH etm_map AS (
+        SELECT
+          old_exposure_time_mode_id,
+          new_exposure_time_mode_id
+        FROM
+          unnest(
+            ARRAY[${exposure_time_mode_id.list(etms.length)}],
+            ARRAY[${exposure_time_mode_id.list(etms.length)}]
+          ) AS map(old_exposure_time_mode_id, new_exposure_time_mode_id)
+      )
+      INSERT INTO #$filterTableName (
+        c_observation_id,
+        c_exposure_time_mode_id,
+        c_filter,
+        c_version,
+        c_role
+      )
+      SELECT
+        $observation_id,
+        e.new_exposure_time_mode_id,
+        f.c_filter,
+        f.c_version,
+        f.c_role
+      FROM #$filterTableName f
+      JOIN etm_map e ON f.c_exposure_time_mode_id = e.old_exposure_time_mode_id
+      WHERE f.c_observation_id = $observation_id
+    """.apply(etms.map(_._1), etms.map(_._2), newId, originalId)

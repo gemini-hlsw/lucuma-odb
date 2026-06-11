@@ -48,6 +48,12 @@ sealed trait Flamingos2ImagingService[F[_]]:
     which: List[Observation.Id]
   )(using Transaction[F]): F[Unit]
 
+  def clone(
+    observationId:    Observation.Id,
+    newObservationId: Observation.Id,
+    etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
+  )(using Transaction[F]): F[Unit]
+
 object Flamingos2ImagingService:
 
   private val ModeTableName   = "t_flamingos_2_imaging"
@@ -178,6 +184,16 @@ object Flamingos2ImagingService:
             _ <- filterUpdates
           yield ()).value
 
+      override def clone(
+        observationId:    Observation.Id,
+        newObservationId: Observation.Id,
+        etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.clone(observationId, newObservationId))                                                             *>
+          session.exec(
+            ImagingStatements.cloneFiltersAndEtms(Flamingos2ImagingService.FilterTableName, observationId, newObservationId, etms)) *>
+          services.telescopeConfigGeneratorService.clone(observationId, newObservationId)
+
   object Statements:
 
     def insert(
@@ -224,17 +240,7 @@ object Flamingos2ImagingService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
 
@@ -260,3 +266,29 @@ object Flamingos2ImagingService:
         input.explicitDecker.toOptionOption.map(upDecker),
         input.explicitReadoutMode.toOptionOption.map(upReadoutMode)
       ).flatten
+
+    def clone(
+      originalId: Observation.Id,
+      newId:      Observation.Id
+    ): AppliedFragment =
+      sql"""
+        INSERT INTO #${Flamingos2ImagingService.ModeTableName} (
+          c_observation_id,
+          c_program_id,
+          c_read_mode,
+          c_reads,
+          c_decker,
+          c_readout_mode,
+          #${ImagingStatements.variantColumns()}
+        )
+        SELECT
+          $observation_id,
+          (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
+          c_read_mode,
+          c_reads,
+          c_decker,
+          c_readout_mode,
+          #${ImagingStatements.variantColumns()}
+        FROM #${Flamingos2ImagingService.ModeTableName}
+        WHERE c_observation_id = $observation_id
+      """.apply(newId, newId, originalId)

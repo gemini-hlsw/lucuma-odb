@@ -358,7 +358,7 @@ object GmosImagingService:
         etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
       )(using Services[F]): F[Unit] =
         session.exec(Statements.clone(modeTableName(site), observationId, newObservationId))                       *>
-        session.exec(Statements.cloneFiltersAndEtms(filterTableName(site), observationId, newObservationId, etms)) *>
+        session.exec(ImagingStatements.cloneFiltersAndEtms(filterTableName(site), observationId, newObservationId, etms)) *>
         services.telescopeConfigGeneratorService.clone(observationId, newObservationId)
 
   object Statements:
@@ -460,17 +460,7 @@ object GmosImagingService:
         SELECT
           t.c_observation_id,
           f.c_filters,
-          t.c_variant,
-          t.c_wavelength_order,
-          t.c_sky_count,
-          t.c_pre_imaging_off1_p,
-          t.c_pre_imaging_off1_q,
-          t.c_pre_imaging_off2_p,
-          t.c_pre_imaging_off2_q,
-          t.c_pre_imaging_off3_p,
-          t.c_pre_imaging_off3_q,
-          t.c_pre_imaging_off4_p,
-          t.c_pre_imaging_off4_q,
+          #${ImagingStatements.variantColumns("t.")},
           t.c_bin_default,
           t.c_bin,
           t.c_amp_read_mode,
@@ -522,17 +512,7 @@ object GmosImagingService:
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
 
@@ -558,17 +538,7 @@ object GmosImagingService:
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
@@ -576,54 +546,9 @@ object GmosImagingService:
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
-
-    def cloneFiltersAndEtms(
-      tableName:  String,
-      originalId: Observation.Id,
-      newId:      Observation.Id,
-      etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
-    ): AppliedFragment =
-      sql"""
-        WITH etm_map AS (
-          SELECT
-            old_exposure_time_mode_id,
-            new_exposure_time_mode_id
-          FROM
-            unnest(
-              ARRAY[${exposure_time_mode_id.list(etms.length)}],
-              ARRAY[${exposure_time_mode_id.list(etms.length)}]
-            ) AS map(old_exposure_time_mode_id, new_exposure_time_mode_id)
-        )
-        INSERT INTO #$tableName (
-          c_observation_id,
-          c_exposure_time_mode_id,
-          c_filter,
-          c_version,
-          c_role
-        )
-        SELECT
-          $observation_id,
-          e.new_exposure_time_mode_id,
-          f.c_filter,
-          f.c_version,
-          f.c_role
-        FROM #$tableName f
-        JOIN etm_map e ON f.c_exposure_time_mode_id = e.old_exposure_time_mode_id
-        WHERE f.c_observation_id = $observation_id
-      """.apply(etms.map(_._1), etms.map(_._2), newId, originalId)
 
     // Update statements following the GmosLongSlitService pattern
     def commonUpdates(

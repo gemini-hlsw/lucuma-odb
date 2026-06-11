@@ -132,10 +132,12 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
 ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
-      job.withSteps(job.steps.map {
-        case s if s.name.contains("Checkout current branch") => CheckoutShallow
-        case s                                               => s
-      })
+      job
+        .withSteps(job.steps.map {
+          case s if s.name.contains("Checkout current branch") => CheckoutShallow
+          case s                                               => s
+        })
+        .withMatrixFailFast(Some(false))
     else job
   }
 }
