@@ -90,8 +90,10 @@ object ObservingModeServices:
               .select(oids)
               .map(_.widen[ObservingMode])
 
-          case (Flamingos2Imaging, _) =>
-            Map.empty[Observation.Id, ObservingMode].pure
+          case (Flamingos2Imaging, oids) =>
+            flamingos2ImagingService
+              .select(oids)
+              .map(_.widen[ObservingMode])
 
           case (GhostIfu, oids) =>
             ghostIfuService
