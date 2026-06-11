@@ -8,6 +8,7 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
 import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
@@ -24,6 +25,7 @@ import lucuma.odb.sequence.visitor.Config as Visitor
  * All observing mode options.
  */
 type ObservingMode =
+  Flamingos2Imaging  |
   Flamingos2LongSlit |
   GhostIfu           |
   GmosNorthImaging   |
@@ -36,6 +38,7 @@ type ObservingMode =
 
 object ObservingMode:
 
+  val Flamingos2ImagingName: String  = "Flamingos 2 Imaging"
   val Flamingos2LongSlitName: String = "Flamingos 2 Long Slit"
   val GhostIfuName: String           = "GHOST IFU"
   val GmosNorthImagingName: String   = "GMOS North Imaging"
@@ -49,6 +52,7 @@ object ObservingMode:
     given Eq[ObservingMode] =
       Eq.instance:
         case (a: Flamingos2LongSlit, b: Flamingos2LongSlit) => a === b
+        case (a: Flamingos2Imaging,  b: Flamingos2Imaging)  => a === b
         case (a: GhostIfu,           b: GhostIfu)           => a === b
         case (a: GmosNorthLongSlit,  b: GmosNorthLongSlit)  => a === b
         case (a: GmosSouthLongSlit,  b: GmosSouthLongSlit)  => a === b
@@ -60,6 +64,7 @@ object ObservingMode:
 
     given HashBytes[ObservingMode] =
       case f2:  Flamingos2LongSlit => f2.hashBytes
+      case f2i: Flamingos2Imaging  => f2i.hashBytes
       case ghs: GhostIfu           => ghs.hashBytes
       case gnl: GmosNorthLongSlit  => gnl.hashBytes
       case gsl: GmosSouthLongSlit  => gsl.hashBytes
@@ -73,6 +78,7 @@ object ObservingMode:
     extension (m: ObservingMode)
       def instrument: Instrument =
         m match
+          case _: Flamingos2Imaging  => Instrument.Flamingos2
           case _: Flamingos2LongSlit => Instrument.Flamingos2
           case _: GhostIfu           => Instrument.Ghost
           case _: GmosNorthImaging   => Instrument.GmosNorth
@@ -85,6 +91,7 @@ object ObservingMode:
 
       def name: String =
         m match
+          case _: Flamingos2Imaging  => Flamingos2ImagingName
           case _: Flamingos2LongSlit => Flamingos2LongSlitName
           case _: GhostIfu           => GhostIfuName
           case _: GmosNorthImaging   => GmosNorthImagingName
@@ -97,6 +104,7 @@ object ObservingMode:
 
       def modeType: ObservingModeType =
         m match
+          case _: Flamingos2Imaging  => ObservingModeType.Flamingos2Imaging
           case _: Flamingos2LongSlit => ObservingModeType.Flamingos2LongSlit
           case _: GhostIfu           => ObservingModeType.GhostIfu
           case _: GmosNorthImaging   => ObservingModeType.GmosNorthImaging
@@ -106,6 +114,11 @@ object ObservingMode:
           case _: GnirsLongSlit      => ObservingModeType.GnirsLongSlit
           case _: Igrins2LongSlit    => ObservingModeType.Igrins2LongSlit
           case v: Visitor            => v.mode
+
+      def asFlamingos2Imaging: Option[Flamingos2Imaging] =
+        m match
+          case a: Flamingos2Imaging => a.some
+          case _                    => none
 
       def asFlamingos2LongSlit: Option[Flamingos2LongSlit] =
         m match

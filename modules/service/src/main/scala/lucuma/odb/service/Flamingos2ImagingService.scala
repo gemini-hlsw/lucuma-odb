@@ -10,7 +10,11 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -23,6 +27,10 @@ import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.graphql.input.Flamingos2ImagingInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
+import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.odb.sequence.flamingos2.imaging.Config
+import lucuma.odb.sequence.flamingos2.imaging.Filter
+import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import monocle.Optional
@@ -32,6 +40,10 @@ import skunk.implicits.*
 import Services.Syntax.*
 
 sealed trait Flamingos2ImagingService[F[_]]:
+
+  def select(
+    which: List[Observation.Id]
+  ): F[Map[Observation.Id, Config]]
 
   def insert(
     input:  Flamingos2ImagingInput.Create,
@@ -61,6 +73,44 @@ object Flamingos2ImagingService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): Flamingos2ImagingService[F] =
     new Flamingos2ImagingService[F]:
+
+      override def select(
+        which: List[Observation.Id]
+      ): F[Map[Observation.Id, Config]] =
+        NonEmptyList
+          .fromList(which)
+          .fold(Map.empty[Observation.Id, Config].pure[F]): oids =>
+
+            val precursorMap: F[Map[Observation.Id, (NonEmptyList[Filter], Variant.Fields, Statements.ReadFields)]] =
+              val af = Statements.select(oids)
+              session
+                .prepareR(af.fragment.query(observation_id *: Statements.configFields))
+                .use: pq =>
+                  pq.stream(af.argument, chunkSize = 1024)
+                    .compile
+                    .toList
+                    .map(_.map((oid, fs, vf, rf) => oid -> (fs, vf, rf)).toMap)
+
+            for
+              c <- precursorMap
+              o <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Object)
+              s <- services.telescopeConfigGeneratorService.select(oids, TelescopeConfigGeneratorRole.Sky)
+            yield c.view.map { case (oid, (fs, vf, rf)) =>
+              val og = o.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
+              val sg = s.getOrElse(oid, TelescopeConfigGenerator.NoGenerator)
+              oid -> Config(
+                vf.toVariant(og, sg),
+                fs,
+                rf.defaultReadMode,
+                rf.explicitReadMode,
+                rf.defaultReads,
+                rf.explicitReads,
+                rf.defaultDecker,
+                rf.explicitDecker,
+                rf.defaultReadoutMode,
+                rf.explicitReadoutMode
+              )
+            }.toMap
 
       private def stripAcquisition[E](
         m: Map[Observation.Id, (E, NonEmptyList[(Flamingos2Filter, E)])]
@@ -195,6 +245,81 @@ object Flamingos2ImagingService:
           services.telescopeConfigGeneratorService.clone(observationId, newObservationId)
 
   object Statements:
+
+    // F2 imaging properties including overrides
+    case class ReadFields(
+      defaultReadMode:     Flamingos2ReadMode,
+      explicitReadMode:    Option[Flamingos2ReadMode],
+      defaultReads:        Flamingos2Reads,
+      explicitReads:       Option[Flamingos2Reads],
+      defaultDecker:       Flamingos2Decker,
+      explicitDecker:      Option[Flamingos2Decker],
+      defaultReadoutMode:  Flamingos2ReadoutMode,
+      explicitReadoutMode: Option[Flamingos2ReadoutMode]
+    )
+
+    val readFields: Decoder[ReadFields] =
+      (flamingos_2_read_mode        *:
+       flamingos_2_read_mode.opt    *:
+       flamingos_2_reads            *:
+       flamingos_2_reads.opt        *:
+       flamingos_2_decker           *:
+       flamingos_2_decker.opt       *:
+       flamingos_2_readout_mode     *:
+       flamingos_2_readout_mode.opt
+      ).to[ReadFields]
+
+    val configFields: Decoder[(NonEmptyList[Filter], Variant.Fields, ReadFields)] =
+      (GmosImagingService.Statements.filter_list(flamingos_2_filter) *:
+       GmosImagingService.Statements.variant_fields                  *:
+       readFields
+      ).map: (filters, variantFields, reads) =>
+        (filters.map(f => Filter(f.filter, f.exposureTimeMode)), variantFields, reads)
+
+    def select(
+      oids: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      sql"""
+        WITH selected_observations AS (
+          SELECT t.c_observation_id
+          FROM #${Flamingos2ImagingService.ModeTableName} t
+          WHERE """(Void) |+| observationIdIn(oids) |+| sql"""
+        ),
+        aggregated_filters AS (
+          SELECT
+            f.c_observation_id,
+            array_agg(
+              ROW(
+                f.c_filter,
+                e.c_exposure_time_mode,
+                e.c_signal_to_noise_at,
+                e.c_signal_to_noise,
+                e.c_exposure_time,
+                e.c_exposure_count
+              )::s_filter_exposure_time_mode
+              ORDER BY f.c_filter
+            ) AS c_filters
+          FROM #${Flamingos2ImagingService.FilterTableName} f
+          JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = f.c_exposure_time_mode_id
+          JOIN selected_observations s ON s.c_observation_id = f.c_observation_id
+          WHERE f.c_version = 'current'
+          GROUP BY f.c_observation_id
+        )
+        SELECT
+          v.c_observation_id,
+          af.c_filters,
+          #${ImagingStatements.variantColumns("v.")},
+          v.c_read_mode_default,
+          v.c_read_mode,
+          v.c_reads_default,
+          v.c_reads,
+          v.c_decker_default,
+          v.c_decker,
+          v.c_readout_mode_default,
+          v.c_readout_mode
+        FROM v_flamingos_2_imaging v
+        JOIN aggregated_filters af ON af.c_observation_id = v.c_observation_id
+      """(Void)
 
     def insert(
       input: Flamingos2ImagingInput.Create,

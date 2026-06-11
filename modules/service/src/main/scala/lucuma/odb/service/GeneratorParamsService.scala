@@ -367,6 +367,23 @@ object GeneratorParamsService {
               sciMode = sciMode
             ).asRight
 
+          case f2 @ flamingos2.imaging.Config(filters = fs) =>
+            // An input per filter.
+            val inputs = fs.map: f =>
+              ImagingParameters(
+                obsParams.constraints.toInput,
+                InstrumentMode.Flamingos2Imaging(f.exposureTimeMode, f.filter, f2.readMode)
+              )
+
+            val itcInput =
+              obsParams
+                .targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.Imaging(inputs, _))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(itcInput, obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
           case ig: igrins2.longslit.Config =>
             val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
             val consInput = obsParams.constraints.toInput
@@ -456,7 +473,7 @@ object GeneratorParamsService {
 
           // Visitor Modes
           case vis: visitor.Config =>
-            GeneratorParams(              
+            GeneratorParams(
               MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("(visitor mode)"))).asLeft,
               obsParams.scienceBand,
               vis,
@@ -466,7 +483,7 @@ object GeneratorParamsService {
               obsParams.stepCount,
               obsParams.isSplittable
             ).asRight
-          
+
 
       private def itcTargetParams(targetParams: TargetParams): ValidatedNel[MissingParam, ItcInput.TargetDefinition] = {
         // If emission line, SED not required, otherwhise must be defined

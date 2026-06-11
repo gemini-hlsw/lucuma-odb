@@ -286,6 +286,8 @@ object GuideService {
       params.observingMode match
         case mode: flamingos2.longslit.Config                 =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
+        case flamingos2.imaging.Config(filters = filters) =>
+          (Site.GS, ObservingModeType.Flamingos2Imaging, filters.map(_.filter.wavelength).maximum)
         case mode: ghost.ifu.Config                           =>
           (Site.GS, ObservingModeType.GhostIfu, GhostCentralWavelength)
         case gmos.imaging.Config.GmosNorth(filters = filters) =>
