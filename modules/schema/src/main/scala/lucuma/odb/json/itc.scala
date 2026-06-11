@@ -15,6 +15,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.data.ZipperCodec
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.math.SignalToNoise
@@ -85,6 +86,9 @@ trait ItcCodec:
         blue <- c.downField("blue").as[Zipper[Itc.Result]]
       yield Itc.GhostIfu(red, blue)
 
+  given Decoder[Itc.Flamingos2Imaging] =
+    imagingScienceNemDecoder[Flamingos2Filter]("flamingos2ImagingScience").map(Itc.Flamingos2Imaging.apply)
+
   given Decoder[Itc.GmosNorthImaging] =
     imagingScienceNemDecoder[GmosNorthFilter]("gmosNorthImagingScience").map(Itc.GmosNorthImaging.apply)
 
@@ -121,6 +125,13 @@ trait ItcCodec:
         "blue"    -> a.blue.asJson
       )
 
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Flamingos2Imaging] =
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"                  -> Itc.Type.Flamingos2Imaging.asJson,
+        "flamingos2ImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[Flamingos2Filter])
+      )
+
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GmosNorthImaging] =
     Encoder.instance: a =>
       Json.obj(
@@ -155,6 +166,7 @@ trait ItcCodec:
       c.downField("itcType")
        .as[Itc.Type]
        .flatMap:
+         case Itc.Type.Flamingos2Imaging   => Decoder[Itc.Flamingos2Imaging].apply(c)
          case Itc.Type.GhostIfu            => Decoder[Itc.GhostIfu].apply(c)
          case Itc.Type.GmosNorthImaging    => Decoder[Itc.GmosNorthImaging].apply(c)
          case Itc.Type.GmosSouthImaging    => Decoder[Itc.GmosSouthImaging].apply(c)
@@ -163,6 +175,7 @@ trait ItcCodec:
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc] =
     Encoder.instance:
+      case a @ Itc.Flamingos2Imaging(_)   => Encoder[Itc.Flamingos2Imaging].apply(a)
       case a @ Itc.GhostIfu(_, _)         => Encoder[Itc.GhostIfu].apply(a)
       case a @ Itc.GmosNorthImaging(_)    => Encoder[Itc.GmosNorthImaging].apply(a)
       case a @ Itc.GmosSouthImaging(_)    => Encoder[Itc.GmosSouthImaging].apply(a)

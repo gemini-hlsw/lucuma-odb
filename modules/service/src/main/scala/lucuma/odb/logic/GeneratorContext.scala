@@ -50,6 +50,8 @@ case class GeneratorContext(
     // ITC
     itcRes.foreach: itc =>
       itc match
+        case Itc.Flamingos2Imaging(m)     =>
+          m.toNel.toList.foreach(addImagingResultSet)
         case Itc.GhostIfu(r, b)           =>
           addResultSet(r)
           addResultSet(b)

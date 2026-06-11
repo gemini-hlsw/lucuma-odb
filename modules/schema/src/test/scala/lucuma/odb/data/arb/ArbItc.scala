@@ -9,6 +9,7 @@ import eu.timepit.refined.scalacheck.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
 import lucuma.core.data.arb.ArbZipper
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.math.SignalToNoise
@@ -73,6 +74,18 @@ trait ArbItc:
     Cogen[(Target.Id, IntegrationTime, Option[SignalToNoiseAt])].contramap: a =>
       (a.targetId, a.value, a.signalToNoise)
 
+  given Arbitrary[Itc.Flamingos2Imaging] =
+    Arbitrary:
+      for
+        f0 <- arbitrary[Flamingos2Filter]
+        fs <- Gen.listOf(arbitrary[Flamingos2Filter]).map(fs => (f0 :: fs).distinct)
+        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[Itc.Result]])
+      yield Itc.Flamingos2Imaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
+
+  given Cogen[Itc.Flamingos2Imaging] =
+    Cogen[List[(Flamingos2Filter, Zipper[Itc.Result])]].contramap: a =>
+      a.science.toNel.toList
+
   given Arbitrary[Itc.GhostIfu] =
     Arbitrary:
       for
@@ -129,6 +142,7 @@ trait ArbItc:
   given Arbitrary[Itc] =
     Arbitrary:
       Gen.oneOf(
+        arbitrary[Itc.Flamingos2Imaging],
         arbitrary[Itc.GhostIfu],
         arbitrary[Itc.GmosNorthImaging],
         arbitrary[Itc.GmosSouthImaging],
@@ -138,12 +152,13 @@ trait ArbItc:
 
   given Cogen[Itc] =
     Cogen[
-      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.Igrins2Spectroscopy, Itc.GhostIfu]]]]
+      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.Igrins2Spectroscopy, Either[Itc.GhostIfu, Itc.Flamingos2Imaging]]]]]
     ].contramap:
       case a: Itc.Spectroscopy        => Left(a)
       case a: Itc.GmosNorthImaging    => Right(Left(a))
       case a: Itc.GmosSouthImaging    => Right(Right(Left(a)))
       case a: Itc.Igrins2Spectroscopy => Right(Right(Right(Left(a))))
-      case a: Itc.GhostIfu            => Right(Right(Right(Right(a))))
+      case a: Itc.GhostIfu            => Right(Right(Right(Right(Left(a)))))
+      case a: Itc.Flamingos2Imaging   => Right(Right(Right(Right(Right(a)))))
 
 object ArbItc extends ArbItc

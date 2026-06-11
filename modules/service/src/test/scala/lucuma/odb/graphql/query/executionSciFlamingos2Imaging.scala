@@ -53,7 +53,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       """
     ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
-  test("Flamingos2 imaging config loads; imaging ITC/generation not yet implemented"):
+  test("Flamingos2 imaging ITC succeeds"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -76,7 +76,7 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
           }
         """,
         expected = {
-          case OdbError.InvalidObservation(_, Some(m))
-            if m.contains("Imaging ITC lookup is not supported for Flamingos 2 Imaging") => // ok
+          case OdbError.SequenceUnavailable(_, Some(m))
+            if m.contains("Flamingos2 imaging sequence generation is not yet implemented") => // ok
         }
       )
