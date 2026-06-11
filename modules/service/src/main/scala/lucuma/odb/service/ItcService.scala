@@ -28,6 +28,7 @@ import fs2.Stream
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.Observation
@@ -329,17 +330,24 @@ object ItcService {
         def wrap(nem: NonEmptyMap[A, Zipper[Itc.Result]]): Itc
 
       object Imaging:
+        case object Flamingos2Imaging extends Imaging[Flamingos2Filter]:
+          override def pf: PartialFunction[InstrumentMode, Flamingos2Filter] =
+            case InstrumentMode.Flamingos2Imaging(filter = f) => f
+
+          override def wrap(nem: NonEmptyMap[Flamingos2Filter, Zipper[Itc.Result]]): Itc =
+            Itc.Flamingos2Imaging(nem)
+
         case object GmosNorthImaging extends Imaging[GmosNorthFilter]:
-          override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] = {
+          override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] =
             case InstrumentMode.GmosNorthImaging(_, f, _, _) => f
-          }
+
           override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosNorthImaging(nem)
 
         case object GmosSouthImaging extends Imaging[GmosSouthFilter]:
-          override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] = {
+          override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] =
                case InstrumentMode.GmosSouthImaging(_, f, _, _) => f
-          }
+
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosSouthImaging(nem)
 
@@ -417,6 +425,9 @@ object ItcService {
 
         def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
           im.science.head.mode match
+            case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
+              callRemoteImagingItc(oid, im, Imaging.Flamingos2Imaging)
+
             case InstrumentMode.GmosNorthImaging(_, _, _, _) =>
               callRemoteImagingItc(oid, im, Imaging.GmosNorthImaging)
 

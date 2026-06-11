@@ -7,10 +7,12 @@ import cats.Eq
 import cats.Order
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
+import cats.derived.*
 import cats.syntax.all.*
 import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.Target
@@ -56,11 +58,28 @@ object Itc:
 
   // ITC result type discriminator.
   enum Type(val tag: String) derives Enumerated:
+    case Flamingos2Imaging   extends Type("flamingos_2_imaging")
     case GhostIfu            extends Type("ghost_ifu")
     case GmosNorthImaging    extends Type("gmos_north_imaging")
     case GmosSouthImaging    extends Type("gmos_south_imaging")
     case Igrins2Spectroscopy extends Type("igrins_2_spectroscopy")
     case Spectroscopy        extends Type("spectroscopy")
+
+  case class Flamingos2Imaging(
+    science: NonEmptyMap[Flamingos2Filter, Zipper[Result]]
+  ) extends Itc derives Eq:
+
+    override def dataType: Type =
+      Type.Flamingos2Imaging
+
+    override def scienceExposureCount: PosInt =
+      PosInt.unsafeFrom:
+        science.foldLeft(0) { (cnt, z) =>
+          cnt + z.focus.value.exposureCount.value
+        }
+
+  val flamingos2Imaging: Prism[Itc, Flamingos2Imaging] =
+    GenPrism[Itc, Flamingos2Imaging]
 
   case class GhostIfu(
     red:  Zipper[Result],
@@ -174,6 +193,7 @@ object Itc:
 
   given Eq[Itc] =
     Eq.instance:
+      case (a: Flamingos2Imaging,   b: Flamingos2Imaging)   => a === b
       case (a: GhostIfu,            b: GhostIfu)            => a === b
       case (a: GmosNorthImaging,    b: GmosNorthImaging)    => a === b
       case (a: GmosSouthImaging,    b: GmosSouthImaging)    => a === b
