@@ -14,13 +14,6 @@ import lucuma.odb.data.OdbError
 
 import ObservingModeSetupOperations.*
 
-// Verifies that a Flamingos 2 imaging observation now loads as a sequence
-// `ObservingMode` (i.e. `ObservingModeServices.selectObservingMode` returns a
-// `flamingos2.imaging.Config` rather than nothing) and flows through
-// `GeneratorParamsService`, building an imaging ITC input.  Before this change
-// the config never reached the generator and the observation failed with
-// "missing observing mode".  Imaging ITC and sequence generation for F2 are
-// follow-ups, so generation currently stops at the imaging ITC lookup.
 class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
 
   private def createFlamingos2ImagingObservationAs(
