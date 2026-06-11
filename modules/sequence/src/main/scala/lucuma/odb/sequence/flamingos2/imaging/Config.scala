@@ -17,9 +17,7 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 /**
- * Configuration for the Flamingos2 imaging science mode.  Using these
- * parameters, a F2 imaging sequence may be generated.  As with GMOS imaging,
- * spatial offsets are described by the imaging `Variant`.
+ * Configuration for the Flamingos2 imaging science mode.
  */
 case class Config(
   variant:             Variant,
@@ -51,10 +49,7 @@ case class Config(
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.write(variant.hashBytes)
-
-    filters.toList.foreach: f =>
-      out.writeChars(f.filter.tag)
-      out.write(f.exposureTimeMode.hashBytes)
+    out.write(filters.hashBytes)
 
     out.writeChars(readMode.tag)
     out.writeChars(reads.tag)

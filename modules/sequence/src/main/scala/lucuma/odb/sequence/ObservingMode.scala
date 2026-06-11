@@ -51,8 +51,8 @@ object ObservingMode:
   object Instances:
     given Eq[ObservingMode] =
       Eq.instance:
-        case (a: Flamingos2Imaging,  b: Flamingos2Imaging)  => a === b
         case (a: Flamingos2LongSlit, b: Flamingos2LongSlit) => a === b
+        case (a: Flamingos2Imaging,  b: Flamingos2Imaging)  => a === b
         case (a: GhostIfu,           b: GhostIfu)           => a === b
         case (a: GmosNorthLongSlit,  b: GmosNorthLongSlit)  => a === b
         case (a: GmosSouthLongSlit,  b: GmosSouthLongSlit)  => a === b
@@ -63,8 +63,8 @@ object ObservingMode:
         case _                                               => false
 
     given HashBytes[ObservingMode] =
-      case f2i: Flamingos2Imaging  => f2i.hashBytes
       case f2:  Flamingos2LongSlit => f2.hashBytes
+      case f2i: Flamingos2Imaging  => f2i.hashBytes
       case ghs: GhostIfu           => ghs.hashBytes
       case gnl: GmosNorthLongSlit  => gnl.hashBytes
       case gsl: GmosSouthLongSlit  => gsl.hashBytes

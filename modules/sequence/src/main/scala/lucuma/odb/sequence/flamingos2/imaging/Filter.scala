@@ -4,18 +4,17 @@
 package lucuma.odb.sequence.flamingos2.imaging
 
 import cats.Eq
+import cats.derived.*
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.model.ExposureTimeMode
+import lucuma.odb.sequence.util.HashBytes
 
-/**
- * Flamingos2 imaging pairs a filter with an exposure time mode.
- */
-final case class Filter(
+case class Filter(
   filter:           Flamingos2Filter,
   exposureTimeMode: ExposureTimeMode
-)
+) derives Eq
 
 object Filter:
 
-  given Eq[Filter] =
-    Eq.by(f => (f.filter, f.exposureTimeMode))
+  given HashBytes[Filter] =
+    HashBytes.by2(_.filter, _.exposureTimeMode)
