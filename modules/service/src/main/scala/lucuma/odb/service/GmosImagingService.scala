@@ -460,17 +460,7 @@ object GmosImagingService:
         SELECT
           t.c_observation_id,
           f.c_filters,
-          t.c_variant,
-          t.c_wavelength_order,
-          t.c_sky_count,
-          t.c_pre_imaging_off1_p,
-          t.c_pre_imaging_off1_q,
-          t.c_pre_imaging_off2_p,
-          t.c_pre_imaging_off2_q,
-          t.c_pre_imaging_off3_p,
-          t.c_pre_imaging_off3_q,
-          t.c_pre_imaging_off4_p,
-          t.c_pre_imaging_off4_q,
+          #${ImagingStatements.variantColumns("t.")},
           t.c_bin_default,
           t.c_bin,
           t.c_amp_read_mode,
@@ -522,17 +512,7 @@ object GmosImagingService:
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
 
@@ -558,17 +538,7 @@ object GmosImagingService:
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         )
         SELECT
           """.apply(Void) |+| sql"$observation_id".apply(newId) |+| sql""",
@@ -576,17 +546,7 @@ object GmosImagingService:
           c_amp_read_mode,
           c_amp_gain,
           c_roi,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         FROM #$tableName
         WHERE c_observation_id = """.apply(Void) |+| sql"$observation_id".apply(originalId)
 

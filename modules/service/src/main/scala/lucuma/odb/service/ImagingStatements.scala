@@ -23,6 +23,25 @@ import skunk.implicits.*
  */
 object ImagingStatements:
 
+  // Variant column names shared by the f2/gmos imaging mode tables
+  private val VariantColumnNames: NonEmptyList[String] = NonEmptyList.of(
+    "c_variant",
+    "c_wavelength_order",
+    "c_sky_count",
+    "c_pre_imaging_off1_p",
+    "c_pre_imaging_off1_q",
+    "c_pre_imaging_off2_p",
+    "c_pre_imaging_off2_q",
+    "c_pre_imaging_off3_p",
+    "c_pre_imaging_off3_q",
+    "c_pre_imaging_off4_p",
+    "c_pre_imaging_off4_q"
+  )
+
+  // The shared variant columns as a comma-separated SQL fragment
+  def variantColumns(prefix: String = ""): String =
+    VariantColumnNames.toList.map(prefix + _).mkString(",\n")
+
   def variantUpdates(
     input: ImagingVariantInput
   ): List[AppliedFragment] =

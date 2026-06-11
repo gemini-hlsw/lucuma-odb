@@ -240,17 +240,7 @@ object Flamingos2ImagingService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
 
@@ -289,17 +279,7 @@ object Flamingos2ImagingService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         )
         SELECT
           $observation_id,
@@ -308,17 +288,7 @@ object Flamingos2ImagingService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_variant,
-          c_wavelength_order,
-          c_sky_count,
-          c_pre_imaging_off1_p,
-          c_pre_imaging_off1_q,
-          c_pre_imaging_off2_p,
-          c_pre_imaging_off2_q,
-          c_pre_imaging_off3_p,
-          c_pre_imaging_off3_q,
-          c_pre_imaging_off4_p,
-          c_pre_imaging_off4_q
+          #${ImagingStatements.variantColumns()}
         FROM #${Flamingos2ImagingService.ModeTableName}
         WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)
