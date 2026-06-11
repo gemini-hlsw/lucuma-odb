@@ -8,26 +8,23 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Partner
 import lucuma.core.enums.PartnerLinkType
 import lucuma.odb.graphql.binding.*
 
-object WherePartnerLink {
+object WherePartnerLink:
 
   def binding(path: Path): Matcher[Predicate] =
     val WherePartnerLinkType = WhereEq.binding[PartnerLinkType](path / "linkType", PartnerLinkTypeBinding)
-    val WherePartner         = WhereOptionEq.binding[Partner](path / "partner", PartnerBinding)
+    val WherePartner         = WhereOptionEq.binding[Partner](path / "geminiPartner", PartnerBinding)
+    val WhereExchangePartner = WhereOptionEq.binding[ExchangePartner](path / "exchangePartner", ExchangePartnerBinding)
 
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         WherePartnerLinkType.Option("linkType", rLinkType),
-        WherePartner.Option("partner", rPartner)
+        WherePartner.Option("geminiPartner", rGeminiPartner),
+        WhereExchangePartner.Option("exchangePartner", rExchangePartner)
       ) =>
-        (rLinkType, rPartner).parMapN { (linkType, partner) =>
-          and(List(
-            linkType,
-            partner
-          ).flatten)
-        }
-    }
-}
+        (rLinkType, rGeminiPartner, rExchangePartner).parMapN: (linkType, geminiPartner, exchangePartner) =>
+          and(List(linkType, geminiPartner, exchangePartner).flatten)

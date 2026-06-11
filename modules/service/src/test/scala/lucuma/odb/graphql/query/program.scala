@@ -81,8 +81,8 @@ class program extends OdbSuite {
                         id
                         partnerLink {
                           linkType
-                          ... on HasPartner {
-                            partner
+                          ... on HasGeminiPartner {
+                            geminiPartner
                           }
                         }
                       }
@@ -106,8 +106,8 @@ class program extends OdbSuite {
                         "programUser": {
                           "id": $mid,
                           "partnerLink": {
-                            "linkType": "HAS_PARTNER",
-                            "partner": "US"
+                            "linkType": "HAS_GEMINI_PARTNER",
+                            "geminiPartner": "US"
                           }
                         },
                         "email": {

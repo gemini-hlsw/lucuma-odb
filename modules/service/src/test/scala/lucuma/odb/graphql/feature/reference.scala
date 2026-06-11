@@ -10,7 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.CallForProposals
@@ -122,7 +122,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   test("submit proposals") {
     for {
-      cid0 <- createCallForProposalsAs(staff, semester = sem2024B)
+      cid0 <- createGeminiCallForProposalsAs(staff, semester = sem2024B)
       pid0 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid0, cid0)
       _    <- addPartnerSplits(pi, pid0)
@@ -135,7 +135,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _    <- addCoisAs(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
-      cid1 <- createCallForProposalsAs(staff, semester = sem2025A)
+      cid1 <- createGeminiCallForProposalsAs(staff, semester = sem2025A)
       pid2 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid2, cid1)
       _    <- addPartnerSplits(pi, pid2)
@@ -254,7 +254,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   test("submit, unsubmit, resubmit, same reference") {
     for {
-      cid  <- createCallForProposalsAs(staff, semester = sem2010A)
+      cid  <- createGeminiCallForProposalsAs(staff, semester = sem2010A)
       pid  <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid, cid)
       _    <- addPartnerSplits(pi, pid)
@@ -270,7 +270,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   test("accept proposal") {
     for {
-      cid  <- createCallForProposalsAs(staff, semester = sem2024A)
+      cid  <- createGeminiCallForProposalsAs(staff, semester = sem2024A)
       pid  <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid, cid)
       _    <- addPartnerSplits(pi, pid)
@@ -287,7 +287,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   test("program reference SCI fields") {
     for {
-      cid <- createCallForProposalsAs(staff, semester = sem2024A)
+      cid <- createGeminiCallForProposalsAs(staff, semester = sem2024A)
       pid <- createProgramWithUsPi(pi)
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
@@ -335,7 +335,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
                 programId: "$pid"
                 SET: {
                   callId: "$cid"
-                  type: {
+                  gemini: {
                     classical: {
                       minPercentTime: 50
                       partnerSplits: [
@@ -354,7 +354,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       )
 
     for {
-      cid  <- createCallForProposalsAs(staff, CallForProposalsType.RegularSemester, sem2024A)
+      cid  <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester, sem2024A)
       pid  <- fetchPid(pi, ref2024A1)
       _    <- toClassical(pid, cid)
       prog <- fetchProgramReference(pi, pid)
@@ -695,7 +695,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   test("setProposalReference SCI, yes proposal") {
     for {
-      cid <- createCallForProposalsAs(staff, semester = sem2025B)
+      cid <- createGeminiCallForProposalsAs(staff, semester = sem2025B)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
@@ -733,7 +733,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
 
   test("setProposalReference SCI -> CAL -> SCI, index increases") {
     for {
-      cid <- createCallForProposalsAs(staff, semester = sem2025B)
+      cid <- createGeminiCallForProposalsAs(staff, semester = sem2025B)
       pid <- fetchPid(pi, "G-2025B-0001-C".programReference)
       _   <- deleteProposal(staff, pid)
       _   <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")

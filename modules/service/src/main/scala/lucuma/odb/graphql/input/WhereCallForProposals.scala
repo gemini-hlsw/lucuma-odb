@@ -7,55 +7,48 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import lucuma.core.enums.CallForProposalsType
-import lucuma.core.model.CallForProposals
 import lucuma.odb.graphql.binding.*
 import org.typelevel.cats.time.given
 
-object WhereCallForProposals {
+object WhereCallForProposals:
 
-  def binding(path: Path): Matcher[Predicate] = {
-    val WhereIdBinding       = WhereOrder.binding(path / "id",                   CallForProposalsIdBinding)
-    val WhereTypeBinding     = WhereEq.binding(   path / "type",                 CallForProposalsTypeBinding)
-    val WhereSemesterBinding = WhereOrder.binding(path / "semester",             SemesterBinding)
-    val WhereStartBinding    = WhereOrder.binding(path / "active" / "start",     DateBinding)
-    val WhereEndBinding      = WhereOrder.binding(path / "active" / "end",       DateBinding)
-    val WhereIsOpenBinding   = WhereBoolean.binding(path / "_isOpen",            BooleanBinding)
-    val WhereAllowsNonPartner= WhereBoolean.binding(path / "allowsNonPartnerPi", BooleanBinding)
+  def binding(path: Path): Matcher[Predicate] =
+    val WhereIdBinding          = WhereOrder.binding(path / "id",               CallForProposalsIdBinding)
+    val WhereSemesterBinding    = WhereOrder.binding(path / "semester",         SemesterBinding)
+    val WhereStartBinding       = WhereOrder.binding(path / "active" / "start", DateBinding)
+    val WhereEndBinding         = WhereOrder.binding(path / "active" / "end",   DateBinding)
+    val WhereIsOpenBinding      = WhereBoolean.binding(path / "_isOpen",        BooleanBinding)
+    val WhereObservatoryBinding = WhereEq.binding(path / "observatory",         ObservatoryBinding)
+    val WhereGeminiBinding      = WhereGeminiCallProperties.binding(path / "gemini")
 
     lazy val WhereCfpBinding = binding(path)
 
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         WhereCfpBinding.List.Option("AND", rAND),
         WhereCfpBinding.List.Option("OR", rOR),
         WhereCfpBinding.Option("NOT", rNOT),
 
         WhereIdBinding.Option("id", rId),
-        WhereTypeBinding.Option("type", rType),
         WhereSemesterBinding.Option("semester", rSemester),
         WhereStartBinding.Option("activeStart", rStart),
         WhereEndBinding.Option("activeEnd", rEnd),
         WhereIsOpenBinding.Option("isOpen", rIsOpen),
-        WhereAllowsNonPartner.Option("allowsNonPartnerPi", rNonPartner)
+        WhereObservatoryBinding.Option("observatory", rObservatory),
+        WhereGeminiBinding.Option("gemini", rGemini)
       ) =>
-        (rAND, rOR, rNOT, rId, rType, rSemester, rStart, rEnd, rIsOpen, rNonPartner).parMapN {
-          (AND, OR, NOT, id, cfpType, semester, start, end, isOpen, nonPartner) =>
+        (rAND, rOR, rNOT, rId, rSemester, rStart, rEnd, rIsOpen, rObservatory, rGemini).parMapN {
+          (AND, OR, NOT, id, semester, start, end, isOpen, observatory, gemini) =>
             and(List(
               AND.map(and),
               OR.map(or),
               NOT.map(Not(_)),
               id,
-              cfpType,
               semester,
               start,
               end,
               isOpen,
-              nonPartner
+              observatory,
+              gemini
             ).flatten)
         }
-    }
-  }
-
-}
-

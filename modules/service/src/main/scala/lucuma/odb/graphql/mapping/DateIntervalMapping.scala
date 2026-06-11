@@ -24,6 +24,6 @@ trait DateIntervalMapping[F[_]] extends CallForProposalsView[F]
 
   lazy val DateIntervalMappings: List[TypeMapping] =
     List(
-      dateIntervalMappingAtPath(CallForProposalsType / "active", CallForProposalsView.ActiveStart, CallForProposalsView.ActiveEnd, CallForProposalsView.Id),
-      dateIntervalMappingAtPath(ProgramType / "active", ProgramView.ActiveStart, ProgramView.ActiveEnd, ProgramView.Id)
+      dateIntervalMappingAtPath(GeminiCallForProposalsType / "active", CallForProposalsView.ActiveStart, CallForProposalsView.ActiveEnd, CallForProposalsView.Id),
+      dateIntervalMappingAtPath(ProgramType / "active", ProgramTable.ActiveStart, ProgramTable.ActiveEnd, ProgramView.Id)
     )

@@ -9,7 +9,7 @@ import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.model.Semester
 
 class createGroup extends OdbSuite {
@@ -254,7 +254,7 @@ class createGroup extends OdbSuite {
       )
 
     for {
-      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       _   <- submitProposal(pi, pid)

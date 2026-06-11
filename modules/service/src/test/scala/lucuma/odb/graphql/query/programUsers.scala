@@ -8,6 +8,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Partner
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
@@ -239,8 +240,8 @@ class programUsers extends OdbSuite:
   test("program user selection via partner"):
     for
       pid  <- createProgramAs(pi2)
-      rid0 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.CA))
-      rid1 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.UH))
+      rid0 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.CA))
+      rid1 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.UH))
       rid2 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasNonPartner)
       _    <- linkUserAs(pi2, rid0, piCharles.id)
       _    <- linkUserAs(pi2, rid1, piLeon.id)
@@ -251,7 +252,7 @@ class programUsers extends OdbSuite:
                  query {
                    programUsers(
                      WHERE: {
-                       partnerLink: { partner: { EQ: UH } }
+                       partnerLink: { geminiPartner: { EQ: UH } }
                      }
                    ) {
                      matches {
@@ -268,6 +269,45 @@ class programUsers extends OdbSuite:
                        Json.obj(
                          "program" -> Json.obj("id" -> pid.asJson),
                          "user"    -> Json.obj("id" -> piLeon.id.asJson)
+                       )
+                     )
+                   )
+                 ).asRight
+             )
+    yield ()
+
+  test("program user selection via exchange partner"):
+    for
+      pid  <- createProgramAs(pi2)
+      rid0 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasExchangePartner(ExchangePartner.Subaru))
+      rid1 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.UH))
+      rid2 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasNonPartner)
+      _    <- linkUserAs(pi2, rid0, piCharles.id)
+      _    <- linkUserAs(pi2, rid1, piLeon.id)
+      _    <- linkUserAs(pi2, rid2, pi.id)
+      _    <- expect(
+               user = staff,
+               query = s"""
+                 query {
+                   programUsers(
+                     WHERE: {
+                       partnerLink: { exchangePartner: { EQ: SUBARU } }
+                     }
+                   ) {
+                     matches {
+                       program { id }
+                       user { id }
+                     }
+                   }
+                 }
+               """,
+               expected =
+                 Json.obj(
+                   "programUsers" -> Json.obj(
+                     "matches" -> Json.arr(
+                       Json.obj(
+                         "program" -> Json.obj("id" -> pid.asJson),
+                         "user"    -> Json.obj("id" -> piCharles.id.asJson)
                        )
                      )
                    )
@@ -321,8 +361,8 @@ class programUsers extends OdbSuite:
 
     for
       pid  <- createProgramAs(pi2)
-      rid0 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.CA), preferred = cg)
-      rid1 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasPartner(Partner.UH), preferred = jwb)
+      rid0 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.CA), preferred = cg)
+      rid1 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.UH), preferred = jwb)
       rid2 <- addProgramUserAs(pi2, pid, partnerLink = PartnerLink.HasNonPartner, preferred = lc)
       _    <- linkUserAs(pi2, rid0, piCharles.id)
       _    <- linkUserAs(pi2, rid2, piLeon.id)

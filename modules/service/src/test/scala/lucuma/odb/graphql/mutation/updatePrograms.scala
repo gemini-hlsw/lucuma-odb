@@ -6,7 +6,7 @@ package mutation
 
 import cats.syntax.all.*
 import io.circe.literal.*
-import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -447,7 +447,7 @@ class updatePrograms extends OdbSuite {
       )
 
   test("changing CfP active period in non-default active period has no impact"):
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         for
           _ <- addProposal(pi, pid, cid.some).void

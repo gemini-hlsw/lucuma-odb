@@ -37,7 +37,7 @@ class addProgramUser extends OdbSuite:
 
   override val httpRequestHandler = invitationEmailRequestHandler
 
-  test("addProgramUser"):
+  test("addProgramUser - has partner"):
     createProgramAs(pi1).flatMap: pid =>
       expect(
         user     = pi1,
@@ -48,7 +48,7 @@ class addProgramUser extends OdbSuite:
                 programId: "$pid"
                 role: COI
                 SET: {
-                  partnerLink: { partner: CA }
+                  partnerLink: { geminiPartner: CA }
                   preferredProfile: {
                     givenName: "Gavrilo"
                     familyName: "Princip"
@@ -65,8 +65,8 @@ class addProgramUser extends OdbSuite:
                 role
                 partnerLink {
                   linkType
-                  ...on HasPartner {
-                    partner
+                  ...on HasGeminiPartner {
+                    geminiPartner
                   }
                 }
                 preferredProfile {
@@ -90,8 +90,8 @@ class addProgramUser extends OdbSuite:
               "programUser": {
                 "role": "COI",
                 "partnerLink": {
-                  "linkType": "HAS_PARTNER",
-                  "partner": "CA"
+                  "linkType": "HAS_GEMINI_PARTNER",
+                  "geminiPartner": "CA"
                 },
                 "preferredProfile": {
                   "givenName": "Gavrilo",
@@ -104,6 +104,57 @@ class addProgramUser extends OdbSuite:
                 "gender": "MALE",
                 "hasDataAccess": true,
                 "classicalVisitor": false
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("addProgramUser - has exchange partner"):
+    createProgramAs(pi1).flatMap: pid =>
+      expect(
+        user     = pi1,
+        query    = s"""
+          mutation {
+            addProgramUser(
+              input: {
+                programId: "$pid"
+                role: COI
+                SET: {
+                  partnerLink: { exchangePartner: SUBARU }
+                  preferredProfile: {
+                    givenName: "Gavrilo"
+                    familyName: "Princip"
+                    creditName: "Гаврило Принцип"
+                    email: "gprincip@mladabosna.org"
+                  }
+                  educationalStatus: GRAD_STUDENT
+                  thesis: false
+                  gender: MALE
+                }
+              }
+            ) {
+              programUser {
+                role
+                partnerLink {
+                  linkType
+                  ...on HasExchangePartner {
+                    exchangePartner
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "addProgramUser": {
+              "programUser": {
+                "role": "COI",
+                "partnerLink": {
+                  "linkType": "HAS_EXCHANGE_PARTNER",
+                  "exchangePartner": "SUBARU"
+                }
               }
             }
           }
@@ -129,7 +180,7 @@ class addProgramUser extends OdbSuite:
             }
           }
         """,
-        expected = List("Argument 'input.SET.partnerLink' is invalid: Specify either 'linkType' (as `HAS_NON_PARTNER` or `HAS_UNSPECIFIED_PARTNER`) or 'partner'.").asLeft
+        expected = List("Argument 'input.SET.partnerLink' is invalid: Specify either 'linkType' (as `HAS_NON_PARTNER` or `HAS_UNSPECIFIED_PARTNER`), 'partner', or 'exchangePartner'.").asLeft
       )
 
   test("[general] (empty link)"):
@@ -138,7 +189,7 @@ class addProgramUser extends OdbSuite:
   test("[general] (missing partner)"):
     testInvalidInput(
       """
-        linkType: HAS_PARTNER
+        linkType: HAS_GEMINI_PARTNER
       """.stripMargin
     )
 
@@ -146,7 +197,7 @@ class addProgramUser extends OdbSuite:
     testInvalidInput(
       """
         linkType: HAS_NON_PARTNER
-        partner: US
+        geminiPartner: US
       """.stripMargin
     )
 
@@ -164,7 +215,7 @@ class addProgramUser extends OdbSuite:
 
   private def partnerLinkFor(role: ProgramUserRole): PartnerLink =
     if (role === ProgramUserRole.SupportPrimary || role === ProgramUserRole.SupportSecondary) PartnerLink.HasUnspecifiedPartner
-    else PartnerLink.HasPartner(Partner.US)
+    else PartnerLink.HasGeminiPartner(Partner.US)
 
   // What can a Guest do?
 
@@ -198,7 +249,7 @@ class addProgramUser extends OdbSuite:
       for
         _   <- createUsers(pi1, pi2)
         pid <- createProgramAs(pi1)
-        mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
+        mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasGeminiPartner(Partner.CA))
         _   <- assertIO(listProgramUsersAs(pi1, pid), List((mid, link, None)))
       yield ()
 
@@ -221,7 +272,7 @@ class addProgramUser extends OdbSuite:
       for
         _    <- createUsers(pi1, pi2)
         pid  <- createProgramAs(pi1)
-        mid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
+        mid  <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasGeminiPartner(Partner.AR))
         _    <- linkUserAs(pi1, mid, pi2.id)
         rid2 <- addProgramUserAs(pi1, pid, role)
         _    <- assertIO(
@@ -329,7 +380,7 @@ class addProgramUser extends OdbSuite:
                 programId: "$pid"
                 role: COI
                 SET: {
-                  partnerLink: { partner: CA }
+                  partnerLink: { geminiPartner: CA }
                   classicalVisitor: true
                 }
               }
