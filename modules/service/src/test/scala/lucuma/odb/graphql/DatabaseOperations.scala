@@ -1197,6 +1197,7 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             fpu: LONG_SLIT_0_30
             filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
               timeAndCount: {
                 time: { seconds: 30.0 }
@@ -1367,6 +1368,7 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             fpu: LONG_SLIT_0_30
             filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
               timeAndCount: {
                 time: { seconds: 30.0 }

@@ -107,10 +107,9 @@ trait GnirsLongSlitMapping[F[_]]
       SqlField("explicitPrism",  GnirsLongSlitView.Prism),
       SqlField("initialPrism",   GnirsLongSlitView.InitialPrism),
 
-      // Grating wavelength: explicit + default + effective (all Wavelength objects)
-      SqlObject("gratingWavelength"),
-      SqlObject("explicitGratingWavelength"),
-      SqlObject("defaultGratingWavelength"),
+      // Central wavelength: required stored value + initial snapshot
+      SqlObject("centralWavelength"),
+      SqlObject("initialCentralWavelength"),
 
       // Camera + FPU + Filter + Wavelength
       SqlField("camera",        GnirsLongSlitView.Camera),

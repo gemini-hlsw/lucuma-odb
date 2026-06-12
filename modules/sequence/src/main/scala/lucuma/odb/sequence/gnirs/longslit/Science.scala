@@ -104,7 +104,7 @@ object Science:
         val acqMirror        = GnirsAcquisitionMirrorMode.Out(
           config.prism,
           config.grating,
-          GnirsGratingWavelength(config.gratingWavelength)
+          GnirsGratingWavelength(config.centralWavelength)
         )
 
         val sciClass = calRole.sciClass

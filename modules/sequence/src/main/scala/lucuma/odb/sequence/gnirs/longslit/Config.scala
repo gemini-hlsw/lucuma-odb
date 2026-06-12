@@ -80,7 +80,7 @@ case class Config(
   fpu:                     GnirsFpuSlit,
   prism:                   GnirsPrism,
   grating:                 GnirsGrating,
-  gratingWavelength:       Wavelength,
+  centralWavelength:       Wavelength,
   camera:                  GnirsCamera,
   focus:                   GnirsFocus,
   explicitReadMode:        Option[GnirsReadMode],
@@ -101,7 +101,7 @@ case class Config(
     out.writeChars(fpu.tag)
     out.writeChars(prism.tag)
     out.writeChars(grating.tag)
-    out.write(gratingWavelength.hashBytes)
+    out.write(centralWavelength.hashBytes)
     out.writeChars(camera.tag)
     focus match
       case GnirsFocus.Best          => out.writeByte(0)
