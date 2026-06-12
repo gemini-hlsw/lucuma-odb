@@ -35,6 +35,10 @@ SET c_initial_central_wavelength = COALESCE(
   END
 );
 
+-- Flush the deferred FK (c_observation_id) trigger events queued by the UPDATE so
+-- the following ALTER TABLE is not blocked by "pending trigger events" (55006).
+SET CONSTRAINTS ALL IMMEDIATE;
+
 -- The initial column is required; the override (c_central_wavelength) remains nullable.
 ALTER TABLE t_gnirs_long_slit
   ALTER COLUMN c_initial_central_wavelength SET NOT NULL;
