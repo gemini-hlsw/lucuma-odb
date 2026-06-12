@@ -17,12 +17,13 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
 
     val Grating: ColumnRef           = col("c_grating", gnirs_grating.opt)
     val Prism: ColumnRef             = col("c_prism", gnirs_prism.opt)
-    val GratingWavelength: ColumnRef = col("c_grating_wavelength", wavelength_pm.opt)
-    val GratingWavelengthValue: ColumnRef = col("c_grating_wavelength", wavelength_pm)
+    // Central wavelength override (nullable); effective falls back to the initial value.
+    val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm.opt)
 
     // Initial acquisition mirror (always set, always Out)
-    val InitialGrating: ColumnRef   = col("c_initial_grating", gnirs_grating)
-    val InitialPrism: ColumnRef     = col("c_initial_prism", gnirs_prism)
+    val InitialGrating: ColumnRef           = col("c_initial_grating", gnirs_grating)
+    val InitialPrism: ColumnRef             = col("c_initial_prism", gnirs_prism)
+    val InitialCentralWavelength: ColumnRef = col("c_initial_central_wavelength", wavelength_pm)
 
     // Camera
     val Camera: ColumnRef           = col("c_camera", gnirs_camera)
@@ -65,14 +66,13 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     // View-computed defaults and effective values
     val DefaultDecker: ColumnRef           = col("c_decker_default", gnirs_decker)
     val DeckerEffective: ColumnRef         = col("c_decker_effective", gnirs_decker)
-    val DefaultGratingWavelength: ColumnRef    = col("c_grating_wavelength_default", wavelength_pm)
-    val GratingWavelengthEffective: ColumnRef  = col("c_grating_wavelength_effective", wavelength_pm)
     val DefaultWellDepth: ColumnRef        = col("c_well_depth_default", gnirs_well_depth)
     val WellDepthEffective: ColumnRef      = col("c_well_depth_effective", gnirs_well_depth)
 
-    // Effective grating/prism: COALESCE(explicit, initial)
-    val GratingEffective: ColumnRef = col("c_grating_effective", gnirs_grating)
-    val PrismEffective: ColumnRef   = col("c_prism_effective", gnirs_prism)
+    // Effective grating/prism/central wavelength: COALESCE(explicit, initial)
+    val GratingEffective: ColumnRef           = col("c_grating_effective", gnirs_grating)
+    val PrismEffective: ColumnRef             = col("c_prism_effective", gnirs_prism)
+    val CentralWavelengthEffective: ColumnRef = col("c_central_wavelength_effective", wavelength_pm)
 
     // Telluric type (stored as jsonb)
     val TelluricType: ColumnRef     = col("c_telluric_type", jsonb)

@@ -213,7 +213,7 @@ object Acquisition:
       // auto from the mode + spectroscopy wavelength), and the FPU-image filter/exposure.
       mode       = config.acquisition.resolvedMode(t.exposureTime)
       selFilter <- config.acquisition
-                     .selectedFilter(mode, config.gratingWavelength)
+                     .selectedFilter(mode, config.centralWavelength)
                      .leftMap(sequenceError)
       fpuStep   <- firstStepFilterAndExposure(mode, config.camera, selFilter).leftMap(sequenceError)
     yield

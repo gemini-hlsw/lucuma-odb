@@ -43,6 +43,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
                           timeAndCount: {
                             time: { seconds: 30.0 }
@@ -73,9 +74,8 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         decker
                         defaultDecker
                         explicitDecker
-                        gratingWavelength { nanometers }
-                        defaultGratingWavelength { nanometers }
-                        explicitGratingWavelength { nanometers }
+                        centralWavelength { nanometers }
+                        initialCentralWavelength { nanometers }
                         explicitReadMode
                         wellDepth
                         defaultWellDepth
@@ -127,9 +127,8 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "decker": "SHORT_CAM_LONG_SLIT",
                       "defaultDecker": "SHORT_CAM_LONG_SLIT",
                       "explicitDecker": null,
-                      "gratingWavelength": { "nanometers": 2200.000 },
-                      "defaultGratingWavelength": { "nanometers": 2200.000 },
-                      "explicitGratingWavelength": null,
+                      "centralWavelength": { "nanometers": 2200.000 },
+                      "initialCentralWavelength": { "nanometers": 2200.000 },
                       "explicitReadMode": null,
                       "wellDepth": "SHALLOW",
                       "defaultWellDepth": "SHALLOW",
@@ -201,6 +200,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
                           timeAndCount: {
                             time: { seconds: 30.0 }
@@ -344,11 +344,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: LONG_RED
                         fpu: LONG_SLIT_0_45
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2100 }
                         coadds: 2
                         explicitDecker: ACQUISITION
                         explicitReadMode: BRIGHT
                         explicitWellDepth: SHALLOW
-                        explicitGratingWavelength: { nanometers: 2100 }
                         explicitFocusMotorSteps: 500
                         exposureTimeMode: {
                           timeAndCount: {
@@ -373,9 +373,8 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         decker
                         defaultDecker
                         explicitDecker
-                        gratingWavelength { nanometers }
-                        defaultGratingWavelength { nanometers }
-                        explicitGratingWavelength { nanometers }
+                        centralWavelength { nanometers }
+                        initialCentralWavelength { nanometers }
                         explicitReadMode
                         wellDepth
                         defaultWellDepth
@@ -402,9 +401,8 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "decker": "ACQUISITION",
                       "defaultDecker": "LONG_CAM_CROSS_DISPERSED",
                       "explicitDecker": "ACQUISITION",
-                      "gratingWavelength": { "nanometers": 2100.000 },
-                      "defaultGratingWavelength": { "nanometers": 2200.000 },
-                      "explicitGratingWavelength": { "nanometers": 2100.000 },
+                      "centralWavelength": { "nanometers": 2100.000 },
+                      "initialCentralWavelength": { "nanometers": 2100.000 },
                       "explicitReadMode": "BRIGHT",
                       "wellDepth": "SHALLOW",
                       "defaultWellDepth": "DEEP",
@@ -501,6 +499,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           camera: SHORT_BLUE
                           fpu: LONG_SLIT_0_30
                           filter: ORDER3
+                          centralWavelength: { nanometers: 2200 }
                           explicitFocusMotorSteps: 500
                           exposureTimeMode: {
                             timeAndCount: {
@@ -548,6 +547,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         explicitFocusMotorSteps: 500
                         exposureTimeMode: {
                           timeAndCount: {
@@ -788,6 +788,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
                           timeAndCount: {
                             time: { seconds: 30.0 }
@@ -857,6 +858,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
                           timeAndCount: {
                             time: { seconds: 30.0 }
@@ -906,6 +908,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         acquisition: {
                           explicitAcquisitionType: BRIGHT
                           skyOffset: { p: { arcseconds: 1.5 }, q: { arcseconds: -2.5 } }
@@ -949,6 +952,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         acquisition: {
                           explicitAcquisitionType: FAINT
                         }
@@ -991,6 +995,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
                           timeAndCount: {
                             time: { seconds: 30.0 }
@@ -1064,6 +1069,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
                           timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }
                         }
@@ -1122,6 +1128,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         camera: SHORT_BLUE
                         fpu: LONG_SLIT_0_30
                         filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
                         telluricType: { tag: SOLAR }
                         exposureTimeMode: {
                           timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }

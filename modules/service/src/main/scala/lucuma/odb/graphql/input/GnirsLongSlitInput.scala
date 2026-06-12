@@ -122,8 +122,8 @@ object GnirsLongSlitInput:
     camera:           GnirsCamera,
     grating:          GnirsGrating,
     prism:            GnirsPrism,
+    centralWavelength:            Wavelength,
     explicitDecker:               Option[GnirsDecker]              = None,
-    explicitGratingWavelength:    Option[Wavelength]               = None,
     explicitGrating:              Option[GnirsGrating]             = None,
     explicitPrism:                Option[GnirsPrism]               = None,
     explicitFocusMotorSteps:      Option[Int]                      = None,
@@ -149,8 +149,8 @@ object GnirsLongSlitInput:
           GnirsCameraBinding("camera", rCamera),
           GnirsGratingBinding("grating", rGrating),
           GnirsPrismBinding("prism", rPrism),
+          WavelengthInput.Binding("centralWavelength", rCentralWavelength),
           GnirsDeckerBinding.Option("explicitDecker", rDecker),
-          WavelengthInput.Binding.Option("explicitGratingWavelength", rGratingWavelength),
           GnirsGratingBinding.Option("explicitGrating", rExplGrating),
           GnirsPrismBinding.Option("explicitPrism", rExplPrism),
           IntBinding.Option("explicitFocusMotorSteps", rFocus),
@@ -161,26 +161,26 @@ object GnirsLongSlitInput:
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
-           rDecker, rGratingWavelength, rExplGrating, rExplPrism,
+           rCentralWavelength, rDecker, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parMapN:
             (etm, coadds, filter, fpu, camera, grating, prism,
-             decker, gratingWavelength, explGrating, explPrism,
+             centralWavelength, decker, explGrating, explPrism,
              focus, readMode, wellDepth, explTelescope, acq, telluricType) =>
               Create(etm, coadds, filter, fpu, camera, grating, prism,
-                     decker, gratingWavelength, explGrating, explPrism,
+                     centralWavelength, decker, explGrating, explPrism,
                      focus, readMode, wellDepth, explTelescope, acq,
                      telluricType.getOrElse(TelluricType.Hot))
 
   case class Edit(
     exposureTimeMode:          Option[ExposureTimeMode],
-    coadds:                    Option[PosInt],          // Option, not Nullable — coadds is NOT NULL
+    coadds:                    Option[PosInt],
     filter:                    Option[GnirsFilter],
     fpu:                       Option[GnirsFpuSlit],
     camera:                    Option[GnirsCamera],
     grating:                   Nullable[GnirsGrating],
     prism:                     Nullable[GnirsPrism],
+    centralWavelength:         Option[Wavelength],
     explicitDecker:            Nullable[GnirsDecker],
-    explicitGratingWavelength: Nullable[Wavelength],
     explicitGrating:           Nullable[GnirsGrating],
     explicitPrism:             Nullable[GnirsPrism],
     explicitFocusMotorSteps:   Nullable[Int],
@@ -209,8 +209,9 @@ object GnirsLongSlitInput:
         c  <- required(camera, "camera")
         g  <- required(grating.toOption, "grating")
         p  <- required(prism.toOption, "prism")
+        w  <- required(centralWavelength, "centralWavelength")
       yield Create(exposureTimeMode, coadds, f, u, c, g, p,
-                   explicitDecker.toOption, explicitGratingWavelength.toOption,
+                   w, explicitDecker.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
                    explicitTelescopeConfigs.toOption, acquisition,
@@ -227,8 +228,8 @@ object GnirsLongSlitInput:
           GnirsCameraBinding.Option("camera", rCamera),
           GnirsGratingBinding.Nullable("grating", rGrating),
           GnirsPrismBinding.Nullable("prism", rPrism),
+          WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
           GnirsDeckerBinding.Nullable("explicitDecker", rDecker),
-          WavelengthInput.Binding.Nullable("explicitGratingWavelength", rGratingWavelength),
           GnirsGratingBinding.Nullable("explicitGrating", rExplGrating),
           GnirsPrismBinding.Nullable("explicitPrism", rExplPrism),
           IntBinding.Nullable("explicitFocusMotorSteps", rFocus),
@@ -239,5 +240,5 @@ object GnirsLongSlitInput:
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
-           rDecker, rGratingWavelength, rExplGrating, rExplPrism,
+           rCentralWavelength, rDecker, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parMapN(Edit.apply)

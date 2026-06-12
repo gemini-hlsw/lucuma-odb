@@ -78,7 +78,7 @@ object GnirsLongSlitService:
         // Effective grating/prism/wavelength for the acquisition configuration
         gnirs_grating                    *: // c_grating_effective
         gnirs_prism                      *: // c_prism_effective
-        wavelength_pm                    *: // c_grating_wavelength_effective
+        wavelength_pm                    *: // c_central_wavelength_effective
         // Camera
         gnirs_camera                     *:
         // FPU
@@ -109,7 +109,7 @@ object GnirsLongSlitService:
         exposure_time_mode               *: // acquisition ETM
         telluric_type                       // c_telluric_type
       ).emap:
-        case (sciEtm *: gratingEff *: prismEff *: gratingWavEff *:
+        case (sciEtm *: gratingEff *: prismEff *: centralWavEff *:
               camera *: fpu *: filter *: coadds *:
               deckerEff *:
               readModeExp *:
@@ -147,7 +147,7 @@ object GnirsLongSlitService:
                           fpu,
                           prismEff,
                           gratingEff,
-                          gratingWavEff,
+                          centralWavEff,
                           camera,
                           focus,
                           readModeExp,
@@ -236,7 +236,7 @@ object GnirsLongSlitService:
           sci.c_exposure_count,
           ls.c_grating_effective,
           ls.c_prism_effective,
-          ls.c_grating_wavelength_effective,
+          ls.c_central_wavelength_effective,
           ls.c_camera,
           ls.c_fpu,
           ls.c_filter,
@@ -288,9 +288,10 @@ object GnirsLongSlitService:
       GnirsFilter,
       // coadds
       Int,
+      // central wavelength (required; stored as the initial value, override left NULL)
+      Wavelength,
       // explicit overrides (all nullable)
       Option[GnirsDecker],
-      Option[Wavelength],
       Option[GnirsGrating],   // explicit grating
       Option[GnirsPrism],     // explicit prism
       Option[Int],            // focus_motor_steps
@@ -321,7 +322,8 @@ object GnirsLongSlitService:
           c_initial_filter,
           c_coadds,
           c_decker,
-          c_grating_wavelength,
+          c_central_wavelength,
+          c_initial_central_wavelength,
           c_grating,
           c_prism,
           c_focus_motor_steps,
@@ -349,7 +351,8 @@ object GnirsLongSlitService:
           $gnirs_filter,
           $int4,
           ${gnirs_decker.opt},
-          ${wavelength_pm.opt},
+          NULL,
+          $wavelength_pm,
           ${gnirs_grating.opt},
           ${gnirs_prism.opt},
           ${int4.opt},
@@ -367,11 +370,11 @@ object GnirsLongSlitService:
         WHERE c_observation_id = $observation_id
       """.contramap {
         (oid, initGrating, initPrism, camera, fpu, filter, coadds,
-         decker, gratingWav, explGrating, explPrism, focus,
+         centralWav, decker, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
          acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, telluricType) =>
           (oid, initGrating, initPrism, camera, camera, fpu, fpu,
-           filter, filter, coadds, decker, gratingWav,
+           filter, filter, coadds, decker, centralWav,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
            acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, telluricType, oid)
@@ -392,8 +395,8 @@ object GnirsLongSlitService:
         input.fpu,
         input.filter,
         input.coadds.map(_.value).getOrElse(1),
+        input.centralWavelength,
         input.explicitDecker,
-        input.explicitGratingWavelength,
         input.explicitGrating,
         input.explicitPrism,
         input.explicitFocusMotorSteps,
@@ -420,7 +423,7 @@ object GnirsLongSlitService:
       val upFpu          = sql"c_fpu                = ${gnirs_fpu_slit.opt}"
       val upCamera       = sql"c_camera             = ${gnirs_camera.opt}"
       val upDecker       = sql"c_decker             = ${gnirs_decker.opt}"
-      val upGratingWav   = sql"c_grating_wavelength = ${wavelength_pm.opt}"
+      val upCentralWav   = sql"c_central_wavelength = $wavelength_pm"
       val upFocus        = sql"c_focus_motor_steps  = ${int4.opt}"
       val upReadMode     = sql"c_read_mode          = ${gnirs_read_mode.opt}"
       val upWellDepth    = sql"c_well_depth         = ${gnirs_well_depth.opt}"
@@ -474,7 +477,7 @@ object GnirsLongSlitService:
         SET.fpu.map(f => upFpu(Some(f))),
         SET.camera.map(c => upCamera(Some(c))),
         SET.explicitDecker.toOptionOption.map(upDecker),
-        SET.explicitGratingWavelength.toOptionOption.map(upGratingWav),
+        SET.centralWavelength.map(upCentralWav),
         SET.explicitFocusMotorSteps.toOptionOption.map(upFocus),
         SET.explicitReadMode.toOptionOption.map(upReadMode),
         SET.explicitWellDepth.toOptionOption.map(upWellDepth),
@@ -527,7 +530,7 @@ object GnirsLongSlitService:
       sql"""
         INSERT INTO t_gnirs_long_slit (
           c_observation_id, c_program_id, c_observing_mode_type,
-          c_grating, c_prism, c_grating_wavelength,
+          c_grating, c_prism, c_central_wavelength, c_initial_central_wavelength,
           c_initial_grating, c_initial_prism,
           c_camera, c_initial_camera,
           c_fpu, c_initial_fpu,
@@ -542,7 +545,7 @@ object GnirsLongSlitService:
           $observation_id,
           (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
           c_observing_mode_type,
-          c_grating, c_prism, c_grating_wavelength,
+          c_grating, c_prism, c_central_wavelength, c_initial_central_wavelength,
           c_initial_grating, c_initial_prism,
           c_camera, c_initial_camera,
           c_fpu, c_initial_fpu,
