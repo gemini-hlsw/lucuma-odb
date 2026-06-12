@@ -79,7 +79,7 @@ object Science:
         yield
           // If there are no sky positions, then each exposure is an atom.
           // If there are sky positions, then we group them into a single atom.
-          if sky.isEmpty then Stream.emits(obj.map(o => ProtoAtom.one(none, o)))
+          if sky.isEmpty then Stream.emits(obj.map(ProtoAtom.one(none, _)))
           else Stream.emit(ProtoAtom(none, NonEmptyList.fromListUnsafe(sky ++ obj ++ sky)))
 
       Stream
@@ -136,15 +136,15 @@ object Science:
       val groups: State[F2, Stream[Pure, Chunk[ProtoStep[F2]]]] =
         (0 until groupCount)
           .toList
-          .traverse(oneGroup)   // State[F2, List[Stream[Pure, F2]]]
+          .traverse(oneGroup)
           .map: lst =>
             Stream
-              .emits(lst.zipWithIndex.map((s, i) => s.tupleRight(i)))
+              .emits(lst.zipWithIndex.map(_.tupleRight(_)))
               .flatten
-              .zip(Stream.emits(offsets)) // Stream[Pure, ((F2, Int), TelescopeConfig)]
-              .map { case ((d, i), tc) =>
-                ProtoStep(d, StepConfig.Science, tc, ObserveClass.Science) -> i
-              }
+              .zip(Stream.emits(offsets))
+              .map:
+                case ((d, i), tc) =>
+                  ProtoStep(d, StepConfig.Science, tc, ObserveClass.Science) -> i
               .groupAdjacentBy(_._2)
               .map(_._2.map(_._1))
 
@@ -155,7 +155,7 @@ object Science:
         a <- skySteps(skyList.reverse)
       yield g.flatMap: chunk =>
         if skyList.isEmpty then
-          Stream.emits(chunk.toList.map(s => ProtoAtom.one(none, s)))
+          Stream.emits(chunk.toList.map(ProtoAtom.one(none, _)))
         else
           Stream.emit(ProtoAtom(none, NonEmptyList.fromListUnsafe(b ++ chunk.toList ++ a)))
 

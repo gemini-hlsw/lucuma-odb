@@ -8,8 +8,6 @@ package imaging
 import cats.data.EitherT
 import cats.effect.Sync
 import fs2.Pure
-import lucuma.core.enums.ImagingVariantType
-import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.data.Itc.Flamingos2Imaging
@@ -29,22 +27,13 @@ object Imaging:
       .map(s => StreamingExecutionConfig(static, SequenceGenerator.empty.generate, s.generate))
       .value
 
-  private val BaseStatic: Flamingos2StaticConfig =
-    Flamingos2StaticConfig(
-      mosPreImaging           = MosPreImaging.IsNotMosPreImaging,
-      useElectronicOffsetting = false
-    )
-
   def flamingos2[F[_]: Sync](
     estimator:  StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig],
     namespace:  UUID,
     config:     Config,
     scienceItc: Either[OdbError, Flamingos2Imaging]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, Flamingos2StaticConfig, Flamingos2DynamicConfig]]] =
-    val static = config.variant.variantType match
-      case ImagingVariantType.PreImaging => BaseStatic.copy(mosPreImaging = MosPreImaging.IsMosPreImaging)
-      case _                             => BaseStatic
-
+    val static = config.staticConfig
     instantiate(
       static,
       Science.flamingos2(estimator, static, namespace, config, scienceItc)
