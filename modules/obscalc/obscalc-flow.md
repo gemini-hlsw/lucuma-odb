@@ -95,19 +95,25 @@ Subscribers:
 
 `runObscalcDaemon` (Main.scala:142):
 
+The daemon runs two concurrent source streams that both emit `PendingCalc` items.
+`merge` combines them into a single stream, which is then processed with bounded
+parallelism. Startup `reset` runs once before the streams begin.
+
 ```mermaid
 flowchart TD
-    A[Start daemon] --> R[reset: calculating → pending/retry]
-    R --> M{merge}
-    M --> E[Event stream: filter NOTIFY where newState = Pending]
-    M --> P[Poll stream: every obscalcPoll period]
-    E --> L1[obscalcService.loadObs oid]
-    P --> L2[obscalcService.load 1024]
-    L1 --> Q[PendingCalc batch]
-    L2 --> Q
-    Q --> X[parEvalMapUnordered connectionsLimit]
-    X --> C[obscalcService.calculateAndUpdate]
-    C --> N[t_obscalc UPDATE → ch_obscalc_update fires]
+    START[Start daemon] --> RESET[Startup reset:<br/>calculating → pending/retry]
+    RESET --> EV
+    RESET --> POLL
+
+    EV[eventStream:<br/>NOTIFY, only transitions into Pending] --> LOAD1[loadObs oid<br/>→ 1 PendingCalc]
+    POLL[pollStream:<br/>every pollPeriod] --> LOAD2[load up to 1024<br/>→ N PendingCalc, incl. Retry]
+
+    LOAD1 --> MERGE[merge into one PendingCalc stream]
+    LOAD2 --> MERGE
+
+    MERGE --> PAR[parEvalMapUnordered connectionsLimit]
+    PAR --> CALC[calculateAndUpdate]
+    CALC --> UPD[t_obscalc UPDATE<br/>→ ch_obscalc_update fires]
 ```
 
 - Pickup uses `SELECT ... FOR UPDATE SKIP LOCKED` (`ObscalcService.scala:524`, `:542`) so multiple daemon instances / workers don't contend.
