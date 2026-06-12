@@ -6,7 +6,6 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -25,11 +24,12 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
+import lucuma.refined.*
 
 class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
 
-  private val TimeY = IntegrationTime(10.secondTimeSpan, PosInt.unsafeFrom(2))
-  private val TimeJ = IntegrationTime(20.secondTimeSpan, PosInt.unsafeFrom(3))
+  private val TimeY = IntegrationTime(10.secondTimeSpan, 2.refined)
+  private val TimeJ = IntegrationTime(20.secondTimeSpan, 3.refined)
 
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
@@ -228,3 +228,49 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
 
     setup.map: (a0, a1) =>
       assertNotEquals(a0, a1)
+
+  test("Flamingos2 imaging ITC results are exposed"):
+    val mode =
+      s"""
+        flamingos2Imaging: {
+          variant: { grouped: { skyCount: 0 } }
+          filters: [ { filter: Y }, { filter: J } ]
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), mode)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        s"""
+          query {
+            observation(observationId: "$oid") {
+              itc {
+                itcType
+                ... on ItcFlamingos2Imaging {
+                  flamingos2ImagingScience { filter }
+                }
+              }
+            }
+          }
+        """,
+        Right(json"""
+          {
+            "observation": {
+              "itc": {
+                "itcType": "FLAMINGOS_2_IMAGING",
+                "flamingos2ImagingScience": [
+                  { "filter": "Y" },
+                  { "filter": "J" }
+                ]
+              }
+            }
+          }
+        """)
+      )

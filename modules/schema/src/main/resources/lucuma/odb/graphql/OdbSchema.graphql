@@ -12384,6 +12384,7 @@ type ItcResult {
 A discriminator for the types of ITC results.
 """
 enum ItcType {
+  FLAMINGOS_2_IMAGING,
   GHOST_IFU,
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING,
@@ -12405,6 +12406,15 @@ type ItcResultSet {
   selected: ItcResult!
   all: [ItcResult!]
   index: NonNegInt!
+}
+
+"""
+Combines a Flamingos 2 filter with an `ItcResultSet`. In other words, ITC
+results for all targets but a single filter.
+"""
+type ItcFlamingos2ImagingResultSet {
+  filter:  Flamingos2Filter!
+  results: ItcResultSet!
 }
 
 """
@@ -12434,6 +12444,15 @@ interface Itc {
   "The type of the Itc results."
   itcType: ItcType!
 
+}
+
+"""
+Flamingos 2 imaging ITC results.  Here each filter is paired with its result
+set.
+"""
+type ItcFlamingos2Imaging implements Itc {
+  itcType: ItcType!
+  flamingos2ImagingScience: [ItcFlamingos2ImagingResultSet!]!
 }
 
 """
