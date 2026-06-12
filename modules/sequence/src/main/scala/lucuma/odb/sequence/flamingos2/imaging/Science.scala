@@ -2,7 +2,7 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
-package gmos
+package flamingos2
 package imaging
 
 import cats.Order
@@ -17,29 +17,17 @@ import fs2.Chunk
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
-import lucuma.core.enums.GmosGratingOrder
-import lucuma.core.enums.GmosNorthFilter
-import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.GmosSouthFpu
-import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
-import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
-import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
-import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.Itc.GmosNorthImaging
-import lucuma.odb.data.Itc.GmosSouthImaging
+import lucuma.odb.data.Itc.Flamingos2Imaging
 import lucuma.odb.data.Itc.Result
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
@@ -52,36 +40,33 @@ import java.util.UUID
 
 object Science:
 
-  sealed trait ProtoSequences[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
+  object ProtoSequences extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
-    def setup(config: Config[L]): State[D, Unit] =
+    def setup(config: Config): State[F2, Unit] =
       for
-        _ <- optics.grating     := none[(G, GmosGratingOrder, Wavelength)]
-        _ <- optics.fpu         := none[GmosFpuMask[U]]
-        _ <- optics.xBin        := GmosXBinning(config.bin)
-        _ <- optics.yBin        := GmosYBinning(config.bin)
-        _ <- optics.ampReadMode := config.ampReadMode
-        _ <- optics.ampGain     := config.ampGain
-        _ <- optics.roi         := config.roi
+        _ <- F2.decker      := config.decker
+        _ <- F2.readMode    := config.readMode
+        _ <- F2.reads       := config.reads
+        _ <- F2.readoutMode := config.readoutMode
       yield ()
 
-    def runSetup(config: Config[L]): D =
+    def runSetup(config: Config): F2 =
       setup(config).runS(initialDynamicConfig).value
 
-    def setFilter(filter: L, time: TimeSpan): State[D, Unit] =
+    def setFilter(filter: Flamingos2Filter, time: TimeSpan): State[F2, Unit] =
       for
-        _ <- optics.filter   := filter.some
-        _ <- optics.exposure := time
+        _ <- F2.filter   := filter
+        _ <- F2.exposure := time
       yield ()
 
     def grouped(
-      config:     Config[L],
-      time:       NonEmptyMap[L, Zipper[Result]],
+      config:     Config,
+      time:       NonEmptyMap[Flamingos2Filter, Zipper[Result]],
       offsets:    List[TelescopeConfig],
       skyOffsets: List[TelescopeConfig]
-    )(using Order[L]): Stream[Pure, ProtoAtom[ProtoStep[D]]] =
+    )(using Order[Flamingos2Filter]): Stream[Pure, ProtoAtom[ProtoStep[F2]]] =
 
-      def oneFilter(filter: L): State[D, Stream[Pure, ProtoAtom[ProtoStep[D]]]] =
+      def oneFilter(filter: Flamingos2Filter): State[F2, Stream[Pure, ProtoAtom[ProtoStep[F2]]]] =
         val integrationTime = time(filter).get.focus._2
         for
           _   <- setFilter(filter, integrationTime.exposureTime)
@@ -105,22 +90,22 @@ object Science:
         .flatten
 
     def interleaved(
-      config:     Config[L],
-      time:       NonEmptyMap[L, Zipper[Result]],
+      config:     Config,
+      time:       NonEmptyMap[Flamingos2Filter, Zipper[Result]],
       offsets:    List[TelescopeConfig],
       skyOffsets: List[TelescopeConfig]
-    )(using Order[L]): Stream[Pure, ProtoAtom[ProtoStep[D]]] =
+    )(using Order[Flamingos2Filter]): Stream[Pure, ProtoAtom[ProtoStep[F2]]] =
 
-      val filterTimes: Map[L, IntegrationTime] =
+      val filterTimes: Map[Flamingos2Filter, IntegrationTime] =
         time.toNel.toList.map((filter, zipper) => filter -> zipper.focus._2).toMap
 
       val filters = filterTimes.keys.toList.sorted
 
-      val skyList: List[(L, TelescopeConfig)] =
+      val skyList: List[(Flamingos2Filter, TelescopeConfig)] =
         val n = skyOffsets.size / filters.size
         filters.flatMap(f => List.fill(n)(f)).zip(skyOffsets)
 
-      def skySteps(skyList: List[(L, TelescopeConfig)]): State[D, List[ProtoStep[D]]] =
+      def skySteps(skyList: List[(Flamingos2Filter, TelescopeConfig)]): State[F2, List[ProtoStep[F2]]] =
         skyList.traverse: (filter, offset) =>
           for
             _ <- setFilter(filter, filterTimes(filter).exposureTime)
@@ -131,7 +116,7 @@ object Science:
       val groupCount: Int =
         filterTimes.values.map(_.exposureCount.value).min
 
-      def oneGroup(n: Int): State[D, Stream[Pure, D]] =
+      def oneGroup(n: Int): State[F2, Stream[Pure, F2]] =
         // exposure count per filter in this group.
         val perFilterCounts =
           filters
@@ -148,15 +133,15 @@ object Science:
             yield Stream.emits(List.fill(perFilterCounts(filter))(d))
           .map(lst => Stream.emits(lst).flatten)
 
-      val groups: State[D, Stream[Pure, Chunk[ProtoStep[D]]]] =
+      val groups: State[F2, Stream[Pure, Chunk[ProtoStep[F2]]]] =
         (0 until groupCount)
           .toList
-          .traverse(oneGroup)   // State[D, List[Stream[Pure, D]]]
+          .traverse(oneGroup)   // State[F2, List[Stream[Pure, F2]]]
           .map: lst =>
             Stream
               .emits(lst.zipWithIndex.map((s, i) => s.tupleRight(i)))
               .flatten
-              .zip(Stream.emits(offsets)) // Stream[Pure, ((D, Int), TelescopeConfig)]
+              .zip(Stream.emits(offsets)) // Stream[Pure, ((F2, Int), TelescopeConfig)]
               .map { case ((d, i), tc) =>
                 ProtoStep(d, StepConfig.Science, tc, ObserveClass.Science) -> i
               }
@@ -176,25 +161,15 @@ object Science:
 
       prog.runA(initialDynamicConfig).value
 
-
-  object ProtoSequences:
-
-    object North extends GmosNorthSequenceState
-                    with ProtoSequences[GmosNorth, GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
-
-    object South extends GmosSouthSequenceState
-                    with ProtoSequences[GmosSouth, GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]
-
   object ScienceGenerator:
 
-    def instantiate[F[_]: Sync, S, D, G, L, U](
-      state:     ProtoSequences[D, G, L, U],
-      estimator: StepTimeEstimateCalculator[S, D],
-      static:    S,
+    def instantiate[F[_]: Sync](
+      estimator: StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
+      static:    Flamingos2StaticConfig,
       namespace: UUID,
-      config:    Config[L],
-      time:      Either[OdbError, NonEmptyMap[L, Zipper[Result]]]
-    )(using Order[L]): F[Either[OdbError, SequenceGenerator[D]]] =
+      config:    Config,
+      time:      Either[OdbError, NonEmptyMap[Flamingos2Filter, Zipper[Result]]]
+    )(using Order[Flamingos2Filter]): F[Either[OdbError, SequenceGenerator[F2]]] =
 
       time.traverse: nem =>
 
@@ -222,7 +197,7 @@ object Science:
             // The same pattern is repeated for each filter so we need enough
             // offsets to cover the filter with the most exposures.
             generateOffsets(offsets, skyCount, skyOffsets)(_.max).map: (o, s) =>
-              state.grouped(config, nem, o, s)
+              ProtoSequences.grouped(config, nem, o, s)
 
           case Variant.Interleaved(offsets, skyCount, skyOffsets) =>
             // The offset pattern is applied to the sequence as a whole so we
@@ -230,34 +205,24 @@ object Science:
             // positions per filter.
             val sc = NonNegInt.unsafeFrom(skyCount.value * nem.length)
             generateOffsets(offsets, sc, skyOffsets)(_.sum).map: (o, s) =>
-              state.interleaved(config, nem, o, s)
+              ProtoSequences.interleaved(config, nem, o, s)
 
           case Variant.PreImaging(o1, o2, o3, o4)                 =>
             val offsets    = TelescopeConfigGenerator.Enumerated:
               NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
             generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(_.max).map: (o, s) =>
-              state.grouped(config, nem, o, s)
+              ProtoSequences.grouped(config, nem, o, s)
 
         protoAtoms.map: v =>
           ImagingSequence.makeGenerator(estimator, static, namespace, v)
 
-  def gmosNorth[F[_]: Sync](
-    estimator: StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
-    static:    StaticConfig.GmosNorth,
+  def flamingos2[F[_]: Sync](
+    estimator: StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
+    static:    Flamingos2StaticConfig,
     namespace: UUID,
-    config:    Config.GmosNorth,
-    time:      Either[OdbError, GmosNorthImaging]
-  ): F[Either[OdbError, SequenceGenerator[GmosNorth]]] =
-    given Order[GmosNorthFilter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
-    ScienceGenerator.instantiate(ProtoSequences.North, estimator, static, namespace, config, time.map(_.science))
-
-  def gmosSouth[F[_]: Sync](
-    estimator: StepTimeEstimateCalculator[StaticConfig.GmosSouth, GmosSouth],
-    static:    StaticConfig.GmosSouth,
-    namespace: UUID,
-    config:    Config.GmosSouth,
-    time:      Either[OdbError, GmosSouthImaging]
-  ): F[Either[OdbError, SequenceGenerator[GmosSouth]]] =
-    given Order[GmosSouthFilter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
-    ScienceGenerator.instantiate(ProtoSequences.South, estimator, static, namespace, config, time.map(_.science))
+    config:    Config,
+    time:      Either[OdbError, Flamingos2Imaging]
+  ): F[Either[OdbError, SequenceGenerator[F2]]] =
+    given Order[Flamingos2Filter] = ImagingSequence.wavelengthOrder(config.variant)(_.wavelength)
+    ScienceGenerator.instantiate(estimator, static, namespace, config, time.map(_.science))
