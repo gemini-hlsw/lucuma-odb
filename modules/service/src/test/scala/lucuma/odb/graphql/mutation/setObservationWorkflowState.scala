@@ -161,7 +161,7 @@ class setObservationWorkflowState
     } yield ()
 
   // (see executionState.scala)
-  test("[Sidereal]    Ongoing    <-> Inactive, Completed"):
+  test("[Sidereal]    Ongoing    <-> Completed"):
     for
       p  <- createProgram
       t  <- createTargetWithProfileAs(pi, p)
@@ -173,7 +173,7 @@ class setObservationWorkflowState
       _  <- addEndStepEvent(s(2), v)
       _  <- runObscalcUpdate(p, o)
       _  <- assertIO(queryObservationWorkflowState(o), Ongoing)
-      _  <- testTransitions(p, o, Ongoing, Inactive, Completed)
+      _  <- testTransitions(p, o, Ongoing, Completed)
     yield ()
 
 // (see executionState.scala)
@@ -216,7 +216,7 @@ class setObservationWorkflowState
       _   <- testTransitions(pid, oid, Defined, Inactive, Ready)
     } yield ()
 
-  test("[Eng]         Ongoing    <-> Inactive, Completed"):
+  test("[Eng]         Ongoing    <-> Completed"):
     for
       p <- createProgram
       _ <- setProgramReference(staff, p, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
@@ -227,7 +227,7 @@ class setObservationWorkflowState
       _ <- s.traverse(sid => addEndStepEvent(sid, v))
       _ <- runObscalcUpdate(p, o)
       _ <- assertIO(queryObservationWorkflowState(o), Ongoing)
-      _ <- testTransitions(p, o, Ongoing, Inactive, Completed)
+      _ <- testTransitions(p, o, Ongoing, Completed)
     yield ()
 
   test("[Eng]         Completed  <->"):

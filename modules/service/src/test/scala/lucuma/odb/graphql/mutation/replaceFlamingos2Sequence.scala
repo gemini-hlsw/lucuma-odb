@@ -167,7 +167,7 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         pi,
         mutation(Instrument.Flamingos2, in),
         List(
-          s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed).",
+          s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed).",
           "User cannot replace the sequence in the current observation workflow state."
         ).asLeft
       )

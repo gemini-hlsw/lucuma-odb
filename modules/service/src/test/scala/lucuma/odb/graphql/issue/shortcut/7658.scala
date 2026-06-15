@@ -153,7 +153,7 @@ trait ShortCut_7658_Helpers extends OdbSuite with UpdateObservationsOps:
   private def expectedAcquisition(i: Instrument): Json =
     expectedObservingMode(i.expectedObservingMode(ExpectedAcquisition))
 
-  protected val ErrorForOngoing: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)"
+  protected val ErrorForOngoing: String = "is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)"
   protected val ErrorForCompleted: String = "is ineligible for this operation due to its workflow state (Completed with allowed transition to Ongoing)"
 
   def testFailedAcquistion(user: User, oid: Observation.Id, i: Instrument, error: String = ErrorForOngoing): IO[Unit] =

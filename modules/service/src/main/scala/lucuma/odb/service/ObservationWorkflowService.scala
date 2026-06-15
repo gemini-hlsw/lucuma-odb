@@ -452,12 +452,10 @@ object ObservationWorkflowService {
                 case Defined    => Some(Ready)
 
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
-        // with the one exception that user state Inactive overrides execution state Ongoing
         val state: ObservationWorkflowState =
           (executionState, userStatus(validationStatus)) match
             case (None, None)     => validationStatus
             case (None, Some(us)) => us
-            case (Some(Ongoing), Some(Inactive)) => Inactive
             case (Some(es), _)    => es
 
         val canUpdateExecutionState: Boolean =
@@ -471,7 +469,7 @@ object ObservationWorkflowService {
             case Unapproved => List(Inactive)
             case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (info.isAccepted || info.tpe =!= ProgramType.Science))(Ready)
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
-            case Ongoing    => List(Inactive, Completed) ++ Option.when(canUpdateExecutionState)(Ready)
+            case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
         (state, allowedTransitions)
