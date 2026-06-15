@@ -39,7 +39,7 @@ class ShortCut_7748 extends ExecutionTestSupportForGmos with UpdateObservationsO
           user = pi,
           query = blindOffsetMutation(oid),
           expected = {
-            case OdbError.InvalidObservation(_, Some(msg)) if msg.contains("is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)") => ()
+            case OdbError.InvalidObservation(_, Some(msg)) if msg.contains("is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)") => ()
           }
         )
   
@@ -106,7 +106,7 @@ class ShortCut_7748 extends ExecutionTestSupportForGmos with UpdateObservationsO
             }
           """,
           expected = {
-            case OdbError.InvalidObservation(_, Some(msg)) if msg.contains("is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)") => ()
+            case OdbError.InvalidObservation(_, Some(msg)) if msg.contains("is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)") => ()
           }
         )
   

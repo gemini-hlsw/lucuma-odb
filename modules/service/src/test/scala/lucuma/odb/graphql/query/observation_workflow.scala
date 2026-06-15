@@ -1079,7 +1079,7 @@ class observation_workflow
             CalculationState.Ready,
             ObservationWorkflow(
               ObservationWorkflowState.Ongoing,
-              List(ObservationWorkflowState.Inactive, ObservationWorkflowState.Completed),
+              List(ObservationWorkflowState.Completed),
               Nil
             )
           )

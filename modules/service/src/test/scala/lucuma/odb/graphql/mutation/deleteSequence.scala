@@ -199,7 +199,7 @@ class deleteSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosN
       _   <- deleteSequence(
               oid,
               List(
-                s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed).",
+                s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed).",
                 "User cannot delete the sequence in the current observation workflow state."
               ).asLeft)
     yield ()

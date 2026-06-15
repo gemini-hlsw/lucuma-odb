@@ -198,37 +198,7 @@ class ShortCut_4596 extends OdbSuite
         oids = List(ongoing, undefined),
         expected = Ior.Both(
           List(
-            s"Observation $ongoing is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
-          ),
-          json"""
-          {
-            "updateObservations": {
-              "observations": [
-                {
-                  "id": $undefined
-                }
-              ]
-            }
-          }
-          """
-        )
-      )
-
-  test(s"Ongoing observations should not be editable, even when set to Inactive"):
-    val setup: IO[(Observation.Id, Observation.Id)] =
-      for
-        pid <- createProgramAs(pi)
-        o1  <- createExecutedObservation(pid, Ongoing)
-        _   <- setObservationWorkflowState(pi, o1, ObservationWorkflowState.Inactive)
-        o2  <- createObservationAs(pi, pid)
-      yield (o1,o2)
-    setup.flatMap: (inactive, undefined) =>
-      tryUpdateSubtitleAs(
-        user = pi,
-        oids = List(inactive, undefined),
-        expected = Ior.Both(
-          List(
-            s"Observation $inactive is ineligible for this operation due to its workflow state (Inactive with allowed transition to Ongoing)."
+            s"Observation $ongoing is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)."
           ),
           json"""
           {
@@ -324,7 +294,7 @@ class ShortCut_4596 extends OdbSuite
     setup.flatMap: (oid, tid) =>
       tryUpdateAsterismsAs(pi, oid, tid,
         Ior.Both(
-          List(s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."),
+          List(s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)."),
           json"""
             {
               "updateAsterisms": {
@@ -450,7 +420,7 @@ class ShortCut_4596 extends OdbSuite
             }
           """,
           expected = Ior.Left(List(
-            s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
+            s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)."
           ))
         )
 
@@ -495,7 +465,7 @@ class ShortCut_4596 extends OdbSuite
           expected =
             Ior.Both(
               List(
-                s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed)."
+                s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed)."
               ),
               json"""
                 {

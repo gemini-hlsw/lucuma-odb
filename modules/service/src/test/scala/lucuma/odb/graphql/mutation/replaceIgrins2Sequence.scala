@@ -158,7 +158,7 @@ class replaceIgrins2Sequence extends query.ExecutionTestSupportForIgrins2 with R
         pi,
         mutation(Instrument.Igrins2, in),
         List(
-          s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Inactive/Completed).",
+          s"Observation $o is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed).",
           "User cannot replace the sequence in the current observation workflow state."
         ).asLeft
       )
