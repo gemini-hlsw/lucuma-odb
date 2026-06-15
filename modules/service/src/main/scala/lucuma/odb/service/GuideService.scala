@@ -320,6 +320,12 @@ object GuideService {
             AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS1.some
           case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2)                                =>
             AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS2.some
+          case (_: flamingos2.imaging.Config, GuideProbe.Flamingos2OIWFS)                          =>
+            AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).some
+          case (_: flamingos2.imaging.Config, GuideProbe.PWFS1)                          =>
+            AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS1.some
+          case (_: flamingos2.imaging.Config, GuideProbe.PWFS2)                          =>
+            AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS2.some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.Flamingos2OIWFS)                          =>
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1)                                    =>
