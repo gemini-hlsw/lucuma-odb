@@ -873,6 +873,9 @@ enum CallForProposalsType {
   POOR_WEATHER
   REGULAR_SEMESTER
   SYSTEM_VERIFICATION
+  KECK
+  SUBARU
+  SUBARU_INTENSIVE
 }
 
 """
@@ -14535,6 +14538,12 @@ enum ScienceSubtype {
   DEMO_SCIENCE
 
   SYSTEM_VERIFICATION
+
+  KECK
+
+  SUBARU
+
+  SUBARU_INTENSIVE
 }
 
 type ScienceRequirements {

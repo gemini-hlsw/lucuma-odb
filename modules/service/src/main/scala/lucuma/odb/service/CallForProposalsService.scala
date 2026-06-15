@@ -18,13 +18,21 @@ import grackle.syntax.*
 import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ScienceSubtype
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Semester
+import lucuma.odb.data.ExchangePartner
+import lucuma.odb.data.Existence
+import lucuma.odb.data.KeckInstrument
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.SubaruInstrument
+import lucuma.odb.data.SubaruProposalType
 import lucuma.odb.graphql.input.CallForProposalsPartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput
+import lucuma.odb.graphql.input.CoordinateLimitsInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.syntax.scienceSubtype.*
 import lucuma.odb.util.Codecs.*
@@ -89,9 +97,15 @@ object CallForProposalsService {
                 case SqlState.CheckViolation(ex) if ex.getMessage.indexOf("d_semester_check") >= 0 =>
                   OdbError.InvalidArgument(s"The maximum semester is capped at the current year +1 (${SET.semester} specified).".some).asFailureF
 
+          // Only Gemini calls list their instruments in `t_cfp_instrument`;
+          // the exchange observatories store theirs in array columns directly.
+          val instruments: List[Instrument] =
+            SET.properties match
+              case CallForProposalsPropertiesInput.Create.Properties.Gemini(g) => g.instruments
+              case _                                                           => Nil
+
           case class UsingCid(cid: CallForProposals.Id):
             val cids = List(cid)
-            val instruments = SET.instruments
 
             val insertPartnersDefault: F[Unit] =
               session
@@ -178,14 +192,41 @@ object CallForProposalsService {
           .map(_.success)
       }
 
+      // Changing the observatory of an existing CfP would require rewriting all
+      // of the observatory-discriminated columns (and re-deriving coordinate
+      // limit defaults per row).  That switch is not yet supported, so we reject
+      // an edit whose observatory-specific properties target an observatory
+      // different from any matched row's existing observatory.
+      private def checkObservatory(
+        SET:   CallForProposalsPropertiesInput.Edit,
+        which: AppliedFragment
+      ): F[Result[Unit]] =
+        SET.observatory.fold(Result.unit.pure[F]): target =>
+          val af = Statements.SelectObservatories(which)
+          session.prepareR(af.fragment.query(observatory)).use { pq =>
+            pq.stream(af.argument, chunkSize = 1024).compile.toList.map { existing =>
+              OdbError.InvalidArgument(
+                s"Cannot change the observatory of an existing Call for Proposals.".some
+              ).asFailure.whenA(existing.exists(_ != target))
+            }
+          }
+
       def updateCallsForProposals(
         input: AccessControl.Checked[CallForProposalsPropertiesInput.Edit]
       )(using Transaction[F]): F[Result[List[CallForProposals.Id]]] =
         input.fold(OdbError.InvalidArgument().asFailureF): (SET, which) =>
+          // Gemini instruments live in `t_cfp_instrument`; for the exchange
+          // observatories the instrument set is updated in the main table.
+          val geminiInstruments: Nullable[List[Instrument]] =
+            SET.properties match
+              case Some(CallForProposalsPropertiesInput.Edit.Properties.Gemini(g)) => g.instruments
+              case _                                                               => Nullable.Absent
+
           (for {
+            _    <- ResultT(checkObservatory(SET, which))
             cids <- ResultT(updateCfpTable(SET, which))
             _    <- ResultT(updatePartners(cids, SET.partners))
-            _    <- ResultT(updateInstruments(cids, SET.instruments))
+            _    <- ResultT(updateInstruments(cids, geminiInstruments))
           } yield cids).value
 
     }
@@ -195,16 +236,77 @@ object CallForProposalsService {
     val cfp_properties: Codec[CfpProperties] =
       (cfp_id *: cfp_type *: semester *: int4_nonneg).to[CfpProperties]
 
+    // Exchange calls have no proprietary period; coalesce to 0 so the value
+    // stays non-optional (it is unused until a proposal can target an exchange
+    // call, which is not yet supported).
     val SelectProperties: Query[CallForProposals.Id, CfpProperties] =
       sql"""
-        SELECT c_cfp_id, c_type, c_semester, c_proprietary
+        SELECT c_cfp_id, c_type, c_semester, COALESCE(c_proprietary, 0)
           FROM t_cfp
          WHERE c_cfp_id = $cfp_id AND c_existence = 'present'::e_existence
       """.query(cfp_properties)
 
+    // The distinct observatories of the CfPs matched by the given id selection.
+    def SelectObservatories(which: AppliedFragment): AppliedFragment =
+      void"SELECT DISTINCT c_observatory FROM t_cfp WHERE c_cfp_id IN (" |+| which |+| void")"
+
+    // The observatory-specific column values derived from a `Create` input.
+    // Each variant supplies values for its own columns and leaves the others
+    // null, in keeping with the `t_cfp` discriminant check constraints.
+    private case class CreateCols(
+      cfpType:     CallForProposalsType,
+      north:       CoordinateLimitsInput.Create,
+      south:       Option[CoordinateLimitsInput.Create],
+      proprietary: Option[NonNegInt],
+      exchange:    Option[List[ExchangePartner]],
+      keck:        Option[List[KeckInstrument]],
+      subaru:      Option[List[SubaruInstrument]]
+    )
+
+    // The Subaru proposal type is encoded directly in the call type.
+    def subaruCallType(t: SubaruProposalType): CallForProposalsType =
+      t match
+        case SubaruProposalType.Normal    => CallForProposalsType.Subaru
+        case SubaruProposalType.Intensive => CallForProposalsType.SubaruIntensive
+
+    private def createCols(p: CallForProposalsPropertiesInput.Create.Properties): CreateCols =
+      import CallForProposalsPropertiesInput.Create.Properties
+      p match
+        case Properties.Gemini(g) =>
+          CreateCols(
+            cfpType     = g.cfpType,
+            north       = g.coordinateLimits.north,
+            south       = g.coordinateLimits.south.some,
+            proprietary = g.proprietary,
+            exchange    = g.exchangePartners.some,
+            keck        = none,
+            subaru      = none
+          )
+        case Properties.Keck(k) =>
+          CreateCols(
+            cfpType     = CallForProposalsType.Keck,
+            north       = k.coordinateLimits,
+            south       = none,
+            proprietary = none,
+            exchange    = none,
+            keck        = k.instruments.some,
+            subaru      = none
+          )
+        case Properties.Subaru(s) =>
+          CreateCols(
+            cfpType     = subaruCallType(s.subaruType),
+            north       = s.coordinateLimits,
+            south       = none,
+            proprietary = none,
+            exchange    = none,
+            keck        = none,
+            subaru      = s.instruments.some
+          )
+
     val InsertCallForProposals: Query[CallForProposalsPropertiesInput.Create, CallForProposals.Id] =
       sql"""
         INSERT INTO t_cfp (
+          c_observatory,
           c_type,
           c_semester,
           c_title_override,
@@ -220,9 +322,13 @@ object CallForProposalsService {
           c_active_start,
           c_active_end,
           c_proprietary,
+          c_exchange_partners,
+          c_keck_instruments,
+          c_subaru_instruments,
           c_existence
         )
         SELECT
+          $observatory,
           $cfp_type,
           $semester,
           ${text_nonempty.opt},
@@ -230,36 +336,46 @@ object CallForProposalsService {
           ${right_ascension},
           ${declination},
           ${declination},
-          ${right_ascension},
-          ${right_ascension},
-          ${declination},
-          ${declination},
+          ${right_ascension.opt},
+          ${right_ascension.opt},
+          ${declination.opt},
+          ${declination.opt},
           ${core_timestamp.opt},
           $date,
           $date,
           COALESCE(${int4_nonneg.opt}, (SELECT c_proprietary FROM t_cfp_type WHERE c_type = $cfp_type)),
+          ${_exchange_partner.opt},
+          ${_keck_instrument.opt},
+          ${_subaru_instrument.opt},
           $existence
         RETURNING
           c_cfp_id
-      """.query(cfp_id).contramap { input => (
-        input.cfpType,
-        input.semester,
-        input.title,
-        input.gnRaLimit._1,
-        input.gnRaLimit._2,
-        input.gnDecLimit._1,
-        input.gnDecLimit._2,
-        input.gsRaLimit._1,
-        input.gsRaLimit._2,
-        input.gsDecLimit._1,
-        input.gsDecLimit._2,
-        input.deadline,
-        input.active.start,
-        input.active.end,
-        input.proprietary,
-        input.cfpType,
-        input.existence
-      )}
+      """.query(cfp_id).contramap { input =>
+        val c = createCols(input.properties)
+        (
+          input.observatory,
+          c.cfpType,
+          input.semester,
+          input.title,
+          c.north.raStart,
+          c.north.raEnd,
+          c.north.decStart,
+          c.north.decEnd,
+          c.south.map(_.raStart),
+          c.south.map(_.raEnd),
+          c.south.map(_.decStart),
+          c.south.map(_.decEnd),
+          input.deadline,
+          input.active.start,
+          input.active.end,
+          c.proprietary,
+          c.cfpType,           // for the proprietary-default subquery
+          c.exchange,
+          c.keck,
+          c.subaru,
+          input.existence
+        )
+      }
 
     def InsertDefaultPartners(
       cids: List[CallForProposals.Id]
@@ -336,31 +452,75 @@ object CallForProposalsService {
       val gsDecEnd    = sql"c_south_dec_end   = $declination"
       val activeStart = sql"c_active_start    = $date"
       val activeEnd   = sql"c_active_end      = $date"
-      val proprietary = sql"c_proprietary     = $int4_nonneg"
 
-      val upExistence = sql"c_existence = $existence"
-      val upSemester  = sql"c_semester  = $semester"
-      val upType      = sql"c_type      = $cfp_type"
+      val upExistence    = sql"c_existence            = $existence"
+      val upSemester     = sql"c_semester             = $semester"
+      val upType         = sql"c_type                 = $cfp_type"
+      val upProprietary  = sql"c_proprietary          = $int4_nonneg"
+      val upExchange     = sql"c_exchange_partners    = ${_exchange_partner}"
+      val upKeckInstr    = sql"c_keck_instruments     = ${_keck_instrument}"
+      val upSubaruInstr  = sql"c_subaru_instruments   = ${_subaru_instrument}"
+
+      // Observatory-specific assignments.  Only the columns belonging to the
+      // edited observatory are touched; supplying properties for the "wrong"
+      // observatory would be rejected by the table's check constraints.
+      val propUps: List[Option[AppliedFragment]] =
+        SET.properties.toList.flatMap {
+          case CallForProposalsPropertiesInput.Edit.Properties.Gemini(g) =>
+            val north = g.coordinateLimits.flatMap(_.north)
+            val south = g.coordinateLimits.flatMap(_.south)
+            List(
+              g.cfpType.map(upType),
+              g.proprietary.map(upProprietary),
+              // The Gemini discriminant requires a non-null array, so a null
+              // reset is stored as the empty array.
+              g.exchangePartners.fold(List.empty[ExchangePartner].some, none, _.some).map(upExchange),
+              north.flatMap(_.raStart).map(gnRaStart),
+              north.flatMap(_.raEnd).map(gnRaEnd),
+              north.flatMap(_.decStart).map(gnDecStart),
+              north.flatMap(_.decEnd).map(gnDecEnd),
+              south.flatMap(_.raStart).map(gsRaStart),
+              south.flatMap(_.raEnd).map(gsRaEnd),
+              south.flatMap(_.decStart).map(gsDecStart),
+              south.flatMap(_.decEnd).map(gsDecEnd)
+            )
+
+          case CallForProposalsPropertiesInput.Edit.Properties.Keck(k) =>
+            val limits = k.coordinateLimits
+            List(
+              // Exchange instrument arrays are never null on their own row, so
+              // a null reset becomes the empty array.
+              k.instruments.fold(List.empty[KeckInstrument].some, none, _.some).map(upKeckInstr),
+              limits.flatMap(_.raStart).map(gnRaStart),
+              limits.flatMap(_.raEnd).map(gnRaEnd),
+              limits.flatMap(_.decStart).map(gnDecStart),
+              limits.flatMap(_.decEnd).map(gnDecEnd)
+            )
+
+          case CallForProposalsPropertiesInput.Edit.Properties.Subaru(s) =>
+            val limits = s.coordinateLimits
+            List(
+              // The Subaru proposal type is encoded in the call type.
+              s.subaruType.map(t => upType(subaruCallType(t))),
+              s.instruments.fold(List.empty[SubaruInstrument].some, none, _.some).map(upSubaruInstr),
+              limits.flatMap(_.raStart).map(gnRaStart),
+              limits.flatMap(_.raEnd).map(gnRaEnd),
+              limits.flatMap(_.decStart).map(gnDecStart),
+              limits.flatMap(_.decEnd).map(gnDecEnd)
+            )
+        }
 
       val ups: Option[NonEmptyList[AppliedFragment]] =
-        NonEmptyList.fromList(List(
-          SET.title.foldPresent(sql"c_title_override = ${text_nonempty.opt}"),
-          SET.gnRaLimit._1.map(gnRaStart),
-          SET.gnRaLimit._2.map(gnRaEnd),
-          SET.gnDecLimit._1.map(gnDecStart),
-          SET.gnDecLimit._2.map(gnDecEnd),
-          SET.gsRaLimit._1.map(gsRaStart),
-          SET.gsRaLimit._2.map(gsRaEnd),
-          SET.gsDecLimit._1.map(gsDecStart),
-          SET.gsDecLimit._2.map(gsDecEnd),
-          SET.deadline.foldPresent(sql"c_deadline_default = ${core_timestamp.opt}"),
-          SET.active.flatMap(_.left).map(activeStart),
-          SET.active.flatMap(_.right).map(activeEnd),
-          SET.existence.map(upExistence),
-          SET.semester.map(upSemester),
-          SET.proprietary.map(proprietary),
-          SET.cfpType.map(upType)
-        ).flatten)
+        NonEmptyList.fromList(
+          List(
+            SET.title.foldPresent(sql"c_title_override = ${text_nonempty.opt}"),
+            SET.deadline.foldPresent(sql"c_deadline_default = ${core_timestamp.opt}"),
+            SET.active.flatMap(_.left).map(activeStart),
+            SET.active.flatMap(_.right).map(activeEnd),
+            SET.existence.map(upExistence),
+            SET.semester.map(upSemester)
+          ).flatten ++ propUps.flatten
+        )
 
       def update(us: NonEmptyList[AppliedFragment]): AppliedFragment =
         void"UPDATE t_cfp "                                      |+|

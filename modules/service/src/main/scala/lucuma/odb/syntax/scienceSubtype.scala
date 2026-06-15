@@ -22,6 +22,9 @@ trait ToScienceSubtypeOps {
         case PoorWeather        => "Poor Weather"
         case Queue              => "Queue"
         case SystemVerification => "System Verification"
+        case Keck               => "Keck Exchange"
+        case Subaru             => "Subaru Exchange"
+        case SubaruIntensive    => "Subaru Exchange (Intensive)"
 
     def callType: CallForProposalsType =
       s match
@@ -32,6 +35,9 @@ trait ToScienceSubtypeOps {
         case LargeProgram       => CallForProposalsType.LargeProgram
         case PoorWeather        => CallForProposalsType.PoorWeather
         case SystemVerification => CallForProposalsType.SystemVerification
+        case Keck               => CallForProposalsType.Keck
+        case Subaru             => CallForProposalsType.Subaru
+        case SubaruIntensive    => CallForProposalsType.SubaruIntensive
 
     def isCompatibleWith(c: CallForProposalsType): Boolean =
       callType === c

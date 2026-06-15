@@ -55,6 +55,9 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
           case ScienceSubtype.PoorWeather        => Result(PoorWeatherType)
           case ScienceSubtype.Queue              => Result(QueueType)
           case ScienceSubtype.SystemVerification => Result(SystemVerificationType)
+          case ScienceSubtype.Keck
+             | ScienceSubtype.Subaru
+             | ScienceSubtype.SubaruIntensive    => Result.internalError("Exchange proposals are not yet supported.")
 
       private def mkPredicate(tpe: ScienceSubtype): Result[Predicate] =
         Eql(ProposalTypeType / "scienceSubtype", Const(tpe)).success
