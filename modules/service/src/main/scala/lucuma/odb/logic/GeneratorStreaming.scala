@@ -58,6 +58,14 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
 
+  def selectOrGenerateFlamingos2Imaging(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+
+  def generateFlamingos2Imaging(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+
   def selectOrGenerateGhost(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GhostStatic, GhostDynamic]]]
@@ -222,6 +230,29 @@ object GeneratorStreaming:
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, itc, rol))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+      override def selectOrGenerateFlamingos2Imaging(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
+        (for
+          cfg <- extractMode(ObservingMode.Flamingos2ImagingName, context)(_.asFlamingos2Imaging)
+          res <- EitherT(selectOrGenerate(
+            cfg.staticConfig,
+            sequenceService.selectFlamingos2Sequence(context.oid, _, _),
+            generateFlamingos2Imaging(context)
+          ))
+        yield res).value
+
+      override def generateFlamingos2Imaging(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
+        import lucuma.odb.sequence.flamingos2.imaging.Imaging
+        (for
+          cfg <- extractMode(ObservingMode.Flamingos2ImagingName, context)(_.asFlamingos2Imaging)
+          itc  = requireImagingItc(ObservingMode.Flamingos2ImagingName, context.oid, context.itcRes, Itc.flamingos2Imaging.getOption)
+          gen <- EitherT(Imaging.flamingos2(calculator.flamingos2Step, context.namespace, cfg, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

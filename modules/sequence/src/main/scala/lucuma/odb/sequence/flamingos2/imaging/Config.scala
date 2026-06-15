@@ -10,6 +10,9 @@ import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.enums.ImagingVariantType
+import lucuma.core.enums.MosPreImaging
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.syntax.all.*
 
@@ -43,6 +46,12 @@ case class Config(
 
   def readoutMode: Flamingos2ReadoutMode =
     explicitReadoutMode.getOrElse(defaultReadoutMode)
+
+  def staticConfig: Flamingos2StaticConfig =
+    val base = Flamingos2StaticConfig(MosPreImaging.IsNotMosPreImaging, useElectronicOffsetting = false)
+    variant.variantType match
+      case ImagingVariantType.PreImaging => base.copy(mosPreImaging = MosPreImaging.IsMosPreImaging)
+      case _                             => base
 
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)

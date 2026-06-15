@@ -221,7 +221,7 @@ object Generator:
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2Imaging  =>
-              EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "Flamingos2 imaging sequence generation is not yet implemented".some))
+              EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)).flatMap(digest(_, calculator.flamingos2ImagingSetup))
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
             case ObservingModeType.GhostIfu    =>
@@ -273,7 +273,7 @@ object Generator:
 
         // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
         val stream = ctx.params.observingMode.modeType match
-          case ObservingModeType.Flamingos2Imaging  => EitherT.leftT[F, StreamingExecutionConfig[F, Unit, Nothing]](OdbError.SequenceUnavailable(ctx.oid, "Flamingos2 imaging sequence generation is not yet implemented".some))
+          case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
           case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
           case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
           case ObservingModeType.GmosNorthImaging   => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
@@ -338,7 +338,9 @@ object Generator:
           ctx.params.observingMode.modeType match
 
             case ObservingModeType.Flamingos2Imaging  =>
-              EitherT.leftT[F, InstrumentExecutionConfig](OdbError.SequenceUnavailable(ctx.oid, "Flamingos2 imaging sequence generation is not yet implemented".some))
+              EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
+                .flatMap(s => EitherT.liftF(executionConfig(s)))
+                .map(InstrumentExecutionConfig.Flamingos2.apply)
 
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
@@ -440,7 +442,8 @@ object Generator:
           ctx.params.observingMode.modeType match
 
             case ObservingModeType.Flamingos2Imaging  =>
-              EitherT.leftT[F, Unit](OdbError.SequenceUnavailable(ctx.oid, "Flamingos2 imaging sequence generation is not yet implemented".some))
+              EitherT(streaming.generateFlamingos2Imaging(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
 
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.generateFlamingos2LongSlit(ctx))
