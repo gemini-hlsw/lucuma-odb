@@ -16,7 +16,7 @@ import lucuma.core.model.User
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.service.Services
 
-trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
+trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F]:
 
   def user: User
   def services: Resource[F, Services[F]]
@@ -29,27 +29,61 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
       SqlField("submissionDeadline",         CallForProposalsPartnerView.Deadline)
     )
 
-  lazy val CallForProposalsMapping: TypeMapping =
-    ObjectMapping(CallForProposalsType)(
-      SqlField("id",       CallForProposalsView.Id, key = true),
-      SqlField("title",    CallForProposalsView.Title),
-      SqlField("type",     CallForProposalsView.Type),
-      SqlField("semester", CallForProposalsView.Semester),
+  lazy val GeminiCallPropertiesMapping: TypeMapping =
+    ObjectMapping(GeminiCallPropertiesType)(
+      SqlField("id",                 CallForProposalsView.gemini.Id, key = true),
+      SqlField("type",               CallForProposalsView.gemini.Type),
       SqlObject("coordinateLimits"),
-      SqlField("submissionDeadlineDefault", CallForProposalsView.DeadlineDefault),
-      SqlObject("active"),
-      SqlObject("partners",          Join(CallForProposalsView.Id, CallForProposalsPartnerView.CfpId)),
-      SqlField("allowsNonPartnerPi", CallForProposalsView.AllowsNonPartner),
-      SqlField("nonPartnerDeadline", CallForProposalsView.NonPartnerDeadline),
-      SqlField("instruments",        CallForProposalsView.Instruments),
-      SqlField("proprietaryMonths",  CallForProposalsView.Proprietary),
-      SqlField("existence",          CallForProposalsView.Existence),
-      SqlField("_isOpen",            CallForProposalsView.IsOpen, hidden = true)
+      SqlField("instruments",        CallForProposalsView.gemini.Instruments),
+      SqlField("proprietaryMonths",  CallForProposalsView.gemini.Proprietary),
+      SqlField("allowsNonPartnerPi", CallForProposalsView.gemini.AllowsNonPartner),
+      SqlField("nonPartnerDeadline", CallForProposalsView.gemini.NonPartnerDeadline),
+      SqlField("exchangePartners",   CallForProposalsView.gemini.ExchangePartners)
     )
 
-  lazy val CallForProposalsElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+  lazy val KeckCallPropertiesMapping: TypeMapping =
+    ObjectMapping(KeckCallPropertiesType)(
+      SqlField("id",          CallForProposalsView.keck.Id, key = true),
+      SqlField("instruments", CallForProposalsView.keck.Instruments),
+      SqlObject("coordinateLimits")
+    )
+
+  lazy val SubaruCallPropertiesMapping: TypeMapping =
+    ObjectMapping(SubaruCallPropertiesType)(
+      SqlField("id",          CallForProposalsView.subaru.Id, key = true),
+      SqlField("type",        CallForProposalsView.subaru.Type),
+      SqlField("instruments", CallForProposalsView.subaru.Instruments),
+      SqlObject("coordinateLimits")
+    )
+
+  lazy val CallForProposalsMapping: TypeMapping =
+    ObjectMapping(CallForProposalsType)(
+      SqlField("id",                        CallForProposalsView.Id, key = true),
+      SqlField("title",                     CallForProposalsView.Title),
+      SqlField("semester",                  CallForProposalsView.Semester),
+      SqlObject("active"),
+      SqlObject("partners",                 Join(CallForProposalsView.Id, CallForProposalsPartnerView.CfpId)),
+      SqlField("submissionDeadlineDefault", CallForProposalsView.DeadlineDefault),
+      SqlField("existence",                 CallForProposalsView.Existence),
+      SqlField("observatory",               CallForProposalsView.Observatory),
+      SqlObject("gemini"),
+      SqlObject("keck"),
+      SqlObject("subaru"),
+      SqlField("_isOpen",                   CallForProposalsView.IsOpen, hidden = true)
+    )
+
+  lazy val CallForProposalsMappings: List[TypeMapping] =
+    List(
+      CallForProposalsPartnerMapping,
+      GeminiCallPropertiesMapping,
+      KeckCallPropertiesMapping,
+      SubaruCallPropertiesMapping,
+      CallForProposalsMapping
+    )
+
+  lazy val CallForProposalsElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (CallForProposalsType, "partners", Nil) =>
-      Elab.transformChild { child =>
+      Elab.transformChild: child =>
         OrderBy(
           OrderSelections(
             List(
@@ -58,7 +92,3 @@ trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F] {
           ),
           child
         )
-      }
-  }
-
-}

@@ -59,15 +59,20 @@ import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
+import lucuma.odb.data.ExchangePartner
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
+import lucuma.odb.data.KeckInstrument
 import lucuma.odb.data.Md5Hash
+import lucuma.odb.data.Observatory
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.data.SubaruInstrument
+import lucuma.odb.data.SubaruProposalType
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TelescopeConfigGeneratorRole
@@ -288,6 +293,12 @@ trait Codecs {
       Epoch.fromString.reverseGet
     )
 
+  val _exchange_partner: Codec[List[ExchangePartner]] =
+    _enumerated[ExchangePartner](Type("_e_exchange_partner", List(Type("e_exchange_partner"))))
+
+  val exchange_partner: Codec[ExchangePartner] =
+    enumerated(Type("e_exchange_partner"))
+
   val execution_event_id: Codec[ExecutionEvent.Id] =
     gid[ExecutionEvent.Id]
 
@@ -379,6 +390,12 @@ trait Codecs {
   val int_percent: Codec[IntPercent] =
     int2.eimap(n => IntPercent.from(n))(_.value.toShort)
 
+  val _keck_instrument: Codec[List[KeckInstrument]] =
+    _enumerated[KeckInstrument](Type("_e_keck_instrument", List(Type("e_keck_instrument"))))
+
+  val keck_instrument: Codec[KeckInstrument] =
+    enumerated(Type("e_keck_instrument"))
+
   val md5_hash: Codec[Md5Hash] =
     bytea.eimap(b => Md5Hash.fromByteArray(b).toRight(s"Expected an MD5 hash value but found ${b.size} bytes"))(_.toByteArray)
 
@@ -398,6 +415,9 @@ trait Codecs {
 
   val obs_class: Codec[ObserveClass] =
     enumerated(Type("e_obs_class"))
+
+  val observatory: Codec[Observatory] =
+    enumerated(Type("e_observatory"))
 
   val observation_validation: Codec[ObservationValidation] =
     jsonb.eimap(
@@ -667,6 +687,15 @@ trait Codecs {
 
   val step_type: Codec[StepType] =
     enumerated(Type("e_step_type"))
+
+  val _subaru_instrument: Codec[List[SubaruInstrument]] =
+    _enumerated[SubaruInstrument](Type("_e_subaru_instrument", List(Type("e_subaru_instrument"))))
+
+  val subaru_instrument: Codec[SubaruInstrument] =
+    enumerated(Type("e_subaru_instrument"))
+
+  val subaru_proposal_type: Codec[SubaruProposalType] =
+    enumerated(Type("e_subaru_proposal_type"))
 
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)

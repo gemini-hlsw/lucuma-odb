@@ -729,9 +729,6 @@ The properties of a Call for Proposal in an input for creation and editing.
 """
 input CallForProposalsPropertiesInput {
 
-  "Type of the call. Required on create."
-  type: CallForProposalsType
-
   "Semester associated with the call. Required on create."
   semester: Semester
 
@@ -761,12 +758,6 @@ input CallForProposalsPropertiesInput {
   Not nullable.  Limited to dates between 1900 and 2100 (exclusive).
   """
   activeEnd: Date
-
-  """
-  Specifies a submission deadline to use for any partners without an explicit
-  partner deadline.
-  """
-  submissionDeadlineDefault: Timestamp
 
   """
   Partners that may participate in the call along with their respective

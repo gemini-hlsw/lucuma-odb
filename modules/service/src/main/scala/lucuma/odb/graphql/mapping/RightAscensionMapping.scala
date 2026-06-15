@@ -36,10 +36,14 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
 
   lazy val RightAscensionMappings: List[TypeMapping] =
     List(
-      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "raStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.RaStart),
-      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.RaEnd),
-      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaStart),
-      rightAscensionMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "raEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.RaEnd),
+      rightAscensionMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "north" / "raStart", CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.north.RaStart),
+      rightAscensionMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "north" / "raEnd",   CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.north.RaEnd),
+      rightAscensionMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "south" / "raStart", CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.south.RaStart),
+      rightAscensionMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "south" / "raEnd",   CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.south.RaEnd),
+      rightAscensionMappingAtPath(KeckCallPropertiesType / "coordinateLimits" / "raStart", CallForProposalsView.keck.Id, CallForProposalsView.coordinateLimits.north.RaStart),
+      rightAscensionMappingAtPath(KeckCallPropertiesType / "coordinateLimits" / "raEnd",   CallForProposalsView.keck.Id, CallForProposalsView.coordinateLimits.north.RaEnd),
+      rightAscensionMappingAtPath(SubaruCallPropertiesType / "coordinateLimits" / "raStart", CallForProposalsView.subaru.Id, CallForProposalsView.coordinateLimits.north.RaStart),
+      rightAscensionMappingAtPath(SubaruCallPropertiesType / "coordinateLimits" / "raEnd",   CallForProposalsView.subaru.Id, CallForProposalsView.coordinateLimits.north.RaEnd),
       rightAscensionMappingAtPath(ConfigurationTargetType / "coordinates" / "ra", ConfigurationRequestView.Target.ReferenceCoordinates.SyntheticId, ConfigurationRequestView.Target.ReferenceCoordinates.Ra),
       rightAscensionMappingAtPath(ConfigurationTargetType / "region" / "rightAscensionArc" / "start", ConfigurationRequestView.Target.Region.RightAscensionArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.RightAscensionArc.Start),
       rightAscensionMappingAtPath(ConfigurationTargetType / "region" / "rightAscensionArc" / "end", ConfigurationRequestView.Target.Region.RightAscensionArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.RightAscensionArc.End),

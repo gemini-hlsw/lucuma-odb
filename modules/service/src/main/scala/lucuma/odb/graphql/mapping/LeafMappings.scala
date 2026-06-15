@@ -53,10 +53,15 @@ import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
+import lucuma.odb.data.ExchangePartner
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
+import lucuma.odb.data.KeckInstrument
+import lucuma.odb.data.Observatory
 import lucuma.odb.data.PosAngleConstraintMode
+import lucuma.odb.data.SubaruInstrument
+import lucuma.odb.data.SubaruProposalType
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
@@ -110,6 +115,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[ExecutionEventType](ExecutionEventTypeType),
+      LeafMapping[ExchangePartner](ExchangePartnerType),
       LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
@@ -185,6 +191,10 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObservationWorkflowState](ObservationWorkflowStateType),
       LeafMapping[ObserveClass](ObserveClassType),
+      LeafMapping[KeckInstrument](KeckInstrumentType),
+      LeafMapping[Observatory](ObservatoryType),
+      LeafMapping[SubaruInstrument](SubaruInstrumentType),
+      LeafMapping[SubaruProposalType](SubaruProposalTypeType),
       LeafMapping[TelescopeConfigGeneratorType](TelescopeConfigGeneratorTypeType),
       LeafMapping[Partner](PartnerType),
       LeafMapping[PartnerLinkType](PartnerLinkTypeType),
