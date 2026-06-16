@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "e6993714697db924f8aca05ce2db3cbbe7df1a53",
+  "ocs_git_hash": "baf8ff77ced0e616afb61e52b5ae8341a47b0356",
   "ocs_git_branch": "main",
-  "ocs_git_describe": "v-66-ge69937146",
-  "local": true,
-  "build_timestamp": "2026-05-28T03:22:11Z"
+  "ocs_git_describe": "2026B.1.1.1-9-gbaf8ff77c",
+  "local": false,
+  "build_timestamp": "2026-06-16T03:13:35Z"
 }
