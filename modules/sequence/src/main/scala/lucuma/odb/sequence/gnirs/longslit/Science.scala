@@ -59,7 +59,8 @@ object Science:
 
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    cals:         NonEmptyList[ProtoStep[GnirsDynamicConfig]]
+    // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
+    cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
@@ -77,17 +78,18 @@ object Science:
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-      flat:         ProtoStep[GnirsDynamicConfig],  // Unexpanded SmartGcal Flat
-      arc:          ProtoStep[GnirsDynamicConfig]   // Unexpanded SmartGcal Arc
+      // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
+      cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
     ):
       def expand[F[_]: Monad](
         static:   GnirsStaticConfig,
         expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig]
       ): EitherT[F, String, StepDefinition] =
-        for
-          fs <- EitherT(expander.expandStep(static, flat))
-          rs <- EitherT(expander.expandStep(static, arc))
-        yield StepDefinition(scienceSteps, fs ::: rs)
+        cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
+          for
+            fs <- EitherT(expander.expandStep(static, flat))
+            rs <- EitherT(expander.expandStep(static, arc))
+          yield StepDefinition(scienceSteps, (fs ::: rs).some)
 
     object PreDef:
 
@@ -109,6 +111,13 @@ object Science:
 
         val sciClass = calRole.sciClass
 
+        // Telluric sequences are standard-star observations and do not carry
+        // their own flats & arcs; those come with the associated science.  We
+        // still build the (cheap) unexpanded flat/arc placeholders, but only
+        // hand them to PreDef when they're wanted — when absent, `expand`
+        // skips the SmartGcal lookup entirely.
+        val includeCals = !calRole.contains(CalibrationRole.Telluric)
+
         SeqState.eval:
           for
             _  <- State.modify[GnirsDynamicConfig]: dyn =>
@@ -127,7 +136,7 @@ object Science:
             ct  = ss.last.telescopeConfig.copy(guiding = Disabled)
             f  <- SeqState.flatStep(ct, ObserveClass.NightCal)
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
-          yield PreDef(ss, f, r)
+          yield PreDef(ss, Option.when(includeCals)((f, r)))
 
     def compute[F[_]: Monad](
       config:   Config,
@@ -150,7 +159,8 @@ object Science:
     // Computes the atoms remaining in a 3 hour science block, limited to
     // `maxCycles` at most.  A "Nighttime Calibrations" atom (flat + arc) is
     // inserted at the end of the block and, when the block is long enough,
-    // around its midpoint, aligned to a science cycle boundary.
+    // around its midpoint, aligned to a science cycle boundary.  Telluric
+    // sequences (`steps.cals.isEmpty`) omit the calibration atoms entirely.
     private def atomsInBlock(maxCycles: NonNegInt): (Int, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]) =
 
       def cyclesIn(timeSpan: TimeSpan): Int =
@@ -161,30 +171,32 @@ object Science:
       val scienceTime: TimeSpan = cycleEstimate *| cycles
 
       val scienceAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] = ProtoAtom(ScienceCycleTitle.some, steps.scienceSteps)
-      val gcalAtom:    ProtoAtom[ProtoStep[GnirsDynamicConfig]] = ProtoAtom(NighttimeCalTitle.some, steps.cals)
 
-      cycles ->
-        Option
-          .when(scienceTime >= MaxSciencePeriod)(scienceTime /| Two)
-          .fold(
-            // The science time is not long enough to warrant a mid-science cal in this block.
-            List.fill(cycles)(scienceAtom) ++ Option.when(cycles > 0)(gcalAtom).toList
-          ): timeUntilMidScienceCals =>
+      steps.cals.fold(cycles -> List.fill(cycles)(scienceAtom)): cals =>
+        val gcalAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] = ProtoAtom(NighttimeCalTitle.some, cals)
 
-            val fullPreCalCycles: Int        = cyclesIn(timeUntilMidScienceCals)
-            val leftOverPreCalTime: TimeSpan = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
+        cycles ->
+          Option
+            .when(scienceTime >= MaxSciencePeriod)(scienceTime /| Two)
+            .fold(
+              // The science time is not long enough to warrant a mid-science cal in this block.
+              List.fill(cycles)(scienceAtom) ++ Option.when(cycles > 0)(gcalAtom).toList
+            ): timeUntilMidScienceCals =>
 
-            // If the nominal cal time falls in the middle of a science cycle, make it so
-            // the break to do calibrations falls closest to a cycle boundary.
-            val extraPreCalCycle: Int =
-              if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
+              val fullPreCalCycles: Int        = cyclesIn(timeUntilMidScienceCals)
+              val leftOverPreCalTime: TimeSpan = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
 
-            val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
-            val postCalCycles: Int = cycles - preCalCycles
+              // If the nominal cal time falls in the middle of a science cycle, make it so
+              // the break to do calibrations falls closest to a cycle boundary.
+              val extraPreCalCycle: Int =
+                if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
 
-            List.fill(preCalCycles)(scienceAtom).appended(gcalAtom) ++
-            List.fill(postCalCycles)(scienceAtom)                   ++
-            Option.when(postCalCycles > 0)(gcalAtom).toList
+              val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
+              val postCalCycles: Int = cycles - preCalCycles
+
+              List.fill(preCalCycles)(scienceAtom).appended(gcalAtom) ++
+              List.fill(postCalCycles)(scienceAtom)                   ++
+              Option.when(postCalCycles > 0)(gcalAtom).toList
 
     override def generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
 

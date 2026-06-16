@@ -7,6 +7,7 @@ import cats.effect.IO
 import cats.syntax.either.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
@@ -227,6 +228,58 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
                   "possibleFuture" -> List(expectedAtom, calAtom(0, 20)).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
+  test("[gnirs] telluric sequences omit the inline flats & arcs"):
+    // A GNIRS telluric is a standard-star observation; its flats & arcs come
+    // with the associated science, so its sequence must contain only science
+    // cycles (no "Nighttime Calibrations" atoms).  The science steps are
+    // charged as NIGHT_CAL because of the telluric calibration role.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
+      yield oid
+
+    // Compact projection: enough to assert the *shape* of the sequence and, in
+    // particular, that no calibration atom is present.
+    val atomShapeQuery: String =
+      """
+        description
+        observeClass
+        steps {
+          stepConfig { stepType }
+          observeClass
+        }
+      """
+
+    setup.flatMap: oid =>
+      val sciStep: Json =
+        Json.obj(
+          "stepConfig"   -> Json.obj("stepType" -> "SCIENCE".asJson),
+          "observeClass" -> "NIGHT_CAL".asJson
+        )
+      val scienceAtom: Json =
+        Json.obj(
+          "description"  -> "Science Cycle".asJson,
+          "observeClass" -> "NIGHT_CAL".asJson,
+          "steps"        -> List.fill(4)(sciStep).asJson
+        )
+      expect(
+        user     = pi,
+        query    = executionConfigQuery(oid, "gnirs", "science", atomShapeQuery, None),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom"       -> scienceAtom,
+                  "possibleFuture" -> Json.arr(),  // no "Nighttime Calibrations" atom
                   "hasMore"        -> false.asJson
                 )
               )
