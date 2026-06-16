@@ -14,10 +14,6 @@ processors:
     send_batch_size: 512
 
 exporters:
-  otlphttp/honeycomb:
-    endpoint: "https://api.honeycomb.io"
-    headers:
-      x-honeycomb-team: "${env:HONEYCOMB_API_KEY}"
   otlphttp/grafana:
     endpoint: "${env:GRAFANA_OTLP_ENDPOINT}"
     headers:
@@ -28,8 +24,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlphttp/grafana, otlphttp/honeycomb]
+      exporters: [otlphttp/grafana]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [otlphttp/grafana, otlphttp/honeycomb]
+      exporters: [otlphttp/grafana]
