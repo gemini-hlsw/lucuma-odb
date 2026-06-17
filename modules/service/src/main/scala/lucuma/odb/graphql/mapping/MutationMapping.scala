@@ -78,6 +78,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       AddStepEvent,
       AddTimeChargeCorrection,
       ChangeProgramUserRole,
+      ChangePrincipalInvestigator,
       CloneGroup,
       CloneObservation,
       CloneTarget,
@@ -319,6 +320,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     MutationField("changeProgramUserRole", ChangeProgramUserRoleInput.Binding): (input, child) =>
       services.useTransactionally:
         programUserService.changeProgramUserRole(input).map: m =>
+          m.map: pui =>
+            Unique(Filter(Predicates.programUser.id.eql(pui), child))
+
+  private lazy val ChangePrincipalInvestigator: MutationField =
+    MutationField("changePrincipalInvestigator", ChangePrincipalInvestigatorInput.Binding): (input, child) =>
+      services.useTransactionally:
+        programUserService.changePrincipalInvestigator(input).map: m =>
           m.map: pui =>
             Unique(Filter(Predicates.programUser.id.eql(pui), child))
 
