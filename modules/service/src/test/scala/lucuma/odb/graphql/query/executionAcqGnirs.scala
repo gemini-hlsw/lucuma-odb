@@ -224,10 +224,18 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       """
     .asJson
 
-  // 500_000 µs = 0.5 s → VeryBright (< 1s), readMode=VERY_BRIGHT
+  // 500_000 µs = 0.5 s. Exposure < 0.6s ⇒ readMode=VERY_BRIGHT. (Note: integration time
+  // 0.5s is NOT < 0.5, so the acquisition *mode* resolves to Bright, not VeryBright.)
   val VeryBrightµs: Long = 500_000L
 
-  test("VeryBright acquisition (< 1s) — VERY_BRIGHT readMode"):
+  // 300_000 µs = 0.3 s. Integration time < 0.5s ⇒ acquisition mode VeryBright; the exposure
+  // is also < 0.6s ⇒ readMode=VERY_BRIGHT.
+  val VeryBrightAcqµs: Long = 300_000L
+
+  // A short (0.5s) ITC exposure yields VERY_BRIGHT science read mode (exposure < 0.6s),
+  // while the acquisition mode is Bright (integration time 0.5s is not < 0.5s) and the H2
+  // filter falls back to H (Order4) for the FPU image.
+  test("Short ITC exposure yields VERY_BRIGHT science read mode"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -375,17 +383,18 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
   // filter and the ITC exposure/coadds (BRIGHT). Columns:
   //   camera, selected filter, FPU-image filter, FPU-image exposure µs, FPU-image readMode
   List(
-    // Short camera: X=10s, J=15s, H=3s, K=3s, H2→H(3s). All BRIGHT.
+    // Short camera: X=10s, J=15s, H=3s, K=3s, H2→H(3s). All BRIGHT.  The X/J/H/K bands are
+    // the spectroscopy order filters Order6/Order5/Order4/Order3 (the acquisition filters).
     ("SHORT_BLUE", "ORDER6", "ORDER6", XShortµs,  "BRIGHT"),      // X stays X
-    ("SHORT_BLUE", "J",      "J",      JShortµs,  "BRIGHT"),      // J stays J
+    ("SHORT_BLUE", "ORDER5", "ORDER5", JShortµs,  "BRIGHT"),      // J (Order5) stays Order5
     ("SHORT_BLUE", "ORDER4", "ORDER4", HShortµs,  "BRIGHT"),      // H
-    ("SHORT_BLUE", "K",      "K",      KShortµs,  "BRIGHT"),      // K stays K
+    ("SHORT_BLUE", "ORDER3", "ORDER3", KShortµs,  "BRIGHT"),      // K (Order3) stays Order3
     ("SHORT_BLUE", "H2",     "ORDER4", HShortµs,  "BRIGHT"),      // H2 → H
     // Long camera: X→H, J→H, H=15s, K=15s, H2→H(15s), PAH=0.5s.
     ("LONG_BLUE",  "ORDER6", "ORDER4", HLongµs,   "BRIGHT"),      // X → H
-    ("LONG_BLUE",  "J",      "ORDER4", HLongµs,   "BRIGHT"),      // J → H
+    ("LONG_BLUE",  "ORDER5", "ORDER4", HLongµs,   "BRIGHT"),      // J (Order5) → H
     ("LONG_BLUE",  "ORDER4", "ORDER4", HLongµs,   "BRIGHT"),      // H
-    ("LONG_BLUE",  "K",      "K",      KLongµs,   "BRIGHT"),      // K stays K
+    ("LONG_BLUE",  "ORDER3", "ORDER3", KLongµs,   "BRIGHT"),      // K (Order3) stays Order3
     ("LONG_BLUE",  "H2",     "ORDER4", HLongµs,   "BRIGHT"),      // H2 → H
     ("LONG_BLUE",  "PAH",    "PAH",    PahLongµs, "VERY_BRIGHT")  // PAH, 0.5s ⇒ VERY_BRIGHT
   ).foreach: (camera, selected, fpuFilter, fpuµs, fpuReadMode) =>
@@ -421,7 +430,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
         p <- createProgram
         t <- createTargetWithProfileAs(pi, p)
         o <- createGnirsLongSlitObservationAs(pi, p, t)
-        _ <- setAcquisitionTimeAndCount(o, 0.5, 1, 1645) // 0.5s ⇒ VeryBright
+        _ <- setAcquisitionTimeAndCount(o, BigDecimal(VeryBrightAcqµs) / 1_000_000, 1, 1645) // 0.3s ⇒ VeryBright
         _ <- setAcquisitionFilter(o, "ORDER6")           // X would otherwise be 10s on the short camera
       yield o
 
@@ -434,9 +443,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
         expected = json"""
           {
             "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
-              ${firstAtomConfig(HShortµs,     1, "ORDER4", "BRIGHT")},
-              ${firstAtomConfig(VeryBrightµs, 1, "ORDER6", "VERY_BRIGHT")},
-              ${firstAtomConfig(VeryBrightµs, 1, "ORDER6", "VERY_BRIGHT")}
+              ${firstAtomConfig(HShortµs,        1, "ORDER4", "BRIGHT")},
+              ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")},
+              ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")}
             ] } } } }
           }
         """.asRight
