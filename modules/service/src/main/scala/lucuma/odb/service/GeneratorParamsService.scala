@@ -439,7 +439,7 @@ object GeneratorParamsService {
               // Acquisition (imaging) filter for the ITC: the explicit acquisition
               // filter if set, otherwise the default for the spectroscopy wavelength.
               acqFilter <- gn.acquisition.explicitFilter
-                             .fold(GnirsFilter.fromSpectroscopyWavelength(gn.centralWavelength, isAcquisition = true))(_.asRight[String])
+                             .fold(GnirsFilter.fromAcquisitionWavelength(gn.centralWavelength))(_.asRight[String])
                              .leftMap(msg => Error.MisconfiguredObservation(obsParams.observationId, msg))
             yield
               val sciReadMode = gn.exposureTimeMode match

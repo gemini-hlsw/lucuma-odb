@@ -105,7 +105,7 @@ object GnirsLongSlitInput:
           (
             rFilter.flatMap: n =>
               n.traverse: f =>
-                if GnirsFilter.AcquisitionFilters.toSortedSet.contains_(f) then f.success
+                if GnirsFilter.AcquisitionFilters.contains_(f) then f.success
                 else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GnirsFilter.AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
             ,
             rAcqType, rCoadds, rSkyOffset, rEtm
