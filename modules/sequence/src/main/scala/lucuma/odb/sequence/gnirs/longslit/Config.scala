@@ -50,7 +50,7 @@ case class AcquisitionConfig(
       case None    =>
         mode match
           case GnirsAcquisitionMode.VeryBright => Right(GnirsFilter.H2)
-          case _                               => GnirsFilter.fromSpectroscopyWavelength(wavelength)
+          case _                               => GnirsFilter.fromAcquisitionWavelength(wavelength)
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(128)
