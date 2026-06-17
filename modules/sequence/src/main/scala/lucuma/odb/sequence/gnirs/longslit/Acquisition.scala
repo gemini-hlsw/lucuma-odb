@@ -58,11 +58,13 @@ object Acquisition:
    *
    * PAH can never be used on the short camera (the sky is too bright), regardless of
    * mode — that yields an error. Otherwise VeryBright always images the FPU in H
-   * (Order4), and for Bright/Faint the values come from a per-camera table:
+   * (Order4), and for Bright/Faint the values come from a per-camera table (the X/J/H/K
+   * bands are the spectroscopy order filters Order6/Order5/Order4/Order3 that auto
+   * selection produces):
    *
    *   Short:  X=10s, J=15s, H=3s, K=3s, H2→H(3s), PAH→error (sky too bright)
    *   Long:   X→H, J→H, H=15s, K=15s, H2→H(15s), PAH=0.5s
-   * 
+   *
    * See https://app.shortcut.com/lucuma/story/8880/gnirs-acquisition-initial-slit-image
    *
    * Any other filter (e.g. a user-selected filter) falls back to H.
@@ -80,11 +82,11 @@ object Acquisition:
         s"PAH acquisition filter cannot be used with short camera".asLeft
       case (GnirsAcquisitionMode.VeryBright, _, _)                  => useH.asRight
       case (_, GnirsFilter.Order6, GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.Order6, 10.secTimeSpan).asRight // X, short
-      case (_, GnirsFilter.J,      GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.J,      15.secTimeSpan).asRight // J, short
-      case (_, GnirsFilter.K,      GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.K,       3.secTimeSpan).asRight // K, short
-      case (_, GnirsFilter.K,      GnirsPixelScale.PixelScale_0_05) => (GnirsFilter.K,      15.secTimeSpan).asRight // K, long
+      case (_, GnirsFilter.Order5, GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.Order5, 15.secTimeSpan).asRight // J, short
+      case (_, GnirsFilter.Order3, GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.Order3,  3.secTimeSpan).asRight // K, short
+      case (_, GnirsFilter.Order3, GnirsPixelScale.PixelScale_0_05) => (GnirsFilter.Order3, 15.secTimeSpan).asRight // K, long
       case (_, GnirsFilter.PAH,    GnirsPixelScale.PixelScale_0_05) => (GnirsFilter.PAH,    500.msTimeSpan).asRight // PAH, long
-      case _                                                        => useH.asRight // H, H2, long X/J, auto order filters, …
+      case _                                                        => useH.asRight // H, H2, long-camera X/J, L/M orders, broadband J/K, …
 
   case class Steps(
     slitImage:      ProtoStep[GnirsDynamicConfig],

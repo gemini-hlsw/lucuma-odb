@@ -51,7 +51,7 @@ object Science:
 
   /** Maximum time that may pass between (inline) flats. */
   val MaxSciencePeriod: TimeSpan =
-    3.hourTimeSpan
+    90.minuteTimeSpan
 
   private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
 

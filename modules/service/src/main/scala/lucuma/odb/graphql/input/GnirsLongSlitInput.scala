@@ -10,6 +10,7 @@ import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
+import cats.syntax.unorderedFoldable.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.syntax.*
@@ -67,10 +68,6 @@ object GnirsLongSlitInput:
             case _ =>
               Matcher.validationFailure("Exactly one of alongSlit or toSky must be provided")
 
-  // GNIRS acquisition (keyhole imaging) filters, from lucuma-core: J, Order4 (H), H2, K, PAH.
-  val AcquisitionFilters: List[GnirsFilter] =
-    GnirsFilter.acquisition.toList
-
   case class AcquisitionInput(
     explicitFilter:   Nullable[GnirsFilter], // Nullable to allow clearing to the computed default
     explicitAcqType:  Nullable[GnirsAcquisitionType], // Nullable to allow clearing to automatic
@@ -108,8 +105,8 @@ object GnirsLongSlitInput:
           (
             rFilter.flatMap: n =>
               n.traverse: f =>
-                if AcquisitionFilters.contains(f) then f.success
-                else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
+                if GnirsFilter.AcquisitionFilters.toSortedSet.contains_(f) then f.success
+                else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GnirsFilter.AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
             ,
             rAcqType, rCoadds, rSkyOffset, rEtm
           ).parMapN(AcquisitionInput.apply).flatMap(validateSkyOffset)
