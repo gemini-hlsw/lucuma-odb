@@ -33,6 +33,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.UserType
 import lucuma.odb.graphql.input.AddProgramUserInput
+import lucuma.odb.graphql.input.ChangePrincipalInvestigatorInput
 import lucuma.odb.graphql.input.ChangeProgramUserRoleInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
@@ -72,6 +73,19 @@ trait ProgramUserService[F[_]]:
 
   def changeProgramUserRole(
     input: ChangeProgramUserRoleInput
+  )(using Transaction[F]): F[Result[ProgramUser.Id]]
+
+  /**
+   * Transfers the PI role of a program to one of its coinvestigators.  The
+   * program user identified by `input.programUserId`, which must currently be a
+   * coinvestigator, becomes the new PI; the current PI is demoted to
+   * coinvestigator.  Only the current PI of the program or a staff (or greater)
+   * user may perform this operation.
+   *
+   * @return the program user id of the new PI
+   */
+  def changePrincipalInvestigator(
+    input: ChangePrincipalInvestigatorInput
   )(using Transaction[F]): F[Result[ProgramUser.Id]]
 
   /**
@@ -190,6 +204,33 @@ object ProgramUserService:
                       case Completion.Update(1) => input.programUserId.success
                       case _                    => OdbError.NotAuthorized(user.id).asFailure
 
+      override def changePrincipalInvestigator(
+        input: ChangePrincipalInvestigatorInput
+      )(using Transaction[F]): F[Result[ProgramUser.Id]] =
+
+        def execUpdate(af: AppliedFragment, onFailure: => OdbError): F[Result[Unit]] =
+          session.prepare(af.fragment.command).flatMap: pq =>
+            pq.execute(af.argument).map:
+              case Completion.Update(1) => ().success
+              case _                    => onFailure.asFailure
+
+        session
+          .prepare(Statements.SelectLinkData)
+          .flatMap(_.option(input.programUserId))
+          .flatMap:
+            case None =>
+              OdbError.InvalidProgramUser(input.programUserId, s"ProgramUser ${input.programUserId} was not found.".some).asFailureF
+            case Some((_, role, _)) if role =!= ProgramUserRole.Coi =>
+              OdbError.UpdateFailed("The specified program user must be a coinvestigator.".some).asFailureF
+            case Some((pid, _, _)) =>
+              // Demote the current PI to Coi *before* promoting the target Coi to
+              // PI, since at most one PI per program is allowed.  The access check
+              // is baked into the demotion, so an unauthorized caller updates zero
+              // rows and is rejected as not authorized.
+              (for
+                _ <- ResultT(execUpdate(Statements.demoteCurrentPi(pid, user), OdbError.NotAuthorized(user.id)))
+                _ <- ResultT(execUpdate(Statements.promoteCoiToPi(input.programUserId), OdbError.UpdateFailed("Failed to promote the coinvestigator to PI.".some)))
+              yield input.programUserId).value
 
       override def deleteProgramUser(
         id: ProgramUser.Id
@@ -355,6 +396,46 @@ object ProgramUserService:
                SET c_role = $program_user_role
              WHERE c_program_user_id = $program_user_id
           """(nextRole, targetProgramUserId) |+| ac
+
+    /**
+     * Access check for changing a program's PI: the source user must have staff
+     * access (or greater), or must be the current PI of the program.  Returns an
+     * optional SQL fragment to append (as an additional `AND` condition) so that
+     * an unauthorized caller matches no rows.
+     */
+    private def authPiOrStaff(
+      programId:  Program.Id,
+      sourceUser: User
+    ): Option[AppliedFragment] =
+      import Access.{Admin, Staff, Service}
+      sourceUser.role.access match
+        case Admin | Staff | Service => none
+        case _                       => existsUserAsPi(programId, sourceUser.id).some
+
+    /** Demotes the program's current PI to Coi, subject to the access check. */
+    def demoteCurrentPi(
+      programId:  Program.Id,
+      sourceUser: User
+    ): AppliedFragment =
+      val base =
+        sql"""
+          UPDATE t_program_user
+             SET c_role = $program_user_role
+           WHERE c_program_id = $program_id
+             AND c_role = $program_user_role
+        """(ProgramUserRole.Coi, programId, ProgramUserRole.Pi)
+      authPiOrStaff(programId, sourceUser).fold(base)(ac => base |+| void" AND " |+| ac)
+
+    /** Promotes the given program user to PI, provided it is currently a Coi. */
+    def promoteCoiToPi(
+      targetProgramUserId: ProgramUser.Id
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_program_user
+           SET c_role = $program_user_role
+         WHERE c_program_user_id = $program_user_id
+           AND c_role = $program_user_role
+      """(ProgramUserRole.Pi, targetProgramUserId, ProgramUserRole.Coi)
 
     def deleteProgramUser(
       pui:             ProgramUser.Id,

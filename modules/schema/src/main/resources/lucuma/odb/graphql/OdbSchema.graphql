@@ -733,6 +733,21 @@ type ChangeProgramUserRoleResult {
 }
 
 """
+Input to changePrincipalInvestigator: the coinvestigator to promote to PI.
+"""
+input ChangePrincipalInvestigatorInput {
+  "Program user (currently a coinvestigator) to make the new PI."
+  programUserId: ProgramUserId!
+}
+
+"""
+Result of changePrincipalInvestigator, which is the program user who is now the PI.
+"""
+type ChangePrincipalInvestigatorResult {
+  programUser: ProgramUser!
+}
+
+"""
 Describes an observation clone operation, making any edits in the `SET`
 parameter.  The observation status in the cloned observation defaults to NEW.
 Identify the observation to clone by specifying either its id or reference.  If
@@ -3049,6 +3064,17 @@ type Mutation {
   changeProgramUserRole(
     input: ChangeProgramUserRoleInput!
   ): ChangeProgramUserRoleResult!
+
+  """
+  Transfer the principal investigator (PI) role of a program to one of its
+  coinvestigators.  The program user identified in the input, which must
+  currently be a coinvestigator, becomes the new PI, and the current PI is
+  demoted to coinvestigator.  Only the current PI of the program or a user with
+  staff access (or greater) may perform this operation.
+  """
+  changePrincipalInvestigator(
+    input: ChangePrincipalInvestigatorInput!
+  ): ChangePrincipalInvestigatorResult!
 
   cloneObservation(
     """

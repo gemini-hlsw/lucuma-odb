@@ -131,6 +131,7 @@ object OdbMapping {
           with CatalogInfoMapping[F]
           with CategorizedTimeMapping[F]
           with ChangeProgramUserRoleResultMapping[F]
+          with ChangePrincipalInvestigatorResultMapping[F]
           with CloneGroupResultMapping[F]
           with CloneObservationResultMapping[F]
           with CloneTargetResultMapping[F]
@@ -388,6 +389,7 @@ object OdbMapping {
                 CallsForProposalsSelectResultMapping,
                 CatalogInfoMapping,
                 ChangeProgramUserRoleResultMapping,
+                ChangePrincipalInvestigatorResultMapping,
                 ClassicalMapping,
                 CloneGroupResultMapping,
                 CloneObservationResultMapping,
