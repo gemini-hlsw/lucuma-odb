@@ -10,19 +10,10 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SourceProfile.*
-import lucuma.core.model.SpectralDefinition
-import lucuma.core.model.SpectralDefinition.BandNormalized
-import lucuma.core.model.SpectralDefinition.EmissionLines
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.sourceprofile.SpectralDefinitionInput.matches
 
 object SourceProfileInput {
-  extension [A](sd1: SpectralDefinition[A])
-    def matches(sd2: SpectralDefinition[A]): Boolean =
-      (sd1, sd2) match {
-        case (_: BandNormalized[A], _: BandNormalized[A]) => true
-        case (_: EmissionLines[A], _: EmissionLines[A])   => true
-        case _                                            => false
-      } 
 
   // convenience projections
   implicit class SourceProfileOps(self: SourceProfile) {
