@@ -72,6 +72,7 @@ object StartupDiagnostics:
           checkPostgresEnum(ghost_ifu_mapping_type),
           checkPostgresEnum(gnirs_acquisition_type),
           checkPostgresEnum(gnirs_decker),
+          checkPostgresEnum(gnirs_fpu_other),
           checkPostgresEnum(gnirs_well_depth),
           {
             // We'll skip this one.  There is a postgres enum, but it is tied

@@ -24,7 +24,6 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
@@ -40,6 +39,7 @@ import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig as Gnirs
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig as Igrins2
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services.GuestAccess
@@ -765,7 +765,8 @@ object SmartGcalService:
         sql"s.c_pixel_scale     = ${gnirs_pixel_scale}"(key.pixelScale),
         sql"s.c_disperser       IS NOT DISTINCT FROM ${gnirs_grating.opt}"(key.disperser),
         sql"s.c_cross_dispersed IS NOT DISTINCT FROM ${gnirs_prism.opt}"(key.crossDispersed),
-        sql"s.c_fpu             IS NOT DISTINCT FROM ${gnirs_fpu_slit.opt}"(key.fpu),
+        sql"s.c_fpu_slit        IS NOT DISTINCT FROM ${gnirs_fpu_slit.opt}"(GnirsFpu.slit.getOption(key.fpu)),
+        sql"s.c_fpu_other       IS NOT DISTINCT FROM ${gnirs_fpu_other.opt}"(GnirsFpu.other.getOption(key.fpu)),
         sql"s.c_well_depth      = ${gnirs_well_depth}"(key.wellDepth),
         key.wavelength.fold(void"s.c_wavelength_range IS NULL")(
           sql"s.c_wavelength_range @> ${wavelength_pm}"
@@ -802,7 +803,7 @@ object SmartGcalService:
       GnirsGrating                ,
       GnirsPrism                  ,
       BoundedInterval[Wavelength] ,
-      GnirsFpuSlit                ,
+      GnirsFpu                    ,
       GnirsWellDepth              ,
       TimeSpan
     )] =
@@ -815,7 +816,8 @@ object SmartGcalService:
           c_disperser,
           c_cross_dispersed,
           c_wavelength_range,
-          c_fpu,
+          c_fpu_slit,
+          c_fpu_other,
           c_well_depth,
           c_exposure_time
         ) SELECT
@@ -826,7 +828,21 @@ object SmartGcalService:
           $gnirs_grating,
           $gnirs_prism,
           $wavelength_pm_range,
-          $gnirs_fpu_slit,
+          ${gnirs_fpu_slit.opt},
+          ${gnirs_fpu_other.opt},
           $gnirs_well_depth,
           $time_span
-      """
+      """.contramap[(
+        Instrument                  ,
+        Int                         ,
+        PosLong                     ,
+        GnirsPixelScale             ,
+        GnirsGrating                ,
+        GnirsPrism                  ,
+        BoundedInterval[Wavelength] ,
+        GnirsFpu                    ,
+        GnirsWellDepth              ,
+        TimeSpan
+      )] { case (i, g, l, ps, disp, xd, wr, fpu, wd, t) =>
+        (i, g, l, ps, disp, xd, wr, GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu), wd, t)
+      }

@@ -22,6 +22,7 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import skunk.Codec
@@ -48,7 +49,7 @@ trait GnirsCodecs:
     enumerated(Type.varchar)
 
   val gnirs_fpu_other: Codec[GnirsFpuOther] =
-    enumerated(Type.varchar)
+    enumerated(Type("e_gnirs_fpu_other"))
 
   val gnirs_grating: Codec[GnirsGrating] =
     enumerated(Type.varchar)
@@ -75,15 +76,14 @@ trait GnirsCodecs:
     gnirs_well_depth.imap(GnirsStaticConfig(_))(_.wellDepth)
 
   // FPU: exactly one of the long-slit slit value or the non-slit "other" value.
-  private val gnirs_fpu: Codec[Either[GnirsFpuSlit, GnirsFpuOther]] =
+  private val gnirs_fpu: Codec[GnirsFpu] =
     (gnirs_fpu_slit.opt *: gnirs_fpu_other.opt).eimap {
-      case (Some(s), None)    => s.asLeft[GnirsFpuOther].asRight[String]
-      case (None,    Some(o)) => o.asRight[GnirsFpuSlit].asRight[String]
+      case (Some(s), None)    => GnirsFpu.Slit(s).asRight[String]
+      case (None,    Some(o)) => GnirsFpu.Other(o).asRight[String]
       case (None,    None)    => "GNIRS FPU: neither slit nor other defined".asLeft
       case (Some(_), Some(_)) => "GNIRS FPU: both slit and other defined".asLeft
-    } {
-      case Left(s)  => (s.some, none)
-      case Right(o) => (none, o.some)
+    } { fpu =>
+      (GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu))
     }
 
   // Spectroscopy config carried when the acquisition mirror is "out".  The

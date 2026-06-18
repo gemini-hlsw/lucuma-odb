@@ -34,6 +34,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -146,7 +147,7 @@ object Acquisition:
                    focus             = config.focus,
                    readMode          = fpuStepReadMode,
                    decker            = slitDecker,
-                   fpu               = Left(config.fpu)
+                   fpu               = GnirsFpu.Slit(config.fpu)
                  )
           slitImage      <- scienceStep(
                               TelescopeConfig(
@@ -163,7 +164,7 @@ object Acquisition:
                                 coadds   = config.acquisition.coadds,
                                 readMode = readMode,
                                 decker   = GnirsDecker.Acquisition,
-                                fpu      = Right(GnirsFpuOther.Acquisition),
+                                fpu      = GnirsFpu.Other(GnirsFpuOther.Acquisition),
                                 filter   = selectedFilter
                               )
           fieldSkyOpt    <- skyOffsetOpt.traverse: sky =>
@@ -171,7 +172,7 @@ object Acquisition:
           field          <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
           // Back to the selected slit (decker/FPU) for the through-slit steps.
           _              <- State.modify[GnirsDynamicConfig]:
-                              _.copy(decker = slitDecker, fpu = Left(config.fpu))
+                              _.copy(decker = slitDecker, fpu = GnirsFpu.Slit(config.fpu))
           tSlitSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           throughSlit    <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)

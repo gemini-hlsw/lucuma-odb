@@ -3,7 +3,6 @@
 
 package lucuma.odb.json
 
-import cats.syntax.either.*
 import coulomb.Quantity
 import coulomb.syntax.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -27,6 +26,7 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.util.TimeSpan
@@ -96,8 +96,8 @@ trait GnirsCodec:
         coadds            <- c.downField("coadds").as[PosInt]
         filter            <- c.downField("filter").as[GnirsFilter]
         decker            <- c.downField("decker").as[GnirsDecker]
-        fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(_.asLeft[GnirsFpuOther]) orElse
-                             c.downField("fpuOther").as[GnirsFpuOther].map(_.asRight[GnirsFpuSlit])
+        fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(GnirsFpu.Slit(_)) orElse
+                             c.downField("fpuOther").as[GnirsFpuOther].map(GnirsFpu.Other(_))
         acqMirror         <- c.downField("acquisitionMirrorOut").as[GnirsAcquisitionMirrorMode]
         camera            <- c.downField("camera").as[GnirsCamera]
         focus             <- c.downField("focusMotorSteps").as[GnirsFocus]
@@ -122,8 +122,8 @@ trait GnirsCodec:
         "centralWavelength"    -> a.centralWavelength.asJson,
         "filter"               -> a.filter.asJson,
         "decker"               -> a.decker.asJson,
-        "fpuSlit"              -> a.fpu.left.toOption.fold(Json.Null)(_.asJson),
-        "fpuOther"             -> a.fpu.toOption.fold(Json.Null)(_.asJson),
+        "fpuSlit"              -> GnirsFpu.slit.getOption(a.fpu).fold(Json.Null)(_.asJson),
+        "fpuOther"             -> GnirsFpu.other.getOption(a.fpu).fold(Json.Null)(_.asJson),
         "acquisitionMirrorOut" -> a.acquisitionMirror.asJson,
         "camera"               -> a.camera.asJson,
         "focusMotorSteps"      -> a.focus.asJson,

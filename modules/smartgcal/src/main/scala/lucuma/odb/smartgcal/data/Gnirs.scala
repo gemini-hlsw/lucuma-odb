@@ -10,7 +10,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import fs2.Pipe
 import fs2.Stream
-import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
@@ -19,6 +18,7 @@ import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
@@ -39,14 +39,14 @@ object Gnirs:
     disperser:      Option[GnirsGrating],
     crossDispersed: Option[GnirsPrism],
     wavelength:     Option[Wavelength],
-    fpu:            Option[GnirsFpuSlit],
+    fpu:            GnirsFpu,
     wellDepth:      GnirsWellDepth
   ):
     def format: String =
       val d = s"disperser: ${disperser.getOrElse("None")}"
       val x = s"crossDispersed: ${crossDispersed.getOrElse("None")}"
       val w = s"wavelength: ${wavelength.fold("None")(w => s"${w.nm.value.value} nm")}"
-      val u = s"fpu: ${fpu.getOrElse("None")}"
+      val u = s"fpu: ${fpu.fold(_.toString, _.toString)}"
       s"Gnirs { pixelScale: $pixelScale, $d, $x, $w, $u, wellDepth: $wellDepth }"
 
   object SearchKey:
@@ -60,7 +60,7 @@ object Gnirs:
         grating,
         prism,
         wavelength,
-        dyn.fpu.left.toOption,
+        dyn.fpu,
         static.wellDepth
       )
 
@@ -74,7 +74,7 @@ object Gnirs:
     disperser:       GnirsGrating,
     crossDispersed:  GnirsPrism,
     wavelengthRange: BoundedInterval[Wavelength],
-    fpu:             GnirsFpuSlit,
+    fpu:             GnirsFpu,
     wellDepth:       GnirsWellDepth
   )
 
@@ -120,7 +120,7 @@ object Gnirs:
     dispersers:      NonEmptyList[GnirsGrating],
     crossDisperseds: NonEmptyList[GnirsPrism],
     wavelengthRange: BoundedInterval[Wavelength],
-    fpus:            NonEmptyList[GnirsFpuSlit],
+    fpus:            NonEmptyList[GnirsFpu],
     wellDepths:      NonEmptyList[GnirsWellDepth]
   ):
     def tableKeys: NonEmptyList[TableKey] =

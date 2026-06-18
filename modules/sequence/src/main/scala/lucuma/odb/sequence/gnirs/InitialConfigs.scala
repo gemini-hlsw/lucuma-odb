@@ -11,6 +11,7 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFocus
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlit
@@ -27,7 +28,7 @@ object InitialConfigs:
       coadds            = PosInt.MinValue,
       filter            = GnirsFilter.Y,
       decker            = GnirsDecker.Acquisition,
-      fpu               = Left(lucuma.core.enums.GnirsFpuSlit.LongSlit_0_10),
+      fpu               = GnirsFpu.Slit(lucuma.core.enums.GnirsFpuSlit.LongSlit_0_10),
       acquisitionMirror = GnirsAcquisitionMirrorMode.In,
       camera            = GnirsCamera.ShortBlue,
       focus             = GnirsFocus.Best,

@@ -16,6 +16,7 @@ import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.parser.MiscParsers.dash
 import lucuma.core.parser.MiscParsers.maybeWhiteSpace
 import lucuma.core.parser.MiscParsers.posInt
@@ -59,16 +60,16 @@ trait GnirsParsers:
 
   // Long slit calibrations only use slit FPUs.  Spectroscopy rows for non-slit
   // FPUs (e.g. pinholes) are skipped, marking the whole row obsolete.
-  val fpu: Parser[Availability[NonEmptyList[GnirsFpuSlit]]] =
+  val fpu: Parser[Availability[NonEmptyList[GnirsFpu]]] =
     manyOfObsoletable(
       Set("pinhole 0.1", "pinhole 0.3"),
-      "0.10 arcsec"  -> GnirsFpuSlit.LongSlit_0_10,
-      "0.15 arcsec"  -> GnirsFpuSlit.LongSlit_0_15,
-      "0.20 arcsec"  -> GnirsFpuSlit.LongSlit_0_20,
-      "0.30 arcsec"  -> GnirsFpuSlit.LongSlit_0_30,
-      "0.45 arcsec"  -> GnirsFpuSlit.LongSlit_0_45,
-      "0.675 arcsec" -> GnirsFpuSlit.LongSlit_0_675,
-      "1.0 arcsec"   -> GnirsFpuSlit.LongSlit_1_00
+      "0.10 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_10),
+      "0.15 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_15),
+      "0.20 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_20),
+      "0.30 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
+      "0.45 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_45),
+      "0.675 arcsec" -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_675),
+      "1.0 arcsec"   -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_1_00)
     ).withContext("GNIRS focal plane unit")
 
   val wellDepth: Parser[NonEmptyList[GnirsWellDepth]] =
