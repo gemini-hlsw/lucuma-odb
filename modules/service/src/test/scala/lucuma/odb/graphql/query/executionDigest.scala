@@ -120,6 +120,11 @@ class executionDigest extends ExecutionTestSupportForGmos {
                   }
                   atomCount
                 }
+                fullTimeEstimate {
+                  program { seconds }
+                  nonCharged { seconds }
+                  total { seconds }
+                }
               }
             }
           }
@@ -187,6 +192,17 @@ class executionDigest extends ExecutionTestSupportForGmos {
                     }
                   ],
                   "atomCount": 4
+                },
+                "fullTimeEstimate" : {
+                  "program" : {
+                    "seconds" : ${(ProgramTime + 1920).asJson}
+                  },
+                  "nonCharged" : {
+                    "seconds" : 0.000000
+                  },
+                  "total" : {
+                    "seconds" : ${(ProgramTime + 1920).asJson}
+                  }
                 }
               }
             }
@@ -768,6 +784,17 @@ class executionDigest extends ExecutionTestSupportForGmos {
                         },
                         "telescopeConfigs" : [],
                         "atomCount": 0
+                      },
+                      "fullTimeEstimate" : {
+                        "program" : {
+                          "seconds" : 0.000000
+                        },
+                        "nonCharged" : {
+                          "seconds" : 0.000000
+                        },
+                        "total" : {
+                          "seconds" : 0.000000
+                        }
                       }
                     }
                   }

@@ -128,10 +128,11 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
-        "setup"       -> a.setup.asJson,
-        "setupCount"  -> a.setupCount.asJson,
-        "acquisition" -> a.acquisition.asJson,
-        "science"     -> a.science.asJson
+        "setup"            -> a.setup.asJson,
+        "setupCount"       -> a.setupCount.asJson,
+        "acquisition"      -> a.acquisition.asJson,
+        "science"          -> a.science.asJson,
+        "fullTimeEstimate" -> a.fullTimeEstimate.asJson
       )
     }
 
