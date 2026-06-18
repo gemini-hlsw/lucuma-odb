@@ -8,6 +8,7 @@ import cats.data.NonEmptySet
 import cats.parse.Parser
 import cats.parse.Rfc5234.digit
 import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPixelScale
@@ -58,11 +59,12 @@ trait GnirsParsers:
       "LXD" -> GnirsPrism.Lxd
     ).withContext("GNIRS cross dispersion")
 
-  // Long slit calibrations only use slit FPUs.  Spectroscopy rows for non-slit
-  // FPUs (e.g. pinholes) are skipped, marking the whole row obsolete.
-  val fpu: Parser[Availability[NonEmptyList[GnirsFpu]]] =
-    manyOfObsoletable(
-      Set("pinhole 0.1", "pinhole 0.3"),
+  // Both long-slit and pinhole FPUs produce calibrations.  The pinhole rows are
+  // the daytime pinhole flats used to trace cross-dispersed spectral orders.
+  val fpu: Parser[NonEmptyList[GnirsFpu]] =
+    manyOf(
+      "pinhole 0.1"  -> GnirsFpu.Other(GnirsFpuOther.Pinhole1),
+      "pinhole 0.3"  -> GnirsFpu.Other(GnirsFpuOther.Pinhole3),
       "0.10 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_10),
       "0.15 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_15),
       "0.20 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_20),
@@ -119,9 +121,8 @@ trait GnirsParsers:
     }
 
   // The search-key columns, in the file's physical order, paired with whether
-  // the row is a spectroscopy row.  Non-slit (obsolete) FPUs make the whole row
-  // obsolete.
-  private val fileKey: Parser[Availability[(Boolean, FileKey)]] =
+  // the row is a spectroscopy row. Imaging rows make the whole row obsolete.
+  private val fileKey: Parser[(Boolean, FileKey)] =
     (
       (mode            <* columnSep) ~
       (pixelScale      <* columnSep) ~
@@ -130,15 +131,13 @@ trait GnirsParsers:
       (wavelengthRange <* columnSep) ~
       (fpu             <* columnSep) ~
       wellDepth
-    ).map { case ((((((spec, ps), disp), xd), wr), usAvail), wd) =>
-      usAvail.map(us => (spec, FileKey(ps, disp, xd, wr, us, wd)))
+    ).map { case ((((((spec, ps), disp), xd), wr), us), wd) =>
+      (spec, FileKey(ps, disp, xd, wr, us, wd))
     }
 
   val fileEntry: Parser[Availability[FileEntry]] =
-    ((fileKey <* columnSep) ~ legacyValue).map { case (keyAvail, value) =>
-      keyAvail.flatMap { case (spec, key) =>
-        if spec then Availability.Current(FileEntry(key, value)) else Availability.Obsolete
-      }
+    ((fileKey <* columnSep) ~ legacyValue).map { case ((spec, key), value) =>
+      if spec then Availability.Current(FileEntry(key, value)) else Availability.Obsolete
     }
 
 object gnirs extends GnirsParsers
