@@ -228,17 +228,24 @@ object GeneratorParamsService {
           )
 
       private def observingMode(
-        params: NonEmptyList[TargetParams],
-        config: Option[ObservingMode]
+        params:          NonEmptyList[TargetParams],
+        config:          Option[ObservingMode],
+        calibrationRole: Option[CalibrationRole]
       ): Either[Error, ObservingMode] =
+        // A daytime pinhole flat is an internal GCAL calibration with no target.
+        // It needs no asterism (and no ITC), so skip the target requirement; its
+        // sequence is a single smart day flat that ignores target information.
         val targetCheck =
-          params
-            .traverse: p =>
-              for
-                t <- p.targetId.toRightNel(MissingParam.forObservation("target"))
-                _ <- p.sourceProfile.toRightNel(MissingParam.forTarget(t, "source profile"))
-              yield ()
-            .void
+          if calibrationRole.contains(CalibrationRole.DaytimePinhole) then
+            ().asRight[NonEmptyList[MissingParam]]
+          else
+            params
+              .traverse: p =>
+                for
+                  t <- p.targetId.toRightNel(MissingParam.forObservation("target"))
+                  _ <- p.sourceProfile.toRightNel(MissingParam.forTarget(t, "source profile"))
+                yield ()
+              .void
 
         val configCheck =
           for
@@ -280,7 +287,7 @@ object GeneratorParamsService {
 
           GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
 
-        observingMode(obsParams.targets, config).flatMap:
+        observingMode(obsParams.targets, config, obsParams.calibrationRole).flatMap:
 
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (

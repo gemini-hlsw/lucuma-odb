@@ -18,6 +18,7 @@ import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPixelScale
@@ -2177,9 +2178,13 @@ class perScienceObservationCalibrations
       GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
+    // The daytime pinhole flat looks up the same config but with the pinhole
+    // FPU (Pinhole3 for the 0.15"/pix short camera).
+    val pinholeKey = key.copy(fpu = GnirsFpu.Other(GnirsFpuOther.Pinhole3))
     val rows = List(
       Gnirs.TableRow(PosLong.unsafeFrom(1), key, gnirsSmartFlat),
-      Gnirs.TableRow(PosLong.unsafeFrom(1), key, gnirsSmartArc)
+      Gnirs.TableRow(PosLong.unsafeFrom(1), key, gnirsSmartArc),
+      Gnirs.TableRow(PosLong.unsafeFrom(1), pinholeKey, gnirsSmartFlat)
     )
     // The test DB is shared across the suite, so seed only once (multiple XD
     // tests call this; the gcal ids would otherwise collide).
@@ -2259,6 +2264,53 @@ class perScienceObservationCalibrations
                              g.calibrationRoles.contains(CalibrationRole.DaytimePinhole)))
       assertEquals(pinObs.flatMap(_.groupId), sciObs.groupId)
     }
+
+  test("daytime pinhole flat generates a sequence without a target or ITC"):
+    // The pinhole calibration has no asterism; generation must not require a
+    // target or call the ITC.  Its sequence is a single smart day flat.
+    val atomShapeQuery: String =
+      """
+        description
+        observeClass
+        steps {
+          stepConfig { stepType }
+          observeClass
+        }
+      """
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      _      <- expect(
+                  user     = pi,
+                  query    = executionConfigQuery(pinOid, "gnirs", "science", atomShapeQuery, None),
+                  expected =
+                    Json.obj(
+                      "executionConfig" -> Json.obj(
+                        "gnirs" -> Json.obj(
+                          "science" -> Json.obj(
+                            "nextAtom" -> Json.obj(
+                              "description"  -> "Daytime Pinhole".asJson,
+                              "observeClass" -> "DAY_CAL".asJson,
+                              "steps"        -> Json.arr(
+                                Json.obj(
+                                  "stepConfig"   -> Json.obj("stepType" -> "GCAL".asJson),
+                                  "observeClass" -> "DAY_CAL".asJson
+                                )
+                              )
+                            ),
+                            "possibleFuture" -> Json.arr(),
+                            "hasMore"        -> false.asJson
+                          )
+                        )
+                      )
+                    ).asRight
+                )
+    } yield ()
 
   test("non-cross-dispersed gnirs observation gets no daytime pinhole flat"):
     for {
