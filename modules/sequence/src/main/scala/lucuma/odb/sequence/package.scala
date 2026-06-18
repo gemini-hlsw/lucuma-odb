@@ -11,6 +11,7 @@ extension(role: Option[CalibrationRole])
   def sciClass: ObserveClass =
     role match
       case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
       case Some(CalibrationRole.Telluric)            => ObserveClass.NightCal
       case Some(CalibrationRole.SpectroPhotometric)  => ObserveClass.NightCal
       case _                                         => ObserveClass.Science
@@ -19,4 +20,5 @@ extension(role: Option[CalibrationRole])
   def gcalClass: ObserveClass =
     role match
       case Some(CalibrationRole.Twilight)            => ObserveClass.DayCal
+      case Some(CalibrationRole.DaytimePinhole)      => ObserveClass.DayCal
       case _                                         => ObserveClass.NightCal
