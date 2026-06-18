@@ -22,7 +22,9 @@ import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.ghost.GhostIfuMapping
+import lucuma.core.model.sequence.ghost.GhostIfuMappingSyntax.*
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
+import lucuma.core.model.sequence.ghost.IfuMappingContext
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.ExposureTimeModeId
@@ -31,8 +33,6 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.GhostIfuInput
 import lucuma.odb.sequence.ghost.DetectorConfig
 import lucuma.odb.sequence.ghost.ifu.Config
-import lucuma.core.model.sequence.ghost.GhostIfuMappingSyntax.*
-import lucuma.core.model.sequence.ghost.IfuMappingContext
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.*
