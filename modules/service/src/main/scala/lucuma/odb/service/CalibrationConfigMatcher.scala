@@ -65,7 +65,7 @@ object CalibrationConfigMatcher:
       case _: GmosSConfigs             => GmosSouthLongSlit
       case _: GmosNImagingConfigs      => GmosNorthImaging
       case _: GmosSImagingConfigs      => GmosSouthImaging
-      case GnirsLongSlitConfigs        => GnirsLongSlit
+      case _: GnirsLongSlitConfigs     => GnirsLongSlit
       case _: Flamingos2Configs        => Flamingos2LongSlit
       case _: Flamingos2ImagingConfigs => Flamingos2Imaging
       case Igrins2Configs              => Igrins2LongSlit

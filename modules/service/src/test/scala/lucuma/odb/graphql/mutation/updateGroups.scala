@@ -775,19 +775,19 @@ class updateGroups extends OdbSuite {
       _   <- updateSameNight(pi, gid, "minimumRequired: 1", None)
     } yield ()
 
-  test("can move telluric system group"):
+  test("can move per-observation calibration system group"):
     for {
       pid <- createProgramAs(pi)
       g1  <- createGroupAs(pi, pid)
       g2  <- createGroupAs(pi, pid)
       _   <- updateGroupSystem(g2, true)
       _   <- setGroupCalibrationRoles(g2, List(CalibrationRole.Telluric))
-      // Move the telluric group into another group
+      // Move the per-observation calibration group into another group
       _   <- moveGroupsAs(pi, List(g2), Some(g1), None)
       es  <- groupElementsAs(pi, pid, Some(g1))
     } yield assertEquals(es, List(Left(g2)))
 
-  test("cannot move non-telluric system group"):
+  test("cannot move non-calibration system group"):
     for {
       pid <- createProgramAs(pi)
       g1  <- createGroupAs(pi, pid)

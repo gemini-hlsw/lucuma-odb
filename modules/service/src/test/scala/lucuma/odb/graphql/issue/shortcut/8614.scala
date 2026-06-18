@@ -12,12 +12,12 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
-// sc-8614: When a science observation within a telluric group becomes Ongoing
+// sc-8614: When a science observation within a obs calibration group becomes Ongoing
 // during execution (typically because observe started executing it), the
 // resulting events trigger a calibration recalculation.
 //
 // The science obs fails the filtering as the state is not yet marked as ongoing
-// and the cleanup branch deleted the telluric group.
+// and the cleanup branch deleted the obs calibration group.
 //
 // This test verifies that the case has been fixed.
 class ShortCut_8614

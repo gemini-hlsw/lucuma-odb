@@ -216,10 +216,10 @@ object GroupService {
             session.prepareR(af.fragment.query(group_id *: void)).use(pq => pq.stream(af.argument, 512).map(_._1).compile.toList)
 
       def updateGroups(SET: GroupPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F]): F[Result[List[Group.Id]]] =
-        // Only telluric system groups can move
+        // Only per-observation calibration system groups can move
         val movePredicate = user.role.access match
           case Access.Service => AppliedFragment.empty
-          case _              => sql" AND (c_system = FALSE OR $calibration_role = ANY(c_calibration_roles))"(CalibrationRole.Telluric)
+          case _              => sql" AND (c_system = FALSE OR c_calibration_roles && $_calibration_role)"(ObsExtract.PerObservationCalibrationRoles)
         val accessPredicate = user.role.access match
           case Access.Service => void""
           case _              => void" AND c_system = FALSE"

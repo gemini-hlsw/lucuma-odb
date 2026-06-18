@@ -7,6 +7,7 @@ package feature
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -17,9 +18,16 @@ import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GnirsFpuSlit
+import lucuma.core.enums.GnirsGrating
+import lucuma.core.enums.GnirsPixelScale
+import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.BoundedInterval
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessValue
@@ -38,6 +46,8 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.model.User
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.igrins2.NodAlongSlitDefaultOffsets
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -54,7 +64,9 @@ import lucuma.odb.json.offset.decoder.given
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
+import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
+import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.refined.*
 
 import java.time.LocalDateTime
@@ -805,7 +817,7 @@ class perScienceObservationCalibrations
       assert(!groupExists)
     }
 
-  test("telluric group has immediate execution properties"):
+  test("obs calibration group has immediate execution properties"):
     for {
       pid       <- createProgramAs(pi)
       tid       <- createTargetWithProfileAs(pi, pid)
@@ -914,7 +926,7 @@ class perScienceObservationCalibrations
       assertEquals(obs.groupId, None)
     }
 
-  test("Observation takes telluric group's position when group is deleted"):
+  test("Observation takes obs calibration group's position when group is deleted"):
     for {
       pid  <- createProgramAs(pi)
       tid  <- createTargetWithProfileAs(pi, pid)
@@ -922,18 +934,18 @@ class perScienceObservationCalibrations
       _    <- runObscalcUpdate(pid, oid)
       _    <- recalculateCalibrations(pid, when, oid)
       obs  <- queryObservation(oid)
-      telluricGroupId = obs.groupId.get
-      telluricGroup <- queryGroup(telluricGroupId)
+      obsCalibrationGroupId = obs.groupId.get
+      obsCalibrationGroup <- queryGroup(obsCalibrationGroupId)
       // Change to GMOS
       _    <- updateObservationMode(oid, "gmosNorthLongSlit")
       _    <- recalculateCalibrations(pid, when, oid)
       obsAfter <- queryObservation(oid)
     } yield {
-      assertEquals(obsAfter.groupId, telluricGroup.parentId)
-      assertEquals(obsAfter.groupIndex, Some(telluricGroup.parentIndex))
+      assertEquals(obsAfter.groupId, obsCalibrationGroup.parentId)
+      assertEquals(obsAfter.groupIndex, Some(obsCalibrationGroup.parentIndex))
     }
 
-  test("Observation preserves parent group position when nested telluric group is deleted"):
+  test("Observation preserves parent group position when nested obs calibration group is deleted"):
     for {
       pid              <- createProgramAs(pi)
       parentGroupId    <- createGroupAs(pi, pid, name = "parent".some)
@@ -944,23 +956,23 @@ class perScienceObservationCalibrations
       _                <- runObscalcUpdate(pid, oid)
       _                <- recalculateCalibrations(pid, when, oid)
       obs              <- queryObservation(oid)
-      telluricGroupId  =  obs.groupId.get
-      telluricGroup    <- queryGroup(telluricGroupId)
+      obsCalibrationGroupId  =  obs.groupId.get
+      obsCalibrationGroup    <- queryGroup(obsCalibrationGroupId)
       _                <- updateObservationMode(oid, "gmosNorthLongSlit")
       _                <- recalculateCalibrations(pid, when, oid)
       obsAfter         <- queryObservation(oid)
-      groupAfter       <- queryGroupExists(telluricGroupId)
+      groupAfter       <- queryGroupExists(obsCalibrationGroupId)
     } yield {
-      assertEquals(telluricGroup.parentId, Some(parentGroupId))
-      assert(telluricGroup.system)
-      assert(telluricGroup.calibrationRoles.contains(CalibrationRole.Telluric))
-      // Verify observation moved back to parent group at telluric group's position
+      assertEquals(obsCalibrationGroup.parentId, Some(parentGroupId))
+      assert(obsCalibrationGroup.system)
+      assert(obsCalibrationGroup.calibrationRoles.contains(CalibrationRole.Telluric))
+      // Verify observation moved back to parent group at obs calibration group's position
       assertEquals(obsAfter.groupId, Some(parentGroupId))
-      assertEquals(obsAfter.groupIndex, Some(telluricGroup.parentIndex))
+      assertEquals(obsAfter.groupIndex, Some(obsCalibrationGroup.parentIndex))
       assert(!groupAfter)
     }
 
-  test("Telluric group uses obs position in the group"):
+  test("Obs calibration group uses obs position in the group"):
     for {
       pid              <- createProgramAs(pi)
       parentGroupId    <- createGroupAs(pi, pid, name = "parent".some)
@@ -981,15 +993,15 @@ class perScienceObservationCalibrations
       _                <- recalculateCalibrations(pid, when, f2Oid)
       f2After          <- queryObservation(f2Oid)
       gmosAfter        <- queryObservation(gmosOid)
-      telluricGroupId  =  f2After.groupId.get
-      telluricGroup    <- queryGroup(telluricGroupId)
+      obsCalibrationGroupId  =  f2After.groupId.get
+      obsCalibrationGroup    <- queryGroup(obsCalibrationGroupId)
     } yield {
       // F2 was originally at index 0, GMOS at index 1
       assertEquals(f2Before.groupIndex, 0.some)
       assertEquals(gmosBefore.groupIndex, 1.some)
-      // Verify telluric group took the F2 observation's original position
-      assertEquals(telluricGroup.parentId, originalGroupId)
-      assertEquals(telluricGroup.parentIndex.some, originalIndex)
+      // Verify obs calibration group took the F2 observation's original position
+      assertEquals(obsCalibrationGroup.parentId, originalGroupId)
+      assertEquals(obsCalibrationGroup.parentIndex.some, originalIndex)
       // GMOS observation stays at index 1
       assertEquals(gmosAfter.groupId, parentGroupId.some)
       assertEquals(gmosAfter.groupIndex, 1.some)
@@ -1238,7 +1250,7 @@ class perScienceObservationCalibrations
       obs1 <- queryObservation(oid1)
       obs2 <- queryObservation(oid2)
     } yield {
-      // No telluric groups created
+      // No obs calibration groups created
       assertEquals(obs1.groupId, None)
       assertEquals(obs2.groupId, None)
     }
@@ -1258,10 +1270,10 @@ class perScienceObservationCalibrations
       obs2        <- queryObservation(oid2)
       obsInGroup1 <- obs1.groupId.traverse(queryObservationsInGroup)
     } yield {
-      // oid1 should have telluric group
+      // oid1 should have obs calibration group
       assert(obs1.groupId.isDefined)
       assertEquals(obsInGroup1.map(_.size), Some(2))
-      // oid2 should not have telluric group
+      // oid2 should not have obs calibration group
       assertEquals(obs2.groupId, None)
     }
 
@@ -1374,7 +1386,7 @@ class perScienceObservationCalibrations
         assertEquals(removed2.size, 0)
       }
 
-  test("telluric group rejects second science observation"):
+  test("obs calibration group rejects second science observation"):
     for {
       pid   <- createProgramAs(pi)
       tid   <- createTargetWithProfileAs(pi, pid)
@@ -1389,7 +1401,7 @@ class perScienceObservationCalibrations
                    assert(msg.contains("at most one science observation"))
     } yield ()
 
-  test("telluric group rejects creating child groups"):
+  test("obs calibration group rejects creating child groups"):
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetWithProfileAs(pi, pid)
@@ -1400,7 +1412,7 @@ class perScienceObservationCalibrations
       gid  =  obs.groupId.get
       _    <- interceptOdbError(createGroupAs(pi, pid, parentGroupId = Some(gid))):
                 case OdbError.InconsistentGroupError(Some(msg)) =>
-                  assert(msg.contains("Cannot create group inside telluric group"))
+                  assert(msg.contains("Cannot create group inside per-observation calibration group"))
     yield ()
 
   test("telluric target gets SED from telluric type when not set"):
@@ -1570,7 +1582,7 @@ class perScienceObservationCalibrations
       assertEquals(removed2.size, 2)
     }
 
-  test("Telluric group and obs preserved when science becomes ongoing"):
+  test("Obs calibration group and obs preserved when science becomes ongoing"):
     for {
       pid                <- createProgramAs(pi)
       tid                <- createTargetWithProfileAs(pi, pid)
@@ -1600,7 +1612,7 @@ class perScienceObservationCalibrations
       assertEquals(obsInGroup2.size, 2)
     }
 
-  test("Telluric group and obs preserved when science becomes observed"):
+  test("Obs calibration group and obs preserved when science becomes observed"):
     for {
       pid                <- createProgramAs(pi)
       tid                <- createTargetWithProfileAs(pi, pid)
@@ -1879,7 +1891,7 @@ class perScienceObservationCalibrations
       assertEquals(telluricEtms.acquisition.snWAt, Wavelength.fromIntNanometers(500))
     }
 
-  test("igrins2 observation is placed in a telluric system group"):
+  test("igrins2 observation is placed in a obs calibration system group"):
     for {
       pid  <- createProgramAs(pi)
       tid  <- createTargetWithProfileAs(pi, pid)
@@ -2100,7 +2112,7 @@ class perScienceObservationCalibrations
         .downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.orEmpty
         .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
 
-  test("gnirs observation is placed in a telluric system group"):
+  test("gnirs observation is placed in a obs calibration system group"):
     for {
       pid  <- createProgramAs(pi)
       tid  <- createTargetWithProfileAs(pi, pid)
@@ -2149,4 +2161,135 @@ class perScienceObservationCalibrations
       assertEquals(sciOffs, List[BigDecimal](2, -4, -4, 2))
       // ...and the telluric uses the corresponding telluric offsets.
       assertEquals(telOffs, List[BigDecimal](-2, 4, 4, -2))
+    }
+
+  // Seed the SmartGcal flat & arc for the SXD science config used by the
+  // cross-dispersed test (the shared support only seeds the D111/Mirror key).
+  private def seedGnirsXdSmartGcal: IO[Unit] =
+    val key = Gnirs.TableKey(
+      GnirsPixelScale.PixelScale_0_15,
+      GnirsGrating.D32,
+      GnirsPrism.Sxd,
+      BoundedInterval.unsafeOpenUpper(
+        Wavelength.fromIntNanometers(900).get,
+        Wavelength.fromIntNanometers(2560).get
+      ),
+      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
+      GnirsWellDepth.Shallow
+    )
+    val rows = List(
+      Gnirs.TableRow(PosLong.unsafeFrom(1), key, gnirsSmartFlat),
+      Gnirs.TableRow(PosLong.unsafeFrom(1), key, gnirsSmartArc)
+    )
+    // The test DB is shared across the suite, so seed only once (multiple XD
+    // tests call this; the gcal ids would otherwise collide).
+    val alreadySeeded: IO[Boolean] =
+      import skunk.syntax.all.*
+      import skunk.codec.boolean.bool
+      withSession: s =>
+        s.unique(
+          sql"SELECT count(*) > 0 FROM t_smart_gnirs WHERE c_cross_dispersed = 'Sxd' AND c_disperser = 'D32' AND c_fpu_slit = 'LongSlit_0_30'".query(bool)
+        )
+    alreadySeeded.flatMap: seeded =>
+      if seeded then IO.unit
+      else
+        withServices(pi): services =>
+          services.transactionally:
+            rows.zipWithIndex.traverse_ : (r, i) =>
+              Services.asSuperUser:
+                services.smartGcalService.insertGnirs(100 + i, r)
+
+  // A cross-dispersed GNIRS observation (SXD prism).
+  private def createGnirsXdObservationAs(user: User, pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson},
+            SET: {
+              targetEnvironment: { asterism: ${List(tid).asJson} }
+              scienceRequirements: ${scienceRequirementsObject(ObservingModeType.GnirsLongSlit)}
+              observingMode: {
+                gnirsLongSlit: {
+                  grating: D32
+                  prism: SXD
+                  camera: SHORT_BLUE
+                  fpu: LONG_SLIT_0_30
+                  filter: ORDER3
+                  centralWavelength: { nanometers: 1650 }
+                  exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
+                }
+              }
+              constraintSet: { imageQuality: POINT_EIGHT }
+            }
+          }) { observation { id } }
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  private def selectDaytimePinholeObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
+    queryObservation(oid).flatMap: obs =>
+      obs.groupId.flatTraverse: gid =>
+        queryObservationsInGroup(gid).map: infos =>
+          infos
+            .find(_.calibrationRole.exists(_ === CalibrationRole.DaytimePinhole))
+            .map(_.id)
+
+  test("gnirs cross-dispersed observation gets a daytime pinhole flat in the obs calibration group"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      pinOpt <- selectDaytimePinholeObservationFor(oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      sciObs <- queryObservation(oid)
+      pinObs <- pinOpt.traverse(queryObservation)
+      grp    <- sciObs.groupId.traverse(queryGroup)
+    } yield {
+      assert(telOpt.isDefined, "expected a telluric calibration")
+      assert(pinOpt.isDefined, "expected a daytime pinhole calibration")
+      // Both calibrations live in the science observation's per-observation
+      // calibration system group, whose roles reflect what it holds.
+      assert(grp.exists(_.system))
+      assert(grp.exists(g => g.calibrationRoles.contains(CalibrationRole.Telluric) &&
+                             g.calibrationRoles.contains(CalibrationRole.DaytimePinhole)))
+      assertEquals(pinObs.flatMap(_.groupId), sciObs.groupId)
+    }
+
+  test("non-cross-dispersed gnirs observation gets no daytime pinhole flat"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createGnirsLongSlitObservationAs(pi, pid, tid) // MIRROR prism
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      pinOpt <- selectDaytimePinholeObservationFor(oid)
+    } yield assert(pinOpt.isEmpty, "expected no daytime pinhole for a non-cross-dispersed config")
+
+  // The daytime pinhole flat reacts like the telluric: when the science obs is
+  // deleted, the pinhole (and the calibration group) are removed too.
+  test("gnirs cross-dispersed calibrations and group are removed when the science observation is deleted"):
+    for {
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      _           <- seedGnirsXdSmartGcal
+      oid         <- createGnirsXdObservationAs(pi, pid, tid)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      pinOid      <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      telOid      <- selectTelluricObservationFor(oid).map(_.get)
+      groupId     <- queryObservation(oid).map(_.groupId.get)
+      _           <- setObservationInactive(oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      groupExists <- queryGroupExists(groupId)
+      pinExists   <- queryObservationExists(pinOid)
+      telExists   <- queryObservationExists(telOid)
+    } yield {
+      assert(!groupExists, "obs calibration group should be deleted")
+      assert(!pinExists,   "daytime pinhole should be deleted")
+      assert(!telExists,   "telluric should be deleted")
     }
