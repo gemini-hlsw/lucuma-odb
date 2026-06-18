@@ -22,6 +22,7 @@ trait ProposalView[F[_]] extends BaseMapping[F] {
 
     val TooActivation   = col("c_too_activation", too_activation)
     val MinPercent      = col("c_min_percent",    int_percent)
+    val ExchangePartner = col("c_exchange_partner", exchange_partner.opt)
 
     val CallId          = col("c_cfp_id", cfp_id.opt)
 

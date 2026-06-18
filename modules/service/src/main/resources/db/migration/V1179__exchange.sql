@@ -152,11 +152,11 @@ BEGIN
   END IF;
 
   IF (observatory = 'keck') THEN
-    RETURN 'Keck Exchange';
+    RETURN concat(semester, ' Keck Exchange');
   ELSIF (observatory = 'subaru') THEN
     RETURN CASE
-      WHEN subaruType = 'intensive' THEN 'Subaru Exchange (Intensive)'
-      ELSE 'Subaru Exchange'
+      WHEN subaruType = 'intensive' THEN concat(semester, ' Subaru Exchange (Intensive)')
+      ELSE concat(semester, ' Subaru Exchange')
     END;
   END IF;
 

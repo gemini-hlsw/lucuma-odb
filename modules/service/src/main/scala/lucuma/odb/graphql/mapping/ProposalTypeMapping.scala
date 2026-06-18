@@ -79,6 +79,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("aeonMultiFacility",  ProposalView.Classical.AeonMultiFacility),
       SqlField("jwstSynergy",        ProposalView.Classical.JwstSynergy),
       SqlField("usLongTerm",         ProposalView.Classical.UsLongTerm),
+      SqlField("exchangePartner",    ProposalView.ExchangePartner),
       SqlObject("partnerSplits",     Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
 
@@ -130,6 +131,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("jwstSynergy",        ProposalView.Queue.JwstSynergy),
       SqlField("usLongTerm",         ProposalView.Queue.UsLongTerm),
       SqlField("considerForBand3",   ProposalView.Queue.ConsiderForBand3),
+      SqlField("exchangePartner",    ProposalView.ExchangePartner),
       SqlObject("partnerSplits",     Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
     )
 

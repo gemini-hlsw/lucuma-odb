@@ -129,6 +129,38 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("⨯ cannot have both partner splits and an exchange partner") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      // First give it partner splits...
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: { type: { queue: { partnerSplits: [ { partner: US, percent: 100 } ] } } }
+            }) { proposal { type { scienceSubtype } } }
+          }
+        """
+      ) *>
+      // ...then setting an exchange partner (leaving the splits) violates the
+      // deferred constraint trigger at commit.
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: { type: { queue: { exchangePartner: KECK } } }
+            }) { proposal { type { scienceSubtype } } }
+          }
+        """,
+        expected = List("A proposal may not have both an exchange partner and partner splits.").asLeft
+      )
+    }
+  }
+
   test("✓ change type") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>

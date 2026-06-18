@@ -357,6 +357,86 @@ class createProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("✓ classical with exchange partner") {
+    createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  type: {
+                    classical: {
+                      minPercentTime: 50
+                      exchangePartner: KECK
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                type {
+                  scienceSubtype
+                  ... on Classical {
+                    exchangePartner
+                    partnerSplits {
+                      partner
+                      percent
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal" : {
+              "proposal" : {
+                "type": {
+                  "scienceSubtype": "CLASSICAL",
+                  "exchangePartner": "KECK",
+                  "partnerSplits": []
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("⨯ classical with both partner splits and exchange partner") {
+    createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  type: {
+                    classical: {
+                      partnerSplits: [ { partner: US, percent: 100 } ]
+                      exchangePartner: KECK
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { type { scienceSubtype } }
+            }
+          }
+        """,
+        expected = List("Argument 'input.SET.type.classical' is invalid: Specify either 'partnerSplits' or 'exchangePartner', not both.").asLeft
+      )
+    }
+  }
+
   test("✓ classical defaults") {
     createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
       expect(

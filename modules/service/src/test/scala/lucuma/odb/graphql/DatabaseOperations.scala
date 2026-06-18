@@ -31,6 +31,8 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
+import lucuma.core.enums.SubaruInstrument
+import lucuma.core.enums.SubaruProposalType
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
@@ -126,6 +128,22 @@ trait DatabaseOperations { this: OdbSuite =>
 
       session.execute(states).map(_.toMap)
 
+  private def deadlineString(deadline: Option[Timestamp]): String =
+    deadline
+      .foldMap(ts => s"submissionDeadlineDefault: \"${ts.isoFormat}\"")
+
+  private def geminiPartnerListInput(
+    partners: List[(Partner, Option[Timestamp])]
+  ): String =
+    partners.map((p, d) =>
+      s"""
+        {
+          geminiPartner: ${p.tag.toScreamingSnakeCase}
+          ${d.foldMap(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
+        }
+      """
+    ).mkString("[", ", ", "]")
+
   def createGeminiCallForProposalsAs(
      user:        User,
      callType:    CallForProposalsType = CallForProposalsType.RegularSemester,
@@ -136,16 +154,6 @@ trait DatabaseOperations { this: OdbSuite =>
      partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
      otherGemini: Option[String]       = None
   ): IO[CallForProposals.Id] =
-    val deadlineStr = deadline.foldMap(ts => s"submissionDeadlineDefault: \"${ts.isoFormat}\"")
-    val partnerList =
-      partners.map((p, d) =>
-        s"""
-          {
-            geminiPartner: ${p.tag.toScreamingSnakeCase}
-            ${d.foldMap(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
-          }
-        """
-      ).mkString("[", ", ", "]")
     query(user, s"""
       mutation {
         createCallForProposals(
@@ -154,8 +162,8 @@ trait DatabaseOperations { this: OdbSuite =>
               semester:    "${semester.format}"
               activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
               activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
-              $deadlineStr
-              partners: $partnerList
+              ${deadlineString(deadline)}
+              partners: ${geminiPartnerListInput(partners)}
               gemini: {
                 type: ${callType.tag.toScreamingSnakeCase}
                 ${otherGemini.getOrElse("")}
@@ -176,6 +184,45 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def createSubaruCallForProposalsAs(
+     user:        User,
+     semester:    Semester               = Semester.unsafeFromString("2025A"),
+     activeStart: LocalDate              = LocalDate.parse("2025-02-01"),
+     activeEnd:   LocalDate              = LocalDate.parse("2025-07-31"),
+     deadline:    Option[Timestamp]      = Timestamp.Max.some,
+     partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
+     subaruType:  SubaruProposalType     = SubaruProposalType.Normal,
+     instruments: List[SubaruInstrument] = Nil,
+     otherGemini: Option[String]         = None
+  ): IO[CallForProposals.Id] =
+    query(user, s"""
+      mutation {
+        createCallForProposals(
+          input: {
+            SET: {
+              semester:    "${semester.format}"
+              activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
+              activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
+              ${deadlineString(deadline)}
+              partners: ${geminiPartnerListInput(partners)}
+              subaru: {
+                type: ${subaruType.tag.toScreamingSnakeCase}
+                ${if instruments.isEmpty then "" else instruments.map(_.tag.toScreamingSnakeCase).mkString("instruments: [ ", ", ", "]")}
+              }
+            }
+          }
+        ) {
+          callForProposals {
+            id
+          }
+        }
+      }
+    """
+    ).map:
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "id")
+       .require[CallForProposals.Id]
 
   def updateCallForProposalsAs(
     user: User,

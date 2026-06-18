@@ -15,6 +15,7 @@ import cats.syntax.parallel.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ConsiderForBand3
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
@@ -65,6 +66,16 @@ object ProposalTypeInput {
 
     }
 
+  // The time request is either an exchange-partner assignment or a set of
+  // Gemini partner splits, never both.
+  private def exchangeXorSplits(
+    exchangePartner: Option[ExchangePartner],
+    partnerSplits:   Option[Map[Partner, IntPercent]]
+  ): Result[Unit] =
+    Matcher
+      .validationFailure("Specify either 'partnerSplits' or 'exchangePartner', not both.")
+      .whenA(exchangePartner.isDefined && partnerSplits.exists(_.nonEmpty))
+
   case class Create(
     scienceSubtype:     ScienceSubtype,
     tooActivation:      ToOActivation            = ToOActivation.None,
@@ -72,6 +83,7 @@ object ProposalTypeInput {
     minPercentTotal:    Option[IntPercent]       = none,
     totalTime:          Option[TimeSpan]         = none,
     partnerSplits:      Map[Partner, IntPercent] = Map.empty,
+    exchangePartner:    Option[ExchangePartner]  = none,
     reviewerId:         Option[ProgramUser.Id]   = none,
     mentorId:           Option[ProgramUser.Id]   = none,
     aeonMultiFacility:  Boolean                  = false,
@@ -88,6 +100,7 @@ object ProposalTypeInput {
         Nullable.orNull(minPercentTotal),
         Nullable.orNull(totalTime),
         Nullable.NonNull(partnerSplits),
+        Nullable.orNull(exchangePartner),
         Nullable.orNull(reviewerId),
         Nullable.orNull(mentorId),
         aeonMultiFacility.some,
@@ -119,6 +132,7 @@ object ProposalTypeInput {
     val minPercentTotal: Lens[Create, Option[IntPercent]]     = Focus[Create](_.minPercentTotal)
     val totalTime: Lens[Create, Option[TimeSpan]]             = Focus[Create](_.totalTime)
     val partnerSplits: Lens[Create, Map[Partner, IntPercent]] = Focus[Create](_.partnerSplits)
+    val exchangePartner: Lens[Create, Option[ExchangePartner]] = Focus[Create](_.exchangePartner)
     val reviewerId: Lens[Create, Option[ProgramUser.Id]]      = Focus[Create](_.reviewerId)
     val mentorId: Lens[Create, Option[ProgramUser.Id]]        = Focus[Create](_.mentorId)
     val aeonMultiFacility: Lens[Create, Boolean]              = Focus[Create](_.aeonMultiFacility)
@@ -146,18 +160,22 @@ object ProposalTypeInput {
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Option("partnerSplits", rSplits),
+          ExchangePartnerBinding.Option("exchangePartner", rExchange),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
-          Create(ScienceSubtype.Classical).update(
-            for {
-              _ <- minPercentTime     := min
-              _ <- partnerSplits      := splits
-              _ <- aeonMultiFacility  := aeon
-              _ <- jwstSynergy        := jwst
-              _ <- usLongTerm         := usLong
-            } yield ()
+        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange, splits).as(
+            Create(ScienceSubtype.Classical).update(
+              for {
+                _ <- minPercentTime     := min
+                _ <- partnerSplits      := splits
+                _ <- exchangePartner    := exchange
+                _ <- aeonMultiFacility  := aeon
+                _ <- jwstSynergy        := jwst
+                _ <- usLongTerm         := usLong
+              } yield ()
+            )
           )
         }
       }
@@ -223,21 +241,25 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Option("partnerSplits", rSplits),
+          ExchangePartnerBinding.Option("exchangePartner", rExchange),
           ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rToo, rMin, rSplits, rBand3, rAeon, rJwst, rUsLong).parMapN { (too, min, splits, band3, aeon, jwst, usLong) =>
-          Create(ScienceSubtype.Queue).update(
-            for {
-              _ <- tooActivation     := too
-              _ <- minPercentTime    := min
-              _ <- partnerSplits     := splits
-              _ <- considerForBand3  := band3
-              _ <- aeonMultiFacility := aeon
-              _ <- jwstSynergy       := jwst
-              _ <- usLongTerm        := usLong
-            } yield ()
+        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap { case (too, min, splits, exchange, band3, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange, splits).as(
+            Create(ScienceSubtype.Queue).update(
+              for {
+                _ <- tooActivation     := too
+                _ <- minPercentTime    := min
+                _ <- partnerSplits     := splits
+                _ <- exchangePartner   := exchange
+                _ <- considerForBand3  := band3
+                _ <- aeonMultiFacility := aeon
+                _ <- jwstSynergy       := jwst
+                _ <- usLongTerm        := usLong
+              } yield ()
+            )
           )
         }
       }
@@ -265,6 +287,7 @@ object ProposalTypeInput {
     minPercentTotal:    Nullable[IntPercent]               = Nullable.Null,
     totalTime:          Nullable[TimeSpan]                 = Nullable.Null,
     partnerSplits:      Nullable[Map[Partner, IntPercent]] = Nullable.Null,
+    exchangePartner:    Nullable[ExchangePartner]          = Nullable.Null,
     reviewerId:         Nullable[ProgramUser.Id]           = Nullable.Null,
     mentorId:           Nullable[ProgramUser.Id]           = Nullable.Null,
     aeonMultiFacility:  Option[Boolean]                    = None,
@@ -280,6 +303,7 @@ object ProposalTypeInput {
           _ <- Create.minPercentTotal   := minPercentTotal.toOptionOption
           _ <- Create.totalTime         := totalTime.toOptionOption
           _ <- Create.partnerSplits     := partnerSplits.toOption
+          _ <- Create.exchangePartner   := exchangePartner.toOptionOption
           _ <- Create.reviewerId        := reviewerId.toOptionOption
           _ <- Create.mentorId          := mentorId.toOptionOption
           _ <- Create.aeonMultiFacility := aeonMultiFacility
@@ -307,11 +331,14 @@ object ProposalTypeInput {
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Nullable("partnerSplits", rSplits),
+          ExchangePartnerBinding.Nullable("exchangePartner", rExchange),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
-          Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange.toOption, splits.toOption).as(
+            Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, exchangePartner = exchange, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+          )
         }
       }
 
@@ -360,12 +387,15 @@ object ProposalTypeInput {
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitsInput.Nullable("partnerSplits", rSplits),
+          ExchangePartnerBinding.Nullable("exchangePartner", rExchange),
           ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rToo, rMin, rSplits, rBand3, rAeon, rJwst, rUsLong).parMapN { (too, min, splits, band3, aeon, jwst, usLong) =>
-          Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, considerForBand3 = band3, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap { case (too, min, splits, exchange, band3, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange.toOption, splits.toOption).as(
+            Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, exchangePartner = exchange, considerForBand3 = band3, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+          )
         }
       }
 

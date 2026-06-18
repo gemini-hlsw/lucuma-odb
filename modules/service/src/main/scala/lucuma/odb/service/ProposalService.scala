@@ -14,6 +14,7 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ConsiderForBand3
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
@@ -127,6 +128,9 @@ object ProposalService {
     def missingOrInvalidSplits(pid: Program.Id, subtype: ScienceSubtype): OdbError =
       s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
 
+    def bothTimeRequests(pid: Program.Id): OdbError =
+      s"Proposal $pid may not have both an exchange partner and partner splits.".invalidArg
+
     def missingPartners(pid: Program.Id, partners: Set[Partner] = Set.empty): OdbError =
       partners.toList.map(_.abbreviation).sorted match
         case Nil     =>
@@ -208,7 +212,8 @@ object ProposalService {
         deadline:          Option[Timestamp],
         cfpTitle:          Option[NonEmptyString],
         cfp:               Option[CfpProperties],
-        considerForBand3:  Option[ConsiderForBand3]
+        considerForBand3:  Option[ConsiderForBand3],
+        exchangePartner:   Option[ExchangePartner]
       ) {
         val isPastDeadline: Option[Boolean] =
           deadline.map(_ < currentTime)
@@ -233,8 +238,15 @@ object ProposalService {
             missingCfP(pid).asFailure.unlessA(cfp.isDefined),
             missingSemester(pid).asFailure.unlessA(semester.isDefined),
             missingScienceSubtype(pid).asFailure.unlessA(scienceSubtype.isDefined),
+            // Defense in depth: the DB trigger also forbids this, but reject a
+            // both-set time request here with a clear message rather than
+            // silently treating it as an exchange request below.
+            bothTimeRequests(pid).asFailure.whenA(exchangePartner.isDefined && splitsSum =!= 0),
             scienceSubtype.fold(().success) { s =>
+              // An exchange-partner time request carries no Gemini partner
+              // splits, so the sum-to-100 rule does not apply to it.
               missingOrInvalidSplits(pid, s).asFailure.whenA(
+                exchangePartner.isEmpty &&
                 splitsSum =!= 100 &&
                 ((s === ScienceSubtype.Classical) ||
                  (s === ScienceSubtype.Queue))
@@ -384,7 +396,7 @@ object ProposalService {
           _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
 
         val codec: Decoder[ProposalContext] =
-          (proposal_status *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -613,6 +625,7 @@ object ProposalService {
             call.aeonMultiFacility.map(sql"c_aeon_multi_facility = ${bool}"),
             call.jwstSynergy.map(sql"c_jwst_synergy = ${bool}"),
             call.usLongTerm.map(sql"c_us_long_term = ${bool}"),
+            call.exchangePartner.foldPresent(sql"c_exchange_partner = ${exchange_partner.opt}"),
             considerForBand3Update
           ).flatten
         }
@@ -647,7 +660,8 @@ object ProposalService {
           c_aeon_multi_facility,
           c_jwst_synergy,
           c_us_long_term,
-          c_consider_for_band_3
+          c_consider_for_band_3,
+          c_exchange_partner
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
@@ -662,7 +676,8 @@ object ProposalService {
           ${bool},
           ${bool},
           ${bool},
-          ${consider_for_band_3}
+          ${consider_for_band_3},
+          ${exchange_partner.opt}
       """.apply(
         pid,
         c.callId,
@@ -677,7 +692,8 @@ object ProposalService {
         c.typeʹ.aeonMultiFacility,
         c.typeʹ.jwstSynergy,
         c.typeʹ.usLongTerm,
-        c.typeʹ.considerForBand3
+        c.typeʹ.considerForBand3,
+        c.typeʹ.exchangePartner
       )
 
     val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], Option[Semester], Option[NonNegInt])] =
@@ -736,14 +752,19 @@ object ProposalService {
           COALESCE(
             cfp_pi.c_deadline,
             (SELECT cfp.c_gemini_non_partner_deadline
-             WHERE pi.c_partner_link = 'has_non_partner')
+             WHERE pi.c_partner_link = 'has_non_partner'),
+            -- An exchange-partner request is not tied to any Gemini partner, so
+            -- it uses the call's default submission deadline.
+            (SELECT cfp.c_deadline_default
+             WHERE prop.c_exchange_partner IS NOT NULL)
           ) AS c_deadline,
           cfp.c_title,
           cfp.c_cfp_id,
           cfp.c_semester,
           cfp.c_gemini_proposal_type,
           cfp.c_gemini_proprietary,
-          prop.c_consider_for_band_3
+          prop.c_consider_for_band_3,
+          prop.c_exchange_partner
         FROM t_program prog
         LEFT JOIN t_proposal prop
           ON prog.c_program_id = prop.c_program_id
