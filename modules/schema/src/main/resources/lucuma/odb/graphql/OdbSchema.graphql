@@ -4458,6 +4458,14 @@ type Classical implements ProposalType {
   partnerSplits: [PartnerSplit!]!
 
   """
+  When the time request is made on behalf of an exchange partner community
+  (i.e., the PI is from Keck or Subaru), the exchange partner is given here and
+  the entire request is associated with it.  In that case `partnerSplits` is
+  empty.  Null when the request uses Gemini partner splits.
+  """
+  exchangePartner: ExchangePartner
+
+  """
   Whether this proposal is part of the AEON/Multi-facility program.
   """
   aeonMultiFacility: Boolean!
@@ -4618,6 +4626,14 @@ type Queue implements ProposalType {
   partnerSplits: [PartnerSplit!]!
 
   """
+  When the time request is made on behalf of an exchange partner community
+  (i.e., the PI is from Keck or Subaru), the exchange partner is given here and
+  the entire request is associated with it.  In that case `partnerSplits` is
+  empty.  Null when the request uses Gemini partner splits.
+  """
+  exchangePartner: ExchangePartner
+
+  """
   Whether this proposal should be considered for Band 3. Defaults to UNSET
   on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
   be submitted.
@@ -4692,9 +4708,17 @@ input ClassicalInput {
   """
   The partnerSplits field specifies how time is apportioned over partners. This
   will default to empty but if specified, the partner percents must sum to 100.
-  By submission time, it must be specified.
+  By submission time, it must be specified.  Mutually exclusive with
+  `exchangePartner`.
   """
   partnerSplits: [PartnerSplitInput!]
+
+  """
+  Set when the time request is on behalf of an exchange partner community (the
+  PI is from Keck or Subaru); the entire request is associated with it and
+  `partnerSplits` must be empty.  Mutually exclusive with `partnerSplits`.
+  """
+  exchangePartner: ExchangePartner
 
   """
   Whether this proposal is part of the AEON/Multi-facility program.
@@ -4855,9 +4879,17 @@ input QueueInput {
   """
   The partnerSplits field specifies how time is apportioned over partners. This
   will default to empty but if specified, the partner percents must sum to 100.
-  By submission time, it must be specified.
+  By submission time, it must be specified.  Mutually exclusive with
+  `exchangePartner`.
   """
   partnerSplits: [PartnerSplitInput!]
+
+  """
+  Set when the time request is on behalf of an exchange partner community (the
+  PI is from Keck or Subaru); the entire request is associated with it and
+  `partnerSplits` must be empty.  Mutually exclusive with `partnerSplits`.
+  """
+  exchangePartner: ExchangePartner
 
   """
   Whether this proposal should be considered for Band 3. Defaults to UNSET

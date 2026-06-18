@@ -894,3 +894,103 @@ class createCallForProposals extends OdbSuite:
         }
       """.asRight
     )
+
+  test("success - subaru"):
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                semester:    "2024B"
+                activeStart: "2024-07-31"
+                activeEnd:   "2025-02-01"
+                subaru: {
+                  type: NORMAL
+                }
+              }
+            }
+          ) {
+            callForProposals {
+              semester
+              active {
+                start
+                end
+              }
+              submissionDeadlineDefault
+              partners {
+                geminiPartner
+                submissionDeadline
+              }
+              existence
+              subaru {
+                type
+                coordinateLimits {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+                instruments
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "semester": "2024B",
+              "active": {
+                "start": "2024-07-31",
+                "end": "2025-02-01"
+              },
+              "submissionDeadlineDefault": null,
+              "partners": [
+                {
+                  "geminiPartner" : "AR",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "BR",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "CA",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "CL",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "KR",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "UH",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "US",
+                  "submissionDeadline": null
+                }
+              ],
+              "existence":         "PRESENT",
+              "subaru": {
+                "type": "NORMAL",
+                "coordinateLimits": {
+                  "raStart": { "hms": "16:30:00.000000" },
+                  "raEnd": { "hms": "14:00:00.000000" },
+                  "decStart": { "dms": "-37:00:00.000000" },
+                  "decEnd": { "dms": "+90:00:00.000000" }
+                },
+                "instruments":       []
+              }
+            }
+          }
+        }
+      """.asRight
+    )

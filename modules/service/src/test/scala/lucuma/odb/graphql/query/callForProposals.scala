@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.SubaruProposalType
 import lucuma.core.model.CallForProposals
 import lucuma.core.syntax.string.*
 
@@ -173,6 +174,84 @@ class callForProposals extends OdbSuite:
 
   test("system verification - no instruments"):
     assertIO(getTitle(CallForProposalsType.SystemVerification), "2025A System Verification")
+
+  private def getSubaruTitle(
+    subaruType: SubaruProposalType,
+    title:      Option[String] = None
+  ): IO[String] =
+    query(
+      user = staff,
+      query = s"""
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                semester:    "2025A"
+                ${title.fold("")(title => s"title: \"$title\"")}
+                activeStart: "2025-02-01"
+                activeEnd:   "2025-07-31"
+                subaru: {
+                  type: ${subaruType.tag.toScreamingSnakeCase}
+                }
+              }
+            }
+          ) {
+            callForProposals {
+              title
+            }
+          }
+        }
+      """
+    ).map:
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "title")
+       .require[String]
+
+  test("subaru - default title"):
+    assertIO(getSubaruTitle(SubaruProposalType.Normal), "2025A Subaru Exchange")
+
+  test("subaru - default intensive title"):
+    assertIO(getSubaruTitle(SubaruProposalType.Intensive), "2025A Subaru Exchange (Intensive)")
+
+  test("subaru - override title"):
+    assertIO(getSubaruTitle(SubaruProposalType.Normal, "Foobaru".some), "Foobaru")
+
+  private def getKeckTitle(
+    title: Option[String] = None
+  ): IO[String] =
+    query(
+      user = staff,
+      query = s"""
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                semester:    "2025A"
+                ${title.fold("")(title => s"title: \"$title\"")}
+                activeStart: "2025-02-01"
+                activeEnd:   "2025-07-31"
+                keck: {
+
+                }
+              }
+            }
+          ) {
+            callForProposals {
+              title
+            }
+          }
+        }
+      """
+    ).map:
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "title")
+       .require[String]
+
+  test("keck - default title"):
+    assertIO(getKeckTitle(), "2025A Keck Exchange")
+
+  test("keck - override title"):
+    assertIO(getKeckTitle("Feck".some), "Feck")
 
   test("system verification - one instrument"):
     val title = query(

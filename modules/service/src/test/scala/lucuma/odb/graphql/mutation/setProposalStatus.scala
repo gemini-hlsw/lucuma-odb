@@ -28,6 +28,7 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.ProposalService.error
 
 import java.time.Instant
+import java.time.LocalDate
 
 class setProposalStatus extends OdbSuite
   with ObservingModeSetupOperations {
@@ -81,6 +82,68 @@ class setProposalStatus extends OdbSuite
             """.asRight
         ) *>
         ensureSomeQueuedEmailsForAddress(defaultPiEmail, 1)
+      }
+    }
+  }
+
+  test("✓ exchange partner submission") {
+    // A Keck/Subaru PI requesting Gemini time: the proposal carries an exchange
+    // partner instead of partner splits, and uses the call's default submission
+    // deadline rather than any Gemini partner deadline.  Uses its own semester
+    // so the assigned proposal reference doesn't perturb other tests' counts.
+    createGeminiCallForProposalsAs(
+      staff,
+      CallForProposalsType.RegularSemester,
+      semester    = Semester.unsafeFromString("2026A"),
+      activeStart = LocalDate.parse("2026-02-01"),
+      activeEnd   = LocalDate.parse("2026-07-31")
+    ).flatMap { cid =>
+      createProgramWithNonPartnerPi(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some, "classical: { exchangePartner: KECK }".some) *>
+        addCoisAs(pi, pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program {
+                  id
+                  proposalStatus
+                  proposal {
+                    type {
+                      ... on Classical {
+                        exchangePartner
+                        partnerSplits { partner }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": {
+                    "id": $pid,
+                    "proposalStatus": "SUBMITTED",
+                    "proposal": {
+                      "type": {
+                        "exchangePartner": "KECK",
+                        "partnerSplits": []
+                      }
+                    }
+                  }
+                }
+              }
+            """.asRight
+        )
       }
     }
   }
