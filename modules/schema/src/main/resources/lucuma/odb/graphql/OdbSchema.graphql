@@ -7893,6 +7893,9 @@ type ExecutionDigest {
   "Science sequence summary."
   science: SequenceDigest
 
+  "Full time estimate: science time plus full setup time for every setup."
+  fullTimeEstimate: CategorizedTime!
+
 }
 
 """
