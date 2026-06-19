@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.model.SourceProfile
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.input.sourceprofile.SpectralDefinitionInput.createOrEdit
 
 object GaussianInput {
 
@@ -28,13 +29,14 @@ object GaussianInput {
     ObjectFieldsBinding.rmap {
       case List(
         AngleInput.Binding.Option("fwhm", rFwhm),
-        SpectralDefinitionInput.Integrated.EditBinding.Option("spectralDefinition", rSpectralDefinition)
+        SpectralDefinitionInput.Integrated.CreateOrEditBinding.Option("spectralDefinition", rSpectralDefinition)
       ) =>
-        (rFwhm, rSpectralDefinition).parMapN {
-          case (None, None)       => g => Result(g)
-          case (Some(v), None)    => g => Result(g.copy(fwhm = v))
-          case (None, Some(f))    => g => f(g.spectralDefinition).map(sd => g.copy(spectralDefinition = sd))
-          case (Some(v), Some(f)) => g => f(g.spectralDefinition).map(sd => g.copy(fwhm = v, spectralDefinition = sd))
+        (rFwhm, rSpectralDefinition).parMapN { (fwhmOpt, sdOpt) => g =>
+          val fwhm = fwhmOpt.getOrElse(g.fwhm)
+          // Edit the spectral definition in place when the SED type matches, otherwise replace it.
+          sdOpt
+            .fold(Result(g.spectralDefinition))(g.spectralDefinition.createOrEdit)
+            .map(sd => g.copy(fwhm = fwhm, spectralDefinition = sd))
         }
 
     }
