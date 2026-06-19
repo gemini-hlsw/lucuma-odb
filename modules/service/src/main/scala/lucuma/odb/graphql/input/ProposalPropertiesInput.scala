@@ -15,13 +15,13 @@ object ProposalPropertiesInput {
   case class Create(
     category:  Option[Tag],
     callId:    Option[CallForProposals.Id],
-    typeʹ:     ProposalTypeInput.Create
+    typeʹ:     GeminiProposalTypeInput.Create
   )
 
   case class Edit(
     category:  Nullable[Tag],
     callId:    Nullable[CallForProposals.Id],
-    typeʹ:     Option[ProposalTypeInput.Edit]
+    typeʹ:     Option[GeminiProposalTypeInput.Edit]
   )
 
   object Edit {
@@ -34,9 +34,9 @@ object ProposalPropertiesInput {
       case List(
         TagBinding.Option("category", rCategory),
         CallForProposalsIdBinding.Option("callId", rCid),
-        ProposalTypeInput.Create.Binding.Option("type", rType)
+        GeminiProposalTypeInput.Create.Binding.Option("type", rType)
       ) =>
-        val t = rType.map(_.getOrElse(ProposalTypeInput.Create.Default))
+        val t = rType.map(_.getOrElse(GeminiProposalTypeInput.Create.Default))
         (rCategory, rCid, t).parMapN(Create.apply)
     }
 
@@ -45,7 +45,7 @@ object ProposalPropertiesInput {
       case List(
         TagBinding.Nullable("category", rCategory),
         CallForProposalsIdBinding.Nullable("callId", rCid),
-        ProposalTypeInput.Edit.Binding.Option("type", rType)
+        GeminiProposalTypeInput.Edit.Binding.Option("type", rType)
       ) =>
         (rCategory, rCid, rType).parMapN(Edit.apply)
     }

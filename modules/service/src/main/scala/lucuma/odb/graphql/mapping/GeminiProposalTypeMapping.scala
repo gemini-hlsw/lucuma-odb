@@ -27,15 +27,15 @@ import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProgramUserView
 import lucuma.odb.graphql.table.ProposalView
 
-trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
+trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
                                    with Predicates[F]
                                    with PartnerSplitTable[F]
                                    with ProgramUserView[F]
                                    with ProposalView[F] {
 
-  lazy val ProposalTypeMapping: ObjectMapping =
+  lazy val GeminiProposalTypeMapping: ObjectMapping =
     SqlInterfaceMapping(
-      tpe = ProposalTypeType,
+      tpe = GeminiProposalTypeType,
       discriminator = proposalTypeDiscriminator,
       fieldMappings = List(
         SqlField("id", ProposalView.ProgramId, key = true, hidden = true),
@@ -57,7 +57,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
           case ScienceSubtype.SystemVerification => Result(SystemVerificationType)
 
       private def mkPredicate(tpe: ScienceSubtype): Result[Predicate] =
-        Eql(ProposalTypeType / "scienceSubtype", Const(tpe)).success
+        Eql(GeminiProposalTypeType / "scienceSubtype", Const(tpe)).success
 
       override def narrowPredicate(tpe:  Type): Result[Predicate] =
         tpe match
@@ -155,7 +155,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       )
     }
 
-  lazy val ProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+  lazy val GeminiProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     case (ClassicalType, "partnerSplits", Nil) => SortSplits
     case (QueueType,     "partnerSplits", Nil) => SortSplits
   }

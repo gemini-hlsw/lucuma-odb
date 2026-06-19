@@ -245,7 +245,7 @@ object OdbMapping {
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
           with ProposalReferenceMapping[F]
-          with ProposalTypeMapping[F]
+          with GeminiProposalTypeMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
@@ -487,7 +487,7 @@ object OdbMapping {
                 ProperMotionRaMapping,
                 ProposalMapping,
                 ProposalReferenceMapping,
-                ProposalTypeMapping,
+                GeminiProposalTypeMapping,
                 QueryMapping,
                 QueueMapping,
                 RadialVelocityMapping,
@@ -646,7 +646,7 @@ object OdbMapping {
                 ObservingModeGroupElaborator,
                 ProgramElaborator,
                 ProgramUserElaborator,
-                ProposalTypeElaborator,
+                GeminiProposalTypeElaborator,
                 SchedulingConstraintsElaborator,
                 ScienceRequirementsElaborator,
                 StepRecordElaborator,

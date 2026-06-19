@@ -136,7 +136,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected =
-          List("Exactly one key must be specified for oneOf input object ProposalTypeInput in field 'createProposal' of type 'Mutation', but found 'demoScience', 'directorsTime'").asLeft
+          List("Exactly one key must be specified for oneOf input object GeminiProposalTypeInput in field 'createProposal' of type 'Mutation', but found 'demoScience', 'directorsTime'").asLeft
       )
     }
   }
