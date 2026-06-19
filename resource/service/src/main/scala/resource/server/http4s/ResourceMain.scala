@@ -54,7 +54,7 @@ object ResourceMain extends IOApp.Simple {
       given Meter[F]          = otel.meter
       given TracerProvider[F] = otel.tracerProvider
       given MeterProvider[F]  = otel.meterProvider
-      r                      <- routesResource[F](conf.database)
+      r                      <- routesResource[F](conf.database, conf.corsOverHttps, conf.domain)
       s                      <- server(conf, r)
     yield s
 
@@ -71,13 +71,15 @@ object ResourceMain extends IOApp.Simple {
     F[_]: {Async, Tracer, TracerProvider, Meter, MeterProvider, Logger, Console, Network, Files,
       Compression}
   ](
-    databaseConfig: DatabaseConfiguration
+    databaseConfig: DatabaseConfiguration,
+    corsOverHttps:  Boolean,
+    domain:         Seq[String]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for
       pool       <- databasePool(databaseConfig)
       schema     <- GraphQlRoutes.loadSchema[F].toResource
       r           = routes(pool, SkunkMonitor.noopMonitor[F], schema)
-      middleware <- ServerMiddleware().toResource
+      middleware <- ServerMiddleware(corsOverHttps, domain).toResource
     yield wsb => middleware(r(wsb))
 
   def server[F[_]: {Async, Network}](
