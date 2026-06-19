@@ -43,6 +43,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.StepConfig.Gcal
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
@@ -103,7 +104,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       GnirsGrating.D111,
       GnirsPrism.Mirror,
       BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max),
-      GnirsFpuSlit.LongSlit_0_30,
+      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
 

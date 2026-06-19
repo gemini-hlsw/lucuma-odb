@@ -29,6 +29,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gnirs
@@ -51,7 +52,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(5600).get
       ),
-      GnirsFpuSlit.LongSlit_0_30,
+      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
 

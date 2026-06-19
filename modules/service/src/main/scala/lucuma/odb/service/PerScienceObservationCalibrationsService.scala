@@ -12,6 +12,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.math.Angle
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
@@ -61,11 +62,10 @@ object PerScienceObservationCalibrationsService:
       private val MultiTelluricThreshold: TimeSpan = TimeSpan.fromHours(1.5).get
 
       private def groupNameForObservation(
-        config:          CalibrationConfigSubset,
-        calibrationRole: CalibrationRole,
-        oid:             Observation.Id
+        config: CalibrationConfigSubset,
+        oid:    Observation.Id
       ): NonEmptyString =
-        NonEmptyString.unsafeFrom(s"${config.modeType.tag}/${calibrationRole.tag}/${oid.show}")
+        NonEmptyString.unsafeFrom(s"${config.modeType.tag}/calibration/${oid.show}")
 
       private def findSystemGroupForObservation(
         tree: GroupTree,
@@ -73,7 +73,7 @@ object PerScienceObservationCalibrationsService:
       ): Option[Group.Id] =
         tree.collectGroups(
           oid,
-          b => b.system && b.calibrationRoles.exists(_ == CalibrationRole.Telluric)
+          b => b.system && b.calibrationRoles.exists(ObsExtract.PerObservationCalibrationRoles.contains)
         )
 
       private def findParentGroupForObservation(
@@ -82,7 +82,14 @@ object PerScienceObservationCalibrationsService:
       ): Option[Group.Id] =
         tree.collectGroups(oid, b => !b.system)
 
-      private def newTelluricGroup(
+      // The calibration roles a per-observation calibration group holds, derived
+      // from the science config: GNIRS cross-dispersed also gets daytime pinhole
+      // flats; everything else has only tellurics.
+      private def obsCalibrationGroupRoles(config: CalibrationConfigSubset): List[CalibrationRole] =
+        if isCrossDispersedGnirs(config) then List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole)
+        else List(CalibrationRole.Telluric)
+
+      private def newObsCalibrationGroup(
         pid:           Program.Id,
         config:        CalibrationConfigSubset,
         oid:           Observation.Id,
@@ -95,7 +102,7 @@ object PerScienceObservationCalibrationsService:
             proposalReference = none,
             programReference = none,
             SET = GroupPropertiesInput.Create(
-              name = groupNameForObservation(config, CalibrationRole.Telluric, oid).some,
+              name = groupNameForObservation(config, oid).some,
               description = none,
               minimumRequired = none,
               ordered = false,
@@ -109,7 +116,7 @@ object PerScienceObservationCalibrationsService:
             initialContents = List(Right(oid))
           ),
           system = true,
-          calibrationRoles = List(CalibrationRole.Telluric)
+          calibrationRoles = obsCalibrationGroupRoles(config)
         ).orError
 
       private def findAllTelluricObservations(gid: Group.Id): F[List[Observation.Id]] =
@@ -126,7 +133,7 @@ object PerScienceObservationCalibrationsService:
 
       private def insertTelluricObservation(
         pid:             Program.Id,
-        telluricGroupId: Group.Id,
+        groupId: Group.Id,
         telluricIndex:   NonNegShort
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
         // Minimal input to create the telluric obs
@@ -152,7 +159,7 @@ object PerScienceObservationCalibrationsService:
           scienceRequirements = none,
           observingMode = none,
           existence = Existence.Present.some,
-          group = telluricGroupId.some,
+          group = groupId.some,
           groupIndex = telluricIndex.some,
           observerNotes = none
         )
@@ -165,13 +172,13 @@ object PerScienceObservationCalibrationsService:
       private def createTelluricObs(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
-        telluricGroupId: Group.Id,
+        groupId: Group.Id,
         telluricIndex:   NonNegShort,
         duration:        TimeSpan,
         order:           TelluricCalibrationOrder
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
         for {
-          telluricId <- insertTelluricObservation(pid, telluricGroupId, telluricIndex)
+          telluricId <- insertTelluricObservation(pid, groupId, telluricIndex)
           _          <- telluricTargetsService.requestTelluricTarget(pid, telluricId, scienceOid, duration, order)
           _          <- syncConfiguration(scienceOid, telluricId)
         } yield telluricId
@@ -179,7 +186,7 @@ object PerScienceObservationCalibrationsService:
       private def createTelluricCalibrations(
         pid:             Program.Id,
         scienceOid:      Observation.Id,
-        telluricGroupId: Group.Id
+        groupId: Group.Id
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           session
@@ -194,9 +201,9 @@ object PerScienceObservationCalibrationsService:
               for {
                 sciIdx <- obsGroupIndex(scienceOid)
                 bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
-                c1     <- createTelluricObs(pid, scienceOid, telluricGroupId, bIdx, d, TelluricCalibrationOrder.Before)
+                c1     <- createTelluricObs(pid, scienceOid, groupId, bIdx, d, TelluricCalibrationOrder.Before)
                 aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 2).toShort)
-                c2     <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d, TelluricCalibrationOrder.After)
+                c2     <- createTelluricObs(pid, scienceOid, groupId, aftIdx, d, TelluricCalibrationOrder.After)
               } yield List(c1, c2)
 
             case Some(d) =>
@@ -204,7 +211,7 @@ object PerScienceObservationCalibrationsService:
               for {
                 sciIdx <- obsGroupIndex(scienceOid)
                 aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
-                cal    <- createTelluricObs(pid, scienceOid, telluricGroupId, aftIdx, d, TelluricCalibrationOrder.After)
+                cal    <- createTelluricObs(pid, scienceOid, groupId, aftIdx, d, TelluricCalibrationOrder.After)
               } yield List(cal)
 
             case None =>
@@ -212,16 +219,16 @@ object PerScienceObservationCalibrationsService:
               List.empty[Observation.Id].pure[F]
         yield created
 
-      private def readTelluricGroup(
+      private def readObsCalibrationGroup(
         pid:  Program.Id,
         tree: GroupTree,
         obs:  ObsExtract[CalibrationConfigSubset]
       )(using Transaction[F]): F[Group.Id] =
         val obsIndexMap = tree.collectObservations(_ => true).flatMap((_, obs) => obs).toMap
-        T.span("read-telluric", Attribute.from(ProgramIdKey, pid)).surround:
+        T.span("read-obs-calibration-group", Attribute.from(ProgramIdKey, pid)).surround:
           findSystemGroupForObservation(tree, obs.id)
             .fold(
-              newTelluricGroup(
+              newObsCalibrationGroup(
                 pid,
                 obs.data,
                 obs.id,
@@ -238,7 +245,7 @@ object PerScienceObservationCalibrationsService:
         T.span("sync-telluric", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
           for {
             existing           <- findAllTelluricObservations(gid)
-            deletable          <- excludeTelluricsFromDeletion(existing, identity)
+            deletable          <- excludeObsCalibrationsFromDeletion(existing, identity)
             duration           <- obsDuration(obs.id)
             requiredCount      = duration match
                                   case Some(d) if d > MultiTelluricThreshold => 2
@@ -259,16 +266,86 @@ object PerScienceObservationCalibrationsService:
             _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
           } yield (created, deleted)
 
-      private def generateTelluricForScience(
+      // ---- Daytime pinhole flats (GNIRS cross-dispersed) ----
+      // Cross-dispersed GNIRS observations need a daytime pinhole flat to trace
+      // the cross-dispersed spectral orders.  It lives in the same system group
+      // as the tellurics and is a daytime (DayCal) calibration, so it does not
+      // count against the program's time.
+
+      private def isCrossDispersedGnirs(config: CalibrationConfigSubset): Boolean =
+        config match
+          case g: CalibrationConfigSubset.GnirsLongSlitConfigs => g.isCrossDispersed
+          case _                                               => false
+
+      private def findDaytimePinholeObservations(gid: Group.Id): F[List[Observation.Id]] =
+        session
+          .prepareR(Statements.selectTelluricObservations)
+          .use(_.stream((gid, CalibrationRole.DaytimePinhole), 10).compile.toList)
+
+      private def insertDaytimePinholeObservation(
+        pid: Program.Id,
+        gid: Group.Id
+      )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
+        // A daytime pinhole flat is an internal GCAL calibration: no target, a
+        // fixed position angle, and no science requirements (the exposure comes
+        // from SmartGcal).
+        val obsInput = ObservationPropertiesInput.Create(
+          subtitle            = none,
+          scienceBand         = none,
+          posAngleConstraint  = PosAngleConstraintInput(
+                                  mode  = PosAngleConstraintMode.Fixed.some,
+                                  angle = Angle.Angle0.some
+                                ).some,
+          targetEnvironment   = none,
+          constraintSet       = none,
+          scheduling          = none,
+          attachments         = none,
+          scienceRequirements = none,
+          observingMode       = none,
+          existence           = Existence.Present.some,
+          group               = gid.some,
+          groupIndex          = none,
+          observerNotes       = none
+        )
+        observationService
+          .createObservation(
+            AccessControl.unchecked(obsInput, pid, program_id),
+            calibrationRole = CalibrationRole.DaytimePinhole.some
+          ).orError
+
+      private def syncDaytimePinhole(
+        pid: Program.Id,
+        obs: ObsExtract[CalibrationConfigSubset],
+        gid: Group.Id
+      )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
+        T.span("sync-daytime-pinhole", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
+          findDaytimePinholeObservations(gid).flatMap: existing =>
+            (isCrossDispersedGnirs(obs.data), existing) match
+              case (true, Nil) =>
+                for
+                  oid <- insertDaytimePinholeObservation(pid, gid)
+                  _   <- syncConfiguration(obs.id, oid)
+                yield (List(oid), List.empty[Observation.Id])
+              case (true, es)  =>
+                es.traverse_(oid => syncConfiguration(obs.id, oid))
+                  .as((List.empty[Observation.Id], List.empty[Observation.Id]))
+              case (false, es) =>
+                excludeObsCalibrationsFromDeletion(es, identity).flatMap: deletable =>
+                  NonEmptyList.fromList(deletable) match
+                    case Some(nel) => observationService.deleteCalibrationObservations(nel).as((List.empty[Observation.Id], deletable))
+                    case None      => (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+
+      private def generateObsCalibrationsForScience(
         pid:  Program.Id,
         tree: GroupTree,
         obs:  ObsExtract[CalibrationConfigSubset]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
-        T.span("generate-telluric-for-science", Attribute.from(ProgramIdKey, pid)).surround:
+        T.span("generate-obs-calibrations-for-science", Attribute.from(ProgramIdKey, pid)).surround:
           for
-            gid    <- readTelluricGroup(pid, tree, obs)
-            result <- syncTelluricObservation(pid, obs, gid)
-          yield result
+            gid     <- readObsCalibrationGroup(pid, tree, obs)
+            tResult <- syncTelluricObservation(pid, obs, gid)
+            pResult <- syncDaytimePinhole(pid, obs, gid)
+          yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
 
       private val MaxTelluricSN = SignalToNoise.fromInt(100).get
 
@@ -385,22 +462,22 @@ object PerScienceObservationCalibrationsService:
           _        <- createTelluricExposureTimeMode(sourceOid, targetOid)
         } yield ()
 
-      private def findTelluricGroupForObservation(
+      private def findObsCalibrationGroupForObservation(
         oid: Observation.Id
       ): F[Option[Group.Id]] =
         S.session
-          .prepareR(Statements.selectTelluricGroup)
-          .use(_.option((oid, CalibrationRole.Telluric)))
+          .prepareR(Statements.selectObsCalibrationGroup)
+          .use(_.option((oid, ObsExtract.PerObservationCalibrationRoles)))
 
-      // Move the science observation out of the telluric group to its parent group
+      // Move the science observation out of the calibration group to its parent group
       private def moveScienceObservationOutOfGroup(
-        telluricGroupId: Group.Id,
-        scienceOid:      Observation.Id
+        obsCalibrationGroupId: Group.Id,
+        scienceOid:            Observation.Id
       )(using Transaction[F], SuperUserAccess): F[Unit] =
         for
           parentInfo <- S.session
                           .prepareR(Statements.selectGroupParent)
-                          .use(_.unique(telluricGroupId))
+                          .use(_.unique(obsCalibrationGroupId))
           (parentGroupId, parentIndex) = parentInfo
           _ <- observationService.updateObservations(
                  Services.asSuperUser:
@@ -415,29 +492,34 @@ object PerScienceObservationCalibrationsService:
                )
         yield ()
 
-      private def cleanupOrphanedTelluricGroup(
+      private def cleanupOrphanedObsCalibrationGroup(
         pid:        Program.Id,
         gid:        Group.Id,
         scienceOid: Observation.Id
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         for
-          // Query only telluric calibration observations in the group, not all observations
+          // Query the calibration observations in the group (tellurics and any
+          // daytime pinhole flat), not all observations.
           telluricOidsInGroup <- S.session
                                    .prepareR(Statements.selectTelluricObservations)
                                    .use(_.stream((gid, CalibrationRole.Telluric), 1024).compile.toList)
-          deletable           <- excludeTelluricsFromDeletion(telluricOidsInGroup, identity)
+          pinholeOidsInGroup  <- findDaytimePinholeObservations(gid)
+          allOidsInGroup       = telluricOidsInGroup ++ pinholeOidsInGroup
+          // Tellurics and daytime pinhole flats alike are kept if they (or the
+          // parent science obs) have started/finished executing or have visits.
+          deletable           <- excludeObsCalibrationsFromDeletion(allOidsInGroup, identity)
           deleted             <- NonEmptyList.fromList(deletable) match
                                    case Some(nel) => observationService.deleteCalibrationObservations(nel).as(deletable)
                                    case None      => List.empty.pure[F]
-          _                   <- (info"Deleted ${deleted.size} orphaned telluric observations for group $gid: $deleted").whenA(deleted.nonEmpty)
-          // Only delete the group if ALL telluric observations were deleted
-          allDeleted           = deleted.size == telluricOidsInGroup.size
+          _                   <- (info"Deleted ${deleted.size} orphaned calibration observations for group $gid: $deleted").whenA(deleted.nonEmpty)
+          // Only delete the group if ALL calibration observations were deleted
+          allDeleted           = deleted.size == allOidsInGroup.size
           // Move the science observation out of the group before deleting the group
           _                   <- moveScienceObservationOutOfGroup(gid, scienceOid).whenA(allDeleted)
           // Actually delete the orphaned group
           _                   <- groupService.deleteSystemGroup(pid, gid).whenA(allDeleted)
-          _                   <- (info"Deleted orphaned telluric group $gid").whenA(allDeleted)
-          _                   <- (info"Telluric group $gid retained: ${telluricOidsInGroup.size - deleted.size} observations have visits").whenA(!allDeleted && deleted.nonEmpty)
+          _                   <- (info"Deleted orphaned obs calibration group $gid").whenA(allDeleted)
+          _                   <- (info"Obs calibration group $gid retained: ${allOidsInGroup.size - deleted.size} observations have visits").whenA(!allDeleted && deleted.nonEmpty)
         yield (List.empty, deleted)
 
       override def generateCalibrations(
@@ -457,31 +539,31 @@ object PerScienceObservationCalibrationsService:
             groupTree        <- groupService.selectGroups(pid)
             result           <- changedObs match
                                   case Some(obs) =>
-                                    info"Observation $oid is active per-obs type, generating telluric" *>
-                                      generateTelluricForScience(pid, groupTree, obs)
+                                    info"Observation $oid is active per-obs type, generating calibrations" *>
+                                      generateObsCalibrationsForScience(pid, groupTree, obs)
                                   case None =>
                                     for {
-                                      gidOpt  <- findTelluricGroupForObservation(oid)
+                                      gidOpt  <- findObsCalibrationGroupForObservation(oid)
                                       result  <- gidOpt match
                                                   case Some(gid) =>
-                                                    info"Observation $oid no longer active or ongoing, cleaning up telluric group $gid" *>
-                                                      cleanupOrphanedTelluricGroup(pid, gid, oid)
+                                                    info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
+                                                      cleanupOrphanedObsCalibrationGroup(pid, gid, oid)
                                                   case None =>
-                                                    debug"Observation $oid has no telluric group, skipping" *>
+                                                    debug"Observation $oid has no obs calibration group, skipping" *>
                                                       (List.empty[Observation.Id], List.empty[Observation.Id]).pure
                                     } yield result
           } yield result
 
       object Statements:
 
-        val selectTelluricGroup: Query[(Observation.Id, CalibrationRole), Group.Id] =
+        val selectObsCalibrationGroup: Query[(Observation.Id, List[CalibrationRole]), Group.Id] =
           sql"""
             SELECT g.c_group_id
             FROM   t_observation o
             JOIN   t_group g ON o.c_group_id = g.c_group_id
             WHERE  o.c_observation_id = $observation_id
               AND  g.c_system = true
-              AND  $calibration_role = ANY(g.c_calibration_roles)
+              AND  g.c_calibration_roles && $_calibration_role
           """.query(group_id)
 
         val selectTelluricObservations: Query[(Group.Id, CalibrationRole), Observation.Id] =

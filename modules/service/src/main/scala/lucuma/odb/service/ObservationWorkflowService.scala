@@ -126,7 +126,7 @@ case class ObservationValidationInfo(
   cfpid:              Option[CallForProposals.Id],
   scienceBand:        Option[ScienceBand],
   asterism:           List[Target],
-  associatedUserState:Option[ObservationWorkflowService.UserState], // state of science obs if this is a telluric
+  associatedUserState:Option[ObservationWorkflowService.UserState], // state of science obs if this is a per-observation calibration (telluric or daytime pinhole)
   generatorParams:    Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
@@ -140,7 +140,9 @@ case class ObservationValidationInfo(
     observingMode.map(_.instrument)
 
   def effectiveUserState: Option[UserState] =
-    if role === Some(CalibrationRole.Telluric) then associatedUserState
+    // Per-observation calibrations (tellurics, daytime pinhole flats) inherit
+    // their science observation's user state.
+    if role.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedUserState
     else userState
 
   /* Has the proposal been accepted? */
@@ -462,7 +464,7 @@ object ObservationWorkflowService {
           info.isVisitor && user.role.access >= Access.Staff
 
         val allowedTransitions: List[ObservationWorkflowState] =
-          if (info.role === Some(CalibrationRole.Telluric) && state <= Ready) then Nil
+          if (info.role.exists(ObsExtract.PerObservationCalibrationRoles.contains) && state <= Ready) then Nil
           else state match
             case Inactive   => List(executionState.getOrElse(validationStatus))
             case Undefined  => List(Inactive)
@@ -805,8 +807,8 @@ object ObservationWorkflowService {
         JOIN t_program p on p.c_program_id = o.c_program_id
         LEFT JOIN t_proposal x 
           ON o.c_program_id = x.c_program_id
-        LEFT JOIN t_observation s 
-          ON  o.c_calibration_role = 'telluric' 
+        LEFT JOIN t_observation s
+          ON  o.c_calibration_role = ANY(ARRAY['telluric','daytime_pinhole']::e_calibration_role[])
           AND s.c_calibration_role IS NULL
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)

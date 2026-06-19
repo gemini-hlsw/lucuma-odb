@@ -4,17 +4,15 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.either.*
 import cats.syntax.parallel.*
 import coulomb.syntax.*
 import grackle.Result
-import lucuma.core.enums.GnirsFpuOther
-import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.odb.graphql.binding.*
 
@@ -47,10 +45,10 @@ object GnirsDynamicInput:
       ) => (rExposure, rCoadds, rFilter, rDecker, rFpuSlit, rFpuOther, rAcqMirror, rCamera, rFocusMotorSteps, rReadMode).parTupled.flatMap {
         case (exposure, coadds, filter, decker, fpuSlit, fpuOther, acqMirror, camera, focusMotorSteps, readMode) =>
 
-          val rFpu: Result[Either[GnirsFpuSlit, GnirsFpuOther]] =
+          val rFpu: Result[GnirsFpu] =
             (fpuSlit, fpuOther) match
-              case (Some(s), None)    => Result.success(s.asLeft)
-              case (None,    Some(o)) => Result.success(o.asRight)
+              case (Some(s), None)    => Result.success(GnirsFpu.Slit(s))
+              case (None,    Some(o)) => Result.success(GnirsFpu.Other(o))
               case (None,    None)    => Matcher.validationFailure("Exactly one of 'fpuSlit' or 'fpuOther' must be provided.")
               case (Some(_), Some(_)) => Matcher.validationFailure("Only one of 'fpuSlit' or 'fpuOther' may be provided.")
 

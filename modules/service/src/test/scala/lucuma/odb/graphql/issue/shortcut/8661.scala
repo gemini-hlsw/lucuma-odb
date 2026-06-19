@@ -12,8 +12,8 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
-// A system telluric group could be left orphaned (a "phantom group")
-// when the parent science observation is moved out of the telluric group.
+// A system obs calibration group could be left orphaned (a "phantom group")
+// when the parent science observation is moved out of the obs calibration group.
 //
 // It was reported that sometimes dragging and dropping created phantom
 // groups and that could explain how these groups were left without a science obs.
@@ -24,7 +24,7 @@ class ShortCut_8661
   private val when =
     LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
 
-  test("cannot move a science observation out of a telluric group"):
+  test("cannot move a science observation out of a obs calibration group"):
     for {
       pid       <- createProgramAs(pi)
       tid       <- createTargetWithProfileAs(pi, pid)
@@ -42,7 +42,7 @@ class ShortCut_8661
                          msg,
                          s"Observations $oid cannot be moved out of their system group; move the group instead."
                        )
-      // The science obs remains on the telluric group.
+      // The science obs remains on the obs calibration group.
       obsAfter  <- queryObservation(oid)
     } yield
       assert(members.exists(_.calibrationRole.contains(CalibrationRole.Telluric)))

@@ -6,6 +6,7 @@ package db.migration
 import cats.data.NonEmptyList
 import cats.effect.IO
 import lucuma.core.enums.Instrument.Gnirs
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.smartgcal.FileReader
 import lucuma.odb.smartgcal.data.Gnirs.FileEntry
 import lucuma.odb.smartgcal.data.Gnirs.TableKey
@@ -33,10 +34,11 @@ object SmartGnirsLoader:
       gnirs_grating       *:
       gnirs_prism         *:
       wavelength_pm_range *:
-      gnirs_fpu_slit      *:
+      gnirs_fpu_slit.opt  *:
+      gnirs_fpu_other.opt *:
       gnirs_well_depth
     ).contramap[TableKey]: k =>
-      (k.pixelScale, k.disperser, k.crossDispersed, k.wavelengthRange, k.fpu, k.wellDepth)
+      (k.pixelScale, k.disperser, k.crossDispersed, k.wavelengthRange, GnirsFpu.slit.getOption(k.fpu), GnirsFpu.other.getOption(k.fpu), k.wellDepth)
 
   def encoder(using k: Encoder[TableKey], v: Encoder[SmartGcalValue.Legacy]): Encoder[TableRow] =
     (
@@ -52,7 +54,8 @@ object SmartGnirsLoader:
       Col.fkey("c_disperser", "t_gnirs_grating").index,
       Col.fkey("c_cross_dispersed", "t_gnirs_prism").index,
       Col("c_wavelength_range", "d_wavelength_pm_range"),
-      Col.fkey("c_fpu", "t_gnirs_fpu_slit").index,
+      Col.fkey("c_fpu_slit", "t_gnirs_fpu_slit").index,
+      Col("c_fpu_other", "e_gnirs_fpu_other").index,
       Col("c_well_depth", "e_gnirs_well_depth")
     )
 

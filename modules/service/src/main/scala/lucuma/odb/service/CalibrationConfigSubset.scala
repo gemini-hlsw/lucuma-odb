@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import lucuma.core.enums.Flamingos2Disperser
@@ -23,6 +24,7 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Wavelength
@@ -54,8 +56,12 @@ object CalibrationConfigSubset:
   case object GhostConfigs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GhostIfu
 
-  case object GnirsLongSlitConfigs extends CalibrationConfigSubset derives Eq:
+  case class GnirsLongSlitConfigs(config: GnirsLongSlitConfig) extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GnirsLongSlit
+
+    /** Cross-dispersed configurations use the SXD or LXD prism (cross-disperser). */
+    def isCrossDispersed: Boolean =
+      config.prism === GnirsPrism.Sxd || config.prism === GnirsPrism.Lxd
 
   sealed trait Gmos[G, L, U] extends CalibrationConfigSubset:
     def grating:           G
@@ -254,8 +260,8 @@ object CalibrationConfigSubset:
         case _: GhostConfig =>
           GhostConfigs
 
-        case _: GnirsLongSlitConfig =>
-          GnirsLongSlitConfigs
+        case c: GnirsLongSlitConfig =>
+          GnirsLongSlitConfigs(c)
 
         case gn: Config.GmosNorth =>
           GmosNConfigs(

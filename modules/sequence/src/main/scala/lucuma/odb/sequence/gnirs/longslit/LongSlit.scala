@@ -33,11 +33,15 @@ object LongSlit:
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
     val static = staticFrom(config)
-    (for
-      a <- EitherT.fromEither(Acquisition.instantiate(
+    // Daytime pinhole flats have no acquisition sequence.
+    val acquisition: Either[OdbError, SequenceGenerator[GnirsDynamicConfig]] =
+      if calRole.contains(CalibrationRole.DaytimePinhole) then Right(SequenceGenerator.empty[GnirsDynamicConfig])
+      else Acquisition.instantiate(
              observationId, estimator, static, namespace, config,
              itc.map(_.acquisition.focus.value)
-           ))
+           )
+    (for
+      a <- EitherT.fromEither(acquisition)
       s <- EitherT(Science.instantiate(
              observationId, estimator, static, namespace, expander, config,
              itc.map(_.science.focus.value), calRole

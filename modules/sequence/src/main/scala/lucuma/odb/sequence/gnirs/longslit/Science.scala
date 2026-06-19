@@ -16,14 +16,20 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFpuOther
+import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
+import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.refined.numeric.NonZeroInt
@@ -44,6 +50,19 @@ object Science:
 
   val NighttimeCalTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Nighttime Calibrations")
+
+  val DaytimePinholeTitle: NonEmptyString =
+    NonEmptyString.unsafeFrom("Daytime Pinhole")
+
+  /**
+   * The pinhole FPU used for a daytime pinhole flat, chosen by pixel scale:
+   * the small pinhole for the long (0.05"/pix) cameras and the large pinhole
+   * for the short (0.15"/pix) cameras.
+   */
+  def pinholeFpu(camera: GnirsCamera): GnirsFpuOther =
+    camera.pixelScale match
+      case GnirsPixelScale.PixelScale_0_05 => GnirsFpuOther.Pinhole1
+      case GnirsPixelScale.PixelScale_0_15 => GnirsFpuOther.Pinhole3
 
   /** A visit shouldn't take more than this before breaking for a telluric. */
   val MaxVisitLength: TimeSpan =
@@ -126,7 +145,7 @@ object Science:
                       coadds            = config.coadds,
                       filter            = config.filter,
                       decker            = config.decker,
-                      fpu               = Left(config.fpu),
+                      fpu               = GnirsFpu.Slit(config.fpu),
                       acquisitionMirror = acqMirror,
                       camera            = config.camera,
                       focus             = config.focus,
@@ -225,7 +244,71 @@ object Science:
   private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
     definitionError(oid, s"Estimated science cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.")
 
+  /**
+   * Generates the sequence for a daytime pinhole flat calibration: a single
+   * smart (day baseline) GCAL flat taken with the pinhole FPU and the science
+   * grating / cross-disperser, used to trace the cross-dispersed spectral
+   * orders. The exposure and lamp come from SmartGcal; the steps are DayCal
+   * (and so do not count against the program's time).
+   */
+  private def daytimePinhole[F[_]: Monad](
+    observationId: Observation.Id,
+    estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
+    static:        GnirsStaticConfig,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
+    config:        Config
+  ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
+
+    val flat: ProtoStep[GnirsDynamicConfig] =
+      SeqState.eval:
+        for
+          _ <- State.modify[GnirsDynamicConfig]: dyn =>
+                 dyn.copy(
+                   coadds            = config.coadds,
+                   filter            = config.filter,
+                   decker            = config.decker,
+                   fpu               = GnirsFpu.Other(pinholeFpu(config.camera)),
+                   acquisitionMirror = GnirsAcquisitionMirrorMode.Out(
+                                         config.prism,
+                                         config.grating,
+                                         GnirsGratingWavelength(config.centralWavelength)
+                                       ),
+                   camera            = config.camera,
+                   focus             = config.focus,
+                   readMode          = config.explicitReadMode.getOrElse(GnirsReadMode.Bright)
+                 )
+          f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, Disabled), ObserveClass.DayCal)
+        yield f
+
+    EitherT(expander.expandStep(static, flat))
+      .bimap(
+        m => definitionError(observationId, m),
+        steps =>
+          val atom    = ProtoAtom(DaytimePinholeTitle.some, steps)
+          val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
+          new SequenceGenerator[GnirsDynamicConfig]:
+            def generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
+              builder.buildStream(Stream.emit(atom))
+      ).value
+
   def instantiate[F[_]: Monad](
+    observationId: Observation.Id,
+    estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
+    static:        GnirsStaticConfig,
+    namespace:     UUID,
+    expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
+    config:        Config,
+    time:          Either[OdbError, IntegrationTime],
+    calRole:       Option[CalibrationRole]
+  ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
+    calRole match
+      case Some(CalibrationRole.DaytimePinhole) =>
+        daytimePinhole(observationId, estimator, static, namespace, expander, config)
+      case _ =>
+        instantiateScience(observationId, estimator, static, namespace, expander, config, time, calRole)
+
+  private def instantiateScience[F[_]: Monad](
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
     static:        GnirsStaticConfig,

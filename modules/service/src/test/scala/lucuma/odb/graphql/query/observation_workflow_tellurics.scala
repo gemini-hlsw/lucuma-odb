@@ -107,7 +107,9 @@ class observation_workflow_tellurics
       s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
         ps.execute(req).void
 
-  test("telluric workflow follows science up to ready"):
+  // A per-observation calibration (telluric or daytime pinhole) inherits its
+  // science observation's workflow state and has no valid transitions.
+  private def workflowFollowsScience(role: CalibrationRole): IO[Unit] =
     val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
       for
         cfp <- createCallForProposalsAs(staff)
@@ -131,7 +133,7 @@ class observation_workflow_tellurics
         gid <- createGroupAs(pi, pid, None)
         _   <- moveObservationAs(pi, sci, Some(gid))
         _   <- moveObservationAs(pi, cal, Some(gid))
-        _   <- setObservationCalibrationRole(List(cal), CalibrationRole.Telluric)
+        _   <- setObservationCalibrationRole(List(cal), role)
 
       yield (pid, sci, cal)
 
@@ -220,5 +222,10 @@ class observation_workflow_tellurics
         ).asRight
       )
 
+  test("telluric workflow follows science up to ready"):
+    workflowFollowsScience(CalibrationRole.Telluric)
+
+  test("daytime pinhole workflow follows science up to ready"):
+    workflowFollowsScience(CalibrationRole.DaytimePinhole)
 
 }

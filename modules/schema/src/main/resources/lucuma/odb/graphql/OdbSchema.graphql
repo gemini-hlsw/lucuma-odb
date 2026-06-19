@@ -16090,6 +16090,11 @@ enum CalibrationRole {
   CalibrationRole Telluric
   """
   TELLURIC
+
+  """
+  CalibrationRole DaytimePinhole
+  """
+  DAYTIME_PINHOLE
 }
 
 """

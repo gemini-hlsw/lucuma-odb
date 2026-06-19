@@ -12,7 +12,7 @@ import java.io.InputStream
 
 class R__SmartGnirs extends SmartGcalMigration("Gnirs"):
 
-  override val importForcingVersion: Int = 1
+  override val importForcingVersion: Int = 2
 
   lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
     gcalFilesFromClasspath("GNIRS_ARC", "GNIRS_FLAT")

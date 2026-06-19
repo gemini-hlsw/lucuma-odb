@@ -69,6 +69,13 @@ case class ObsExtract[A](
 object ObsExtract:
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
+  // Calibration roles whose observations live in a per-observation calibration
+  // group (the system group attached to a single science observation).  This
+  // set discriminates such a group from the per-program "Calibrations" group,
+  // whose roles (twilight, spectrophotometric) are disjoint from these.  Keep
+  // that disjointness invariant when adding roles.
+  val PerObservationCalibrationRoles = List(CalibrationRole.Telluric, CalibrationRole.DaytimePinhole)
+
   def perObsFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: Flamingos2Config)    => d
     case d @ ObsExtract(data = _: Igrins2Config)       => d
@@ -140,13 +147,16 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
       haveVisits(filtered.map(oid)).map: visited =>
         filtered.filterNot(a => visited.contains(oid(a)))
 
-  // Like `excludeFromDeletion`, but also checks tellurics parent execution state
-  def excludeTelluricsFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
-    T.span("exclude-tellurics-from-deletion").surround:
+  // Like `excludeFromDeletion`, but also checks the parent science observation's
+  // execution state.  Applies to any calibration in a per-observation calibration
+  // group (tellurics and daytime pinhole flats): if the science obs has started
+  // or finished executing, its calibrations are kept.
+  def excludeObsCalibrationsFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
+    T.span("exclude-obs-calibrations-from-deletion").surround:
       excludeFromDeletion(obs, oid).flatMap: base =>
-        executionStates(base.map(oid), Statements.selectTelluricScienceExecutionStates).map: parents =>
+        executionStates(base.map(oid), Statements.selectObsCalibrationScienceExecutionStates).map: parents =>
           base.filterNot: a =>
-            // if the science obs has started or finished executing, the telluric should not be deleted.
+            // if the science obs has started or finished executing, the calibration should not be deleted.
             parents.get(oid(a)).exists(ProtectedExecutionStates.contains_)
 
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
@@ -220,7 +230,7 @@ object WorkflowStateQueries:
         oids.map(sql"$observation_id").intercalate(void", ")                                               |+|
         void")"
 
-    def selectTelluricScienceExecutionStates(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+    def selectObsCalibrationScienceExecutionStates(oids: NonEmptyList[Observation.Id]): AppliedFragment =
       void"""
         SELECT t.c_observation_id, sci_gp.c_execution_state
         FROM t_observation t
@@ -229,7 +239,7 @@ object WorkflowStateQueries:
          AND sci.c_calibration_role IS NULL
         JOIN v_generator_params sci_gp
           ON sci_gp.c_observation_id = sci.c_observation_id
-        WHERE t.c_calibration_role = 'telluric'
+        WHERE t.c_calibration_role IS NOT NULL
           AND t.c_observation_id IN (
       """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
