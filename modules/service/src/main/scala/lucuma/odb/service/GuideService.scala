@@ -25,6 +25,7 @@ import lucuma.ags.DefaultAreaBuffer
 import lucuma.ags.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.GuideSpeed
@@ -149,6 +150,11 @@ object GuideService {
 
   object GuideEnvironment {
     given Encoder[GuideEnvironment] = deriveEncoder
+
+    // Calibration roles that don't use guide stars; an empty guide environment is
+    // returned for these without invoking AGS.
+    val CalRolesWithoutGuiding: Set[CalibrationRole] =
+      Set(CalibrationRole.Twilight, CalibrationRole.DaytimePinhole)
 
     val posAngle: Lens[GuideEnvironment, Angle] =
       Focus[GuideEnvironment](_.posAngle)
@@ -955,7 +961,12 @@ object GuideService {
             scienceDuration <- ResultT.fromResult(genInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = genInfo.getScienceStartTime(obsTime)
             oGSName          = obsInfo.validGuideStarName(genInfo.hash)
-            result          <- ResultT(lookupGuideStar(oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+            // Twilight and daytime pinhole calibrations have no guide stars, so skip AGS
+            // entirely and return an empty guide environment.
+            result          <- if (genInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
+                                  ResultT.pure(GuideEnvironment(obsInfo.availabilityAngles.head, Nil))
+                                else
+                                  ResultT(lookupGuideStar(oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
           } yield result).value
 
       override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
