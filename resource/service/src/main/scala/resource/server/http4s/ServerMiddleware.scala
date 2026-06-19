@@ -11,6 +11,7 @@ import fs2.compression.Compression
 import org.http4s.HttpRoutes
 import org.http4s.Query
 import org.http4s.Uri
+import org.http4s.Uri.Scheme
 import org.http4s.headers.Upgrade
 import org.http4s.metrics.MetricsOps
 import org.http4s.otel4s.middleware.metrics.OtelMetrics
@@ -19,6 +20,7 @@ import org.http4s.otel4s.middleware.trace.redact.PathRedactor
 import org.http4s.otel4s.middleware.trace.redact.QueryRedactor
 import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
+import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.http4s.server.middleware.GZip
 import org.http4s.server.middleware.Logger as Http4sLogger
@@ -28,13 +30,18 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.TracerProvider
 
+import scala.concurrent.duration.*
+
 object ServerMiddleware {
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
 
   /**
    * Create a combined middleware to all server routes
    */
-  def apply[F[_]: {Async, Compression, TracerProvider, MeterProvider}](): F[Middleware[F]] = {
+  def apply[F[_]: {Async, Compression, TracerProvider, MeterProvider}](
+    corsOverHttps: Boolean,
+    domain:        Seq[String]
+  ): F[Middleware[F]] = {
     given Logger[F] = Slf4jLogger.getLogger[F]
 
     val logging = Http4sLogger.httpRoutes[F](
@@ -42,7 +49,7 @@ object ServerMiddleware {
       logBody = false
     )
 
-    val httpMetrics: MetricsOps[F] => Middleware[F] = metricsOps =>
+    def httpMetrics(metricsOps: MetricsOps[F]): Middleware[F] =
       routes =>
         val withMetrics = Metrics[F](metricsOps)(routes)
         Kleisli(req => if (req.headers.get[Upgrade].isDefined) routes(req) else withMetrics(req))
@@ -55,13 +62,22 @@ object ServerMiddleware {
       )
     val spanDataProvider              = ServerSpanDataProvider.openTelemetry(redactor)
 
+    val cors: Middleware[F] =
+      CORS.policy
+        .withAllowCredentials(true)
+        .withAllowOriginHost: u =>
+          (!corsOverHttps || (u.scheme === Scheme.https)) && domain.exists(u.host.value.endsWith)
+        .withMaxAge(1.day)
+        .apply
+
     (
       OtelServerMiddleware.builder[F](spanDataProvider).build,
-      OtelMetrics.serverMetricsOps[F]()
-    ).mapN: (otel, metricsOps) =>
+      OtelMetrics.serverMetricsOps[F]().map(httpMetrics)
+    ).mapN: (otel, httpMetrics) =>
       List[Middleware[F]](
+        cors,
         logging,
-        httpMetrics(metricsOps),
+        httpMetrics,
         otel.asHttpRoutesMiddleware,
         errorReporting,
         GZip(_)

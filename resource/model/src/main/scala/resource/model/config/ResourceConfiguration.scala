@@ -12,10 +12,12 @@ import com.comcast.ip4s.*
 import lucuma.otel.OtelConfig
 
 final case class ResourceConfiguration(
-  database:    DatabaseConfiguration,
-  environment: ExecutionEnvironment,
-  port:        Port,
-  otel:        Option[OtelConfig]
+  database:      DatabaseConfiguration,
+  environment:   ExecutionEnvironment,
+  port:          Port,
+  corsOverHttps: Boolean,     // Whether to require CORS over HTTPS
+  domain:        Seq[String], // Domains, for CORS headers
+  otel:          Option[OtelConfig]
 ) derives Eq
 
 object ResourceConfiguration:
@@ -24,6 +26,8 @@ object ResourceConfiguration:
     DatabaseConfiguration.fromCiris,
     environment,
     port,
+    corsOverHttps,
+    domain,
     otelConfig
   ).parMapN(ResourceConfiguration.apply)
 
@@ -54,6 +58,10 @@ object ResourceConfiguration:
         case _                                                                               =>
           None
     )
+
+  private lazy val corsOverHttps = envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true)
+
+  private lazy val domain = envOrProp("RESOURCE_DOMAIN").map(_.split(",").map(_.trim).toSeq)
 
 def envOrProp(name: String): ConfigValue[Effect, String] =
   env(name).or(prop(name))
