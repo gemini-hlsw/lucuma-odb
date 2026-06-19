@@ -29,7 +29,7 @@ import monocle.Focus
 import monocle.Lens
 
 
-object ProposalTypeInput {
+object GeminiProposalTypeInput {
 
   private val fieldNames: List[String] =
     List(
