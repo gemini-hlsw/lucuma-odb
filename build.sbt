@@ -611,7 +611,7 @@ lazy val itcService = project
 
 lazy val itcClient = crossProject(JVMPlatform, JSPlatform)
   .in(file("itc/client"))
-  .dependsOn(itcModel)
+  .dependsOn(itcModel, schema)
   .settings(itcCommonSettings)
   .settings(
     name := "lucuma-itc-client",
