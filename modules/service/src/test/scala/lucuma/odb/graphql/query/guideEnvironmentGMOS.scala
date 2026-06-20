@@ -12,6 +12,7 @@ import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.ags.GuideStarName
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -374,6 +375,39 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ImagingResult)
+    }
+
+  // Twilight calibrations have no guide stars: AGS is skipped and an empty
+  // guide environment is returned.  The position angle comes from the
+  // observation's (default, unbounded) position angle constraint.
+  val emptyGuideEnvironmentResult: Either[List[String], Json] =
+    json"""
+    {
+      "observation": {
+        "title": "V1647 Orionis",
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "posAngle": {
+              "degrees": 0.000000
+            },
+            "guideTargets": []
+          }
+        }
+      }
+    }
+    """.asRight
+
+  test("twilight calibration - empty guide environment, AGS not invoked"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _ <- setObservationCalibrationRole(List(o), CalibrationRole.Twilight)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = emptyGuideEnvironmentResult)
     }
 
 }

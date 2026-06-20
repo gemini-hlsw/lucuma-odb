@@ -17,6 +17,7 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPixelScale
@@ -87,11 +88,19 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some { s =>
     val prior: IO[Unit] = super.dbInitialization.fold(IO.unit)(_(s))
 
+    // The daytime pinhole flat looks up the same config but with the pinhole
+    // FPU (Pinhole1 for the 0.05"/pix long camera, Pinhole3 for the 0.15"/pix
+    // short camera).
+    def pinholeFpu(ps: GnirsPixelScale): GnirsFpuOther = ps match
+      case GnirsPixelScale.PixelScale_0_05 => GnirsFpuOther.Pinhole1
+      case GnirsPixelScale.PixelScale_0_15 => GnirsFpuOther.Pinhole3
+
     val rows: List[Gnirs.TableRow] =
       List(GnirsPixelScale.PixelScale_0_05, GnirsPixelScale.PixelScale_0_15).flatMap: ps =>
         List(
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartFlat),
-          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartArc)
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartArc),
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat)
         )
 
     prior >>
