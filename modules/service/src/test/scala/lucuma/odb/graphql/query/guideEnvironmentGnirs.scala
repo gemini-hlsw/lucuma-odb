@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -118,3 +119,36 @@ class guideEnvironmentGnirs extends ExecutionTestSupportForGnirs
 
     setup.flatMap: oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = gnirsPwfs2Result("Nonsidereal Target"))
+
+  // Daytime pinhole calibrations have no guide stars: AGS is skipped and an
+  // empty guide environment is returned, with the position angle taken from the
+  // observation's (default, unbounded) position angle constraint.
+  val emptyGuideEnvironmentResult: Either[List[String], Json] =
+    json"""
+    {
+      "observation": {
+        "title": "V1647 Orionis",
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "posAngle": {
+              "degrees": 0.000000
+            },
+            "guideTargets": []
+          }
+        }
+      }
+    }
+    """.asRight
+
+  test("daytime pinhole calibration - empty guide environment, AGS not invoked"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _ <- setObservationCalibrationRole(List(o), CalibrationRole.DaytimePinhole)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = emptyGuideEnvironmentResult)

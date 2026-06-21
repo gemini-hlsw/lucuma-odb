@@ -285,7 +285,7 @@ object VisitService:
          FROM t_visit
         WHERE c_created >= $timestamp
           AND c_created  < $timestamp
-          AND c_observtation_id = $observation_id
+          AND c_observation_id = $observation_id
         ORDER BY c_created DESC LIMIT 1;
       """
         .query(visit_record)
