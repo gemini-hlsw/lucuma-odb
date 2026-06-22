@@ -104,11 +104,18 @@ object Science:
         static:   GnirsStaticConfig,
         expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig]
       ): EitherT[F, String, StepDefinition] =
+
+        // The read mode of a calibration step is determined by its exposure
+        // time, which comes from the SmartGcal lookup (and so may differ from
+        // the science read mode).
+        def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
+          s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
+
         cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
           for
             fs <- EitherT(expander.expandStep(static, flat))
             rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, (fs ::: rs).some)
+          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
 
     object PreDef:
 
