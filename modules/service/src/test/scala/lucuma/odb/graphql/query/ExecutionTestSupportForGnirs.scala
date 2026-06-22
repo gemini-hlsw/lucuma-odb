@@ -22,6 +22,7 @@ import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.BoundedInterval
@@ -31,6 +32,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gnirs
@@ -468,7 +470,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   /**
    * A single inline GCAL calibration step (flat or arc): the science instrument
    * config with its exposure replaced by the smart gcal value, taken at the
-   * given (unguided) offset.
+   * given (unguided) offset.  The read mode is resolved from the step's own
+   * exposure time, so it may differ from the science read mode.
    */
   protected def gnirsExpectedCal(
     cfg:      GnirsDynamicSnapshot,
@@ -483,6 +486,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       ),
       StepGuideState.Disabled
     )
+    val readMode = GnirsReadMode.forExposureTime(exposure).tag.toScreamingSnakeCase
     json"""
       {
         "instrumentConfig": {
@@ -496,7 +500,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
           "camera":               ${cfg.camera.asJson},
           "focusMotorSteps":      ${cfg.focus.asJson},
-          "readMode":             ${cfg.readMode.asJson}
+          "readMode":             ${readMode.asJson}
         },
         "stepConfig": { "stepType": "GCAL" },
         "telescopeConfig": ${expectedTelescopeConfig(tc)},
