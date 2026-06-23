@@ -332,7 +332,9 @@ class callsForProposals extends OdbSuite:
       semester:    "2025A"
       activeStart: "2025-02-01"
       activeEnd:   "2025-07-31"
-      keck: {}
+      keck: {
+        instruments: [ HIRES ]
+      }
     """.stripMargin
     ).flatMap: id =>
       expect(pi,
@@ -359,3 +361,88 @@ class callsForProposals extends OdbSuite:
           }
         """.asRight
       )
+
+  test("WHERE query contains unmatched observatories"):
+    expect(
+      user  = pi,
+      query = s"""
+        query {
+          callsForProposals(WHERE: { observatory: { EQ: KECK } }) {
+            matches {
+              observatory
+              gemini {
+                type
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                }
+                instruments
+                proprietaryMonths
+                allowsNonPartnerPi
+                nonPartnerDeadline
+                exchangePartners
+              }
+              keck {
+                instruments
+                coordinateLimits {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+              }
+              subaru {
+                type
+                instruments
+                coordinateLimits {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "callsForProposals": {
+            "matches": [
+              {
+                "observatory": "KECK",
+                "gemini": null,
+                "keck": {
+                  "instruments": [ "HIRES" ],
+                  "coordinateLimits": {
+                    "raStart": {
+                      "hms": "04:00:00.000000"
+                    },
+                    "raEnd": {
+                      "hms": "01:00:00.000000"
+                    },
+                    "decStart" : {
+                      "dms" : "-37:00:00.000000"
+                    },
+                    "decEnd" : {
+                      "dms" : "+90:00:00.000000"
+                    }
+                  }
+                },
+                "subaru": null
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
