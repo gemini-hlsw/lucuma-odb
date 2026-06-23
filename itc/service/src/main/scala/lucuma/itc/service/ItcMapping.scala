@@ -122,7 +122,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                             .focusIndex(1) // For gmos focus on the second CCD
                             .getOrElse(integrationTime)
                         case ObservingMode.ImagingMode.Flamingos2(_, _, _) |
-                            ObservingMode.ImagingMode.Gnirs(_, _, _, _, _) =>
+                            ObservingMode.ImagingMode.Gnirs(_, _, _, _, _, _) =>
                           integrationTime
       .flatMap: (targetOutcomes: NonEmptyChain[TargetIntegrationTimeOutcome]) =>
         Tracer[F]

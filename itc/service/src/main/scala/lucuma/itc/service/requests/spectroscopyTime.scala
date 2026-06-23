@@ -103,18 +103,20 @@ object AsterismSpectroscopyTimeRequest:
         case Igrins2SpectroscopyInput(_, port) =>
           Result.success:
             ObservingMode.SpectroscopyMode.Igrins2(port)
-        case GhostSpectroscopyInput(numSkyMicrolens,
-                                    stepCount,
-                                    resolutionMode,
-                                    redDetector,
-                                    blueDetector
+        case GhostSpectroscopyInput(
+              numSkyMicrolens,
+              stepCount,
+              resolutionMode,
+              redDetector,
+              blueDetector
             ) =>
           Result.success:
-            ObservingMode.SpectroscopyMode.Ghost(numSkyMicrolens,
-                                                 stepCount,
-                                                 resolutionMode,
-                                                 redDetector,
-                                                 blueDetector
+            ObservingMode.SpectroscopyMode.Ghost(
+              numSkyMicrolens,
+              stepCount,
+              resolutionMode,
+              redDetector,
+              blueDetector
             )
         case GnirsSpectroscopyInput(
               _,
@@ -126,6 +128,7 @@ object AsterismSpectroscopyTimeRequest:
               camera,
               readMode,
               wellDepth,
+              coadds,
               port
             ) =>
           Result.success:
@@ -138,6 +141,7 @@ object AsterismSpectroscopyTimeRequest:
               camera,
               readMode,
               wellDepth,
+              coadds,
               port
             )
         case _                                 =>
