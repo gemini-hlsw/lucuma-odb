@@ -30,7 +30,6 @@ import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
-import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
@@ -665,7 +664,9 @@ object WiringSuite:
           Wavelength.Min,
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,
-          GmosFpu.North.customMask(GmosCustomMask(GmosCustomSlitWidth.CustomWidth_0_75, "mos_mask.fits")),
+          GmosFpu.North.customMask(
+            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_0_75, "mos_mask.fits")
+          ),
           GmosCcdMode(
             GmosXBinning.Two,
             GmosYBinning.Two,
@@ -757,7 +758,9 @@ object WiringSuite:
           Wavelength.Min,
           GmosSouthGrating.B1200_G5321,
           GmosSouthFilter.GPrime.some,
-          GmosFpu.South.customMask(GmosCustomMask(GmosCustomSlitWidth.CustomWidth_1_00, "mos_mask.fits")),
+          GmosFpu.South.customMask(
+            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_1_00, "mos_mask.fits")
+          ),
           GmosCcdMode(
             GmosXBinning.Two,
             GmosYBinning.Two,
