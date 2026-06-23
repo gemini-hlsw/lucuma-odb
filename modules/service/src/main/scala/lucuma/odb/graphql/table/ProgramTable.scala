@@ -21,6 +21,8 @@ trait ProgramTable[F[_]] extends BaseMapping[F]:
     val CalibrationRole = col("c_calibration_role", calibration_role.opt)
     val ActiveStart     = col("c_active_start", date)
     val ActiveEnd       = col("c_active_end", date)
+    val ResourceCount   = col("c_resource_count", int4_nonneg)
+    val ResourceLimit   = col("c_resource_limit", int4_nonneg)
 
     object Goa:
       val Proprietary   = col("c_goa_proprietary", int4_nonneg)

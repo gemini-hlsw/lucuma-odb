@@ -261,6 +261,7 @@ object OdbMapping {
           with SetAllocationsResultMapping[F]
           with SetGuideTargetNameResultMapping[F]
           with SetProgramReferenceResultMapping[F]
+          with SetProgramResourceLimitResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
           with SiteCoordinateLimitsMapping[F]
@@ -518,6 +519,7 @@ object OdbMapping {
                 SetAllocationsResultMapping,
                 SetGuideTargetNameResultMapping,
                 SetProgramReferenceResultMapping,
+                SetProgramResourceLimitResultMapping,
                 SetProposalStatusResultMapping,
                 SiderealMapping,
                 SlewEventMapping,

@@ -3300,6 +3300,11 @@ type Mutation {
     input: SetProgramReferenceInput!
   ): SetProgramReferenceResult!
 
+  "Set a program's resource limit (the maximum combined number of observations, groups, targets, attachments, and program notes). Requires staff access."
+  setProgramResourceLimit(
+    input: SetProgramResourceLimitInput!
+  ): SetProgramResourceLimitResult!
+
   "Set the proposal status."
   setProposalStatus(input: SetProposalStatusInput!): SetProposalStatusResult!
 
@@ -5073,6 +5078,21 @@ input ProgramReferencePropertiesInput @oneOf {
 type SetProgramReferenceResult {
   "The resulting program reference, if any."
   reference: ProgramReference
+}
+
+"Input to `setProgramResourceLimit`."
+input SetProgramResourceLimitInput {
+  "The program whose resource limit should be set."
+  programId: ProgramId!
+
+  "The new maximum combined number of associated resources."
+  limit: NonNegInt!
+}
+
+"The result of `setProgramResourceLimit`."
+type SetProgramResourceLimitResult {
+  "The updated program."
+  program: Program!
 }
 
 """
@@ -13418,6 +13438,19 @@ type Program {
   Observatory archive properties related to this program.
   """
   goa: GoaProperties!
+
+  """
+  Maximum number of resources (observations, groups, targets, attachments, and
+  program notes, combined) that may be associated with this program.
+  """
+  resourceLimit: NonNegInt!
+
+  """
+  Current number of resources (present, non-system observations, groups,
+  targets, attachments, and program notes) associated with this program, counted
+  against `resourceLimit`.
+  """
+  resourceCount: NonNegInt!
 }
 
 """

@@ -113,6 +113,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       SetGuideTargetName,
       SetObservationWorkflowState,
       SetProgramReference,
+      SetProgramResourceLimit,
       SetProposalStatus,
       UnlinkUser,
       UpdateAsterisms,
@@ -149,17 +150,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     def elaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]]
     def FieldMapping: RootEffect
   }
-  // SQLSTATE raised by the deferred program-object-limit constraint trigger
+  // SQLSTATE raised by the deferred program-resource-limit constraint trigger
   // (see V1182). It uses a custom code so it is distinguishable from other
   // RAISEs (which use the default P0001). Because the trigger is deferred, the
   // error surfaces at commit, so we recover it centrally here rather than in
   // each mutation.
-  private val ProgramObjectLimitSqlState = "LU001"
+  private val ProgramResourceLimitSqlState = "LU001"
 
-  private def recoverProgramObjectLimit[A](fa: F[Result[A]]): F[Result[A]] =
+  private def recoverProgramResourceLimit[A](fa: F[Result[A]]): F[Result[A]] =
     fa.recover:
-      case ex: skunk.exception.PostgresErrorException if ex.code === ProgramObjectLimitSqlState =>
-        OdbError.ProgramObjectLimitExceeded(Some(ex.message)).asFailure
+      case ex: skunk.exception.PostgresErrorException if ex.code === ProgramResourceLimitSqlState =>
+        OdbError.ProgramResourceLimitExceeded(Some(ex.message)).asFailure
 
   private object MutationField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
@@ -168,7 +169,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           RootEffect.computeChild(fieldName) { (child, _, _) =>
             child match {
               case Environment(env, child2) =>
-                Nested(env.getR[I]("input").flatTraverse(i => recoverProgramObjectLimit(f(i, child2))))
+                Nested(env.getR[I]("input").flatTraverse(i => recoverProgramResourceLimit(f(i, child2))))
                   .map(child3 => Environment(env, child3))
                   .value
               case _ =>
@@ -187,7 +188,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       new MutationField {
         val FieldMapping =
           RootEffect.computeJson(fieldName): (_, env) =>
-            Nested(env.getR[I]("input").flatTraverse(i => recoverProgramObjectLimit(f(i)))).value
+            Nested(env.getR[I]("input").flatTraverse(i => recoverProgramResourceLimit(f(i)))).value
         val elaborator =
           case (MutationType, `fieldName`, List(inputBinding("input", rInput))) =>
             Elab.liftR(rInput).flatMap: i =>
@@ -736,6 +737,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           r.flatTraverse: checked =>
             programService.setProgramReference(checked).nestMap: (pid, _) =>
               Unique(Filter(Predicates.setProgramReferenceResult.programId.eql(pid), child))
+
+  private lazy val SetProgramResourceLimit =
+    MutationField("setProgramResourceLimit", SetProgramResourceLimitInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireStaffAccess:
+          programService.setResourceLimit(input.programId, input.limit).nestMap: pid =>
+            Unique(Filter(Predicates.program.id.eql(pid), child))
 
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>

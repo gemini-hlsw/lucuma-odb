@@ -98,7 +98,9 @@ trait ProgramMapping[F[_]]
       SqlObject("userInvitations", Join(ProgramTable.Id, UserInvitationTable.ProgramId)),
       SqlObject("allocations", Join(ProgramTable.Id, AllocationTable.ProgramId)),
       SqlField("calibrationRole", ProgramTable.CalibrationRole),
-      SqlObject("goa")
+      SqlObject("goa"),
+      SqlField("resourceLimit", ProgramTable.ResourceLimit),
+      SqlField("resourceCount", ProgramTable.ResourceCount)
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

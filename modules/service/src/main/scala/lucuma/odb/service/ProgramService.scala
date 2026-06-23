@@ -32,6 +32,7 @@ import lucuma.odb.util.Codecs.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.codec.all.*
+import skunk.data.Completion
 import skunk.syntax.all.*
 
 import java.time.LocalDate
@@ -53,6 +54,16 @@ trait ProgramService[F[_]] {
   def setProgramReference(
     input: AccessControl.CheckedWithId[ProgramReferencePropertiesInput, Program.Id]
   )(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]]
+
+  /**
+   * Set the maximum number of resources (observations, groups, targets,
+   * attachments, and program notes, combined) that may be associated with the
+   * program. Access control (staff) is enforced by the caller.
+   */
+  def setResourceLimit(
+    pid:   Program.Id,
+    limit: NonNegInt
+  )(using Transaction[F]): F[Result[Program.Id]]
 
   /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
@@ -178,6 +189,13 @@ object ProgramService {
             _ <- ResultT(validateProposal(pid))
             r <- ResultT(setProgramReferenceImpl(pid, props).map(_.map((pid, _))))
           } yield r).value
+
+      override def setResourceLimit(pid: Program.Id, limit: NonNegInt)(using Transaction[F]): F[Result[Program.Id]] =
+        session
+          .execute(Statements.SetResourceLimit)(limit, pid)
+          .map:
+            case Completion.Update(1) => pid.success
+            case _                    => OdbError.InvalidProgram(pid).asFailure
 
       def validateActivePeriodUpdate[A](active: Option[A]): Result[Unit] =
         OdbError
@@ -319,6 +337,13 @@ object ProgramService {
            prpi.scienceSubtype,
            id
          )}
+
+    val SetResourceLimit: Command[(NonNegInt, Program.Id)] =
+      sql"""
+        UPDATE t_program
+        SET    c_resource_limit = $int4_nonneg
+        WHERE  c_program_id = $program_id
+      """.command
 
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""
