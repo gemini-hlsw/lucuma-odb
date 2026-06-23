@@ -196,6 +196,195 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
     )
   }
 
+  test("gmos north mos case") {
+    query(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }, {
+                        band: J
+                        value: 2.1
+                        units: AB_MAGNITUDE
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
+                centralWavelength: {
+                  nanometers: 60
+                },
+                filter: GG455,
+                fpu: {
+                  customMask: {
+                    filename: "my_mask.fits",
+                    slitWidth: CUSTOM_WIDTH_0_75
+                  }
+                },
+                grating: B1200_G5301
+              }
+            }
+          }) {
+            brightest {
+              selected {
+                exposureCount
+                exposureTime {
+                  seconds
+                }
+              }
+              band
+            }
+          }
+        }
+        """,
+      json"""
+        {
+          "data": {
+            "spectroscopy" : {
+              "brightest": {
+                "selected" : {
+                  "exposureCount" : 10,
+                  "exposureTime" : {
+                    "seconds" : 1.000000
+                  }
+                },
+                "band": "R"
+              }
+            }
+          }
+        }
+        """
+    )
+  }
+
+  test("gmos south mos case") {
+    query(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        planet: JUPITER
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                        error: 0.2
+                      }, {
+                        band: J
+                        value: 2.1
+                        units: AB_MAGNITUDE
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosSSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
+                centralWavelength: {
+                  nanometers: 60
+                },
+                filter: RG610,
+                fpu: {
+                  customMask: {
+                    filename: "my_mask.fits",
+                    slitWidth: CUSTOM_WIDTH_1_00
+                  }
+                },
+                grating: B1200_G5321
+              }
+            }
+          }) {
+              brightest {
+                selected {
+                  exposureCount
+                  exposureTime {
+                    seconds
+                  }
+                }
+              }
+          }
+        }
+        """,
+      json"""
+        {
+          "data": {
+            "spectroscopy" : {
+                "brightest": {
+                  "selected" : {
+                    "exposureCount" : 10,
+                    "exposureTime" : {
+                      "seconds" : 1.000000
+                    }
+                  }
+                }
+              }
+          }
+        }
+        """
+    )
+  }
+
   test("f2 case") {
     query(
       """
