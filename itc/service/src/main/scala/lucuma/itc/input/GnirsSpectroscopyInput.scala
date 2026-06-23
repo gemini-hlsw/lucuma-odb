@@ -4,6 +4,7 @@
 package lucuma.itc.input
 
 import cats.syntax.parallel.*
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuSlit
@@ -28,6 +29,7 @@ final case class GnirsSpectroscopyInput(
   camera:            GnirsCamera,
   readMode:          GnirsReadMode,
   wellDepth:         GnirsWellDepth,
+  coadds:            PosInt,
   port:              PortDisposition
 ) extends InstrumentModesInput
 
@@ -45,6 +47,7 @@ object GnirsSpectroscopyInput:
             GnirsCameraBinding("camera", camera),
             GnirsReadModeBinding("readMode", readMode),
             GnirsWellDepthBinding("wellDepth", wellDepth),
+            PosIntBinding("coadds", coadds),
             PortDispositionBinding("port", portDisposition)
           ) =>
         (exposureTimeMode,
@@ -56,5 +59,6 @@ object GnirsSpectroscopyInput:
          camera,
          readMode,
          wellDepth,
+         coadds,
          portDisposition
         ).parMapN(apply)

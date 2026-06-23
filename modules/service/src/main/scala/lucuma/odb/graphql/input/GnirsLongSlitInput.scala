@@ -40,6 +40,16 @@ import lucuma.odb.graphql.binding.*
 
 object GnirsLongSlitInput:
 
+  // Signal-to-noise exposure time mode does not support coadds. When the ETM is set to
+  // signal-to-noise, force coadds to 1 so a previously-set value doesn't linger.
+  private def coaddsForEtm(
+    etm:    Option[ExposureTimeMode],
+    coadds: Option[PosInt]
+  ): Option[PosInt] =
+    etm match
+      case Some(ExposureTimeMode.SignalToNoiseMode(_, _)) => PosInt.from(1).toOption
+      case _                                           => coadds
+
   object TelescopeConfigAlongSlitInput:
     val Binding: Matcher[TelescopeConfigAlongSlit] =
       ObjectFieldsBinding.rmap:
@@ -109,7 +119,9 @@ object GnirsLongSlitInput:
                 else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GnirsFilter.AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
             ,
             rAcqType, rCoadds, rSkyOffset, rEtm
-          ).parMapN(AcquisitionInput.apply).flatMap(validateSkyOffset)
+          ).parMapN(AcquisitionInput.apply)
+           .map(a => a.copy(coadds = coaddsForEtm(a.exposureTimeMode, a.coadds)))
+           .flatMap(validateSkyOffset)
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],
@@ -163,7 +175,7 @@ object GnirsLongSlitInput:
             (etm, coadds, filter, fpu, camera, grating, prism,
              centralWavelength, decker, explGrating, explPrism,
              focus, readMode, wellDepth, explTelescope, acq, telluricType) =>
-              Create(etm, coadds, filter, fpu, camera, grating, prism,
+              Create(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
                      centralWavelength, decker, explGrating, explPrism,
                      focus, readMode, wellDepth, explTelescope, acq,
                      telluricType.getOrElse(TelluricType.Hot))
@@ -239,3 +251,4 @@ object GnirsLongSlitInput:
           (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
            rCentralWavelength, rDecker, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parMapN(Edit.apply)
+            .map(e => e.copy(coadds = coaddsForEtm(e.exposureTimeMode, e.coadds)))
