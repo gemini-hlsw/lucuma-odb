@@ -336,11 +336,6 @@ input GnirsSpectroscopyInput {
   wellDepth: GnirsWellDepth!
 
   """
-  Number of coadds
-  """
-  coadds: PosInt!
-
-  """
   Instrument port disposition
   """
   port: PortDisposition = SIDE
@@ -371,11 +366,6 @@ input GnirsImagingInput {
   GNIRS well depth
   """
   wellDepth: GnirsWellDepth!
-
-  """
-  Number of coadds
-  """
-  coadds: PosInt!
 
   """
   Instrument port disposition

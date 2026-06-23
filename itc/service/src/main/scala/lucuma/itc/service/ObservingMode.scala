@@ -167,7 +167,6 @@ object ObservingMode {
       camera:            GnirsCamera,
       readMode:          GnirsReadMode,
       wellDepth:         GnirsWellDepth,
-      coadds:            PosInt,
       portDisposition:   PortDisposition
     ) extends SpectroscopyMode derives Hash {
       val instrument: Instrument =
@@ -244,7 +243,6 @@ object ObservingMode {
       camera:          GnirsCamera,
       readMode:        GnirsReadMode,
       wellDepth:       GnirsWellDepth,
-      coadds:          PosInt,
       portDisposition: PortDisposition
     ) extends ImagingMode derives Hash {
       val instrument: Instrument = Instrument.Gnirs

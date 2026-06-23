@@ -242,7 +242,7 @@ private[legacy] object codecs:
       Json.obj(
         "readMode"          -> d.readMode.ocs2Tag.asJson,
         "binning"           -> d.binning.ocs2Tag.asJson,
-        "calculationMethod" -> d.timeAndCount.spectroscopyCalculationMethod().asJson
+        "calculationMethod" -> d.timeAndCount.spectroscopyCalculationMethod.asJson
       )
 
     // The legacy ITC doesn't know about step count, so we "include" it by multiplying the

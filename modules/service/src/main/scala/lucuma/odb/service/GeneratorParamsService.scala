@@ -464,8 +464,7 @@ object GeneratorParamsService {
                 grating           = gn.grating,
                 camera            = gn.camera,
                 readMode          = sciReadMode,
-                wellDepth         = gn.wellDepth,
-                coadds            = gn.coadds
+                wellDepth         = gn.wellDepth
               )
               spectroscopyGeneratorParams(
                 obsMode = gn,
@@ -474,8 +473,7 @@ object GeneratorParamsService {
                   filter           = acqFilter,
                   camera           = gn.camera,
                   readMode         = GnirsReadMode.Bright,
-                  wellDepth        = gn.wellDepth,
-                  coadds           = gn.acquisition.coadds
+                  wellDepth        = gn.wellDepth
                 ),
                 sciMode = sciMode
               )

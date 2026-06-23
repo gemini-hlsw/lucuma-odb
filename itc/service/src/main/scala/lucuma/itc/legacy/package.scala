@@ -3,7 +3,6 @@
 
 package lucuma.itc.legacy
 
-import cats.syntax.option.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Redshift
@@ -30,51 +29,39 @@ case class ItcSourceDefinition(
 ):
   export target.*
 
-extension (mode: ObservingMode)
-  /** The number of coadds for instruments that support it (currently GNIRS), else None. */
-  def coadds: Option[Int] =
-    mode match
-      case ObservingMode.SpectroscopyMode.GnirsLongSlit(coadds = coadds) => coadds.value.some
-      case ObservingMode.ImagingMode.Gnirs(coadds = coadds)              => coadds.value.some
-      case _                                                             => none
-
 extension (etm: ExposureTimeMode)
-  def spectroscopyCalculationMethod(
-    coadds: Option[Int] = none
-  ): ItcObservationDetails.CalculationMethod =
+  def spectroscopyCalculationMethod: ItcObservationDetails.CalculationMethod =
     etm match
       case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
         ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.SpectroscopyIntegrationTime(
           sigma = sn.toBigDecimal.toDouble,
-          coadds = coadds,
+          coadds = None,
           wavelengthAt = at,
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0
         )
-      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
           exposureCount = count.value,
-          coadds = coadds,
+          coadds = None,
           exposureDuration = time.toMilliseconds.toDouble.milliseconds,
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0,
           wavelengthAt = at
         )
-  def imagingCalculationMethod(
-    coadds: Option[Int] = none
-  ): ItcObservationDetails.CalculationMethod =
+  def imagingCalculationMethod: ItcObservationDetails.CalculationMethod      =
     etm match
       case ExposureTimeMode.SignalToNoiseMode(sn, at)         =>
         ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.ImagingIntegrationTime(
           sigma = sn.toBigDecimal.toDouble,
-          coadds = coadds,
+          coadds = None,
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0
         )
-      case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
+      case ExposureTimeMode.TimeAndCountMode(time, count, at) => // TODO add coadds
         ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
           exposureCount = count.value,
-          coadds = coadds,
+          coadds = None,
           exposureDuration = time.toMilliseconds.toDouble.milliseconds,
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0
@@ -92,9 +79,9 @@ def getCalculationMethod(
 ): ItcObservationDetails.CalculationMethod =
   observingMode match
     case s: ObservingMode.SpectroscopyMode =>
-      exposureTimeMode.spectroscopyCalculationMethod(observingMode.coadds)
+      exposureTimeMode.spectroscopyCalculationMethod
     case i: ObservingMode.ImagingMode      =>
-      exposureTimeMode.imagingCalculationMethod(observingMode.coadds)
+      exposureTimeMode.imagingCalculationMethod
 
 case class ItcParameters(
   source:      ItcSourceDefinition,
@@ -130,7 +117,7 @@ def spectroscopyGraphParams(
       observation = ItcObservationDetails(
         calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
           exposureCount = exposureCount,
-          coadds = observingMode.coadds,
+          coadds = None,
           exposureDuration = exposureDuration,
           sourceFraction = 1.0,
           ditherOffset = Angle.Angle0,
