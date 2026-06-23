@@ -196,7 +196,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
     )
   }
 
-  test("gmos north mos case") {
+  test("gmos north mos (custom fpu) case") {
     query(
       """
         query {
@@ -291,7 +291,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
     )
   }
 
-  test("gmos south mos case") {
+  test("gmos south mos (custom mask) case") {
     query(
       """
         query {
