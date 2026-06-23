@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
@@ -117,4 +118,33 @@ class programResourceLimit extends OdbSuite:
                  { "setProgramResourceLimit": { "program": { "resourceLimit": 5000 } } }
                """)
              )
+    yield ()
+
+  test("lowering the limit below current usage succeeds with a warning"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- createTargetAs(pi, pid)
+      _   <- createGroupAs(pi, pid)          // count = 2
+      _   <- expectIor(
+               user  = staff,
+               query = s"""
+                 mutation {
+                   setProgramResourceLimit(input: { programId: "$pid", limit: 0 }) {
+                     program { resourceLimit resourceCount }
+                   }
+                 }
+               """,
+               expected = Ior.both(
+                 List(s"Program $pid has 2 associated resources, which exceeds the new limit of 0. No new resources can be added until the count drops below the limit."),
+                 json"""{ "setProgramResourceLimit": { "program": { "resourceLimit": 0, "resourceCount": 2 } } }"""
+               )
+             )
+    yield ()
+
+  test("setting the limit to 0 freezes the program"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- setResourceLimitAs(staff, pid, 0)   // empty program: succeeds without warning
+      _   <- interceptOdbError(createTargetAs(pi, pid)):
+               case OdbError.ProgramResourceLimitExceeded(_) => ()
     yield ()

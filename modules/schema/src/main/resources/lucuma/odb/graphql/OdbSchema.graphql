@@ -3303,6 +3303,9 @@ type Mutation {
   """
   Set a program's resource limit (the maximum combined number of observations,
   groups, targets, attachments, and program notes). Requires staff access.
+  Lowering the limit below the program's current resource count is allowed (e.g.
+  set it to 0 to prevent any further additions) and succeeds with a warning; no
+  new resources may be added until the count drops below the limit.
   """
   setProgramResourceLimit(
     input: SetProgramResourceLimitInput!
