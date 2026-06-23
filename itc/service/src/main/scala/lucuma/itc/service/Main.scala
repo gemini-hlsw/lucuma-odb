@@ -9,6 +9,7 @@ import cats.Functor
 import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.*
+import cats.effect.std.Semaphore
 import cats.syntax.all.*
 import com.comcast.ip4s.*
 import dev.profunktor.redis4cats.Redis
@@ -160,7 +161,16 @@ object Main extends IOApp with ItcCacheOrRemote {
     val spanDataProvider = ServerSpanDataProvider.openTelemetry(redactor)
     for
       localItc                   <- Resource.eval(legacyItcLoader[F])
-      itc                        <- Resource.eval(ItcImpl.build(FLocalItc[F](localItc)).pure[F])
+      calcSemaphore              <- Resource.eval(Semaphore[F](cfg.maxConcurrentCalculations.toLong))
+      _                          <- Resource.eval(
+                                      Logger[F].info(
+                                        s"ITC max concurrent calculations: ${cfg.maxConcurrentCalculations}"
+                                      )
+                                    )
+      itc                         =
+                                    Itc.limitConcurrency(cfg.maxConcurrentCalculations, calcSemaphore)(
+                                      ItcImpl.build(FLocalItc[F](localItc))
+                                    )
       cache                      <- createCache[F](cfg.redisUrl)
       _                          <- Resource.eval(checkVersionToPurge[F](cache))
       customSedResolver          <- CustomSedOdbAttachmentResolver[F](cfg.odbBaseUrl, cfg.odbServiceToken)

@@ -19,7 +19,8 @@ final case class Config(
   odbServiceToken: String,
   otel:            Option[SharedOtelConfig],
   inHeroku:        Boolean,
-  cacheTtlDays:    Int
+  cacheTtlDays:    Int,
+  maxConcurrentCalculations: Int
 )
 
 object Config:
@@ -43,7 +44,8 @@ object Config:
      envOrProp("ODB_SERVICE_JWT"),
      OtelConfig.fromCiris,
      dynoCheck.map(_.isDefined),
-     envOrProp("ITC_CACHE_TTL_DAYS").as[Int].default(7)
+     envOrProp("ITC_CACHE_TTL_DAYS").as[Int].default(7),
+     envOrProp("ITC_MAX_CONCURRENT_CALCULATIONS").as[Int].default(4)
     ).parMapN(Config.apply)
 
   private def redisUrlConfig(
