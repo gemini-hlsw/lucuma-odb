@@ -190,6 +190,7 @@ object InstrumentMode {
     camera:            GnirsCamera,
     readMode:          GnirsReadMode,
     wellDepth:         GnirsWellDepth,
+    coadds:            PosInt,
     port:              PortDisposition = PortDisposition.Bottom
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
@@ -207,6 +208,7 @@ object InstrumentMode {
         "camera"            -> a.camera.asScreamingJson,
         "readMode"          -> a.readMode.asScreamingJson,
         "wellDepth"         -> a.wellDepth.asScreamingJson,
+        "coadds"            -> a.coadds.asJson,
         "port"              -> a.port.asScreamingJson
       )
 
@@ -275,6 +277,7 @@ object InstrumentMode {
     camera:           GnirsCamera,
     readMode:         GnirsReadMode,
     wellDepth:        GnirsWellDepth,
+    coadds:           PosInt,
     port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
@@ -289,6 +292,7 @@ object InstrumentMode {
         "camera"           -> a.camera.asScreamingJson,
         "readMode"         -> a.readMode.asScreamingJson,
         "wellDepth"        -> a.wellDepth.asScreamingJson,
+        "coadds"           -> a.coadds.asJson,
         "port"             -> a.port.asScreamingJson
       )
 
@@ -340,8 +344,8 @@ object InstrumentMode {
         Json.obj("igrins2Spectroscopy" -> a.asJson)
       case a @ GhostSpectroscopy(_, _, _, _)                   =>
         Json.obj("ghostSpectroscopy" -> a.asJson)
-      case a @ GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _) =>
+      case a @ GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _, _) =>
         Json.obj("gnirsSpectroscopy" -> a.asJson)
-      case a @ GnirsImaging(_, _, _, _, _, _)                  =>
+      case a @ GnirsImaging(_, _, _, _, _, _, _)                  =>
         Json.obj("gnirsImaging" -> a.asJson)
 }

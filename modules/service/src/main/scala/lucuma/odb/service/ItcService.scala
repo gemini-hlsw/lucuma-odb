@@ -295,7 +295,7 @@ object ItcService {
           case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
-          case InstrumentMode.GnirsImaging(_, _, _, _, _, _) =>
+          case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
             go(lucuma.odb.sequence.gnirs.MinAcquisitionExposureTime,
                lucuma.odb.sequence.gnirs.MaxAcquisitionExposureTime)
           case m                                                      =>
