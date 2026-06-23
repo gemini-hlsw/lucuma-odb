@@ -9,6 +9,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 import lucuma.odb.util.Codecs.*
@@ -44,6 +45,34 @@ class programResourceLimit extends OdbSuite:
           values ($program_id, 'finder', $text, 0, $text)
         """.command
       )((pid, fileName, s"remote/$fileName")).void
+
+  private def hardDeleteAttachment(pid: Program.Id, fileName: String): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"delete from t_attachment where c_program_id = $program_id and c_file_name = $text".command
+      )((pid, fileName)).void
+
+  private def restoreTarget(tid: Target.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(sql"update t_target set c_existence = 'present' where c_target_id = $target_id".command)(tid).void
+
+  private def moveTarget(tid: Target.Id, pid: Program.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(sql"update t_target set c_program_id = $program_id where c_target_id = $target_id".command)((pid, tid)).void
+
+  // Assert the maintained counter matches the count recomputed from scratch
+  // (and equals the expected value, so we know it is actually counting).
+  private def assertReconciled(pid: Program.Id, expected: Int): IO[Unit] =
+    withSession: s =>
+      s.unique(
+        sql"""
+          select rc.c_resource_count, program_resource_count_actual(rc.c_program_id)
+          from   t_program_resource_count rc
+          where  rc.c_program_id = $program_id
+        """.query(int4 *: int4)
+      )(pid).map: (maintained, actual) =>
+        assertEquals(maintained, actual,    s"resource count drift for $pid: maintained=$maintained actual=$actual")
+        assertEquals(maintained, expected,  s"unexpected resource count for $pid")
 
   test("observations, groups, targets, and program notes count together"):
     for
@@ -147,4 +176,25 @@ class programResourceLimit extends OdbSuite:
       _   <- setResourceLimitAs(staff, pid, 0)   // empty program: succeeds without warning
       _   <- interceptOdbError(createTargetAs(pi, pid)):
                case OdbError.ProgramResourceLimitExceeded(_) => ()
+    yield ()
+
+  test("maintained count reconciles with the recomputed count across all transitions"):
+    for
+      pid  <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      _    <- createGroupAs(pi, pid)
+      _    <- createObservationAs(pi, pid)
+      _    <- createProgramNoteAs(pi, pid, "note", "x".some)
+      _    <- insertAttachment(pid, "finder.png")
+      _    <- assertReconciled(pid, 5)             // five inserts, one of each type
+      _    <- deleteTargetAs(pi, tid)              // soft delete
+      _    <- assertReconciled(pid, 4)
+      _    <- restoreTarget(tid)                   // restore (existence -> present)
+      _    <- assertReconciled(pid, 5)
+      _    <- hardDeleteAttachment(pid, "finder.png")
+      _    <- assertReconciled(pid, 4)
+      _    <- moveTarget(tid, pid2)                // cross-program move
+      _    <- assertReconciled(pid, 3)
+      _    <- assertReconciled(pid2, 1)
     yield ()
