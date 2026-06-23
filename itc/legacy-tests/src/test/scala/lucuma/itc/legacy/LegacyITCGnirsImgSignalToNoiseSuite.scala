@@ -3,7 +3,6 @@
 
 package lucuma.itc.legacy
 
-import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
@@ -39,7 +38,6 @@ class LegacyITCGnirsImgSignalToNoiseSuite extends CommonITCLegacySuite:
     camera = GnirsCamera.ShortBlue,
     readMode = GnirsReadMode.Bright,
     wellDepth = GnirsWellDepth.Shallow,
-    coadds = PosInt.unsafeFrom(1),
     portDisposition = PortDisposition.Bottom
   )
 
