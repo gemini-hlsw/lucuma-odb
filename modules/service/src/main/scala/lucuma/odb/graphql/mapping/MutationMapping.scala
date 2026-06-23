@@ -149,6 +149,18 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     def elaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]]
     def FieldMapping: RootEffect
   }
+  // SQLSTATE raised by the deferred program-object-limit constraint trigger
+  // (see V1182). It uses a custom code so it is distinguishable from other
+  // RAISEs (which use the default P0001). Because the trigger is deferred, the
+  // error surfaces at commit, so we recover it centrally here rather than in
+  // each mutation.
+  private val ProgramObjectLimitSqlState = "LU001"
+
+  private def recoverProgramObjectLimit[A](fa: F[Result[A]]): F[Result[A]] =
+    fa.recover:
+      case ex: skunk.exception.PostgresErrorException if ex.code === ProgramObjectLimitSqlState =>
+        OdbError.ProgramObjectLimitExceeded(Some(ex.message)).asFailure
+
   private object MutationField {
     def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
       new MutationField {
@@ -156,7 +168,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           RootEffect.computeChild(fieldName) { (child, _, _) =>
             child match {
               case Environment(env, child2) =>
-                Nested(env.getR[I]("input").flatTraverse(i => f(i, child2)))
+                Nested(env.getR[I]("input").flatTraverse(i => recoverProgramObjectLimit(f(i, child2))))
                   .map(child3 => Environment(env, child3))
                   .value
               case _ =>
@@ -175,7 +187,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       new MutationField {
         val FieldMapping =
           RootEffect.computeJson(fieldName): (_, env) =>
-            Nested(env.getR[I]("input").flatTraverse(i => f(i))).value
+            Nested(env.getR[I]("input").flatTraverse(i => recoverProgramObjectLimit(f(i)))).value
         val elaborator =
           case (MutationType, `fieldName`, List(inputBinding("input", rInput))) =>
             Elab.liftR(rInput).flatMap: i =>

@@ -60,6 +60,7 @@ enum OdbError:
   case GuideEnvironmentError(detail: Option[String] = None)
   case EmailSendError(detail: Option[String] = None)
   case InconsistentGroupError(detail: Option[String] = None)
+  case ProgramObjectLimitExceeded(detail: Option[String] = None)
   case InvalidConfiguration(detail: Option[String] = None)
   case InvalidWorkflowTransition(currentState: ObservationWorkflowState, requestedState: ObservationWorkflowState, detail: Option[String] = None)
   case RemoteServiceCallError(detail: Option[String] = None)
@@ -92,6 +93,7 @@ object OdbError:
     case GuideEnvironmentError     extends Tag("guide_environment_error")
     case EmailSendError            extends Tag("email_send_error")
     case InconsistentGroup         extends Tag("inconsistent_group")
+    case ProgramObjectLimitExceeded extends Tag("program_object_limit_exceeded")
     case InvalidConfiguration      extends Tag("invalid_configuration")
     case InvalidWorkflowTransition extends Tag("invalid_workflow_transition")
     case RemoteServiceCallError    extends Tag("remote_service_call_error")
@@ -128,6 +130,7 @@ object OdbError:
       case GuideEnvironmentError(_)           => Tag.GuideEnvironmentError
       case EmailSendError(_)                  => Tag.EmailSendError
       case InconsistentGroupError(_)          => Tag.InconsistentGroup
+      case ProgramObjectLimitExceeded(_)      => Tag.ProgramObjectLimitExceeded
       case InvalidConfiguration(_)            => Tag.InvalidConfiguration
       case InvalidWorkflowTransition(_, _, _) => Tag.InvalidWorkflowTransition
       case RemoteServiceCallError(_)          => Tag.RemoteServiceCallError
@@ -156,6 +159,7 @@ object OdbError:
       case GuideEnvironmentError(_)      => "The guide environment as configured is ineligible for the requested operation."
       case EmailSendError(_)             => "Unable to send the email."
       case InconsistentGroupError(_)     => "Group hierarchy is inconsistent, or a deleted group contains a non-deleted element."
+      case ProgramObjectLimitExceeded(_) => "The program has reached its maximum number of observations, groups, and targets."
       case InvalidConfiguration(_)       => "Observation configuration is incomplete."
       case InvalidWorkflowTransition(a, b, _) => s"Workflow state cannot be chanegd from $a to $b."
       case RemoteServiceCallError(_)     => "Error attempting to call a remote service."
@@ -184,6 +188,7 @@ object OdbError:
       case GuideEnvironmentError(_)           => JsonObject()
       case EmailSendError(_)                  => JsonObject()
       case InconsistentGroupError(_)          => JsonObject()
+      case ProgramObjectLimitExceeded(_)      => JsonObject()
       case InvalidConfiguration(_)            => JsonObject()
       case InvalidWorkflowTransition(a, b, _) => JsonObject("currentState" -> a.asJson, "requestedState" -> b.asJson)
       case RemoteServiceCallError(_)          => JsonObject()
@@ -212,6 +217,7 @@ object OdbError:
       case Tag.GuideEnvironmentError     => GuideEnvironmentError(detail).asRight
       case Tag.EmailSendError            => EmailSendError(detail).asRight
       case Tag.InconsistentGroup         => InconsistentGroupError(detail).asRight
+      case Tag.ProgramObjectLimitExceeded => ProgramObjectLimitExceeded(detail).asRight
       case Tag.InvalidConfiguration      => InvalidConfiguration(detail).asRight
       case Tag.InvalidWorkflowTransition => (c.downField("currentState").as[ObservationWorkflowState], c.downField("requestedState").as[ObservationWorkflowState]).mapN(InvalidWorkflowTransition(_, _, detail))
       case Tag.RemoteServiceCallError    => RemoteServiceCallError(detail).asRight
