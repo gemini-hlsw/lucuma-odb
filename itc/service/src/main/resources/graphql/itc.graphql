@@ -336,9 +336,9 @@ input GnirsSpectroscopyInput {
   wellDepth: GnirsWellDepth!
 
   """
-  Number of coadds
+  Number of coadds. Optional for compatibility with clients that don't send it; defaults to 1.
   """
-  coadds: PosInt!
+  coadds: PosInt
 
   """
   Instrument port disposition
@@ -373,9 +373,9 @@ input GnirsImagingInput {
   wellDepth: GnirsWellDepth!
 
   """
-  Number of coadds
+  Number of coadds. Optional for compatibility with clients that don't send it; defaults to 1.
   """
-  coadds: PosInt!
+  coadds: PosInt
 
   """
   Instrument port disposition

@@ -47,9 +47,10 @@ object GnirsSpectroscopyInput:
             GnirsCameraBinding("camera", camera),
             GnirsReadModeBinding("readMode", readMode),
             GnirsWellDepthBinding("wellDepth", wellDepth),
-            PosIntBinding("coadds", coadds),
+            PosIntBinding.Option("coadds", coadds),
             PortDispositionBinding("port", portDisposition)
           ) =>
+        // coadds is optional for compatibility with clients that don't send it; default to 1.
         (exposureTimeMode,
          centralWavelength,
          filter,
@@ -59,6 +60,6 @@ object GnirsSpectroscopyInput:
          camera,
          readMode,
          wellDepth,
-         coadds,
+         coadds.map(_.getOrElse(PosInt.MinValue)),
          portDisposition
         ).parMapN(apply)
