@@ -328,21 +328,21 @@ object InstrumentMode {
 
   given Encoder[InstrumentMode] = a =>
     a match
-      case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _, _)   =>
+      case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _, _)      =>
         Json.obj("gmosNSpectroscopy" -> a.asJson)
-      case a @ GmosSouthSpectroscopy(_, _, _, _, _, _, _, _)   =>
+      case a @ GmosSouthSpectroscopy(_, _, _, _, _, _, _, _)      =>
         Json.obj("gmosSSpectroscopy" -> a.asJson)
-      case a @ GmosNorthImaging(_, _, _, _)                    =>
+      case a @ GmosNorthImaging(_, _, _, _)                       =>
         Json.obj("gmosNImaging" -> a.asJson)
-      case a @ GmosSouthImaging(_, _, _, _)                    =>
+      case a @ GmosSouthImaging(_, _, _, _)                       =>
         Json.obj("gmosSImaging" -> a.asJson)
-      case a @ Flamingos2Spectroscopy(_, _, _, _, _, _)        =>
+      case a @ Flamingos2Spectroscopy(_, _, _, _, _, _)           =>
         Json.obj("flamingos2Spectroscopy" -> a.asJson)
-      case a @ Flamingos2Imaging(_, _, _, _)                   =>
+      case a @ Flamingos2Imaging(_, _, _, _)                      =>
         Json.obj("flamingos2Imaging" -> a.asJson)
-      case a @ Igrins2Spectroscopy(_, _)                       =>
+      case a @ Igrins2Spectroscopy(_, _)                          =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)
-      case a @ GhostSpectroscopy(_, _, _, _)                   =>
+      case a @ GhostSpectroscopy(_, _, _, _)                      =>
         Json.obj("ghostSpectroscopy" -> a.asJson)
       case a @ GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _, _) =>
         Json.obj("gnirsSpectroscopy" -> a.asJson)
