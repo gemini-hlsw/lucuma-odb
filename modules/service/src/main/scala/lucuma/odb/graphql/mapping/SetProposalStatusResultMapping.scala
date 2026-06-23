@@ -5,13 +5,13 @@ package lucuma.odb.graphql
 
 package mapping
 
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 
-trait SetProposalStatusResultMapping[F[_]] extends ProgramTable[F] {
+trait SetProposalStatusResultMapping[F[_]] extends ProgramView[F] {
   
   lazy val SetProposalStatusResultMapping =
     ObjectMapping(SetProposalStatusResultType)(
-      SqlField("programId", ProgramTable.Id, key = true, hidden = true),
+      SqlField("programId", ProgramView.Id, key = true, hidden = true),
       SqlObject("program")
     )
 

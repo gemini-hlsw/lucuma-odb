@@ -11,9 +11,9 @@ import lucuma.core.math.Parallax
 import java.math.MathContext
 
 import table.TargetView
-import table.ProgramTable
+import table.ProgramView
 
-trait ParallaxMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
+trait ParallaxMapping[F[_]] extends ProgramView[F] with TargetView[F] {
 
   lazy val ParallaxMapping =
     ObjectMapping(ParallaxType)(

@@ -10,7 +10,7 @@ import grackle.skunk.SkunkMapping
 import table.*
 
 trait EmailMapping[F[_]]
-  extends ProgramTable[F]
+  extends ProgramView[F]
   with EmailTable[F] {
 
   lazy val EmailMapping = 

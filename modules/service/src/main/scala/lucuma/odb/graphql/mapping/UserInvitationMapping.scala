@@ -9,7 +9,7 @@ import grackle.skunk.SkunkMapping
 import table.*
 
 trait UserInvitationMapping[F[_]]
-  extends ProgramTable[F]
+  extends ProgramView[F]
   with ProgramUserView[F]
   with UserTable[F]
   with UserInvitationTable[F]

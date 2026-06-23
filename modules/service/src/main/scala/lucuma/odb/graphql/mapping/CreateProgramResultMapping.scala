@@ -7,14 +7,14 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 
-import table.ProgramTable
+import table.ProgramView
 
-trait CreateProgramResultMapping[F[_]] extends ProgramTable[F] {
+trait CreateProgramResultMapping[F[_]] extends ProgramView[F] {
 
 
   lazy val CreateProgramResultMapping =
     ObjectMapping(CreateProgramResultType)(
-      SqlField("id", ProgramTable.Id, key = true, hidden = true),
+      SqlField("id", ProgramView.Id, key = true, hidden = true),
       SqlObject("program"),
     )
 

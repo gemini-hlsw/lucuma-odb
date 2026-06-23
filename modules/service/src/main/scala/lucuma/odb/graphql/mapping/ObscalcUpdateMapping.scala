@@ -8,9 +8,9 @@ import lucuma.core.model.Observation
 import lucuma.core.util.CalculationState
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.ObservationView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 
-trait ObscalcUpdateMapping[F[_]] extends ObservationView[F] with ProgramTable[F]:
+trait ObscalcUpdateMapping[F[_]] extends ObservationView[F] with ProgramView[F]:
 
   // This is slightly complicated by hard deletion of observations.  The id has
   // to be the program id and we need a join to get to the "value" observation.
@@ -18,12 +18,12 @@ trait ObscalcUpdateMapping[F[_]] extends ObservationView[F] with ProgramTable[F]
   // N.B. env is populated by the subscription elaborator
   lazy val ObscalcUpdateMapping =
     ObjectMapping(ObscalcUpdateType)(
-      SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
+      SqlField("synthetic-id", ProgramView.Id, key = true, hidden = true),
       CursorField("editType",            _.envR[EditType]("editType"),                 List("synthetic-id")),
       CursorField("oldCalculationState", _.envR[Option[CalculationState]]("oldState"), List("synthetic-id")),
       CursorField("oldState",            _.envR[Option[CalculationState]]("oldState"), List("synthetic-id")),
       CursorField("newCalculationState", _.envR[Option[CalculationState]]("newState"), List("synthetic-id")),
       CursorField("newState",            _.envR[Option[CalculationState]]("newState"), List("synthetic-id")),
       CursorField("observationId",       _.envR[Observation.Id]("observationId"),      List("synthetic-id")),
-      SqlObject("value", Join(ProgramTable.Id, ObservationView.ProgramId))
+      SqlObject("value", Join(ProgramView.Id, ObservationView.ProgramId))
     )

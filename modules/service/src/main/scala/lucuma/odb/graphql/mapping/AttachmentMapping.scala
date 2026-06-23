@@ -8,11 +8,11 @@ package mapping
 import lucuma.odb.graphql.predicate.Predicates
 
 import table.AttachmentTable
-import table.ProgramTable
+import table.ProgramView
 
 trait AttachmentMapping[F[_]]
   extends AttachmentTable[F]
-     with ProgramTable[F]
+     with ProgramView[F]
      with Predicates[F] {
 
   lazy val AttachmentMapping =
@@ -25,7 +25,7 @@ trait AttachmentMapping[F[_]]
       SqlField("checked", AttachmentTable.Checked),
       SqlField("fileSize", AttachmentTable.FileSize),
       SqlField("updatedAt", AttachmentTable.UpdatedAt),
-      SqlObject("program", Join(AttachmentTable.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(AttachmentTable.ProgramId, ProgramView.Id)),
     )
 
 }

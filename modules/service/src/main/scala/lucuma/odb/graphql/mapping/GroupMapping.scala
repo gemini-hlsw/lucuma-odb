@@ -28,7 +28,7 @@ import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.GroupElementView
 import lucuma.odb.graphql.table.GroupView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.json.calculatedValue.given
 import lucuma.odb.json.time.query.given
 import lucuma.odb.json.timeaccounting.given
@@ -40,7 +40,7 @@ import org.http4s.client.Client
 import Services.Syntax.*
 
 
-trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupElementView[F] with KeyValueEffectHandler[F] with Predicates[F]:
+trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with KeyValueEffectHandler[F] with Predicates[F]:
 
   def user: User
   def itcClient: ItcClient[F]
@@ -63,7 +63,7 @@ trait GroupMapping[F[_]] extends GroupView[F] with ProgramTable[F] with GroupEle
       SqlObject("maximumInterval"),
       SqlField("sameNight", GroupView.SameNight),
       SqlObject("elements", Join(GroupView.Id, GroupElementView.GroupId)),
-      SqlObject("program", Join(GroupView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(GroupView.ProgramId, ProgramView.Id)),
 
       EffectField("timeEstimateRange", estimateRangeHandler, List("id")),
       EffectField("timeEstimateBanded", estimateBandedHandler, List("id")),

@@ -3300,7 +3300,10 @@ type Mutation {
     input: SetProgramReferenceInput!
   ): SetProgramReferenceResult!
 
-  "Set a program's resource limit (the maximum combined number of observations, groups, targets, attachments, and program notes). Requires staff access."
+  """
+  Set a program's resource limit (the maximum combined number of observations,
+  groups, targets, attachments, and program notes). Requires staff access.
+  """
   setProgramResourceLimit(
     input: SetProgramResourceLimitInput!
   ): SetProgramResourceLimitResult!

@@ -19,13 +19,13 @@ import binding.*
 import table.*
 
 trait TargetGroupMapping[F[_]]
-  extends TargetView[F] with ProgramTable[F] with AsterismTargetTable[F] with ObservationView[F]
+  extends TargetView[F] with ProgramView[F] with AsterismTargetTable[F] with ObservationView[F]
      with Predicates[F] {
 
   lazy val TargetGroupMapping =
     ObjectMapping(TargetGroupType)(
       SqlField("key", TargetView.TargetId, key = true, hidden = true),
-      SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(TargetView.ProgramId, ProgramView.Id)),
       SqlObject("observations"),
       SqlObject("target"),
     )

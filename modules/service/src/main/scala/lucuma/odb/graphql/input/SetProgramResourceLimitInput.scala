@@ -13,12 +13,10 @@ case class SetProgramResourceLimitInput(
   limit:     NonNegInt
 )
 
-object SetProgramResourceLimitInput {
+object SetProgramResourceLimitInput:
   val Binding: Matcher[SetProgramResourceLimitInput] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         ProgramIdBinding("programId", rPid),
         NonNegIntBinding("limit", rLimit)
       ) => (rPid, rLimit).parMapN(apply)
-    }
-}

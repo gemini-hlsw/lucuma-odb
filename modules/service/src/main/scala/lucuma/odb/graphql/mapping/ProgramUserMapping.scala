@@ -23,7 +23,7 @@ import lucuma.odb.json.partnerlink.given
 import table.*
 
 trait ProgramUserMapping[F[_]]
-  extends ProgramTable[F]
+  extends ProgramView[F]
      with UserTable[F]
      with UserInvitationTable[F]
      with ProgramUserView[F] { this: SkunkMapping[F] =>
@@ -52,7 +52,7 @@ trait ProgramUserMapping[F[_]]
         } yield r.asJson,
         List("partner", "linkType")
       ),
-      SqlObject("program", Join(ProgramUserView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(ProgramUserView.ProgramId, ProgramView.Id)),
       SqlObject("user", Join(ProgramUserView.UserId, UserTable.UserId)),
       SqlObject("preferredProfile"),
       SqlObject("invitations", Join(ProgramUserView.ProgramUserId, UserInvitationTable.ProgramUserId))

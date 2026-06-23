@@ -4,14 +4,14 @@
 package lucuma.odb.graphql
 package mapping
 
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 
-trait GoaPropertiesMapping[F[_]] extends ProgramTable[F]:
+trait GoaPropertiesMapping[F[_]] extends ProgramView[F]:
 
   lazy val GoaPropertiesMapping: ObjectMapping =
     ObjectMapping(GoaPropertiesType)(
-      SqlField("synthetic_id", ProgramTable.Id, key = true, hidden = true),
-      SqlField("proprietaryMonths", ProgramTable.Goa.Proprietary),
-      SqlField("shouldNotify", ProgramTable.Goa.ShouldNotify),
-      SqlField("privateHeader", ProgramTable.Goa.PrivateHeader)
+      SqlField("synthetic_id", ProgramView.Id, key = true, hidden = true),
+      SqlField("proprietaryMonths", ProgramView.Goa.Proprietary),
+      SqlField("shouldNotify", ProgramView.Goa.ShouldNotify),
+      SqlField("privateHeader", ProgramView.Goa.PrivateHeader)
     )

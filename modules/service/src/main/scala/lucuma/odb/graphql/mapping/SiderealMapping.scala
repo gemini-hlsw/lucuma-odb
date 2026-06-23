@@ -8,9 +8,9 @@ package mapping
 import grackle.skunk.SkunkMapping
 
 import table.TargetView
-import table.ProgramTable
+import table.ProgramView
 
-trait SiderealMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
+trait SiderealMapping[F[_]] extends ProgramView[F] with TargetView[F] {
 
   lazy val SiderealMapping =
     ObjectMapping(SiderealType)(

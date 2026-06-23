@@ -8,18 +8,18 @@ package mapping
 import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 
 
-trait ConfigurationRequestEditMapping[F[_]] extends ConfigurationRequestView[F] with ProgramTable[F] {
+trait ConfigurationRequestEditMapping[F[_]] extends ConfigurationRequestView[F] with ProgramView[F] {
 
   // N.B. env is populated by the subscription elaborator
   lazy val ConfigurationRequestEditMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestEditType)(
-      SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
+      SqlField("synthetic-id", ProgramView.Id, key = true, hidden = true),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
       CursorField("configurationRequestId", _.envR[ConfigurationRequest.Id]("configurationRequestId"), List("synthetic-id")),
-      SqlObject("configurationRequest", Join(ProgramTable.Id, ConfigurationRequestView.ProgramId))
+      SqlObject("configurationRequest", Join(ProgramView.Id, ConfigurationRequestView.ProgramId))
     )
 
 }

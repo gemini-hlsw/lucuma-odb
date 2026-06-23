@@ -8,16 +8,16 @@ package mapping
 import grackle.skunk.SkunkMapping
 
 import table.TargetView
-import table.ProgramTable
+import table.ProgramView
 
-trait TargetMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
+trait TargetMapping[F[_]] extends ProgramView[F] with TargetView[F] {
 
   lazy val TargetMapping: ObjectMapping =
     ObjectMapping(TargetType)(
       SqlField("id", TargetView.TargetId, key = true),
       SqlField("existence", TargetView.Existence),
       SqlField("name", TargetView.Name),
-      SqlObject("program", Join(TargetView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(TargetView.ProgramId, ProgramView.Id)),
       SqlJson("sourceProfile", TargetView.SourceProfile),
       SqlField("disposition", TargetView.TargetDisposition),
       SqlField("calibrationRole", TargetView.CalibrationRole),

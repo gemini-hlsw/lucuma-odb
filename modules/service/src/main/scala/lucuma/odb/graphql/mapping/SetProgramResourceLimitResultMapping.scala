@@ -7,14 +7,12 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 
-import table.ProgramTable
+import table.ProgramView
 
-trait SetProgramResourceLimitResultMapping[F[_]] extends ProgramTable[F] {
+trait SetProgramResourceLimitResultMapping[F[_]] extends ProgramView[F]:
 
   lazy val SetProgramResourceLimitResultMapping =
     ObjectMapping(SetProgramResourceLimitResultType)(
-      SqlField("id", ProgramTable.Id, key = true, hidden = true),
-      SqlObject("program"),
+      SqlField("id", ProgramView.Id, key = true, hidden = true),
+      SqlObject("program")
     )
-
-}
