@@ -23,6 +23,7 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.tag
 import lucuma.itc.legacy.FLocalItc
@@ -112,7 +113,7 @@ object ItcBenchmarkSetup:
     val gmosNorthMode = ObservingMode.SpectroscopyMode.GmosNorth(
       Wavelength.fromIntNanometers(600).get,
       GmosNorthGrating.B1200_G5301,
-      GmosNorthFpuParam(GmosNorthFpu.LongSlit_1_00),
+      GmosNorthFpuParam(GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_1_00)),
       None,
       GmosCcdMode(
         GmosXBinning.One,
