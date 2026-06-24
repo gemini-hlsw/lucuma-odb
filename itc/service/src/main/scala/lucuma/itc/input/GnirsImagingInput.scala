@@ -35,15 +35,9 @@ object GnirsImagingInput:
             GnirsCameraBinding("camera", camera),
             GnirsReadModeBinding("readMode", readMode),
             GnirsWellDepthBinding("wellDepth", wellDepth),
-            PosIntBinding.Option("coadds", coadds),
+            PosIntBinding("coadds", coadds),
             PortDispositionBinding("port", portDisposition)
           ) =>
-        // coadds is optional for compatibility with clients that don't send it; default to 1.
-        (exposureTimeMode,
-         filter,
-         camera,
-         readMode,
-         wellDepth,
-         coadds.map(_.getOrElse(PosInt.MinValue)),
-         portDisposition
-        ).parMapN(apply)
+        (exposureTimeMode, filter, camera, readMode, wellDepth, coadds, portDisposition).parMapN(
+          apply
+        )
