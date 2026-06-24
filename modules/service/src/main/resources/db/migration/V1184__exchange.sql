@@ -1,384 +1,281 @@
--- A proposal is one of three kinds, discriminated by c_observatory:
---   * a "Gemini" proposal (c_observatory = 'gemini'), which has a science subtype
---     (c_science_subtype) and requests time at Gemini; or
---   * an "external" proposal (c_observatory in 'keck'/'subaru'), in which a Gemini
---     PI requests time at another observatory via an exchange.  These have no
---     science subtype; Subaru proposals additionally carry a Subaru proposal type.
---
--- Every proposal has an observatory.  A science subtype is present if and only if
--- the observatory is Gemini.  A Subaru proposal type is present if and only if the
--- observatory is Subaru.
---
--- Separately, a Gemini queue or classical proposal whose PI belongs to an exchange
--- partner community (Keck/Subaru) carries that exchange partner in
--- c_exchange_partner; the entire time request is then assigned to it rather than
--- apportioned across Gemini partner splits.
+-- The call type, its enum, and the proprietary period are Gemini-specific
+-- concepts.  Rename them with a `gemini` marker to match the `keck_` and
+-- `subaru_` prefixes used by the exchange columns added below.
+ALTER TYPE e_cfp_type RENAME TO e_gemini_proposal_type;
 
-ALTER TABLE t_proposal
-  ADD COLUMN c_exchange_partner     e_exchange_partner     NULL,
-  ADD COLUMN c_observatory          e_observatory          NOT NULL DEFAULT 'gemini',
+ALTER TABLE t_cfp
+  RENAME COLUMN c_type TO c_gemini_proposal_type;
+
+ALTER TABLE t_cfp
+  RENAME COLUMN c_proprietary TO c_gemini_proprietary;
+
+-- Add the observatory discriminant, defaulting existing rows to 'gemini'.
+ALTER TABLE t_cfp
+  ADD COLUMN c_observatory e_observatory NOT NULL DEFAULT 'gemini';
+
+ALTER TABLE t_cfp
+  ALTER COLUMN c_observatory DROP DEFAULT;
+
+-- Add exchange-specific columns.  Instrument arrays remain null for the
+-- observatories they don't apply to; a null array means "no instrument
+-- restriction".
+ALTER TABLE t_cfp
+  ADD COLUMN c_keck_instruments     e_keck_instrument[]    NULL,
+  ADD COLUMN c_subaru_instruments   e_subaru_instrument[]  NULL,
   ADD COLUMN c_subaru_proposal_type e_subaru_proposal_type NULL;
 
--- Replace the science-subtype-only checks with a broader set of proposal-type
--- checks keyed off the observatory and (for Gemini) the science subtype.
-DROP TRIGGER ch_proposal_science_subtype ON t_proposal;
-DROP FUNCTION t_proposal_science_subtype_checks();
+-- Exchange partners that may apply for time in a Gemini CfP.  NULL for
+-- non-Gemini CfPs, empty array for Gemini CfPs without exchange partners.
+ALTER TABLE t_cfp
+  ADD COLUMN c_gemini_exchange_partners e_exchange_partner[] NULL;
 
-CREATE FUNCTION t_proposal_type_checks()
-RETURNS TRIGGER AS $$
+UPDATE t_cfp
+   SET c_gemini_exchange_partners = '{}'
+ WHERE c_observatory = 'gemini';
+
+-- The call type is a Gemini concept; now nullable (null for exchange).
+ALTER TABLE t_cfp
+  ALTER COLUMN c_gemini_proposal_type DROP NOT NULL;
+
+-- South coordinate limits: now nullable (null for non-Gemini, which use only
+-- the "north" Mauna Kea limits).
+ALTER TABLE t_cfp
+  ALTER COLUMN c_south_ra_start  DROP NOT NULL,
+  ALTER COLUMN c_south_ra_end    DROP NOT NULL,
+  ALTER COLUMN c_south_dec_start DROP NOT NULL,
+  ALTER COLUMN c_south_dec_end   DROP NOT NULL;
+
+-- The proprietary period is Gemini-specific; null for exchange calls.
+ALTER TABLE t_cfp
+  ALTER COLUMN c_gemini_proprietary DROP NOT NULL,
+  ALTER COLUMN c_gemini_proprietary DROP DEFAULT;
+
+-- Recreate the validate_cfp_update trigger now that the new/renamed columns
+-- exist.  Its body referenced the old c_type (which a column rename does not
+-- update), and the set of "type-defining" columns has grown: changing a CfP's
+-- observatory or Subaru proposal type is now also forbidden when proposals
+-- reference it.
+DROP TRIGGER validate_cfp_update_trigger ON t_cfp;
+
+CREATE OR REPLACE FUNCTION validate_cfp_update()
+  RETURNS TRIGGER AS $$
 DECLARE
-  is_gemini boolean           := (NEW.c_observatory = 'gemini');
-  st        e_science_subtype := NEW.c_science_subtype;
+  program_ids text;
 BEGIN
-  -- A science subtype is present iff the proposal is a Gemini proposal.
-  IF is_gemini AND st IS NULL THEN
-    RAISE EXCEPTION 'Gemini proposals must define a science subtype.';
-  END IF;
-  IF (NOT is_gemini) AND st IS NOT NULL THEN
-    RAISE EXCEPTION 'Only Gemini proposals may define a science subtype.';
-  END IF;
+  IF ((NEW.c_existence              IS DISTINCT FROM OLD.c_existence)              OR
+      (NEW.c_semester               IS DISTINCT FROM OLD.c_semester)               OR
+      (NEW.c_observatory            IS DISTINCT FROM OLD.c_observatory)            OR
+      (NEW.c_gemini_proposal_type   IS DISTINCT FROM OLD.c_gemini_proposal_type)   OR
+      (NEW.c_subaru_proposal_type   IS DISTINCT FROM OLD.c_subaru_proposal_type))  THEN
 
-  -- A Subaru proposal type is present iff the observatory is Subaru.
-  IF NEW.c_observatory = 'subaru' AND NEW.c_subaru_proposal_type IS NULL THEN
-    RAISE EXCEPTION 'Subaru proposals must define a Subaru proposal type.';
-  END IF;
-  IF NEW.c_observatory <> 'subaru' AND NEW.c_subaru_proposal_type IS NOT NULL THEN
-    RAISE EXCEPTION 'Only Subaru proposals may define a Subaru proposal type.';
-  END IF;
+    -- Select program ids that use this CFP, if any.
+    SELECT json_agg(c_program_id) INTO program_ids
+    FROM t_proposal
+    WHERE c_cfp_id = NEW.c_cfp_id;
 
-  -- An exchange partner may only be set on Gemini queue or classical proposals.
-  IF NEW.c_exchange_partner IS NOT NULL AND NOT (is_gemini AND st IN ('queue', 'classical')) THEN
-    RAISE EXCEPTION 'An exchange partner may only be set on Gemini queue or classical proposals.';
-  END IF;
-
-  -- TOO activation must be None except for Gemini subtypes other than classical
-  -- and poor weather.
-  IF NEW.c_too_activation <> 'none' AND NOT (is_gemini AND st NOT IN ('classical', 'poor_weather')) THEN
-    RAISE EXCEPTION 'TOO activation must be None for this proposal type.';
-  END IF;
-
-  -- Minimum percent time must be 0 for external proposals and Gemini poor weather.
-  IF NEW.c_min_percent <> 0 AND ((NOT is_gemini) OR st = 'poor_weather') THEN
-    RAISE EXCEPTION 'Minimum percent time must be 0 for this proposal type.';
-  END IF;
-
-  -- Total time and min percent total are set if and only if the proposal is a
-  -- Gemini large program.
-  IF (NEW.c_total_time IS NOT NULL OR NEW.c_min_percent_total IS NOT NULL)
-       AND NOT (is_gemini AND st = 'large_program') THEN
-    RAISE EXCEPTION 'Total time and min percent total may only be set on Gemini large programs.';
-  END IF;
-  IF is_gemini AND st = 'large_program'
-       AND (NEW.c_total_time IS NULL OR NEW.c_min_percent_total IS NULL) THEN
-    RAISE EXCEPTION 'Large Program proposals must define the total time and min percent total.';
-  END IF;
-
-  -- US long term may only be set on Gemini classical or queue proposals.
-  IF NEW.c_us_long_term AND NOT (is_gemini AND st IN ('classical', 'queue')) THEN
-    RAISE EXCEPTION 'US long term may only be set on Gemini classical or queue proposals.';
-  END IF;
-
-  -- AEON multi-facility and JWST synergy may only be set on Gemini classical,
-  -- large program, or queue proposals.
-  IF (NEW.c_aeon_multi_facility OR NEW.c_jwst_synergy)
-       AND NOT (is_gemini AND st IN ('classical', 'large_program', 'queue')) THEN
-    RAISE EXCEPTION 'AEON multi-facility and JWST synergy may only be set on Gemini classical, large program, or queue proposals.';
-  END IF;
-
-  -- Consider for band 3 may only be set on Gemini queue proposals.
-  IF NEW.c_consider_for_band_3 <> 'unset' AND NOT (is_gemini AND st = 'queue') THEN
-    RAISE EXCEPTION 'Consider for band 3 may only be set on Gemini queue proposals.';
-  END IF;
-
-  -- A mentor may only be set on Gemini fast turnaround proposals.
-  IF NEW.c_mentor_id IS NOT NULL AND NOT (is_gemini AND st = 'fast_turnaround') THEN
-    RAISE EXCEPTION 'A mentor may only be set on Gemini fast turnaround proposals.';
+    IF program_ids IS NOT NULL THEN
+      RAISE EXCEPTION 'Cannot delete this Call for Proposals, or change its type or semester, because dependent proposals reference it: %', program_ids::text
+        USING ERRCODE = 'P0001',
+               DETAIL = program_ids::text;
+    END IF;
   END IF;
 
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE CONSTRAINT TRIGGER ch_proposal_type
-AFTER INSERT OR UPDATE ON t_proposal
-DEFERRABLE INITIALLY DEFERRED
+CREATE TRIGGER validate_cfp_update_trigger
+BEFORE UPDATE OF c_existence, c_semester, c_observatory, c_gemini_proposal_type, c_subaru_proposal_type ON t_cfp
 FOR EACH ROW
-EXECUTE FUNCTION t_proposal_type_checks();
+EXECUTE FUNCTION validate_cfp_update();
 
--- Enforce the time-request invariant: a proposal cannot have both an exchange
--- partner (t_proposal.c_exchange_partner) and Gemini partner splits
--- (t_partner_split rows).  These live in different tables, so a CHECK cannot
--- express it.  Plain (immediate) row triggers raise during the offending
--- statement so the service can surface a clean error (a deferred constraint
--- trigger would instead fail at COMMIT, outside the request handler).
-CREATE FUNCTION check_proposal_time_request() RETURNS trigger AS $$
+-- Discriminant consistency constraints.
+ALTER TABLE t_cfp
+  ADD CONSTRAINT t_cfp_gemini_check CHECK (
+    c_observatory <> 'gemini' OR (
+      c_gemini_proposal_type     IS NOT NULL AND
+      c_south_ra_start           IS NOT NULL AND
+      c_south_ra_end             IS NOT NULL AND
+      c_south_dec_start          IS NOT NULL AND
+      c_south_dec_end            IS NOT NULL AND
+      c_gemini_proprietary       IS NOT NULL AND
+      c_gemini_exchange_partners IS NOT NULL AND
+      c_keck_instruments         IS NULL     AND
+      c_subaru_instruments       IS NULL     AND
+      c_subaru_proposal_type     IS NULL
+    )
+  ),
+  ADD CONSTRAINT t_cfp_keck_check CHECK (
+    c_observatory <> 'keck' OR (
+      c_gemini_proposal_type     IS NULL AND
+      c_south_ra_start           IS NULL AND
+      c_south_ra_end             IS NULL AND
+      c_south_dec_start          IS NULL AND
+      c_south_dec_end            IS NULL AND
+      c_gemini_proprietary       IS NULL AND
+      c_gemini_exchange_partners IS NULL AND
+      c_subaru_instruments       IS NULL AND
+      c_subaru_proposal_type     IS NULL
+    )
+  ),
+  ADD CONSTRAINT t_cfp_subaru_check CHECK (
+    c_observatory <> 'subaru' OR (
+      c_gemini_proposal_type     IS NULL     AND
+      c_south_ra_start           IS NULL     AND
+      c_south_ra_end             IS NULL     AND
+      c_south_dec_start          IS NULL     AND
+      c_south_dec_end            IS NULL     AND
+      c_gemini_proprietary       IS NULL     AND
+      c_gemini_exchange_partners IS NULL     AND
+      c_keck_instruments         IS NULL     AND
+      c_subaru_proposal_type     IS NOT NULL
+    )
+  );
+
+-- The type lookup, partner deadlines, and instruments are all Gemini-specific
+-- concepts (the exchange observatories store their type and instruments in
+-- columns on t_cfp), so give these tables a `gemini` marker and rename their
+-- primary keys to match.
+ALTER TABLE t_cfp_type RENAME TO t_gemini_cfp_type;
+ALTER TABLE t_gemini_cfp_type RENAME CONSTRAINT t_cfp_type_pkey TO t_gemini_cfp_type_pkey;
+
+ALTER TABLE t_cfp_partner RENAME TO t_gemini_cfp_partner;
+ALTER TABLE t_gemini_cfp_partner RENAME CONSTRAINT t_cfp_partner_pkey TO t_gemini_cfp_partner_pkey;
+
+ALTER TABLE t_cfp_instrument RENAME TO t_gemini_cfp_instrument;
+ALTER TABLE t_gemini_cfp_instrument RENAME CONSTRAINT t_cfp_instrument_pkey TO t_gemini_cfp_instrument_pkey;
+
+-- The partner-deadline view is likewise Gemini-specific.
+ALTER VIEW v_cfp_partner RENAME TO v_gemini_cfp_partner;
+
+-- Recreate the title formatter and view to account for the observatory-specific
+-- properties and the renamed/new t_cfp columns.
+DROP VIEW v_cfp;
+
+DROP FUNCTION format_cfp_title;
+CREATE FUNCTION format_cfp_title(
+  observatory       e_observatory,
+  semester          d_semester,
+  titleOverride     text,
+  startDate         date,
+  endDate           date,
+  geminiType        e_gemini_proposal_type,
+  geminiInstruments d_tag[],
+  subaruType        e_subaru_proposal_type
+) RETURNS text AS $$
 DECLARE
-  pid          d_program_id := COALESCE(NEW.c_program_id, OLD.c_program_id);
-  has_exchange boolean;
+  instrument_list text;
+  name text;
 BEGIN
-  SELECT (c_exchange_partner IS NOT NULL) INTO has_exchange
-    FROM t_proposal WHERE c_program_id = pid;
-
-  IF has_exchange AND EXISTS (SELECT 1 FROM t_partner_split WHERE c_program_id = pid) THEN
-    RAISE EXCEPTION 'A proposal may not have both an exchange partner and partner splits'
-      USING ERRCODE = 'P0001';
+  IF (titleOverride IS NOT NULL) THEN
+    RETURN titleOverride;
   END IF;
 
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER check_proposal_time_request_proposal
-  AFTER INSERT OR UPDATE ON t_proposal
-  FOR EACH ROW EXECUTE FUNCTION check_proposal_time_request();
-
-CREATE TRIGGER check_proposal_time_request_split
-  AFTER INSERT OR UPDATE ON t_partner_split
-  FOR EACH ROW EXECUTE FUNCTION check_proposal_time_request();
-
--- Recreate v_proposal to pick up the new columns and to add discriminant key
--- columns: one non-null only for each observatory (driving the
--- Gemini/Keck/Subaru proposal-type mappings), plus non-null placeholder columns
--- for the Gemini science subtype and Subaru call type used by those mappings.
-DROP VIEW v_proposal;
-CREATE VIEW v_proposal AS
-  SELECT
-    p.*,
-    CASE WHEN p.c_observatory = 'gemini'               THEN c_program_id END AS c_program_id_gemini,
-    CASE WHEN p.c_observatory = 'keck'                 THEN c_program_id END AS c_program_id_keck,
-    CASE WHEN p.c_observatory = 'subaru'               THEN c_program_id END AS c_program_id_subaru,
-    -- Non-null discriminator for the GeminiProposalType interface mapping.  Only
-    -- meaningful for Gemini proposals; others get a placeholder that is never
-    -- rendered (their c_program_id_gemini key is null).
-    COALESCE(p.c_science_subtype, 'queue')                                   AS c_gemini_science_subtype,
-    -- Non-null Subaru call type for the SubaruProposalType mapping.  Only
-    -- meaningful for Subaru proposals; others get a placeholder that is never
-    -- rendered (their c_program_id_subaru key is null).
-    COALESCE(p.c_subaru_proposal_type, 'normal')                             AS c_subaru_proposal_type_d,
-    CASE WHEN p.c_science_subtype = 'classical'           THEN c_program_id END AS c_program_id_c,
-    CASE WHEN p.c_science_subtype = 'demo_science'        THEN c_program_id END AS c_program_id_s,
-    CASE WHEN p.c_science_subtype = 'directors_time'      THEN c_program_id END AS c_program_id_d,
-    CASE WHEN p.c_science_subtype = 'fast_turnaround'     THEN c_program_id END AS c_program_id_f,
-    CASE WHEN p.c_science_subtype = 'large_program'       THEN c_program_id END AS c_program_id_l,
-    CASE WHEN p.c_science_subtype = 'poor_weather'        THEN c_program_id END AS c_program_id_p,
-    CASE WHEN p.c_science_subtype = 'queue'               THEN c_program_id END AS c_program_id_q,
-    CASE WHEN p.c_science_subtype = 'system_verification' THEN c_program_id END AS c_program_id_v
-  FROM
-    t_proposal p;
-
--- Mirror the observatory and Subaru proposal type onto t_program (as is done with
--- c_science_subtype) so the IMMUTABLE reference-formatting functions can build the
--- program reference without consulting t_proposal.
-ALTER TABLE t_program
-  ADD COLUMN c_observatory          e_observatory          NOT NULL DEFAULT 'gemini',
-  ADD COLUMN c_subaru_proposal_type e_subaru_proposal_type NULL;
-
--- A submitted science program requires a science subtype only when it is a Gemini
--- proposal; external proposals have none.  Also clear the Subaru proposal type for
--- non-science program types.
-CREATE OR REPLACE FUNCTION update_program_type()
-RETURNS TRIGGER AS $$
-BEGIN
-
-    CASE
-      WHEN NEW.c_program_type = 'calibration'   OR
-           NEW.c_program_type = 'commissioning' OR
-           NEW.c_program_type = 'engineering'   OR
-           NEW.c_program_Type = 'monitoring'    THEN
-        BEGIN
-          IF NEW.c_semester IS NULL THEN
-            RAISE EXCEPTION '% programs must define a semester', INITCAP(NEW.c_program_type);
-          ELSEIF NEW.c_instrument IS NULL THEN
-            RAISE EXCEPTION '% programs must define an instrument', INITCAP(NEW.c_program_type);
-          ELSEIF (NEW.c_program_type != OLD.c_program_type)         OR
-                 (NEW.c_semester   IS DISTINCT FROM OLD.c_semester)   OR
-                 (NEW.c_instrument IS DISTINCT FROM OLD.c_instrument) THEN
-            NEW.c_semester_index := next_semester_index(NEW.c_program_type, NEW.c_semester, NEW.c_instrument);
-          END IF;
-          NEW.c_library_desc          := NULL;
-          NEW.c_science_subtype       := NULL;
-          NEW.c_subaru_proposal_type  := NULL;
-        END;
-
-      WHEN NEW.c_program_type = 'example' THEN
-        BEGIN
-          IF NEW.c_instrument IS NULL THEN
-            RAISE EXCEPTION 'Example programs must define an instrument';
-          END IF;
-          NEW.c_semester              := NULL;
-          NEW.c_semester_index        := NULL;
-          NEW.c_library_desc          := NULL;
-          NEW.c_science_subtype       := NULL;
-          NEW.c_subaru_proposal_type  := NULL;
-        END;
-
-      WHEN NEW.c_program_type = 'library' THEN
-        BEGIN
-          IF NEW.c_instrument IS NULL THEN
-            RAISE EXCEPTION 'Library programs must define an instrument';
-          ELSEIF NEW.c_library_desc IS NULL THEN
-            RAISE EXCEPTION 'Library programs must define a description';
-          END IF;
-          NEW.c_semester              := NULL;
-          NEW.c_semester_index        := NULL;
-          NEW.c_science_subtype       := NULL;
-          NEW.c_subaru_proposal_type  := NULL;
-        END;
-
-      WHEN NEW.c_program_type = 'science' THEN
-        BEGIN
-          IF NEW.c_proposal_status <> 'not_submitted' THEN
-            -- A submitted science program must have a semester.  A Gemini proposal
-            -- must also have a science subtype; an external (exchange) proposal has
-            -- none.
-            IF NEW.c_semester IS NULL THEN
-              RAISE EXCEPTION 'Submitted science programs must define a semester';
-            ELSEIF NEW.c_observatory = 'gemini' AND NEW.c_science_subtype IS NULL THEN
-              RAISE EXCEPTION 'Submitted Gemini science programs must define a science subtype.';
-            ELSEIF (NEW.c_program_type != OLD.c_program_type) OR
-                   (NEW.c_semester IS DISTINCT FROM OLD.c_semester) OR
-                   (OLD.c_proposal_status = 'not_submitted' AND NEW.c_semester_index IS NULL) THEN
-              NEW.c_semester_index := next_semester_index('science', NEW.c_semester, NULL);
-            END IF;
-          ELSEIF (NEW.c_semester IS DISTINCT FROM OLD.c_semester) THEN
-            -- Since it is not submitted and the semester has changed, we lose
-            -- any index we may have had while previously submitted
-            NEW.c_semester_index := NULL;
-          END IF;
-          NEW.c_instrument   := NULL;
-          NEW.c_library_desc := NULL;
-        END;
-
-      WHEN NEW.c_program_type = 'system' THEN
-        BEGIN
-          IF NEW.c_library_desc IS NULL THEN
-            RAISE EXCEPTION 'System programs must define a description';
-          END IF;
-          NEW.c_instrument            := NULL;
-          NEW.c_semester              := NULL;
-          NEW.c_semester_index        := NULL;
-          NEW.c_science_subtype       := NULL;
-          NEW.c_subaru_proposal_type  := NULL;
-        END;
-
-    END CASE;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- The program reference for science programs now depends on the observatory and
--- (for Subaru) the Subaru proposal type.  Drop the generated column so the
--- formatting functions can be replaced, then recreate it with the new inputs.
--- v_program_reference selects the generated column, and a trigger fires on
--- updates of it, so both must be dropped and recreated around the change.
-DROP VIEW v_program_reference;
-DROP TRIGGER update_program_reference_in_observation_trigger ON t_program;
-ALTER TABLE t_program
-  DROP COLUMN c_program_reference;
-
-DROP FUNCTION format_program_reference(e_program_type, d_semester, int4, d_tag, e_science_subtype, d_tag, text);
-DROP FUNCTION format_science_reference(d_semester, int4, e_science_subtype);
-
--- The trailing letter of a science program reference identifies the proposal
--- kind: for Gemini proposals it is the science-subtype abbreviation; for external
--- proposals it is 'K' (Keck), 'U' (Subaru) or 'I' (Subaru intensive).
-CREATE FUNCTION format_science_reference(
-  semester        d_semester,
-  index           int4,
-  observatory     e_observatory,
-  science_subtype e_science_subtype,
-  subaru_type     e_subaru_proposal_type
-)
-RETURNS text AS $$
-DECLARE
-  letter       char;
-  proposal_ref text;
-BEGIN
-    letter := CASE
-      WHEN observatory = 'keck'   THEN 'K'
-      WHEN observatory = 'subaru' THEN CASE WHEN subaru_type = 'intensive' THEN 'I' ELSE 'U' END
-      ELSE (SELECT c_abbr FROM t_science_subtype WHERE c_type = science_subtype)
-    END;
-    proposal_ref := format_proposal_reference('science', semester, index);
-
+  IF (observatory = 'keck') THEN
+    RETURN concat(semester, ' Keck Exchange');
+  ELSIF (observatory = 'subaru') THEN
     RETURN CASE
-        WHEN proposal_ref IS NULL OR letter IS NULL THEN NULL
-        ELSE CONCAT(proposal_ref, '-', letter)
+      WHEN subaruType = 'intensive' THEN concat(semester, ' Subaru Exchange (Intensive)')
+      ELSE concat(semester, ' Subaru Exchange')
     END;
+  END IF;
+
+  SELECT c_name INTO name FROM t_gemini_cfp_type WHERE c_type = geminiType;
+  instrument_list := array_to_string(geminiInstruments, ', ');
+  RETURN CASE
+    WHEN geminiType = 'fast_turnaround' THEN
+      concat(
+        left(semester, -1),
+        ' ',
+        to_char(date_trunc('month', startDate) - INTERVAL '2 months', 'FMMonth'),
+        ' ',
+        name
+      )
+    WHEN geminiType = 'system_verification' THEN
+          concat(semester, nullif(' ' || instrument_list, ' '), ' ', name)
+    ELSE concat(semester, ' ', name)
+  END CASE;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-CREATE FUNCTION format_program_reference(
-  ptype           e_program_type,
-  semester        d_semester,
-  index           int4,
-  proposal_status d_tag,
-  science_subtype e_science_subtype,
-  instrument      d_tag,
-  description     text,
-  observatory     e_observatory,
-  subaru_type     e_subaru_proposal_type
-)
-RETURNS text AS $$
-BEGIN
-    RETURN CASE
-      WHEN ptype = 'calibration'   OR
-           ptype = 'commissioning' OR
-           ptype = 'engineering'   OR
-           ptype = 'monitoring'    THEN
-          public.format_semester_instrument_reference(ptype, semester, index, instrument)
-
-      WHEN ptype = 'example' OR
-           ptype = 'library' THEN
-          public.format_lib_or_xpl_reference(ptype, instrument, description)
-
-      WHEN ptype = 'system' THEN
-          CONCAT('SYS-', description)
-
-      WHEN ptype = 'science' AND proposal_status = 'accepted' THEN
-          public.format_science_reference(semester, index, observatory, science_subtype, subaru_type)
-
-      ELSE
-          NULL
-    END;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
-ALTER TABLE t_program
-  ADD COLUMN c_program_reference text GENERATED ALWAYS AS (
-    format_program_reference(
-      c_program_type,
-      c_semester,
-      c_semester_index,
-      c_proposal_status,
-      c_science_subtype,
-      c_instrument,
-      c_library_desc,
-      c_observatory,
-      c_subaru_proposal_type
+CREATE VIEW v_cfp AS
+  WITH
+    cte_instrument AS (
+      SELECT
+        c.c_cfp_id,
+        array_remove(array_agg(ci.c_instrument ORDER BY ci.c_instrument), NULL) AS c_instruments,
+        array_remove(array_agg(i.c_long_name ORDER BY i.c_long_name), NULL) AS c_instrument_names
+      FROM
+        t_cfp c
+      LEFT JOIN
+        t_gemini_cfp_instrument ci ON c.c_cfp_id = ci.c_cfp_id
+      LEFT JOIN
+        t_instrument i ON i.c_tag = ci.c_instrument
+      GROUP BY
+        c.c_cfp_id
+    ),
+    cte_partner AS (
+      SELECT
+        c.c_cfp_id,
+        (COUNT(*) FILTER (WHERE p.c_deadline IS NOT NULL AND p.c_deadline > CURRENT_TIMESTAMP) > 0) AS c_is_open,
+        MAX(CASE WHEN p.c_partner = 'us' AND (c.c_gemini_proposal_type = 'regular_semester' OR c.c_gemini_proposal_type = 'directors_time') THEN 1 ELSE 0 END) AS c_non_partner,
+        MAX(CASE WHEN p.c_partner = 'us' THEN p.c_deadline ELSE NULL END) AS c_us_deadline
+      FROM
+        t_cfp c
+      LEFT JOIN
+        v_gemini_cfp_partner p ON c.c_cfp_id = p.c_cfp_id
+      GROUP BY
+        c.c_cfp_id
     )
-  ) STORED UNIQUE;
+    SELECT
+      c.*,
+      (CASE WHEN c.c_observatory = 'gemini' THEN c.c_cfp_id ELSE NULL END) AS c_gemini_cfp_id,
+      (CASE WHEN c.c_observatory = 'keck'   THEN c.c_cfp_id ELSE NULL END) AS c_keck_cfp_id,
+      (CASE WHEN c.c_observatory = 'subaru' THEN c.c_cfp_id ELSE NULL END) AS c_subaru_cfp_id,
+      cte_instrument.c_instruments AS c_gemini_instruments,
+      cte_partner.c_is_open,
+      format_cfp_title(c.c_observatory, c.c_semester, c.c_title_override, c.c_active_start, c.c_active_end, c.c_gemini_proposal_type, cte_instrument.c_instrument_names, c.c_subaru_proposal_type) AS c_title,
+      cte_partner.c_non_partner = 1 AS c_gemini_allows_non_partner,
+      (CASE WHEN cte_partner.c_non_partner = 1 THEN cte_partner.c_us_deadline ELSE NULL END) AS c_gemini_non_partner_deadline
+    FROM
+      t_cfp c
+    LEFT JOIN
+      cte_instrument ON c.c_cfp_id = cte_instrument.c_cfp_id
+    LEFT JOIN
+      cte_partner ON c.c_cfp_id = cte_partner.c_cfp_id;
 
--- Recreate the observation-reference sync trigger on the new generated column.
-CREATE TRIGGER update_program_reference_in_observation_trigger
-AFTER UPDATE OF c_program_reference ON t_program
-FOR EACH ROW
-EXECUTE FUNCTION update_program_reference_in_observation();
+-- "c_partner" now specifically means the Gemini partner, so rename it to match
+-- the new c_exchange_partner column added below.
+ALTER TABLE t_program_user
+  RENAME COLUMN c_partner TO c_gemini_partner;
 
--- Recreate v_program_reference now that the generated column exists again.
-CREATE VIEW v_program_reference AS
-  SELECT
-    c_program_id,
-    c_program_type,
-    c_library_desc,
-    c_instrument,
-    c_science_subtype,
-    c_semester,
-    c_semester_index,
-    c_program_reference
-  FROM
-    t_program
-  WHERE
-    c_program_reference IS NOT NULL
-  ORDER BY c_program_id;
+-- Store the exchange-partner affiliation alongside the Gemini partner.
+-- Set only when c_partner_link = 'has_exchange_partner'.
+ALTER TABLE t_program_user
+  ADD COLUMN c_exchange_partner e_exchange_partner NULL;
+
+-- Replace the two-way partner check with a three-way version that accounts for
+-- the exchange partner: exactly the column matching the link type is populated.
+ALTER TABLE t_program_user
+  DROP CONSTRAINT program_user_partner_check,
+  ADD CONSTRAINT program_user_partner_check CHECK (
+    CASE c_partner_link
+      WHEN 'has_gemini_partner'   THEN c_gemini_partner IS NOT NULL AND c_exchange_partner IS NULL
+      WHEN 'has_exchange_partner' THEN c_exchange_partner IS NOT NULL AND c_gemini_partner IS NULL
+      ELSE                             c_gemini_partner IS NULL     AND c_exchange_partner IS NULL
+    END
+  );
+
+-- Recreate v_program_user so its `p.*` picks up the new c_exchange_partner column.
+DROP VIEW v_program_user;
+
+CREATE VIEW v_program_user AS
+SELECT
+  p.*,
+  COALESCE(p.c_preferred_email, u.c_orcid_email) AS c_email,
+  COALESCE(
+    user_profile_display_name(p.c_preferred_credit_name, p.c_preferred_given_name, p.c_preferred_family_name),
+    user_profile_display_name(u.c_orcid_credit_name, u.c_orcid_given_name, u.c_orcid_family_name)
+  ) AS c_display_name
+FROM t_program_user p
+LEFT JOIN t_user u ON p.c_user_id = u.c_user_id;
