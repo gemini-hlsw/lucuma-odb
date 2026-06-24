@@ -30,24 +30,13 @@ case class ItcSourceDefinition(
 ):
   export target.*
 
-// Diagnostic toggle: set env/sysprop ITC_SEND_COADDS=false to stop sending coadds to the
-// legacy ITC (keeping all other coadds plumbing and cache keys), to isolate whether the
-// coadds value fed into the legacy recipe is what destabilizes the service. Defaults to true.
-private val SendCoaddsToLegacy: Boolean =
-  sys.env
-    .get("ITC_SEND_COADDS")
-    .orElse(sys.props.get("ITC_SEND_COADDS"))
-    .forall(s => s.equalsIgnoreCase("true") || s == "1")
-
 extension (mode: ObservingMode)
   /** The number of coadds for instruments that support it (currently GNIRS), else None. */
   def coadds: Option[Int] =
-    if !SendCoaddsToLegacy then none
-    else
-      mode match
-        case ObservingMode.SpectroscopyMode.GnirsLongSlit(coadds = coadds) => coadds.value.some
-        case ObservingMode.ImagingMode.Gnirs(coadds = coadds)              => coadds.value.some
-        case _                                                             => none
+    mode match
+      case ObservingMode.SpectroscopyMode.GnirsLongSlit(coadds = coadds) => coadds.value.some
+      case ObservingMode.ImagingMode.Gnirs(coadds = coadds)              => coadds.value.some
+      case _                                                             => none
 
 extension (etm: ExposureTimeMode)
   def spectroscopyCalculationMethod(
