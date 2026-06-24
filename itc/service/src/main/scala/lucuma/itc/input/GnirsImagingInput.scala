@@ -38,11 +38,6 @@ object GnirsImagingInput:
             PosIntBinding("coadds", coadds),
             PortDispositionBinding("port", portDisposition)
           ) =>
-        (exposureTimeMode,
-         filter,
-         camera,
-         readMode,
-         wellDepth,
-         coadds,
-         portDisposition
-        ).parMapN(apply)
+        (exposureTimeMode, filter, camera, readMode, wellDepth, coadds, portDisposition).parMapN(
+          apply
+        )
