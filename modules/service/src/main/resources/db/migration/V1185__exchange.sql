@@ -274,6 +274,8 @@ $$ LANGUAGE plpgsql;
 -- updates of it, so both must be dropped and recreated around the change.
 DROP VIEW v_program_reference;
 DROP TRIGGER update_program_reference_in_observation_trigger ON t_program;
+
+DROP VIEW v_program;
 ALTER TABLE t_program
   DROP COLUMN c_program_reference;
 
@@ -359,6 +361,12 @@ ALTER TABLE t_program
       c_subaru_proposal_type
     )
   ) STORED UNIQUE;
+
+-- Recreate the program view from V1182.
+CREATE VIEW v_program AS
+  SELECT p.*, COALESCE(rc.c_resource_count, 0) AS c_resource_count
+  FROM t_program p
+  LEFT JOIN t_program_resource_count rc ON rc.c_program_id = p.c_program_id;
 
 -- Recreate the observation-reference sync trigger on the new generated column.
 CREATE TRIGGER update_program_reference_in_observation_trigger
