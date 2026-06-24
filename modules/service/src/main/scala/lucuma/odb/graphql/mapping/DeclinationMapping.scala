@@ -37,10 +37,14 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
 
   lazy val DeclinationMapping: List[TypeMapping] =
     List(
-      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "decStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.DecStart),
-      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "north" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.north.DecEnd),
-      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decStart", CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecStart),
-      declinationMappingAtPath(CallForProposalsType / "coordinateLimits" / "south" / "decEnd",   CallForProposalsView.Id, CallForProposalsView.coordinateLimits.south.DecEnd),
+      declinationMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "north" / "decStart", CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.north.DecStart),
+      declinationMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "north" / "decEnd",   CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.north.DecEnd),
+      declinationMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "south" / "decStart", CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.south.DecStart),
+      declinationMappingAtPath(GeminiCallPropertiesType / "coordinateLimits" / "south" / "decEnd",   CallForProposalsView.gemini.Id, CallForProposalsView.coordinateLimits.south.DecEnd),
+      declinationMappingAtPath(KeckCallPropertiesType / "coordinateLimits" / "decStart", CallForProposalsView.keck.Id, CallForProposalsView.coordinateLimits.north.DecStart),
+      declinationMappingAtPath(KeckCallPropertiesType / "coordinateLimits" / "decEnd",   CallForProposalsView.keck.Id, CallForProposalsView.coordinateLimits.north.DecEnd),
+      declinationMappingAtPath(SubaruCallPropertiesType / "coordinateLimits" / "decStart", CallForProposalsView.subaru.Id, CallForProposalsView.coordinateLimits.north.DecStart),
+      declinationMappingAtPath(SubaruCallPropertiesType / "coordinateLimits" / "decEnd",   CallForProposalsView.subaru.Id, CallForProposalsView.coordinateLimits.north.DecEnd),
       declinationMappingAtPath(ConfigurationTargetType / "coordinates" / "dec", ConfigurationRequestView.Target.ReferenceCoordinates.SyntheticId, ConfigurationRequestView.Target.ReferenceCoordinates.Dec),
       declinationMappingAtPath(ConfigurationTargetType / "region" / "declinationArc" / "start", ConfigurationRequestView.Target.Region.DeclinationArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.DeclinationArc.Start),
       declinationMappingAtPath(ConfigurationTargetType / "region" / "declinationArc" / "end", ConfigurationRequestView.Target.Region.DeclinationArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.DeclinationArc.End),

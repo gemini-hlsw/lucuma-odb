@@ -92,7 +92,7 @@ class createUserInvitation extends OdbSuite:
   List(ProgramUserRole.Coi, ProgramUserRole.CoiRO, ProgramUserRole.External).foreach: pur =>
     test(s"invite ${pur.toString.toLowerCase} (metadata)"):
       createProgramAs(pi).flatMap: pid =>
-        addProgramUserAs(pi, pid, pur, PartnerLink.HasPartner(Partner.US)).flatMap: mid =>
+        addProgramUserAs(pi, pid, pur, PartnerLink.HasGeminiPartner(Partner.US)).flatMap: mid =>
           expect(
             user = pi,
             query = s"""
@@ -151,7 +151,7 @@ class createUserInvitation extends OdbSuite:
       val pidrid = for
         pid  <- createProgramAs(pi)
         _    <- createProgramAs(pi2) // this creates pi2
-        rid2 <- addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasPartner(Partner.US))
+        rid2 <- addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.US))
         _    <- linkUserAs(pi, rid2, pi2.id)
         rid3 <- addProgramUserAs(pi, pid, pur)
       yield (pid, rid3)

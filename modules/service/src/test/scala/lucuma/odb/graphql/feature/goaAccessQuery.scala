@@ -60,7 +60,7 @@ class goaAccessQuery extends OdbSuite:
 
   def setup(link: Option[(User, ProgramUserRole)]): IO[ProgramReference] =
     for
-      cid <- createCallForProposalsAs(staff, semester = sem2025B)
+      cid <- createGeminiCallForProposalsAs(staff, semester = sem2025B)
       pid <- createProgramWithUsPi(pi)
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)

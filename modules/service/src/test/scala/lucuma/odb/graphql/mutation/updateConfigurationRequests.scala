@@ -70,7 +70,7 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   val setup: IO[ConfigurationRequest.Id] =
     for     
-      cid <- createCallForProposalsAs(admin)
+      cid <- createGeminiCallForProposalsAs(admin)
       pid <- createProgramAs(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cid), None)
       tid <- createTargetWithProfileAs(pi, pid)

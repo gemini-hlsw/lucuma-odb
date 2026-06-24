@@ -55,7 +55,7 @@ class updateProgramUsers extends OdbSuite:
           input: {
             SET: {
               partnerLink: {
-                ${pl.fold("linkType: HAS_UNSPECIFIED_PARTNER", "linkType: HAS_NON_PARTNER", p => s"partner: ${p.tag.toScreamingSnakeCase}")}
+                ${pl.fold("linkType: HAS_UNSPECIFIED_PARTNER", "linkType: HAS_NON_PARTNER", p => s"geminiPartner: ${p.tag.toScreamingSnakeCase}", e => s"exchangePartner: ${e.tag.toScreamingSnakeCase}")}
               }
             }
             WHERE: {
@@ -71,8 +71,8 @@ class updateProgramUsers extends OdbSuite:
             user { id }
             partnerLink {
               linkType
-              ... on HasPartner {
-                partner
+              ... on HasGeminiPartner {
+                geminiPartner
               }
             }
           }
@@ -328,8 +328,8 @@ class updateProgramUsers extends OdbSuite:
             "program" -> Json.obj("id" -> pid.asJson),
             "user"    -> Json.obj("id" -> user.id.asJson),
             "partnerLink" -> Json.fromFields(
-              ("linkType" -> link.linkType.tag.toScreamingSnakeCase.asJson) :: link.partnerOption.toList.map { p =>
-                "partner" -> p.tag.toScreamingSnakeCase.asJson
+              ("linkType" -> link.linkType.tag.toScreamingSnakeCase.asJson) :: link.geminiPartnerOption.toList.map { p =>
+                "geminiPartner" -> p.tag.toScreamingSnakeCase.asJson
               }
             )
           )
@@ -454,8 +454,8 @@ class updateProgramUsers extends OdbSuite:
     createProgramAs(pi).flatMap: pid =>
       expect(
         user     = pi,
-        query    = updateUserMutation(pi, PartnerLink.HasPartner(US)),
-        expected = expected((pid, pi, PartnerLink.HasPartner(US))).asRight
+        query    = updateUserMutation(pi, PartnerLink.HasGeminiPartner(US)),
+        expected = expected((pid, pi, PartnerLink.HasGeminiPartner(US))).asRight
       )
 
   test("update coi partner"):
@@ -629,7 +629,7 @@ class updateProgramUsers extends OdbSuite:
     createProgramAs(piCharles).flatMap: _ =>
       expect(
         user     = piCharles,
-        query    = updateUserMutation(pi, PartnerLink.HasPartner(US)),
+        query    = updateUserMutation(pi, PartnerLink.HasGeminiPartner(US)),
         expected = expected().asRight
       )
 

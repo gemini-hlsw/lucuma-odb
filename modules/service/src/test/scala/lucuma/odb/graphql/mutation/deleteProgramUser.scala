@@ -56,7 +56,7 @@ class deleteProgramUser extends OdbSuite:
 
   private def partnerLinkFor(role: ProgramUserRole): PartnerLink =
     if (role === ProgramUserRole.SupportPrimary || role === ProgramUserRole.SupportSecondary) PartnerLink.HasUnspecifiedPartner
-    else PartnerLink.HasPartner(Partner.US)
+    else PartnerLink.HasGeminiPartner(Partner.US)
 
  // What can a Guest do?
 
@@ -81,7 +81,7 @@ class deleteProgramUser extends OdbSuite:
       for
         _   <- createUsers(pi1, pi2)
         pid <- createProgramAs(pi1)
-        mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasPartner(Partner.CA))
+        mid <- addProgramUserAs(pi1, pid, link, PartnerLink.HasGeminiPartner(Partner.CA))
         _   <- assertIO(deleteProgramUserAs(pi1, mid), true)
       yield ()
 
@@ -105,7 +105,7 @@ class deleteProgramUser extends OdbSuite:
       for
         _    <- createUsers(pi1, pi2, pi3)
         pid  <- createProgramAs(pi1)
-        rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.AR))
+        rid2 <- addProgramUserAs(pi1, pid, ProgramUserRole.Coi, PartnerLink.HasGeminiPartner(Partner.AR))
         _    <- linkUserAs(pi1, rid2, pi2.id)
         rid3 <- addProgramUserAs(pi1, pid, role)
         _    <- assertIO(deleteProgramUserAs(pi2, rid3), true)
@@ -119,7 +119,7 @@ class deleteProgramUser extends OdbSuite:
           pid  <- createProgramAs(pi1)
           rid2 <- addProgramUserAs(admin, pid, role, partnerLinkFor(role))
           _    <- linkUserAs(admin, rid2, pi2.id)
-          rid3 <- addProgramUserAs(admin, pid, ProgramUserRole.Coi, PartnerLink.HasPartner(Partner.US))
+          rid3 <- addProgramUserAs(admin, pid, ProgramUserRole.Coi, PartnerLink.HasGeminiPartner(Partner.US))
           _    <- deleteProgramUserAs(pi3, rid3)
         yield ()
       } {

@@ -101,7 +101,7 @@ class setObservationWorkflowState
 
   testWithTargetTypes("Unapproved <-> Inactive"): (_, mkTarget) =>
     for {
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -116,7 +116,7 @@ class setObservationWorkflowState
 
   testWithTargetTypes("Defined    <-> Inactive        (proposal not yet accepted)"): (_, mkTarget) =>
     for {
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramAs(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cfp), None)
       tid <- mkTarget(pi, pid)
@@ -130,7 +130,7 @@ class setObservationWorkflowState
 
   test("[Sidereal]    Defined    <-> Inactive, Ready (proposal accepted)"):
     for {
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -146,7 +146,7 @@ class setObservationWorkflowState
 
   test("[Opportunity] Defined    <-> Inactive        (proposal accepted)"):
     for {
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi, "Foo")
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -259,7 +259,7 @@ class setObservationWorkflowState
 
   test("[Visitor]      Defined <-> Inactive, Ready"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -276,7 +276,7 @@ class setObservationWorkflowState
   // N.B. you can't go from Inactive straight to ready, you have to go via Defined
   test("[Visitor]      Ready -> Inactive -> Defined -> Ready"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -295,7 +295,7 @@ class setObservationWorkflowState
 
   test("[Visitor]      Ready -> Ongoing (disallowed for PIs)"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -313,7 +313,7 @@ class setObservationWorkflowState
 
   test("[Visitor]      Ready -> Ongoing (allowed for Staff)"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -332,7 +332,7 @@ class setObservationWorkflowState
 
   test("[Visitor]      Ongoing -> Ready (allowed for staff)"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
@@ -354,7 +354,7 @@ class setObservationWorkflowState
     
   test("[Visitor]      Ongoing -> Ready (disallowed for staff)"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)

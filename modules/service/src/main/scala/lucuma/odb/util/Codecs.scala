@@ -226,8 +226,8 @@ trait Codecs {
   val cfp_id: Codec[CallForProposals.Id] =
     gid[CallForProposals.Id]
 
-  val cfp_type: Codec[CallForProposalsType] =
-    enumerated(Type("e_cfp_type"))
+  val gemini_proposal_type: Codec[GeminiCallForProposalsType] =
+    enumerated(Type("e_gemini_proposal_type"))
 
   val charge_class: Codec[ChargeClass] =
     enumerated(Type("e_charge_class"))
@@ -287,6 +287,12 @@ trait Codecs {
       s => Epoch.fromString.getOption(s).toRight(s"Invalid epoch: $s"))(
       Epoch.fromString.reverseGet
     )
+
+  val _exchange_partner: Codec[List[ExchangePartner]] =
+    _enumerated[ExchangePartner](Type("_e_exchange_partner", List(Type("e_exchange_partner"))))
+
+  val exchange_partner: Codec[ExchangePartner] =
+    enumerated(Type("e_exchange_partner"))
 
   val execution_event_id: Codec[ExecutionEvent.Id] =
     gid[ExecutionEvent.Id]
@@ -379,6 +385,12 @@ trait Codecs {
   val int_percent: Codec[IntPercent] =
     int2.eimap(n => IntPercent.from(n))(_.value.toShort)
 
+  val _keck_instrument: Codec[List[KeckInstrument]] =
+    _enumerated[KeckInstrument](Type("_e_keck_instrument", List(Type("e_keck_instrument"))))
+
+  val keck_instrument: Codec[KeckInstrument] =
+    enumerated(Type("e_keck_instrument"))
+
   val md5_hash: Codec[Md5Hash] =
     bytea.eimap(b => Md5Hash.fromByteArray(b).toRight(s"Expected an MD5 hash value but found ${b.size} bytes"))(_.toByteArray)
 
@@ -398,6 +410,9 @@ trait Codecs {
 
   val obs_class: Codec[ObserveClass] =
     enumerated(Type("e_obs_class"))
+
+  val observatory: Codec[Observatory] =
+    enumerated(Type("e_observatory"))
 
   val observation_validation: Codec[ObservationValidation] =
     jsonb.eimap(
@@ -668,6 +683,15 @@ trait Codecs {
   val step_type: Codec[StepType] =
     enumerated(Type("e_step_type"))
 
+  val _subaru_instrument: Codec[List[SubaruInstrument]] =
+    _enumerated[SubaruInstrument](Type("_e_subaru_instrument", List(Type("e_subaru_instrument"))))
+
+  val subaru_instrument: Codec[SubaruInstrument] =
+    enumerated(Type("e_subaru_instrument"))
+
+  val subaru_proposal_type: Codec[SubaruCallForProposalsType] =
+    enumerated(Type("e_subaru_proposal_type"))
+
   val tag: Codec[Tag] =
     varchar.imap(Tag(_))(_.value)
 
@@ -822,13 +846,9 @@ trait Codecs {
     }(o => (o.p.toAngle, o.q.toAngle))
 
   val partner_link: Codec[PartnerLink] =
-    (partner_link_type *: partner.opt).eimap { (l, p) =>
-      l match {
-        case PartnerLinkType.HasPartner            => p.toRight("Invalid data: has_partner link type without partner").map(PartnerLink.HasPartner.apply)
-        case PartnerLinkType.HasNonPartner         => PartnerLink.HasNonPartner.asRight
-        case PartnerLinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.asRight
-      }
-    } { pl => (pl.linkType, pl.partnerOption) }
+    (partner_link_type *: partner.opt *: exchange_partner.opt).eimap { (l, p, e) =>
+      PartnerLink.fromLinkType(l, p, e)
+    } { pl => (pl.linkType, pl.geminiPartnerOption, pl.exchangePartnerOption) }
 
   val pos_angle_constraint: Codec[PosAngleConstraint] =
     (pac_mode *: angle_µas).imap { (m, a) =>

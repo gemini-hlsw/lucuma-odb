@@ -100,7 +100,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
   test("trigger for CfP assignment"):
     val s = for {
       (pid, oid) <- setup
-      cid        <- createCallForProposalsAs(staff)
+      cid        <- createGeminiCallForProposalsAs(staff)
       _          <- addProposal(pi, pid)
     } yield (pid, oid, cid)
     s.flatMap: (pid, oid, cid) =>
@@ -134,9 +134,9 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
   test("trigger for CfP assignment change"):
     val s = for {
       (pid, oid) <- setup
-      cid1       <- createCallForProposalsAs(staff)
+      cid1       <- createGeminiCallForProposalsAs(staff)
       _          <- addProposal(pi, pid, cid1.some)
-      cid2       <- createCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025B"))
+      cid2       <- createGeminiCallForProposalsAs(staff, semester = Semester.unsafeFromString("2025B"))
     } yield (pid, oid, cid2)
     s.flatMap: (pid, oid, cid) =>
       subscriptionExpect(
@@ -167,10 +167,10 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
       )
 
   test("trigger for CfP coordinateLimits change"):
-    val set = "{ coordinateLimits: { north: {raStart: {degrees: 17.3}}} }"
+    val set = "{ gemini: { coordinateLimits: { north: {raStart: {degrees: 17.3}}} } }"
     val s = for {
       (pid, oid) <- setup
-      cid        <- createCallForProposalsAs(staff)
+      cid        <- createGeminiCallForProposalsAs(staff)
       _          <- addProposal(pi, pid, cid.some)
     } yield (oid, cid)
     s.flatMap: (oid, cid) =>
@@ -204,7 +204,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
   test("trigger for CfP instrument change"):
     val s = for {
       (pid, oid) <- setup
-      cid        <- createCallForProposalsAs(staff)
+      cid        <- createGeminiCallForProposalsAs(staff)
       _          <- addProposal(pi, pid, cid.some)
     } yield (oid, cid)
     s.flatMap: (oid, cid) =>
@@ -220,7 +220,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
             }
           }
         """,
-        mutations = updateCallForProposalsAs(staff, cid, "{ instruments: [GMOS_NORTH] }").asRight,
+        mutations = updateCallForProposalsAs(staff, cid, "{ gemini: { instruments: [GMOS_NORTH] } }").asRight,
         expected  = List(
           Json.obj(
             "obscalcUpdate" -> Json.obj(
@@ -510,7 +510,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
 
     val setup =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)

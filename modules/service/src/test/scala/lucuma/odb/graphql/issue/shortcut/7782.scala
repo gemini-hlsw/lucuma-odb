@@ -48,7 +48,7 @@ class ShortCut_7782 extends OdbSuite with DatabaseOperations:
 
   test("submit a proposal with two F2 obs with different dispersers"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)

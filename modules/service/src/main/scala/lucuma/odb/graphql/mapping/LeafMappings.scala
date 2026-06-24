@@ -16,9 +16,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
-import lucuma.core.enums.ConsiderForBand3
-import lucuma.core.enums.ImagingCapability
-import lucuma.core.enums.ImagingVariantType
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -84,7 +81,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[BlindOffsetType](BlindOffsetTypeType),
       LeafMapping[CalibrationRole](CalibrationRoleType),
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
-      LeafMapping[CallForProposalsType](CallForProposalsTypeType),
+      LeafMapping[GeminiCallForProposalsType](GeminiCallForProposalsTypeType),
       LeafMapping[CassRotator](CassRotatorType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
@@ -110,6 +107,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Epoch](EpochStringType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[ExecutionEventType](ExecutionEventTypeType),
+      LeafMapping[ExchangePartner](ExchangePartnerType),
       LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
@@ -185,6 +183,10 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObservationWorkflowState](ObservationWorkflowStateType),
       LeafMapping[ObserveClass](ObserveClassType),
+      LeafMapping[KeckInstrument](KeckInstrumentType),
+      LeafMapping[Observatory](ObservatoryType),
+      LeafMapping[SubaruInstrument](SubaruInstrumentType),
+      LeafMapping[SubaruCallForProposalsType](SubaruCallForProposalsTypeType),
       LeafMapping[TelescopeConfigGeneratorType](TelescopeConfigGeneratorTypeType),
       LeafMapping[Partner](PartnerType),
       LeafMapping[PartnerLinkType](PartnerLinkTypeType),
