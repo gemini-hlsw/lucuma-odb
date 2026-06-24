@@ -16,6 +16,7 @@ import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
 import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
@@ -35,6 +36,7 @@ import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.StreamingExecutionConfig
+import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
@@ -255,6 +257,16 @@ object Generator:
                   EitherT.pure[F, OdbError]:
                     VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state)
 
+            case _: ExchangeObservingModeType =>
+              // There is no sequence for exchange observations; we compute the
+              // digest directly from the requested total time.
+              val state = ctx.params.declaredState.getOrElse(ExecutionState.Completed)
+              val totalRequestTime = ctx.params.observingMode match
+                case ExchangeConfig(totalRequestTime = t) => t.some
+                case _                                    => none
+              EitherT.pure[F, OdbError]:
+                VisitorExecutionDigestCalculator.alienDigest(totalRequestTime, state)
+
       private def calculateScienceAtomDigests(
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, Stream[F, AtomDigest]] =
@@ -273,6 +285,9 @@ object Generator:
 
         // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
         val stream = ctx.params.observingMode.modeType match
+          case _: ExchangeObservingModeType         =>
+            EitherT.rightT[F, OdbError]:
+              StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
           case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
           case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
           case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
@@ -337,6 +352,9 @@ object Generator:
         )(using Transaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
           ctx.params.observingMode.modeType match
 
+            case _: ExchangeObservingModeType =>
+              EitherT.rightT(InstrumentExecutionConfig.Exchange)
+
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
@@ -393,6 +411,9 @@ object Generator:
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
         transactionallyWithContext(observationId, commitHash): ctx =>
           ctx.params.observingMode.modeType match
+
+            case _: ExchangeObservingModeType =>
+              EitherT.pure(())
 
             // N.B. there is no imaging acquisition, but it should not blow up.
             case ObservingModeType.Flamingos2Imaging  =>
@@ -478,6 +499,9 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s)))
 
             case _: VisitorObservingModeType =>
+              EitherT.pure(())
+
+            case _: ExchangeObservingModeType =>
               EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>

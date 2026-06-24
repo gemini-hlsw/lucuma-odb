@@ -72,6 +72,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gmos
@@ -291,6 +292,11 @@ object GuideService {
 
     val (site, observingModeType, agsWavelength): (Site, ObservingModeType, Wavelength) =
       params.observingMode match
+        case c: exchange.Config                               =>
+          // Exchange observations are not supported by AGS.  No guide probe is
+          // defined for exchange modes, so `agsParamsFor` is always empty and
+          // these placeholder values are never used for catalog queries.
+          (Site.GN, c.mode, Wavelength.Min)
         case mode: flamingos2.longslit.Config                 =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
         case flamingos2.imaging.Config(filters = filters) =>

@@ -226,48 +226,44 @@ trait SequenceCodec {
     rootEncoder(_.executionConfig)
 
   given Encoder[InstrumentExecutionConfig.Visitor] = v =>
-    Json.obj("instrument" -> v.instrument.asJson)
+    Json.obj("instrument" -> v.visitorInstrument.asJson)
 
   given Decoder[InstrumentExecutionConfig] =
-    Decoder.instance { c =>
-      for {
-        i <- c.downField("instrument").as[Instrument]
-        r <- i match {
-          case Instrument.Flamingos2 => c.downField("flamingos2").as[InstrumentExecutionConfig.Flamingos2]
-          case Instrument.Ghost      => c.downField("ghost").as[InstrumentExecutionConfig.Ghost]
-          case Instrument.GmosNorth  => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
-          case Instrument.GmosSouth  => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
-          case Instrument.Gnirs      => c.downField("gnirs").as[InstrumentExecutionConfig.Gnirs]
-          case Instrument.Igrins2    => c.downField("igrins2").as[InstrumentExecutionConfig.Igrins2]
-          case Instrument.VisitorNorth |
-               Instrument.VisitorSouth |
-               Instrument.Zorro        |
-               Instrument.Alopeke      |
-               Instrument.MaroonX    => c.downField("visitor").as[InstrumentExecutionConfig.Visitor]
-          case _                     => DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
-        }
-      } yield r
-    }
+    Decoder.instance: c =>
+      // A null/absent instrument identifies an exchange observation, which has
+      // no Gemini instrument and no sequence.
+      c.downField("instrument").as[Option[Instrument]].flatMap:
+        case None                          => InstrumentExecutionConfig.Exchange.asRight
+        case Some(Instrument.Flamingos2)   => c.downField("flamingos2").as[InstrumentExecutionConfig.Flamingos2]
+        case Some(Instrument.Ghost)        => c.downField("ghost").as[InstrumentExecutionConfig.Ghost]
+        case Some(Instrument.GmosNorth)    => c.downField("gmosNorth").as[InstrumentExecutionConfig.GmosNorth]
+        case Some(Instrument.GmosSouth)    => c.downField("gmosSouth").as[InstrumentExecutionConfig.GmosSouth]
+        case Some(Instrument.Gnirs)        => c.downField("gnirs").as[InstrumentExecutionConfig.Gnirs]
+        case Some(Instrument.Igrins2)      => c.downField("igrins2").as[InstrumentExecutionConfig.Igrins2]
+        case Some(i) if Instrument.visitorInstruments(i) =>
+          InstrumentExecutionConfig.Visitor(i).asRight
+        case Some(i)                                     =>
+         DecodingFailure(s"Unexpected instrument $i", c.history).asLeft[InstrumentExecutionConfig]
 
   given (using Encoder[Offset], Encoder[TimeSpan], Encoder[Wavelength]): Encoder[InstrumentExecutionConfig] =
     Encoder.instance: (a: InstrumentExecutionConfig) =>
       Json.obj(
         "instrument" -> a.instrument.asJson,
-        "flamingos2" -> Json.Null, // one of these will be replaced
-        "ghost"      -> Json.Null, // one of these will be replaced
-        "gmosNorth"  -> Json.Null, // one of these will be replaced
-        "gmosSouth"  -> Json.Null, // one of these will be replaced
-        "gnirs"      -> Json.Null, // one of these will be replaced
-        "igrins2"    -> Json.Null, // one of these will be replaced
-        "visitor"    -> Json.Null, // one of these will be replaced
+        "flamingos2" -> Json.Null, // one of these may be replaced
+        "ghost"      -> Json.Null, // one of these may be replaced
+        "gmosNorth"  -> Json.Null, // one of these may be replaced
+        "gmosSouth"  -> Json.Null, // one of these may be replaced
+        "gnirs"      -> Json.Null, // one of these may be replaced
+        "igrins2"    -> Json.Null, // one of these may be replaced
         a match
+          case InstrumentExecutionConfig.Exchange        => "instrument" -> Json.Null // no exchange instance
           case i@InstrumentExecutionConfig.Flamingos2(_) => "flamingos2" -> i.asJson
           case i@InstrumentExecutionConfig.Ghost(_)      => "ghost"      -> i.asJson
           case i@InstrumentExecutionConfig.GmosNorth(_)  => "gmosNorth"  -> i.asJson
           case i@InstrumentExecutionConfig.GmosSouth(_)  => "gmosSouth"  -> i.asJson
           case i@InstrumentExecutionConfig.Gnirs(_)      => "gnirs"      -> i.asJson
           case i@InstrumentExecutionConfig.Igrins2(_)    => "igrins2"    -> i.asJson
-          case i@InstrumentExecutionConfig.Visitor(_)    => "visitor"    -> i.asJson
+          case InstrumentExecutionConfig.Visitor(vi)     => "instrument" -> vi.asJson  // no visitor instance
       )
 
 }

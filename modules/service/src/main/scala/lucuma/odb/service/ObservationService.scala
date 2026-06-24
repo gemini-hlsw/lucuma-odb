@@ -16,6 +16,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
@@ -67,6 +68,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
@@ -389,6 +391,7 @@ object ObservationService {
         }
       }
 
+      // An exchange observing mode (exchange_keck / exchange_subaru) may only be
       private def updateObservingModes(
         nEdit: Nullable[ObservingModeInput.Edit],
         oids:  NonEmptyList[Observation.Id],
@@ -396,6 +399,12 @@ object ObservationService {
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
+          // An exchange edit that doesn't supply an instrument (e.g. only
+          // totalRequestTime is changed) leaves the observing mode type unchanged.
+          // It can't name keck vs subaru on its own (since the instrument isn't
+          // being changed), so we route it as an in-place update and leave
+          // t_observation's mode type alone.
+//          val exchangeInPlace = oEdit.exists(_.exchange.exists(_.instrument.isEmpty))
           for {
             m <- selectObservingModes(oids.toList)
             // Rewrite the observation's mode type to match the edit:
@@ -407,9 +416,15 @@ object ObservationService {
             _ <- oEdit match
                    case None       => updateObservingModeType(None, oids)
                    case Some(edit) => edit.observingModeType.traverse_(t => updateObservingModeType(Some(t), oids))
+            //_ <- if exchangeInPlace then ().pure[F]
+            //     else updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
 
               (existingMode, oEdit) match {
+                case (Some(_: ExchangeObservingModeType), Some(edit)) if exchangeInPlace =>
+                  // update existing exchange mode in place
+                  observingModeServices.update(edit, matchingOids)
+
                 // `forall` (rather than `contains`) so a partial edit whose mode type is
                 // indeterminate (None) — e.g. a GNIRS spectroscopy edit that doesn't change
                 // the FPU, and so can't say slit vs ifu — updates the existing mode in place
@@ -735,7 +750,7 @@ object ObservationService {
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
-          SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
+          SET.observingMode.flatMap(_.observingModeType).flatMap(_.instrumentOption),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
@@ -1166,7 +1181,7 @@ object ObservationService {
       void"UPDATE t_observation " |+|
          void"SET " |+|
             sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void", " |+|
-            sql"c_instrument = ${instrument.opt}"(newMode.map(_.instrument)) |+| void" " |+|
+            sql"c_instrument = ${instrument.opt}"(newMode.flatMap(_.instrumentOption)) |+| void" " |+|
        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
 
     /**

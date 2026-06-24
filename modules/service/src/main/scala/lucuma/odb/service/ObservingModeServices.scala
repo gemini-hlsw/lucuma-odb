@@ -12,6 +12,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.ExposureTimeMode
@@ -79,8 +80,8 @@ object ObservingModeServices:
 
         which.groupMap(_._2)(_._1).toList.traverse {
 
-          case (v: VisitorObservingModeType, oids) =>
-            visitorService
+          case (e: ExchangeObservingModeType, oids) =>
+            exchangeService
               .select(oids)
               .map(_.widen[ObservingMode])
 
@@ -129,6 +130,11 @@ object ObservingModeServices:
               .select(oids)
               .map(_.widen[ObservingMode])
 
+          case (v: VisitorObservingModeType, oids) =>
+            visitorService
+              .select(oids)
+              .map(_.widen[ObservingMode])
+
         }.map(_.fold(Map.empty[Observation.Id, ObservingMode])(_ ++ _))
 
       //------------------------------------------------------------------------
@@ -153,6 +159,7 @@ object ObservingModeServices:
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
+          input.exchange.map(m =>           exchangeService.insert(m, which)),
           input.flamingos2Imaging.map(m =>  flamingos2ImagingService.insert(m, etm, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
           input.ghostIfu.map(m =>           ghostIfuService.insert(m, etm, which)),
@@ -178,6 +185,7 @@ object ObservingModeServices:
 
         val deleteObservingMode: F[Unit] =
           mode match
+            case _: ExchangeObservingModeType         => exchangeService.delete(which)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.delete(which)
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
@@ -196,6 +204,7 @@ object ObservingModeServices:
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
+          input.exchange.map(m => exchangeService.update(m, which).map(_.success)),
           input.flamingos2Imaging.map(m => flamingos2ImagingService.update(m, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which).map(_.success)),
           input.ghostIfu.map(m => ghostIfuService.update(m, which)),
@@ -226,6 +235,7 @@ object ObservingModeServices:
 
         def cloneObservingMode(etms: List[(ExposureTimeModeId, ExposureTimeModeId)]): F[Unit] =
           mode match
+            case _: ExchangeObservingModeType         => exchangeService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)

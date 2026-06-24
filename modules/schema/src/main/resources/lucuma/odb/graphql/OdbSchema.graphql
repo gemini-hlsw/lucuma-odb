@@ -5226,6 +5226,12 @@ type SmartGcal implements StepConfig {
 Edit or create an observation's observing mode
 """
 input ObservingModeInput @oneOf {
+
+  """
+  An exchange instrument mode (Keck/Subaru). It cannot be unset with a null value.
+  """
+  exchange: ExchangeInput
+
   """
   The flamingos2Imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -5316,6 +5322,42 @@ type Visitor {
   Optional total requested observing time.
   """
   totalRequestTime: TimeSpan
+}
+
+input ExchangeInput {
+  """
+  Keck instrument. Required (and only allowed) when mode is EXCHANGE_KECK.
+  """
+  keckInstrument: KeckInstrument
+
+  """
+  Subaru instrument. Required (and only allowed) when mode is EXCHANGE_SUBARU.
+  """
+  subaruInstrument: SubaruInstrument
+
+  """
+  Total requested observing time.
+  """
+  totalRequestTime: TimeSpanInput
+}
+
+type Exchange {
+  mode: ExchangeObservingModeType!
+
+  """
+  Keck instrument, present when mode is EXCHANGE_KECK.
+  """
+  keckInstrument: KeckInstrument
+
+  """
+  Subaru instrument, present when mode is EXCHANGE_SUBARU.
+  """
+  subaruInstrument: SubaruInstrument
+
+  """
+  Total requested observing time.
+  """
+  totalRequestTime: TimeSpan!
 }
 
 """
@@ -7364,6 +7406,18 @@ enum ObservingModeType {
   ALOPEKE_WIDE_FIELD
 
   """
+  ObservingModeType ExchangeKeck.  Refers to an observation executed at the
+  Keck observatory.
+  """
+  EXCHANGE_KECK
+
+  """
+  ObservingModeType ExchangeSubaru.  Refers to an observation executed at the
+  Subaru observatory.
+  """
+  EXCHANGE_SUBARU
+
+  """
   ObservingModeType Flamingos2Imaging
   """
   FLAMINGOS_2_IMAGING
@@ -7437,6 +7491,7 @@ enum ObservingModeType {
   ObservingModeType ZorroWideField
   """
   ZORRO_WIDE_FIELD
+
 }
 
 """
@@ -7450,6 +7505,14 @@ enum VisitorObservingModeType {
   VISITOR_SOUTH
   ZORRO_SPECKLE
   ZORRO_WIDE_FIELD
+}
+
+"""
+ExchangeObservingModeType
+"""
+enum ExchangeObservingModeType {
+  EXCHANGE_KECK
+  EXCHANGE_SUBARU
 }
 
 type ConstraintSet {
@@ -8146,9 +8209,9 @@ Execution configuration.  All but one of the instruments will be `null`.
 type ExecutionConfig {
   """
   Instrument type.  This will indicate which of the instrument-specific fields
-  is defined.
+  is defined.  Null for exchange observations, which have no Gemini instrument.
   """
-  instrument: Instrument!
+  instrument: Instrument
 
   """
   Flamingos 2 execution config.  This will be null unless the `instrument` is
@@ -8174,16 +8237,17 @@ type ExecutionConfig {
   gmosSouth: GmosSouthExecutionConfig
 
   """
+  GNIRS execution config.  This will be null unless the `instrument` is
+  `GNIRS`.
+  """
+  gnirs: GnirsExecutionConfig
+
+  """
   IGRINS-2 execution config.  This will be null unless the `instrument` is
   `IGRINS2`.
   """
   igrins2: Igrins2ExecutionConfig
 
-  """
-  GNIRS execution config.  This will be null unless the `instrument` is
-  `GNIRS`.
-  """
-  gnirs: GnirsExecutionConfig
 }
 
 """
@@ -13384,7 +13448,7 @@ type ConfigurationConditions {
 }
 
 type ConfigurationObservingMode {
-  instrument: Instrument!
+  instrument: Instrument
   mode: ObservingModeType!
   gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
   gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
@@ -14641,14 +14705,19 @@ Base science mode
 """
 type ObservingMode {
   """
-  Instrument
+  Instrument, or null for exchange observations (which have no Gemini instrument).
   """
-  instrument: Instrument!
+  instrument: Instrument
 
   """
   Mode type
   """
   mode: ObservingModeType!
+
+  """
+  Observations executed at Keck or Subaru.
+  """
+  exchange: Exchange
 
   """
   Flamingos 2 Imaging mode
