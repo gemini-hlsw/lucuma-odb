@@ -5,9 +5,9 @@ package lucuma.itc.cache
 
 import boopickle.DefaultBasic.*
 import cats.Hash
-import cats.effect.Clock
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
+import org.typelevel.log4cats.Logger
 
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -18,16 +18,9 @@ import scala.concurrent.duration.FiniteDuration
  *
  * Values are stored in binary via boopickle.
  */
-trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Clock]
+trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Logger]
     extends EffectfulCache[F, Array[Byte], Array[Byte]]:
   protected val KeyCharset = Charset.forName("UTF8")
-
-  private def elapsedMillis[A](fa: F[A]): F[(Long, A)] =
-    for
-      start <- Clock[F].monotonic
-      a     <- fa
-      end   <- Clock[F].monotonic
-    yield ((end - start).toMillis, a)
 
   private def keyToBinary[K1: Hash](key: K1, keyPrefix: String): Array[Byte] =
     val hash: Int      = Hash[K1].hash(key)
@@ -62,33 +55,28 @@ trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Clock]
   ): F[V1] =
     val bk = keyToBinary(key, keyPrefix)
 
-    // Write the freshly computed value back, timing the cache write. (The computation itself
-    // is timed/bounded separately in Itc.limitConcurrency, so it isn't re-timed here.)
-    def writeValue(value: V1): F[Unit] =
-      elapsedMillis(write(bk, valueToBinary(value), ttl).attempt).flatMap: (writeMs, res) =>
-        L.info(s"[itc-cache] $keyPrefix wrote writeMs=$writeMs ok=${res.isRight}")
-
-    val computeAndWrite: F[V1] =
-      effect.flatTap(writeValue)
-
     def recoverFromCorruption: F[V1] =
-      L.warn(s"[itc-cache] $keyPrefix binary decode failed, deleting and recomputing") *>
-        delete(bk) *> computeAndWrite
+      for
+        _     <- delete(bk)
+        value <- effect
+        _     <- write(bk, valueToBinary(value), ttl).attempt.void
+      yield value
 
     def safeValueFromBinary(bytes: Array[Byte]): F[V1] =
       valueFromBinary(bytes).handleErrorWith: e =>
-        L.warn(e)(s"Binary decoding failed recalculate") *> recoverFromCorruption
+        Logger[F].warn(e)(s"Binary decoding failed recalculate") *>
+          recoverFromCorruption
+
+    val writeValue: F[V1] =
+      effect.flatTap(r => write(bk, valueToBinary(r), ttl).attempt)
 
     // Use our own getOrInvoke logic to distinguish between cached and fresh data
     keySemaphore(bk).permit.use: _ =>
       for
-        readResult          <-
-          elapsedMillis(
-            readWithContext(bk, keyPrefix).handleErrorWith: e =>
-              L.error(e)(s"[itc-cache] $keyPrefix read error").as(none)
-          )
-        (readMs, cacheValue) = readResult
-        _                   <-
-          L.info(s"[itc-cache] $keyPrefix ${cacheValue.fold("MISS")(_ => "HIT")} readMs=$readMs")
-        r                   <- cacheValue.fold(computeAndWrite)(safeValueFromBinary)
+        _          <- Logger[F].debug(s"Reading from cache with key [$bk]")
+        cacheValue <-
+          readWithContext(bk, keyPrefix)
+            .handleErrorWith: e =>
+              Logger[F].error(e)(s"Error reading from cache with key [$bk]").as(none)
+        r          <- cacheValue.fold(writeValue)(safeValueFromBinary)
       yield r
