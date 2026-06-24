@@ -58,15 +58,11 @@ object Itc:
           for
             acquiredAt <- Clock[F].monotonic
             r          <- F.delay(running.incrementAndGet())
-            _          <-
-              L.info(
-                s"[itc-compute] $label start waitMs=${(acquiredAt - queuedAt).toMillis} running=$r/$maxConcurrent"
-              )
             a          <- fa.guarantee(F.delay(running.decrementAndGet()).void)
             doneAt     <- Clock[F].monotonic
             _          <-
-              L.info(
-                s"[itc-compute] $label done computeMs=${(doneAt - acquiredAt).toMillis} running=${running.get}/$maxConcurrent"
+              L.debug(
+                s"[itc-compute] $label waitMs=${(acquiredAt - queuedAt).toMillis} computeMs=${(doneAt - acquiredAt).toMillis} running=$r/$maxConcurrent"
               )
           yield a
 
