@@ -168,9 +168,9 @@ object Main extends IOApp with ItcCacheOrRemote {
                                       )
                                     )
       itc                         =
-                                    Itc.limitConcurrency(cfg.maxConcurrentCalculations, calcSemaphore)(
-                                      ItcImpl.build(FLocalItc[F](localItc))
-                                    )
+        Itc.limitConcurrency(cfg.maxConcurrentCalculations, calcSemaphore)(
+          ItcImpl.build(FLocalItc[F](localItc))
+        )
       cache                      <- createCache[F](cfg.redisUrl)
       _                          <- Resource.eval(checkVersionToPurge[F](cache))
       customSedResolver          <- CustomSedOdbAttachmentResolver[F](cfg.odbBaseUrl, cfg.odbServiceToken)

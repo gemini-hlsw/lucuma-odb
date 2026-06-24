@@ -12,14 +12,14 @@ import org.http4s.Uri
  * Application configuration.
  */
 final case class Config(
-  environment:     ExecutionEnvironment,
-  port:            Int,
-  redisUrl:        Option[Uri],
-  odbBaseUrl:      Uri,
-  odbServiceToken: String,
-  otel:            Option[SharedOtelConfig],
-  inHeroku:        Boolean,
-  cacheTtlDays:    Int,
+  environment:               ExecutionEnvironment,
+  port:                      Int,
+  redisUrl:                  Option[Uri],
+  odbBaseUrl:                Uri,
+  odbServiceToken:           String,
+  otel:                      Option[SharedOtelConfig],
+  inHeroku:                  Boolean,
+  cacheTtlDays:              Int,
   maxConcurrentCalculations: Int
 )
 

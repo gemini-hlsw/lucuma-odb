@@ -38,13 +38,13 @@ object Itc:
   def apply[F[_]](using ev: Itc[F]): ev.type = ev
 
   /**
-   * Wrap an `Itc` so that at most `maxConcurrent` heavy (legacy OCS) calculations run
-   * concurrently. Only cache misses reach this (cache hits never invoke the calculation),
-   * so this caps the expensive work without throttling cached responses.
+   * Wrap an `Itc` so that at most `maxConcurrent` heavy (legacy OCS) calculations run concurrently.
+   * Only cache misses reach this (cache hits never invoke the calculation), so this caps the
+   * expensive work without throttling cached responses.
    *
-   * It also logs, for each calculation: how long it waited for a permit (queue backlog),
-   * how long the calculation took, and the live concurrency level. This is meant to isolate
-   * whether requests are backing up (contention) vs. individual calculations being slow.
+   * It also logs, for each calculation: how long it waited for a permit (queue backlog), how long
+   * the calculation took, and the live concurrency level. This is meant to isolate whether requests
+   * are backing up (contention) vs. individual calculations being slow.
    */
   def limitConcurrency[F[_]: {Sync as F, Logger as L}](
     maxConcurrent: Int,
@@ -58,14 +58,16 @@ object Itc:
           for
             acquiredAt <- Clock[F].monotonic
             r          <- F.delay(running.incrementAndGet())
-            _          <- L.info(
-                            s"[itc-compute] $label start waitMs=${(acquiredAt - queuedAt).toMillis} running=$r/$maxConcurrent"
-                          )
+            _          <-
+              L.info(
+                s"[itc-compute] $label start waitMs=${(acquiredAt - queuedAt).toMillis} running=$r/$maxConcurrent"
+              )
             a          <- fa.guarantee(F.delay(running.decrementAndGet()).void)
             doneAt     <- Clock[F].monotonic
-            _          <- L.info(
-                            s"[itc-compute] $label done computeMs=${(doneAt - acquiredAt).toMillis} running=${running.get}/$maxConcurrent"
-                          )
+            _          <-
+              L.info(
+                s"[itc-compute] $label done computeMs=${(doneAt - acquiredAt).toMillis} running=${running.get}/$maxConcurrent"
+              )
           yield a
 
     new Itc[F]:

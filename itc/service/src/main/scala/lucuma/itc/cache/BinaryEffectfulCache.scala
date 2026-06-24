@@ -83,13 +83,13 @@ trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Logger: Clock]
     // Use our own getOrInvoke logic to distinguish between cached and fresh data
     keySemaphore(bk).permit.use: _ =>
       for
-        readResult           <-
+        readResult          <-
           elapsedMillis(
             readWithContext(bk, keyPrefix).handleErrorWith: e =>
               L.error(e)(s"[itc-cache] $keyPrefix read error").as(none)
           )
-        (readMs, cacheValue)  = readResult
-        _                    <-
+        (readMs, cacheValue) = readResult
+        _                   <-
           L.info(s"[itc-cache] $keyPrefix ${cacheValue.fold("MISS")(_ => "HIT")} readMs=$readMs")
-        r                    <- cacheValue.fold(computeAndWrite)(safeValueFromBinary)
+        r                   <- cacheValue.fold(computeAndWrite)(safeValueFromBinary)
       yield r
