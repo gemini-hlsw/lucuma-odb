@@ -15,8 +15,8 @@ import grackle.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
-import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProposalStatus
@@ -25,8 +25,8 @@ import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.core.enums.ToOActivation
 import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
-import lucuma.core.model.Program
 import lucuma.core.model.IntPercent
+import lucuma.core.model.Program
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User

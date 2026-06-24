@@ -7,11 +7,11 @@ package input
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
-import lucuma.core.enums.ExchangePartner
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 

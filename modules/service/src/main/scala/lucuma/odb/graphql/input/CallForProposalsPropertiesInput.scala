@@ -9,13 +9,13 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.Observatory
 import lucuma.core.model.Semester
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
-import lucuma.core.enums.Observatory
 import lucuma.odb.graphql.binding.*
 
 import java.time.LocalDate

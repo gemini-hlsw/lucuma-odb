@@ -6,11 +6,11 @@ package input
 
 import cats.syntax.all.*
 import lucuma.core.enums.Site
+import lucuma.core.enums.SubaruCallForProposalsType
+import lucuma.core.enums.SubaruInstrument
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.odb.data.Nullable
-import lucuma.core.enums.SubaruInstrument
-import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.odb.graphql.binding.*
 
 object SubaruCallPropertiesInput:

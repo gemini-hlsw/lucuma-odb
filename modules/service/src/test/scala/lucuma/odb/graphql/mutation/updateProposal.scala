@@ -10,8 +10,8 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
-import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.util.DateInterval

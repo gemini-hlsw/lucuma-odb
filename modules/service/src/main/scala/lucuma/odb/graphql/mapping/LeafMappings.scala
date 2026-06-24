@@ -16,9 +16,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
-import lucuma.core.enums.ConsiderForBand3
-import lucuma.core.enums.ImagingCapability
-import lucuma.core.enums.ImagingVariantType
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -53,16 +50,11 @@ import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
-import lucuma.core.enums.ExchangePartner
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.core.enums.KeckInstrument
-import lucuma.core.enums.Observatory
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
-import lucuma.core.enums.SubaruInstrument
-import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.odb.data.Tag
 import lucuma.odb.data.UserType
 

@@ -16,11 +16,11 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.PerSite
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
@@ -31,8 +31,8 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
-import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.SubaruCallForProposalsType
+import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle

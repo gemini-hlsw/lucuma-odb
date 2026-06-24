@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.Site
 import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
-import lucuma.core.enums.KeckInstrument
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
