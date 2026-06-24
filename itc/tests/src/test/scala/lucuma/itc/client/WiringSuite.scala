@@ -810,12 +810,14 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.GnirsImaging(etm,
-                                    GnirsFilter.H2,
-                                    GnirsCamera.ShortBlue,
-                                    GnirsReadMode.Bright,
-                                    GnirsWellDepth.Shallow,
-                                    PortDisposition.Side
+        InstrumentMode.GnirsImaging(
+          etm,
+          GnirsFilter.H2,
+          GnirsCamera.ShortBlue,
+          GnirsReadMode.Bright,
+          GnirsWellDepth.Shallow,
+          PosInt.unsafeFrom(1),
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(
