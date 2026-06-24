@@ -8,7 +8,6 @@ import cats.Hash
 import cats.effect.Clock
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
-import org.typelevel.log4cats.Logger
 
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -19,7 +18,7 @@ import scala.concurrent.duration.FiniteDuration
  *
  * Values are stored in binary via boopickle.
  */
-trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Logger: Clock]
+trait BinaryEffectfulCache[F[_]: MonadCancelThrow: Clock]
     extends EffectfulCache[F, Array[Byte], Array[Byte]]:
   protected val KeyCharset = Charset.forName("UTF8")
 
