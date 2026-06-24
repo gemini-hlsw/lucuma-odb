@@ -18,8 +18,8 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
-import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.SubaruCallForProposalsType
