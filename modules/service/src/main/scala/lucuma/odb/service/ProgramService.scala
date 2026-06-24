@@ -55,6 +55,16 @@ trait ProgramService[F[_]] {
   )(using Transaction[F]): F[Result[(Program.Id, Option[ProgramReference])]]
 
   /**
+   * Set the maximum number of resources (observations, groups, targets,
+   * attachments, and program notes, combined) that may be associated with the
+   * program. Access control (staff) is enforced by the caller.
+   */
+  def setResourceLimit(
+    pid:   Program.Id,
+    limit: NonNegInt
+  )(using Transaction[F]): F[Result[Program.Id]]
+
+  /**
    * Insert a new program, where the calling user becomes PI (unless it's a Service user, in which
    * case the PI is left empty.
    */
@@ -178,6 +188,21 @@ object ProgramService {
             _ <- ResultT(validateProposal(pid))
             r <- ResultT(setProgramReferenceImpl(pid, props).map(_.map((pid, _))))
           } yield r).value
+
+      override def setResourceLimit(pid: Program.Id, limit: NonNegInt)(using Transaction[F]): F[Result[Program.Id]] =
+        session
+          .option(Statements.SetResourceLimit)(limit, pid)
+          .map:
+            case None        => OdbError.InvalidProgram(pid).asFailure
+            case Some(count) =>
+              // Lowering the limit below the current usage is allowed (e.g. set
+              // it to 0 to freeze a program), but warn since no new resources
+              // can be added until the count drops below the limit.
+              if count > limit.value then
+                OdbError.ProgramResourceLimitExceeded(
+                  s"Program $pid has $count associated resources, which exceeds the new limit of ${limit.value}. No new resources can be added until the count drops below the limit.".some
+                ).asWarning(pid)
+              else pid.success
 
       def validateActivePeriodUpdate[A](active: Option[A]): Result[Unit] =
         OdbError
@@ -319,6 +344,20 @@ object ProgramService {
            prpi.scienceSubtype,
            id
          )}
+
+    // Sets the limit and returns the program's current resource count, so the
+    // caller can warn if the new limit is below it.
+    val SetResourceLimit: Query[(NonNegInt, Program.Id), Int] =
+      sql"""
+        UPDATE t_program p
+        SET    c_resource_limit = $int4_nonneg
+        WHERE  c_program_id = $program_id
+        RETURNING (
+          SELECT rc.c_resource_count
+          FROM   t_program_resource_count rc
+          WHERE  rc.c_program_id = p.c_program_id
+        )
+      """.query(int4)
 
     def createProgramUpdateTempTable(whichProgramIds: AppliedFragment): AppliedFragment =
       void"""

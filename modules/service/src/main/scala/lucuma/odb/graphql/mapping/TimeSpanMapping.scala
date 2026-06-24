@@ -19,7 +19,7 @@ import lucuma.odb.graphql.table.GnirsLongSlitView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.Igrins2DynamicTable
 import lucuma.odb.graphql.table.ObservationView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.graphql.table.ProposalView
 import lucuma.odb.graphql.table.StepRecordView
 import lucuma.odb.graphql.table.TimeChargeCorrectionTable
@@ -38,7 +38,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with GmosDynamicTables[F]
                                with GnirsDynamicView[F]
                                with Igrins2DynamicTable[F]
-                               with ProgramTable[F]
+                               with ProgramView[F]
                                with ProposalView[F]
                                with ObservationView[F]
                                with GroupView[F]

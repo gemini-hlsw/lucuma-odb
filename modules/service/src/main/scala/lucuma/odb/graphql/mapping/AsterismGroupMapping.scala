@@ -16,7 +16,7 @@ trait AsterismGroupMapping[F[_]]
   extends AsterismGroupView[F]
     with AsterismTargetTable[F]
     with ObservationView[F]
-    with ProgramTable[F]
+    with ProgramView[F]
     with TargetView[F]
     with Predicates[F] {
 
@@ -27,7 +27,7 @@ trait AsterismGroupMapping[F[_]]
       SqlField("asterismGroup", AsterismGroupView.AsterismGroup, key = true, hidden = true),
 
       // User-visible fields
-      SqlObject("program", Join(AsterismGroupView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(AsterismGroupView.ProgramId, ProgramView.Id)),
       // SqlObject("observations", Join(AsterismGroupView.AsterismGroup, ObservationView.AsterismGroup)),
       SqlObject("observations"),
       SqlObject("asterism", Join(AsterismGroupView.ExampleObservationId, AsterismTargetTable.ObservationId), Join(AsterismTargetTable.TargetId, TargetView.TargetId)),

@@ -17,12 +17,12 @@ import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.service.Services
 
 import Services.Syntax.*
 
-trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with ProgramTable[F] {
+trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with ProgramView[F] {
 
   def services: Resource[F, Services[F]]
 
@@ -31,7 +31,7 @@ trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with
       SqlField("id", ConfigurationRequestView.Id, key = true),
       SqlField("status", ConfigurationRequestView.Status),
       SqlField("justification", ConfigurationRequestView.Justification),
-      SqlObject("program", Join(ConfigurationRequestView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(ConfigurationRequestView.ProgramId, ProgramView.Id)),
       SqlObject("configuration"),
       EffectField("applicableObservations", applicableObservationsHandler, List("id"))
     )

@@ -60,6 +60,7 @@ enum OdbError:
   case GuideEnvironmentError(detail: Option[String] = None)
   case EmailSendError(detail: Option[String] = None)
   case InconsistentGroupError(detail: Option[String] = None)
+  case ProgramResourceLimitExceeded(detail: Option[String] = None)
   case InvalidConfiguration(detail: Option[String] = None)
   case InvalidWorkflowTransition(currentState: ObservationWorkflowState, requestedState: ObservationWorkflowState, detail: Option[String] = None)
   case RemoteServiceCallError(detail: Option[String] = None)
@@ -70,31 +71,32 @@ object OdbError:
 
   // N.B. package-private to allow for Arb instance
   private[data] enum Tag(val value: String):
-    case InvalidArgument           extends Tag("invalid_argument")
-    case NoAction                  extends Tag("no_action")
-    case NotAuthorized             extends Tag("not_authorized")
-    case InvitationError           extends Tag("invitation_error")
-    case InvalidProgram            extends Tag("invalid_program")
-    case InvalidObservation        extends Tag("invalid_observation")
-    case InvalidObservationList    extends Tag("invalid_observation_list")
-    case SequenceUnavailable       extends Tag("sequence_unavailable")
-    case InvalidTarget             extends Tag("invalid_target")
-    case InvalidTargetList         extends Tag("invalid_target_list")
-    case InvalidVisit              extends Tag("invalid_visit")
-    case InvalidStep               extends Tag("invalid_step")
-    case InvalidFilename           extends Tag("invalid_filename")
-    case InvalidAtom               extends Tag("invalid_atom")
-    case InvalidDataset            extends Tag("invalid_dataset")
-    case InvalidProgramUser        extends Tag("invalid_program_user")
-    case InvalidUser               extends Tag("invalid_user")
-    case UpdateFailed              extends Tag("update_failed")
-    case ItcError                  extends Tag("itc_error")
-    case GuideEnvironmentError     extends Tag("guide_environment_error")
-    case EmailSendError            extends Tag("email_send_error")
-    case InconsistentGroup         extends Tag("inconsistent_group")
-    case InvalidConfiguration      extends Tag("invalid_configuration")
-    case InvalidWorkflowTransition extends Tag("invalid_workflow_transition")
-    case RemoteServiceCallError    extends Tag("remote_service_call_error")
+    case InvalidArgument              extends Tag("invalid_argument")
+    case NoAction                     extends Tag("no_action")
+    case NotAuthorized                extends Tag("not_authorized")
+    case InvitationError              extends Tag("invitation_error")
+    case InvalidProgram               extends Tag("invalid_program")
+    case InvalidObservation           extends Tag("invalid_observation")
+    case InvalidObservationList       extends Tag("invalid_observation_list")
+    case SequenceUnavailable          extends Tag("sequence_unavailable")
+    case InvalidTarget                extends Tag("invalid_target")
+    case InvalidTargetList            extends Tag("invalid_target_list")
+    case InvalidVisit                 extends Tag("invalid_visit")
+    case InvalidStep                  extends Tag("invalid_step")
+    case InvalidFilename              extends Tag("invalid_filename")
+    case InvalidAtom                  extends Tag("invalid_atom")
+    case InvalidDataset               extends Tag("invalid_dataset")
+    case InvalidProgramUser           extends Tag("invalid_program_user")
+    case InvalidUser                  extends Tag("invalid_user")
+    case UpdateFailed                 extends Tag("update_failed")
+    case ItcError                     extends Tag("itc_error")
+    case GuideEnvironmentError        extends Tag("guide_environment_error")
+    case EmailSendError               extends Tag("email_send_error")
+    case InconsistentGroup            extends Tag("inconsistent_group")
+    case ProgramResourceLimitExceeded extends Tag("program_resource_limit_exceeded")
+    case InvalidConfiguration         extends Tag("invalid_configuration")
+    case InvalidWorkflowTransition    extends Tag("invalid_workflow_transition")
+    case RemoteServiceCallError       extends Tag("remote_service_call_error")
 
   private[data]  object Tag:
 
@@ -128,37 +130,39 @@ object OdbError:
       case GuideEnvironmentError(_)           => Tag.GuideEnvironmentError
       case EmailSendError(_)                  => Tag.EmailSendError
       case InconsistentGroupError(_)          => Tag.InconsistentGroup
+      case ProgramResourceLimitExceeded(_)    => Tag.ProgramResourceLimitExceeded
       case InvalidConfiguration(_)            => Tag.InvalidConfiguration
       case InvalidWorkflowTransition(_, _, _) => Tag.InvalidWorkflowTransition
       case RemoteServiceCallError(_)          => Tag.RemoteServiceCallError
 
   def defaultMessage(e: OdbError): String =
     e match
-      case InvalidArgument(_)            => "The provided argument is not valid."
-      case NoAction(_)                   => "No action was taken."
-      case NotAuthorized(u, _)           => s"User $u is not authorized to perform this operation."
-      case InvitationError(_, _)         => "Invitation operation could not be completed."
-      case InvalidProgram(p, _)          => s"Program $p does not exist, is not visible, or is ineligible for the requested operation."
-      case InvalidObservation(o, _)      => s"Observation $o does not exist, is not visible, or is ineligible for the requested operation."
-      case InvalidObservationList(os, _) => s"Observation(s) ${os.sorted.toList.mkString(", ")} must exist and be associated with the same program."
-      case SequenceUnavailable(o, _)     => s"Could not generate the requested sequence for observation $o."
-      case InvalidTarget(t, _)           => s"Target $t does not exist, is not visible, or is ineligible for the requested operation."
-      case InvalidTargetList(p, ts, _)   => s"Target(s) ${ts.sorted.toList.mkString(", ")} must exist and be associated with Program $p."
-      case InvalidVisit(v, _)            => s"Visit $v does not exist, is not visible, or is ineligible for the requested operation."
-      case InvalidStep(s, _)             => s"Step $s does not exist, is not visible, or is ineligible for the requested operation."
-      case InvalidFilename(n, _)         => s"Filename '$n' is invalid or already exists."
-      case InvalidAtom(a, _)             => s"Atom $a does not exist, is not visible, or is ineligible for the requested operation."
-      case InvalidDataset(d, _)          => s"Dataset $d does not exist, is not visible, or is ineligible for the requested operation."
-      case InvalidProgramUser(u, _)      => s"ProgramUser $u does not exist, or is ineligible for the requested operation."
-      case InvalidUser(u, _)             => s"User $u user does not exist, or is ineligible for the requested operation."
-      case UpdateFailed(_)               => "The specified operation could not be completed."
-      case ItcError(_)                   => "The requested ITC operation could not be completed."
-      case GuideEnvironmentError(_)      => "The guide environment as configured is ineligible for the requested operation."
-      case EmailSendError(_)             => "Unable to send the email."
-      case InconsistentGroupError(_)     => "Group hierarchy is inconsistent, or a deleted group contains a non-deleted element."
-      case InvalidConfiguration(_)       => "Observation configuration is incomplete."
+      case InvalidArgument(_)                 => "The provided argument is not valid."
+      case NoAction(_)                        => "No action was taken."
+      case NotAuthorized(u, _)                => s"User $u is not authorized to perform this operation."
+      case InvitationError(_, _)              => "Invitation operation could not be completed."
+      case InvalidProgram(p, _)               => s"Program $p does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidObservation(o, _)           => s"Observation $o does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidObservationList(os, _)      => s"Observation(s) ${os.sorted.toList.mkString(", ")} must exist and be associated with the same program."
+      case SequenceUnavailable(o, _)          => s"Could not generate the requested sequence for observation $o."
+      case InvalidTarget(t, _)                => s"Target $t does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidTargetList(p, ts, _)        => s"Target(s) ${ts.sorted.toList.mkString(", ")} must exist and be associated with Program $p."
+      case InvalidVisit(v, _)                 => s"Visit $v does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidStep(s, _)                  => s"Step $s does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidFilename(n, _)              => s"Filename '$n' is invalid or already exists."
+      case InvalidAtom(a, _)                  => s"Atom $a does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidDataset(d, _)               => s"Dataset $d does not exist, is not visible, or is ineligible for the requested operation."
+      case InvalidProgramUser(u, _)           => s"ProgramUser $u does not exist, or is ineligible for the requested operation."
+      case InvalidUser(u, _)                  => s"User $u user does not exist, or is ineligible for the requested operation."
+      case UpdateFailed(_)                    => "The specified operation could not be completed."
+      case ItcError(_)                        => "The requested ITC operation could not be completed."
+      case GuideEnvironmentError(_)           => "The guide environment as configured is ineligible for the requested operation."
+      case EmailSendError(_)                  => "Unable to send the email."
+      case InconsistentGroupError(_)          => "Group hierarchy is inconsistent, or a deleted group contains a non-deleted element."
+      case ProgramResourceLimitExceeded(_)    => "The program has reached its maximum number of associated resources (observations, groups, targets, attachments, and program notes)."
+      case InvalidConfiguration(_)            => "Observation configuration is incomplete."
       case InvalidWorkflowTransition(a, b, _) => s"Workflow state cannot be chanegd from $a to $b."
-      case RemoteServiceCallError(_)     => "Error attempting to call a remote service."
+      case RemoteServiceCallError(_)          => "Error attempting to call a remote service."
 
   private def data(e: OdbError): JsonObject =
     e match
@@ -184,37 +188,39 @@ object OdbError:
       case GuideEnvironmentError(_)           => JsonObject()
       case EmailSendError(_)                  => JsonObject()
       case InconsistentGroupError(_)          => JsonObject()
+      case ProgramResourceLimitExceeded(_)    => JsonObject()
       case InvalidConfiguration(_)            => JsonObject()
       case InvalidWorkflowTransition(a, b, _) => JsonObject("currentState" -> a.asJson, "requestedState" -> b.asJson)
       case RemoteServiceCallError(_)          => JsonObject()
 
   private def decode(d: Tag, detail: Option[String], c: ACursor): Decoder.Result[OdbError] =
     d match
-      case Tag.InvalidArgument           => InvalidArgument(detail).asRight
-      case Tag.NoAction                  => NoAction(detail).asRight
-      case Tag.NotAuthorized             => c.downField("userId").as[User.Id].map(NotAuthorized(_, detail))
-      case Tag.InvitationError           => c.downField("invitationId").as[UserInvitation.Id].map(InvitationError(_, detail))
-      case Tag.InvalidProgram            => c.downField("programId").as[Program.Id].map(InvalidProgram(_, detail))
-      case Tag.InvalidObservation        => c.downField("observationId").as[Observation.Id].map(InvalidObservation(_, detail))
-      case Tag.InvalidObservationList    => c.downField("observationIds").as[NonEmptyList[Observation.Id]].map(InvalidObservationList(_, detail))
-      case Tag.SequenceUnavailable       => c.downField("observationId").as[Observation.Id].map(SequenceUnavailable(_, detail))
-      case Tag.InvalidTarget             => c.downField("targetId").as[Target.Id].map(InvalidTarget(_, detail))
-      case Tag.InvalidTargetList         => (c.downField("programId").as[Program.Id], c.downField("targetIds").as[NonEmptyList[Target.Id]]).mapN(InvalidTargetList(_, _, detail))
-      case Tag.InvalidVisit              => c.downField("visitId").as[Visit.Id].map(InvalidVisit(_, detail))
-      case Tag.InvalidStep               => c.downField("stepId").as[Step.Id].map(InvalidStep(_, detail))
-      case Tag.InvalidFilename           => c.downField("filename").as[Filename].map(InvalidFilename(_, detail))
-      case Tag.InvalidAtom               => c.downField("atomId").as[Atom.Id].map(InvalidAtom(_, detail))
-      case Tag.InvalidDataset            => c.downField("datasetId").as[Dataset.Id].map(InvalidDataset(_, detail))
-      case Tag.InvalidProgramUser        => c.downField("programUserId").as[ProgramUser.Id].map(InvalidProgramUser(_, detail))
-      case Tag.InvalidUser               => c.downField("userId").as[User.Id].map(InvalidUser(_, detail))
-      case Tag.UpdateFailed              => UpdateFailed(detail).asRight
-      case Tag.ItcError                  => ItcError(detail).asRight
-      case Tag.GuideEnvironmentError     => GuideEnvironmentError(detail).asRight
-      case Tag.EmailSendError            => EmailSendError(detail).asRight
-      case Tag.InconsistentGroup         => InconsistentGroupError(detail).asRight
-      case Tag.InvalidConfiguration      => InvalidConfiguration(detail).asRight
-      case Tag.InvalidWorkflowTransition => (c.downField("currentState").as[ObservationWorkflowState], c.downField("requestedState").as[ObservationWorkflowState]).mapN(InvalidWorkflowTransition(_, _, detail))
-      case Tag.RemoteServiceCallError    => RemoteServiceCallError(detail).asRight
+      case Tag.InvalidArgument              => InvalidArgument(detail).asRight
+      case Tag.NoAction                     => NoAction(detail).asRight
+      case Tag.NotAuthorized                => c.downField("userId").as[User.Id].map(NotAuthorized(_, detail))
+      case Tag.InvitationError              => c.downField("invitationId").as[UserInvitation.Id].map(InvitationError(_, detail))
+      case Tag.InvalidProgram               => c.downField("programId").as[Program.Id].map(InvalidProgram(_, detail))
+      case Tag.InvalidObservation           => c.downField("observationId").as[Observation.Id].map(InvalidObservation(_, detail))
+      case Tag.InvalidObservationList       => c.downField("observationIds").as[NonEmptyList[Observation.Id]].map(InvalidObservationList(_, detail))
+      case Tag.SequenceUnavailable          => c.downField("observationId").as[Observation.Id].map(SequenceUnavailable(_, detail))
+      case Tag.InvalidTarget                => c.downField("targetId").as[Target.Id].map(InvalidTarget(_, detail))
+      case Tag.InvalidTargetList            => (c.downField("programId").as[Program.Id], c.downField("targetIds").as[NonEmptyList[Target.Id]]).mapN(InvalidTargetList(_, _, detail))
+      case Tag.InvalidVisit                 => c.downField("visitId").as[Visit.Id].map(InvalidVisit(_, detail))
+      case Tag.InvalidStep                  => c.downField("stepId").as[Step.Id].map(InvalidStep(_, detail))
+      case Tag.InvalidFilename              => c.downField("filename").as[Filename].map(InvalidFilename(_, detail))
+      case Tag.InvalidAtom                  => c.downField("atomId").as[Atom.Id].map(InvalidAtom(_, detail))
+      case Tag.InvalidDataset               => c.downField("datasetId").as[Dataset.Id].map(InvalidDataset(_, detail))
+      case Tag.InvalidProgramUser           => c.downField("programUserId").as[ProgramUser.Id].map(InvalidProgramUser(_, detail))
+      case Tag.InvalidUser                  => c.downField("userId").as[User.Id].map(InvalidUser(_, detail))
+      case Tag.UpdateFailed                 => UpdateFailed(detail).asRight
+      case Tag.ItcError                     => ItcError(detail).asRight
+      case Tag.GuideEnvironmentError        => GuideEnvironmentError(detail).asRight
+      case Tag.EmailSendError               => EmailSendError(detail).asRight
+      case Tag.InconsistentGroup            => InconsistentGroupError(detail).asRight
+      case Tag.ProgramResourceLimitExceeded => ProgramResourceLimitExceeded(detail).asRight
+      case Tag.InvalidConfiguration         => InvalidConfiguration(detail).asRight
+      case Tag.InvalidWorkflowTransition    => (c.downField("currentState").as[ObservationWorkflowState], c.downField("requestedState").as[ObservationWorkflowState]).mapN(InvalidWorkflowTransition(_, _, detail))
+      case Tag.RemoteServiceCallError       => RemoteServiceCallError(detail).asRight
 
   private object Field:
     private val Prefix = "odb_error"

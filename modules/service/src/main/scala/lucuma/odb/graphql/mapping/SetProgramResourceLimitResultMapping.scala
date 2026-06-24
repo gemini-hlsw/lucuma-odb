@@ -9,14 +9,10 @@ import grackle.skunk.SkunkMapping
 
 import table.ProgramView
 
-trait CreateProgramResultMapping[F[_]] extends ProgramView[F] {
+trait SetProgramResourceLimitResultMapping[F[_]] extends ProgramView[F]:
 
-
-  lazy val CreateProgramResultMapping =
-    ObjectMapping(CreateProgramResultType)(
+  lazy val SetProgramResourceLimitResultMapping =
+    ObjectMapping(SetProgramResourceLimitResultType)(
       SqlField("id", ProgramView.Id, key = true, hidden = true),
-      SqlObject("program"),
+      SqlObject("program")
     )
-
-}
-

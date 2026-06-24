@@ -8,14 +8,14 @@ package mapping
 import grackle.skunk.SkunkMapping
 import lucuma.odb.data.EditType
 
-import table.ProgramTable
+import table.ProgramView
 
-trait ProgramEditMapping[F[_]] extends ProgramTable[F]  {
+trait ProgramEditMapping[F[_]] extends ProgramView[F]  {
 
   // N.B. env is populated by the subscription elaborator
   lazy val ProgramEditMapping =
     ObjectMapping(ProgramEditType)(
-      SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
+      SqlField("synthetic-id", ProgramView.Id, key = true, hidden = true),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
       SqlObject("value")
     )

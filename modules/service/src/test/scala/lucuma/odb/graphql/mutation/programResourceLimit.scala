@@ -1,0 +1,200 @@
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.graphql
+package mutation
+
+import cats.data.Ior
+import cats.effect.IO
+import cats.syntax.all.*
+import io.circe.literal.*
+import lucuma.core.model.Program
+import lucuma.core.model.Target
+import lucuma.core.model.User
+import lucuma.odb.data.OdbError
+import lucuma.odb.util.Codecs.*
+import skunk.codec.all.*
+import skunk.syntax.all.*
+
+class programResourceLimit extends OdbSuite:
+
+  val pi    = TestUsers.Standard.pi(nextId, nextId)
+  val staff = TestUsers.Standard.staff(nextId, nextId)
+
+  lazy val validUsers = List(pi, staff)
+
+  private def setResourceLimitAs(user: User, pid: Program.Id, limit: Int): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          setProgramResourceLimit(input: { programId: "$pid", limit: $limit }) {
+            program { id }
+          }
+        }
+      """
+    ).void
+
+  // Attachments have no GraphQL creation helper (they go through an HTTP upload
+  // route), so insert one directly to exercise attachment counting.
+  private def insertAttachment(pid: Program.Id, fileName: String): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"""
+          insert into t_attachment (c_program_id, c_attachment_type, c_file_name, c_file_size, c_remote_path)
+          values ($program_id, 'finder', $text, 0, $text)
+        """.command
+      )((pid, fileName, s"remote/$fileName")).void
+
+  private def hardDeleteAttachment(pid: Program.Id, fileName: String): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"delete from t_attachment where c_program_id = $program_id and c_file_name = $text".command
+      )((pid, fileName)).void
+
+  private def restoreTarget(tid: Target.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(sql"update t_target set c_existence = 'present' where c_target_id = $target_id".command)(tid).void
+
+  private def moveTarget(tid: Target.Id, pid: Program.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(sql"update t_target set c_program_id = $program_id where c_target_id = $target_id".command)((pid, tid)).void
+
+  // Assert the maintained counter matches the count recomputed from scratch
+  // (and equals the expected value, so we know it is actually counting).
+  private def assertReconciled(pid: Program.Id, expected: Int): IO[Unit] =
+    withSession: s =>
+      s.unique(
+        sql"""
+          select rc.c_resource_count, program_resource_count_actual(rc.c_program_id)
+          from   t_program_resource_count rc
+          where  rc.c_program_id = $program_id
+        """.query(int4 *: int4)
+      )(pid).map: (maintained, actual) =>
+        assertEquals(maintained, actual,    s"resource count drift for $pid: maintained=$maintained actual=$actual")
+        assertEquals(maintained, expected,  s"unexpected resource count for $pid")
+
+  test("observations, groups, targets, and program notes count together"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- setResourceLimitAs(staff, pid, 4)
+      _   <- createTargetAs(pi, pid)                          // 1
+      _   <- createGroupAs(pi, pid)                           // 2
+      _   <- createObservationAs(pi, pid)                     // 3
+      _   <- createProgramNoteAs(pi, pid, "note", "x".some)   // 4 (at the limit)
+      _   <- interceptOdbError(createTargetAs(pi, pid)):
+               case OdbError.ProgramResourceLimitExceeded(_) => ()
+    yield ()
+
+  test("attachments count toward the limit"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- setResourceLimitAs(staff, pid, 1)
+      _   <- insertAttachment(pid, "finder.png")   // 1 (at the limit)
+      _   <- interceptOdbError(createTargetAs(pi, pid)):
+               case OdbError.ProgramResourceLimitExceeded(_) => ()
+    yield ()
+
+  test("soft-deleting a resource frees capacity"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- setResourceLimitAs(staff, pid, 1)
+      tid <- createTargetAs(pi, pid)               // at the limit
+      _   <- interceptOdbError(createGroupAs(pi, pid)):
+               case OdbError.ProgramResourceLimitExceeded(_) => ()
+      _   <- deleteTargetAs(pi, tid)               // frees a slot
+      _   <- createGroupAs(pi, pid)                // now succeeds
+    yield ()
+
+  test("resourceLimit and resourceCount are readable on Program (no staff gating)"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- createTargetAs(pi, pid)
+      _   <- createGroupAs(pi, pid)
+      _   <- expect(
+               user  = pi,
+               query = s"""query { program(programId: "$pid") { resourceLimit resourceCount } }""",
+               expected = Right(json"""
+                 { "program": { "resourceLimit": 1000, "resourceCount": 2 } }
+               """)
+             )
+    yield ()
+
+  test("only staff may set the resource limit"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- expectOdbError(
+               user  = pi,
+               query = s"""
+                 mutation {
+                   setProgramResourceLimit(input: { programId: "$pid", limit: 50 }) {
+                     program { id }
+                   }
+                 }
+               """,
+               expected = { case OdbError.NotAuthorized(_, _) => () }
+             )
+      _   <- expect(
+               user  = staff,
+               query = s"""
+                 mutation {
+                   setProgramResourceLimit(input: { programId: "$pid", limit: 5000 }) {
+                     program { resourceLimit }
+                   }
+                 }
+               """,
+               expected = Right(json"""
+                 { "setProgramResourceLimit": { "program": { "resourceLimit": 5000 } } }
+               """)
+             )
+    yield ()
+
+  test("lowering the limit below current usage succeeds with a warning"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- createTargetAs(pi, pid)
+      _   <- createGroupAs(pi, pid)          // count = 2
+      _   <- expectIor(
+               user  = staff,
+               query = s"""
+                 mutation {
+                   setProgramResourceLimit(input: { programId: "$pid", limit: 0 }) {
+                     program { resourceLimit resourceCount }
+                   }
+                 }
+               """,
+               expected = Ior.both(
+                 List(s"Program $pid has 2 associated resources, which exceeds the new limit of 0. No new resources can be added until the count drops below the limit."),
+                 json"""{ "setProgramResourceLimit": { "program": { "resourceLimit": 0, "resourceCount": 2 } } }"""
+               )
+             )
+    yield ()
+
+  test("setting the limit to 0 freezes the program"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- setResourceLimitAs(staff, pid, 0)   // empty program: succeeds without warning
+      _   <- interceptOdbError(createTargetAs(pi, pid)):
+               case OdbError.ProgramResourceLimitExceeded(_) => ()
+    yield ()
+
+  test("maintained count reconciles with the recomputed count across all transitions"):
+    for
+      pid  <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      _    <- createGroupAs(pi, pid)
+      _    <- createObservationAs(pi, pid)
+      _    <- createProgramNoteAs(pi, pid, "note", "x".some)
+      _    <- insertAttachment(pid, "finder.png")
+      _    <- assertReconciled(pid, 5)             // five inserts, one of each type
+      _    <- deleteTargetAs(pi, tid)              // soft delete
+      _    <- assertReconciled(pid, 4)
+      _    <- restoreTarget(tid)                   // restore (existence -> present)
+      _    <- assertReconciled(pid, 5)
+      _    <- hardDeleteAttachment(pid, "finder.png")
+      _    <- assertReconciled(pid, 4)
+      _    <- moveTarget(tid, pid2)                // cross-program move
+      _    <- assertReconciled(pid, 3)
+      _    <- assertReconciled(pid2, 1)
+    yield ()

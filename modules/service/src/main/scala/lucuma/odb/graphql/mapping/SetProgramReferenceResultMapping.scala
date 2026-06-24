@@ -5,16 +5,16 @@ package lucuma.odb.graphql
 package mapping
 
 import lucuma.odb.graphql.table.ProgramReferenceView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 
 trait SetProgramReferenceResultMapping[F[_]] extends BaseMapping[F]
                                                 with ProgramReferenceView[F]
-                                                with ProgramTable[F] {
+                                                with ProgramView[F] {
 
   lazy val SetProgramReferenceResultMapping: ObjectMapping =
     ObjectMapping(SetProgramReferenceResultType)(
-      SqlField("programId", ProgramTable.Id, key = true, hidden = true),
-      SqlObject("reference", Join(ProgramTable.Id, ProgramReferenceView.Id))
+      SqlField("programId", ProgramView.Id, key = true, hidden = true),
+      SqlObject("reference", Join(ProgramView.Id, ProgramReferenceView.Id))
     )
 
 }
