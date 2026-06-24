@@ -336,7 +336,7 @@ class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
   test("recordDataset - two datasets, same step"):
     assertIOBoolean:
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithUsPi(pi)
         _   <- addProposal(pi, pid, cfp.some, None)
         _   <- addPartnerSplits(pi, pid)

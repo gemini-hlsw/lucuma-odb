@@ -38,6 +38,7 @@ import lucuma.odb.graphql.input.ChangeProgramUserRoleInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
 import lucuma.odb.util.Codecs.educational_status
+import lucuma.odb.util.Codecs.exchange_partner
 import lucuma.odb.util.Codecs.gender
 import lucuma.odb.util.Codecs.partner
 import lucuma.odb.util.Codecs.partner_link
@@ -348,7 +349,8 @@ object ProgramUserService:
           c_user_type,
           c_role,
           c_partner_link,
-          c_partner
+          c_gemini_partner,
+          c_exchange_partner
         ) SELECT $program_id, $user_id, $user_type, $program_user_role, $partner_link
         RETURNING c_program_user_id
       """.query(program_user_id)
@@ -369,7 +371,8 @@ object ProgramUserService:
               c_program_id,
               c_role,
               c_partner_link,
-              c_partner
+              c_gemini_partner,
+              c_exchange_partner
             )
             SELECT $program_id, $program_user_role, $partner_link"""(
               targetProgramId, targetRole, targetPartnerLink
@@ -675,7 +678,7 @@ object ProgramUserService:
       innerAlias: String
     ): AppliedFragment =
       sql"""
-        EXISTS (SELECT 1 FROM t_allocation #$innerAlias WHERE #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_ta_category=#$outerAlias.c_partner and #$innerAlias.c_duration > 'PT')
+        EXISTS (SELECT 1 FROM t_allocation #$innerAlias WHERE #$innerAlias.c_program_id = #$outerAlias.c_program_id and #$innerAlias.c_ta_category=#$outerAlias.c_gemini_partner and #$innerAlias.c_duration > 'PT')
       """(Void)
 
     private def correlatedExistsUserAccess(
@@ -736,8 +739,9 @@ object ProgramUserService:
           SET.classicalVisitor.map(upClassicalVisitor)
         ).flattenOption :::
         SET.partnerLink.toList.flatMap { pl => List(
-          sql"c_partner_link = $partner_link_type"(pl.linkType),
-          sql"c_partner      = ${partner.opt}"(pl.partnerOption)
+          sql"c_partner_link     = $partner_link_type"(pl.linkType),
+          sql"c_gemini_partner   = ${partner.opt}"(pl.geminiPartnerOption),
+          sql"c_exchange_partner = ${exchange_partner.opt}"(pl.exchangePartnerOption)
         )}
       )
 

@@ -10,7 +10,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SkyBackground
 import lucuma.core.model.ImageQuality
@@ -135,7 +135,7 @@ class constraintSetGroup extends OdbSuite {
           create2(ImageQuality.Preset.PointOne, SkyBackground.Bright),
           create2(ImageQuality.Preset.PointOne, SkyBackground.Dark)
         ).parTupled.flatMap { (g1, g2, g3) =>
-          createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+          createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
            addDemoScienceProposal(user, pid, cid)
           } *>
           submitProposal(user, pid) *>

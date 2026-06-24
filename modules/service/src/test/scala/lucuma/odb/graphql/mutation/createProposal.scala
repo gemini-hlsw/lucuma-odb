@@ -10,7 +10,7 @@ import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
@@ -41,7 +41,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on Queue {
                     toOActivation
@@ -61,7 +61,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "QUEUE",
                   "toOActivation": "NONE",
                   "minPercentTime": 100,
@@ -89,7 +89,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     demoScience: {
                       toOActivation: NONE
                       minPercentTime: 0
@@ -118,7 +118,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     demoScience: {
                       toOActivation: NONE
                       minPercentTime: 0
@@ -136,7 +136,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected =
-          List("Exactly one key must be specified for oneOf input object ProposalTypeInput in field 'createProposal' of type 'Mutation', but found 'demoScience', 'directorsTime'").asLeft
+          List("Exactly one key must be specified for oneOf input object GeminiProposalTypeInput in field 'createProposal' of type 'Mutation', but found 'demoScience', 'directorsTime'").asLeft
       )
     }
   }
@@ -152,7 +152,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   callId: "c-123"
-                  type: {
+                  gemini: {
                     demoScience: {
                       toOActivation: NONE
                       minPercentTime: 0
@@ -182,7 +182,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   callId: "$cid"
-                  type: {
+                  gemini: {
                     demoScience: {
                       toOActivation: NONE
                       minPercentTime: 0
@@ -200,7 +200,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
       )
 
     for {
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.PoorWeather)
+      cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.PoorWeather)
       pid <- createProgramAs(pi, "My Demo Science Proposal")
       _   <- go(cid, pid)
     } yield ()
@@ -217,7 +217,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   callId: "$cid"
-                  type: {
+                  gemini: {
                     demoScience: {
                       toOActivation: NONE
                       minPercentTime: 0
@@ -228,7 +228,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 call { id }
-                type {
+                gemini {
                   scienceSubtype
                 }
               }
@@ -243,7 +243,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "call": {
                     "id": $cid
                   },
-                  "type": {
+                  "gemini": {
                     "scienceSubtype": "DEMO_SCIENCE"
                   }
                 }
@@ -253,7 +253,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
       )
 
     for {
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.DemoScience)
+      cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.DemoScience)
       pid <- createProgramAs(pi,  "My Demo Science Proposal")
       _   <- go(cid, pid)
     } yield ()
@@ -261,7 +261,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
 
   test("✓ assign proprietary period") { // proprietary months match the call
     val months = for {
-      cid <- createCallForProposalsAs(staff, CallForProposalsType.DemoScience)
+      cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.DemoScience)
       pid <- createProgramAs(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       m   <- getProprietaryMonths(pi, pid)
@@ -296,7 +296,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     classical: {
                       minPercentTime: 50
                       partnerSplits: [
@@ -316,7 +316,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on Classical {
                     minPercentTime
@@ -335,7 +335,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "CLASSICAL",
                   "minPercentTime": 50,
                   "partnerSplits": [
@@ -357,6 +357,86 @@ class createProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("✓ classical with exchange partner") {
+    createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  gemini: {
+                    classical: {
+                      minPercentTime: 50
+                      exchangePartner: KECK
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini {
+                  scienceSubtype
+                  ... on Classical {
+                    exchangePartner
+                    partnerSplits {
+                      partner
+                      percent
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal" : {
+              "proposal" : {
+                "gemini": {
+                  "scienceSubtype": "CLASSICAL",
+                  "exchangePartner": "KECK",
+                  "partnerSplits": []
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("⨯ classical with both partner splits and exchange partner") {
+    createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    classical: {
+                      partnerSplits: [ { partner: US, percent: 100 } ]
+                      exchangePartner: KECK
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { gemini { scienceSubtype } }
+            }
+          }
+        """,
+        expected = List("Argument 'input.SET.gemini.classical' is invalid: Specify either 'partnerSplits' or 'exchangePartner', not both.").asLeft
+      )
+    }
+  }
+
   test("✓ classical defaults") {
     createProgramAs(pi, "My Classical Proposal").flatMap { pid =>
       expect(
@@ -368,13 +448,13 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: { classical: { } }
+                  gemini: { classical: { } }
                 }
               }
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on Classical {
                     minPercentTime
@@ -392,7 +472,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "CLASSICAL",
                   "minPercentTime": 100,
                   "aeonMultiFacility": false,
@@ -418,7 +498,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     demoScience: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -429,7 +509,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on DemoScience {
                     toOActivation
@@ -445,7 +525,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
                   "toOActivation": "NONE",
                   "minPercentTime": 50
@@ -469,7 +549,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     demoScience: { }
                   }
                 }
@@ -477,7 +557,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on DemoScience {
                     toOActivation
@@ -493,7 +573,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
                   "toOActivation": "NONE",
                   "minPercentTime": 100
@@ -517,7 +597,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     directorsTime: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -528,7 +608,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on DirectorsTime {
                     toOActivation
@@ -544,7 +624,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "DIRECTORS_TIME",
                   "toOActivation": "NONE",
                   "minPercentTime": 50
@@ -568,7 +648,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     fastTurnaround: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -579,7 +659,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on FastTurnaround {
                     toOActivation
@@ -599,7 +679,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
@@ -624,7 +704,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     fastTurnaround: { }
                   }
                 }
@@ -632,7 +712,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on FastTurnaround {
                     toOActivation
@@ -648,7 +728,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 100
@@ -675,7 +755,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     fastTurnaround: {
                       toOActivation: NONE
                       minPercentTime: 50
@@ -687,7 +767,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on FastTurnaround {
                     toOActivation
@@ -707,7 +787,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal": {
               "proposal": {
                 "category": "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
@@ -735,7 +815,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     fastTurnaround: {
                       toOActivation: NONE
                       minPercentTime: 50
@@ -751,7 +831,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             }
           }
         """,
-        expected = List("Argument 'input.SET.type.fastTurnaround.reviewerId' is invalid: 'pu-ffff-ffff-ffff-ffff' is not a valid program user id").asLeft
+        expected = List("Argument 'input.SET.gemini.fastTurnaround.reviewerId' is invalid: 'pu-ffff-ffff-ffff-ffff' is not a valid program user id").asLeft
       )
     }
   }
@@ -767,7 +847,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     largeProgram: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -780,7 +860,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on LargeProgram {
                     toOActivation
@@ -798,7 +878,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "LARGE_PROGRAM",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
@@ -827,7 +907,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     largeProgram: { }
                   }
                 }
@@ -835,7 +915,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on LargeProgram {
                     toOActivation
@@ -853,7 +933,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "LARGE_PROGRAM",
                   "toOActivation": "NONE",
                   "minPercentTime": 100,
@@ -881,7 +961,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     poorWeather: {}
                   }
                 }
@@ -889,7 +969,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                 }
               }
@@ -901,7 +981,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "POOR_WEATHER"
                 }
               }
@@ -923,7 +1003,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     poorWeather: {
                       ignore: IGNORE
                     }
@@ -933,7 +1013,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                 }
               }
@@ -945,7 +1025,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "POOR_WEATHER"
                 }
               }
@@ -967,7 +1047,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -988,7 +1068,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on Queue {
                     toOActivation
@@ -1008,7 +1088,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "QUEUE",
                   "toOActivation": "NONE",
                   "minPercentTime": 50,
@@ -1042,7 +1122,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     systemVerification: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -1053,7 +1133,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on SystemVerification {
                     toOActivation
@@ -1069,7 +1149,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal" : {
               "proposal" : {
                 "category" : "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "SYSTEM_VERIFICATION",
                   "toOActivation": "NONE",
                   "minPercentTime": 50
@@ -1092,7 +1172,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -1116,7 +1196,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected =
-          List("Argument 'input.SET.type.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+          List("Argument 'input.SET.gemini.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
       )
     }
   }
@@ -1131,7 +1211,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -1146,7 +1226,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected =
-          List("Argument 'input.SET.type.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+          List("Argument 'input.SET.gemini.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
       )
     }
   }
@@ -1161,7 +1241,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation:  NONE
                       minPercentTime: 50
@@ -1171,7 +1251,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Queue {
                     scienceSubtype
                   }
@@ -1184,7 +1264,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           {
             "createProposal" : {
               "proposal" : {
-                "type": {
+                "gemini": {
                   "scienceSubtype": "QUEUE"
                 }
               }
@@ -1299,7 +1379,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     fastTurnaround: {
                       toOActivation: NONE
                       minPercentTime: 50
@@ -1309,7 +1389,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on FastTurnaround {
                     scienceSubtype
                     reviewer {
@@ -1328,7 +1408,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
           {
             "createProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "scienceSubtype": "FAST_TURNAROUND",
                   "reviewer": null,
                   "mentor": null
@@ -1378,7 +1458,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     queue: {
                       reviewerId: "pu-1234-5678-9abc-def0"
                     }
@@ -1406,7 +1486,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     queue: {
                       mentorId: "pu-1234-5678-9abc-def0"
                     }
@@ -1434,7 +1514,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: SMALL_BODIES
-                  type: {
+                  gemini: {
                     classical: {
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
@@ -1448,7 +1528,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   ... on Classical {
                     minPercentTime
                     aeonMultiFacility
@@ -1465,7 +1545,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal": {
               "proposal": {
                 "category": "SMALL_BODIES",
-                "type": {
+                "gemini": {
                   "minPercentTime": 80,
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
@@ -1488,7 +1568,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: COSMOLOGY
-                  type: {
+                  gemini: {
                     largeProgram: {
                       toOActivation: NONE
                       minPercentTime: 80
@@ -1503,7 +1583,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   ... on LargeProgram {
                     toOActivation
                     minPercentTime
@@ -1522,7 +1602,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal": {
               "proposal": {
                 "category": "COSMOLOGY",
-                "type": {
+                "gemini": {
                   "toOActivation": "NONE",
                   "minPercentTime": 80,
                   "minPercentTotalTime": 90,
@@ -1547,7 +1627,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: EXOPLANET_HOST_STAR
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation: NONE
                       minPercentTime: 80
@@ -1563,7 +1643,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   ... on Queue {
                     toOActivation
                     minPercentTime
@@ -1582,7 +1662,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal": {
               "proposal": {
                 "category": "EXOPLANET_HOST_STAR",
-                "type": {
+                "gemini": {
                   "toOActivation": "NONE",
                   "minPercentTime": 80,
                   "aeonMultiFacility": true,
@@ -1595,5 +1675,288 @@ class createProposal extends OdbSuite with DatabaseOperations {
           }
         """.asRight
       )
+
+  test("✓ Keck exchange proposal"):
+    createProgramAs(pi, "Keck Proposal").flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: EXOPLANET_HOST_STAR
+                  keck: {
+                    partnerSplits: [{ partner: US, percent: 100 }]
+                  }
+                }
+              }
+            ) {
+              proposal {
+                category
+                gemini { scienceSubtype }
+                keck {
+                  partnerSplits {
+                    partner
+                    percent
+                  }
+                }
+                subaru { type }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "category": "EXOPLANET_HOST_STAR",
+                "gemini": null,
+                "keck": {
+                  "partnerSplits": [
+                    { "partner": "US", "percent": 100 }
+                  ]
+                },
+                "subaru": null
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("✓ Subaru intensive exchange proposal"):
+    createProgramAs(pi, "Subaru Proposal").flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  subaru: {
+                    type: INTENSIVE
+                    partnerSplits: [{ partner: US, percent: 100 }]
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini { scienceSubtype }
+                keck { partnerSplits { partner } }
+                subaru {
+                  type
+                  partnerSplits { partner percent }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "gemini": null,
+                "keck": null,
+                "subaru": {
+                  "type": "INTENSIVE",
+                  "partnerSplits": [
+                    { "partner": "US", "percent": 100 }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("✓ Subaru exchange proposal defaults to NORMAL"):
+    createProgramAs(pi, "Subaru Normal Proposal").flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  subaru: {
+                    partnerSplits: [{ partner: US, percent: 100 }]
+                  }
+                }
+              }
+            ) {
+              proposal {
+                subaru { type }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "subaru": {
+                  "type": "NORMAL"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("⨯ cannot specify more than one of gemini/keck/subaru"):
+    createProgramAs(pi, "Both").flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: { queue: { minPercentTime: 50 } }
+                  subaru: { type: NORMAL }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected =
+          List("Argument 'input.SET' is invalid: Specify only one of 'gemini', 'keck' or 'subaru'.").asLeft
+      )
+
+  // The proposal's observatory must agree with its Call for Proposals.
+
+  test("⨯ external proposal observatory must match the call (Keck on Subaru call)"):
+    def go(cid: CallForProposals.Id, pid: Program.Id): IO[Unit] =
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: { callId: "$cid", keck: { partnerSplits: [{ partner: US, percent: 100 }] } }
+              }
+            ) { proposal { category } }
+          }
+        """,
+        expected =
+          List(s"The Call for Proposals $cid is a Subaru call and cannot be used with a Keck proposal.").asLeft
+      )
+    for
+      cid <- createSubaruCallForProposalsAs(staff)
+      pid <- createProgramAs(pi, "Keck on Subaru")
+      _   <- go(cid, pid)
+    yield ()
+
+  test("⨯ Gemini proposal cannot use an exchange (Subaru) call"):
+    def go(cid: CallForProposals.Id, pid: Program.Id): IO[Unit] =
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: { callId: "$cid", gemini: { queue: { minPercentTime: 50 } } }
+              }
+            ) { proposal { category } }
+          }
+        """,
+        expected =
+          List(s"The Call for Proposals $cid is a Subaru call and cannot be used with a Gemini proposal.").asLeft
+      )
+    for
+      cid <- createSubaruCallForProposalsAs(staff)
+      pid <- createProgramAs(pi, "Gemini on Subaru")
+      _   <- go(cid, pid)
+    yield ()
+
+  test("⨯ Keck proposal cannot use a Gemini call"):
+    def go(cid: CallForProposals.Id, pid: Program.Id): IO[Unit] =
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: { callId: "$cid", keck: { partnerSplits: [{ partner: US, percent: 100 }] } }
+              }
+            ) { proposal { category } }
+          }
+        """,
+        expected =
+          List(s"The Call for Proposals $cid is a Gemini call and cannot be used with a Keck proposal.").asLeft
+      )
+    for
+      cid <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramAs(pi, "Keck on Gemini")
+      _   <- go(cid, pid)
+    yield ()
+
+  test("⨯ Subaru proposal call type must match the call (intensive on normal)"):
+    def go(cid: CallForProposals.Id, pid: Program.Id): IO[Unit] =
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: { callId: "$cid", subaru: { type: INTENSIVE } }
+              }
+            ) { proposal { category } }
+          }
+        """,
+        expected =
+          List(s"The Call for Proposals $cid is a Subaru Normal call and cannot be used with a Subaru Intensive proposal.").asLeft
+      )
+    for
+      cid <- createSubaruCallForProposalsAs(staff, subaruType = lucuma.core.enums.SubaruCallForProposalsType.Normal)
+      pid <- createProgramAs(pi, "Subaru type mismatch")
+      _   <- go(cid, pid)
+    yield ()
+
+  test("✓ Subaru proposal matching its call"):
+    def go(cid: CallForProposals.Id, pid: Program.Id): IO[Unit] =
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: { callId: "$cid", subaru: { type: INTENSIVE, partnerSplits: [{ partner: US, percent: 100 }] } }
+              }
+            ) {
+              proposal {
+                call { id }
+                subaru { type }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "call": { "id": $cid },
+                "subaru": { "type": "INTENSIVE" }
+              }
+            }
+          }
+        """.asRight
+      )
+    for
+      cid <- createSubaruCallForProposalsAs(staff, subaruType = lucuma.core.enums.SubaruCallForProposalsType.Intensive)
+      pid <- createProgramAs(pi, "Subaru match")
+      _   <- go(cid, pid)
+    yield ()
 
 }

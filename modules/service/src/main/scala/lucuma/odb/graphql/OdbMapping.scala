@@ -246,7 +246,9 @@ object OdbMapping {
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
           with ProposalReferenceMapping[F]
-          with ProposalTypeMapping[F]
+          with GeminiProposalTypeMapping[F]
+          with KeckProposalTypeMapping[F]
+          with SubaruProposalTypeMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
@@ -385,8 +387,6 @@ object OdbMapping {
                 AtomRecordMapping,
                 AttachmentMapping,
                 CalibrationProgramReferenceMapping,
-                CallForProposalsMapping,
-                CallForProposalsPartnerMapping,
                 CallsForProposalsSelectResultMapping,
                 CatalogInfoMapping,
                 ChangeProgramUserRoleResultMapping,
@@ -492,7 +492,9 @@ object OdbMapping {
                 ProperMotionRaMapping,
                 ProposalMapping,
                 ProposalReferenceMapping,
-                ProposalTypeMapping,
+                GeminiProposalTypeMapping,
+                KeckProposalTypeMapping,
+                SubaruProposalTypeMapping,
                 QueryMapping,
                 QueueMapping,
                 RadialVelocityMapping,
@@ -575,6 +577,7 @@ object OdbMapping {
                 ArcMappings,
                 AtomRecordSelectResultMappings,
                 CalculatedObservationWorkflowMappings,
+                CallForProposalsMappings,
                 CategorizedTimeMappings,
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
@@ -651,7 +654,9 @@ object OdbMapping {
                 ObservingModeGroupElaborator,
                 ProgramElaborator,
                 ProgramUserElaborator,
-                ProposalTypeElaborator,
+                GeminiProposalTypeElaborator,
+                KeckProposalTypeElaborator,
+                SubaruProposalTypeElaborator,
                 SchedulingConstraintsElaborator,
                 ScienceRequirementsElaborator,
                 StepRecordElaborator,

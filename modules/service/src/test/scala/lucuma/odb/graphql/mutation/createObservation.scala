@@ -14,7 +14,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.*
-import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ImageQuality
@@ -139,7 +139,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] can create observation with a program reference") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>
@@ -172,7 +172,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] can create an observation when both ref and pid are supplied if they correspond") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>
@@ -206,7 +206,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] cannot create an observation when both ref and pid are supplied if they do not correspond") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>
@@ -236,7 +236,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("[general] cannot create an observation without a ref or pid") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>

@@ -9,7 +9,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.enums.Partner
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
@@ -568,7 +568,7 @@ class createTarget extends OdbSuite {
 
   test("[general] can create a target with a proposal reference") {
     createProgramWithUsPi(pi).flatMap { pid =>
-      createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
+      createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
       submitProposal(pi, pid) *>

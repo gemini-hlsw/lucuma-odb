@@ -157,7 +157,7 @@ class programs extends OdbSuite {
       // Add a program where Charles Guiteau is the COI.  It
       // shouldn't match the `WHERE` filter below.
       createProgramAs(piLeon).flatMap { pid =>
-        addProgramUserAs(piLeon, pid, partnerLink = PartnerLink.HasPartner(Partner.BR)).flatMap { mid =>
+        addProgramUserAs(piLeon, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.BR)).flatMap { mid =>
           linkUserAs(piLeon, mid, piCharles.id)
         }
       } >>
@@ -235,7 +235,7 @@ class programs extends OdbSuite {
           programs(
             WHERE: {
               pi: {
-                partnerLink: { partner: { EQ: US } }
+                partnerLink: { geminiPartner: { EQ: US } }
               }
             }
           ) {
@@ -256,7 +256,7 @@ class programs extends OdbSuite {
   val end   = LocalDate.parse("2025-07-01")
 
   test("program selection via active period"):
-    createCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
       createProgramAs(pi, "Active Period Test").flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         expect(
@@ -290,7 +290,7 @@ class programs extends OdbSuite {
     }
 
   test("program selection via active period (empty)"):
-    createCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, activeStart = start, activeEnd = end).flatMap { cid =>
       createProgramAs(pi, "Active Period Test").flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         expect(
@@ -321,8 +321,8 @@ class programs extends OdbSuite {
 
   test("program selection via cfp"):
     for
-      cid0 <- createCallForProposalsAs(staff)
-      cid1 <- createCallForProposalsAs(staff)
+      cid0 <- createGeminiCallForProposalsAs(staff)
+      cid1 <- createGeminiCallForProposalsAs(staff)
       pid0 <- createProgramAs(pi, "CfP Test 0")
       pid1 <- createProgramAs(pi, "CfP Test 1")
       pid2 <- createProgramAs(pi, "CfP Test 2")

@@ -7,14 +7,14 @@ package mutation
 import cats.syntax.either.*
 import io.circe.literal.*
 
-class createCallForProposals extends OdbSuite {
+class createCallForProposals extends OdbSuite:
 
   val pi    = TestUsers.Standard.pi(1, 101)
   val staff = TestUsers.Standard.staff(3, 103)
 
   val validUsers = List(pi, staff)
 
-  test("failure - only staff may create calls") {
+  test("failure - only staff may create calls"):
     expect(
       user = pi,
       query = """
@@ -22,10 +22,12 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2025-02-28"
                 activeEnd:   "2025-07-31"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) { callForProposals { id } }
@@ -33,9 +35,8 @@ class createCallForProposals extends OdbSuite {
       """,
       expected = List("User u-1 is not authorized to perform this operation.").asLeft
     )
-  }
 
-  test("failure - start too far in the future for LST calc") {
+  test("failure - start too far in the future for LST calc"):
     expect(
       user = pi,
       query = """
@@ -43,10 +44,12 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2100-02-28"
                 activeEnd:   "2025-07-31"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) { callForProposals { id } }
@@ -54,9 +57,8 @@ class createCallForProposals extends OdbSuite {
       """,
       expected = List("Argument 'input.SET' is invalid: 'activeStart' date (2100-02-28) must be between 1900 and 2100 UTC (exclusive)").asLeft
     )
-  }
 
-  test("failure - end too far in the future for LST calc") {
+  test("failure - end too far in the future for LST calc"):
     expect(
       user = pi,
       query = """
@@ -64,10 +66,12 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2025-02-28"
                 activeEnd:   "2100-07-31"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) { callForProposals { id } }
@@ -75,11 +79,9 @@ class createCallForProposals extends OdbSuite {
       """,
       expected = List("Argument 'input.SET' is invalid: 'activeEnd' date (2100-07-31) must be between 1900 and 2100 UTC (exclusive)").asLeft
     )
-  }
 
-  test("success - simple with defaults") {
+  test("success - simple with defaults"):
 
-    // existence defaults to PRESENT
     expect(
       user = staff,
       query = """
@@ -87,43 +89,47 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2024B"
                 activeStart: "2024-07-31"
                 activeEnd:   "2025-02-01"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) {
             callForProposals {
               id
-              type
               semester
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-              }
               active {
                 start
                 end
               }
               submissionDeadlineDefault
               partners {
-                partner
+                geminiPartner
                 submissionDeadline
               }
-              instruments
-              proprietaryMonths
               existence
+              gemini {
+                type
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                }
+                instruments
+                proprietaryMonths
+              }
             }
           }
         }
@@ -132,23 +138,8 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "id":            "c-100",
-              "type":          "REGULAR_SEMESTER",
-              "semester":      "2024B",
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "16:30:00.000000" },
-                  "raEnd": { "hms": "14:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "15:30:00.000000" },
-                  "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "-90:00:00.000000" },
-                  "decEnd": { "dms": "+28:00:00.000000" }
-                }
-              },
+              "id":       "c-100",
+              "semester": "2024B",
               "active": {
                 "start": "2024-07-31",
                 "end": "2025-02-01"
@@ -156,45 +147,61 @@ class createCallForProposals extends OdbSuite {
               "submissionDeadlineDefault": null,
               "partners": [
                 {
-                  "partner" : "AR",
+                  "geminiPartner" : "AR",
                   "submissionDeadline": null
                 },
                 {
-                  "partner" : "BR",
+                  "geminiPartner" : "BR",
                   "submissionDeadline": null
                 },
                 {
-                  "partner" : "CA",
+                  "geminiPartner" : "CA",
                   "submissionDeadline": null
                 },
                 {
-                  "partner" : "CL",
+                  "geminiPartner" : "CL",
                   "submissionDeadline": null
                 },
                 {
-                  "partner" : "KR",
+                  "geminiPartner" : "KR",
                   "submissionDeadline": null
                 },
                 {
-                  "partner" : "UH",
+                  "geminiPartner" : "UH",
                   "submissionDeadline": null
                 },
                 {
-                  "partner" : "US",
+                  "geminiPartner" : "US",
                   "submissionDeadline": null
                 }
               ],
-              "instruments":       [],
-              "proprietaryMonths": 12,
-              "existence":         "PRESENT"
+              "existence":         "PRESENT",
+              "gemini": {
+                "type": "REGULAR_SEMESTER",
+                "coordinateLimits": {
+                  "north": {
+                    "raStart": { "hms": "16:30:00.000000" },
+                    "raEnd": { "hms": "14:00:00.000000" },
+                    "decStart": { "dms": "-37:00:00.000000" },
+                    "decEnd": { "dms": "+90:00:00.000000" }
+                  },
+                  "south": {
+                    "raStart": { "hms": "15:30:00.000000" },
+                    "raEnd": { "hms": "12:30:00.000000" },
+                    "decStart": { "dms": "-90:00:00.000000" },
+                    "decEnd": { "dms": "+28:00:00.000000" }
+                  }
+                },
+                "instruments":       [],
+                "proprietaryMonths": 12
+              }
             }
           }
         }
       """.asRight
     )
-  }
 
-  test("failure - end before start") {
+  test("failure - end before start"):
     expect(
       user = staff,
       query = """
@@ -202,10 +209,12 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2025-07-31"
                 activeEnd:   "2025-02-28"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) { callForProposals { id } }
@@ -213,9 +222,8 @@ class createCallForProposals extends OdbSuite {
       """,
       expected = List("Argument 'input.SET' is invalid: 'activeStart' must come before 'activeEnd'").asLeft
     )
-  }
 
-  test("success - with partners") {
+  test("success - with partners"):
     expect(
       user = staff,
       query = """
@@ -223,24 +231,26 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2026-02-01"
                 activeEnd:   "2026-07-31"
                 submissionDeadlineDefault: "2025-07-31T10:00:02Z"
                 partners:    [
                   {
-                    partner: CA
+                    geminiPartner: CA
                     submissionDeadlineOverride: "2025-07-31T10:00:00Z"
                   },
                   {
-                    partner: CL
+                    geminiPartner: CL
                   },
                   {
-                    partner: US
+                    geminiPartner: US
                     submissionDeadlineOverride: "2025-07-31T10:00:01Z"
                   }
                 ]
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) {
@@ -248,12 +258,14 @@ class createCallForProposals extends OdbSuite {
                id
                submissionDeadlineDefault
                partners {
-                 partner
+                 geminiPartner
                  submissionDeadlineOverride
                  submissionDeadline
                }
-               allowsNonPartnerPi
-               nonPartnerDeadline
+               gemini {
+                 allowsNonPartnerPi
+                 nonPartnerDeadline
+               }
              }
           }
         }
@@ -266,31 +278,32 @@ class createCallForProposals extends OdbSuite {
               "submissionDeadlineDefault": "2025-07-31T10:00:02Z",
               "partners": [
                 {
-                  "partner": "CA",
+                  "geminiPartner": "CA",
                   "submissionDeadlineOverride": "2025-07-31T10:00:00Z",
                   "submissionDeadline": "2025-07-31T10:00:00Z"
                 },
                 {
-                  "partner": "CL",
+                  "geminiPartner": "CL",
                   "submissionDeadlineOverride": null,
                   "submissionDeadline": "2025-07-31T10:00:02Z"
                 },
                 {
-                  "partner": "US",
+                  "geminiPartner": "US",
                   "submissionDeadlineOverride": "2025-07-31T10:00:01Z",
                   "submissionDeadline": "2025-07-31T10:00:01Z"
                 }
               ],
-              "allowsNonPartnerPi": true,
-              "nonPartnerDeadline": "2025-07-31T10:00:01Z"
+              "gemini": {
+                "allowsNonPartnerPi": true,
+                "nonPartnerDeadline": "2025-07-31T10:00:01Z"
+              }
             }
           }
         }
       """.asRight
     )
-  }
 
-  test("success - with empty partners") {
+  test("success - with empty partners"):
     expect(
       user = staff,
       query = """
@@ -298,19 +311,23 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2026-02-01"
                 activeEnd:   "2026-07-31"
                 partners:    []
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) {
              callForProposals {
                id
-               partners { partner }
-               allowsNonPartnerPi
-               nonPartnerDeadline
+               partners { geminiPartner }
+               gemini {
+                 allowsNonPartnerPi
+                 nonPartnerDeadline
+               }
              }
           }
         }
@@ -321,16 +338,17 @@ class createCallForProposals extends OdbSuite {
             "callForProposals": {
               "id": "c-102",
               "partners": [],
-              "allowsNonPartnerPi": false,
-              "nonPartnerDeadline": null
+              "gemini": {
+                "allowsNonPartnerPi": false,
+                "nonPartnerDeadline": null
+              }
             }
           }
         }
       """.asRight
     )
-  }
 
-  test("failure - with duplicate partners") {
+  test("failure - with duplicate partners"):
     expect(
       user = staff,
       query = """
@@ -338,27 +356,29 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2026-02-01"
                 activeEnd:   "2026-07-31"
                 partners:    [
                   {
-                    partner: US
+                    geminiPartner: US
                     submissionDeadlineOverride: "2025-07-31T10:00:00Z"
                   },
                   {
-                    partner: US
+                    geminiPartner: US
                     submissionDeadlineOverride: "2025-07-31T10:00:01Z"
                   }
                 ]
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) {
              callForProposals {
                id
                partners {
-                 partner
+                 geminiPartner
                  submissionDeadline
                }
              }
@@ -367,9 +387,8 @@ class createCallForProposals extends OdbSuite {
       """,
       expected = List("Argument 'input.SET' is invalid: duplicate 'partners' specified: US").asLeft
     )
-  }
 
-  test("success - with instruments") {
+  test("success - with instruments"):
     expect(
       user = staff,
       query = """
@@ -377,16 +396,20 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2026-02-01"
                 activeEnd:   "2026-07-31"
-                instruments: [GMOS_SOUTH, GMOS_NORTH]
+                gemini: {
+                  type:        REGULAR_SEMESTER
+                  instruments: [GMOS_SOUTH, GMOS_NORTH]
+                }
               }
             }
           ) {
              callForProposals {
-               instruments
+               gemini {
+                 instruments
+               }
              }
           }
         }
@@ -396,15 +419,16 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "instruments": [ "GMOS_NORTH", "GMOS_SOUTH" ]
+              "gemini": {
+                "instruments": [ "GMOS_NORTH", "GMOS_SOUTH" ]
+              }
             }
           }
         }
       """.asRight
     )
-  }
 
-  test("failure - with duplicate instruments") {
+  test("failure - with duplicate instruments"):
     expect(
       user = staff,
       query = """
@@ -412,25 +436,28 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2025A"
                 activeStart: "2026-02-01"
                 activeEnd:   "2026-07-31"
-                instruments: [GMOS_SOUTH, GMOS_SOUTH]
+                gemini: {
+                  type:        REGULAR_SEMESTER
+                  instruments: [GMOS_SOUTH, GMOS_SOUTH]
+                }
               }
             }
           ) {
              callForProposals {
-               instruments
+               gemini {
+                 instruments
+               }
              }
           }
         }
       """,
-      expected = List("Argument 'input.SET' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
+      expected = List("Argument 'input.SET.gemini' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
     )
-  }
 
-  test("success - with ra") {
+  test("success - with ra"):
     expect(
       user = staff,
       query = """
@@ -438,32 +465,36 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:         REGULAR_SEMESTER
                 semester:    "2024B"
                 activeStart: "2024-07-31"
                 activeEnd:   "2025-02-01"
-                coordinateLimits: {
-                  north: {
-                    raStart: { hms: "17:00:00" }
-                    raEnd: { hms: "13:00:00" }
+                gemini: {
+                  type: REGULAR_SEMESTER
+                  coordinateLimits: {
+                    north: {
+                      raStart: { hms: "17:00:00" }
+                      raEnd: { hms: "13:00:00" }
+                    }
                   }
                 }
               }
             }
           ) {
             callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
+              gemini {
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
                 }
               }
             }
@@ -474,18 +505,20 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "17:00:00.000000" },
-                  "raEnd": { "hms": "13:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "15:30:00.000000" },
-                  "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "-90:00:00.000000" },
-                  "decEnd": { "dms": "+28:00:00.000000" }
+              "gemini": {
+                "coordinateLimits": {
+                  "north": {
+                    "raStart": { "hms": "17:00:00.000000" },
+                    "raEnd": { "hms": "13:00:00.000000" },
+                    "decStart": { "dms": "-37:00:00.000000" },
+                    "decEnd": { "dms": "+90:00:00.000000" }
+                  },
+                  "south": {
+                    "raStart": { "hms": "15:30:00.000000" },
+                    "raEnd": { "hms": "12:30:00.000000" },
+                    "decStart": { "dms": "-90:00:00.000000" },
+                    "decEnd": { "dms": "+28:00:00.000000" }
+                  }
                 }
               }
             }
@@ -493,9 +526,8 @@ class createCallForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-  test("success - with dec") {
+  test("success - with dec"):
     expect(
       user = staff,
       query = """
@@ -503,32 +535,36 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:         REGULAR_SEMESTER
                 semester:    "2024B"
                 activeStart: "2024-07-31"
                 activeEnd:   "2025-02-01"
-                coordinateLimits: {
-                  south: {
-                    decStart: { dms: "45:00:00" }
-                    decEnd: { dms: "-45:00:00" }
+                gemini: {
+                  type: REGULAR_SEMESTER
+                  coordinateLimits: {
+                    south: {
+                      decStart: { dms: "45:00:00" }
+                      decEnd: { dms: "-45:00:00" }
+                    }
                   }
                 }
               }
             }
           ) {
              callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
+              gemini {
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
                 }
               }
             }
@@ -539,18 +575,20 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "16:30:00.000000" },
-                  "raEnd": { "hms": "14:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "15:30:00.000000" },
-                  "raEnd": { "hms": "12:30:00.000000" },
-                  "decStart": { "dms": "+45:00:00.000000" },
-                  "decEnd": { "dms": "-45:00:00.000000" }
+              "gemini": {
+                "coordinateLimits": {
+                  "north": {
+                    "raStart": { "hms": "16:30:00.000000" },
+                    "raEnd": { "hms": "14:00:00.000000" },
+                    "decStart": { "dms": "-37:00:00.000000" },
+                    "decEnd": { "dms": "+90:00:00.000000" }
+                  },
+                  "south": {
+                    "raStart": { "hms": "15:30:00.000000" },
+                    "raEnd": { "hms": "12:30:00.000000" },
+                    "decStart": { "dms": "+45:00:00.000000" },
+                    "decEnd": { "dms": "-45:00:00.000000" }
+                  }
                 }
               }
             }
@@ -558,9 +596,8 @@ class createCallForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-  test("director's time - non-partner accepted") {
+  test("director's time - non-partner accepted"):
 
     // existence defaults to PRESENT
     expect(
@@ -570,20 +607,24 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        DIRECTORS_TIME
                 semester:    "2024B"
                 activeStart: "2024-07-31"
                 activeEnd:   "2025-02-01"
                 submissionDeadlineDefault: "2025-07-31T10:00:02Z"
+                gemini: {
+                  type: DIRECTORS_TIME
+                }
               }
             }
           ) {
             callForProposals {
               id
-              type
-              allowsNonPartnerPi
-              nonPartnerDeadline
-              proprietaryMonths
+              gemini {
+                type
+                allowsNonPartnerPi
+                nonPartnerDeadline
+                proprietaryMonths
+              }
             }
           }
         }
@@ -593,18 +634,19 @@ class createCallForProposals extends OdbSuite {
           "createCallForProposals": {
             "callForProposals": {
               "id":   "c-106",
-              "type": "DIRECTORS_TIME",
-              "allowsNonPartnerPi": true,
-              "nonPartnerDeadline": "2025-07-31T10:00:02Z",
-              "proprietaryMonths": 6
+              "gemini": {
+                "type": "DIRECTORS_TIME",
+                "allowsNonPartnerPi": true,
+                "nonPartnerDeadline": "2025-07-31T10:00:02Z",
+                "proprietaryMonths": 6
+              }
             }
           }
         }
       """.asRight
     )
-  }
 
-  test("demo science - non-partner prohibited") {
+  test("demo science - non-partner prohibited"):
 
     // existence defaults to PRESENT
     expect(
@@ -614,20 +656,24 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        DEMO_SCIENCE
                 semester:    "2024B"
                 activeStart: "2024-07-31"
                 activeEnd:   "2025-02-01"
                 submissionDeadlineDefault: "2025-07-31T10:00:02Z"
+                gemini: {
+                  type: DEMO_SCIENCE
+                }
               }
             }
           ) {
             callForProposals {
               id
-              type
-              allowsNonPartnerPi
-              nonPartnerDeadline
-              proprietaryMonths
+              gemini {
+                type
+                allowsNonPartnerPi
+                nonPartnerDeadline
+                proprietaryMonths
+              }
             }
           }
         }
@@ -637,18 +683,19 @@ class createCallForProposals extends OdbSuite {
           "createCallForProposals": {
             "callForProposals": {
               "id":   "c-107",
-              "type": "DEMO_SCIENCE",
-              "allowsNonPartnerPi": false,
-              "nonPartnerDeadline": null,
-              "proprietaryMonths": 3
+              "gemini": {
+                "type": "DEMO_SCIENCE",
+                "allowsNonPartnerPi": false,
+                "nonPartnerDeadline": null,
+                "proprietaryMonths": 3
+              }
             }
           }
         }
       """.asRight
     )
-  }
 
-  test("negative LST bug") {
+  test("negative LST bug"):
     expect(
       user = staff,
       query = """
@@ -656,25 +703,29 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type: FAST_TURNAROUND
                 semester: "2024B"
                 activeStart: "2024-10-01"
                 activeEnd: "2024-12-31"
                 submissionDeadlineDefault: "2024-08-31T22:00:00Z"
-                partners: [{ partner: US }]
-                instruments: [GMOS_NORTH, GMOS_SOUTH]
+                partners: [{ geminiPartner: US }]
+                gemini: {
+                  type: FAST_TURNAROUND
+                  instruments: [GMOS_NORTH, GMOS_SOUTH]
+                }
               }
             }
           ) {
             callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
+              gemini {
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                  }
                 }
               }
             }
@@ -685,14 +736,16 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "20:00:00.000000" },
-                  "raEnd": { "hms": "12:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "20:00:00.000000" },
-                  "raEnd": { "hms": "10:00:00.000000" }
+              "gemini": {
+                "coordinateLimits": {
+                  "north": {
+                    "raStart": { "hms": "20:00:00.000000" },
+                    "raEnd": { "hms": "12:00:00.000000" }
+                  },
+                  "south": {
+                    "raStart": { "hms": "20:00:00.000000" },
+                    "raEnd": { "hms": "10:00:00.000000" }
+                  }
                 }
               }
             }
@@ -700,9 +753,8 @@ class createCallForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-  test("success - explicit proprietaryMonths") {
+  test("success - explicit proprietaryMonths"):
     expect(
       user = staff,
       query = """
@@ -710,16 +762,20 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:              REGULAR_SEMESTER
                 semester:          "2024B"
                 activeStart:       "2024-07-31"
                 activeEnd:         "2025-02-01"
-                proprietaryMonths: 36
+                gemini: {
+                  type:              REGULAR_SEMESTER
+                  proprietaryMonths: 36
+                }
               }
             }
           ) {
             callForProposals {
-              proprietaryMonths
+              gemini {
+                proprietaryMonths
+              }
             }
           }
         }
@@ -728,13 +784,14 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "proprietaryMonths": 36
+              "gemini": {
+                "proprietaryMonths": 36
+              }
             }
           }
         }
       """.asRight
     )
-  }
 
   test("failure - too far in the future"):
     expect(
@@ -744,12 +801,14 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type: REGULAR_SEMESTER
                 semester: "2099A"
                 activeStart: "2026-02-01"
                 activeEnd: "2026-07-31"
-                partners: [{ partner: CL }, { partner: US }]
-                instruments: [GMOS_NORTH, GMOS_SOUTH]
+                partners: [{ geminiPartner: CL }, { geminiPartner: US }]
+                gemini: {
+                  type: REGULAR_SEMESTER
+                  instruments: [GMOS_NORTH, GMOS_SOUTH]
+                }
               }
             }
           ) {
@@ -772,26 +831,30 @@ class createCallForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:        REGULAR_SEMESTER
                 semester:    "2024B"
                 activeStart: "1901-01-01"
                 activeEnd:   "2099-12-31"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                }
               }
             }
           ) {
             callForProposals {
-              coordinateLimits {
-                north {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
-                }
-                south {
-                  raStart { hms }
-                  raEnd { hms }
-                  decStart { dms }
-                  decEnd { dms }
+              gemini {
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
                 }
               }
               active {
@@ -806,18 +869,20 @@ class createCallForProposals extends OdbSuite {
         {
           "createCallForProposals": {
             "callForProposals": {
-              "coordinateLimits": {
-                "north": {
-                  "raStart": { "hms": "01:30:00.000000" },
-                  "raEnd": { "hms": "12:00:00.000000" },
-                  "decStart": { "dms": "-37:00:00.000000" },
-                  "decEnd": { "dms": "+90:00:00.000000" }
-                },
-                "south": {
-                  "raStart": { "hms": "03:30:00.000000" },
-                  "raEnd": { "hms": "10:00:00.000000" },
-                  "decStart": { "dms": "-90:00:00.000000" },
-                  "decEnd": { "dms": "+28:00:00.000000" }
+              "gemini": {
+                "coordinateLimits": {
+                  "north": {
+                    "raStart": { "hms": "01:30:00.000000" },
+                    "raEnd": { "hms": "12:00:00.000000" },
+                    "decStart": { "dms": "-37:00:00.000000" },
+                    "decEnd": { "dms": "+90:00:00.000000" }
+                  },
+                  "south": {
+                    "raStart": { "hms": "03:30:00.000000" },
+                    "raEnd": { "hms": "10:00:00.000000" },
+                    "decStart": { "dms": "-90:00:00.000000" },
+                    "decEnd": { "dms": "+28:00:00.000000" }
+                  }
                 }
               },
               "active": {
@@ -830,4 +895,102 @@ class createCallForProposals extends OdbSuite {
       """.asRight
     )
 
-}
+  test("success - subaru"):
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                semester:    "2024B"
+                activeStart: "2024-07-31"
+                activeEnd:   "2025-02-01"
+                subaru: {
+                  type: NORMAL
+                }
+              }
+            }
+          ) {
+            callForProposals {
+              semester
+              active {
+                start
+                end
+              }
+              submissionDeadlineDefault
+              partners {
+                geminiPartner
+                submissionDeadline
+              }
+              existence
+              subaru {
+                type
+                coordinateLimits {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+                instruments
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "semester": "2024B",
+              "active": {
+                "start": "2024-07-31",
+                "end": "2025-02-01"
+              },
+              "submissionDeadlineDefault": null,
+              "partners": [
+                {
+                  "geminiPartner" : "AR",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "BR",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "CA",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "CL",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "KR",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "UH",
+                  "submissionDeadline": null
+                },
+                {
+                  "geminiPartner" : "US",
+                  "submissionDeadline": null
+                }
+              ],
+              "existence":         "PRESENT",
+              "subaru": {
+                "type": "NORMAL",
+                "coordinateLimits": {
+                  "raStart": { "hms": "16:30:00.000000" },
+                  "raEnd": { "hms": "14:00:00.000000" },
+                  "decStart": { "dms": "-37:00:00.000000" },
+                  "decEnd": { "dms": "+90:00:00.000000" }
+                },
+                "instruments":       []
+              }
+            }
+          }
+        }
+      """.asRight
+    )

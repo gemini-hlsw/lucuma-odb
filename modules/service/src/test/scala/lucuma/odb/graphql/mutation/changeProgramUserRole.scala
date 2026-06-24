@@ -61,7 +61,7 @@ class changeProgramUserRole extends OdbSuite:
 
   private def partnerLinkFor(role: ProgramUserRole): PartnerLink =
     if (role === ProgramUserRole.SupportPrimary || role === ProgramUserRole.SupportSecondary) PartnerLink.HasUnspecifiedPartner
-    else PartnerLink.HasPartner(Partner.US)
+    else PartnerLink.HasGeminiPartner(Partner.US)
 
   test("canonical use case"):
     createProgramAs(pi1).flatMap: pid =>

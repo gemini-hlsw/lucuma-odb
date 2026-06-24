@@ -27,18 +27,18 @@ import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProgramUserView
 import lucuma.odb.graphql.table.ProposalView
 
-trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
+trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
                                    with Predicates[F]
                                    with PartnerSplitTable[F]
                                    with ProgramUserView[F]
                                    with ProposalView[F] {
 
-  lazy val ProposalTypeMapping: ObjectMapping =
+  lazy val GeminiProposalTypeMapping: ObjectMapping =
     SqlInterfaceMapping(
-      tpe = ProposalTypeType,
+      tpe = GeminiProposalTypeType,
       discriminator = proposalTypeDiscriminator,
       fieldMappings = List(
-        SqlField("id", ProposalView.ProgramId, key = true, hidden = true),
+        SqlField("id", ProposalView.GeminiId, key = true, hidden = true),
         SqlField("scienceSubtype", ProposalView.ScienceSubtype, discriminator = true),
       )
     )
@@ -57,7 +57,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
           case ScienceSubtype.SystemVerification => Result(SystemVerificationType)
 
       private def mkPredicate(tpe: ScienceSubtype): Result[Predicate] =
-        Eql(ProposalTypeType / "scienceSubtype", Const(tpe)).success
+        Eql(GeminiProposalTypeType / "scienceSubtype", Const(tpe)).success
 
       override def narrowPredicate(tpe:  Type): Result[Predicate] =
         tpe match
@@ -79,6 +79,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("aeonMultiFacility",  ProposalView.Classical.AeonMultiFacility),
       SqlField("jwstSynergy",        ProposalView.Classical.JwstSynergy),
       SqlField("usLongTerm",         ProposalView.Classical.UsLongTerm),
+      SqlField("exchangePartner",    ProposalView.ExchangePartner),
       SqlObject("partnerSplits",     Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
 
@@ -130,6 +131,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("jwstSynergy",        ProposalView.Queue.JwstSynergy),
       SqlField("usLongTerm",         ProposalView.Queue.UsLongTerm),
       SqlField("considerForBand3",   ProposalView.Queue.ConsiderForBand3),
+      SqlField("exchangePartner",    ProposalView.ExchangePartner),
       SqlObject("partnerSplits",     Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
     )
 
@@ -153,7 +155,7 @@ trait ProposalTypeMapping[F[_]] extends BaseMapping[F]
       )
     }
 
-  lazy val ProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
+  lazy val GeminiProposalTypeElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     case (ClassicalType, "partnerSplits", Nil) => SortSplits
     case (QueueType,     "partnerSplits", Nil) => SortSplits
   }

@@ -637,7 +637,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
   )(using Services[F]): F[Result[AccessControl.Checked[CallForProposalsPropertiesInput.Edit]]] =
     requireStaffAccess: // this is the only check
       idSelectFromPredicate(
-        CallForProposalsType,
+        GeminiCallForProposalsType,
         and(List(
           Predicates.callForProposals.existence.includeDeleted(input.includeDeleted.getOrElse(false)),
           input.WHERE.getOrElse(True)

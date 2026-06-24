@@ -9,7 +9,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -191,7 +191,7 @@ class asterismGroup extends OdbSuite {
   test("lookup by proposal reference should work") {
     List(pi).traverse { user =>
       for {
-        cid  <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+        cid  <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
         pid  <- createProgramWithUsPi(user)
         _    <- addDemoScienceProposal(user, pid, cid)
         _    <- submitProposal(user, pid)

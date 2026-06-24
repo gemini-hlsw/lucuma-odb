@@ -19,7 +19,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
   val validUsers = List(pi, admin).toList
 
   test("create and select configuration request for fully-configured observation") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -109,7 +109,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
   }
 
   test("can't create configuration request if no targets") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createObservationAs(pi, pid).flatMap { oid =>
@@ -160,7 +160,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
   }
 
   test("can't create configuration request if no observing mode") {
-    createCallForProposalsAs(admin).flatMap { cfpid =>
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
         addProposal(pi, pid, Some(cfpid), None) >>
         createTargetWithProfileAs(pi, pid).flatMap { tid =>
@@ -189,7 +189,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
 
   test("identical requests are canonicalized") {
     for
-        cfpid <- createCallForProposalsAs(admin)
+        cfpid <- createGeminiCallForProposalsAs(admin)
         pid   <- createProgramAs(pi, "Foo")
         _     <- addProposal(pi, pid, Some(cfpid), None)
         tid   <- createTargetWithProfileAs(pi, pid)
@@ -201,7 +201,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
 
   test("identical requests are canonicalized, even if justifications differ") {
     for
-        cfpid <- createCallForProposalsAs(admin)
+        cfpid <- createGeminiCallForProposalsAs(admin)
         pid   <- createProgramAs(pi, "Foo")
         _     <- addProposal(pi, pid, Some(cfpid), None)
         tid   <- createTargetWithProfileAs(pi, pid)

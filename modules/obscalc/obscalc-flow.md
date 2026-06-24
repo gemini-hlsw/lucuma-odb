@@ -71,7 +71,7 @@ All write paths funnel through one procedure: `invalidate_obscalc(observation_id
 | `step_record_invalidate_trigger` | `t_step_record` | `c_completed` changes |
 | `cfp_assignment_invalidate_obscalc_trigger` | `t_proposal` | CfP assignment changes |
 | `cfp_edit_invalidate_obscalc_trigger` | `t_cfp` | CfP edits |
-| `cfp_instrument_invalidate_obscalc_trigger` | `t_cfp_instrument` | INSERT/UPDATE/DELETE |
+| `cfp_instrument_invalidate_obscalc_trigger` | `t_gemini_cfp_instrument` | INSERT/UPDATE/DELETE |
 | `configreq_invalidate_obscalc_trigger` | `t_configuration_request` | INSERT/UPDATE/DELETE |
 
 ## Notification: `ch_obscalc_update`

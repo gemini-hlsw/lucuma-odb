@@ -93,7 +93,7 @@ class observation_workflow_visitors extends OdbSuite with ObservingModeSetupOper
 
     val setup: IO[(Program.Id, Observation.Id)] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi)
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)

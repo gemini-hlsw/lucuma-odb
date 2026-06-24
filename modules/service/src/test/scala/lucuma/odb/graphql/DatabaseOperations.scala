@@ -16,11 +16,11 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.PerSite
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
@@ -31,6 +31,8 @@ import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
 import lucuma.core.enums.StepStage
+import lucuma.core.enums.SubaruCallForProposalsType
+import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
@@ -126,38 +128,46 @@ trait DatabaseOperations { this: OdbSuite =>
 
       session.execute(states).map(_.toMap)
 
-  def createCallForProposalsAs(
+  private def deadlineString(deadline: Option[Timestamp]): String =
+    deadline
+      .foldMap(ts => s"submissionDeadlineDefault: \"${ts.isoFormat}\"")
+
+  private def geminiPartnerListInput(
+    partners: List[(Partner, Option[Timestamp])]
+  ): String =
+    partners.map((p, d) =>
+      s"""
+        {
+          geminiPartner: ${p.tag.toScreamingSnakeCase}
+          ${d.foldMap(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
+        }
+      """
+    ).mkString("[", ", ", "]")
+
+  def createGeminiCallForProposalsAs(
      user:        User,
-     callType:    CallForProposalsType = CallForProposalsType.RegularSemester,
+     callType:    GeminiCallForProposalsType = GeminiCallForProposalsType.RegularSemester,
      semester:    Semester             = Semester.unsafeFromString("2025A"),
      activeStart: LocalDate            = LocalDate.parse("2025-02-01"),
      activeEnd:   LocalDate            = LocalDate.parse("2025-07-31"),
      deadline:    Option[Timestamp]    = Timestamp.Max.some,
      partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
-     other:       Option[String]       = None
+     otherGemini: Option[String]       = None
   ): IO[CallForProposals.Id] =
-    val deadlineStr = deadline.foldMap(ts => s"submissionDeadlineDefault: \"${ts.isoFormat}\"")
-    val partnerList =
-      partners.map((p, d) =>
-        s"""
-          {
-            partner: ${p.tag.toScreamingSnakeCase}
-            ${d.foldMap(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
-          }
-        """
-      ).mkString("[", ", ", "]")
     query(user, s"""
       mutation {
         createCallForProposals(
           input: {
             SET: {
-              type:        ${callType.tag.toScreamingSnakeCase}
               semester:    "${semester.format}"
               activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
               activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
-              $deadlineStr
-              partners: $partnerList
-              ${other.getOrElse("")}
+              ${deadlineString(deadline)}
+              partners: ${geminiPartnerListInput(partners)}
+              gemini: {
+                type: ${callType.tag.toScreamingSnakeCase}
+                ${otherGemini.getOrElse("")}
+              }
             }
           }
         ) {
@@ -174,6 +184,45 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def createSubaruCallForProposalsAs(
+     user:        User,
+     semester:    Semester               = Semester.unsafeFromString("2025A"),
+     activeStart: LocalDate              = LocalDate.parse("2025-02-01"),
+     activeEnd:   LocalDate              = LocalDate.parse("2025-07-31"),
+     deadline:    Option[Timestamp]      = Timestamp.Max.some,
+     partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
+     subaruType:  SubaruCallForProposalsType     = SubaruCallForProposalsType.Normal,
+     instruments: List[SubaruInstrument] = Nil,
+     otherGemini: Option[String]         = None
+  ): IO[CallForProposals.Id] =
+    query(user, s"""
+      mutation {
+        createCallForProposals(
+          input: {
+            SET: {
+              semester:    "${semester.format}"
+              activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
+              activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
+              ${deadlineString(deadline)}
+              partners: ${geminiPartnerListInput(partners)}
+              subaru: {
+                type: ${subaruType.tag.toScreamingSnakeCase}
+                ${if instruments.isEmpty then "" else instruments.map(_.tag.toScreamingSnakeCase).mkString("instruments: [ ", ", ", "]")}
+              }
+            }
+          }
+        ) {
+          callForProposals {
+            id
+          }
+        }
+      }
+    """
+    ).map:
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "id")
+       .require[CallForProposals.Id]
 
   def updateCallForProposalsAs(
     user: User,
@@ -221,10 +270,10 @@ trait DatabaseOperations { this: OdbSuite =>
     createProgramWithPiAffiliation(pi, PartnerLink.HasNonPartner, programName)
 
   def createProgramWithUsPi(pi: User, programName: String = null): IO[Program.Id] =
-    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.US), programName)
+    createProgramWithPiAffiliation(pi, PartnerLink.HasGeminiPartner(Partner.US), programName)
 
   def createProgramWithCaPi(pi: User, programName: String = null): IO[Program.Id] =
-    createProgramWithPiAffiliation(pi, PartnerLink.HasPartner(Partner.CA), programName)
+    createProgramWithPiAffiliation(pi, PartnerLink.HasGeminiPartner(Partner.CA), programName)
 
   def createProgramNoteAs(
     user:      User,
@@ -600,7 +649,7 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 category: GALACTIC_OTHER
                 ${callId.fold("")(c => s"callId: \"$c\"")}
-                type: {
+                gemini: {
                   $props
                 }
               }
@@ -702,7 +751,7 @@ trait DatabaseOperations { this: OdbSuite =>
           input: {
             programId: "$pid"
             SET: {
-              type: {
+              gemini: {
                 $proposalType: {
                   partnerSplits: $splitsList
                 }
@@ -2557,7 +2606,7 @@ trait DatabaseOperations { this: OdbSuite =>
     user:        User,
     pid:         Program.Id,
     role:        ProgramUserRole   = ProgramUserRole.Coi,
-    partnerLink: PartnerLink       = PartnerLink.HasPartner(Partner.US),
+    partnerLink: PartnerLink       = PartnerLink.HasGeminiPartner(Partner.US),
     preferred:   UserProfile       = UserProfile.Empty,
     education:   EducationalStatus = EducationalStatus.PhD,
     thesis:      Boolean           = false,
@@ -2577,8 +2626,9 @@ trait DatabaseOperations { this: OdbSuite =>
                 partnerLink: {
                   ${
                     partnerLink match
-                      case PartnerLink.HasPartner(partner)   => s"partner: ${partner.tag.toScreamingSnakeCase}"
-                      case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                      case PartnerLink.HasGeminiPartner(gp)   => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
+                      case PartnerLink.HasExchangePartner(xp) => s"exchangePartner: ${xp.tag.toScreamingSnakeCase}"
+                      case _                                  => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                   }
                 }
                 preferredProfile: {
@@ -2627,8 +2677,8 @@ trait DatabaseOperations { this: OdbSuite =>
               partnerLink: {
                 ${
                   partnerLink match
-                    case PartnerLink.HasPartner(partner)   => s"partner: ${partner.tag.toScreamingSnakeCase}"
-                    case _                                 => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                    case PartnerLink.HasGeminiPartner(gp) => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
+                    case _                                => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                 }
               }
               $preferred
@@ -2642,7 +2692,7 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
     ps.traverse_ : p =>
-      addProgramUserAs(u, pid, partnerLink = PartnerLink.HasPartner(p))
+      addProgramUserAs(u, pid, partnerLink = PartnerLink.HasGeminiPartner(p))
 
   def deleteProgramUserAs(
     user: User,
@@ -3016,7 +3066,7 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: "$pid"
             SET: {
               category: COSMOLOGY
-              type: {
+              gemini: {
                 fastTurnaround: {
                   toOActivation: NONE
                   minPercentTime: 50
@@ -3028,7 +3078,7 @@ trait DatabaseOperations { this: OdbSuite =>
         ) {
           proposal {
             category
-            type {
+            gemini {
               scienceSubtype
               ... on FastTurnaround {
                 toOActivation
@@ -3059,7 +3109,7 @@ trait DatabaseOperations { this: OdbSuite =>
           "createProposal": {
             "proposal": {
               "category": "COSMOLOGY",
-              "type": {
+              "gemini": {
                 "scienceSubtype": "FAST_TURNAROUND",
                 "toOActivation": "NONE",
                 "minPercentTime": 50,
@@ -3085,7 +3135,7 @@ trait DatabaseOperations { this: OdbSuite =>
             programId: "$pid"
             SET: {
               category: COSMOLOGY
-              type: {
+              gemini: {
                 fastTurnaround: {
                   toOActivation: NONE
                   minPercentTime: 50
@@ -3131,7 +3181,7 @@ trait DatabaseOperations { this: OdbSuite =>
               programId: "$pid"
               SET: {
                 category: COSMOLOGY
-                type: {
+                gemini: {
                   fastTurnaround: {
                     toOActivation: NONE
                     minPercentTime: 50
@@ -3171,7 +3221,7 @@ trait DatabaseOperations { this: OdbSuite =>
           input: {
             programId: "$pid"
             SET: {
-              type: {
+              gemini: {
                 fastTurnaround: {
                   $reviewerField
                   $mentorField
@@ -3181,7 +3231,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         ) {
           proposal {
-            type {
+            gemini {
               scienceSubtype
               ... on FastTurnaround {
                 toOActivation
@@ -3211,7 +3261,7 @@ trait DatabaseOperations { this: OdbSuite =>
         {
           "updateProposal": {
             "proposal": {
-              "type": {
+              "gemini": {
                 "scienceSubtype": "FAST_TURNAROUND",
                 "toOActivation": "NONE",
                 "minPercentTime": 50,
@@ -3236,7 +3286,7 @@ trait DatabaseOperations { this: OdbSuite =>
           input: {
             programId: "$pid"
             SET: {
-              type: {
+              gemini: {
                 fastTurnaround: {
                   reviewerId: "$userId"
                   mentorId: "$userId"
@@ -3246,7 +3296,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         ) {
           proposal {
-            type {
+            gemini {
               scienceSubtype
             }
           }

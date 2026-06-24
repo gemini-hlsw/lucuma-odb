@@ -8,7 +8,7 @@ import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
-import lucuma.core.enums.CallForProposalsType.DemoScience
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
@@ -244,7 +244,7 @@ class setAllocations extends OdbSuite {
 
   test("set allocations with a proposal reference"):
     val ref = for
-      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       ref <- submitProposal(pi, pid)
@@ -295,7 +295,7 @@ class setAllocations extends OdbSuite {
 
   test("set allocations with a program reference"):
     val ref = for
-      cid <- createCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
       _   <- submitProposal(pi, pid)

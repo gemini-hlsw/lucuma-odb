@@ -112,7 +112,7 @@ class observation_workflow_tellurics
   private def workflowFollowsScience(role: CalibrationRole): IO[Unit] =
     val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi)
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)

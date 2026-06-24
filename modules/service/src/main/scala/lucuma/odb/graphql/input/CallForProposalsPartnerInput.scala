@@ -12,7 +12,7 @@ import lucuma.odb.graphql.binding.PartnerBinding
 import lucuma.odb.graphql.binding.TimestampBinding
 
 case class CallForProposalsPartnerInput(
-  partner:  Partner,
+  geminiPartner: Partner,
   deadline: Option[Timestamp]
 )
 
@@ -20,7 +20,7 @@ object CallForProposalsPartnerInput {
 
   val Binding = ObjectFieldsBinding.rmap {
     case List(
-      PartnerBinding("partner", rPartner),
+      PartnerBinding("geminiPartner", rPartner),
       TimestampBinding.Option("submissionDeadlineOverride", rDeadline)
     ) =>
       (rPartner, rDeadline).parMapN(apply)
