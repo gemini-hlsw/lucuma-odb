@@ -97,43 +97,48 @@ object Conversions:
         .headOption
         .flatMap(v => SignalToNoise.FromBigDecimalRounding.getOption(v))
 
-    // Calculate the wavelengths at where the peaks happen
+    // Calculate the wavelengths at where the peaks happen.
+    //
+    // Most modes report one S/N series per CCD, so each CCD is paired with the series
+    // at its own index. GNIRS cross-dispersed is different: it reports a single CCD but
+    // one Final S/N series per spectral order, and no single-exposure S/N series at all.
+    // In that case the single CCD aggregates the peak across all of its series, and the
+    // missing single-exposure S/N is simply left absent.
     val calculatedCCDs: Chain[ItcCcd] =
       graphs
         .flatMap(_.graphs)
         .filter(_.graphType === GraphType.S2NGraph)
         .flatMap: graph =>
-          val finalSN     = wavelengthAtMaxSN(graph, SeriesDataType.FinalS2NData)
-          val maxWVFinal  = finalSN.map(_._1)
-          val maxSNFinal  = finalSN.map(_._2)
-          val singleSN    = wavelengthAtMaxSN(graph, SeriesDataType.SingleS2NData)
-          val maxWVSingle = singleSN.map(_._1)
-          val maxSNSingle = singleSN.map(_._2)
+          val finalSN  = wavelengthAtMaxSN(graph, SeriesDataType.FinalS2NData)
+          val singleSN = wavelengthAtMaxSN(graph, SeriesDataType.SingleS2NData)
+
+          // Select the (wavelength, value) peak for the CCD at the given index. When a
+          // single CCD is paired with multiple series, aggregate the peak over all of them.
+          def peakFor(series: List[(Wavelength, Double)], i: Int): Option[(Wavelength, Double)] =
+            if (ccds.length.toInt === 1 && series.sizeIs > 1) series.maxByOption(_._2)
+            else series.lift(i)
 
           ccds.zipWithIndex
             .map: (ccd, i) =>
-              val finalWV        = maxWVFinal.lift(i)
-              val singleWV       = maxWVSingle.lift(i)
-              val maxFinalValue  = maxSNFinal.lift(i)
-              val maxSingleValue = maxSNSingle.lift(i)
+              val finalPeak  = peakFor(finalSN, i)
+              val singlePeak = peakFor(singleSN, i)
 
-              (finalWV, singleWV, maxSingleValue, maxFinalValue).flatMapN:
-                (maxFinalAt, maxSingleAt, maxSingleValue, maxFinalValue) =>
-                  for
-                    single <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.singleSNRatio)
-                    total  <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.totalSNRatio)
-                  yield ItcCcd(
-                    SingleSN(single),
-                    Some(maxSingleValue),
-                    TotalSN(total),
-                    Some(maxFinalValue),
-                    Some(maxFinalAt),
-                    Some(maxSingleAt),
-                    ccd.peakPixelFlux,
-                    ccd.wellDepth,
-                    ccd.ampGain,
-                    ccd.warnings
-                  )
+              finalPeak.flatMap: (maxFinalAt, maxFinalValue) =>
+                for
+                  single <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.singleSNRatio)
+                  total  <- SignalToNoise.FromBigDecimalRounding.getOption(ccd.totalSNRatio)
+                yield ItcCcd(
+                  SingleSN(single),
+                  singlePeak.map(_._2),
+                  TotalSN(total),
+                  Some(maxFinalValue),
+                  Some(maxFinalAt),
+                  singlePeak.map(_._1),
+                  ccd.peakPixelFlux,
+                  ccd.wellDepth,
+                  ccd.ampGain,
+                  ccd.warnings
+                )
             .toChain
             .flattenOption
 
@@ -151,6 +156,9 @@ object Conversions:
       .flatten
     val peakSingleSNRatio: SignalToNoise = maxSingleSNRatio
       .flatMap(SignalToNoise.FromBigDecimalRounding.getOption(_))
+      // GNIRS cross-dispersed doesn't produce a single-exposure S/N series; fall back
+      // to the per-CCD single S/N reported by the ITC rather than failing the request.
+      .orElse(calculatedCCDs.map(_.singleSNRatio.value).maximumOption)
       .getOrElse(throw UpstreamException(List("Peak Single SN is not available")))
 
     def wvAtRatio(seriesType: SeriesDataType): Option[SignalToNoise] =
