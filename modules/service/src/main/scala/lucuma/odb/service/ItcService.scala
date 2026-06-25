@@ -24,6 +24,7 @@ import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
+import clue.ResponseException
 import fs2.Stream
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
@@ -174,7 +175,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent: Parallel: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent: Parallel: Logger: Services](client: ItcClient[F]): ItcService[F] =
     new ItcService[F] {
 
       override def lookup(
@@ -184,7 +185,7 @@ object ItcService {
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, oa) = pr
-          result <- oa.fold(EitherT(callRemote(pid, oid, params)))(EitherT.pure(_))
+          result <- oa.fold(EitherT(callRemote(pid, oid, params)))(EitherT.fromEither(_))
         } yield result).value
 
       override def callRemote(
@@ -192,23 +193,46 @@ object ItcService {
         oid:    Observation.Id,
         params: GeneratorParams
       )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
-        (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))))
-          r <- EitherT(callRemoteItc(oid, p))
-          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
-        } yield r).value
+        params.itcInput
+          .leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m)))
+          .fold(
+            err => Left(err).pure[F],
+            p =>
+              callRemoteItc(oid, p).flatTap:
+                case Right(r)                       => services.transactionally(insertOrUpdate(pid, oid, p, r))
+                case Left(e @ OdbError.ItcError(_)) => services.transactionally(insertOrUpdateFailure(pid, oid, p, e))
+                case Left(_)                        => Concurrent[F].unit
+          )
 
-      // Selects the parameters then selects the previously stored result set, if any.
+      // Selects the parameters then checks both success and failure caches.
+      // Returns None if not cached (call remote), Some(Right) for cached success,
+      // Some(Left) for cached deterministic failure.
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[Itc])]] =
+      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[Either[OdbError, Itc]])]] =
         services.transactionally {
           (for {
             p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.invalidObservation(oid, _))))
-            r <- EitherT.liftF(selectOne(pid, oid, p))
+            r <- EitherT.liftF:
+              selectOne(pid, oid, p).flatMap:
+                case Some(itc) => Some(itc.asRight[OdbError]).pure[F]
+                case None      => selectOneFailure(pid, oid, p).map(_.map(_.asLeft[Itc]))
           } yield (p, r)).value
         }
+
+      private def selectOneFailure(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        params: GeneratorParams
+      ): F[Option[OdbError]] =
+        params.itcInput.toOption.flatTraverse: ps =>
+          val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
+          session
+            .option(Statements.SelectOneItcFailure)(pid, oid)
+            .map:
+              _.collect:
+                case (h, msg) if h === inputHash => OdbError.ItcError(msg.some)
 
       override def selectOne(
         pid:    Program.Id,
@@ -286,6 +310,11 @@ object ItcService {
 
                 val modifiedCcr = ClientCalculationResult(ccr.versions, modifiedTargetTimes)
                 toTargetResults(targets, NonEmptyList.one(modifiedCcr)).map(_.head)
+              .handleErrorWith:
+                case e: ResponseException[?] =>
+                  OdbError.ItcError(e.getMessage.some).asLeft.pure
+                case t =>
+                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
         input.mode match
           case InstrumentMode.GmosNorthImaging(_, _, _, _) |
@@ -375,8 +404,11 @@ object ItcService {
             .parTraverse: in =>
               client.imaging(in, useCache = false)
             .map(_.asRight)
-            .handleError: err =>
-              OdbError.RemoteServiceCallError(s"Error calling ITC service: ${err.getMessage}".some).asLeft
+            .handleErrorWith:
+              case e: ResponseException[?] =>
+                OdbError.ItcError(e.getMessage.some).asLeft.pure
+              case t =>
+                OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
         for
           fs <- EitherT.fromEither(extractFilters(input.science.map(_.mode).toList, Nil))
@@ -395,8 +427,11 @@ object ItcService {
             client
               .spectroscopy(si, useCache = false)
               .map(_.asRight)
-              .handleError: t =>
-                OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
+              .handleErrorWith:
+                case e: ResponseException[?] =>
+                  OdbError.ItcError(e.getMessage.some).asLeft.pure
+                case t =>
+                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
         // A placeholder result for GHOST, at least for now.
         //
@@ -464,13 +499,12 @@ object ItcService {
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))
         ).value
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def insertOrUpdate(
         pid:     Program.Id,
         oid:     Observation.Id,
         input:   ItcInput,
         results: Itc
-      )(using Transaction[F]): F[Unit] =
+      ): F[Unit] =
         val h = Md5Hash.unsafeFromByteArray(input.md5)
         session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results)
           .void
@@ -478,6 +512,20 @@ object ItcService {
             case SqlState.ForeignKeyViolation(ex) =>
               Logger[F].info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
           }
+
+      private def insertOrUpdateFailure(
+        pid:   Program.Id,
+        oid:   Observation.Id,
+        input: ItcInput,
+        error: OdbError.ItcError
+      ): F[Unit] =
+        val h   = Md5Hash.unsafeFromByteArray(input.md5)
+        val msg = error.detail.getOrElse("")
+        session.execute(Statements.InsertOrUpdateItcFailure)(pid, oid, h, msg, h, msg)
+          .void
+          .recoverWith:
+            case SqlState.ForeignKeyViolation(ex) =>
+              Logger[F].info(ex)(s"Failed to insert or update ITC failure for program $pid, observation $oid. Probably due to a deleted calibration observation.")
     }
 
   object Statements {
@@ -555,6 +603,39 @@ object ItcService {
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash             = $md5_hash,
               c_asterism_results = $itc
+      """.command
+
+    val SelectOneItcFailure: Query[(Program.Id, Observation.Id), (Md5Hash, String)] =
+      sql"""
+        SELECT c_hash, c_error_message
+        FROM t_itc_result_failure
+        WHERE c_program_id     = $program_id AND
+              c_observation_id = $observation_id
+      """.query(md5_hash *: text)
+
+    val InsertOrUpdateItcFailure: Command[(
+      Program.Id,
+      Observation.Id,
+      Md5Hash,
+      String,
+      Md5Hash,
+      String
+    )] =
+      sql"""
+        INSERT INTO t_itc_result_failure (
+          c_program_id,
+          c_observation_id,
+          c_hash,
+          c_error_message
+        ) VALUES (
+          $program_id,
+          $observation_id,
+          $md5_hash,
+          $text
+        )
+        ON CONFLICT ON CONSTRAINT t_itc_result_failure_pkey DO UPDATE
+          SET c_hash          = $md5_hash,
+              c_error_message = $text
       """.command
 
   }
