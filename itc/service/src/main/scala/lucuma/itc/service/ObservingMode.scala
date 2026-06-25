@@ -73,7 +73,8 @@ object ObservingMode {
         )
 
       val description: String =
-        s"${instrument.shortName} Longslit"
+        if fpu.fpu.custom.isDefined then s"${instrument.shortName} MOS"
+        else s"${instrument.shortName} Longslit"
     }
 
     case class GmosSouth(
@@ -99,7 +100,8 @@ object ObservingMode {
         )
 
       val description: String =
-        s"${instrument.shortName} Longslit"
+        if fpu.fpu.custom.isDefined then s"${instrument.shortName} MOS"
+        else s"${instrument.shortName} Longslit"
     }
 
     case class Flamingos2(

@@ -4,11 +4,13 @@
 package lucuma.itc.legacy
 
 import cats.implicits.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.GmosNorthFpuParam
@@ -43,7 +45,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
     ObservingMode.SpectroscopyMode.GmosNorth(
       Wavelength.decimalNanometers.getOption(600).get,
       GmosNorthGrating.B1200_G5301,
-      GmosNorthFpuParam(GmosNorthFpu.LongSlit_5_00),
+      GmosNorthFpuParam(GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_5_00)),
       none,
       GmosCcdMode(
         GmosXBinning.One,
@@ -64,7 +66,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
   val gnConf = ObservingMode.SpectroscopyMode.GmosNorth(
     Wavelength.decimalNanometers.getOption(500).get,
     GmosNorthGrating.B480_G5309,
-    GmosNorthFpuParam(GmosNorthFpu.LongSlit_0_25),
+    GmosNorthFpuParam(GmosFpuMask.Builtin(GmosNorthFpu.LongSlit_0_25)),
     none,
     GmosCcdMode(
       GmosXBinning.One,
@@ -108,8 +110,22 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
           bodyConf(
             sourceDefinition,
             obs,
-            gnConf.copy(fpu = GmosNorthFpuParam(f)),
+            gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Builtin(f))),
             if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
+          ).asJson.noSpaces
+        )
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+
+  test("gmos north mos custom slit width".tag(LegacyITCTest)):
+    Enumerated[GmosCustomSlitWidth].all.foreach: w =>
+      val result = localItc
+        .calculate(
+          bodyConf(
+            sourceDefinition,
+            obs,
+            gnConf.copy(fpu =
+              GmosNorthFpuParam(GmosFpuMask.Custom(NonEmptyString.unsafeFrom("mos_mask.fits"), w))
+            )
           ).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -118,7 +134,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
   val gsConf = ObservingMode.SpectroscopyMode.GmosSouth(
     Wavelength.decimalNanometers.getOption(600).get,
     GmosSouthGrating.B1200_G5321,
-    GmosSouthFpuParam(GmosSouthFpu.LongSlit_1_00),
+    GmosSouthFpuParam(GmosFpuMask.Builtin(GmosSouthFpu.LongSlit_1_00)),
     none,
     GmosCcdMode(
       GmosXBinning.One,
@@ -162,8 +178,22 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
           bodyConf(
             sourceDefinition,
             obs,
-            gsConf.copy(fpu = GmosSouthFpuParam(f)),
+            gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Builtin(f))),
             if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
+          ).asJson.noSpaces
+        )
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+
+  test("gmos south mos custom slit width".tag(LegacyITCTest)):
+    Enumerated[GmosCustomSlitWidth].all.foreach: w =>
+      val result = localItc
+        .calculate(
+          bodyConf(
+            sourceDefinition,
+            obs,
+            gsConf.copy(fpu =
+              GmosSouthFpuParam(GmosFpuMask.Custom(NonEmptyString.unsafeFrom("mos_mask.fits"), w))
+            )
           ).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))

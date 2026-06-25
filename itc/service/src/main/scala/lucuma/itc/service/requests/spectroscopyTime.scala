@@ -9,7 +9,6 @@ import cats.derived.*
 import cats.syntax.all.*
 import grackle.*
 import lucuma.core.model.ExposureTimeMode
-import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.itc.*
 import lucuma.itc.input.*
 import lucuma.itc.service.GmosNorthFpuParam
@@ -54,7 +53,7 @@ object AsterismSpectroscopyTimeRequest:
               _,
               centralWavelength,
               grating,
-              GmosFpuMask.Builtin(fpu),
+              fpu,
               filter,
               ccdMode,
               roi,
@@ -74,7 +73,7 @@ object AsterismSpectroscopyTimeRequest:
               _,
               centralWavelength,
               grating,
-              GmosFpuMask.Builtin(fpu),
+              fpu,
               filter,
               ccdMode,
               roi,
