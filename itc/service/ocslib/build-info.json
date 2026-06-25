@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "baf8ff77ced0e616afb61e52b5ae8341a47b0356",
-  "ocs_git_branch": "main",
-  "ocs_git_describe": "2026B.1.1.1-9-gbaf8ff77c",
-  "local": false,
-  "build_timestamp": "2026-06-16T03:13:35Z"
+  "ocs_git_hash": "ee89194960c203bf6d78de6d5da4090e57d1e894",
+  "ocs_git_branch": "gnirs-itc-single",
+  "ocs_git_describe": "2026B.1.1.1-12-gee8919496",
+  "local": true,
+  "build_timestamp": "2026-06-25T01:33:49Z"
 }
