@@ -87,6 +87,13 @@ private[legacy] object codecs:
   private val encodeGmosNorthSpectroscopy: Encoder[ObservingMode.SpectroscopyMode.GmosNorth] =
     new Encoder[ObservingMode.SpectroscopyMode.GmosNorth] {
       def apply(a: ObservingMode.SpectroscopyMode.GmosNorth): Json =
+        val (fpMaskJson, customSlitWidthJson) = a.fpu.fpu.fold(
+          b => (Json.obj("FPUnitNorth" -> Json.fromString(b.value.ocs2Tag)), Json.Null),
+          c =>
+            (Json.obj("FPUnitNorth" -> Json.fromString("CUSTOM_MASK")),
+             Json.fromString(c.slitWidth.ocs2Tag)
+            )
+        )
         Json.obj(
           // Translate observing mode to OCS2 style
           "centralWavelength" -> a.centralWavelength.asJson,
@@ -96,7 +103,7 @@ private[legacy] object codecs:
             )
           ),
           "grating"           -> Json.obj("DisperserNorth" -> Json.fromString(a.disperser.ocs2Tag)),
-          "fpMask"            -> Json.obj("FPUnitNorth" -> Json.fromString(a.fpu.builtin.ocs2Tag)),
+          "fpMask"            -> fpMaskJson,
           "spectralBinning"   -> Json.fromInt(
             a.ccdMode.map(_.xBin).getOrElse(GmosXBinning.One).count.value
           ),
@@ -110,7 +117,7 @@ private[legacy] object codecs:
           ),
           "spatialBinning"    -> Json
             .fromInt(a.ccdMode.map(_.yBin).getOrElse(GmosYBinning.One).count.value),
-          "customSlitWidth"   -> Json.Null,
+          "customSlitWidth"   -> customSlitWidthJson,
           "ampGain"           -> Json.fromString(
             a.ccdMode.map(_.ampGain).getOrElse(GmosAmpGain.Low).tag.toUpperCase
           )
@@ -145,6 +152,13 @@ private[legacy] object codecs:
     )
 
   private val encodeGmosSouthSpectroscopy: Encoder[ObservingMode.SpectroscopyMode.GmosSouth] = a =>
+    val (fpMaskJson, customSlitWidthJson) = a.fpu.fpu.fold(
+      b => (Json.obj("FPUnitSouth" -> Json.fromString(b.value.ocs2Tag)), Json.Null),
+      c =>
+        (Json.obj("FPUnitSouth" -> Json.fromString("CUSTOM_MASK")),
+         Json.fromString(c.slitWidth.ocs2Tag)
+        )
+    )
     Json.obj(
       // Translate observing mode to OCS2 style
       "centralWavelength" -> a.centralWavelength.asJson,
@@ -154,7 +168,7 @@ private[legacy] object codecs:
         )
       ),
       "grating"           -> Json.obj("DisperserSouth" -> Json.fromString(a.disperser.ocs2Tag)),
-      "fpMask"            -> Json.obj("FPUnitSouth" -> Json.fromString(a.fpu.builtin.ocs2Tag)),
+      "fpMask"            -> fpMaskJson,
       "spectralBinning"   -> Json.fromInt(
         a.ccdMode.map(_.xBin).getOrElse(GmosXBinning.One).count.value
       ),
@@ -169,7 +183,7 @@ private[legacy] object codecs:
       "spatialBinning"    -> Json.fromInt(
         a.ccdMode.map(_.yBin).getOrElse(GmosYBinning.One).count.value
       ),
-      "customSlitWidth"   -> Json.Null,
+      "customSlitWidth"   -> customSlitWidthJson,
       "ampGain"           -> Json.fromString(
         a.ccdMode.map(_.ampGain).getOrElse(GmosAmpGain.Low).tag.toUpperCase
       )
