@@ -204,7 +204,7 @@ object ItcService {
                 case Left(_)                        => F.unit
           )
 
-      // Selects the parameters then checks both success and failure caches.
+      // Selects the parameters then checks the cache
       // Returns None if not cached (call remote), Some(Right) for cached success,
       // Some(Left) for cached deterministic failure.
       private def attemptLookup(
@@ -214,37 +214,32 @@ object ItcService {
         services.transactionally {
           (for {
             p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.invalidObservation(oid, _))))
-            r <- EitherT.liftF:
-              selectOne(pid, oid, p).flatMap:
-                case Some(itc) => Some(itc.asRight[OdbError]).pure[F]
-                case None      => selectOneFailure(pid, oid, p).map(_.map(_.asLeft[Itc]))
+            r <- EitherT.liftF(selectOneCached(pid, oid, p))
           } yield (p, r)).value
         }
 
-      private def selectOneFailure(
+      private def selectOneCached(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      ): F[Option[OdbError]] =
+      ): F[Option[Either[OdbError, Itc]]] =
         params.itcInput.toOption.flatTraverse: ps =>
           val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
           session
-            .option(Statements.SelectOneItcFailure)(pid, oid)
-            .map:
-              _.collect:
-                case (h, msg) if h === inputHash => OdbError.ItcError(msg.some)
+            .option(Statements.SelectOneCachedResult)(pid, oid)
+            .map: rowOpt =>
+              for
+                (h, itcOpt, errOpt) <- rowOpt
+                if h === inputHash
+                result              <- itcOpt.map(_.asRight).orElse(errOpt.map(msg => OdbError.ItcError(msg.some).asLeft))
+              yield result
 
       override def selectOne(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
       )(using Transaction[F]): F[Option[Itc]] =
-        params.itcInput.toOption.flatTraverse: ps =>
-          val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
-          session
-            .option(Statements.SelectOneItcResult)(pid, oid)
-            .map:
-              _.collect { case (h, rs) if h === inputHash => rs }
+        selectOneCached(pid, oid, params).map(_.flatMap(_.toOption))
 
       override def selectAll(
         pid:    Program.Id,
@@ -548,18 +543,19 @@ object ItcService {
                c_data    = ${text.opt}
       """.command
 
-    val SelectOneItcResult: Query[(
+    val SelectOneCachedResult: Query[(
       Program.Id,
       Observation.Id,
-    ), (Md5Hash, Itc)] =
+    ), (Md5Hash, Option[Itc], Option[String])] =
       sql"""
         SELECT
           c_hash,
-          c_asterism_results
+          c_asterism_results,
+          c_error_message
         FROM t_itc_result
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id
-      """.query(md5_hash *: itc)
+      """.query(md5_hash *: itc.opt *: text.opt)
 
     val SelectAllItcResults: Query[Program.Id, (Observation.Id, Md5Hash, Itc)] =
       sql"""
@@ -568,7 +564,8 @@ object ItcService {
           c_hash,
           c_asterism_results
         FROM t_itc_result
-        WHERE c_program_id = $program_id
+        WHERE c_program_id         = $program_id AND
+              c_asterism_results IS NOT NULL
       """.query(observation_id *: md5_hash *: itc)
 
     def selectAllItcResults[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, (Observation.Id, Md5Hash, Itc)] =
@@ -578,7 +575,8 @@ object ItcService {
           c_hash,
           c_asterism_results
         FROM t_itc_result
-        WHERE c_observation_id IN ($enc)
+        WHERE c_observation_id    IN ($enc) AND
+              c_asterism_results IS NOT NULL
       """.query(observation_id *: md5_hash *: itc)
 
     val InsertOrUpdateItcResult: Command[(
@@ -595,23 +593,17 @@ object ItcService {
           c_observation_id,
           c_hash,
           c_asterism_results
-        ) SELECT
+        ) VALUES (
           $program_id,
           $observation_id,
           $md5_hash,
           $itc
+        )
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash             = $md5_hash,
-              c_asterism_results = $itc
+              c_asterism_results = $itc,
+              c_error_message    = NULL
       """.command
-
-    val SelectOneItcFailure: Query[(Program.Id, Observation.Id), (Md5Hash, String)] =
-      sql"""
-        SELECT c_hash, c_error_message
-        FROM t_itc_result_failure
-        WHERE c_program_id     = $program_id AND
-              c_observation_id = $observation_id
-      """.query(md5_hash *: text)
 
     val InsertOrUpdateItcFailure: Command[(
       Program.Id,
@@ -622,7 +614,7 @@ object ItcService {
       String
     )] =
       sql"""
-        INSERT INTO t_itc_result_failure (
+        INSERT INTO t_itc_result (
           c_program_id,
           c_observation_id,
           c_hash,
@@ -633,9 +625,10 @@ object ItcService {
           $md5_hash,
           $text
         )
-        ON CONFLICT ON CONSTRAINT t_itc_result_failure_pkey DO UPDATE
-          SET c_hash          = $md5_hash,
-              c_error_message = $text
+        ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
+          SET c_hash             = $md5_hash,
+              c_asterism_results = NULL,
+              c_error_message    = $text
       """.command
 
   }

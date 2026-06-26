@@ -52,8 +52,10 @@ trait ItcServiceSuiteSupport extends ExecutionTestSupportForGmos:
     withSession: s =>
       s.unique(
         sql"""
-          SELECT count(*) FROM t_itc_result_failure
-          WHERE c_program_id = $program_id AND c_observation_id = $observation_id
+          SELECT count(*) FROM t_itc_result
+          WHERE c_program_id      = $program_id      AND
+                c_observation_id  = $observation_id  AND
+                c_error_message  IS NOT NULL
         """.query(skunk.codec.numeric.int8)
       )(pid, oid).map(_ > 0)
 
