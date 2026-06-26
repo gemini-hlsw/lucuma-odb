@@ -175,7 +175,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent: Parallel: Logger: Services](client: ItcClient[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent as F: Parallel: Logger as L: Services](client: ItcClient[F]): ItcService[F] =
     new ItcService[F] {
 
       override def lookup(
@@ -201,7 +201,7 @@ object ItcService {
               callRemoteItc(oid, p).flatTap:
                 case Right(r)                       => services.transactionally(insertOrUpdate(pid, oid, p, r))
                 case Left(e @ OdbError.ItcError(_)) => services.transactionally(insertOrUpdateFailure(pid, oid, p, e))
-                case Left(_)                        => Concurrent[F].unit
+                case Left(_)                        => F.unit
           )
 
       // Selects the parameters then checks both success and failure caches.
@@ -368,14 +368,14 @@ object ItcService {
 
         case object GmosNorthImaging extends Imaging[GmosNorthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] =
-            case InstrumentMode.GmosNorthImaging(_, f, _, _) => f
+            case InstrumentMode.GmosNorthImaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosNorthImaging(nem)
 
         case object GmosSouthImaging extends Imaging[GmosSouthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] =
-               case InstrumentMode.GmosSouthImaging(_, f, _, _) => f
+               case InstrumentMode.GmosSouthImaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosSouthImaging(nem)
@@ -510,7 +510,7 @@ object ItcService {
           .void
           .recoverWith {
             case SqlState.ForeignKeyViolation(ex) =>
-              Logger[F].info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+              L.info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
           }
 
       private def insertOrUpdateFailure(
@@ -525,7 +525,7 @@ object ItcService {
           .void
           .recoverWith:
             case SqlState.ForeignKeyViolation(ex) =>
-              Logger[F].info(ex)(s"Failed to insert or update ITC failure for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+              L.info(ex)(s"Failed to insert or update ITC failure for program $pid, observation $oid. Probably due to a deleted calibration observation.")
     }
 
   object Statements {

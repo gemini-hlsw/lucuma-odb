@@ -19,9 +19,10 @@ import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsInput
 import lucuma.itc.client.SpectroscopyIntegrationTimeAndGraphsResult
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.service.Services.ServiceAccess
+import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.implicits.*
-import lucuma.odb.util.Codecs.*
+
 import java.io.IOException
 
 // Shared support for ITC service caching tests.
