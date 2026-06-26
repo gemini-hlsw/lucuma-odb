@@ -87,14 +87,17 @@ sealed trait ItcService[F[_]] {
   )(using NoTransaction[F]): F[Either[OdbError, Itc]]
 
   /**
-   * Selects the cached ITC results for a single observation, if available and
-   * still valid.  Does not perform a remote ITC service call if not available.
+   * Selects the cached ITC result for a single observation, if available and
+   * still valid.  
+   * Returns Some(Right) for a cached success, Some(Left) for a
+   * cached deterministic failure, and None if not cached.
+   * Does not perform a remote ITC service call.
    */
   def selectOne(
     programId:    Program.Id,
     observatinId: Observation.Id,
     params:       GeneratorParams
-  )(using Transaction[F]): F[Option[Itc]]
+  )(using Transaction[F]): F[Option[Either[OdbError, Itc]]]
 
   /**
    * Selects the cached ITC results for a program, for those observations where
@@ -238,8 +241,8 @@ object ItcService {
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using Transaction[F]): F[Option[Itc]] =
-        selectOneCached(pid, oid, params).map(_.flatMap(_.toOption))
+      )(using Transaction[F]): F[Option[Either[OdbError, Itc]]] =
+        selectOneCached(pid, oid, params)
 
       override def selectAll(
         pid:    Program.Id,

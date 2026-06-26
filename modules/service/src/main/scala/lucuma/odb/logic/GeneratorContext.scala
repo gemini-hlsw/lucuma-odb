@@ -4,7 +4,6 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
-import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.either.*
@@ -92,7 +91,7 @@ object GeneratorContext:
       pid:    Program.Id,
       params: GeneratorParams
     )(using Transaction[F]): F[Option[Either[OdbError, Itc]]] =
-      OptionT(itc.selectOne(pid, oid, params)).map(_.asRight).value
+      itc.selectOne(pid, oid, params)
 
     val opc: F[Either[OdbError, (Program.Id, GeneratorParams, Option[Either[OdbError, Itc]])]] =
       services.transactionally:
