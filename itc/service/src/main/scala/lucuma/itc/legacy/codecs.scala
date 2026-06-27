@@ -24,6 +24,7 @@ import lucuma.core.math.dimensional.syntax.*
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.display.*
 import lucuma.core.syntax.string.*
 import lucuma.itc.GraphType
@@ -268,12 +269,18 @@ private[legacy] object codecs:
       "redCamera"     -> a.redDetector.multiplyCount(a.stepCount).asJson
     )
 
-  private val encodeGnirsLongSlitSpectroscopy
-    : Encoder[ObservingMode.SpectroscopyMode.GnirsLongSlit] = a =>
+  private val encodeGnirsSpectroscopy
+    : Encoder[ObservingMode.SpectroscopyMode.GnirsSpectroscopy] = a =>
+    // The OCS recipe takes the slit width and the IFU through the same `slitWidth`
+    // parameter (GNIRSParams.SlitWidth includes the LR/HR IFU values).
+    val slitWidthTag: String =
+      a.fpu match
+        case GnirsFpu.Spectroscopy.Slit(s) => s.ocs2Tag
+        case GnirsFpu.Spectroscopy.Ifu(i)  => i.ocs2Tag
     Json.obj(
       "centralWavelength" -> a.centralWavelength.asJson,
       "filter"            -> Json.fromString(a.filter.ocs2Tag),
-      "slitWidth"         -> Json.fromString(a.slitWidth.ocs2Tag),
+      "slitWidth"         -> Json.fromString(slitWidthTag),
       "crossDispersed"    -> Json.fromString(a.prism.ocs2Tag),
       "grating"           -> Json.fromString(a.grating.ocs2Tag),
       "camera"            -> Json.fromString(a.camera.ocs2Tag),
@@ -310,8 +317,8 @@ private[legacy] object codecs:
         Json.obj("Igrins2Parameters" -> encodeIgrins2Spectroscopy(a))
       case a: ObservingMode.SpectroscopyMode.Ghost         =>
         Json.obj("GhostParameters" -> encodeGhostSpectroscopy(a))
-      case a: ObservingMode.SpectroscopyMode.GnirsLongSlit =>
-        Json.obj("GnirsParameters" -> encodeGnirsLongSlitSpectroscopy(a))
+      case a: ObservingMode.SpectroscopyMode.GnirsSpectroscopy =>
+        Json.obj("GnirsParameters" -> encodeGnirsSpectroscopy(a))
       // Imaging
       case a: ObservingMode.ImagingMode.Flamingos2         =>
         Json.obj("Flamingos2Parameters" -> encodeF2Imaging(a))

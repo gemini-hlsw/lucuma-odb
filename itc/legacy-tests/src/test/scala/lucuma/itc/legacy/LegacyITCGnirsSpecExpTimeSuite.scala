@@ -16,6 +16,7 @@ import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails
@@ -43,14 +44,14 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
     analysisMethod = ItcObservationDetails.AnalysisMethod.Aperture.Auto(1)
   )
 
-  val gnirs = ObservingMode.SpectroscopyMode.GnirsLongSlit(
+  val gnirs = ObservingMode.SpectroscopyMode.GnirsSpectroscopy(
     centralWavelength = centralWavelength,
     grating = GnirsGrating.D32,
     filter = GnirsFilter.Order3,
     camera = GnirsCamera.ShortBlue,
     prism = GnirsPrism.Mirror,
     readMode = GnirsReadMode.Bright,
-    slitWidth = GnirsFpuSlit.LongSlit_0_30,
+    fpu = GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
     wellDepth = GnirsWellDepth.Shallow,
     coadds = PosInt.unsafeFrom(1),
     portDisposition = PortDisposition.Bottom
@@ -91,7 +92,7 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
   test("gnirs slit width".tag(LegacyITCTest)):
     Enumerated[GnirsFpuSlit].all.foreach: s =>
       val result = localItc.calculate:
-        bodyConf(sourceDefinition, obs, gnirs.copy(slitWidth = s)).asJson.noSpaces
+        bodyConf(sourceDefinition, obs, gnirs.copy(fpu = GnirsFpu.Spectroscopy.Slit(s))).asJson.noSpaces
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs well depth".tag(LegacyITCTest)):

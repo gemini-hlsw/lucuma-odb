@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.*
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.service.ItcObservationDetails.AnalysisMethod
 import lucuma.itc.service.hashes.given
@@ -160,10 +161,10 @@ object ObservingMode {
         s"${instrument.shortName} IFU"
     }
 
-    final case class GnirsLongSlit(
+    final case class GnirsSpectroscopy(
       centralWavelength: Wavelength,
       filter:            GnirsFilter,
-      slitWidth:         GnirsFpuSlit,
+      fpu:               GnirsFpu.Spectroscopy,
       prism:             GnirsPrism,
       grating:           GnirsGrating,
       camera:            GnirsCamera,
@@ -176,12 +177,25 @@ object ObservingMode {
         Instrument.Gnirs
 
       override def analysisMethod: AnalysisMethod =
-        ItcObservationDetails.AnalysisMethod.Aperture.Auto(
-          skyAperture = 1.0
-        )
+        fpu match
+          case GnirsFpu.Spectroscopy.Slit(_) =>
+            ItcObservationDetails.AnalysisMethod.Aperture.Auto(
+              skyAperture = 1.0
+            )
+          case GnirsFpu.Spectroscopy.Ifu(_)  =>
+            // "Sum of 2x2 elements at the center" with a single sky fibre.
+            ItcObservationDetails.AnalysisMethod.Ifu.Summed(
+              skyFibres = 1,
+              numX = 2,
+              numY = 2,
+              centerX = 0.0,
+              centerY = 0.0
+            )
 
       val description: String =
-        s"${instrument.shortName} Longslit"
+        fpu match
+          case GnirsFpu.Spectroscopy.Slit(_) => s"${instrument.shortName} Longslit"
+          case GnirsFpu.Spectroscopy.Ifu(_)  => s"${instrument.shortName} IFU"
     }
   }
 

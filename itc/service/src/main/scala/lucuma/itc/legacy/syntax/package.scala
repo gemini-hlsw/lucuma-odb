@@ -24,6 +24,7 @@ object all
     with GnirsCrossDispersedSyntax
     with GnirsReadModeSyntax
     with GnirsSlitWidthSyntax
+    with GnirsFpuIfuSyntax
     with GnirsWellDepthSyntax
     with ConditionsSyntax
     with CoolStarModelSyntax

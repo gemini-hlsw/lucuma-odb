@@ -7,7 +7,6 @@ import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
@@ -15,6 +14,7 @@ import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
@@ -23,7 +23,7 @@ final case class GnirsSpectroscopyInput(
   exposureTimeMode:  ExposureTimeMode,
   centralWavelength: Wavelength,
   filter:            GnirsFilter,
-  slitWidth:         GnirsFpuSlit,
+  fpu:               GnirsFpu.Spectroscopy,
   prism:             GnirsPrism,
   grating:           GnirsGrating,
   camera:            GnirsCamera,
@@ -41,7 +41,7 @@ object GnirsSpectroscopyInput:
             ExposureTimeModeInput.Binding("exposureTimeMode", exposureTimeMode),
             WavelengthInput.Binding("centralWavelength", centralWavelength),
             GnirsFilterBinding("filter", filter),
-            GnirsFpuSlitBinding("slitWidth", slitWidth),
+            GnirsFpuSpectroscopyInput.Binding("fpu", fpu),
             GnirsPrismBinding("prism", prism),
             GnirsGratingBinding("grating", grating),
             GnirsCameraBinding("camera", camera),
@@ -53,7 +53,7 @@ object GnirsSpectroscopyInput:
         (exposureTimeMode,
          centralWavelength,
          filter,
-         slitWidth,
+         fpu,
          prism,
          grating,
          camera,

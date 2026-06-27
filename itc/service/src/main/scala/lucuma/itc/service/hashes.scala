@@ -17,6 +17,7 @@ import lucuma.core.model.Attachment
 import lucuma.core.model.NonNegDuration
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 
@@ -39,3 +40,7 @@ given Hash[GmosAmpGain]     = Hash.by(_.tag)
 given Hash[GmosAmpReadMode] = Hash.by(_.tag)
 given Hash[GmosCcdMode]     = Hash.by(x => (x.xBin, x.yBin, x.ampCount, x.ampGain, x.ampReadMode))
 given Hash[Attachment.Id]   = Hash.by(_.value)
+
+given Hash[GnirsFpu.Spectroscopy] = Hash.by:
+  case GnirsFpu.Spectroscopy.Slit(s) => (0, s.tag)
+  case GnirsFpu.Spectroscopy.Ifu(i)  => (1, i.tag)

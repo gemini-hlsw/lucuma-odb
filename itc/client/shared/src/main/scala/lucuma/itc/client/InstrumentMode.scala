@@ -24,7 +24,6 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
@@ -33,6 +32,7 @@ import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.json.encoders.given
 import lucuma.itc.client.json.syntax.*
@@ -184,7 +184,7 @@ object InstrumentMode {
     exposureTimeMode:  ExposureTimeMode,
     centralWavelength: Wavelength,
     filter:            GnirsFilter,
-    slitWidth:         GnirsFpuSlit,
+    fpu:               GnirsFpu.Spectroscopy,
     prism:             GnirsPrism,
     grating:           GnirsGrating,
     camera:            GnirsCamera,
@@ -198,11 +198,16 @@ object InstrumentMode {
 
   object GnirsSpectroscopy:
     given Encoder[GnirsSpectroscopy] = a =>
+      // `fpu` is a @oneOf input: exactly one of `slitWidth` / `ifu`.
+      val fpuJson: Json =
+        a.fpu match
+          case GnirsFpu.Spectroscopy.Slit(s) => Json.obj("slitWidth" -> s.asScreamingJson)
+          case GnirsFpu.Spectroscopy.Ifu(i)  => Json.obj("ifu" -> i.asScreamingJson)
       Json.obj(
         "exposureTimeMode"  -> a.exposureTimeMode.asJson,
         "centralWavelength" -> a.centralWavelength.asJson,
         "filter"            -> a.filter.asScreamingJson,
-        "slitWidth"         -> a.slitWidth.asScreamingJson,
+        "fpu"               -> fpuJson,
         "prism"             -> a.prism.asScreamingJson,
         "grating"           -> a.grating.asScreamingJson,
         "camera"            -> a.camera.asScreamingJson,

@@ -1931,7 +1931,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 exposureTimeMode: { timeAndCount: { time: { seconds: 120 }, count: 30, at: { nanometers: 2200 } } },
                 centralWavelength: { nanometers: 2200 },
                 filter: ORDER3,
-                slitWidth: LONG_SLIT_0_30,
+                fpu: { slitWidth: LONG_SLIT_0_30 },
                 prism: MIRROR,
                 grating: D32,
                 camera: SHORT_BLUE,
