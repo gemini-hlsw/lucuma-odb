@@ -107,7 +107,6 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlField("grating",    SpectroscopyConfigOptionGnirsTable.Grating),
       SqlField("filter",     SpectroscopyConfigOptionGnirsTable.Filter),
       SqlField("fpuSlit",    SpectroscopyConfigOptionGnirsTable.FpuSlit),
-      SqlField("fpu",        SpectroscopyConfigOptionGnirsTable.FpuSlit), // deprecated alias of fpuSlit
       SqlField("fpuIfu",     SpectroscopyConfigOptionGnirsTable.FpuIfu),
       SqlField("prism",      SpectroscopyConfigOptionGnirsTable.Prism),
       SqlField("camera",     SpectroscopyConfigOptionGnirsTable.Camera)

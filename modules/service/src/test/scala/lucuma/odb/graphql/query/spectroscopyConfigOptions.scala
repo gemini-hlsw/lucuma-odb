@@ -631,7 +631,6 @@ class spectroscopyConfigOptions extends OdbSuite {
               grating
               filter
               fpuSlit
-              fpu
               fpuIfu
             }
           }
@@ -646,7 +645,6 @@ class spectroscopyConfigOptions extends OdbSuite {
                 "grating": "D32",
                 "filter": "ORDER6",
                 "fpuSlit": null,
-                "fpu": null,
                 "fpuIfu": "LOW_RESOLUTION"
               }
             },
@@ -656,7 +654,6 @@ class spectroscopyConfigOptions extends OdbSuite {
                 "grating": "D32",
                 "filter": "ORDER6",
                 "fpuSlit": "LONG_SLIT_0_30",
-                "fpu": "LONG_SLIT_0_30",
                 "fpuIfu": null
               }
             }
