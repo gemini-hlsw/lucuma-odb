@@ -152,7 +152,7 @@ object Science:
                       coadds            = config.coadds,
                       filter            = config.filter,
                       decker            = config.decker,
-                      fpu               = GnirsFpu.Slit(config.fpu),
+                      fpu               = GnirsFpu.Spectroscopy.Slit(config.fpu),
                       acquisitionMirror = acqMirror,
                       camera            = config.camera,
                       focus             = config.focus,

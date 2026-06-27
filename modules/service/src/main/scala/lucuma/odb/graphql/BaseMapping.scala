@@ -229,6 +229,7 @@ trait BaseMapping[F[_]]
   lazy val GmosBinningType                         = schema.ref("GmosBinning")
   lazy val GnirsDeckerType                         = schema.ref("GnirsDecker")
   lazy val GnirsFilterType                         = schema.ref("GnirsFilter")
+  lazy val GnirsFpuIfuType                         = schema.ref("GnirsFpuIfu")
   lazy val GnirsFpuOtherType                       = schema.ref("GnirsFpuOther")
   lazy val GnirsFpuSlitType                        = schema.ref("GnirsFpuSlit")
   lazy val GnirsGratingType                        = schema.ref("GnirsGrating")

@@ -38,19 +38,21 @@ object GnirsDynamicInput:
         GnirsDeckerBinding("decker", rDecker),
         GnirsFpuSlitBinding.Option("fpuSlit", rFpuSlit),
         GnirsFpuOtherBinding.Option("fpuOther", rFpuOther),
+        GnirsFpuIfuBinding.Option("fpuIfu", rFpuIfu),
         GnirsAcquisitionMirrorOutInput.Binding.Option("acquisitionMirrorOut", rAcqMirror),
         GnirsCameraBinding("camera", rCamera),
         IntBinding.Option("focusMotorSteps", rFocusMotorSteps),
         GnirsReadModeBinding("readMode", rReadMode)
-      ) => (rExposure, rCoadds, rFilter, rDecker, rFpuSlit, rFpuOther, rAcqMirror, rCamera, rFocusMotorSteps, rReadMode).parTupled.flatMap {
-        case (exposure, coadds, filter, decker, fpuSlit, fpuOther, acqMirror, camera, focusMotorSteps, readMode) =>
+      ) => (rExposure, rCoadds, rFilter, rDecker, rFpuSlit, rFpuOther, rFpuIfu, rAcqMirror, rCamera, rFocusMotorSteps, rReadMode).parTupled.flatMap {
+        case (exposure, coadds, filter, decker, fpuSlit, fpuOther, fpuIfu, acqMirror, camera, focusMotorSteps, readMode) =>
 
           val rFpu: Result[GnirsFpu] =
-            (fpuSlit, fpuOther) match
-              case (Some(s), None)    => Result.success(GnirsFpu.Slit(s))
-              case (None,    Some(o)) => Result.success(GnirsFpu.Other(o))
-              case (None,    None)    => Matcher.validationFailure("Exactly one of 'fpuSlit' or 'fpuOther' must be provided.")
-              case (Some(_), Some(_)) => Matcher.validationFailure("Only one of 'fpuSlit' or 'fpuOther' may be provided.")
+            (fpuSlit, fpuOther, fpuIfu) match
+              case (Some(s), None,    None)    => Result.success(GnirsFpu.Spectroscopy.Slit(s))
+              case (None,    Some(o), None)    => Result.success(GnirsFpu.Other(o))
+              case (None,    None,    Some(i)) => Result.success(GnirsFpu.Spectroscopy.Ifu(i))
+              case (None,    None,    None)    => Matcher.validationFailure("Exactly one of 'fpuSlit', 'fpuOther' or 'fpuIfu' must be provided.")
+              case _                           => Matcher.validationFailure("Only one of 'fpuSlit', 'fpuOther' or 'fpuIfu' may be provided.")
 
           val rFocus: Result[GnirsFocus] =
             focusMotorSteps match

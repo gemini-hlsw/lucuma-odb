@@ -96,7 +96,7 @@ trait GnirsCodec:
         coadds            <- c.downField("coadds").as[PosInt]
         filter            <- c.downField("filter").as[GnirsFilter]
         decker            <- c.downField("decker").as[GnirsDecker]
-        fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(GnirsFpu.Slit(_)) orElse
+        fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(GnirsFpu.Spectroscopy.Slit(_)) orElse
                              c.downField("fpuOther").as[GnirsFpuOther].map(GnirsFpu.Other(_))
         acqMirror         <- c.downField("acquisitionMirrorOut").as[GnirsAcquisitionMirrorMode]
         camera            <- c.downField("camera").as[GnirsCamera]

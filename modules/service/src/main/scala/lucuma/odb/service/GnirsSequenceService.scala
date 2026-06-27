@@ -71,6 +71,7 @@ object GnirsSequenceService:
         "c_decker",
         "c_fpu_slit",
         "c_fpu_other",
+        "c_fpu_ifu",
         "c_prism",
         "c_grating",
         "c_grating_wavelength",
