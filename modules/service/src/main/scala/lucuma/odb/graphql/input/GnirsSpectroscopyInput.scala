@@ -18,6 +18,7 @@ import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
@@ -32,13 +33,14 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 
-object GnirsLongSlitInput:
+object GnirsSpectroscopyInput:
 
   // Signal-to-noise exposure time mode does not support coadds. When the ETM is set to
   // signal-to-noise, force coadds to 1 so a previously-set value doesn't linger.
@@ -49,6 +51,24 @@ object GnirsLongSlitInput:
     etm match
       case Some(ExposureTimeMode.SignalToNoiseMode(_, _)) => PosInt.from(1).toOption
       case _                                           => coadds
+
+  // The observing mode type follows the FPU: the long slit and the IFU are persisted
+  // in the same table but carry distinct ObservingModeType values.
+  private def modeTypeFor(fpu: GnirsFpu.Spectroscopy): ObservingModeType =
+    fpu match
+      case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
+      case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
+
+  // Exactly one of slitWidth (fpuSlit) / ifu (fpuIfu) is required on create.
+  private def fpuFromSlitIfu(
+    fpuSlit: Option[GnirsFpuSlit],
+    fpuIfu:  Option[GnirsFpuIfu]
+  ): Result[GnirsFpu.Spectroscopy] =
+    (fpuSlit, fpuIfu) match
+      case (Some(s), None) => Result(GnirsFpu.Spectroscopy.Slit(s))
+      case (None, Some(i)) => Result(GnirsFpu.Spectroscopy.Ifu(i))
+      case (None, None)    => Matcher.validationFailure("Exactly one of 'fpuSlit' or 'fpuIfu' must be provided.")
+      case _               => Matcher.validationFailure("Only one of 'fpuSlit' or 'fpuIfu' may be provided.")
 
   object TelescopeConfigAlongSlitInput:
     val Binding: Matcher[TelescopeConfigAlongSlit] =
@@ -127,7 +147,7 @@ object GnirsLongSlitInput:
     exposureTimeMode: Option[ExposureTimeMode],
     coadds:           Option[PosInt],
     filter:           GnirsFilter,
-    fpu:              GnirsFpuSlit,
+    fpu:              GnirsFpu.Spectroscopy,
     camera:           GnirsCamera,
     grating:          GnirsGrating,
     prism:            GnirsPrism,
@@ -142,7 +162,7 @@ object GnirsLongSlitInput:
     acquisition:                  Option[AcquisitionInput]         = None,
     telluricType:                 TelluricType                     = TelluricType.Hot
   ):
-    def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
+    def observingModeType: ObservingModeType = modeTypeFor(fpu)
 
     /** True if the input modifies fields that only Staff (or higher) may set. */
     def needsStaffAccess: Boolean = explicitFocusMotorSteps.isDefined
@@ -154,7 +174,8 @@ object GnirsLongSlitInput:
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
           PosIntBinding.Option("coadds", rCoadds),
           GnirsFilterBinding("filter", rFilter),
-          GnirsFpuSlitBinding("fpu", rFpu),
+          GnirsFpuSlitBinding.Option("fpuSlit", rFpuSlit),
+          GnirsFpuIfuBinding.Option("fpuIfu", rFpuIfu),
           GnirsCameraBinding("camera", rCamera),
           GnirsGratingBinding("grating", rGrating),
           GnirsPrismBinding("prism", rPrism),
@@ -169,22 +190,23 @@ object GnirsLongSlitInput:
           AcquisitionInput.Binding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
-          (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
+          (rEtm, rCoadds, rFilter, rFpuSlit, rFpuIfu, rCamera, rGrating, rPrism,
            rCentralWavelength, rDecker, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parMapN:
-            (etm, coadds, filter, fpu, camera, grating, prism,
+           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parTupled.flatMap:
+            (etm, coadds, filter, fpuSlit, fpuIfu, camera, grating, prism,
              centralWavelength, decker, explGrating, explPrism,
              focus, readMode, wellDepth, explTelescope, acq, telluricType) =>
-              Create(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
-                     centralWavelength, decker, explGrating, explPrism,
-                     focus, readMode, wellDepth, explTelescope, acq,
-                     telluricType.getOrElse(TelluricType.Hot))
+              fpuFromSlitIfu(fpuSlit, fpuIfu).map: fpu =>
+                Create(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
+                       centralWavelength, decker, explGrating, explPrism,
+                       focus, readMode, wellDepth, explTelescope, acq,
+                       telluricType.getOrElse(TelluricType.Hot))
 
   case class Edit(
     exposureTimeMode:          Option[ExposureTimeMode],
     coadds:                    Option[PosInt],
     filter:                    Option[GnirsFilter],
-    fpu:                       Option[GnirsFpuSlit],
+    fpu:                       Option[GnirsFpu.Spectroscopy],
     camera:                    Option[GnirsCamera],
     grating:                   Nullable[GnirsGrating],
     prism:                     Nullable[GnirsPrism],
@@ -199,7 +221,7 @@ object GnirsLongSlitInput:
     acquisition:               Option[AcquisitionInput],
     telluricType:              Option[TelluricType]            // Option: set or skip; cannot be unset
   ):
-    def observingModeType: ObservingModeType = ObservingModeType.GnirsLongSlit
+    def observingModeType: Option[ObservingModeType] = fpu.map(modeTypeFor)
     def updatesAcquisition: Boolean = acquisition.isDefined
     def limitToPreExecution(access: Access): Boolean = false
 
@@ -211,7 +233,7 @@ object GnirsLongSlitInput:
     def needsStaffAccess: Boolean = explicitFocusMotorSteps.isPresent
     def toCreate: Result[Create] =
       def required[A](oa: Option[A], name: String): Result[A] =
-        Result.fromOption(oa, Matcher.validationProblem(s"A $name is required to create a GNIRS Long Slit observing mode."))
+        Result.fromOption(oa, Matcher.validationProblem(s"A $name is required to create a GNIRS spectroscopy observing mode."))
       for
         f  <- required(filter, "filter")
         u  <- required(fpu, "fpu")
@@ -233,7 +255,8 @@ object GnirsLongSlitInput:
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
           PosIntBinding.Option("coadds", rCoadds),
           GnirsFilterBinding.Option("filter", rFilter),
-          GnirsFpuSlitBinding.Option("fpu", rFpu),
+          GnirsFpuSlitBinding.Option("fpuSlit", rFpuSlit),
+          GnirsFpuIfuBinding.Option("fpuIfu", rFpuIfu),
           GnirsCameraBinding.Option("camera", rCamera),
           GnirsGratingBinding.Nullable("grating", rGrating),
           GnirsPrismBinding.Nullable("prism", rPrism),
@@ -248,7 +271,20 @@ object GnirsLongSlitInput:
           AcquisitionInput.Binding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
-          (rEtm, rCoadds, rFilter, rFpu, rCamera, rGrating, rPrism,
+          (rEtm, rCoadds, rFilter, rFpuSlit, rFpuIfu, rCamera, rGrating, rPrism,
            rCentralWavelength, rDecker, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parMapN(Edit.apply)
-            .map(e => e.copy(coadds = coaddsForEtm(e.exposureTimeMode, e.coadds)))
+           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parTupled.flatMap:
+            (etm, coadds, filter, fpuSlit, fpuIfu, camera, grating, prism,
+             centralWavelength, decker, explGrating, explPrism,
+             focus, readMode, wellDepth, explTelescope, acq, telluricType) =>
+              // At most one of fpuSlit / fpuIfu may be edited at a time.
+              val rFpu: Result[Option[GnirsFpu.Spectroscopy]] =
+                (fpuSlit, fpuIfu) match
+                  case (None, None)    => Result(none)
+                  case (Some(s), None) => Result(GnirsFpu.Spectroscopy.Slit(s).some)
+                  case (None, Some(i)) => Result(GnirsFpu.Spectroscopy.Ifu(i).some)
+                  case _               => Matcher.validationFailure("Only one of 'fpuSlit' or 'fpuIfu' may be provided.")
+              rFpu.map: fpu =>
+                Edit(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
+                     centralWavelength, decker, explGrating, explPrism,
+                     focus, readMode, wellDepth, explTelescope, acq, telluricType)

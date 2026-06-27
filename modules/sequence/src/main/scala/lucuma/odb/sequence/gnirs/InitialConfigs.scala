@@ -14,7 +14,7 @@ import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.util.TimeSpan
-import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlit
+import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopy
 
 object InitialConfigs:
 
@@ -35,5 +35,5 @@ object InitialConfigs:
       readMode          = GnirsReadMode.VeryBright
     )
 
-  def staticFrom(config: GnirsLongSlit): GnirsStaticConfig =
+  def staticFrom(config: GnirsSpectroscopy): GnirsStaticConfig =
     GnirsStaticConfig(config.wellDepth)

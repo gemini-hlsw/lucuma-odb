@@ -5267,9 +5267,9 @@ input ObservingModeInput @oneOf {
   igrins2LongSlit: Igrins2LongSlitInput
 
   """
-  The gnirsLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The gnirsSpectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  gnirsLongSlit: GnirsLongSlitInput
+  gnirsSpectroscopy: GnirsSpectroscopyInput
 
   """
   A visiting instrument mode. It cannot be unset with a null value.
@@ -7402,6 +7402,11 @@ enum ObservingModeType {
   ObservingModeType GnirsLongSlit
   """
   GNIRS_LONG_SLIT
+
+  """
+  ObservingModeType GnirsIfu
+  """
+  GNIRS_IFU
 
   """
   ObservingModeType Igrins2LongSlit
@@ -10191,7 +10196,7 @@ input Igrins2LongSlitInput {
 
 }
 
-type GnirsLongSlitAcquisition {
+type GnirsSpectroscopyAcquisition {
   exposureTimeMode: ExposureTimeMode!
 
   coadds: PosInt!
@@ -10205,9 +10210,9 @@ type GnirsLongSlitAcquisition {
 }
 
 """
-GNIRS Long Slit mode
+GNIRS Spectroscopy mode (long slit or IFU, distinguished by the FPU).
 """
-type GnirsLongSlit {
+type GnirsSpectroscopy {
 
   exposureTimeMode: ExposureTimeMode!
 
@@ -10225,8 +10230,19 @@ type GnirsLongSlit {
   camera: GnirsCamera!
   initialCamera: GnirsCamera!
 
-  fpu: GnirsFpuSlit!
-  initialFpu: GnirsFpuSlit!
+  """
+  Long-slit FPU, when this is a long-slit configuration. Exactly one of
+  `fpuSlit` / `fpuIfu` is present (and one of `initialFpuSlit` / `initialFpuIfu`).
+  """
+  fpuSlit: GnirsFpuSlit
+  initialFpuSlit: GnirsFpuSlit
+
+  """
+  IFU FPU, when this is an integral field unit configuration. Exactly one of
+  `fpuSlit` / `fpuIfu` is present (and one of `initialFpuSlit` / `initialFpuIfu`).
+  """
+  fpuIfu: GnirsFpuIfu
+  initialFpuIfu: GnirsFpuIfu
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
@@ -10249,7 +10265,7 @@ type GnirsLongSlit {
   defaultTelescopeConfigs: SlitTelescopeConfigs!
   explicitTelescopeConfigs: SlitTelescopeConfigs
 
-  acquisition: GnirsLongSlitAcquisition!
+  acquisition: GnirsSpectroscopyAcquisition!
 
   """
   Telluric type configuration for this observation.
@@ -10258,7 +10274,7 @@ type GnirsLongSlit {
 
 }
 
-input GnirsLongSlitAcquisitionInput {
+input GnirsSpectroscopyAcquisitionInput {
   explicitFilter: GnirsFilter
   explicitAcquisitionType: GnirsAcquisitionType
   coadds: PosInt
@@ -10295,9 +10311,9 @@ input SlitTelescopeConfigsInput {
 }
 
 """
-Edit or create GNIRS Long Slit configuration
+Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
 """
-input GnirsLongSlitInput {
+input GnirsSpectroscopyInput {
 
   exposureTimeMode: ExposureTimeModeInput
 
@@ -10305,7 +10321,15 @@ input GnirsLongSlitInput {
 
   filter: GnirsFilter
 
-  fpu: GnirsFpuSlit
+  """
+  Long-slit FPU. On create, exactly one of `fpuSlit` / `fpuIfu` is required.
+  """
+  fpuSlit: GnirsFpuSlit
+
+  """
+  IFU FPU. On create, exactly one of `fpuSlit` / `fpuIfu` is required.
+  """
+  fpuIfu: GnirsFpuIfu
 
   camera: GnirsCamera
 
@@ -10329,7 +10353,7 @@ input GnirsLongSlitInput {
 
   explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
-  acquisition: GnirsLongSlitAcquisitionInput
+  acquisition: GnirsSpectroscopyAcquisitionInput
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
@@ -12667,6 +12691,8 @@ enum GnirsDecker {
   LONG_CAM_LONG_SLIT
   SHORT_CAM_LONG_SLIT
   LONG_CAM_CROSS_DISPERSED
+  LOW_RESOLUTION_IFU
+  HIGH_RESOLUTION_IFU
 }
 
 """
@@ -14661,7 +14687,7 @@ type ObservingMode {
   """
   GNIRS Long Slit mode
   """
-  gnirsLongSlit: GnirsLongSlit
+  gnirsSpectroscopy: GnirsSpectroscopy
 
   visitor: Visitor
 

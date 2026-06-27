@@ -274,8 +274,8 @@ object PerScienceObservationCalibrationsService:
 
       private def isCrossDispersedGnirs(config: CalibrationConfigSubset): Boolean =
         config match
-          case g: CalibrationConfigSubset.GnirsLongSlitConfigs => g.isCrossDispersed
-          case _                                               => false
+          case g: CalibrationConfigSubset.GnirsSpectroscopyConfigs => g.isCrossDispersed
+          case _                                                   => false
 
       private def findDaytimePinholeObservations(gid: Group.Id): F[List[Observation.Id]] =
         session
@@ -446,7 +446,7 @@ object PerScienceObservationCalibrationsService:
             case Some(ObservingModeType.Flamingos2LongSlit) =>
               flamingos2LongSlitService.resetTelluricConfig(targetOid)
             case Some(ObservingModeType.GnirsLongSlit) =>
-              gnirsLongSlitService.resetTelluricConfig(targetOid)
+              gnirsSpectroscopyService.resetTelluricConfig(targetOid)
             case _ =>
               F.unit
 

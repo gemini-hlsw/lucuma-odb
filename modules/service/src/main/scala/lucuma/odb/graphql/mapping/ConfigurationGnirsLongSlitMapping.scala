@@ -5,10 +5,10 @@ package lucuma.odb.graphql
 package mapping
 
 import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.GnirsLongSlitView
+import lucuma.odb.graphql.table.GnirsSpectroscopyView
 
 trait ConfigurationGnirsLongSlitMappings[F[_]]
-  extends GnirsLongSlitView[F]
+  extends GnirsSpectroscopyView[F]
      with ConfigurationRequestView[F] {
 
   lazy val ConfigurationGnirsLongSlitMappings = List(
@@ -18,10 +18,10 @@ trait ConfigurationGnirsLongSlitMappings[F[_]]
 
   private lazy val ConfigurationGnirsLongSlitMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode" / "gnirsLongSlit")(
-      SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
-      SqlField("grating", GnirsLongSlitView.GratingEffective),
-      SqlField("camera",  GnirsLongSlitView.Camera),
-      SqlField("prism",   GnirsLongSlitView.PrismEffective),
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
+      SqlField("grating", GnirsSpectroscopyView.GratingEffective),
+      SqlField("camera",  GnirsSpectroscopyView.Camera),
+      SqlField("prism",   GnirsSpectroscopyView.PrismEffective),
     )
 
   private lazy val ConfigurationRequestGnirsLongSlitMapping: ObjectMapping =

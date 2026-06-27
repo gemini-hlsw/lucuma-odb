@@ -15,7 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
-import lucuma.odb.sequence.gnirs.longslit.Acquisition.RepeatingAtomCount
+import lucuma.odb.sequence.gnirs.spectroscopy.Acquisition.RepeatingAtomCount
 
 class executionAcqGnirs extends ExecutionTestSupportForGnirs:
 
@@ -307,7 +307,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                    updateObservations(input: {
                      SET: {
                        observingMode: {
-                         gnirsLongSlit: {
+                         gnirsSpectroscopy: {
                            acquisition: { coadds: 7 }
                          }
                        }

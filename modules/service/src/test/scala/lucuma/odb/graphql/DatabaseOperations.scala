@@ -1240,11 +1240,29 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            fpuSlit: LONG_SLIT_0_30
+            filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          gnirsSpectroscopy: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            fpuIfu: LOW_RESOLUTION
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
@@ -1411,11 +1429,11 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            fpuSlit: LONG_SLIT_0_30
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {

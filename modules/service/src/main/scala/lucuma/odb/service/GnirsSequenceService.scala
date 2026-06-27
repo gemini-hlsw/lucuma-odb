@@ -114,6 +114,6 @@ object GnirsSequenceService:
       sql"""
         SELECT
           COALESCE(c_well_depth, c_well_depth_default)
-        FROM v_gnirs_long_slit
+        FROM v_gnirs_spectroscopy
         WHERE c_observation_id = $observation_id
       """.query(gnirs_static)

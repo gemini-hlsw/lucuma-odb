@@ -119,8 +119,8 @@ object ObservingModeServices:
               .selectSouth(oids)
               .map(_.widen[ObservingMode])
 
-          case (GnirsLongSlit, oids) =>
-            gnirsLongSlitService
+          case (GnirsLongSlit | GnirsIfu, oids) =>
+            gnirsSpectroscopyService
               .select(oids)
               .map(_.widen[ObservingMode])
 
@@ -161,7 +161,7 @@ object ObservingModeServices:
           input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
           input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which)),
           input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which)),
-          input.gnirsLongSlit.map(m =>      gnirsLongSlitService.insert(m, etm, which)),
+          input.gnirsSpectroscopy.map(m =>  gnirsSpectroscopyService.insert(m, etm, which)),
           input.visitor.map(m => visitorService.insert(m, which)),
         ).flattenOption match
           case List(r) => r
@@ -185,7 +185,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
-            case ObservingModeType.GnirsLongSlit      => gnirsLongSlitService.delete(which)
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
             case _: VisitorObservingModeType          => visitorService.delete(which)
 
@@ -204,7 +204,7 @@ object ObservingModeServices:
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
           input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
           input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which).map(_.success)),
-          input.gnirsLongSlit.map(m => gnirsLongSlitService.update(m, which).map(_.success)),
+          input.gnirsSpectroscopy.map(m => gnirsSpectroscopyService.update(m, which).map(_.success)),
           input.visitor.map(m => visitorService.update(m, which).map(_.success))
         ).flattenOption match
           case List(r) => r
@@ -233,7 +233,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
-            case ObservingModeType.GnirsLongSlit      => gnirsLongSlitService.clone(origOid, newOid)
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
             case _: VisitorObservingModeType          => visitorService.clone(origOid, newOid)
 

@@ -127,7 +127,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   explicitTelescopeConfigs: { alongSlit: $entries }
                 }
               }
@@ -149,7 +149,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   explicitTelescopeConfigs: { toSky: $entries }
                 }
               }
@@ -171,7 +171,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   exposureTimeMode: {
                     timeAndCount: {
                       time:  { seconds: $seconds }
@@ -243,7 +243,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     exposureTimeMode: {
                       timeAndCount: {
@@ -273,7 +273,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitAcquisitionType: $acqType
                   }
@@ -297,7 +297,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     skyOffset: {
                       p: { arcseconds: $pArcsec }
@@ -328,7 +328,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitAcquisitionType: FAINT
                     skyOffset: { p: { arcseconds: $pArcsec }, q: { arcseconds: $qArcsec } }
@@ -353,7 +353,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   camera: $camera
                 }
               }
@@ -375,7 +375,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitFilter: $filter
                   }

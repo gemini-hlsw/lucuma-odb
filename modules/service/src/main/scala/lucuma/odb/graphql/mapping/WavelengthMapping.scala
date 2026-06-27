@@ -13,7 +13,7 @@ import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.GnirsDynamicView
-import lucuma.odb.graphql.table.GnirsLongSlitView
+import lucuma.odb.graphql.table.GnirsSpectroscopyView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.table.VisitorTable
@@ -25,7 +25,7 @@ trait WavelengthMapping[F[_]]
      with Flamingos2DynamicView[F]
      with GmosDynamicTables[F]
      with GnirsDynamicView[F]
-     with GnirsLongSlitView[F]
+     with GnirsSpectroscopyView[F]
      with ObservationView[F]
      with SpectroscopyConfigOptionTable[F]
      with VisitorTable[F]:
@@ -79,6 +79,6 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
       wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),
       wavelengthMappingAtPath(VisitorType / "centralWavelength", VisitorTable.CentralWavelength, VisitorTable.ObservationId),
-      wavelengthMappingAtPath(GnirsLongSlitType / "centralWavelength",        GnirsLongSlitView.CentralWavelengthEffective, GnirsLongSlitView.ObservationId),
-      wavelengthMappingAtPath(GnirsLongSlitType / "initialCentralWavelength", GnirsLongSlitView.InitialCentralWavelength,   GnirsLongSlitView.ObservationId),
+      wavelengthMappingAtPath(GnirsSpectroscopyType / "centralWavelength",        GnirsSpectroscopyView.CentralWavelengthEffective, GnirsSpectroscopyView.ObservationId),
+      wavelengthMappingAtPath(GnirsSpectroscopyType / "initialCentralWavelength", GnirsSpectroscopyView.InitialCentralWavelength,   GnirsSpectroscopyView.ObservationId),
     )

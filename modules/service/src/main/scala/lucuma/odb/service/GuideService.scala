@@ -55,6 +55,7 @@ import lucuma.core.model.probes
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.ghost.CentralWavelength as GhostCentralWavelength
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.igrins2.CentralWavelength as Igrins2CentralWavelength
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -304,8 +305,11 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosSouth             =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
-        case mode: gnirs.longslit.Config                      =>
-          (Site.GN, ObservingModeType.GnirsLongSlit, mode.filter.centralWavelength)
+        case mode: gnirs.spectroscopy.Config                  =>
+          val tpe = mode.fpu match
+            case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
+            case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
+          (Site.GN, tpe, mode.filter.centralWavelength)
         case _: igrins2.longslit.Config                       =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
         case visitor.Config(mode, wavelength, _, _, _)        =>
@@ -348,9 +352,11 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS2) =>
+          // AGS for the long slit; IFU guiding is not yet modeled in lucuma-ags, so IFU
+          // configs fall through to `none` below (no AGS params).
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
-          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS1) =>
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some

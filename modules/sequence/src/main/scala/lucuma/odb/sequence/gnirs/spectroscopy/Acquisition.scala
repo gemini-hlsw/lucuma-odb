@@ -3,7 +3,7 @@
 
 package lucuma.odb.sequence
 package gnirs
-package longslit
+package spectroscopy
 
 import cats.data.NonEmptyList
 import cats.data.State
@@ -125,7 +125,11 @@ object Acquisition:
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
       val readMode: GnirsReadMode   = GnirsReadMode.forExposureTime(acqExposureTime)
-      val slitDecker: GnirsDecker   = GnirsDecker.forCameraAndPrism(config.camera, GnirsPrism.Mirror)
+      // The science-aperture decker: derived from the IFU for IFU configs, else from
+      // camera + prism (always Mirror) for the long slit.
+      val specDecker: GnirsDecker   = config.fpu match
+        case GnirsFpu.Spectroscopy.Ifu(i)  => GnirsDecker.forIfu(i)
+        case GnirsFpu.Spectroscopy.Slit(_) => GnirsDecker.forCameraAndPrism(config.camera, GnirsPrism.Mirror)
 
       // The FPU image (first step) uses a single coadd and the fixed filter/exposure from
       // firstStepFilterAndExposure; its read mode follows from that fixed exposure time.
@@ -146,8 +150,8 @@ object Acquisition:
                    camera            = config.camera,
                    focus             = config.focus,
                    readMode          = fpuStepReadMode,
-                   decker            = slitDecker,
-                   fpu               = GnirsFpu.Spectroscopy.Slit(config.fpu)
+                   decker            = specDecker,
+                   fpu               = config.fpu
                  )
           slitImage      <- scienceStep(
                               TelescopeConfig(
@@ -170,9 +174,9 @@ object Acquisition:
           fieldSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           field          <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
-          // Back to the selected slit (decker/FPU) for the through-slit steps.
+          // Back to the science aperture (decker/FPU) for the through-slit steps.
           _              <- State.modify[GnirsDynamicConfig]:
-                              _.copy(decker = slitDecker, fpu = GnirsFpu.Spectroscopy.Slit(config.fpu))
+                              _.copy(decker = specDecker, fpu = config.fpu)
           tSlitSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           throughSlit    <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)

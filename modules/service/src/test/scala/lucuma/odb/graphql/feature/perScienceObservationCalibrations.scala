@@ -2099,7 +2099,7 @@ class perScienceObservationCalibrations
         query {
           observation(observationId: "$oid") {
             observingMode {
-              gnirsLongSlit {
+              gnirsSpectroscopy {
                 telescopeConfigs {
                   alongSlit { q { arcseconds } }
                 }
@@ -2109,7 +2109,7 @@ class perScienceObservationCalibrations
         }"""
     ).map: c =>
       c.hcursor
-        .downField("observation").downField("observingMode").downField("gnirsLongSlit")
+        .downField("observation").downField("observingMode").downField("gnirsSpectroscopy")
         .downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.orEmpty
         .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
 
@@ -2216,11 +2216,11 @@ class perScienceObservationCalibrations
               targetEnvironment: { asterism: ${List(tid).asJson} }
               scienceRequirements: ${scienceRequirementsObject(ObservingModeType.GnirsLongSlit)}
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   grating: D32
                   prism: SXD
                   camera: SHORT_BLUE
-                  fpu: LONG_SLIT_0_30
+                  fpuSlit: LONG_SLIT_0_30
                   filter: ORDER3
                   centralWavelength: { nanometers: 1650 }
                   exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }

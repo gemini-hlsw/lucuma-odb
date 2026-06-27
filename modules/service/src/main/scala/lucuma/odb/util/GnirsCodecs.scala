@@ -79,6 +79,17 @@ trait GnirsCodecs:
   val gnirs_static: Codec[GnirsStaticConfig] =
     gnirs_well_depth.imap(GnirsStaticConfig(_))(_.wellDepth)
 
+  // Spectroscopy FPU: exactly one of the long-slit slit value or the IFU value.
+  val gnirs_fpu_spectroscopy: Codec[GnirsFpu.Spectroscopy] =
+    (gnirs_fpu_slit.opt *: gnirs_fpu_ifu.opt).eimap {
+      case (Some(s), None) => GnirsFpu.Spectroscopy.Slit(s).asRight[String]
+      case (None, Some(i)) => GnirsFpu.Spectroscopy.Ifu(i).asRight[String]
+      case (None, None)    => "GNIRS spectroscopy FPU: neither slit nor ifu defined".asLeft
+      case _               => "GNIRS spectroscopy FPU: both slit and ifu defined".asLeft
+    } { fpu =>
+      (GnirsFpu.Spectroscopy.slit.getOption(fpu), GnirsFpu.Spectroscopy.ifu.getOption(fpu))
+    }
+
   // FPU: exactly one of the long-slit slit value, the IFU value or the non-slit
   // "other" value.
   private val gnirs_fpu: Codec[GnirsFpu] =

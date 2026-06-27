@@ -2,7 +2,7 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
-package gnirs.longslit
+package gnirs.spectroscopy
 
 import cats.Monad
 import cats.data.EitherT
@@ -18,7 +18,7 @@ import lucuma.odb.sequence.gnirs.InitialConfigs
 
 import java.util.UUID
 
-object LongSlit:
+object Spectroscopy:
 
   def staticFrom(config: Config): GnirsStaticConfig =
     InitialConfigs.staticFrom(config)

@@ -15,7 +15,7 @@ import lucuma.odb.graphql.table.GhostIfuView
 import lucuma.odb.graphql.table.GhostStaticView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GnirsDynamicView
-import lucuma.odb.graphql.table.GnirsLongSlitView
+import lucuma.odb.graphql.table.GnirsSpectroscopyView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.Igrins2DynamicTable
 import lucuma.odb.graphql.table.ObservationView
@@ -32,7 +32,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with ExposureTimeModeView[F]
                                with Flamingos2DynamicView[F]
                                with GhostDynamicTable[F]
-                               with GnirsLongSlitView[F]
+                               with GnirsSpectroscopyView[F]
                                with GhostIfuView[F]
                                with GhostStaticView[F]
                                with GmosDynamicTables[F]
