@@ -8,6 +8,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
@@ -92,7 +93,20 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
   test("gnirs slit width".tag(LegacyITCTest)):
     Enumerated[GnirsFpuSlit].all.foreach: s =>
       val result = localItc.calculate:
-        bodyConf(sourceDefinition, obs, gnirs.copy(fpu = GnirsFpu.Spectroscopy.Slit(s))).asJson.noSpaces
+        bodyConf(sourceDefinition,
+                 obs,
+                 gnirs.copy(fpu = GnirsFpu.Spectroscopy.Slit(s))
+        ).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+
+  test("gnirs IFU".tag(LegacyITCTest)):
+    Enumerated[GnirsFpuIfu].all.foreach: ifu =>
+      val ifuMode = gnirs.copy(
+        fpu = GnirsFpu.Spectroscopy.Ifu(ifu),
+        camera = gnirsCameraForIfu(ifu)
+      )
+      val result  = localItc.calculate:
+        bodyConf(sourceDefinition, obs, ifuMode, gnirsIfuAnalysisMethod).asJson.noSpaces
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs well depth".tag(LegacyITCTest)):

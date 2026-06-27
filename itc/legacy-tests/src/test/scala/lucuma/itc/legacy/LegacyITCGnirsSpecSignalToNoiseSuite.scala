@@ -69,25 +69,19 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
     val result = localItc.calculate(baseParams.asJson.noSpaces)
     assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
-  // Exercises the IFU path through the real OCS jars: slitWidth encodes to LR_IFU,
-  // crossDispersed to NO, and the analysis method is "sum of 2x2 elements at the
-  // center" with a single sky fibre (the production default). LR-IFU requires the
-  // 0.15"/pix (Short) camera.
-  test("gnirs IFU yields valid results".tag(LegacyITCTest)):
-    val ifuMode     = gnirs.copy(
-      fpu = GnirsFpu.Spectroscopy.Ifu(GnirsFpuIfu.LowResolution),
-      camera = GnirsCamera.ShortBlue
-    )
-    val ifuAnalysis = ItcObservationDetails.AnalysisMethod.Ifu.Summed(
-      skyFibres = 1,
-      numX = 2,
-      numY = 2,
-      centerX = 0.0,
-      centerY = 0.0
-    )
-    val result      = localItc.calculate:
-      bodyConf(sourceDefinition, obs, ifuMode, ifuAnalysis).asJson.noSpaces
-    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+  // Exercises both IFU FPU mappings through the real OCS jars: the slitWidth field
+  // encodes to LR_IFU / HR_IFU, crossDispersed to NO, and the analysis method is
+  // "sum of 2x2 elements at the center" with a single sky fibre (the production
+  // default). Each resolution requires its specific camera.
+  test("gnirs IFU".tag(LegacyITCTest)):
+    Enumerated[GnirsFpuIfu].all.foreach: ifu =>
+      val ifuMode = gnirs.copy(
+        fpu = GnirsFpu.Spectroscopy.Ifu(ifu),
+        camera = gnirsCameraForIfu(ifu)
+      )
+      val result  = localItc.calculate:
+        bodyConf(sourceDefinition, obs, ifuMode, gnirsIfuAnalysisMethod).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
   test("gnirs grating".tag(LegacyITCTest)):
     Enumerated[GnirsGrating].all.foreach: g =>
