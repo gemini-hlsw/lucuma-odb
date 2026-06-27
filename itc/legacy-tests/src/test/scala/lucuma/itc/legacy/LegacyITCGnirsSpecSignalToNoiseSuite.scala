@@ -116,7 +116,10 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gnirs slit width".tag(LegacyITCTest)):
     Enumerated[GnirsFpuSlit].all.foreach: s =>
       val result = localItc.calculate:
-        bodyConf(sourceDefinition, obs, gnirs.copy(fpu = GnirsFpu.Spectroscopy.Slit(s))).asJson.noSpaces
+        bodyConf(sourceDefinition,
+                 obs,
+                 gnirs.copy(fpu = GnirsFpu.Spectroscopy.Slit(s))
+        ).asJson.noSpaces
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs well depth".tag(LegacyITCTest)):

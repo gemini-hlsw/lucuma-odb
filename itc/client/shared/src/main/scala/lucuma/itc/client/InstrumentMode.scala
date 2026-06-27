@@ -199,7 +199,7 @@ object InstrumentMode {
   object GnirsSpectroscopy:
     given Encoder[GnirsSpectroscopy] = a =>
       // `fpu` is a @oneOf input: exactly one of `slitWidth` / `ifu`.
-      val fpuJson: Json =
+      val fpuJson: Json  =
         a.fpu match
           case GnirsFpu.Spectroscopy.Slit(s) => Json.obj("slitWidth" -> s.asScreamingJson)
           case GnirsFpu.Spectroscopy.Ifu(i)  => Json.obj("ifu" -> i.asScreamingJson)
