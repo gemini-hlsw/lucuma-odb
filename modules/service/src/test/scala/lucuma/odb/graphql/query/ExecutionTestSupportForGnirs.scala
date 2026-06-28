@@ -214,6 +214,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           decker
           fpuSlit
           fpuOther
+          fpuIfu
           acquisitionMirrorOut {
             prism
             grating
@@ -412,6 +413,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
     decker:              String,
     fpuSlit:             Option[String],
     fpuOther:            Option[String],
+    fpuIfu:              Option[String],
     prism:               Option[String],
     grating:             Option[String],
     mirrorWavelengthNm:  Option[BigDecimal],
@@ -452,6 +454,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           "decker":               ${cfg.decker.asJson},
           "fpuSlit":              ${cfg.fpuSlit.asJson},
           "fpuOther":             ${cfg.fpuOther.asJson},
+          "fpuIfu":               ${cfg.fpuIfu.asJson},
           "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
           "camera":               ${cfg.camera.asJson},
           "focusMotorSteps":      ${cfg.focus.asJson},
@@ -507,6 +510,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           "decker":               ${cfg.decker.asJson},
           "fpuSlit":              ${cfg.fpuSlit.asJson},
           "fpuOther":             ${cfg.fpuOther.asJson},
+          "fpuIfu":               ${cfg.fpuIfu.asJson},
           "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
           "camera":               ${cfg.camera.asJson},
           "focusMotorSteps":      ${cfg.focus.asJson},

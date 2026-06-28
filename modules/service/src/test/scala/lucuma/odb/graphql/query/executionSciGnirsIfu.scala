@@ -9,10 +9,14 @@ import io.circe.Json
 import lucuma.core.model.Observation
 
 /**
- * GNIRS IFU science sequence generation.  This is the regression test for the
- * "missing Smart GCAL mapping" failure: an IFU observation must resolve its
- * nighttime flat/arc smart gcal (keyed by the IFU FPU) just like the long slit.
- * The IFU smart gcal rows are seeded by ExecutionTestSupportForGnirs.
+ * GNIRS IFU science sequence generation.  Regression test for two IFU-specific
+ * failures:
+ *   - "missing Smart GCAL mapping": an IFU observation must resolve its nighttime
+ *     flat/arc smart gcal (keyed by the IFU FPU), seeded by ExecutionTestSupportForGnirs.
+ *   - the generated-sequence JSON must carry `fpuIfu` (the GnirsDynamicConfig encoder),
+ *     otherwise the Grackle circe cursor falls back to the SQL mapping and the query
+ *     fails with "Unhandled mapping of type SqlField for field 'fpuIfu'".  The shared
+ *     gnirsScienceQuery selects fpuIfu, so this test exercises that path.
  */
 class executionSciGnirsIfu extends ExecutionTestSupportForGnirs:
 
@@ -23,16 +27,26 @@ class executionSciGnirsIfu extends ExecutionTestSupportForGnirs:
       o <- createGnirsIfuObservationAs(pi, p, t)
     yield o
 
-  test("[gnirs ifu] science sequence generates and resolves smart gcal"):
+  test("[gnirs ifu] science sequence generates, resolves smart gcal, and carries fpuIfu"):
     gnirsIfuObs.flatMap: oid =>
       query(pi, gnirsScienceQuery(oid)).map: js =>
-        val science =
+        val steps =
           js.hcursor
             .downField("executionConfig")
             .downField("gnirs")
             .downField("science")
-        val nextAtomSteps =
-          science.downField("nextAtom").downField("steps").as[List[Json]].toOption.orEmpty
-        // A successful generation yields science steps; a missing smart gcal
-        // mapping would instead surface as a GraphQL error (failing `query`).
-        assert(nextAtomSteps.nonEmpty, s"expected science steps, got: $js")
+            .downField("nextAtom")
+            .downField("steps")
+            .as[List[Json]]
+            .toOption
+            .orEmpty
+        // A successful generation yields science steps; a missing smart gcal mapping
+        // would instead surface as a GraphQL error (failing `query`).
+        assert(steps.nonEmpty, s"expected science steps, got: $js")
+        // The science step's FPU must round-trip as fpuIfu (with fpuSlit/fpuOther null).
+        val fpuIfus =
+          steps.flatMap(_.hcursor.downField("instrumentConfig").downField("fpuIfu").as[String].toOption)
+        assert(
+          fpuIfus.contains("LOW_RESOLUTION"),
+          s"expected a science step with fpuIfu=LOW_RESOLUTION, got: $js"
+        )

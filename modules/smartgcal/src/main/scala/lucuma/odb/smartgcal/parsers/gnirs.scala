@@ -6,8 +6,10 @@ package lucuma.odb.smartgcal.parsers
 import cats.data.NonEmptyList
 import cats.data.NonEmptySet
 import cats.parse.Parser
+import cats.parse.Parser0
 import cats.parse.Rfc5234.digit
 import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GcalBaselineType
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
@@ -102,6 +104,12 @@ trait GnirsParsers:
   private val lamp: Parser[Gcal.Lamp] =
     arcs.eitherOr(gcal.continuum).map(Gcal.Lamp.fromEither)
 
+  // The source file leaves the Basecal column empty for the pinhole rows (the
+  // pinhole calibrations are taken during the day, mirroring the Day pinhole
+  // flats), so treat an empty baseline as Day.
+  private val baselineTypeOrDay: Parser0[GcalBaselineType] =
+    gcal.baselineType.backtrack.orElse(Parser.pure(GcalBaselineType.Day))
+
   // Calibration value columns, in the file's physical order:
   // lamp, shutter, filter, diffuser, observe(count), exposure time, coadds, basecal.
   private val legacyValue: Parser[SmartGcalValue.Legacy] =
@@ -113,7 +121,7 @@ trait GnirsParsers:
       (posInt             <* columnSep) ~
       (posSecondsTimeSpan <* columnSep) ~
       (posInt             <* columnSep) ~
-      gcal.baselineType
+      baselineTypeOrDay
     ).map { case (((((((l, shutter), filter), diffuser), count), time), coadds), baseline) =>
       SmartGcalValue(
         Gcal(l, filter, diffuser, shutter),
