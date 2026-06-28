@@ -17,6 +17,7 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
@@ -97,12 +98,21 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       case GnirsPixelScale.PixelScale_0_05 => GnirsFpuOther.Pinhole1
       case GnirsPixelScale.PixelScale_0_15 => GnirsFpuOther.Pinhole3
 
+    // IFU resolution is tied to the camera pixel scale: LR-IFU on the 0.15"/pix
+    // short camera, HR-IFU on the 0.05"/pix long camera.
+    def ifuFpu(ps: GnirsPixelScale): GnirsFpuIfu = ps match
+      case GnirsPixelScale.PixelScale_0_05 => GnirsFpuIfu.HighResolution
+      case GnirsPixelScale.PixelScale_0_15 => GnirsFpuIfu.LowResolution
+
     val rows: List[Gnirs.TableRow] =
       List(GnirsPixelScale.PixelScale_0_05, GnirsPixelScale.PixelScale_0_15).flatMap: ps =>
         List(
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartFlat),
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartArc),
-          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat)
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat),
+          // IFU flat + arc, so IFU science sequences resolve smart gcal too.
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartFlat),
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
         )
 
     prior >>

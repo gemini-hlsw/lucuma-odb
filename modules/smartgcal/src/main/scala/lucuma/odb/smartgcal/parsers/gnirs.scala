@@ -8,6 +8,7 @@ import cats.data.NonEmptySet
 import cats.parse.Parser
 import cats.parse.Rfc5234.digit
 import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
@@ -65,6 +66,8 @@ trait GnirsParsers:
     manyOf(
       "pinhole 0.1"  -> GnirsFpu.Other(GnirsFpuOther.Pinhole1),
       "pinhole 0.3"  -> GnirsFpu.Other(GnirsFpuOther.Pinhole3),
+      "LR-IFU"       -> GnirsFpu.Spectroscopy.Ifu(GnirsFpuIfu.LowResolution),
+      "HR-IFU"       -> GnirsFpu.Spectroscopy.Ifu(GnirsFpuIfu.HighResolution),
       "0.10 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_10),
       "0.15 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_15),
       "0.20 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_20),

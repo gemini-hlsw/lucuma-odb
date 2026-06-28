@@ -1,9 +1,25 @@
-321,2014/08/06 10:23:38 HST
-#,,V 256,"MLB, 2013Jul12",,Changes:,added config for 13AQ28-110 AND 13B-Q-91
-# "REM, 2014Jul17",,Changes:,"edited IR Texp for SB+SXD+32, 0.45"" slit from 8 sec to 7 sec"
-# 2014 Aug 6, astephens, modified 0.15"/pix 32 l/mm 1.47-1.80 1.0" slit exposure time from 0.24s to 0.38s
-#
+549,2026/04/29 16:36:03 HST
+# 2013-Jul-12, MLB, added config for 13AQ28-110 AND 13B-Q-91,,,,,,,,,,,,
+# 2014-Jul-17, REM, edited IR Texp for SB+SXD+32 0.45 arcsec slit from 8 sec to 7 sec,,,,,,,,,,,,
+# 2014-Aug-06, astephens, modified 0.15/pix 32 l/mm 1.47-1.80 1.0 arcsec slit exposure time from 0.24s to 0.38s,,,,,,,,,,,,
+# 2018-Oct-15, astephens, added configurations for 0.05/pix + 111 l/m + LXD + 0.10 arcsec slit,,,,,,,,,,,,
+# 2019-Feb-03, astephens, change long camera, long slit, 111 l/mm, 3.36um, 0.1 arcsec slit, to work for both well depths,,,,,,,
+# 2022-Jan-21, astephens and mrawlings, add config: 0.05/pix, 111 l/mm, No, 4.40-4.97um, 0.2 arcsec slit, Shallow, 4 seconds,,,,,,
+# 2022-Feb-01, astephens and mrawlings, add config: 0.05/pix, 10 l/mm, No, 2.8-4.2 um, 0.45 arcsec slit, Shallow, 0.2 seconds,,,,,,
+# 2022-Jun-06, astephens, add LR-IFU configs,,,,,,,,,,,,
+# 2022-Jul-04, astephens, add short-camera 0.15 arcsec slit configs,,,,,,,,,,,,
+# 2023-Jun-01, astephens, add HR-IFU configs,,,,,,,,,,,,
+# 2023-Oct-30, astephens and mrawlings, add config: 0.05/pix, 111 l/mm, 0.30 arcsec, Shallow,,,,,,,,,
+# 2023-Dec-20, astephens and blemaux, add config: 0.05/pix, 32 l/mm, HR-IFU, Shallow, 3.95um,,,,,,,,
+# 2024-Feb-06, astephens and hsuh, add deep well config: 0.15/pix, 32 l/mm, 1.65um, LR-IFU,,,,,,,,,
+# 2024-Jul-25, astephens, add shallow-well flat for LR 111 4.05um 0.1 arcsec slit,,,,,,,,,,,,
+# 2025-Jan-17, astephens, add shallow-well LR 10 0.1 arcsec slit at 3.7um,,,,,,,,,,,,
+# 2025-Apr-04, bclemaux," modified 0.15""/pix", 111 l/mm," 0.3""-wide slit", 1.25-1.37um to avoid >5% non-linearity,,,,,,,,,
+# 2025-Dec-16, bclemaux, modified many SR exp. times and # of obs. after testing the current fiducial values with new SR camera + current GCAL env.,,,,,,,,,,,,
+# 2026-Apr-29, bclemaux, added shutter open flats for LB LXD 111 l/mm setups in addition to shutter closed flats,,,,,,,,,,,,
+#,,,,,,,,,,,,,,
 Mode,Pixel Scale,Disperser,Cross Dispersed,Central Wavelength,Focal Plane Unit,Well Depth,Calibration Lamps,Calibration Shutter,Calibration Filter,Calibration Diffuser,Calibration Observe,Calibration Exposure Time,Calibration Coadds,Calibration Basecal
+#,,,,,,,,,,,,,,
 Imaging,"0.05""/pix",*,*,1.03 - 1.17,*,Shallow,IR grey body - high,Open,none,IR,10,2.5,1,Night
 Imaging,"0.05""/pix",*,*,1.03 - 1.17,*,Shallow,IR grey body - high,Closed,none,IR,10,2.5,1,Night
 Imaging,"0.05""/pix",*,*,1.17 - 1.37,*,Shallow,IR grey body - high,Open,ND1.0,IR,10,2.5,1,Night
@@ -20,6 +36,7 @@ Imaging,"0.15""/pix",*,*,1.47 - 1.80,*,Shallow,IR grey body - high,Open,ND4-5,IR
 Imaging,"0.15""/pix",*,*,1.47 - 1.80,*,Shallow,IR grey body - high,Closed,ND4-5,IR,6,12,1,Night
 Imaging,"0.15""/pix",*,*,1.91 - 2.49,*,Shallow,IR grey body - high,Open,ND4-5,IR,10,1,1,Night
 Imaging,"0.15""/pix",*,*,1.91 - 2.49,*,Shallow,IR grey body - high,Closed,ND4-5,IR,10,1,1,Night
+#,,,,,,,,,,,,,,
 Spectroscopy,"0.05""/pix",10 l/mm grating,LXD,0.9 - 2.56,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,5,3,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,LXD,0.9 - 2.56,0.45 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,8,10,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,LXD,0.9 - 2.56,1.0 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,6,5,1,Night
@@ -36,46 +53,59 @@ Spectroscopy,"0.05""/pix",10 l/mm grating,LXD,0.9 - 2.56,0.20 arcsec,Shallow,Qua
 Spectroscopy,"0.05""/pix",10 l/mm grating,LXD,0.9 - 2.56,0.10 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,20,8,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,LXD,0.9 - 2.56,pinhole 0.1,Shallow,Quartz Halogen,Closed,NIR balance,IR,1,12,3,Day
 Spectroscopy,"0.05""/pix",10 l/mm grating,LXD,0.9 - 2.56,0.10 arcsec,Shallow,Quartz Halogen ,Closed,ND2.0,IR,8,13.2,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.30 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,4.8,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.16,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.44,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.94,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,8.7,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,HR-IFU,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,6,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.10 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,16.8,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.15 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,9.24,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,8.7,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.30 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,4.8,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.94,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.16,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.44,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.03 - 1.17,pinhole 0.1,Shallow,Quartz Halogen,Closed,NIR balance,IR,1,12,3,Day
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.30 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,3.6,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.56,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.08,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.28,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,5.4,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,HR-IFU,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,3,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.10 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,13.8,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.15 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,7.8,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,5.4,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.30 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,3.6,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.28,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.56,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.08,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.17 - 1.37,pinhole 0.1,Shallow,Quartz Halogen,Closed,NIR balance,IR,1,12,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,HR-IFU,Shallow,Quartz Halogen ,Closed,ND1.0,IR,10,1.4,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.10 arcsec,Shallow,Quartz Halogen ,Closed,ND2.0,IR,10,11.4,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.15 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,7.2,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,4.74,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.30 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,3,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.1,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.32,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,0.9,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,2.1,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,4.74,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.15 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,7.2,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,pinhole 0.1,Shallow,Quartz Halogen,Closed,NIR balance,IR,1,8.28,3,Day
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.47 - 1.80,0.10 arcsec,Shallow,Quartz Halogen ,Closed,ND2.0,IR,10,11.4,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.30 arcsec,Shallow,IR grey body - high,Open,none,IR,6,0.7,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.675 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,0.8,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,1.0 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,0.5,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.45 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,1.18,1,Night
-Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.20 arcsec,Shallow,IR grey body - high,Open ,ND1.0,IR,6,2.7,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,HR-IFU,Shallow,IR grey body - high,Open,none,IR,6,3.7,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.10 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,6.7,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.15 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,3.7,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.20 arcsec,Shallow,IR grey body - high,Open ,ND1.0,IR,6,2.7,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.30 arcsec,Shallow,IR grey body - high,Open,none,IR,6,0.7,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.45 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,1.18,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,0.675 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,0.8,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,1.0 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,0.5,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,1.91 - 2.49,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,5,2,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,HR-IFU,Deep,IR grey body - high,Open,none,IR,8,4,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,8,1.3,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,8,2,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,10,1.3,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,10,1,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.30 arcsec,Deep,IR grey body - high,Open,none,IR,10,0.6,1,Night
+Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.45 arcsec,Shallow,IR grey body - high,Open,none,IR,10,0.2,2,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,10,0.45,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,10,0.3,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,10,0.2,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,No,2.8 - 4.2,pinhole 0.1,Deep,IR grey body - high,Open,none,IR,3,2,1,Day
+#,,,,,,,,,,,,,,
 Spectroscopy,"0.05""/pix",10 l/mm grating,SXD,0.9 - 2.56,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,5,3,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,SXD,0.9 - 2.56,0.15 arcsec,Shallow,IR grey body - high,Open,none,IR,8,1.7,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,SXD,0.9 - 2.56,0.20 arcsec,Shallow,IR grey body - high,Open,none,IR,3,1.3,1,Night
@@ -91,6 +121,8 @@ Spectroscopy,"0.05""/pix",10 l/mm grating,SXD,0.9 - 2.56,0.45 arcsec,Shallow,Qua
 Spectroscopy,"0.05""/pix",10 l/mm grating,SXD,0.9 - 2.56,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.8,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,SXD,0.9 - 2.56,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,1.44,1,Night
 Spectroscopy,"0.05""/pix",10 l/mm grating,SXD,0.9 - 2.56,pinhole 0.1,Shallow,Quartz Halogen,Closed,NIR balance,IR,1,12,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,8.4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,4.2,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,2.76,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,0.20 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.92,1,Night
@@ -99,6 +131,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,0.45 arcsec,Shallow,Qu
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,5.4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,3.84,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.03 - 1.17,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,1.98,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,9.6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,4.8,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,3.6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,0.20 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,2.4,1,Night
@@ -107,6 +141,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,0.45 arcsec,Shallow,Qu
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,5.4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,4.8,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.17 - 1.21,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,3.6,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,2.4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,0.20 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.8,1,Night
@@ -115,6 +151,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,0.45 arcsec,Shallow,Qu
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,3.6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,2.16,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.21 - 1.25,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,2.4,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,2.04,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,0.20 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.44,1,Night
@@ -123,6 +161,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,0.45 arcsec,Shallow,Qu
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,3.24,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,2.16,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.25 - 1.28,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,1.44,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.8,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,0.20 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.2,1,Night
@@ -131,6 +171,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,0.45 arcsec,Shallow,Qu
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,2.4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,1.2,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.28 - 1.36,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,1.44,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,8,4.3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,0.10 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,8,7.2,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,0.15 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,8,4.2,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,8,3,1,Night
@@ -139,6 +181,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,0.45 arcsec,Shallow,Qu
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,8,0.96,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,8,0.6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.49 - 1.78,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,1.2,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,HR-IFU,Shallow,IR grey body - high,Open,none,IR,6,100,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,6,50,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,0.15 arcsec,Shallow,IR grey body - high,Open,none,IR,6,40,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,0.20 arcsec,Shallow,IR grey body - high,Open,none,IR,6,25,1,Night
@@ -147,7 +191,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,0.45 arcsec,Shallow,IR
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,0.675 arcsec,Shallow,IR grey body - high,Open,none,IR,6,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,1.0 arcsec,Shallow,IR grey body - high,Open,none,IR,6,5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.91 - 1.97,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,45,1,Day
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.04,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,90,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,HR-IFU,Shallow,IR grey body - high,Open,none,IR,6,70,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,6,35,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,0.15 arcsec,Shallow,IR grey body - high,Open,none,IR,6,20,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,0.20 arcsec,Shallow,IR grey body - high,Open,none,IR,6,15,1,Night
@@ -155,9 +200,12 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,0.30 arcsec,Shallow,IR
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,0.45 arcsec,Shallow,IR grey body - high,Open,none,IR,6,7,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,0.675 arcsec,Shallow,IR grey body - high,Open,none,IR,6,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.29,1.0 arcsec,Shallow,IR grey body - high,Open,none,IR,6,2.5,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,1.97 - 2.04,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,90,1,Day
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.04 - 2.10,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,60,1,Day
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.10 - 2.16,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,45,1,Day
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.23 - 2.29,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,45,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,HR-IFU,Shallow,IR grey body - high,Open,none,IR,6,70,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,6,35,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,0.15 arcsec,Shallow,IR grey body - high,Open,none,IR,6,20,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,0.20 arcsec,Shallow,IR grey body - high,Open,none,IR,6,15,1,Night
@@ -166,6 +214,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,0.45 arcsec,Shallow,IR
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,0.675 arcsec,Shallow,IR grey body - high,Open,none,IR,6,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,1.0 arcsec,Shallow,IR grey body - high,Open,none,IR,6,2.5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.29 - 2.41,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,45,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,HR-IFU,Shallow,IR grey body - high,Open,none,IR,6,100,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,6,50,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,0.15 arcsec,Shallow,IR grey body - high,Open,none,IR,6,30,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,0.20 arcsec,Shallow,IR grey body - high,Open,none,IR,6,18,1,Night
@@ -174,6 +224,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,0.45 arcsec,Shallow,IR
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,0.675 arcsec,Shallow,IR grey body - high,Open,none,IR,6,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,1.0 arcsec,Shallow,IR grey body - high,Open,none,IR,6,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.41 - 2.47,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,45,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.08,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,120,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.08,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,60,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.08,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,45,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.08,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,30,1,Night
@@ -182,6 +234,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.08,0.45 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.08,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,7,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.08,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,2.80 - 3.65,pinhole 0.1,Deep,IR grey body - high,Closed,none,IR,1,200,2,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,56,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,28,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,23,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
@@ -189,20 +243,26 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,0.30 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,7,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.08 - 3.18,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,3,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.10 arcsec,Deep,IR grey body - high,Open ,none,IR,4,28,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.15 arcsec,Deep,IR grey body - high,Open ,none,IR,4,20,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.20 arcsec,Deep,IR grey body - high,Open ,none,IR,4,14,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.30 arcsec,Deep,IR grey body - high,Open ,none,IR,4,10,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.45 arcsec,Deep,IR grey body - high,Open ,none,IR,4,7,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.675 arcsec,Deep,IR grey body - high,Open ,none,IR,4,4,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,1.0 arcsec,Deep,IR grey body - high,Open ,none,IR,4,3,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,28,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,56,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,28,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,20,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,14,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.30 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,7,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.18 - 3.27,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,3,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,HR-IFU,*,IR grey body - high,Open,none,IR,4,56,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,0.10 arcsec,*,IR grey body - high,Open,none,IR,4,28,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,23,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,0.30 arcsec,Deep,IR grey body - high,Open,none,IR,4,12,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.27 - 3.37,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,2,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,40,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,20,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,15,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
@@ -210,6 +270,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,0.30 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.37 - 3.46,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,2,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,HR-IFU,Deep,IR grey body - high,Open ,none,IR,4,40,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,0.10 arcsec,Deep,IR grey body - high,Open ,none,IR,4,20,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,0.15 arcsec,Deep,IR grey body - high,Open ,none,IR,4,15,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,0.20 arcsec,Deep,IR grey body - high,Open ,none,IR,4,10,1,Night
@@ -217,6 +279,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,0.30 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,0.45 arcsec,Deep,IR grey body - high,Open ,none,IR,4,5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,0.675 arcsec,Deep,IR grey body - high,Open ,none,IR,4,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.46 - 3.56,1.0 arcsec,Deep,IR grey body - high,Open ,none,IR,4,2,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,40,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,20,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,15,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
@@ -224,21 +288,28 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,0.30 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,3.5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.56 - 3.65,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.5,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,36,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,14,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,0.30 arcsec,Shallow,IR grey body - high,Open,none,IR,4,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,0.30 arcsec,Deep,IR grey body - high,Open,none,IR,4,6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.75,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.65 - 3.94,pinhole 0.1,Deep,IR grey body - high,Closed,none,IR,1,150,2,Day
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.10 arcsec,Deep,IR grey body - high,Open ,none,IR,4,18,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.15 arcsec,Deep,IR grey body - high,Open ,none,IR,4,13,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.20 arcsec,Deep,IR grey body - high,Open ,none,IR,4,9,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.30 arcsec,Deep,IR grey body - high,Open ,none,IR,4,5.25,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.45 arcsec,Deep,IR grey body - high,Open ,none,IR,4,4,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.675 arcsec,Deep,IR grey body - high,Open ,none,IR,4,2.25,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,1.0 arcsec,Deep,IR grey body - high,Open ,none,IR,4,1.5,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,36,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,13,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,9,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.30 arcsec,Deep,IR grey body - high,Open,none,IR,4,5.25,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,2.25,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.75 - 3.84,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.5,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,36,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,14,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
@@ -246,6 +317,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,0.30 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.84 - 3.94,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.5,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.03,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,36,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.03,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.03,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,14,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.03,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
@@ -254,13 +327,19 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.03,0.45 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.03,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.03,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.75,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,3.94 - 4.22,pinhole 0.1,Deep,IR grey body - high,Closed,none,IR,1,120,2,Day
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.10 arcsec,Deep,IR grey body - high,Open ,none,IR,4,18,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.15 arcsec,Deep,IR grey body - high,Open ,none,IR,4,13,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.20 arcsec,Deep,IR grey body - high,Open ,none,IR,4,9,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.30 arcsec,Deep,IR grey body - high,Open ,none,IR,4,5.25,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.45 arcsec,Deep,IR grey body - high,Open ,none,IR,4,4.25,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.675 arcsec,Deep,IR grey body - high,Open ,none,IR,4,2.6,1,Night
-Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,1.0 arcsec,Deep,IR grey body - high,Open ,none,IR,4,1.75,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,36,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,4,14,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,13,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,9,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.30 arcsec,Shallow,IR grey body - high,Open,none,IR,4,3.1,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.30 arcsec,Deep,IR grey body - high,Open,none,IR,4,5.25,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,4.25,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,2.6,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.03 - 4.12,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.75,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,36,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,18,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,14,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
@@ -268,14 +347,19 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,0.30 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.12 - 4.22,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.75,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,HR-IFU,Deep,IR grey body - high,Closed,none,IR,10,40,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,0.10 arcsec,Deep,IR grey body - high,Closed,none,IR,10,20,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,12,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,0.20 arcsec,Deep,IR grey body - high,Closed,none,IR,10,8,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,0.20 arcsec,Shallow,IR grey body - high,Closed,none,IR,10,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,5,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3.2,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2.1,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.3,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.40 - 4.97,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,5,5,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,HR-IFU,Deep,IR grey body - high,Closed,none,IR,10,14,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,0.10 arcsec,Deep,IR grey body - high,Closed,none,IR,10,7,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,0.20 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
@@ -284,6 +368,8 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,0.45 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,4.97 - 5.36,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,5,2,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,HR-IFU,Deep,IR grey body - high,Closed,none,IR,10,14,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,0.10 arcsec,Deep,IR grey body - high,Closed,none,IR,10,7,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,4,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,0.20 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
@@ -292,8 +378,20 @@ Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,0.45 arcsec,Deep,IR gr
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.6,1,Night
 Spectroscopy,"0.05""/pix",111 l/mm grating,No,5.36 - 5.55,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,5,1.5,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,1.86 - 1.90,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,5,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,1.90 - 2.00,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,4.5,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,2.00 - 2.15,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,3.5,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,2.15 - 2.30,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,3,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,2.30 - 2.40,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,3.5,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,2.40 - 2.45,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,4,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,2.45 - 2.50,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,5,1,Night
+Spectroscopy,"0.05""/pix",111 l/mm grating,LXD,0.9 - 2.56,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,5,9,1,Day
+#,,,,,,,,,,,,,,
 Spectroscopy,"0.05""/pix",32 l/mm grating,SXD,1.49 - 1.82,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,4,8,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,SXD,1.49 - 1.82,0.10 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,8,4,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,SXD,1.49 - 1.82,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,5,2,1,Day
+#,,,,,,,,,,,,,,
 Spectroscopy,"0.05""/pix",32 l/mm grating,LXD,0.9 - 2.56,0.10 arcsec,Shallow,IR grey body - high,Open,none,IR,3,15,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,LXD,0.9 - 2.56,0.45 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,3,60,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,LXD,0.9 - 2.56,1.0 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,4,30,1,Night
@@ -309,6 +407,8 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,LXD,0.9 - 2.56,0.15 arcsec,Shallow,Qua
 Spectroscopy,"0.05""/pix",32 l/mm grating,LXD,0.9 - 2.56,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,5,7.2,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,LXD,0.9 - 2.56,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,5,21.6,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,LXD,0.9 - 2.56,pinhole 0.1,Shallow,Quartz Halogen,Closed,NIR balance,IR,1,36,2,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,3.6,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.8,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.08,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,0.20 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,0.72,1,Night
@@ -317,6 +417,8 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,0.45 arcsec,Shallow,Qua
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,2.16,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,1.44,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.03 - 1.17,pinhole 0.1,Shallow,Quartz Halogen,Closed,ND1.0,IR,1,3.6,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,2.16,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.08,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,0.72,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,3,1,Night
@@ -325,6 +427,8 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,0.45 arcsec,Shallow,Qua
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,0.9,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,5.4,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.17 - 1.30,pinhole 0.1,Shallow,Quartz Halogen,Closed,ND1.0,IR,1,1.2,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,2.16,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,1.08,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,0.84,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,0.20 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,3,1,Night
@@ -333,7 +437,8 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,0.45 arcsec,Shallow,Qua
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,0.96,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,5.4,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.30 - 1.37,pinhole 0.1,Shallow,Quartz Halogen,Closed,ND1.0,IR,1,2.4,3,Day
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.66,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,1.2,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,HR-IFU,Shallow,Quartz Halogen,Closed,none,IR,10,1.56,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,0.10 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,0.78,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,0.15 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,0.48,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,0.20 arcsec,Shallow,Quartz Halogen,Closed,none,IR,10,0.36,1,Night
@@ -341,23 +446,30 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,0.30 arcsec,Shallow,Qua
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,0.54,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,0.675 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,0.36,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.82,1.0 arcsec,Shallow,Quartz Halogen,Closed,ND1.0,IR,10,0.24,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.49 - 1.66,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,1.2,3,Day
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.66 - 1.82,pinhole 0.1,Shallow,Quartz Halogen,Closed,none,IR,1,1.8,3,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,HR-IFU,Shallow,IR grey body - high,Open,none,IR,6,18,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,0.10 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,35,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,0.15 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,17,1,Night
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,0.20 arcsec,Shallow,IR grey body - high,Open ,ND1.0,IR,6,12.5,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,0.20 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,12.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,0.30 arcsec,Shallow,IR grey body - high,Open,none,IR,6,3,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,0.45 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,5.25,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,0.675 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,3.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,1.0 arcsec,Shallow,IR grey body - high,Open,ND1.0,IR,6,2.15,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,1.91 - 2.49,pinhole 0.1,Shallow,IR grey body - high,Open,none,IR,1,15,2,Day
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.10 arcsec,Deep,IR grey body - high,Open ,none,IR,4,17,1,Night
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.15 arcsec,Deep,IR grey body - high,Open ,none,IR,4,8,1,Night
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.20 arcsec,Deep,IR grey body - high,Open ,none,IR,4,8,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,34,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,17,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,8,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,8,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.30 arcsec,Deep,IR grey body - high,Open,none,IR,4,8,1,Night
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.45 arcsec,Deep,IR grey body - high,Open ,none,IR,4,4,1,Night
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.675 arcsec,Deep,IR grey body - high,Open ,none,IR,4,3,1,Night
-Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,1.0 arcsec,Deep,IR grey body - high,Open ,none,IR,4,2.2,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,3,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 3.13,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,2.2,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,2.80 - 4.13,pinhole 0.1,Deep,IR grey body - high,Closed,none,IR,1,30,2,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,20,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,10,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,7,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,6,1,Night
@@ -365,6 +477,8 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,0.30 arcsec,Deep,IR gre
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,2,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,1,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.13 - 3.46,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,0.6,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,14,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,7,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,5.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
@@ -372,6 +486,9 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,0.30 arcsec,Deep,IR gre
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,1,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.46 - 3.80,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,0.5,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,HR-IFU,Deep,IR grey body - high,Open,none,IR,4,16,1,Night
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,HR-IFU,Shallow,IR grey body - high,Open,none,IR,8,10,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,0.10 arcsec,Deep,IR grey body - high,Open,none,IR,4,8,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,0.15 arcsec,Deep,IR grey body - high,Open,none,IR,4,5.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,0.20 arcsec,Deep,IR grey body - high,Open,none,IR,4,4,1,Night
@@ -379,6 +496,8 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,0.30 arcsec,Deep,IR gre
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,0.45 arcsec,Deep,IR grey body - high,Open,none,IR,4,1.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,0.675 arcsec,Deep,IR grey body - high,Open,none,IR,4,1,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,3.80 - 4.13,1.0 arcsec,Deep,IR grey body - high,Open,none,IR,4,0.4,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,HR-IFU,Deep,IR grey body - high,Closed,none,IR,10,6,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,0.10 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2.2,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,0.20 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.6,1,Night
@@ -387,6 +506,8 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,0.45 arcsec,Deep,IR gre
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.3,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,4.40 - 5.06,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,5,1.6,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,HR-IFU,Deep,IR grey body - high,Closed,none,IR,10,4,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,0.10 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.5,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,0.20 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.2,1,Night
@@ -395,66 +516,103 @@ Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,0.45 arcsec,Deep,IR gre
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.35,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.3,1,Night
 Spectroscopy,"0.05""/pix",32 l/mm grating,No,5.06 - 5.72,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,5,1.2,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.03 - 1.12,LR-IFU,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.03 - 1.12,0.15 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.03 - 1.12,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.03 - 1.12,0.45 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,7.2,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.03 - 1.12,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,5.4,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.03 - 1.12,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,3.6,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.03 - 1.12,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,2,18,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.12 - 1.17,LR-IFU,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.12 - 1.17,0.15 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.12 - 1.17,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.12 - 1.17,0.45 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,8.4,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.12 - 1.17,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,6,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.12 - 1.17,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,3.6,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.12 - 1.17,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,2,33.6,1,Day
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.37,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.37,LR-IFU,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.37,0.15 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.25,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,12,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.37,0.45 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,5.4,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.37,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,3.6,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.37,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,2.4,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.17 - 1.37,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,3,12,1,Day
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.25 - 1.37,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,8,1,Night
+#,,,,,,,,,,,,,,
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.49 - 1.63,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,3,3.6,1,Day
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.49 - 1.77,LR-IFU,Shallow,Quartz Halogen,Closed,NIR balance,IR,10,1.92,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.49 - 1.77,0.15 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,10,1.92,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.49 - 1.77,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,10,1.92,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.49 - 1.77,0.45 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,10,1.2,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.49 - 1.77,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,10,0.84,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.49 - 1.77,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,10,0.6,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.63 - 1.77,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,3,2.4,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.91 - 2.49,LR-IFU,Shallow,IR grey body - high,Open,NIR balance,IR,4,20,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.91 - 2.49,0.15 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,4,20,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.91 - 2.49,0.30 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,4,20,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.91 - 2.49,0.45 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,8,12,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.91 - 2.49,0.675 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,4,10,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.91 - 2.49,1.0 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,8,6,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,1.91 - 2.49,pinhole 0.3,Shallow,IR grey body - high,Open,NIR balance,IR,2,30,1,Day
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,3,25,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,4,15,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,5,10,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,7,7,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,30,1,Day
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,4,10,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,5,5.5,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,6,4,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,12,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,LR-IFU,Deep,IR grey body - high,Closed,none,IR,3,90,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,3,75,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,3,60,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,3,30,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,3,25,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,3,18,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,2.80 - 3.08,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,90,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,LR-IFU,Deep,IR grey body - high,Closed,none,IR,4,40,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,3,30,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,4,15,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,5,9,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,6,6,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,4,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.08 - 3.36,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,45,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,LR-IFU,Deep,IR grey body - high,Closed,none,IR,5,12,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,4,15,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,6,6,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,4,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2.5,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,15,1,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,5,1,Day
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,6,8,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,4,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,15,2,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,6,1,Day
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,5,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,15,2,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,16,1.5,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,3,1,Day
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,1,0.5,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,0.45 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.3,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,0.675 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.2,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,1.0 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.2,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,1,0.6,1,Day
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.36 - 3.64,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,20,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,LR-IFU,Deep,IR grey body - high,Closed,none,IR,6,8,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,6,8,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,4,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.6,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.64 - 3.92,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,15,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,LR-IFU,Deep,IR grey body - high,Closed,none,IR,10,5,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,5,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,3,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.2,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.75,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,3.92 - 4.20,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,10,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,LR-IFU,Deep,IR grey body - high,Closed,none,IR,10,1,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.5,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,0.45 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,10,0.3,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,0.675 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,10,0.2,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,1.0 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,10,0.2,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.40 - 4.98,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,3,1.5,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.98 - 5.55,LR-IFU,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.2,1,Night
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.98 - 5.55,0.15 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.35,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.98 - 5.55,0.30 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.2,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.98 - 5.55,0.45 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.2,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.98 - 5.55,0.675 arcsec,Deep,IR grey body - high,Closed,ND4-5,IR,1,0.2,1,Night
-Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.98 - 5.55,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,1,0.2,1,Day
+Spectroscopy,"0.15""/pix",111 l/mm grating,No,4.98 - 5.55,pinhole 0.3,Deep,IR grey body - high,Closed,NIR balance,IR,1,0.6,1,Day
+#,,,,,,,,,,,,,,
 Spectroscopy,"0.15""/pix",111 l/mm grating,SXD,0.9 - 2.56,0.675 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,4,15,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,SXD,0.9 - 2.56,1.0 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,4,10,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,SXD,0.9 - 2.56,0.30 arcsec,Shallow,IR grey body - high,Open ,none,IR,4,1,1,Night
@@ -464,31 +622,64 @@ Spectroscopy,"0.15""/pix",111 l/mm grating,SXD,0.9 - 2.56,1.0 arcsec,Shallow,Qua
 Spectroscopy,"0.15""/pix",111 l/mm grating,SXD,0.9 - 2.56,0.45 arcsec,Shallow,Quartz Halogen,Closed,ND2.0,IR,10,3,1,Night
 Spectroscopy,"0.15""/pix",111 l/mm grating,SXD,0.9 - 2.56,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,4,4.8,1,Day
 Spectroscopy,"0.15""/pix",111 l/mm grating,SXD,0.9 - 2.56,0.30 arcsec,Shallow,Quartz Halogen ,Closed,ND2.0,IR,8,4.8,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,2.4,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,1.44,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,LR-IFU,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,4.8,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,0.15 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,4.8,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,4.8,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,0.45 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,3,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,2.4,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,1.44,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.03 - 1.17,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,2,7.2,1,Day
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,1.8,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.96,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,LR-IFU,Shallow,Quartz Halogen,Closed,NIR balance,IR,3,3.6,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,0.15 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,3,3.6,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,3,3.6,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,0.45 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,2.16,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,1.8,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.96,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.17 - 1.37,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,2,6,1,Day
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.36,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.38,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,LR-IFU,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.96,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,LR-IFU,Deep,Quartz Halogen,Closed,NIR balance,IR,5,1,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,0.15 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.96,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,0.30 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.96,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,0.45 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.54,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,0.675 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.36,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,1.0 arcsec,Shallow,Quartz Halogen,Closed,NIR balance,IR,5,0.38,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.47 - 1.80,pinhole 0.3,Shallow,Quartz Halogen,Closed,NIR balance,IR,3,1.2,1,Day
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,0.675 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,5,3,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,1.0 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,5,2,1,Night
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,LR-IFU,Shallow,IR grey body - high,Open,NIR balance,IR,5,7,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,0.15 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,5,7,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,0.30 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,5,7,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,0.45 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,5,5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,0.675 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,5,3,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,1.0 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,5,2,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,No,1.91 - 2.49,pinhole 0.3,Shallow,IR grey body - high,Open,NIR balance,IR,3,6,1,Day
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 4.2,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.8,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 4.2,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.5,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 4.2,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.2,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 4.2,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.8,1,Night
-Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 4.2,pinhole 0.3,Deep,IR grey body - high,Closed,none,IR,3,2,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 3.2,LR-IFU,Deep,IR grey body - high,Closed,none,IR,6,10,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 3.2,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,6,10,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 3.2,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,6,5.5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 3.2,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,6,3.5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 3.2,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,6,2,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 3.2,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1.5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,2.8 - 3.2,pinhole 0.3,Deep,IR grey body - high,Closed,none,IR,3,6,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.2 - 3.8,LR-IFU,Deep,IR grey body - high,Closed,none,IR,10,3.5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.2 - 3.8,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2.5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.2 - 3.8,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.2 - 3.8,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.2 - 3.8,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.2 - 3.8,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.35,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.2 - 3.8,pinhole 0.3,Deep,IR grey body - high,Closed,none,IR,3,3,1,Day
+#,,,,,,,,,,,,,,
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.8 - 4.2,LR-IFU,Deep,IR grey body - high,Closed,none,IR,10,2.5,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.8 - 4.2,0.15 arcsec,Deep,IR grey body - high,Closed,none,IR,10,2,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.8 - 4.2,0.30 arcsec,Deep,IR grey body - high,Closed,none,IR,10,1,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.8 - 4.2,0.45 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.8,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.8 - 4.2,0.675 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.4,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.8 - 4.2,1.0 arcsec,Deep,IR grey body - high,Closed,none,IR,10,0.3,1,Night
+Spectroscopy,"0.15""/pix",32 l/mm grating,No,3.8 - 4.2,pinhole 0.3,Deep,IR grey body - high,Closed,none,IR,3,3,1,Day
+#,,,,,,,,,,,,,,
 Spectroscopy,"0.15""/pix",32 l/mm grating,SXD,0.9 - 2.56,0.675 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,6,5,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,SXD,0.9 - 2.56,1.0 arcsec,Shallow,IR grey body - high,Open,NIR balance,IR,10,3.25,1,Night
 Spectroscopy,"0.15""/pix",32 l/mm grating,SXD,0.9 - 2.56,0.15 arcsec,Shallow,IR grey body - high,Open ,NIR balance,IR,6,15,1,Night
