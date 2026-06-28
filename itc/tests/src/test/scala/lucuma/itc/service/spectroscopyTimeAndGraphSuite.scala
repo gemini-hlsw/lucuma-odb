@@ -377,7 +377,8 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
                 grating: D32,
                 camera: SHORT_BLUE,
                 readMode: BRIGHT,
-                wellDepth: SHALLOW
+                wellDepth: SHALLOW,
+                coadds: 1
               }
             },
             significantFigures: {

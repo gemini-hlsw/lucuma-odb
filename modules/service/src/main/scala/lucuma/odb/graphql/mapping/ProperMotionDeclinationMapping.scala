@@ -9,9 +9,9 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.math.Angle
 
 import table.TargetView
-import table.ProgramTable
+import table.ProgramView
 
-trait ProperMotionDeclinationMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
+trait ProperMotionDeclinationMapping[F[_]] extends ProgramView[F] with TargetView[F] {
 
   lazy val ProperMotionDeclinationMapping: ObjectMapping =
     ObjectMapping(ProperMotionDeclinationType)(

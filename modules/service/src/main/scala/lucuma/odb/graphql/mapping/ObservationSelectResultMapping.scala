@@ -8,7 +8,7 @@ import lucuma.odb.graphql.table.*
 trait ObservationSelectResultMapping[F[_]]
   extends ConstraintSetGroupView[F]
      with ObservationView[F]
-     with ProgramTable[F]
+     with ProgramView[F]
      with TargetView[F]
      with AsterismTargetTable[F]
      with AsterismGroupView[F]
@@ -18,7 +18,7 @@ trait ObservationSelectResultMapping[F[_]]
   lazy val ObservationSelectResultMappings: List[TypeMapping] =
     List(
       topLevelSelectResultMappingAtPath(QueryType / "observations"),
-      nestedSelectResultMappingAtPath(ProgramType / "observations", ProgramTable.Id, Join(ProgramTable.Id, ObservationView.ProgramId)),
+      nestedSelectResultMappingAtPath(ProgramType / "observations", ProgramView.Id, Join(ProgramView.Id, ObservationView.ProgramId)),
       nestedSelectResultMappingAtPath(ConstraintSetGroupType / "observations", ConstraintSetGroupView.ConstraintSetKey, Join(ConstraintSetGroupView.ConstraintSetKey, ObservationView.ConstraintSet.Key)),
       nestedSelectResultMappingAtPath(ObservingModeGroupType / "observations", ObservingModeGroupView.ObservingModeKey, Join(ObservingModeGroupView.ObservingModeKey, ObservationView.ObservingMode.Key)),
       nestedSelectResultMappingAtPath(TargetGroupType / "observations", TargetView.TargetId, Join(TargetView.TargetId, AsterismTargetTable.TargetId), Join(AsterismTargetTable.ObservationId, ObservationView.Id)),

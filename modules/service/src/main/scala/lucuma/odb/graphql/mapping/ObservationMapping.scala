@@ -37,12 +37,12 @@ import table.AttachmentTable
 import table.ObsAttachmentAssignmentTable
 import table.ObscalcTable
 import table.ObservationReferenceView
-import table.ProgramTable
+import table.ProgramView
 import Services.Syntax.*
 
 trait ObservationMapping[F[_]]
   extends ObservationEffectHandler[F]
-     with ProgramTable[F]
+     with ProgramView[F]
      with TimingWindowView[F]
      with AttachmentTable[F]
      with ObsAttachmentAssignmentTable[F]
@@ -77,7 +77,7 @@ trait ObservationMapping[F[_]]
       SqlObject("scienceRequirements"),
       SqlObject("observingMode"),
       SqlField("instrument", ObservationView.Instrument),
-      SqlObject("program", Join(ObservationView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(ObservationView.ProgramId, ProgramView.Id)),
       EffectField("itc", itcQueryHandler, List("id", "programId")),
       SqlObject("execution"),
       SqlField("groupId", ObservationView.GroupId),

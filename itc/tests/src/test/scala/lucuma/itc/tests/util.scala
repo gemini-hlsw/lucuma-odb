@@ -60,7 +60,8 @@ def routesForWsb(
     odbServiceToken = "",
     otel = None,
     inHeroku = false,
-    cacheTtlDays = 7
+    cacheTtlDays = 7,
+    maxConcurrentCalculations = 4
   )
 
   for

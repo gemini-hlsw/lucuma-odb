@@ -4,7 +4,7 @@
 package lucuma.odb.syntax
 
 import cats.syntax.eq.*
-import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ScienceSubtype
 
 trait ToScienceSubtypeOps {
@@ -23,17 +23,17 @@ trait ToScienceSubtypeOps {
         case Queue              => "Queue"
         case SystemVerification => "System Verification"
 
-    def callType: CallForProposalsType =
+    def callType: GeminiCallForProposalsType =
       s match
-        case Classical | Queue  => CallForProposalsType.RegularSemester
-        case DemoScience        => CallForProposalsType.DemoScience
-        case DirectorsTime      => CallForProposalsType.DirectorsTime
-        case FastTurnaround     => CallForProposalsType.FastTurnaround
-        case LargeProgram       => CallForProposalsType.LargeProgram
-        case PoorWeather        => CallForProposalsType.PoorWeather
-        case SystemVerification => CallForProposalsType.SystemVerification
+        case Classical | Queue  => GeminiCallForProposalsType.RegularSemester
+        case DemoScience        => GeminiCallForProposalsType.DemoScience
+        case DirectorsTime      => GeminiCallForProposalsType.DirectorsTime
+        case FastTurnaround     => GeminiCallForProposalsType.FastTurnaround
+        case LargeProgram       => GeminiCallForProposalsType.LargeProgram
+        case PoorWeather        => GeminiCallForProposalsType.PoorWeather
+        case SystemVerification => GeminiCallForProposalsType.SystemVerification
 
-    def isCompatibleWith(c: CallForProposalsType): Boolean =
+    def isCompatibleWith(c: GeminiCallForProposalsType): Boolean =
       callType === c
 
 }

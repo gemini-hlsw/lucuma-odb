@@ -10,9 +10,11 @@ import lucuma.odb.util.Codecs.*
 import skunk.codec.boolean.bool
 import skunk.codec.temporal.date
 
-trait ProgramTable[F[_]] extends BaseMapping[F]:
+trait ProgramView[F[_]] extends BaseMapping[F]:
 
-  object ProgramTable extends TableDef("t_program"):
+  // Backed by the v_program view, which adds the computed c_resource_count
+  // column on top of t_program (see V1182).
+  object ProgramView extends TableDef("v_program"):
     val Id              = col("c_program_id", program_id)
     val Existence       = col("c_existence", existence)
     val Name            = col("c_name", text_nonempty.opt)
@@ -21,6 +23,8 @@ trait ProgramTable[F[_]] extends BaseMapping[F]:
     val CalibrationRole = col("c_calibration_role", calibration_role.opt)
     val ActiveStart     = col("c_active_start", date)
     val ActiveEnd       = col("c_active_end", date)
+    val ResourceCount   = col("c_resource_count", int4_nonneg)
+    val ResourceLimit   = col("c_resource_limit", int4_nonneg)
 
     object Goa:
       val Proprietary   = col("c_goa_proprietary", int4_nonneg)

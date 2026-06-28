@@ -126,7 +126,7 @@ class observation_workflow
         }
       """
     }
-    createCallForProposalsAs(staff, other = (inStr + limitStr).some)
+    createGeminiCallForProposalsAs(staff, otherGemini = (inStr + limitStr).some)
 
   def setTargetCoords(tid: Target.Id, raHours: Int, decHours: Int): IO[Unit] =
     query(
@@ -296,7 +296,7 @@ class observation_workflow
   testWithTargetTypes("no validations") { (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramAs(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         tid <- mkTarget(pi, pid)
@@ -663,7 +663,7 @@ class observation_workflow
   testWithTargetTypes("no configuration request checks if proposal is not approved"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramAs(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         tid <- mkTarget(pi, pid)
@@ -691,7 +691,7 @@ class observation_workflow
   testWithTargetTypes("no configuration request"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
@@ -722,7 +722,7 @@ class observation_workflow
   testWithTargetTypes("unapproved configuration request"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
@@ -754,7 +754,7 @@ class observation_workflow
   testWithTargetTypes("denied configuration request"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
@@ -786,7 +786,7 @@ class observation_workflow
   test("calibrations are not validated and are immediately Defined"):
     val setup: IO[Observation.Id] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
@@ -843,7 +843,7 @@ class observation_workflow
 
     val oid1: IO[Observation.Id]  =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
@@ -906,7 +906,7 @@ class observation_workflow
   testWithTargetTypes("approved configuration request") { (tt, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi, "Foo")
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
@@ -944,7 +944,7 @@ class observation_workflow
 
     val setup: IO[(Program.Id, Observation.Id)] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi)
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
@@ -995,7 +995,7 @@ class observation_workflow
 
     val setup: IO[(Program.Id, Observation.Id)] =
       for
-        cfp <- createCallForProposalsAs(staff)
+        cfp <- createGeminiCallForProposalsAs(staff)
         pid <- createProgramWithNonPartnerPi(pi)
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)

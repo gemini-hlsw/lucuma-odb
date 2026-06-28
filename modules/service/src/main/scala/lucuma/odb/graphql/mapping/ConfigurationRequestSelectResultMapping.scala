@@ -7,10 +7,10 @@ import lucuma.odb.graphql.table.*
 
 trait ConfigurationRequestSelectResultMapping[F[_]]
   extends ConfigurationRequestView[F]
-     with ProgramTable[F]
+     with ProgramView[F]
      with ResultMapping[F] {
 
   lazy val ConfigurationRequestSelectResultMapping =
-    nestedSelectResultMappingAtPath(ProgramType / "configurationRequests", ProgramTable.Id, Join(ProgramTable.Id, ConfigurationRequestView.ProgramId))
+    nestedSelectResultMappingAtPath(ProgramType / "configurationRequests", ProgramView.Id, Join(ProgramView.Id, ConfigurationRequestView.ProgramId))
 
 }

@@ -8,18 +8,18 @@ package mapping
 import lucuma.core.model.Observation
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.table.ObservationView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 
 
-trait ObservationEditMapping[F[_]] extends ObservationView[F] with ProgramTable[F] {
+trait ObservationEditMapping[F[_]] extends ObservationView[F] with ProgramView[F] {
 
   // N.B. env is populated by the subscription elaborator
   lazy val ObservationEditMapping: ObjectMapping =
     ObjectMapping(ObservationEditType)(
-      SqlField("synthetic-id", ProgramTable.Id, key = true, hidden = true),
+      SqlField("synthetic-id", ProgramView.Id, key = true, hidden = true),
       CursorField("editType", _.envR[EditType]("editType"), List("synthetic-id")),
       CursorField("observationId", _.envR[Observation.Id]("observationId"), List("synthetic-id")),
-      SqlObject("value", Join(ProgramTable.Id, ObservationView.ProgramId))
+      SqlObject("value", Join(ProgramView.Id, ObservationView.ProgramId))
     )
 
 }

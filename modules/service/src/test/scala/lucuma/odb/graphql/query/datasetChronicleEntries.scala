@@ -50,7 +50,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
 
   test("Basic DatasetChronicleEntry Mapping"):
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithUsPi(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       _   <- addQueueProposal(pi, pid, cfp)
@@ -278,7 +278,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
 
   def setup(index: Int): IO[Dataset.Id] =
     for
-      cfp <- createCallForProposalsAs(staff)
+      cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithUsPi(pi)
       tid <- createTargetWithProfileAs(pi, pid)
       _   <- addQueueProposal(pi, pid, cfp)

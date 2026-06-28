@@ -9,7 +9,7 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.CallForProposalsType.RegularSemester
+import lucuma.core.enums.GeminiCallForProposalsType.RegularSemester
 import lucuma.core.enums.ProgramUserRole.CoiRO
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -29,7 +29,7 @@ class ShortCut_4457 extends OdbSuite with ObservingModeSetupOperations:
   val setup: IO[(Program.Id, Observation.Id)] =
     for
       _ <- createUsers(pi, coiRo, staff)
-      c <- createCallForProposalsAs(staff, RegularSemester)
+      c <- createGeminiCallForProposalsAs(staff, RegularSemester)
       p <- createProgramWithNonPartnerPi(pi, "ShortCut 4457")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))

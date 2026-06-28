@@ -19,18 +19,18 @@ import lucuma.odb.graphql.binding.ObservationIdBinding
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.ObservingModeGroupView
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 
 trait ObservingModeGroupMapping[F[_]]
   extends ObservingModeGroupView[F]
      with ObservationView[F]
      with Predicates[F]
-     with ProgramTable[F]:
+     with ProgramView[F]:
 
   lazy val ObservingModeGroupMapping =
     ObjectMapping(ObservingModeGroupType)(
       SqlField("key", ObservingModeGroupView.ObservingModeKey, key = true, hidden = true),
-      SqlObject("program", Join(ObservingModeGroupView.ProgramId, ProgramTable.Id)),
+      SqlObject("program", Join(ObservingModeGroupView.ProgramId, ProgramView.Id)),
       SqlObject("observations"),
       SqlObject("observingMode", Join(ObservingModeGroupView.ObservationId, ObservationView.Id))
     )

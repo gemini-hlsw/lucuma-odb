@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.CallForProposalsType
+import lucuma.core.enums.GeminiCallForProposalsType
 
-val CallForProposalsTypeBinding: Matcher[CallForProposalsType] =
+val GeminiCallForProposalsTypeBinding: Matcher[GeminiCallForProposalsType] =
   enumeratedBinding

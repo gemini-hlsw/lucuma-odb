@@ -7,10 +7,10 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 
-import table.ProgramTable
+import table.ProgramView
 import table.UserTable
 
-trait UserMapping[F[_]] extends ProgramTable[F] with UserTable[F]:
+trait UserMapping[F[_]] extends ProgramView[F] with UserTable[F]:
    this: SkunkMapping[F] =>
      lazy val UserMapping =
        ObjectMapping(UserType)(

@@ -39,6 +39,7 @@
             pkgs.age
             pkgs.yq
             pkgs.direnv
+            pkgs.redis
           ];
           typelevelShell = {
             nodejs.enable = true;

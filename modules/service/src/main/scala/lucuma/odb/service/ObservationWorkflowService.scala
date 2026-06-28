@@ -845,7 +845,7 @@ object ObservationWorkflowService {
           c.c_active_end,
           i.c_instrument
         FROM t_cfp c
-        LEFT JOIN t_cfp_instrument i
+        LEFT JOIN t_gemini_cfp_instrument i
         ON c.c_cfp_id = i.c_cfp_id
         WHERE c.c_cfp_id in ($enc)
       """.query(cfp_id *: right_ascension *: right_ascension *: declination *: declination *: right_ascension *: right_ascension *: declination *: declination *: date_interval *: instrument.opt)

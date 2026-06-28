@@ -73,7 +73,8 @@ object ObservingMode {
         )
 
       val description: String =
-        s"${instrument.shortName} Longslit"
+        if fpu.fpu.custom.isDefined then s"${instrument.shortName} MOS"
+        else s"${instrument.shortName} Longslit"
     }
 
     case class GmosSouth(
@@ -99,7 +100,8 @@ object ObservingMode {
         )
 
       val description: String =
-        s"${instrument.shortName} Longslit"
+        if fpu.fpu.custom.isDefined then s"${instrument.shortName} MOS"
+        else s"${instrument.shortName} Longslit"
     }
 
     case class Flamingos2(
@@ -167,6 +169,7 @@ object ObservingMode {
       camera:            GnirsCamera,
       readMode:          GnirsReadMode,
       wellDepth:         GnirsWellDepth,
+      coadds:            PosInt,
       portDisposition:   PortDisposition
     ) extends SpectroscopyMode derives Hash {
       val instrument: Instrument =
@@ -243,6 +246,7 @@ object ObservingMode {
       camera:          GnirsCamera,
       readMode:        GnirsReadMode,
       wellDepth:       GnirsWellDepth,
+      coadds:          PosInt,
       portDisposition: PortDisposition
     ) extends ImagingMode derives Hash {
       val instrument: Instrument = Instrument.Gnirs

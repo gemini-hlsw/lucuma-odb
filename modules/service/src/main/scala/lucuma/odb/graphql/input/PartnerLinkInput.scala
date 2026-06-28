@@ -12,6 +12,7 @@ import lucuma.core.model.PartnerLink
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
+import lucuma.odb.graphql.binding.ExchangePartnerBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PartnerBinding
@@ -21,24 +22,25 @@ import lucuma.odb.graphql.binding.PartnerLinkTypeBinding
 object PartnerLinkInput:
 
   private val InvalidResult: Result[Nothing] =
-    OdbError.InvalidArgument(s"Specify either 'linkType' (as `${PartnerLinkType.HasNonPartner.tag.toScreamingSnakeCase}` or `${PartnerLinkType.HasUnspecifiedPartner.tag.toScreamingSnakeCase}`) or 'partner'.".some).asFailure
+    OdbError.InvalidArgument(s"Specify either 'linkType' (as `${PartnerLinkType.HasNonPartner.tag.toScreamingSnakeCase}` or `${PartnerLinkType.HasUnspecifiedPartner.tag.toScreamingSnakeCase}`), 'partner', or 'exchangePartner'.".some).asFailure
 
   val Binding: Matcher[PartnerLink] =
     ObjectFieldsBinding.rmap:
       case List(
         PartnerLinkTypeBinding.Option("linkType", rLinkType),
-        PartnerBinding.Option("partner", rPartner)
+        PartnerBinding.Option("geminiPartner", rPartner),
+        ExchangePartnerBinding.Option("exchangePartner", rExchange)
       ) =>
-        (rLinkType, rPartner).parTupled.flatMap:
-          case (None,    None)        => InvalidResult
-          case (None,    Some(p))     => PartnerLink.HasPartner(p).success
-          case (Some(t), None)        => t match {
+        (rLinkType, rPartner, rExchange).parTupled.flatMap:
+          case (None,    Some(p), None)    => PartnerLink.HasGeminiPartner(p).success
+          case (None,    None,    Some(e)) => PartnerLink.HasExchangePartner(e).success
+          case (None,    None,    None)    => InvalidResult
+          case (Some(t), None,    None)    => t match {
             case PartnerLinkType.HasUnspecifiedPartner => PartnerLink.HasUnspecifiedPartner.success
             case PartnerLinkType.HasNonPartner         => PartnerLink.HasNonPartner.success
-            case PartnerLinkType.HasPartner            => InvalidResult
+            case PartnerLinkType.HasGeminiPartner      => InvalidResult
+            case PartnerLinkType.HasExchangePartner    => InvalidResult
           }
-          case (Some(t), Some(p))     => t match {
-            case PartnerLinkType.HasUnspecifiedPartner => InvalidResult
-            case PartnerLinkType.HasNonPartner         => InvalidResult
-            case PartnerLinkType.HasPartner            => PartnerLink.HasPartner(p).success
-          }
+          case (Some(PartnerLinkType.HasGeminiPartner),   Some(p), None)    => PartnerLink.HasGeminiPartner(p).success
+          case (Some(PartnerLinkType.HasExchangePartner), None,    Some(e)) => PartnerLink.HasExchangePartner(e).success
+          case _                                                            => InvalidResult

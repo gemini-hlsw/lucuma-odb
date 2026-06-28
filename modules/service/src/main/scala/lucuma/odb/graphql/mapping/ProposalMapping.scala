@@ -8,14 +8,14 @@ import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.PartnerSplitTable
-import lucuma.odb.graphql.table.ProgramTable
+import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.graphql.table.ProposalReferenceView
 import lucuma.odb.graphql.table.ProposalView
 
 trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
                                with CallForProposalsView[F]
                                with Predicates[F]
-                               with ProgramTable[F]
+                               with ProgramView[F]
                                with ProposalReferenceView[F]
                                with ProposalView[F]
                                with KeyValueEffectHandler[F] {
@@ -26,7 +26,9 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
       SqlObject("reference", Join(ProposalView.ProgramId, ProposalReferenceView.Id)),
       SqlObject("call", Join(ProposalView.CallId, CallForProposalsView.Id)),
       SqlField("category", ProposalView.Category),
-      SqlObject("type")
+      SqlObject("gemini"),
+      SqlObject("keck"),
+      SqlObject("subaru")
     )
 
 }

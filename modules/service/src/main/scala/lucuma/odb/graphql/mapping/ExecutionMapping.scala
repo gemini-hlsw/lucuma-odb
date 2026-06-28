@@ -150,21 +150,33 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
         ).value
 
   private lazy val digestHandler: EffectHandler[F] =
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (_, oid, _) =>
-        services.useTransactionally:
-          obscalcService
-           .selectExecutionDigest(oid)
-           .map:
-             _.fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>
-               cv
-                 .map: res =>
-                   res.map(_.asJson) match
-                     case Result.Failure(ps) => Result.Warning(ps, Json.Null)
-                     case r                  => r
-                 .sequence.map(_.asJson)
+    new EffectHandler[F]:
+      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
+        queries.traverse:
+          case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
 
-    effectHandler(_ => ().success, calculate)
+      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (
+          for
+            oids    <- ResultT.fromResult(queryContext(queries))
+            digests <- ResultT.liftF(services.useTransactionally(obscalcService.selectManyExecutionDigest(oids)))
+            res     <- ResultT.fromResult:
+                         oids.zip(queries).traverse:
+                           case (oid, (query, parentCursor)) =>
+                            val json: Result[Json] =
+                              digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>
+                                cv
+                                  .map: res =>
+                                    res.map(_.asJson) match
+                                      case Result.Failure(ps) => Result.Warning(ps, Json.Null)
+                                      case r                  => r
+                                  .sequence.map(_.asJson)
+                            for
+                              j            <- json
+                              childContext <- Query.childContext(parentCursor.context, query)
+                            yield CirceCursor(childContext, j, Some(parentCursor), parentCursor.fullEnv)
+          yield res
+        ).value
 
   private lazy val timeChargeHandler: EffectHandler[F] = {
     val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =

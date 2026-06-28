@@ -31,35 +31,37 @@ class updateCallsForProposals extends OdbSuite {
           createCallForProposals(
             input: {
               SET: {
-                type:          REGULAR_SEMESTER
                 semester:      "2025A"
                 activeStart:   "2025-02-01"
                 activeEnd:     "2025-07-31"
-                coordinateLimits: {
-                  north: {
-                    raStart: { hms: "12:00:00" }
-                    raEnd: { hms: "18:00:00" }
-                    decStart: { dms: "45:00:00" }
-                    decEnd: { dms: "-45:00:00" }
-                  }
-                  south: {
-                    raStart: { hms: "12:00:01" }
-                    raEnd: { hms: "18:00:01" }
-                    decStart: { dms: "45:00:01" }
-                    decEnd: { dms: "-45:00:01" }
-                  }
-                }
-                instruments:   [GMOS_NORTH]
                 submissionDeadlineDefault: "2025-07-31T10:00:01Z"
                 partners:      [
                   {
-                    partner: CA
+                    geminiPartner: CA
                     submissionDeadlineOverride: "2025-07-31T10:00:00Z"
                   },
                   {
-                    partner: US
+                    geminiPartner: US
                   }
                 ]
+                gemini: {
+                  type:          REGULAR_SEMESTER
+                  coordinateLimits: {
+                    north: {
+                      raStart: { hms: "12:00:00" }
+                      raEnd: { hms: "18:00:00" }
+                      decStart: { dms: "45:00:00" }
+                      decEnd: { dms: "-45:00:00" }
+                    }
+                    south: {
+                      raStart: { hms: "12:00:01" }
+                      raEnd: { hms: "18:00:01" }
+                      decStart: { dms: "45:00:01" }
+                      decEnd: { dms: "-45:00:01" }
+                    }
+                  }
+                  instruments:   [GMOS_NORTH]
+                }
               }
             }
           ) {
@@ -87,15 +89,19 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                type: DEMO_SCIENCE
+                gemini: {
+                  type: DEMO_SCIENCE
+                }
               },
               WHERE: {
                 id: { EQ: "$id" }
               }
             }) {
               callsForProposals {
-                type
-                proprietaryMonths
+                gemini {
+                  type
+                  proprietaryMonths
+                }
               }
             }
           }
@@ -105,8 +111,10 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "type": "DEMO_SCIENCE",
-                  "proprietaryMonths": 12
+                  "gemini": {
+                    "type": "DEMO_SCIENCE",
+                    "proprietaryMonths": 12
+                  }
                 }
               ]
             }
@@ -158,10 +166,12 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                coordinateLimits: {
-                  north: {
-                    raStart: { hms: "00:00:00" }
-                    raEnd:   { hms: "06:00:00" }
+                gemini: {
+                  coordinateLimits: {
+                    north: {
+                      raStart: { hms: "00:00:00" }
+                      raEnd:   { hms: "06:00:00" }
+                    }
                   }
                 }
               }
@@ -170,18 +180,20 @@ class updateCallsForProposals extends OdbSuite {
               }
             }) {
               callsForProposals {
-                coordinateLimits {
-                  north {
-                    raStart { hms }
-                    raEnd { hms }
-                    decStart { dms }
-                    decEnd { dms }
-                  }
-                  south {
-                    raStart { hms }
-                    raEnd { hms }
-                    decStart { dms }
-                    decEnd { dms }
+                gemini {
+                  coordinateLimits {
+                    north {
+                      raStart { hms }
+                      raEnd { hms }
+                      decStart { dms }
+                      decEnd { dms }
+                    }
+                    south {
+                      raStart { hms }
+                      raEnd { hms }
+                      decStart { dms }
+                      decEnd { dms }
+                    }
                   }
                 }
               }
@@ -193,18 +205,20 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "coordinateLimits": {
-                    "north": {
-                      "raStart": { "hms": "00:00:00.000000" },
-                      "raEnd": { "hms": "06:00:00.000000" },
-                      "decStart": { "dms": "+45:00:00.000000" },
-                      "decEnd": { "dms": "-45:00:00.000000" }
-                    },
-                    "south": {
-                      "raStart": { "hms": "12:00:01.000000" },
-                      "raEnd": { "hms": "18:00:01.000000" },
-                      "decStart": { "dms": "+45:00:01.000000" },
-                      "decEnd": { "dms": "-45:00:01.000000" }
+                  "gemini": {
+                    "coordinateLimits": {
+                      "north": {
+                        "raStart": { "hms": "00:00:00.000000" },
+                        "raEnd": { "hms": "06:00:00.000000" },
+                        "decStart": { "dms": "+45:00:00.000000" },
+                        "decEnd": { "dms": "-45:00:00.000000" }
+                      },
+                      "south": {
+                        "raStart": { "hms": "12:00:01.000000" },
+                        "raEnd": { "hms": "18:00:01.000000" },
+                        "decStart": { "dms": "+45:00:01.000000" },
+                        "decEnd": { "dms": "-45:00:01.000000" }
+                      }
                     }
                   }
                 }
@@ -225,10 +239,12 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                coordinateLimits: {
-                  south: {
-                    decStart: { dms: "+10:00:00" }
-                    decEnd:   { dms: "-50:00:00" }
+                gemini: {
+                  coordinateLimits: {
+                    south: {
+                      decStart: { dms: "+10:00:00" }
+                      decEnd:   { dms: "-50:00:00" }
+                    }
                   }
                 }
               }
@@ -237,18 +253,20 @@ class updateCallsForProposals extends OdbSuite {
               }
             }) {
               callsForProposals {
-                coordinateLimits {
-                  north {
-                    raStart { hms }
-                    raEnd { hms }
-                    decStart { dms }
-                    decEnd { dms }
-                  }
-                  south {
-                    raStart { hms }
-                    raEnd { hms }
-                    decStart { dms }
-                    decEnd { dms }
+                gemini {
+                  coordinateLimits {
+                    north {
+                      raStart { hms }
+                      raEnd { hms }
+                      decStart { dms }
+                      decEnd { dms }
+                    }
+                    south {
+                      raStart { hms }
+                      raEnd { hms }
+                      decStart { dms }
+                      decEnd { dms }
+                    }
                   }
                 }
               }
@@ -260,18 +278,20 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "coordinateLimits": {
-                    "north": {
-                      "raStart": { "hms": "12:00:00.000000" },
-                      "raEnd": { "hms": "18:00:00.000000" },
-                      "decStart": { "dms": "+45:00:00.000000" },
-                      "decEnd": { "dms": "-45:00:00.000000" }
-                    },
-                    "south": {
-                      "raStart": { "hms": "12:00:01.000000" },
-                      "raEnd": { "hms": "18:00:01.000000" },
-                      "decStart": { "dms": "+10:00:00.000000" },
-                      "decEnd": { "dms": "-50:00:00.000000" }
+                  "gemini": {
+                    "coordinateLimits": {
+                      "north": {
+                        "raStart": { "hms": "12:00:00.000000" },
+                        "raEnd": { "hms": "18:00:00.000000" },
+                        "decStart": { "dms": "+45:00:00.000000" },
+                        "decEnd": { "dms": "-45:00:00.000000" }
+                      },
+                      "south": {
+                        "raStart": { "hms": "12:00:01.000000" },
+                        "raEnd": { "hms": "18:00:01.000000" },
+                        "decStart": { "dms": "+10:00:00.000000" },
+                        "decEnd": { "dms": "-50:00:00.000000" }
+                      }
                     }
                   }
                 }
@@ -504,14 +524,18 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                instruments: [GMOS_NORTH, GMOS_SOUTH]
+                gemini: {
+                  instruments: [GMOS_NORTH, GMOS_SOUTH]
+                }
               },
               WHERE: {
                 id: { EQ: "$id" }
               }
             }) {
               callsForProposals {
-                instruments
+                gemini {
+                  instruments
+                }
               }
             }
           }
@@ -521,10 +545,12 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "instruments": [
-                    "GMOS_NORTH",
-                    "GMOS_SOUTH"
-                  ]
+                  "gemini": {
+                    "instruments": [
+                      "GMOS_NORTH",
+                      "GMOS_SOUTH"
+                    ]
+                  }
                 }
               ]
             }
@@ -542,14 +568,18 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                instruments: null
+                gemini: {
+                  instruments: null
+                }
               },
               WHERE: {
                 id: { EQ: "$id" }
               }
             }) {
               callsForProposals {
-                instruments
+                gemini {
+                  instruments
+                }
               }
             }
           }
@@ -559,7 +589,9 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "instruments": []
+                  "gemini": {
+                    "instruments": []
+                  }
                 }
               ]
             }
@@ -577,19 +609,23 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                instruments: [GMOS_SOUTH, GMOS_SOUTH]
+                gemini: {
+                  instruments: [GMOS_SOUTH, GMOS_SOUTH]
+                }
               },
               WHERE: {
                 id: { EQ: "$id" }
               }
             }) {
               callsForProposals {
-                instruments
+                gemini {
+                  instruments
+                }
               }
             }
           }
         """,
-        List("Argument 'input.SET' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
+        List("Argument 'input.SET.gemini' is invalid: duplicate 'instruments' specified: GMOS_SOUTH").asLeft
       )
     }
   }
@@ -604,11 +640,11 @@ class updateCallsForProposals extends OdbSuite {
               SET: {
                 partners: [
                   {
-                    partner: BR
+                    geminiPartner: BR
                     submissionDeadlineOverride: "2025-08-15T04:00:00Z"
                   },
                   {
-                    partner: AR
+                    geminiPartner: AR
                   }
                 ]
               },
@@ -618,7 +654,7 @@ class updateCallsForProposals extends OdbSuite {
             }) {
               callsForProposals {
                 partners {
-                  partner
+                  geminiPartner
                   submissionDeadline
                 }
               }
@@ -632,11 +668,11 @@ class updateCallsForProposals extends OdbSuite {
                 {
                   "partners": [
                     {
-                      "partner": "AR",
+                      "geminiPartner": "AR",
                       "submissionDeadline": "2025-07-31T10:00:01Z"
                     },
                     {
-                      "partner": "BR",
+                      "geminiPartner": "BR",
                       "submissionDeadline": "2025-08-15T04:00:00Z"
                     }
                   ]
@@ -664,7 +700,7 @@ class updateCallsForProposals extends OdbSuite {
               }
             }) {
               callsForProposals {
-                partners { partner }
+                partners { geminiPartner }
               }
             }
           }
@@ -694,11 +730,11 @@ class updateCallsForProposals extends OdbSuite {
               SET: {
                 partners: [
                   {
-                    partner: BR
+                    geminiPartner: BR
                     submissionDeadlineOverride: "2025-08-15T04:00:00Z"
                   },
                   {
-                    partner: BR
+                    geminiPartner: BR
                     submissionDeadlineOverride: "2025-08-15T04:00:00Z"
                   }
                 ]
@@ -708,7 +744,9 @@ class updateCallsForProposals extends OdbSuite {
               }
             }) {
               callsForProposals {
-                instruments
+                gemini {
+                  instruments
+                }
               }
             }
           }
@@ -734,7 +772,7 @@ class updateCallsForProposals extends OdbSuite {
             }) {
               callsForProposals {
                 partners {
-                  partner
+                  geminiPartner
                   submissionDeadline
                 }
               }
@@ -748,11 +786,11 @@ class updateCallsForProposals extends OdbSuite {
                 {
                   "partners": [
                     {
-                      "partner": "CA",
+                      "geminiPartner": "CA",
                       "submissionDeadline": "2025-07-31T10:00:00Z"
                     },
                     {
-                      "partner": "US",
+                      "geminiPartner": "US",
                       "submissionDeadline": null
                     }
                   ]
@@ -867,14 +905,18 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                type: DEMO_SCIENCE
+                gemini: {
+                  type: DEMO_SCIENCE
+                }
               },
               WHERE: {
                 id: { EQ: "$cid" }
               }
             }) {
               callsForProposals {
-                type
+                gemini {
+                  type
+                }
               }
             }
           }
@@ -938,14 +980,18 @@ class updateCallsForProposals extends OdbSuite {
           mutation {
             updateCallsForProposals(input: {
               SET: {
-                proprietaryMonths: 36
+                gemini: {
+                  proprietaryMonths: 36
+                }
               },
               WHERE: {
                 id: { EQ: "$id" }
               }
             }) {
               callsForProposals {
-                proprietaryMonths
+                gemini {
+                  proprietaryMonths
+                }
               }
             }
           }
@@ -955,7 +1001,9 @@ class updateCallsForProposals extends OdbSuite {
             "updateCallsForProposals": {
               "callsForProposals": [
                 {
-                  "proprietaryMonths": 36
+                  "gemini": {
+                    "proprietaryMonths": 36
+                  }
                 }
               ]
             }

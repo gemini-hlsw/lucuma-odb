@@ -246,7 +246,9 @@ object OdbMapping {
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
           with ProposalReferenceMapping[F]
-          with ProposalTypeMapping[F]
+          with GeminiProposalTypeMapping[F]
+          with KeckProposalTypeMapping[F]
+          with SubaruProposalTypeMapping[F]
           with QueryMapping[F]
           with RadialVelocityMapping[F]
           with RecordDatasetResultMapping[F]
@@ -261,6 +263,7 @@ object OdbMapping {
           with SetAllocationsResultMapping[F]
           with SetGuideTargetNameResultMapping[F]
           with SetProgramReferenceResultMapping[F]
+          with SetProgramResourceLimitResultMapping[F]
           with SetProposalStatusResultMapping[F]
           with SiderealMapping[F]
           with SiteCoordinateLimitsMapping[F]
@@ -384,8 +387,6 @@ object OdbMapping {
                 AtomRecordMapping,
                 AttachmentMapping,
                 CalibrationProgramReferenceMapping,
-                CallForProposalsMapping,
-                CallForProposalsPartnerMapping,
                 CallsForProposalsSelectResultMapping,
                 CatalogInfoMapping,
                 ChangeProgramUserRoleResultMapping,
@@ -491,7 +492,9 @@ object OdbMapping {
                 ProperMotionRaMapping,
                 ProposalMapping,
                 ProposalReferenceMapping,
-                ProposalTypeMapping,
+                GeminiProposalTypeMapping,
+                KeckProposalTypeMapping,
+                SubaruProposalTypeMapping,
                 QueryMapping,
                 QueueMapping,
                 RadialVelocityMapping,
@@ -518,6 +521,7 @@ object OdbMapping {
                 SetAllocationsResultMapping,
                 SetGuideTargetNameResultMapping,
                 SetProgramReferenceResultMapping,
+                SetProgramResourceLimitResultMapping,
                 SetProposalStatusResultMapping,
                 SiderealMapping,
                 SlewEventMapping,
@@ -573,6 +577,7 @@ object OdbMapping {
                 ArcMappings,
                 AtomRecordSelectResultMappings,
                 CalculatedObservationWorkflowMappings,
+                CallForProposalsMappings,
                 CategorizedTimeMappings,
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
@@ -649,7 +654,9 @@ object OdbMapping {
                 ObservingModeGroupElaborator,
                 ProgramElaborator,
                 ProgramUserElaborator,
-                ProposalTypeElaborator,
+                GeminiProposalTypeElaborator,
+                KeckProposalTypeElaborator,
+                SubaruProposalTypeElaborator,
                 SchedulingConstraintsElaborator,
                 ScienceRequirementsElaborator,
                 StepRecordElaborator,

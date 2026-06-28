@@ -10,7 +10,7 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.model.CallForProposals
 
-class callsForProposals extends OdbSuite {
+class callsForProposals extends OdbSuite:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(3, 103)
@@ -35,15 +35,14 @@ class callsForProposals extends OdbSuite {
           }
         }
       """
-    ).flatMap {
+    ).flatMap:
       _.hcursor
        .downFields("createCallForProposals", "callForProposals", "id")
        .as[CallForProposals.Id]
        .leftMap(f => new RuntimeException(f.message))
        .liftTo[IO]
-    }
 
-  test("empty") {
+  test("empty"):
     expect(
       user  = pi,
       query = s"""
@@ -65,16 +64,17 @@ class callsForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-  test("WHERE id") {
+  test("WHERE id"):
     createCall(s"""
-      type:        REGULAR_SEMESTER
       semester:    "2025A"
       activeStart: "2025-02-01"
       activeEnd:   "2025-07-31"
+      gemini: {
+        type: REGULAR_SEMESTER
+      }
     """.stripMargin
-    ).flatMap { id =>
+    ).flatMap: id =>
       expect(pi,
         s"""
           query {
@@ -97,21 +97,21 @@ class callsForProposals extends OdbSuite {
           }
         """.asRight
       )
-    }
-  }
 
-  test("WHERE type") {
+  test("WHERE type"):
     createCall(s"""
-      type:        FAST_TURNAROUND
       semester:    "2025A"
       activeStart: "2025-02-01"
       activeEnd:   "2025-07-31"
+      gemini: {
+        type: FAST_TURNAROUND
+      }
     """.stripMargin
-    ).flatMap { id =>
+    ).flatMap: id =>
       expect(pi,
         s"""
           query {
-            callsForProposals(WHERE: { type: { EQ: FAST_TURNAROUND } }) {
+            callsForProposals(WHERE: { gemini: { type: { EQ: FAST_TURNAROUND } } }) {
               matches {
                 id
               }
@@ -130,17 +130,17 @@ class callsForProposals extends OdbSuite {
           }
         """.asRight
       )
-    }
-  }
 
-  test("WHERE semester") {
+  test("WHERE semester"):
     createCall(s"""
-      type:        REGULAR_SEMESTER
       semester:    "2024B"
       activeStart: "2025-02-01"
       activeEnd:   "2025-07-31"
+      gemini: {
+        type: REGULAR_SEMESTER
+      }
     """.stripMargin
-    ).flatMap { id =>
+    ).flatMap: id =>
       expect(pi,
         s"""
           query {
@@ -163,17 +163,17 @@ class callsForProposals extends OdbSuite {
           }
         """.asRight
       )
-    }
-  }
 
-  test("WHERE active") {
+  test("WHERE active"):
     createCall(s"""
-      type:        REGULAR_SEMESTER
       semester:    "2025B"
       activeStart: "2025-02-02"
       activeEnd:   "2025-07-30"
+      gemini: {
+        type: REGULAR_SEMESTER
+      }
     """.stripMargin
-    ).flatMap { id =>
+    ).flatMap: id =>
       expect(pi,
         s"""
           query {
@@ -199,10 +199,8 @@ class callsForProposals extends OdbSuite {
           }
         """.asRight
       )
-    }
-  }
 
-  test("WHERE isOpen (none)") {
+  test("WHERE isOpen (none)"):
     expect(pi,
       s"""
         query {
@@ -221,9 +219,8 @@ class callsForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-  test("WHERE isOpen (no partners)") {
+  test("WHERE isOpen (no partners)"):
     expect(pi,
       s"""
         query {
@@ -255,26 +252,27 @@ class callsForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-  test("WHERE isOpen (active partner)") {
+  test("WHERE isOpen (active partner)"):
     createCall(s"""
-      type:        DEMO_SCIENCE
       semester:    "2025B"
       activeStart: "2025-02-02"
       activeEnd:   "2099-07-30"
       partners:    [
         {
-          partner: CA
+          geminiPartner: CA
           submissionDeadlineOverride: "3000-01-01 00:00:00"
         },
         {
-          partner: US
+          geminiPartner: US
           submissionDeadlineOverride: "2000-01-01 00:00:00"
         }
       ]
+      gemini: {
+        type: DEMO_SCIENCE
+      }
     """.stripMargin
-    ).flatMap { id =>
+    ).flatMap: id =>
       expect(pi,
         s"""
           query {
@@ -297,14 +295,12 @@ class callsForProposals extends OdbSuite {
           }
         """.asRight
       )
-    }
-  }
 
-  test("WHERE allowsNonPartnerPi") {
+  test("WHERE allowsNonPartnerPi"):
     expect(pi,
       s"""
         query {
-          callsForProposals(WHERE: { allowsNonPartnerPi: { EQ: true } }) {
+          callsForProposals(WHERE: { gemini: { allowsNonPartnerPi: { EQ: true } } }) {
             matches {
               id
             }
@@ -329,6 +325,124 @@ class callsForProposals extends OdbSuite {
         }
       """.asRight
     )
-  }
 
-}
+  test("WHERE observatory"):
+    // No prior test creates a Keck call, so filtering on KECK isolates this one.
+    createCall(s"""
+      semester:    "2025A"
+      activeStart: "2025-02-01"
+      activeEnd:   "2025-07-31"
+      keck: {
+        instruments: [ HIRES ]
+      }
+    """.stripMargin
+    ).flatMap: id =>
+      expect(pi,
+        s"""
+          query {
+            callsForProposals(WHERE: { observatory: { EQ: KECK } }) {
+              matches {
+                id
+                observatory
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "callsForProposals": {
+              "matches": [
+                {
+                  "id": $id,
+                  "observatory": "KECK"
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+  test("WHERE query contains unmatched observatories"):
+    expect(
+      user  = pi,
+      query = s"""
+        query {
+          callsForProposals(WHERE: { observatory: { EQ: KECK } }) {
+            matches {
+              observatory
+              gemini {
+                type
+                coordinateLimits {
+                  north {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                  south {
+                    raStart { hms }
+                    raEnd { hms }
+                    decStart { dms }
+                    decEnd { dms }
+                  }
+                }
+                instruments
+                proprietaryMonths
+                allowsNonPartnerPi
+                nonPartnerDeadline
+                exchangePartners
+              }
+              keck {
+                instruments
+                coordinateLimits {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+              }
+              subaru {
+                type
+                instruments
+                coordinateLimits {
+                  raStart { hms }
+                  raEnd { hms }
+                  decStart { dms }
+                  decEnd { dms }
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "callsForProposals": {
+            "matches": [
+              {
+                "observatory": "KECK",
+                "gemini": null,
+                "keck": {
+                  "instruments": [ "HIRES" ],
+                  "coordinateLimits": {
+                    "raStart": {
+                      "hms": "04:00:00.000000"
+                    },
+                    "raEnd": {
+                      "hms": "01:00:00.000000"
+                    },
+                    "decStart" : {
+                      "dms" : "-37:00:00.000000"
+                    },
+                    "decEnd" : {
+                      "dms" : "+90:00:00.000000"
+                    }
+                  }
+                },
+                "subaru": null
+              }
+            ]
+          }
+        }
+      """.asRight
+    )

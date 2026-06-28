@@ -302,7 +302,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
               value {
                 name
                 proposal {
-                  type {
+                  gemini {
                     ... on Queue {
                       partnerSplits {
                         partner
@@ -319,7 +319,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         Right(
           createProgram(pi, "foo").flatMap { pid =>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
-            createCallForProposalsAs(service).flatMap(addQueueProposal(pi, pid, _)) >>
+            createGeminiCallForProposalsAs(service).flatMap(addQueueProposal(pi, pid, _)) >>
             IO.sleep(1.second) >> // give time to see the creation before we do an update
             query(
               pi,
@@ -328,7 +328,7 @@ class programEdit extends OdbSuite with SubscriptionUtils {
                 updateProposal(input: {
                   programId: "$pid"
                   SET: {
-                    type: {
+                    gemini: {
                       queue: {
                         partnerSplits: [
                           {
@@ -357,8 +357,8 @@ class programEdit extends OdbSuite with SubscriptionUtils {
         List(
           json"""{ "programEdit": { "editType" : "CREATED", "value": { "name": "foo", "proposal": null } } }""",
           json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": null } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [] } } } } }""",
-          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "type": { "partnerSplits": [ { "partner" : "US", "percent" : 60 }, { "partner" : "AR", "percent" : 40 }] } } } } }"""
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "gemini": { "partnerSplits": [] } } } } }""",
+          json"""{ "programEdit": { "editType" : "UPDATED", "value": { "name": "foo", "proposal": { "gemini": { "partnerSplits": [ { "partner" : "US", "percent" : 60 }, { "partner" : "AR", "percent" : 40 }] } } } } }"""
         )
     )
   }

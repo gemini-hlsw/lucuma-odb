@@ -24,6 +24,7 @@ import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
+import clue.ResponseException
 import fs2.Stream
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
@@ -86,14 +87,17 @@ sealed trait ItcService[F[_]] {
   )(using NoTransaction[F]): F[Either[OdbError, Itc]]
 
   /**
-   * Selects the cached ITC results for a single observation, if available and
-   * still valid.  Does not perform a remote ITC service call if not available.
+   * Selects the cached ITC result for a single observation, if available and
+   * still valid.  
+   * Returns Some(Right) for a cached success, Some(Left) for a
+   * cached deterministic failure, and None if not cached.
+   * Does not perform a remote ITC service call.
    */
   def selectOne(
     programId:    Program.Id,
     observatinId: Observation.Id,
     params:       GeneratorParams
-  )(using Transaction[F]): F[Option[Itc]]
+  )(using Transaction[F]): F[Option[Either[OdbError, Itc]]]
 
   /**
    * Selects the cached ITC results for a program, for those observations where
@@ -174,7 +178,7 @@ object ItcService {
 
   }
 
-  def instantiate[F[_]: Concurrent: Parallel: Logger](client: ItcClient[F])(using Services[F]): ItcService[F] =
+  def instantiate[F[_]: Concurrent as F: Parallel: Logger as L: Services](client: ItcClient[F]): ItcService[F] =
     new ItcService[F] {
 
       override def lookup(
@@ -184,7 +188,7 @@ object ItcService {
         (for {
           pr     <- EitherT(attemptLookup(pid, oid))
           (params, oa) = pr
-          result <- oa.fold(EitherT(callRemote(pid, oid, params)))(EitherT.pure(_))
+          result <- oa.fold(EitherT(callRemote(pid, oid, params)))(EitherT.fromEither(_))
         } yield result).value
 
       override def callRemote(
@@ -192,35 +196,53 @@ object ItcService {
         oid:    Observation.Id,
         params: GeneratorParams
       )(using NoTransaction[F]): F[Either[OdbError, Itc]] =
-        (for {
-          p <- EitherT.fromEither(params.itcInput.leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))))
-          r <- EitherT(callRemoteItc(oid, p))
-          _ <- EitherT.liftF(services.transactionally(insertOrUpdate(pid, oid, p, r)))
-        } yield r).value
+        params.itcInput
+          .leftMap(m => Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m)))
+          .fold(
+            err => Left(err).pure[F],
+            p =>
+              callRemoteItc(oid, p).flatTap:
+                case Right(r)                       => services.transactionally(insertOrUpdate(pid, oid, p, r))
+                case Left(e @ OdbError.ItcError(_)) => services.transactionally(insertOrUpdateFailure(pid, oid, p, e))
+                case Left(_)                        => F.unit
+          )
 
-      // Selects the parameters then selects the previously stored result set, if any.
+      // Selects the parameters then checks the cache
+      // Returns None if not cached (call remote), Some(Right) for cached success,
+      // Some(Left) for cached deterministic failure.
       private def attemptLookup(
         pid: Program.Id,
         oid: Observation.Id
-      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[Itc])]] =
+      )(using NoTransaction[F]): F[Either[OdbError, (GeneratorParams, Option[Either[OdbError, Itc]])]] =
         services.transactionally {
           (for {
             p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.invalidObservation(oid, _))))
-            r <- EitherT.liftF(selectOne(pid, oid, p))
+            r <- EitherT.liftF(selectOneCached(pid, oid, p))
           } yield (p, r)).value
         }
+
+      private def selectOneCached(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        params: GeneratorParams
+      ): F[Option[Either[OdbError, Itc]]] =
+        params.itcInput.toOption.flatTraverse: ps =>
+          val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
+          session
+            .option(Statements.SelectOneCachedResult)(pid, oid)
+            .map: rowOpt =>
+              for
+                (h, itcOpt, errOpt) <- rowOpt
+                if h === inputHash
+                result              <- itcOpt.map(_.asRight).orElse(errOpt.map(msg => OdbError.ItcError(msg.some).asLeft))
+              yield result
 
       override def selectOne(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
-      )(using Transaction[F]): F[Option[Itc]] =
-        params.itcInput.toOption.flatTraverse: ps =>
-          val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
-          session
-            .option(Statements.SelectOneItcResult)(pid, oid)
-            .map:
-              _.collect { case (h, rs) if h === inputHash => rs }
+      )(using Transaction[F]): F[Option[Either[OdbError, Itc]]] =
+        selectOneCached(pid, oid, params)
 
       override def selectAll(
         pid:    Program.Id,
@@ -286,6 +308,11 @@ object ItcService {
 
                 val modifiedCcr = ClientCalculationResult(ccr.versions, modifiedTargetTimes)
                 toTargetResults(targets, NonEmptyList.one(modifiedCcr)).map(_.head)
+              .handleErrorWith:
+                case e: ResponseException[?] =>
+                  OdbError.ItcError(e.getMessage.some).asLeft.pure
+                case t =>
+                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
         input.mode match
           case InstrumentMode.GmosNorthImaging(_, _, _, _) |
@@ -295,7 +322,7 @@ object ItcService {
           case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
             go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
                lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
-          case InstrumentMode.GnirsImaging(_, _, _, _, _, _) =>
+          case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
             go(lucuma.odb.sequence.gnirs.MinAcquisitionExposureTime,
                lucuma.odb.sequence.gnirs.MaxAcquisitionExposureTime)
           case m                                                      =>
@@ -339,14 +366,14 @@ object ItcService {
 
         case object GmosNorthImaging extends Imaging[GmosNorthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] =
-            case InstrumentMode.GmosNorthImaging(_, f, _, _) => f
+            case InstrumentMode.GmosNorthImaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosNorthImaging(nem)
 
         case object GmosSouthImaging extends Imaging[GmosSouthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] =
-               case InstrumentMode.GmosSouthImaging(_, f, _, _) => f
+               case InstrumentMode.GmosSouthImaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosSouthImaging(nem)
@@ -375,8 +402,11 @@ object ItcService {
             .parTraverse: in =>
               client.imaging(in, useCache = false)
             .map(_.asRight)
-            .handleError: err =>
-              OdbError.RemoteServiceCallError(s"Error calling ITC service: ${err.getMessage}".some).asLeft
+            .handleErrorWith:
+              case e: ResponseException[?] =>
+                OdbError.ItcError(e.getMessage.some).asLeft.pure
+              case t =>
+                OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
         for
           fs <- EitherT.fromEither(extractFilters(input.science.map(_.mode).toList, Nil))
@@ -395,8 +425,11 @@ object ItcService {
             client
               .spectroscopy(si, useCache = false)
               .map(_.asRight)
-              .handleError: t =>
-                OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft
+              .handleErrorWith:
+                case e: ResponseException[?] =>
+                  OdbError.ItcError(e.getMessage.some).asLeft.pure
+                case t =>
+                  OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
         // A placeholder result for GHOST, at least for now.
         //
@@ -464,20 +497,33 @@ object ItcService {
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))
         ).value
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def insertOrUpdate(
         pid:     Program.Id,
         oid:     Observation.Id,
         input:   ItcInput,
         results: Itc
-      )(using Transaction[F]): F[Unit] =
+      ): F[Unit] =
         val h = Md5Hash.unsafeFromByteArray(input.md5)
         session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results, h, results)
           .void
           .recoverWith {
             case SqlState.ForeignKeyViolation(ex) =>
-              Logger[F].info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+              L.info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
           }
+
+      private def insertOrUpdateFailure(
+        pid:   Program.Id,
+        oid:   Observation.Id,
+        input: ItcInput,
+        error: OdbError.ItcError
+      ): F[Unit] =
+        val h   = Md5Hash.unsafeFromByteArray(input.md5)
+        val msg = error.detail.getOrElse("")
+        session.execute(Statements.InsertOrUpdateItcFailure)(pid, oid, h, msg, h, msg)
+          .void
+          .recoverWith:
+            case SqlState.ForeignKeyViolation(ex) =>
+              L.info(ex)(s"Failed to insert or update ITC failure for program $pid, observation $oid. Probably due to a deleted calibration observation.")
     }
 
   object Statements {
@@ -500,18 +546,19 @@ object ItcService {
                c_data    = ${text.opt}
       """.command
 
-    val SelectOneItcResult: Query[(
+    val SelectOneCachedResult: Query[(
       Program.Id,
       Observation.Id,
-    ), (Md5Hash, Itc)] =
+    ), (Md5Hash, Option[Itc], Option[String])] =
       sql"""
         SELECT
           c_hash,
-          c_asterism_results
+          c_asterism_results,
+          c_error_message
         FROM t_itc_result
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id
-      """.query(md5_hash *: itc)
+      """.query(md5_hash *: itc.opt *: text.opt)
 
     val SelectAllItcResults: Query[Program.Id, (Observation.Id, Md5Hash, Itc)] =
       sql"""
@@ -520,7 +567,8 @@ object ItcService {
           c_hash,
           c_asterism_results
         FROM t_itc_result
-        WHERE c_program_id = $program_id
+        WHERE c_program_id         = $program_id AND
+              c_asterism_results IS NOT NULL
       """.query(observation_id *: md5_hash *: itc)
 
     def selectAllItcResults[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, (Observation.Id, Md5Hash, Itc)] =
@@ -530,7 +578,8 @@ object ItcService {
           c_hash,
           c_asterism_results
         FROM t_itc_result
-        WHERE c_observation_id IN ($enc)
+        WHERE c_observation_id    IN ($enc) AND
+              c_asterism_results IS NOT NULL
       """.query(observation_id *: md5_hash *: itc)
 
     val InsertOrUpdateItcResult: Command[(
@@ -547,14 +596,42 @@ object ItcService {
           c_observation_id,
           c_hash,
           c_asterism_results
-        ) SELECT
+        ) VALUES (
           $program_id,
           $observation_id,
           $md5_hash,
           $itc
+        )
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash             = $md5_hash,
-              c_asterism_results = $itc
+              c_asterism_results = $itc,
+              c_error_message    = NULL
+      """.command
+
+    val InsertOrUpdateItcFailure: Command[(
+      Program.Id,
+      Observation.Id,
+      Md5Hash,
+      String,
+      Md5Hash,
+      String
+    )] =
+      sql"""
+        INSERT INTO t_itc_result (
+          c_program_id,
+          c_observation_id,
+          c_hash,
+          c_error_message
+        ) VALUES (
+          $program_id,
+          $observation_id,
+          $md5_hash,
+          $text
+        )
+        ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
+          SET c_hash             = $md5_hash,
+              c_asterism_results = NULL,
+              c_error_message    = $text
       """.command
 
   }

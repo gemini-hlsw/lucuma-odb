@@ -8,9 +8,9 @@ package mapping
 import grackle.skunk.SkunkMapping
 
 import table.TargetView
-import table.ProgramTable
+import table.ProgramView
 
-trait CatalogInfoMapping[F[_]] extends ProgramTable[F] with TargetView[F]  {
+trait CatalogInfoMapping[F[_]] extends ProgramView[F] with TargetView[F]  {
 
   lazy val CatalogInfoMapping =
     ObjectMapping(CatalogInfoType)(

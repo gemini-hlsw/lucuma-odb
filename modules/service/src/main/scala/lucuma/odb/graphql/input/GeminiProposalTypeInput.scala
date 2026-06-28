@@ -6,8 +6,6 @@ package input
 
 import cats.data.State
 import cats.syntax.applicative.*
-import cats.syntax.apply.*
-import cats.syntax.eq.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -15,6 +13,7 @@ import cats.syntax.parallel.*
 import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ConsiderForBand3
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.ToOActivation
@@ -28,7 +27,7 @@ import monocle.Focus
 import monocle.Lens
 
 
-object ProposalTypeInput {
+object GeminiProposalTypeInput:
 
   private val fieldNames: List[String] =
     List(
@@ -42,28 +41,23 @@ object ProposalTypeInput {
       "systemVerfication"
     )
 
-  private lazy val formattedFieldNames: String = {
+  private lazy val formattedFieldNames: String =
     val fs = fieldNames.map(n => s"'$n'")
     val prefix = fs.init.intercalate(", ")
     s"$prefix or ${fs.last}"
-  }
 
   private lazy val ZeroPercent    = IntPercent.unsafeFrom(0)
   private lazy val HundredPercent = IntPercent.unsafeFrom(100)
 
-  private val PartnerSplitsInput: Matcher[Map[Partner, IntPercent]] =
-    PartnerSplitInput.Binding.List.Option.rmap { splits =>
-      val map = splits.getOrElse(List.empty).map(a => (a.partner -> a.percent)).toMap
-
-      Matcher
-        .validationFailure("Each partner may only appear once.")
-        .unlessA(splits.forall(_.length === map.size)) *>
-      Matcher
-        .validationFailure("Percentages must sum to exactly 100.")
-        .unlessA(splits.forall(_.foldMap(_.percent.value) === 100)) *>
-      map.success
-
-    }
+  // The time request is either an exchange-partner assignment or a set of
+  // Gemini partner splits, never both.
+  private def exchangeXorSplits(
+    exchangePartner: Option[ExchangePartner],
+    partnerSplits:   Option[Map[Partner, IntPercent]]
+  ): Result[Unit] =
+    Matcher
+      .validationFailure("Specify either 'partnerSplits' or 'exchangePartner', not both.")
+      .whenA(exchangePartner.isDefined && partnerSplits.exists(_.nonEmpty))
 
   case class Create(
     scienceSubtype:     ScienceSubtype,
@@ -72,14 +66,14 @@ object ProposalTypeInput {
     minPercentTotal:    Option[IntPercent]       = none,
     totalTime:          Option[TimeSpan]         = none,
     partnerSplits:      Map[Partner, IntPercent] = Map.empty,
+    exchangePartner:    Option[ExchangePartner]  = none,
     reviewerId:         Option[ProgramUser.Id]   = none,
     mentorId:           Option[ProgramUser.Id]   = none,
     aeonMultiFacility:  Boolean                  = false,
     jwstSynergy:        Boolean                  = false,
     usLongTerm:         Boolean                  = false,
     considerForBand3:   ConsiderForBand3         = ConsiderForBand3.Unset
-  ) {
-
+  ):
     def asEdit: Edit =
       Edit(
         scienceSubtype,
@@ -88,6 +82,7 @@ object ProposalTypeInput {
         Nullable.orNull(minPercentTotal),
         Nullable.orNull(totalTime),
         Nullable.NonNull(partnerSplits),
+        Nullable.orNull(exchangePartner),
         Nullable.orNull(reviewerId),
         Nullable.orNull(mentorId),
         aeonMultiFacility.some,
@@ -99,9 +94,7 @@ object ProposalTypeInput {
     def update(s: State[Create, Unit]): Create =
       s.runS(this).value
 
-  }
-
-  object Create {
+  object Create:
 
     val DefaultFor: ScienceSubtype => Create = {
       case ScienceSubtype.LargeProgram =>
@@ -114,53 +107,55 @@ object ProposalTypeInput {
 
     val Default: Create = DefaultFor(ScienceSubtype.Queue)
 
-    val tooActivation: Lens[Create, ToOActivation]            = Focus[Create](_.tooActivation)
-    val minPercentTime: Lens[Create, IntPercent]              = Focus[Create](_.minPercentTime)
-    val minPercentTotal: Lens[Create, Option[IntPercent]]     = Focus[Create](_.minPercentTotal)
-    val totalTime: Lens[Create, Option[TimeSpan]]             = Focus[Create](_.totalTime)
-    val partnerSplits: Lens[Create, Map[Partner, IntPercent]] = Focus[Create](_.partnerSplits)
-    val reviewerId: Lens[Create, Option[ProgramUser.Id]]      = Focus[Create](_.reviewerId)
-    val mentorId: Lens[Create, Option[ProgramUser.Id]]        = Focus[Create](_.mentorId)
-    val aeonMultiFacility: Lens[Create, Boolean]              = Focus[Create](_.aeonMultiFacility)
-    val jwstSynergy: Lens[Create, Boolean]                    = Focus[Create](_.jwstSynergy)
-    val usLongTerm: Lens[Create, Boolean]                     = Focus[Create](_.usLongTerm)
-    val considerForBand3: Lens[Create, ConsiderForBand3]      = Focus[Create](_.considerForBand3)
+    val tooActivation: Lens[Create, ToOActivation]             = Focus[Create](_.tooActivation)
+    val minPercentTime: Lens[Create, IntPercent]               = Focus[Create](_.minPercentTime)
+    val minPercentTotal: Lens[Create, Option[IntPercent]]      = Focus[Create](_.minPercentTotal)
+    val totalTime: Lens[Create, Option[TimeSpan]]              = Focus[Create](_.totalTime)
+    val partnerSplits: Lens[Create, Map[Partner, IntPercent]]  = Focus[Create](_.partnerSplits)
+    val exchangePartner: Lens[Create, Option[ExchangePartner]] = Focus[Create](_.exchangePartner)
+    val reviewerId: Lens[Create, Option[ProgramUser.Id]]       = Focus[Create](_.reviewerId)
+    val mentorId: Lens[Create, Option[ProgramUser.Id]]         = Focus[Create](_.mentorId)
+    val aeonMultiFacility: Lens[Create, Boolean]               = Focus[Create](_.aeonMultiFacility)
+    val jwstSynergy: Lens[Create, Boolean]                     = Focus[Create](_.jwstSynergy)
+    val usLongTerm: Lens[Create, Boolean]                      = Focus[Create](_.usLongTerm)
+    val considerForBand3: Lens[Create, ConsiderForBand3]       = Focus[Create](_.considerForBand3)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin)
-        ) => (rToo, rMin).parMapN { (too, min) =>
+        ) => (rToo, rMin).parMapN: (too, min) =>
           Create(s).update(
-            for {
+            for
               _ <- tooActivation  := too
               _ <- minPercentTime := min
-            } yield ()
+            yield ()
           )
-        }
-      }
 
     private val Classical: Matcher[Create] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Option("partnerSplits", rSplits),
+          PartnerSplitInput.BindingAll.Option("partnerSplits", rSplits),
+          ExchangePartnerBinding.Option("exchangePartner", rExchange),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
-          Create(ScienceSubtype.Classical).update(
-            for {
-              _ <- minPercentTime     := min
-              _ <- partnerSplits      := splits
-              _ <- aeonMultiFacility  := aeon
-              _ <- jwstSynergy        := jwst
-              _ <- usLongTerm         := usLong
-            } yield ()
+        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange, splits).as(
+            Create(ScienceSubtype.Classical).update(
+              for
+                _ <- minPercentTime     := min
+                _ <- partnerSplits      := splits
+                _ <- exchangePartner    := exchange
+                _ <- aeonMultiFacility  := aeon
+                _ <- jwstSynergy        := jwst
+                _ <- usLongTerm         := usLong
+              yield ()
+            )
           )
         }
-      }
 
     private val DemoScience: Matcher[Create] =
       simpleCreateBinding(ScienceSubtype.DemoScience)
@@ -169,26 +164,24 @@ object ProposalTypeInput {
       simpleCreateBinding(ScienceSubtype.DirectorsTime)
 
     private val FastTurnaround: Matcher[Create] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           ProgramUserIdBinding.Option("reviewerId", rReviewerId),
           ProgramUserIdBinding.Option("mentorId", rMentorId)
-        ) => (rToo, rMin, rReviewerId, rMentorId).parMapN { (too, min, reviewer, mentor) =>
+        ) => (rToo, rMin, rReviewerId, rMentorId).parMapN: (too, min, reviewer, mentor) =>
           Create(ScienceSubtype.FastTurnaround).update(
-            for {
+            for
               _ <- tooActivation  := too
               _ <- minPercentTime := min
               _ <- reviewerId     := reviewer
               _ <- mentorId       := mentor
-            } yield ()
+            yield ()
           )
-        }
-      }
 
     private val LargeProgram: Matcher[Create] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
@@ -196,51 +189,50 @@ object ProposalTypeInput {
           TimeSpanInput.Binding.Option("totalTime", rTotal),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst)
-        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN { (too, min, minTotal, total, aeon, jwst) =>
-          Create(ScienceSubtype.LargeProgram).update {
-            for {
+        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN: (too, min, minTotal, total, aeon, jwst) =>
+          Create(ScienceSubtype.LargeProgram).update:
+            for
               _ <- tooActivation     := too
               _ <- minPercentTime    := min
               _ <- minPercentTotal   := minTotal.orElse(HundredPercent.some)
               _ <- totalTime         := total.orElse(TimeSpan.Zero.some)
               _ <- aeonMultiFacility := aeon
               _ <- jwstSynergy       := jwst
-            } yield ()
-          }
-        }
-      }
+            yield ()
 
     private val PoorWeather: Matcher[Create] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           EnumBinding.Option("ignore", rIgnore)
         ) => rIgnore.as(Create(ScienceSubtype.PoorWeather, minPercentTime = ZeroPercent))
-      }
 
     private val Queue: Matcher[Create] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Option("partnerSplits", rSplits),
+          PartnerSplitInput.BindingAll.Option("partnerSplits", rSplits),
+          ExchangePartnerBinding.Option("exchangePartner", rExchange),
           ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rToo, rMin, rSplits, rBand3, rAeon, rJwst, rUsLong).parMapN { (too, min, splits, band3, aeon, jwst, usLong) =>
-          Create(ScienceSubtype.Queue).update(
-            for {
-              _ <- tooActivation     := too
-              _ <- minPercentTime    := min
-              _ <- partnerSplits     := splits
-              _ <- considerForBand3  := band3
-              _ <- aeonMultiFacility := aeon
-              _ <- jwstSynergy       := jwst
-              _ <- usLongTerm        := usLong
-            } yield ()
+        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap { case (too, min, splits, exchange, band3, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange, splits).as(
+            Create(ScienceSubtype.Queue).update(
+              for
+                _ <- tooActivation     := too
+                _ <- minPercentTime    := min
+                _ <- partnerSplits     := splits
+                _ <- exchangePartner   := exchange
+                _ <- considerForBand3  := band3
+                _ <- aeonMultiFacility := aeon
+                _ <- jwstSynergy       := jwst
+                _ <- usLongTerm        := usLong
+              yield ()
+            )
           )
         }
-      }
 
     private val SystemVerification: Matcher[Create] =
       simpleCreateBinding(ScienceSubtype.SystemVerification)
@@ -256,7 +248,6 @@ object ProposalTypeInput {
         Queue,
         SystemVerification
       )
-  }
 
   case class Edit(
     scienceSubtype:     ScienceSubtype,
@@ -265,55 +256,54 @@ object ProposalTypeInput {
     minPercentTotal:    Nullable[IntPercent]               = Nullable.Null,
     totalTime:          Nullable[TimeSpan]                 = Nullable.Null,
     partnerSplits:      Nullable[Map[Partner, IntPercent]] = Nullable.Null,
+    exchangePartner:    Nullable[ExchangePartner]          = Nullable.Null,
     reviewerId:         Nullable[ProgramUser.Id]           = Nullable.Null,
     mentorId:           Nullable[ProgramUser.Id]           = Nullable.Null,
     aeonMultiFacility:  Option[Boolean]                    = None,
     jwstSynergy:        Option[Boolean]                    = None,
     usLongTerm:         Option[Boolean]                    = None,
     considerForBand3:   Option[ConsiderForBand3]           = None
-  ) {
+  ):
     def asCreate: Create =
-      Create.DefaultFor(scienceSubtype).update {
-        for {
+      Create.DefaultFor(scienceSubtype).update:
+        for
           _ <- Create.tooActivation     := tooActivation
           _ <- Create.minPercentTime    := minPercentTime
           _ <- Create.minPercentTotal   := minPercentTotal.toOptionOption
           _ <- Create.totalTime         := totalTime.toOptionOption
           _ <- Create.partnerSplits     := partnerSplits.toOption
+          _ <- Create.exchangePartner   := exchangePartner.toOptionOption
           _ <- Create.reviewerId        := reviewerId.toOptionOption
           _ <- Create.mentorId          := mentorId.toOptionOption
           _ <- Create.aeonMultiFacility := aeonMultiFacility
           _ <- Create.jwstSynergy       := jwstSynergy
           _ <- Create.usLongTerm        := usLongTerm
           _ <- Create.considerForBand3  := considerForBand3
-        } yield ()
-      }
-  }
+        yield ()
 
-
-  object Edit {
+  object Edit:
     private def simpleEditBinding(s: ScienceSubtype): Matcher[Edit] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin)
-        ) => (rToo, rMin).parMapN { (too, min) =>
+        ) => (rToo, rMin).parMapN: (too, min) =>
           Edit(s, tooActivation = too, minPercentTime = min)
-        }
-      }
 
     private val Classical: Matcher[Edit] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Nullable("partnerSplits", rSplits),
+          PartnerSplitInput.BindingAll.Nullable("partnerSplits", rSplits),
+          ExchangePartnerBinding.Nullable("exchangePartner", rExchange),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rAeon, rJwst, rUsLong).parMapN { (min, splits, aeon, jwst, usLong) =>
-          Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange.toOption, splits.toOption).as(
+            Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, exchangePartner = exchange, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+          )
         }
-      }
 
     private val DemoScience: Matcher[Edit] =
       simpleEditBinding(ScienceSubtype.DemoScience)
@@ -322,19 +312,17 @@ object ProposalTypeInput {
       simpleEditBinding(ScienceSubtype.DirectorsTime)
 
     private val FastTurnaround: Matcher[Edit] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           ProgramUserIdBinding.Nullable("reviewerId", rReviewerId),
           ProgramUserIdBinding.Nullable("mentorId", rMentorId)
-        ) => (rToo, rMin, rReviewerId, rMentorId).parMapN { (too, min, reviewerId, mentorId) =>
+        ) => (rToo, rMin, rReviewerId, rMentorId).parMapN: (too, min, reviewerId, mentorId) =>
           Edit(ScienceSubtype.FastTurnaround, tooActivation = too, minPercentTime = min, reviewerId = reviewerId, mentorId = mentorId)
-        }
-      }
 
     private val LargeProgram: Matcher[Edit] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
@@ -342,32 +330,31 @@ object ProposalTypeInput {
           TimeSpanInput.Binding.Nullable("totalTime", rTotal),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst)
-        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN { (too, min, minTotal, total, aeon, jwst) =>
+        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN: (too, min, minTotal, total, aeon, jwst) =>
           Edit(ScienceSubtype.LargeProgram, too, min, minTotal, total, aeonMultiFacility = aeon, jwstSynergy = jwst)
-        }
-      }
 
     private val PoorWeather: Matcher[Edit] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           EnumBinding.Option("ignore", rIgnore)
         ) => rIgnore.as(Edit(ScienceSubtype.PoorWeather))
-      }
 
     private val Queue: Matcher[Edit] =
-      ObjectFieldsBinding.rmap {
+      ObjectFieldsBinding.rmap:
         case List(
           ToOActivationBinding.Option("toOActivation", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
-          PartnerSplitsInput.Nullable("partnerSplits", rSplits),
+          PartnerSplitInput.BindingAll.Nullable("partnerSplits", rSplits),
+          ExchangePartnerBinding.Nullable("exchangePartner", rExchange),
           ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rToo, rMin, rSplits, rBand3, rAeon, rJwst, rUsLong).parMapN { (too, min, splits, band3, aeon, jwst, usLong) =>
-          Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, considerForBand3 = band3, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap { case (too, min, splits, exchange, band3, aeon, jwst, usLong) =>
+          exchangeXorSplits(exchange.toOption, splits.toOption).as(
+            Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, exchangePartner = exchange, considerForBand3 = band3, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+          )
         }
-      }
 
     private val SystemVerification: Matcher[Edit] =
       simpleEditBinding(ScienceSubtype.SystemVerification)
@@ -383,7 +370,6 @@ object ProposalTypeInput {
         Queue,
         SystemVerification
       )
-  }
 
   private def binding[A](
     classical:          Matcher[A],
@@ -395,7 +381,7 @@ object ProposalTypeInput {
     queue:              Matcher[A],
     systemVerification: Matcher[A]
   ): Matcher[A] =
-    ObjectFieldsBinding.rmap {
+    ObjectFieldsBinding.rmap:
       case List(
         classical.Option("classical", rClassical),
         demoScience.Option("demoScience", rDemo),
@@ -405,15 +391,10 @@ object ProposalTypeInput {
         poorWeather.Option("poorWeather", rPoor),
         queue.Option("queue", rQueue),
         systemVerification.Option("systemVerification", rSystem)
-      ) => (rClassical, rDemo, rDirector, rFast, rLarge, rPoor, rQueue, rSystem).parFlatMapN {
+      ) => (rClassical, rDemo, rDirector, rFast, rLarge, rPoor, rQueue, rSystem).parFlatMapN:
         (classical, demo, director, fast, large, poor, queue, system) =>
           val typeOption = List(classical, demo, director, fast, large, poor, queue, system).flatten
-          typeOption match {
+          typeOption match
             case Nil      => Matcher.validationFailure(s"One of $formattedFieldNames must be provided.")
             case a :: Nil => a.success
             case _        => Matcher.validationFailure(s"Only one of $formattedFieldNames may be provided.")
-          }
-      }
-    }
-
-}

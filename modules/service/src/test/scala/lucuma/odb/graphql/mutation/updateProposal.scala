@@ -10,8 +10,8 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
-import lucuma.core.enums.CallForProposalsType
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.core.util.DateInterval
@@ -75,7 +75,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       partnerSplits: [
                         {
@@ -93,7 +93,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Queue {
                     partnerSplits {
                       partner
@@ -109,7 +109,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "partnerSplits": [
                     {
                       "partner": "US",
@@ -129,6 +129,38 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("⨯ cannot have both partner splits and an exchange partner") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      // First give it partner splits...
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: { gemini: { queue: { partnerSplits: [ { partner: US, percent: 100 } ] } } }
+            }) { proposal { gemini { scienceSubtype } } }
+          }
+        """
+      ) *>
+      // ...then setting an exchange partner (leaving the splits) violates the
+      // deferred constraint trigger at commit.
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: { gemini: { queue: { exchangePartner: KECK } } }
+            }) { proposal { gemini { scienceSubtype } } }
+          }
+        """,
+        expected = List("A proposal may not have both an exchange partner and partner splits.").asLeft
+      )
+    }
+  }
+
   test("✓ change type") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
@@ -141,7 +173,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: SMALL_BODIES
-                  type: {
+                  gemini: {
                     demoScience: {
                       toOActivation: STANDARD
                       minPercentTime: 50
@@ -152,7 +184,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on DemoScience {
                     toOActivation
@@ -168,7 +200,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "category": "SMALL_BODIES",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
                   "toOActivation": "STANDARD",
                   "minPercentTime": 50
@@ -194,7 +226,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: SMALL_BODIES
-                  type: {
+                  gemini: {
                     largeProgram: {
                       minPercentTotalTime: 25
                     }
@@ -204,7 +236,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             ) {
               proposal {
                 category
-                type {
+                gemini {
                   scienceSubtype
                   ... on LargeProgram {
                     minPercentTotalTime
@@ -220,7 +252,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "category": "SMALL_BODIES",
-                "type": {
+                "gemini": {
                   "scienceSubtype": "LARGE_PROGRAM",
                   "minPercentTotalTime": 25,
                   "totalTime": { "hours": 0.000000 }
@@ -253,14 +285,14 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: SMALL_BODIES
-                  type: {
+                  gemini: {
                     demoScience: { }
                   }
                 }
               }
             ) {
               proposal {
-                type {
+                gemini {
                   scienceSubtype
                   ... on DemoScience {
                     minPercentTime
@@ -274,7 +306,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
                   "minPercentTime": 100
                 }
@@ -307,14 +339,14 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: SMALL_BODIES
-                  type: {
+                  gemini: {
                     poorWeather: { }
                   }
                 }
               }
             ) {
               proposal {
-                type {
+                gemini {
                   scienceSubtype
                 }
               }
@@ -325,7 +357,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "scienceSubtype": "POOR_WEATHER"
                 }
               }
@@ -357,14 +389,14 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   category: SMALL_BODIES
-                  type: {
+                  gemini: {
                     classical: { }
                   }
                 }
               }
             ) {
               proposal {
-                type {
+                gemini {
                   scienceSubtype
                   ... on Classical {
                     minPercentTime
@@ -378,7 +410,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "scienceSubtype": "CLASSICAL",
                   "minPercentTime": 100
                 }
@@ -423,7 +455,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       partnerSplits: [
                         {
@@ -445,7 +477,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected =
-          List("Argument 'input.SET.type.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
+          List("Argument 'input.SET.gemini.queue.partnerSplits' is invalid: Percentages must sum to exactly 100.").asLeft
       )
     }
   }
@@ -474,7 +506,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("⨯ set mismatched cfp") {
-    createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.DemoScience).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         expect(
@@ -499,7 +531,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ set matching cfp") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         expect(
@@ -512,7 +544,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   SET: { callId: "$cid" }
                 }
               ) {
-                proposal { type { scienceSubtype } }
+                proposal { gemini { scienceSubtype } }
               }
             }
           """,
@@ -520,7 +552,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             {
               "updateProposal": {
                 "proposal": {
-                  "type": {
+                  "gemini": {
                     "scienceSubtype": "QUEUE"
                   }
                 }
@@ -534,7 +566,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ set cfp on creation, default active period"):
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some) *>
         assertIOBoolean(getActivePeriod(pi, pid).map(_ ===  DateInterval.between(LocalDate.of(2025, Month.FEBRUARY, 1), LocalDate.of(2025, Month.JULY, 31))))
@@ -542,7 +574,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
 
   test("✓ set cfp later, default active period"):
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(
@@ -555,7 +587,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   SET: { callId: "$cid" }
                 }
               ) {
-                proposal { type { scienceSubtype } }
+                proposal { gemini { scienceSubtype } }
               }
             }
           """
@@ -565,7 +597,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
 
   test("⨯ invalid type change") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(
@@ -591,7 +623,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 input: {
                   programId: "$pid"
                   SET: {
-                    type: {
+                    gemini: {
                       demoScience: {
                         toOActivation: STANDARD
                         minPercentTime: 50
@@ -612,7 +644,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ change call and type") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(
@@ -631,7 +663,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           """
         ) *>
         assertIO(getProprietaryMonths(pi, pid), NonNegInt.unsafeFrom(12).some) *>
-        createCallForProposalsAs(staff, CallForProposalsType.DemoScience).flatMap { cid2 =>
+        createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.DemoScience).flatMap { cid2 =>
           expect(
             user = pi,
             query = s"""
@@ -641,7 +673,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                     programId: "$pid"
                     SET: {
                       callId: "$cid2"
-                      type: {
+                      gemini: {
                         demoScience: {
                           toOActivation: STANDARD
                           minPercentTime: 50
@@ -650,7 +682,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                     }
                   }
                 ) {
-                  proposal { type { scienceSubtype } }
+                  proposal { gemini { scienceSubtype } }
                 }
               }
             """,
@@ -658,7 +690,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               {
                 "updateProposal": {
                   "proposal": {
-                    "type": {
+                    "gemini": {
                       "scienceSubtype": "DEMO_SCIENCE"
                     }
                   }
@@ -672,7 +704,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   }
 
   test("✓ delete cfp") {
-    createCallForProposalsAs(staff, CallForProposalsType.RegularSemester).flatMap { cid =>
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramAs(pi).flatMap { pid =>
         addProposal(pi, pid) *>
         query(
@@ -699,7 +731,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   programId: "$pid"
                   SET: {
                     callId: null
-                    type: {
+                    gemini: {
                       demoScience: {
                         toOActivation: STANDARD
                         minPercentTime: 50
@@ -708,7 +740,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   }
                 }
               ) {
-                proposal { type { scienceSubtype } }
+                proposal { gemini { scienceSubtype } }
               }
             }
           """,
@@ -716,7 +748,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             {
               "updateProposal": {
                 "proposal": {
-                  "type": {
+                  "gemini": {
                     "scienceSubtype": "DEMO_SCIENCE"
                   }
                 }
@@ -845,7 +877,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation: NONE
                       minPercentTime: 50
@@ -861,7 +893,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   scienceSubtype
                   ... on Queue {
                     minPercentTime
@@ -879,7 +911,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           query {
             program(programId: "$pid") {
               proposal {
-                type {
+                gemini {
                   scienceSubtype
                   ... on Queue {
                     minPercentTime
@@ -901,7 +933,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "program": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "scienceSubtype": "QUEUE",
                   "minPercentTime": 50
                 }
@@ -960,7 +992,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                             input: {
                               programId: "$pid1"
                               SET: {
-                                type: {
+                                gemini: {
                                   fastTurnaround: {
                                     reviewerId: "$reviewerId"
                                   }
@@ -990,7 +1022,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       reviewerId: "pu-1234-5678-9abc-def0"
                     }
@@ -1018,7 +1050,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     classical: {
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
@@ -1031,7 +1063,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Classical {
                     minPercentTime
                     aeonMultiFacility
@@ -1047,7 +1079,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "minPercentTime": 80,
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
@@ -1070,7 +1102,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     classical: {
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
@@ -1083,7 +1115,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Classical {
                     aeonMultiFacility
                     jwstSynergy
@@ -1098,7 +1130,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "aeonMultiFacility": false,
                   "jwstSynergy": false,
                   "usLongTerm": false
@@ -1120,7 +1152,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     largeProgram: {
                       toOActivation: NONE
                       minPercentTime: 80
@@ -1134,7 +1166,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on LargeProgram {
                     toOActivation
                     minPercentTime
@@ -1152,7 +1184,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "toOActivation": "NONE",
                   "minPercentTime": 80,
                   "minPercentTotalTime": 90,
@@ -1177,7 +1209,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation: NONE
                       minPercentTime: 80
@@ -1192,7 +1224,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Queue {
                     toOActivation
                     minPercentTime
@@ -1210,7 +1242,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "toOActivation": "NONE",
                   "minPercentTime": 80,
                   "aeonMultiFacility": true,
@@ -1235,7 +1267,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       toOActivation: NONE
                       minPercentTime: 80
@@ -1250,7 +1282,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Queue {
                     aeonMultiFacility
                     jwstSynergy
@@ -1266,7 +1298,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
                   "usLongTerm": true,
@@ -1293,7 +1325,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       minPercentTime: 50
                     }
@@ -1302,7 +1334,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Queue {
                     considerForBand3
                   }
@@ -1316,7 +1348,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "considerForBand3": "CONSIDER"
                 }
               }
@@ -1339,7 +1371,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       minPercentTime: 50
                     }
@@ -1348,7 +1380,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Queue {
                     minPercentTime
                     aeonMultiFacility
@@ -1365,7 +1397,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "minPercentTime": 50,
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
@@ -1387,9 +1419,9 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           updateProposal(
             input: {
               programId: "$pid"
-              SET: { type: { classical: { minPercentTime: 50 } } }
+              SET: { gemini: { classical: { minPercentTime: 50 } } }
             }
-          ) { proposal { type { scienceSubtype } } }
+          ) { proposal { gemini { scienceSubtype } } }
         }
       """) *>
       expect(
@@ -1400,7 +1432,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               input: {
                 programId: "$pid"
                 SET: {
-                  type: {
+                  gemini: {
                     queue: {
                       partnerSplits: [{ partner: US, percent: 100 }]
                     }
@@ -1409,7 +1441,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                type {
+                gemini {
                   ... on Queue {
                     considerForBand3
                   }
@@ -1423,7 +1455,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "type": {
+                "gemini": {
                   "considerForBand3": "UNSET"
                 }
               }

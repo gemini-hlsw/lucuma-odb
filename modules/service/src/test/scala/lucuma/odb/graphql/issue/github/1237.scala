@@ -54,8 +54,8 @@ class GitHub_1237 extends OdbSuite {
 
   test("switch proposal semester after submit") {
     for {
-      cid24B <- createCallForProposalsAs(staff, semester = sem24B)
-      cid25A <- createCallForProposalsAs(staff, semester = sem25A)
+      cid24B <- createGeminiCallForProposalsAs(staff, semester = sem24B)
+      cid25A <- createGeminiCallForProposalsAs(staff, semester = sem25A)
 
       pid1 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid1, cid24B)
@@ -78,8 +78,8 @@ class GitHub_1237 extends OdbSuite {
 
   test("switch proposal semester after unsubmit") {
     for {
-      cid24B <- createCallForProposalsAs(staff, semester = sem24B)
-      cid25A <- createCallForProposalsAs(staff, semester = sem25A)
+      cid24B <- createGeminiCallForProposalsAs(staff, semester = sem24B)
+      cid25A <- createGeminiCallForProposalsAs(staff, semester = sem25A)
 
       pid1 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid1, cid24B)

@@ -24,10 +24,13 @@ import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.GnirsCamera
@@ -98,6 +101,52 @@ class WiringSuite extends ClientSuite:
   test("ItcClient spectroscopy basic wiring and sanity check"):
     spectroscopy(
       WiringSuite.GmosSpectroscopyInputData,
+      ClientCalculationResult(
+        ItcVersions(
+          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          BuildInfo.ocslibHash.some
+        ),
+        AsterismIntegrationTimeOutcomes:
+          NonEmptyChain:
+            TargetIntegrationTimeOutcome:
+              TargetIntegrationTime(
+                Zipper.fromNel(NonEmptyList.one(selected)),
+                Band.R.asLeft,
+                SignalToNoiseAt(atWavelength,
+                                SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                                TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+                ).some,
+                List.empty
+              ).asRight
+      ).asRight
+    )
+
+  test("ItcClient gmos north mos spectroscopy basic wiring and sanity check"):
+    spectroscopy(
+      WiringSuite.GmosMosSpectroscopyInputData,
+      ClientCalculationResult(
+        ItcVersions(
+          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          BuildInfo.ocslibHash.some
+        ),
+        AsterismIntegrationTimeOutcomes:
+          NonEmptyChain:
+            TargetIntegrationTimeOutcome:
+              TargetIntegrationTime(
+                Zipper.fromNel(NonEmptyList.one(selected)),
+                Band.R.asLeft,
+                SignalToNoiseAt(atWavelength,
+                                SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                                TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+                ).some,
+                List.empty
+              ).asRight
+      ).asRight
+    )
+
+  test("ItcClient gmos south mos spectroscopy basic wiring and sanity check"):
+    spectroscopy(
+      WiringSuite.GmosSouthMosSpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
           versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
@@ -600,6 +649,54 @@ object WiringSuite:
   val GmosSpectroscopyInputData: SpectroscopyInput =
     gmosSpectroscopyInput(defaultEtm)
 
+  val GmosMosSpectroscopyInputData: SpectroscopyInput =
+    SpectroscopyInput(
+      SpectroscopyParameters(
+        ItcConstraintsInput(
+          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
+          skyBackground = SkyBackground.Darkest,
+          waterVapor = WaterVapor.VeryDry,
+          elevationRange = ElevationRange.ByAirMass.Default
+        ),
+        InstrumentMode.GmosNorthSpectroscopy(
+          defaultEtm,
+          Wavelength.Min,
+          GmosNorthGrating.B1200_G5301,
+          GmosNorthFilter.GPrime.some,
+          GmosFpu.North.customMask(
+            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_0_75, "mos_mask.fits")
+          ),
+          GmosCcdMode(
+            GmosXBinning.Two,
+            GmosYBinning.Two,
+            GmosAmpCount.Twelve,
+            GmosAmpGain.High,
+            GmosAmpReadMode.Fast
+          ).some,
+          GmosRoi.FullFrame.some,
+          PortDisposition.Side
+        )
+      ),
+      NonEmptyList.of(
+        TargetInput(
+          SourceProfile.Point(
+            BandNormalized[Integrated](
+              Galaxy(Spiral).some,
+              SortedMap(
+                Band.R ->
+                  Measure(
+                    BrightnessValue.unsafeFrom(BigDecimal(10.0)),
+                    TaggedUnit[VegaMagnitude, Brightness[Integrated]].unit
+                  ).tag
+              )
+            )
+          ),
+          RadialVelocity.fromMetersPerSecond.getOption(1.0).get
+        )
+      )
+    )
+
   def gmosSpectroscopyInput(etm: ExposureTimeMode): SpectroscopyInput =
     SpectroscopyInput(
       SpectroscopyParameters(
@@ -616,6 +713,54 @@ object WiringSuite:
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,
           GmosFpu.North.builtin(GmosNorthFpu.LongSlit_0_25),
+          GmosCcdMode(
+            GmosXBinning.Two,
+            GmosYBinning.Two,
+            GmosAmpCount.Twelve,
+            GmosAmpGain.High,
+            GmosAmpReadMode.Fast
+          ).some,
+          GmosRoi.FullFrame.some,
+          PortDisposition.Side
+        )
+      ),
+      NonEmptyList.of(
+        TargetInput(
+          SourceProfile.Point(
+            BandNormalized[Integrated](
+              Galaxy(Spiral).some,
+              SortedMap(
+                Band.R ->
+                  Measure(
+                    BrightnessValue.unsafeFrom(BigDecimal(10.0)),
+                    TaggedUnit[VegaMagnitude, Brightness[Integrated]].unit
+                  ).tag
+              )
+            )
+          ),
+          RadialVelocity.fromMetersPerSecond.getOption(1.0).get
+        )
+      )
+    )
+
+  val GmosSouthMosSpectroscopyInputData: SpectroscopyInput =
+    SpectroscopyInput(
+      SpectroscopyParameters(
+        ItcConstraintsInput(
+          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
+          skyBackground = SkyBackground.Darkest,
+          waterVapor = WaterVapor.VeryDry,
+          elevationRange = ElevationRange.ByAirMass.Default
+        ),
+        InstrumentMode.GmosSouthSpectroscopy(
+          defaultEtm,
+          Wavelength.Min,
+          GmosSouthGrating.B1200_G5321,
+          GmosSouthFilter.GPrime.some,
+          GmosFpu.South.customMask(
+            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_1_00, "mos_mask.fits")
+          ),
           GmosCcdMode(
             GmosXBinning.Two,
             GmosYBinning.Two,
@@ -810,12 +955,14 @@ object WiringSuite:
           waterVapor = WaterVapor.VeryDry,
           elevationRange = ElevationRange.ByAirMass.Default
         ),
-        InstrumentMode.GnirsImaging(etm,
-                                    GnirsFilter.H2,
-                                    GnirsCamera.ShortBlue,
-                                    GnirsReadMode.Bright,
-                                    GnirsWellDepth.Shallow,
-                                    PortDisposition.Side
+        InstrumentMode.GnirsImaging(
+          etm,
+          GnirsFilter.H2,
+          GnirsCamera.ShortBlue,
+          GnirsReadMode.Bright,
+          GnirsWellDepth.Shallow,
+          PosInt.unsafeFrom(1),
+          PortDisposition.Side
         )
       ),
       NonEmptyList.of(

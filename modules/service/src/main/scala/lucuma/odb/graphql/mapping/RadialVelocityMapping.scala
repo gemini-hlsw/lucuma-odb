@@ -9,9 +9,9 @@ import grackle.skunk.SkunkMapping
 import lucuma.core.math.RadialVelocity
 
 import table.TargetView
-import table.ProgramTable
+import table.ProgramView
 
-trait RadialVelocityMapping[F[_]] extends ProgramTable[F] with TargetView[F] {
+trait RadialVelocityMapping[F[_]] extends ProgramView[F] with TargetView[F] {
 
   lazy val RadialVelocityMapping =
     ObjectMapping(RadialVelocityType)(
