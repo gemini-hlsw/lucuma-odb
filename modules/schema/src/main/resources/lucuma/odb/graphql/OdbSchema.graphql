@@ -13392,6 +13392,7 @@ type ConfigurationObservingMode {
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
   gnirsLongSlit: ConfigurationGnirsLongSlit
+  gnirsIfu: ConfigurationGnirsIfu
   igrins2LongSlit: ConfigurationIgrins2LongSlit
   visitor: ConfigurationVisitor
 }
@@ -13425,6 +13426,11 @@ type ConfigurationGnirsLongSlit {
   grating: GnirsGrating!
   camera: GnirsCamera!
   prism: GnirsPrism!
+}
+
+type ConfigurationGnirsIfu {
+  grating: GnirsGrating!
+  fpu: GnirsFpuIfu!
 }
 
 type ConfigurationIgrins2LongSlit {
