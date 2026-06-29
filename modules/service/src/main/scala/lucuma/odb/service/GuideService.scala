@@ -321,6 +321,13 @@ object GuideService {
         case visitor.Config(mode, wavelength, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
 
+    // Extra static coordinates AGS should treat like science positions.
+    // only GHOST supplies an optional one for the sky fiber position
+    val extraSciencePositions: List[Coordinates] =
+      params.observingMode match
+        case g: ghost.ifu.Config => g.skyPosition.toList
+        case _                   => Nil
+
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
         (params.observingMode, probe) match
@@ -818,7 +825,7 @@ object GuideService {
                                obsInfo.constraints,
                                wavelength,
                                baseCoords,
-                               scienceCoords.toList,
+                               scienceCoords.toList ++ genInfo.extraSciencePositions,
                                blindOffset,
                                obsInfo.availabilityAngles,
                                genInfo.acqOffsets,
@@ -934,6 +941,7 @@ object GuideService {
           scienceCoords <- ResultT.fromResult:
                              asterismTracking.toList
                                .traverse(_.at(obsTime.toInstant))
+                               .map(_ ++ genInfo.extraSciencePositions)
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for science targets in observation $oid"
