@@ -28,7 +28,7 @@ object InitialConfigs:
       coadds            = PosInt.MinValue,
       filter            = GnirsFilter.Y,
       decker            = GnirsDecker.Acquisition,
-      fpu               = GnirsFpu.Slit(lucuma.core.enums.GnirsFpuSlit.LongSlit_0_10),
+      fpu               = GnirsFpu.Spectroscopy.Slit(lucuma.core.enums.GnirsFpuSlit.LongSlit_0_10),
       acquisitionMirror = GnirsAcquisitionMirrorMode.In,
       camera            = GnirsCamera.ShortBlue,
       focus             = GnirsFocus.Best,

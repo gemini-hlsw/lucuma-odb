@@ -20,6 +20,7 @@ trait GnirsDynamicView[F[_]] extends BaseMapping[F]:
     val Decker: ColumnRef            = col("c_decker",             gnirs_decker)
     val FpuSlit: ColumnRef           = col("c_fpu_slit",           gnirs_fpu_slit.opt)
     val FpuOther: ColumnRef          = col("c_fpu_other",          gnirs_fpu_other.opt)
+    val FpuIfu: ColumnRef            = col("c_fpu_ifu",            gnirs_fpu_ifu.opt)
     val Camera: ColumnRef            = col("c_camera",             gnirs_camera)
     val FocusMotorSteps: ColumnRef   = col("c_focus_motor_steps",  int4.opt)
     val ReadMode: ColumnRef          = col("c_read_mode",          gnirs_read_mode)

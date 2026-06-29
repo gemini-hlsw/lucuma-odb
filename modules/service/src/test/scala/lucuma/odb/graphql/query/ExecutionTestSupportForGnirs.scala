@@ -55,7 +55,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(5600).get
       ),
-      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
+      GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
 

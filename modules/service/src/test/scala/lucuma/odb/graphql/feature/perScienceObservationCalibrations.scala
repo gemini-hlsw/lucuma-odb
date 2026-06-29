@@ -2175,7 +2175,7 @@ class perScienceObservationCalibrations
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(2560).get
       ),
-      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
+      GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
     // The daytime pinhole flat looks up the same config but with the pinhole

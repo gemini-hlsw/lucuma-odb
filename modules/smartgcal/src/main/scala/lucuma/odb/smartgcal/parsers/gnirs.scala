@@ -65,13 +65,13 @@ trait GnirsParsers:
     manyOf(
       "pinhole 0.1"  -> GnirsFpu.Other(GnirsFpuOther.Pinhole1),
       "pinhole 0.3"  -> GnirsFpu.Other(GnirsFpuOther.Pinhole3),
-      "0.10 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_10),
-      "0.15 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_15),
-      "0.20 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_20),
-      "0.30 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
-      "0.45 arcsec"  -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_45),
-      "0.675 arcsec" -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_675),
-      "1.0 arcsec"   -> GnirsFpu.Slit(GnirsFpuSlit.LongSlit_1_00)
+      "0.10 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_10),
+      "0.15 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_15),
+      "0.20 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_20),
+      "0.30 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
+      "0.45 arcsec"  -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_45),
+      "0.675 arcsec" -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_675),
+      "1.0 arcsec"   -> GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_1_00)
     ).withContext("GNIRS focal plane unit")
 
   val wellDepth: Parser[NonEmptyList[GnirsWellDepth]] =

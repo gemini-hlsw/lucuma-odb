@@ -46,7 +46,7 @@ object Gnirs:
       val d = s"disperser: ${disperser.getOrElse("None")}"
       val x = s"crossDispersed: ${crossDispersed.getOrElse("None")}"
       val w = s"wavelength: ${wavelength.fold("None")(w => s"${w.nm.value.value} nm")}"
-      val u = s"fpu: ${fpu.fold(_.toString, _.toString)}"
+      val u = s"fpu: ${fpu.fold(_.toString, _.toString, _.toString)}"
       s"Gnirs { pixelScale: $pixelScale, $d, $x, $w, $u, wellDepth: $wellDepth }"
 
   object SearchKey:

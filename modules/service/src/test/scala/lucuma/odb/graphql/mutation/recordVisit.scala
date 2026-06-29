@@ -104,7 +104,7 @@ class recordVisit extends OdbSuite with query.GenerationTestSupport with Executi
       GnirsGrating.D111,
       GnirsPrism.Mirror,
       BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max),
-      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
+      GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
 

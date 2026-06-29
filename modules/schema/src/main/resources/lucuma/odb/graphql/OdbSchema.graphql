@@ -8782,6 +8782,11 @@ type GnirsDynamic {
   fpuOther: GnirsFpuOther
 
   """
+  IFU FPU value, when the FPU is an integral field unit.
+  """
+  fpuIfu: GnirsFpuIfu
+
+  """
   Spectroscopy configuration carried when the acquisition mirror is "out" of
   the beam. `null` means the mirror is "in".
   """
@@ -12552,7 +12557,19 @@ type SpectroscopyConfigOptionGmosSouth {
 type SpectroscopyConfigOptionGnirs {
   grating: GnirsGrating!
   filter: GnirsFilter!
-  fpu: GnirsFpuSlit!
+
+  """
+  Long-slit FPU, when this option is a single-slit configuration. Exactly one of
+  `fpuSlit` / `fpuIfu` is present.
+  """
+  fpuSlit: GnirsFpuSlit
+
+  """
+  IFU FPU, when this option is an integral field unit configuration. Exactly one
+  of `fpuSlit` / `fpuIfu` is present.
+  """
+  fpuIfu: GnirsFpuIfu
+
   prism: GnirsPrism!
   camera: GnirsCamera!
 }
@@ -12601,6 +12618,14 @@ enum GnirsFpuSlit {
   LONG_SLIT_0_45
   LONG_SLIT_0_675
   LONG_SLIT_1_00
+}
+
+"""
+IFU FPU options for GNIRS (low- and high-resolution integral field units).
+"""
+enum GnirsFpuIfu {
+  LOW_RESOLUTION
+  HIGH_RESOLUTION
 }
 
 """
@@ -20635,10 +20660,10 @@ input GnirsAcquisitionMirrorOutInput {
 """
 GNIRS dynamic step configuration input.
 
-Exactly one of `fpuSlit` / `fpuOther` must be provided.  `acquisitionMirrorOut`
-is provided when the acquisition mirror is "out" (spectroscopy mode); its
-absence indicates the mirror is "in".  `focusMotorSteps` is omitted when focus
-is "Best" (instrument-chosen).
+Exactly one of `fpuSlit` / `fpuOther` / `fpuIfu` must be provided.
+`acquisitionMirrorOut` is provided when the acquisition mirror is "out"
+(spectroscopy mode); its absence indicates the mirror is "in".  `focusMotorSteps`
+is omitted when focus is "Best" (instrument-chosen).
 """
 input GnirsDynamicInput {
   exposure: TimeSpanInput!
@@ -20647,6 +20672,7 @@ input GnirsDynamicInput {
   decker: GnirsDecker!
   fpuSlit: GnirsFpuSlit
   fpuOther: GnirsFpuOther
+  fpuIfu: GnirsFpuIfu
   acquisitionMirrorOut: GnirsAcquisitionMirrorOutInput
   camera: GnirsCamera!
   focusMotorSteps: Int

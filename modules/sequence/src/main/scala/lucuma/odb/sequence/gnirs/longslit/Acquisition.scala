@@ -147,7 +147,7 @@ object Acquisition:
                    focus             = config.focus,
                    readMode          = fpuStepReadMode,
                    decker            = slitDecker,
-                   fpu               = GnirsFpu.Slit(config.fpu)
+                   fpu               = GnirsFpu.Spectroscopy.Slit(config.fpu)
                  )
           slitImage      <- scienceStep(
                               TelescopeConfig(
@@ -172,7 +172,7 @@ object Acquisition:
           field          <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
           // Back to the selected slit (decker/FPU) for the through-slit steps.
           _              <- State.modify[GnirsDynamicConfig]:
-                              _.copy(decker = slitDecker, fpu = GnirsFpu.Slit(config.fpu))
+                              _.copy(decker = slitDecker, fpu = GnirsFpu.Spectroscopy.Slit(config.fpu))
           tSlitSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           throughSlit    <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)

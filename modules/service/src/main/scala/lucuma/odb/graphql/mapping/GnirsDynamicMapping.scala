@@ -18,6 +18,7 @@ trait GnirsDynamicMapping[F[_]] extends GnirsDynamicView[F]:
       SqlField("decker",          GnirsDynamicView.Decker),
       SqlField("fpuSlit",         GnirsDynamicView.FpuSlit),
       SqlField("fpuOther",        GnirsDynamicView.FpuOther),
+      SqlField("fpuIfu",          GnirsDynamicView.FpuIfu),
       SqlObject("acquisitionMirrorOut"),
       SqlField("camera",          GnirsDynamicView.Camera),
       SqlField("focusMotorSteps", GnirsDynamicView.FocusMotorSteps),

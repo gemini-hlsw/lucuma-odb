@@ -202,18 +202,20 @@ object Phase0Table {
 
     override def encoder: Encoder[GnirsSpectroscopyRow] =
       (
-        instrument    *:
-        gnirs_grating *:
-        gnirs_filter  *:
-        gnirs_fpu_slit *:
-        gnirs_prism   *:
+        instrument         *:
+        gnirs_grating      *:
+        gnirs_filter       *:
+        gnirs_fpu_slit.opt *:
+        gnirs_fpu_ifu.opt  *:
+        gnirs_prism        *:
         gnirs_camera
       ).contramap[GnirsSpectroscopyRow]: row =>
         (
           row.spec.instrument,
           row.grating,
           row.filter,
-          row.fpu,
+          row.fpu.left.toOption,
+          row.fpu.toOption,
           row.prism,
           row.camera
         )
@@ -223,7 +225,8 @@ object Phase0Table {
         "c_instrument",
         "c_grating",
         "c_filter",
-        "c_fpu",
+        "c_fpu_slit",
+        "c_fpu_ifu",
         "c_prism",
         "c_camera"
       )
