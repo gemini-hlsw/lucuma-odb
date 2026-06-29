@@ -114,15 +114,16 @@ object configurationrequest:
         "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
         "visitor"           -> Json.Null,  // one of these will be replaced below
         m match
-          case Flamingos2LongSlit(disperser) => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
-          case GhostIfu                      => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
-          case GmosNorthImaging(filter)      => "gmosNorthImaging"   -> Json.obj("filter" -> filter.asJson)
-          case GmosNorthLongSlit(grating)    => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)
-          case GmosSouthImaging(filter)      => "gmosSouthImaging"   -> Json.obj("filter" -> filter.asJson)
-          case GmosSouthLongSlit(grating)    => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
-          case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit" -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
-          case Igrins2LongSlit               => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
-          case Visitor(mode, radius)         => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
+          case Flamingos2LongSlit(disperser)         => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
+          case GhostIfu                              => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
+          case GmosNorthImaging(filter)              => "gmosNorthImaging"   -> Json.obj("filter" -> filter.asJson)
+          case GmosNorthLongSlit(grating)            => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)
+          case GmosSouthImaging(filter)              => "gmosSouthImaging"   -> Json.obj("filter" -> filter.asJson)
+          case GmosSouthLongSlit(grating)            => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
+          case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit"      -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
+          case GnirsIfu(_, _)                        => "gnirsIfu"           -> Json.obj() // TODO Not implemented yet
+          case Igrins2LongSlit                       => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
+          case Visitor(mode, radius)                 => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
       )
 
     given Encoder[Either[Coordinates, Region]] = e =>
