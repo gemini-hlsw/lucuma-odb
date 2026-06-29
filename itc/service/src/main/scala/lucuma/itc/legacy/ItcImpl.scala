@@ -139,7 +139,7 @@ object ItcImpl {
                   SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
                   SpectroscopyMode.Flamingos2(_, _, _, _, _) | SpectroscopyMode.Igrins2(_) |
                   SpectroscopyMode.Ghost(_, _, _, _, _) |
-                  SpectroscopyMode.GnirsLongSlit(_, _, _, _, _, _, _, _, _, _)) =>
+                  SpectroscopyMode.GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _)) =>
                 spectroscopyTimeAndGraphs(
                   target,
                   observingMode,

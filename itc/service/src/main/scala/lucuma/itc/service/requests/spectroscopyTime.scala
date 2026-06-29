@@ -121,7 +121,7 @@ object AsterismSpectroscopyTimeRequest:
               _,
               centralWavelength,
               filter,
-              slitWidth,
+              fpu,
               prism,
               grating,
               camera,
@@ -131,10 +131,10 @@ object AsterismSpectroscopyTimeRequest:
               port
             ) =>
           Result.success:
-            ObservingMode.SpectroscopyMode.GnirsLongSlit(
+            ObservingMode.SpectroscopyMode.GnirsSpectroscopy(
               centralWavelength,
               filter,
-              slitWidth,
+              fpu,
               prism,
               grating,
               camera,

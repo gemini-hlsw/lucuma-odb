@@ -4,7 +4,7 @@
 #import GmosSouthGrating, GmosSouthFpuInput, GmosSouthFilter, GmosCcdModeInput, GmosRoi, GmosNorthGrating, GmosNorthFpuInput, GmosNorthFilter from "lucuma/odb/graphql/OdbSchema.graphql"
 #import Flamingos2Disperser, Flamingos2Fpu, Flamingos2Filter, Flamingos2ReadMode from "lucuma/odb/graphql/OdbSchema.graphql"
 #import GhostReadMode, GhostBinning, GhostResolutionMode from "lucuma/odb/graphql/OdbSchema.graphql"
-#import GnirsFilter, GnirsFpuSlit, GnirsPrism, GnirsGrating, GnirsCamera, GnirsReadMode, GnirsWellDepth from "lucuma/odb/graphql/OdbSchema.graphql"
+#import GnirsFilter, GnirsFpuSlit, GnirsFpuIfu, GnirsPrism, GnirsGrating, GnirsCamera, GnirsReadMode, GnirsWellDepth from "lucuma/odb/graphql/OdbSchema.graphql"
 
 """
 ##########
@@ -289,6 +289,21 @@ input GhostSpectroscopyInput {
   blueDetector: ItcGhostDetectorInput!
 }
 
+"""
+GNIRS spectroscopy FPU: exactly one of a long slit or an IFU.
+"""
+input GnirsFpuSpectroscopyInput @oneOf {
+  """
+  GNIRS slit width
+  """
+  slitWidth: GnirsFpuSlit
+
+  """
+  GNIRS IFU
+  """
+  ifu: GnirsFpuIfu
+}
+
 input GnirsSpectroscopyInput {
   """
   Exposure time mode.
@@ -306,9 +321,9 @@ input GnirsSpectroscopyInput {
   filter: GnirsFilter!
 
   """
-  GNIRS slit width
+  GNIRS spectroscopy FPU (long slit or IFU)
   """
-  slitWidth: GnirsFpuSlit!
+  fpu: GnirsFpuSpectroscopyInput!
 
   """
   GNIRS cross-disperser prism
@@ -428,7 +443,7 @@ input InstrumentModesInput @oneOf {
   ghostSpectroscopy: GhostSpectroscopyInput
 
   """
-  Gnirs Longslit Spectroscopy
+  Gnirs Spectroscopy (long slit or IFU)
   """
   gnirsSpectroscopy: GnirsSpectroscopyInput
 

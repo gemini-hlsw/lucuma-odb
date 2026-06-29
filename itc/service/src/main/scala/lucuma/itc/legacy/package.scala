@@ -34,9 +34,9 @@ extension (mode: ObservingMode)
   /** The number of coadds for instruments that support it (currently GNIRS), else None. */
   def coadds: Option[Int] =
     mode match
-      case ObservingMode.SpectroscopyMode.GnirsLongSlit(coadds = coadds) => coadds.value.some
-      case ObservingMode.ImagingMode.Gnirs(coadds = coadds)              => coadds.value.some
-      case _                                                             => none
+      case ObservingMode.SpectroscopyMode.GnirsSpectroscopy(coadds = coadds) => coadds.value.some
+      case ObservingMode.ImagingMode.Gnirs(coadds = coadds)                  => coadds.value.some
+      case _                                                                 => none
 
 extension (etm: ExposureTimeMode)
   def spectroscopyCalculationMethod(

@@ -37,6 +37,7 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.GmosFpu
@@ -459,7 +460,7 @@ object GeneratorParamsService {
                 exposureTimeMode  = gn.exposureTimeMode,
                 centralWavelength = gn.centralWavelength,
                 filter            = gn.filter,
-                slitWidth         = gn.fpu,
+                fpu               = GnirsFpu.Spectroscopy.Slit(gn.fpu),
                 prism             = gn.prism,
                 grating           = gn.grating,
                 camera            = gn.camera,
