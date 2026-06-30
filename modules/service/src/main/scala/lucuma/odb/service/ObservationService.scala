@@ -390,7 +390,6 @@ object ObservationService {
         }
       }
 
-      // An exchange observing mode (exchange_keck / exchange_subaru) may only be
       private def updateObservingModes(
         nEdit: Nullable[ObservingModeInput.Edit],
         oids:  NonEmptyList[Observation.Id],
@@ -398,12 +397,6 @@ object ObservationService {
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
 
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
-          // An exchange edit that doesn't supply an instrument (e.g. only
-          // totalRequestTime is changed) leaves the observing mode type unchanged.
-          // It can't name keck vs subaru on its own (since the instrument isn't
-          // being changed), so we route it as an in-place update and leave
-          // t_observation's mode type alone.
-//          val exchangeInPlace = oEdit.exists(_.exchange.exists(_.instrument.isEmpty))
           for {
             m <- selectObservingModes(oids.toList)
             // Rewrite the observation's mode type to match the edit:
@@ -415,15 +408,9 @@ object ObservationService {
             _ <- oEdit match
                    case None       => updateObservingModeType(None, oids)
                    case Some(edit) => edit.observingModeType.traverse_(t => updateObservingModeType(Some(t), oids))
-            //_ <- if exchangeInPlace then ().pure[F]
-            //     else updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
 
               (existingMode, oEdit) match {
-//                case (Some(_: ExchangeObservingModeType), Some(edit)) if exchangeInPlace =>
-                  // update existing exchange mode in place
-//                  observingModeServices.update(edit, matchingOids)
-
                 // `forall` (rather than `contains`) so a partial edit whose mode type is
                 // indeterminate (None) — e.g. a GNIRS spectroscopy edit that doesn't change
                 // the FPU, and so can't say slit vs ifu — updates the existing mode in place
