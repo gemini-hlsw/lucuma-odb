@@ -37,7 +37,6 @@ import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
-import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.GmosFpu
@@ -442,7 +441,7 @@ object GeneratorParamsService {
 
             GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
-          case gn: gnirs.longslit.Config =>
+          case gn: gnirs.spectroscopy.Config =>
             for
               // Acquisition (imaging) filter for the ITC: the explicit acquisition
               // filter if set, otherwise the default for the spectroscopy wavelength.
@@ -460,7 +459,7 @@ object GeneratorParamsService {
                 exposureTimeMode  = gn.exposureTimeMode,
                 centralWavelength = gn.centralWavelength,
                 filter            = gn.filter,
-                fpu               = GnirsFpu.Spectroscopy.Slit(gn.fpu),
+                fpu               = gn.fpu,
                 prism             = gn.prism,
                 grating           = gn.grating,
                 camera            = gn.camera,

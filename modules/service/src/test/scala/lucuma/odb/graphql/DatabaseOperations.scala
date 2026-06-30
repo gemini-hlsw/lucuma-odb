@@ -863,6 +863,9 @@ trait DatabaseOperations { this: OdbSuite =>
   def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
+  def createGnirsIfuObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsIfu, ImageQuality.Preset.PointEight, None, tids*)
+
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -1117,6 +1120,16 @@ trait DatabaseOperations { this: OdbSuite =>
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          spectroscopy: {
+            wavelength: { nanometers: 2200 }
+            resolution: 1000
+            wavelengthCoverage: { nanometers: 200 }
+            focalPlane: IFU
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
       case ObservingModeType.Igrins2LongSlit =>
         """{
           spectroscopy: {
@@ -1240,11 +1253,29 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            fpuSlit: LONG_SLIT_0_30
+            filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          gnirsSpectroscopy: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            fpuIfu: LOW_RESOLUTION
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
@@ -1411,11 +1442,29 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            fpuSlit: LONG_SLIT_0_30
+            filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          gnirsSpectroscopy: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            fpuIfu: LOW_RESOLUTION
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {

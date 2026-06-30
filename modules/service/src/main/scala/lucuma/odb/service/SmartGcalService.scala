@@ -767,6 +767,7 @@ object SmartGcalService:
         sql"s.c_cross_dispersed IS NOT DISTINCT FROM ${gnirs_prism.opt}"(key.crossDispersed),
         sql"s.c_fpu_slit        IS NOT DISTINCT FROM ${gnirs_fpu_slit.opt}"(GnirsFpu.slit.getOption(key.fpu)),
         sql"s.c_fpu_other       IS NOT DISTINCT FROM ${gnirs_fpu_other.opt}"(GnirsFpu.other.getOption(key.fpu)),
+        sql"s.c_fpu_ifu         IS NOT DISTINCT FROM ${gnirs_fpu_ifu.opt}"(GnirsFpu.ifu.getOption(key.fpu)),
         sql"s.c_well_depth      = ${gnirs_well_depth}"(key.wellDepth),
         key.wavelength.fold(void"s.c_wavelength_range IS NULL")(
           sql"s.c_wavelength_range @> ${wavelength_pm}"
@@ -818,6 +819,7 @@ object SmartGcalService:
           c_wavelength_range,
           c_fpu_slit,
           c_fpu_other,
+          c_fpu_ifu,
           c_well_depth,
           c_exposure_time
         ) SELECT
@@ -830,6 +832,7 @@ object SmartGcalService:
           $wavelength_pm_range,
           ${gnirs_fpu_slit.opt},
           ${gnirs_fpu_other.opt},
+          ${gnirs_fpu_ifu.opt},
           $gnirs_well_depth,
           $time_span
       """.contramap[(
@@ -844,5 +847,5 @@ object SmartGcalService:
         GnirsWellDepth              ,
         TimeSpan
       )] { case (i, g, l, ps, disp, xd, wr, fpu, wd, t) =>
-        (i, g, l, ps, disp, xd, wr, GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu), wd, t)
+        (i, g, l, ps, disp, xd, wr, GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu), GnirsFpu.ifu.getOption(fpu), wd, t)
       }

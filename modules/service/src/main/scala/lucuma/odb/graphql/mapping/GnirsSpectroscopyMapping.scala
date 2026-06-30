@@ -24,8 +24,8 @@ import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
 
-trait GnirsLongSlitMapping[F[_]]
-  extends GnirsLongSlitView[F]
+trait GnirsSpectroscopyMapping[F[_]]
+  extends GnirsSpectroscopyView[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
@@ -60,20 +60,20 @@ trait GnirsLongSlitMapping[F[_]]
           "toSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
         )
 
-  lazy val GnirsLongSlitAcquisitionMapping: ObjectMapping =
-    ObjectMapping(GnirsLongSlitAcquisitionType)(
+  lazy val GnirsSpectroscopyAcquisitionMapping: ObjectMapping =
+    ObjectMapping(GnirsSpectroscopyAcquisitionType)(
 
-      SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
 
-      SqlField("explicitAcquisitionType", GnirsLongSlitView.AcqType),
-      SqlField("coadds",    GnirsLongSlitView.AcqCoadds),
+      SqlField("explicitAcquisitionType", GnirsSpectroscopyView.AcqType),
+      SqlField("coadds",    GnirsSpectroscopyView.AcqCoadds),
 
       // Acquisition filter: explicit override only. The effective/default filter is
       // determined in code (GnirsAcquisitionMode) at sequence-generation time.
-      SqlField("explicitFilter", GnirsLongSlitView.AcqFilter),
+      SqlField("explicitFilter", GnirsSpectroscopyView.AcqFilter),
 
-      SqlField("acqSkyOffPRaw", GnirsLongSlitView.AcqSkyOffsetP, hidden = true),
-      SqlField("acqSkyOffQRaw", GnirsLongSlitView.AcqSkyOffsetQ, hidden = true),
+      SqlField("acqSkyOffPRaw", GnirsSpectroscopyView.AcqSkyOffsetP, hidden = true),
+      SqlField("acqSkyOffQRaw", GnirsSpectroscopyView.AcqSkyOffsetQ, hidden = true),
 
       CursorFieldJson("skyOffset",
         cursor =>
@@ -87,63 +87,66 @@ trait GnirsLongSlitMapping[F[_]]
         List("acqSkyOffPRaw", "acqSkyOffQRaw")
       ),
 
-      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
     )
 
-  lazy val GnirsLongSlitMapping: ObjectMapping =
-    ObjectMapping(GnirsLongSlitType)(
+  lazy val GnirsSpectroscopyMapping: ObjectMapping =
+    ObjectMapping(GnirsSpectroscopyType)(
 
-      SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
 
-      SqlObject("exposureTimeMode", Join(GnirsLongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("exposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
 
       // Grating: effective = COALESCE(explicit, initial)
-      SqlField("grating",        GnirsLongSlitView.GratingEffective),
-      SqlField("explicitGrating", GnirsLongSlitView.Grating),
-      SqlField("initialGrating", GnirsLongSlitView.InitialGrating),
+      SqlField("grating",        GnirsSpectroscopyView.GratingEffective),
+      SqlField("explicitGrating", GnirsSpectroscopyView.Grating),
+      SqlField("initialGrating", GnirsSpectroscopyView.InitialGrating),
 
       // Prism: effective = COALESCE(explicit, initial)
-      SqlField("prism",          GnirsLongSlitView.PrismEffective),
-      SqlField("explicitPrism",  GnirsLongSlitView.Prism),
-      SqlField("initialPrism",   GnirsLongSlitView.InitialPrism),
+      SqlField("prism",          GnirsSpectroscopyView.PrismEffective),
+      SqlField("explicitPrism",  GnirsSpectroscopyView.Prism),
+      SqlField("initialPrism",   GnirsSpectroscopyView.InitialPrism),
 
       // Central wavelength: required stored value + initial snapshot
       SqlObject("centralWavelength"),
       SqlObject("initialCentralWavelength"),
 
       // Camera + FPU + Filter + Wavelength
-      SqlField("camera",        GnirsLongSlitView.Camera),
-      SqlField("initialCamera", GnirsLongSlitView.InitialCamera),
-      SqlField("fpu",           GnirsLongSlitView.Fpu),
-      SqlField("initialFpu",    GnirsLongSlitView.InitialFpu),
-      SqlField("filter",        GnirsLongSlitView.Filter),
-      SqlField("initialFilter", GnirsLongSlitView.InitialFilter),
-      SqlField("coadds",        GnirsLongSlitView.Coadds),
+      SqlField("camera",        GnirsSpectroscopyView.Camera),
+      SqlField("initialCamera", GnirsSpectroscopyView.InitialCamera),
+      // FPU: exactly one of fpuSlit / fpuIfu is non-null (+ initial snapshots).
+      SqlField("fpuSlit",        GnirsSpectroscopyView.FpuSlit),
+      SqlField("fpuIfu",         GnirsSpectroscopyView.FpuIfu),
+      SqlField("initialFpuSlit", GnirsSpectroscopyView.InitialFpuSlit),
+      SqlField("initialFpuIfu",  GnirsSpectroscopyView.InitialFpuIfu),
+      SqlField("filter",        GnirsSpectroscopyView.Filter),
+      SqlField("initialFilter", GnirsSpectroscopyView.InitialFilter),
+      SqlField("coadds",        GnirsSpectroscopyView.Coadds),
 
       // Decker: effective (DB-computed COALESCE), default, explicit
-      SqlField("decker",         GnirsLongSlitView.DeckerEffective),
-      SqlField("defaultDecker",  GnirsLongSlitView.DefaultDecker),
-      SqlField("explicitDecker", GnirsLongSlitView.ExplicitDecker),
+      SqlField("decker",         GnirsSpectroscopyView.DeckerEffective),
+      SqlField("defaultDecker",  GnirsSpectroscopyView.DefaultDecker),
+      SqlField("explicitDecker", GnirsSpectroscopyView.ExplicitDecker),
 
       // Read mode: explicit override only; when null the read mode is computed
       // from the exposure time at sequence-generation time (mirrors Flamingos2).
-      SqlField("explicitReadMode", GnirsLongSlitView.ExplicitReadMode),
+      SqlField("explicitReadMode", GnirsSpectroscopyView.ExplicitReadMode),
 
       // Well depth: effective (DB-computed COALESCE), default, explicit
-      SqlField("wellDepth",         GnirsLongSlitView.WellDepthEffective),
-      SqlField("defaultWellDepth",  GnirsLongSlitView.DefaultWellDepth),
-      SqlField("explicitWellDepth", GnirsLongSlitView.ExplicitWellDepth),
+      SqlField("wellDepth",         GnirsSpectroscopyView.WellDepthEffective),
+      SqlField("defaultWellDepth",  GnirsSpectroscopyView.DefaultWellDepth),
+      SqlField("explicitWellDepth", GnirsSpectroscopyView.ExplicitWellDepth),
 
       // Focus motor steps (null = best)
-      SqlField("explicitFocusMotorSteps", GnirsLongSlitView.FocusMotorSteps),
+      SqlField("explicitFocusMotorSteps", GnirsSpectroscopyView.FocusMotorSteps),
 
       // Telescope configs raw columns (hidden, used for cursor fields)
-      SqlField("slitOffsetModeEffRaw",  GnirsLongSlitView.SlitOffsetModeEffective,  hidden = true),
-      SqlField("tcEffRaw",              GnirsLongSlitView.TelescopeConfigsEffective, hidden = true),
-      SqlField("slitOffsetModeDefRaw",  GnirsLongSlitView.DefaultSlitOffsetMode,     hidden = true),
-      SqlField("tcDefRaw",              GnirsLongSlitView.DefaultTelescopeConfigs,   hidden = true),
-      SqlField("slitOffsetModeExpRaw",  GnirsLongSlitView.ExplicitSlitOffsetMode,    hidden = true),
-      SqlField("tcExpRaw",              GnirsLongSlitView.ExplicitTelescopeConfigs,  hidden = true),
+      SqlField("slitOffsetModeEffRaw",  GnirsSpectroscopyView.SlitOffsetModeEffective,  hidden = true),
+      SqlField("tcEffRaw",              GnirsSpectroscopyView.TelescopeConfigsEffective, hidden = true),
+      SqlField("slitOffsetModeDefRaw",  GnirsSpectroscopyView.DefaultSlitOffsetMode,     hidden = true),
+      SqlField("tcDefRaw",              GnirsSpectroscopyView.DefaultTelescopeConfigs,   hidden = true),
+      SqlField("slitOffsetModeExpRaw",  GnirsSpectroscopyView.ExplicitSlitOffsetMode,    hidden = true),
+      SqlField("tcExpRaw",              GnirsSpectroscopyView.ExplicitTelescopeConfigs,  hidden = true),
 
       // telescopeConfigs: effective SlitTelescopeConfigs = explicit coalesce default
       CursorFieldJson("telescopeConfigs",
@@ -181,12 +184,12 @@ trait GnirsLongSlitMapping[F[_]]
       SqlObject("acquisition"),
 
       // Telluric type (stored as jsonb)
-      SqlJson("telluricType", GnirsLongSlitView.TelluricType),
+      SqlJson("telluricType", GnirsSpectroscopyView.TelluricType),
 
     )
 
-  lazy val GnirsLongSlitElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (GnirsLongSlitType, "exposureTimeMode", Nil) =>
+  lazy val GnirsSpectroscopyElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GnirsSpectroscopyType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(
@@ -195,7 +198,7 @@ trait GnirsLongSlitMapping[F[_]]
           )
         )
 
-    case (GnirsLongSlitAcquisitionType, "exposureTimeMode", Nil) =>
+    case (GnirsSpectroscopyAcquisitionType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(

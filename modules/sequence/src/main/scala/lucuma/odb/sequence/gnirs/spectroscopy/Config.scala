@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gnirs.longslit
+package lucuma.odb.sequence.gnirs.spectroscopy
 
 import cats.Eq
 import cats.derived.*
@@ -10,7 +10,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
@@ -21,6 +20,7 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.syntax.all.*
 
@@ -77,7 +77,7 @@ object AcquisitionConfig:
 case class Config(
   filter:                  GnirsFilter,
   decker:                  GnirsDecker,
-  fpu:                     GnirsFpuSlit,
+  fpu:                     GnirsFpu.Spectroscopy,
   prism:                   GnirsPrism,
   grating:                 GnirsGrating,
   centralWavelength:       Wavelength,
@@ -98,7 +98,14 @@ case class Config(
 
     out.writeChars(filter.tag)
     out.writeChars(decker.tag)
-    out.writeChars(fpu.tag)
+    // FPU: discriminator byte + leaf tag, so slit and IFU tag namespaces can't collide.
+    fpu match
+      case GnirsFpu.Spectroscopy.Slit(s) =>
+        out.writeByte(0)
+        out.writeChars(s.tag)
+      case GnirsFpu.Spectroscopy.Ifu(i)  =>
+        out.writeByte(1)
+        out.writeChars(i.tag)
     out.writeChars(prism.tag)
     out.writeChars(grating.tag)
     out.write(centralWavelength.hashBytes)

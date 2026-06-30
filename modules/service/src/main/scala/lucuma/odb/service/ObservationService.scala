@@ -398,11 +398,23 @@ object ObservationService {
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
           for {
             m <- selectObservingModes(oids.toList)
-            _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
+            // Rewrite the observation's mode type to match the edit:
+            //  - delete (oEdit = None): null the type so it no longer references the deleted row.
+            //  - full edit (observingModeType = Some): set the new type.
+            //  - partial in-place edit (observingModeType = None): leave it as-is; nulling would
+            //    orphan the mode row. This happens e.g. for a GNIRS spectroscopy edit that doesn't
+            //    change the FPU and so can't determine slit vs ifu.
+            _ <- oEdit match
+                   case None       => updateObservingModeType(None, oids)
+                   case Some(edit) => edit.observingModeType.traverse_(t => updateObservingModeType(Some(t), oids))
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
 
               (existingMode, oEdit) match {
-                case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
+                // `forall` (rather than `contains`) so a partial edit whose mode type is
+                // indeterminate (None) — e.g. a GNIRS spectroscopy edit that doesn't change
+                // the FPU, and so can't say slit vs ifu — updates the existing mode in place
+                // instead of replacing it. Modes whose input always yields Some are unaffected.
+                case (Some(ex), Some(edit)) if edit.observingModeType.forall(_ === ex) =>
                   // update existing
                   observingModeServices.update(edit, matchingOids)
 

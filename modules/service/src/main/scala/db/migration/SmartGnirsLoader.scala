@@ -36,9 +36,10 @@ object SmartGnirsLoader:
       wavelength_pm_range *:
       gnirs_fpu_slit.opt  *:
       gnirs_fpu_other.opt *:
+      gnirs_fpu_ifu.opt   *:
       gnirs_well_depth
     ).contramap[TableKey]: k =>
-      (k.pixelScale, k.disperser, k.crossDispersed, k.wavelengthRange, GnirsFpu.slit.getOption(k.fpu), GnirsFpu.other.getOption(k.fpu), k.wellDepth)
+      (k.pixelScale, k.disperser, k.crossDispersed, k.wavelengthRange, GnirsFpu.slit.getOption(k.fpu), GnirsFpu.other.getOption(k.fpu), GnirsFpu.ifu.getOption(k.fpu), k.wellDepth)
 
   def encoder(using k: Encoder[TableKey], v: Encoder[SmartGcalValue.Legacy]): Encoder[TableRow] =
     (
@@ -56,6 +57,7 @@ object SmartGnirsLoader:
       Col("c_wavelength_range", "d_wavelength_pm_range"),
       Col.fkey("c_fpu_slit", "t_gnirs_fpu_slit").index,
       Col("c_fpu_other", "e_gnirs_fpu_other").index,
+      Col("c_fpu_ifu", "e_gnirs_fpu_ifu").index,
       Col("c_well_depth", "e_gnirs_well_depth")
     )
 

@@ -41,6 +41,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       decker              = "SHORT_CAM_LONG_SLIT",
       fpuSlit             = Some("LONG_SLIT_0_30"),
       fpuOther            = None,
+      fpuIfu              = None,
       prism               = Some("MIRROR"),
       grating             = Some("D111"),
       mirrorWavelengthNm  = Some(BigDecimal("2200.000")),

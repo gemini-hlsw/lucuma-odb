@@ -17,6 +17,7 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
@@ -97,12 +98,21 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       case GnirsPixelScale.PixelScale_0_05 => GnirsFpuOther.Pinhole1
       case GnirsPixelScale.PixelScale_0_15 => GnirsFpuOther.Pinhole3
 
+    // IFU resolution is tied to the camera pixel scale: LR-IFU on the 0.15"/pix
+    // short camera, HR-IFU on the 0.05"/pix long camera.
+    def ifuFpu(ps: GnirsPixelScale): GnirsFpuIfu = ps match
+      case GnirsPixelScale.PixelScale_0_05 => GnirsFpuIfu.HighResolution
+      case GnirsPixelScale.PixelScale_0_15 => GnirsFpuIfu.LowResolution
+
     val rows: List[Gnirs.TableRow] =
       List(GnirsPixelScale.PixelScale_0_05, GnirsPixelScale.PixelScale_0_15).flatMap: ps =>
         List(
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartFlat),
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartArc),
-          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat)
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat),
+          // IFU flat + arc, so IFU science sequences resolve smart gcal too.
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartFlat),
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
         )
 
     prior >>
@@ -127,7 +137,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   explicitTelescopeConfigs: { alongSlit: $entries }
                 }
               }
@@ -149,7 +159,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   explicitTelescopeConfigs: { toSky: $entries }
                 }
               }
@@ -171,7 +181,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   exposureTimeMode: {
                     timeAndCount: {
                       time:  { seconds: $seconds }
@@ -204,6 +214,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           decker
           fpuSlit
           fpuOther
+          fpuIfu
           acquisitionMirrorOut {
             prism
             grating
@@ -243,7 +254,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     exposureTimeMode: {
                       timeAndCount: {
@@ -273,7 +284,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitAcquisitionType: $acqType
                   }
@@ -297,7 +308,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     skyOffset: {
                       p: { arcseconds: $pArcsec }
@@ -328,7 +339,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitAcquisitionType: FAINT
                     skyOffset: { p: { arcseconds: $pArcsec }, q: { arcseconds: $qArcsec } }
@@ -353,7 +364,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   camera: $camera
                 }
               }
@@ -375,7 +386,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitFilter: $filter
                   }
@@ -402,6 +413,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
     decker:              String,
     fpuSlit:             Option[String],
     fpuOther:            Option[String],
+    fpuIfu:              Option[String],
     prism:               Option[String],
     grating:             Option[String],
     mirrorWavelengthNm:  Option[BigDecimal],
@@ -442,6 +454,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           "decker":               ${cfg.decker.asJson},
           "fpuSlit":              ${cfg.fpuSlit.asJson},
           "fpuOther":             ${cfg.fpuOther.asJson},
+          "fpuIfu":               ${cfg.fpuIfu.asJson},
           "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
           "camera":               ${cfg.camera.asJson},
           "focusMotorSteps":      ${cfg.focus.asJson},
@@ -497,6 +510,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           "decker":               ${cfg.decker.asJson},
           "fpuSlit":              ${cfg.fpuSlit.asJson},
           "fpuOther":             ${cfg.fpuOther.asJson},
+          "fpuIfu":               ${cfg.fpuIfu.asJson},
           "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
           "camera":               ${cfg.camera.asJson},
           "focusMotorSteps":      ${cfg.focus.asJson},

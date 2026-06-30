@@ -28,6 +28,7 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
@@ -40,7 +41,7 @@ import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
-import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlitConfig
+import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopyConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 
@@ -56,8 +57,11 @@ object CalibrationConfigSubset:
   case object GhostConfigs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GhostIfu
 
-  case class GnirsLongSlitConfigs(config: GnirsLongSlitConfig) extends CalibrationConfigSubset derives Eq:
-    def modeType: ObservingModeType = ObservingModeType.GnirsLongSlit
+  case class GnirsSpectroscopyConfigs(config: GnirsSpectroscopyConfig) extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType =
+      config.fpu match
+        case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
+        case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
 
     /** Cross-dispersed configurations use the SXD or LXD prism (cross-disperser). */
     def isCrossDispersed: Boolean =
@@ -260,8 +264,8 @@ object CalibrationConfigSubset:
         case _: GhostConfig =>
           GhostConfigs
 
-        case c: GnirsLongSlitConfig =>
-          GnirsLongSlitConfigs(c)
+        case c: GnirsSpectroscopyConfig =>
+          GnirsSpectroscopyConfigs(c)
 
         case gn: Config.GmosNorth =>
           GmosNConfigs(

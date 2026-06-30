@@ -3,7 +3,7 @@
 
 package lucuma.odb.sequence
 package gnirs
-package longslit
+package spectroscopy
 
 import cats.Monad
 import cats.data.EitherT
@@ -152,7 +152,7 @@ object Science:
                       coadds            = config.coadds,
                       filter            = config.filter,
                       decker            = config.decker,
-                      fpu               = GnirsFpu.Spectroscopy.Slit(config.fpu),
+                      fpu               = config.fpu,
                       acquisitionMirror = acqMirror,
                       camera            = config.camera,
                       focus             = config.focus,

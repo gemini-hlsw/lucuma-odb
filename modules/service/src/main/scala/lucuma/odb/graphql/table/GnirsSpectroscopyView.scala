@@ -9,9 +9,9 @@ import lucuma.odb.util.GnirsCodecs.*
 import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
-trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
+trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
 
-  object GnirsLongSlitView extends TableDef("v_gnirs_long_slit"):
+  object GnirsSpectroscopyView extends TableDef("v_gnirs_spectroscopy"):
 
     val ObservationId: ColumnRef    = col("c_observation_id", observation_id)
 
@@ -29,9 +29,11 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val Camera: ColumnRef           = col("c_camera", gnirs_camera)
     val InitialCamera: ColumnRef    = col("c_initial_camera", gnirs_camera)
 
-    // FPU
-    val Fpu: ColumnRef              = col("c_fpu", gnirs_fpu_slit)
-    val InitialFpu: ColumnRef       = col("c_initial_fpu", gnirs_fpu_slit)
+    // FPU: exactly one of slit / ifu is non-null per row.
+    val FpuSlit: ColumnRef          = col("c_fpu_slit", gnirs_fpu_slit.opt)
+    val FpuIfu: ColumnRef           = col("c_fpu_ifu", gnirs_fpu_ifu.opt)
+    val InitialFpuSlit: ColumnRef   = col("c_initial_fpu_slit", gnirs_fpu_slit.opt)
+    val InitialFpuIfu: ColumnRef    = col("c_initial_fpu_ifu", gnirs_fpu_ifu.opt)
 
     // Filter
     val Filter: ColumnRef           = col("c_filter", gnirs_filter)
