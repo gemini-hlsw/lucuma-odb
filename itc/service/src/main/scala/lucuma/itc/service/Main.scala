@@ -111,7 +111,7 @@ object Main extends IOApp with ItcCacheOrRemote {
         CORS.policy
       case Production               =>
         CORS.policy
-          .withAllowOriginHostCi(domain.contains)
+          .withAllowOriginHostCi(u => domain.exists(d => u.host.value === d || u.host.value.endsWith("." + d)))
 
   def cacheMiddleware[F[_]: Functor](service: HttpRoutes[F]): HttpRoutes[F] =
     Kleisli: (req: Request[F]) =>
