@@ -283,7 +283,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     exposureTimeMode: {
                       signalToNoise: {
