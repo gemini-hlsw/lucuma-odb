@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import eu.timepit.refined.cats.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -26,7 +25,6 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
@@ -36,6 +34,7 @@ import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2ImagingConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
@@ -49,6 +48,9 @@ sealed trait CalibrationConfigSubset derives Eq:
   def modeType: ObservingModeType
 
 object CalibrationConfigSubset:
+
+  case class ExchangeConfigSubset(config: ExchangeConfig) extends CalibrationConfigSubset:
+    def modeType: ObservingModeType = config.mode
 
   case class VisitorConfigSubset(config: VisitorConfig) extends CalibrationConfigSubset:
     def modeType: ObservingModeType = config.mode
@@ -114,6 +116,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput, none).some,
         none,
         none,
@@ -138,6 +141,7 @@ object CalibrationConfigSubset:
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
+        none,
         none,
         none,
         none,
@@ -171,6 +175,7 @@ object CalibrationConfigSubset:
 
     def toImagingInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
+        none,
         none,
         none,
         none,
@@ -209,6 +214,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosImagingInput.Create(
           ImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
@@ -236,6 +242,7 @@ object CalibrationConfigSubset:
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         none,
+        none,
         Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some,
         none,
         none,
@@ -258,8 +265,18 @@ object CalibrationConfigSubset:
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
       mode match
-        case v: VisitorConfig =>
-          VisitorConfigSubset(v)
+        case e: ExchangeConfig =>
+          ExchangeConfigSubset(e)
+
+        case f2: Flamingos2Config =>
+          Flamingos2Configs(
+            f2.disperser,
+            f2.filter,
+            f2.fpu
+          )
+
+        case f2i: Flamingos2ImagingConfig =>
+          Flamingos2ImagingConfigs(f2i.filters.map(_.filter))
 
         case _: GhostConfig =>
           GhostConfigs
@@ -279,6 +296,7 @@ object CalibrationConfigSubset:
             gn.ampGain,
             gn.roi
           )
+
         case gs: Config.GmosSouth =>
           GmosSConfigs(
             gs.grating,
@@ -291,6 +309,7 @@ object CalibrationConfigSubset:
             gs.ampGain,
             gs.roi
           )
+
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(
             gni.filters.map(_._1),
@@ -299,6 +318,7 @@ object CalibrationConfigSubset:
             gni.ampGain,
             gni.roi,
           )
+
         case gsi: ImagingConfig.GmosSouth =>
           GmosSImagingConfigs(
             gsi.filters.map(_._1),
@@ -307,13 +327,8 @@ object CalibrationConfigSubset:
             gsi.ampGain,
             gsi.roi
           )
-        case f2: Flamingos2Config =>
-          Flamingos2Configs(
-            f2.disperser,
-            f2.filter,
-            f2.fpu
-          )
-        case f2i: Flamingos2ImagingConfig =>
-          Flamingos2ImagingConfigs(f2i.filters.map(_.filter))
         case _: Igrins2Config =>
           Igrins2Configs
+
+        case v: VisitorConfig =>
+          VisitorConfigSubset(v)

@@ -1,7 +1,7 @@
-val SbtLucumaVersion = "0.14.17"
+val SbtLucumaVersion = "0.14.19"
 
 addSbtPlugin("io.spray"            % "sbt-revolver"        % "0.10.0")
-addSbtPlugin("com.timushev.sbt"    % "sbt-updates"         % "0.6.4")
+addSbtPlugin("com.timushev.sbt"    % "sbt-updates"         % "0.7.0")
 addSbtPlugin("edu.gemini"          % "sbt-lucuma-lib"      % SbtLucumaVersion)
 addSbtPlugin("edu.gemini"          % "sbt-lucuma-docker"   % SbtLucumaVersion)
 addSbtPlugin("com.github.reibitto" % "sbt-test-shards"     % "0.2.1")

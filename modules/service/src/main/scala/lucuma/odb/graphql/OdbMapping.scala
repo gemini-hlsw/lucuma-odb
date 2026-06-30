@@ -173,6 +173,7 @@ object OdbMapping {
           with DeleteSequenceResultMapping[F]
           with ElevationRangeMapping[F]
           with EmailMapping[F]
+          with ExchangeMapping[F]
           with ExecutionMapping[F]
           with ExecutionEventAddedMapping[F]
           with ExecutionEventMapping[F]
@@ -427,6 +428,7 @@ object OdbMapping {
                 EngineeringProgramReferenceMapping,
                 ElevationRangeMapping,
                 ExampleProgramReferenceMapping,
+                ExchangeMapping,
                 ExecutionEventAddedMapping,
                 ExecutionEventMapping,
                 ExecutionMapping,

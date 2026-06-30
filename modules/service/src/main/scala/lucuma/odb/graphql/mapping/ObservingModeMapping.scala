@@ -7,11 +7,13 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ObservingModeType
+import lucuma.odb.syntax.observingModeType.*
 
 import table.*
 
 trait ObservingModeMapping[F[_]]
   extends ObservationView[F]
+     with ExchangeView[F]
      with Flamingos2ImagingView[F]
      with Flamingos2LongSlitView[F]
      with GhostIfuView[F]
@@ -25,9 +27,10 @@ trait ObservingModeMapping[F[_]]
     ObjectMapping(ObservingModeType)(
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
 
-      FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
+      FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
 
+      SqlObject("exchange",           Join(ObservationView.Id, ExchangeView.ObservationId)),
       SqlObject("flamingos2Imaging",  Join(ObservationView.Id, Flamingos2ImagingView.ObservationId)),
       SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
       SqlObject("ghostIfu",           Join(ObservationView.Id, GhostIfuView.ObservationId)),

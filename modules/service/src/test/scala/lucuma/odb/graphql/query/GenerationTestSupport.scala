@@ -67,7 +67,7 @@ trait GenerationTestSupport extends OdbSuite:
   ): IO[InstrumentExecutionConfig.Flamingos2] =
     generateOrFailAs(user, oid).flatMap:
       case f2 @ InstrumentExecutionConfig.Flamingos2(_) => f2.pure
-      case i                                            => IO.raiseError(new RuntimeException(s"Expected GMOS North, but got ${i.instrument.longName}"))
+      case i                                            => IO.raiseError(new RuntimeException(s"Expected GMOS North, but got ${i.instrument.map(_.longName)}"))
 
   def generateGmosNorthOrFail(
     user: User,
@@ -75,7 +75,7 @@ trait GenerationTestSupport extends OdbSuite:
   ): IO[InstrumentExecutionConfig.GmosNorth] =
     generateOrFailAs(user, oid).flatMap:
       case gn @ InstrumentExecutionConfig.GmosNorth(_) => gn.pure
-      case i                                           => IO.raiseError(new RuntimeException(s"Expected GMOS North, but got ${i.instrument.longName}"))
+      case i                                           => IO.raiseError(new RuntimeException(s"Expected GMOS North, but got ${i.instrument.map(_.longName)}"))
 
   def generateGmosSouthOrFail(
     user: User,
@@ -83,7 +83,7 @@ trait GenerationTestSupport extends OdbSuite:
   ): IO[InstrumentExecutionConfig.GmosSouth] =
     generateOrFailAs(user, oid).flatMap:
       case gs @ InstrumentExecutionConfig.GmosSouth(_) => gs.pure
-      case i                                           => IO.raiseError(new RuntimeException(s"Expected GMOS North, but got ${i.instrument.longName}"))
+      case i                                           => IO.raiseError(new RuntimeException(s"Expected GMOS North, but got ${i.instrument.map(_.longName)}"))
 
   private def executionConfig(
     user: User,

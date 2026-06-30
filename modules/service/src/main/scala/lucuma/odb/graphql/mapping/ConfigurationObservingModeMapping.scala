@@ -7,6 +7,7 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ObservingModeType
+import lucuma.odb.syntax.observingModeType.*
 
 import table.*
 
@@ -28,7 +29,7 @@ trait ConfigurationObservingModeMappings[F[_]]
   private lazy val ConfigurationObservingModeMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
-      FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
+      FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
       SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
       SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitView.Common.ObservationId)),
@@ -44,7 +45,7 @@ trait ConfigurationObservingModeMappings[F[_]]
   private lazy val ConfigurationRequestObservingModeMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ConfigurationRequestView.Id, key = true, hidden = true),
-      FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
+      FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
       SqlField("mode", ConfigurationRequestView.ObservingModeType),
       SqlObject("flamingos2LongSlit"),
       SqlObject("gmosNorthLongSlit"),
