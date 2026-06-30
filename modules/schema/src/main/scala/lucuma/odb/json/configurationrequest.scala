@@ -18,6 +18,7 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.SkyBackground
@@ -82,6 +83,12 @@ object configurationrequest:
         prism   <- hc.downField("prism").as[GnirsPrism]
       yield GnirsLongSlit(grating, camera, prism)
 
+    val DecodeGnirsIfu: Decoder[GnirsIfu] = hc =>
+      for
+        grating <- hc.downField("grating").as[GnirsGrating]
+        fpu     <- hc.downField("fpu").as[GnirsFpuIfu]
+      yield GnirsIfu(grating, fpu)
+
     val DecodeVisitor: Decoder[Visitor] = hc =>
       for
         m <- hc.downField("mode").as[VisitorObservingModeType]
@@ -96,6 +103,7 @@ object configurationrequest:
       hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
       hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit) orElse
       hc.downField("gnirsLongSlit").as(using DecodeGnirsLongSlit) orElse
+      hc.downField("gnirsIfu").as(using DecodeGnirsIfu) orElse
       // GhostIfu and Igrins2LongSlit don't have parameters, so decode by name
       hc.downField("mode").as[String].flatMap:
         case "GHOST_IFU"          => GhostIfu.asRight
@@ -111,6 +119,7 @@ object configurationrequest:
         "gmosSouthImaging"   -> Json.Null, // one of these will be replaced below
         "gmosSouthLongSlit"  -> Json.Null, // one of these will be replaced below
         "gnirsLongSlit"      -> Json.Null,
+        "gnirsIfu"           -> Json.Null,
         "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
         "visitor"           -> Json.Null,  // one of these will be replaced below
         m match
@@ -121,7 +130,7 @@ object configurationrequest:
           case GmosSouthImaging(filter)              => "gmosSouthImaging"   -> Json.obj("filter" -> filter.asJson)
           case GmosSouthLongSlit(grating)            => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
           case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit"      -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
-          case GnirsIfu(_, _)                        => "gnirsIfu"           -> Json.obj() // TODO Not implemented yet
+          case GnirsIfu(grating, fpu)                => "gnirsIfu"           -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
           case Igrins2LongSlit                       => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
           case Visitor(mode, radius)                 => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
       )

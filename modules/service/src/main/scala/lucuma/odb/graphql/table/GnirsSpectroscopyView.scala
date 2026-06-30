@@ -32,6 +32,8 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
     // FPU: exactly one of slit / ifu is non-null per row.
     val FpuSlit: ColumnRef          = col("c_fpu_slit", gnirs_fpu_slit.opt)
     val FpuIfu: ColumnRef           = col("c_fpu_ifu", gnirs_fpu_ifu.opt)
+    // Non-null alias of c_fpu_ifu for the IFU configuration mapping (only queried for IFU rows).
+    val FpuIfuConfig: ColumnRef     = col("c_fpu_ifu", gnirs_fpu_ifu.embedded)
     val InitialFpuSlit: ColumnRef   = col("c_initial_fpu_slit", gnirs_fpu_slit.opt)
     val InitialFpuIfu: ColumnRef    = col("c_initial_fpu_ifu", gnirs_fpu_ifu.opt)
 

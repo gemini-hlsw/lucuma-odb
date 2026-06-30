@@ -37,6 +37,7 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosSouthImaging", Join(ObservationView.Id, GmosSouthImagingView.Common.ObservationId)),
       SqlObject("igrins2LongSlit", Join(ObservationView.Id, Igrins2LongSlitView.ObservationId)),
       SqlObject("gnirsLongSlit", Join(ObservationView.Id, GnirsSpectroscopyView.ObservationId)),
+      SqlObject("gnirsIfu", Join(ObservationView.Id, GnirsSpectroscopyView.ObservationId)),
       SqlObject("visitor", Join(ObservationView.Id, VisitorTable.ObservationId)),
     )
 
@@ -51,6 +52,7 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosNorthImaging"),
       SqlObject("gmosSouthImaging"),
       SqlObject("gnirsLongSlit"),
+      SqlObject("gnirsIfu"),
       SqlObject("igrins2LongSlit"),
       SqlObject("visitor"),
     )
