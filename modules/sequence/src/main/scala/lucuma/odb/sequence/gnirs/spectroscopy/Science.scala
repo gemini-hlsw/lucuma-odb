@@ -162,7 +162,7 @@ object Science:
                       focus             = config.focus,
                       readMode          = resolvedReadMode
                     )
-            ss <- config.telescopeConfigs.telescopeConfigs.traverse(SeqState.scienceStep(_, sciClass))
+            ss <- config.telescopeConfigs.traverse(SeqState.scienceStep(_, sciClass))
             ct  = ss.last.telescopeConfig.copy(guiding = Disabled)
             f  <- SeqState.flatStep(ct, ObserveClass.NightCal)
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)

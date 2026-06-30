@@ -32,6 +32,7 @@ import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.string.*
@@ -69,6 +70,24 @@ object GnirsSpectroscopyInput:
       case (None, Some(i)) => Result(GnirsFpu.Spectroscopy.Ifu(i))
       case (None, None)    => Matcher.validationFailure("Exactly one of 'fpuSlit' or 'fpuIfu' must be provided.")
       case _               => Matcher.validationFailure("Only one of 'fpuSlit' or 'fpuIfu' may be provided.")
+
+  // Telescope configs must match the FPU kind: slit configs only with a slit FPU, IFU
+  // configs only with an IFU FPU. When the FPU is absent (an edit that doesn't touch it)
+  // only mutual exclusion is checked here; the FPU-kind match is enforced against the
+  // persisted row in the service.
+  private def validateTelescopeConfigs(
+    fpu:  Option[GnirsFpu.Spectroscopy],
+    slit: Boolean,
+    ifu:  Boolean
+  ): Result[Unit] =
+    if slit && ifu then
+      Matcher.validationFailure("Only one of 'explicitTelescopeConfigsSlit' or 'explicitTelescopeConfigsIfu' may be provided.")
+    else fpu match
+      case Some(_: GnirsFpu.Spectroscopy.Slit) if ifu  =>
+        Matcher.validationFailure("'explicitTelescopeConfigsIfu' is only valid with an IFU FPU.")
+      case Some(_: GnirsFpu.Spectroscopy.Ifu)  if slit =>
+        Matcher.validationFailure("'explicitTelescopeConfigsSlit' is only valid with a long-slit FPU.")
+      case _ => Result.unit
 
   object TelescopeConfigAlongSlitInput:
     val Binding: Matcher[TelescopeConfigAlongSlit] =
@@ -158,7 +177,8 @@ object GnirsSpectroscopyInput:
     explicitFocusMotorSteps:      Option[Int]                      = None,
     explicitReadMode:             Option[GnirsReadMode]            = None,
     explicitWellDepth:            Option[GnirsWellDepth]           = None,
-    explicitTelescopeConfigs:     Option[SlitTelescopeConfigs]     = None,
+    explicitTelescopeConfigsSlit: Option[SlitTelescopeConfigs]     = None,
+    explicitTelescopeConfigsIfu:  Option[NonEmptyList[TelescopeConfig]] = None,
     acquisition:                  Option[AcquisitionInput]         = None,
     telluricType:                 TelluricType                     = TelluricType.Hot
   ):
@@ -186,20 +206,27 @@ object GnirsSpectroscopyInput:
           IntBinding.Option("explicitFocusMotorSteps", rFocus),
           GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
-          SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rExplTelescope),
+          SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigsSlit", rExplTelescopeSlit),
+          TelescopeConfigInput.Binding.List.Option("explicitTelescopeConfigsIfu", rExplTelescopeIfuList),
           AcquisitionInput.Binding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rEtm, rCoadds, rFilter, rFpuSlit, rFpuIfu, rCamera, rGrating, rPrism,
            rCentralWavelength, rDecker, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parTupled.flatMap:
+           rFocus, rReadMode, rWellDepth, rExplTelescopeSlit, rExplTelescopeIfuList, rAcq, rTelluricType).parTupled.flatMap:
             (etm, coadds, filter, fpuSlit, fpuIfu, camera, grating, prism,
              centralWavelength, decker, explGrating, explPrism,
-             focus, readMode, wellDepth, explTelescope, acq, telluricType) =>
-              fpuFromSlitIfu(fpuSlit, fpuIfu).map: fpu =>
-                Create(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
+             focus, readMode, wellDepth, explTelescopeSlit, explTelescopeIfuList, acq, telluricType) =>
+              for
+                fpu          <- fpuFromSlitIfu(fpuSlit, fpuIfu)
+                explTelIfu   <- explTelescopeIfuList.traverse: cs =>
+                                  NonEmptyList.fromList(cs).fold(
+                                    Matcher.validationFailure("'explicitTelescopeConfigsIfu' must not be empty")
+                                  )(Result(_))
+                _            <- validateTelescopeConfigs(fpu.some, explTelescopeSlit.isDefined, explTelIfu.isDefined)
+              yield Create(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
                        centralWavelength, decker, explGrating, explPrism,
-                       focus, readMode, wellDepth, explTelescope, acq,
+                       focus, readMode, wellDepth, explTelescopeSlit, explTelIfu, acq,
                        telluricType.getOrElse(TelluricType.Hot))
 
   case class Edit(
@@ -217,7 +244,8 @@ object GnirsSpectroscopyInput:
     explicitFocusMotorSteps:   Nullable[Int],
     explicitReadMode:          Nullable[GnirsReadMode],
     explicitWellDepth:         Nullable[GnirsWellDepth],
-    explicitTelescopeConfigs:  Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
+    explicitTelescopeConfigsSlit: Nullable[SlitTelescopeConfigs], // Nullable to allow clearing to default
+    explicitTelescopeConfigsIfu:  Nullable[NonEmptyList[TelescopeConfig]],
     acquisition:               Option[AcquisitionInput],
     telluricType:              Option[TelluricType]            // Option: set or skip; cannot be unset
   ):
@@ -245,7 +273,7 @@ object GnirsSpectroscopyInput:
                    w, explicitDecker.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
-                   explicitTelescopeConfigs.toOption, acquisition,
+                   explicitTelescopeConfigsSlit.toOption, explicitTelescopeConfigsIfu.toOption, acquisition,
                    telluricType.getOrElse(TelluricType.Hot))
 
   object Edit:
@@ -267,16 +295,17 @@ object GnirsSpectroscopyInput:
           IntBinding.Nullable("explicitFocusMotorSteps", rFocus),
           GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
-          SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rExplTelescope),
+          SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigsSlit", rExplTelescopeSlit),
+          TelescopeConfigInput.Binding.List.Nullable("explicitTelescopeConfigsIfu", rExplTelescopeIfuList),
           AcquisitionInput.Binding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rEtm, rCoadds, rFilter, rFpuSlit, rFpuIfu, rCamera, rGrating, rPrism,
            rCentralWavelength, rDecker, rExplGrating, rExplPrism,
-           rFocus, rReadMode, rWellDepth, rExplTelescope, rAcq, rTelluricType).parTupled.flatMap:
+           rFocus, rReadMode, rWellDepth, rExplTelescopeSlit, rExplTelescopeIfuList, rAcq, rTelluricType).parTupled.flatMap:
             (etm, coadds, filter, fpuSlit, fpuIfu, camera, grating, prism,
              centralWavelength, decker, explGrating, explPrism,
-             focus, readMode, wellDepth, explTelescope, acq, telluricType) =>
+             focus, readMode, wellDepth, explTelescopeSlit, explTelescopeIfuList, acq, telluricType) =>
               // At most one of fpuSlit / fpuIfu may be edited at a time.
               val rFpu: Result[Option[GnirsFpu.Spectroscopy]] =
                 (fpuSlit, fpuIfu) match
@@ -284,7 +313,16 @@ object GnirsSpectroscopyInput:
                   case (Some(s), None) => Result(GnirsFpu.Spectroscopy.Slit(s).some)
                   case (None, Some(i)) => Result(GnirsFpu.Spectroscopy.Ifu(i).some)
                   case _               => Matcher.validationFailure("Only one of 'fpuSlit' or 'fpuIfu' may be provided.")
-              rFpu.map: fpu =>
-                Edit(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
-                     centralWavelength, decker, explGrating, explPrism,
-                     focus, readMode, wellDepth, explTelescope, acq, telluricType)
+              val rExplTelescopeIfu: Result[Nullable[NonEmptyList[TelescopeConfig]]] =
+                explTelescopeIfuList match
+                  case Nullable.NonNull(cs) =>
+                    NonEmptyList.fromList(cs).fold(
+                      Matcher.validationFailure("'explicitTelescopeConfigsIfu' must not be empty")
+                    )(nel => Result(Nullable.NonNull(nel)))
+                  case Nullable.Null        => Result(Nullable.Null)
+                  case Nullable.Absent      => Result(Nullable.Absent)
+              (rFpu, rExplTelescopeIfu).parTupled.flatMap: (fpu, explTelIfu) =>
+                validateTelescopeConfigs(fpu, explTelescopeSlit.isPresent, explTelIfu.isPresent).map: _ =>
+                  Edit(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
+                       centralWavelength, decker, explGrating, explPrism,
+                       focus, readMode, wellDepth, explTelescopeSlit, explTelIfu, acq, telluricType)

@@ -60,6 +60,11 @@ trait GnirsSpectroscopyMapping[F[_]]
           "toSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
         )
 
+  // IFU configs: a plain [TelescopeConfig] (no slit offset mode).
+  private def ifuTelescopeConfigsJson(json: String): Json =
+    ToSkyFormat.getOption(json).fold(Json.Null):
+      _.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
+
   lazy val GnirsSpectroscopyAcquisitionMapping: ObjectMapping =
     ObjectMapping(GnirsSpectroscopyAcquisitionType)(
 
@@ -148,35 +153,59 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlField("slitOffsetModeExpRaw",  GnirsSpectroscopyView.ExplicitSlitOffsetMode,    hidden = true),
       SqlField("tcExpRaw",              GnirsSpectroscopyView.ExplicitTelescopeConfigs,  hidden = true),
 
-      // telescopeConfigs: effective SlitTelescopeConfigs = explicit coalesce default
-      CursorFieldJson("telescopeConfigs",
+      // Slit vs IFU is discriminated by the slit offset mode: present => long slit, NULL => IFU.
+      // telescopeConfigsSlit / telescopeConfigsIfu: effective (explicit coalesce default).
+      CursorFieldJson("telescopeConfigsSlit",
         cursor =>
           for
-            modeExp <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            tcExp   <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
-            modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[SlitOffsetMode])
-            tcDef   <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
-          yield slitTelescopeConfigsJson(modeExp.getOrElse(modeDef), tcExp.getOrElse(tcDef)),
-        List("slitOffsetModeExpRaw", "tcExpRaw", "slitOffsetModeDefRaw", "tcDefRaw")
+            modeEff <- cursor.field("slitOffsetModeEffRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
+            tcEff   <- cursor.field("tcEffRaw", None).flatMap(_.as[String])
+          yield modeEff.fold(Json.Null)(slitTelescopeConfigsJson(_, tcEff)),
+        List("slitOffsetModeEffRaw", "tcEffRaw")
+      ),
+      CursorFieldJson("telescopeConfigsIfu",
+        cursor =>
+          for
+            modeEff <- cursor.field("slitOffsetModeEffRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
+            tcEff   <- cursor.field("tcEffRaw", None).flatMap(_.as[String])
+          yield if modeEff.isEmpty then ifuTelescopeConfigsJson(tcEff) else Json.Null,
+        List("slitOffsetModeEffRaw", "tcEffRaw")
       ),
 
-      // defaultTelescopeConfigs: the pure default
-      CursorFieldJson("defaultTelescopeConfigs",
+      CursorFieldJson("defaultTelescopeConfigsSlit",
         cursor =>
           for
-            mode <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[SlitOffsetMode])
-            json <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
-          yield slitTelescopeConfigsJson(mode, json),
+            modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
+            tcDef   <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
+          yield modeDef.fold(Json.Null)(slitTelescopeConfigsJson(_, tcDef)),
+        List("slitOffsetModeDefRaw", "tcDefRaw")
+      ),
+      CursorFieldJson("defaultTelescopeConfigsIfu",
+        cursor =>
+          for
+            modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
+            tcDef   <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
+          yield if modeDef.isEmpty then ifuTelescopeConfigsJson(tcDef) else Json.Null,
         List("slitOffsetModeDefRaw", "tcDefRaw")
       ),
 
-      // explicitTelescopeConfigs (nullable): present only when an explicit override is set
-      CursorFieldJson("explicitTelescopeConfigs",
+      // explicit (nullable): present only when an explicit override of the matching kind is set.
+      CursorFieldJson("explicitTelescopeConfigsSlit",
         cursor =>
           for
             modeOpt <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
             jsonOpt <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
           yield (modeOpt, jsonOpt).mapN(slitTelescopeConfigsJson).getOrElse(Json.Null),
+        List("slitOffsetModeExpRaw", "tcExpRaw")
+      ),
+      CursorFieldJson("explicitTelescopeConfigsIfu",
+        cursor =>
+          for
+            modeOpt <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
+            jsonOpt <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
+          yield (modeOpt, jsonOpt) match
+            case (None, Some(json)) => ifuTelescopeConfigsJson(json)
+            case _                  => Json.Null,
         List("slitOffsetModeExpRaw", "tcExpRaw")
       ),
 

@@ -81,7 +81,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         defaultWellDepth
                         explicitWellDepth
                         explicitFocusMotorSteps
-                        telescopeConfigs {
+                        telescopeConfigsSlit {
                           offsetMode
                           alongSlit { q { arcseconds } guiding }
                           toSky { offset { p { arcseconds } q { arcseconds } } guiding }
@@ -134,7 +134,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "defaultWellDepth": "SHALLOW",
                       "explicitWellDepth": null,
                       "explicitFocusMotorSteps": null,
-                      "telescopeConfigs": {
+                      "telescopeConfigsSlit": {
                         "offsetMode": "NOD_ALONG_SLIT",
                         "alongSlit": [
                           { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" },

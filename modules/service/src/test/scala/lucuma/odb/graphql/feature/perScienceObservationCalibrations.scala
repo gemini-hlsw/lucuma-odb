@@ -2100,7 +2100,7 @@ class perScienceObservationCalibrations
           observation(observationId: "$oid") {
             observingMode {
               gnirsSpectroscopy {
-                telescopeConfigs {
+                telescopeConfigsSlit {
                   alongSlit { q { arcseconds } }
                 }
               }
@@ -2110,7 +2110,7 @@ class perScienceObservationCalibrations
     ).map: c =>
       c.hcursor
         .downField("observation").downField("observingMode").downField("gnirsSpectroscopy")
-        .downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.orEmpty
+        .downField("telescopeConfigsSlit").downField("alongSlit").as[List[Json]].toOption.orEmpty
         .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
 
   test("gnirs observation is placed in a obs calibration system group"):

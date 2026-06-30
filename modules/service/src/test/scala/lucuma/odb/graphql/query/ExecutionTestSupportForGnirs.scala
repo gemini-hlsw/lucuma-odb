@@ -140,7 +140,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
             SET: {
               observingMode: {
                 gnirsSpectroscopy: {
-                  explicitTelescopeConfigs: { alongSlit: $entries }
+                  explicitTelescopeConfigsSlit: { alongSlit: $entries }
                 }
               }
             }
@@ -162,7 +162,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
             SET: {
               observingMode: {
                 gnirsSpectroscopy: {
-                  explicitTelescopeConfigs: { toSky: $entries }
+                  explicitTelescopeConfigsSlit: { toSky: $entries }
                 }
               }
             }
