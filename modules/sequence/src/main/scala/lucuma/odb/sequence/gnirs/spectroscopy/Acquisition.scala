@@ -133,9 +133,13 @@ object Acquisition:
 
       // The FPU image (first step) uses a single coadd and the fixed filter/exposure from
       // firstStepFilterAndExposure; its read mode follows from that fixed exposure time.
-      // All other steps use the selected filter, the ITC exposure, and the configured
-      // coadds. Sky frames are generated only for Faint, at its sky offset.
+      // The remaining steps use the selected filter and the ITC exposure. Only the
+      // acquisition-FPU/decker field steps use the resolved coadds (the ITC exposure count
+      // in S/N mode, else the explicit acquisition coadds); the through-slit steps keep the
+      // explicit acquisition coadds. Sky frames are generated only for Faint, at its sky
+      // offset.
       val fpuStepReadMode: GnirsReadMode = GnirsReadMode.forExposureTime(fpuStepExposureTime)
+      val fieldCoadds: PosInt            = config.acquisition.resolvedCoadds(time)
 
       val skyOffsetOpt: Option[Offset] = GnirsAcquisitionMode.skyOffset.getOption(mode)
 
@@ -160,12 +164,12 @@ object Acquisition:
                               ),
                               ObserveClass.Acquisition
                             )
-          // Subsequent steps switch to the acquisition decker/FPU and the selected filter,
-          // and use the ITC exposure time, read mode and configured coadds.
+          // The field steps switch to the acquisition decker/FPU and the selected filter,
+          // and use the ITC exposure time, read mode and field coadds.
           _              <- State.modify[GnirsDynamicConfig]:
                               _.copy(
                                 exposure = acqExposureTime,
-                                coadds   = config.acquisition.coadds,
+                                coadds   = fieldCoadds,
                                 readMode = readMode,
                                 decker   = GnirsDecker.Acquisition,
                                 fpu      = GnirsFpu.Other(GnirsFpuOther.Acquisition),
@@ -174,9 +178,10 @@ object Acquisition:
           fieldSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           field          <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
-          // Back to the science aperture (decker/FPU) for the through-slit steps.
+          // Back to the science aperture (decker/FPU) for the through-slit steps, which revert
+          // to the explicit acquisition coadds (the ITC count is used only for the field).
           _              <- State.modify[GnirsDynamicConfig]:
-                              _.copy(decker = specDecker, fpu = config.fpu)
+                              _.copy(decker = specDecker, fpu = config.fpu, coadds = config.acquisition.coadds)
           tSlitSkyOpt    <- skyOffsetOpt.traverse: sky =>
                               scienceStep(TelescopeConfig(sky, Enabled), ObserveClass.Acquisition)
           throughSlit    <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
@@ -218,7 +223,7 @@ object Acquisition:
            )
       // Resolve the acquisition mode (explicit or auto), the selected filter (explicit, or
       // auto from the mode + spectroscopy wavelength), and the FPU-image filter/exposure.
-      mode       = config.acquisition.resolvedMode(t.exposureTime)
+      mode       = config.acquisition.resolvedMode(t)
       selFilter <- config.acquisition
                      .selectedFilter(mode, config.centralWavelength)
                      .leftMap(sequenceError)

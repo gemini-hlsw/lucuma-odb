@@ -22,6 +22,7 @@ import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.TimeSpan
+import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -35,8 +36,8 @@ case class AcquisitionConfig(
 ):
 
   /** The acquisition mode: the explicit choice if set, else the default for the integration time. */
-  def resolvedMode(acqExposureTime: TimeSpan): GnirsAcquisitionMode =
-    explicitAcqMode.getOrElse(GnirsAcquisitionMode.defaultFor(acqExposureTime, coadds))
+  def resolvedMode(time: IntegrationTime): GnirsAcquisitionMode =
+    explicitAcqMode.getOrElse(GnirsAcquisitionMode.defaultFor(time.exposureTime, resolvedCoadds(time)))
 
   /**
    * The selected acquisition filter: the explicit filter if set, otherwise the
@@ -51,6 +52,17 @@ case class AcquisitionConfig(
         mode match
           case GnirsAcquisitionMode.VeryBright => Right(GnirsFilter.H2)
           case _                               => GnirsFilter.fromAcquisitionWavelength(wavelength)
+
+  /**
+   * Coadds for the acquisition steps. In S/N mode the ITC sizes the acquisition, so we
+   * use its exposure count — the number of exposures needed to reach the target S/N — as
+   * the coadds. In time-and-count mode the user controls the acquisition directly, so the
+   * explicit coadds are used.
+   */
+  def resolvedCoadds(time: IntegrationTime): PosInt =
+    exposureTimeMode match
+      case ExposureTimeMode.SignalToNoiseMode(_, _)   => time.exposureCount
+      case ExposureTimeMode.TimeAndCountMode(_, _, _) => coadds
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(128)
