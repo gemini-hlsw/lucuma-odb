@@ -275,6 +275,34 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       """
     ).void
 
+  def setAcquisitionSignalToNoise(oid: Observation.Id, value: BigDecimal, atNm: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  acquisition: {
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: $value
+                        at:    { nanometers: $atNm }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
   /** Set the explicit acquisition type on a GNIRS LongSlit observation. */
   def setAcquisitionType(oid: Observation.Id, acqType: String): IO[Unit] =
     query(

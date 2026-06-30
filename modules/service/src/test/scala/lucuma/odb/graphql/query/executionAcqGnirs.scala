@@ -362,6 +362,61 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
         """.asRight
       )
 
+  test("Acquisition coadds come from the ITC exposure count in S/N mode"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionSignalToNoise(o, 100, 1645)
+        _ <- setAcquisitionFilter(o, "ORDER4")
+      yield o
+
+    // In S/N mode the ITC sizes the acquisition: the fake imaging result is
+    // IntegrationTime(10s, 6), so only the acquisition-FPU/decker field steps take their
+    // coadds from the ITC exposure count (6). The FPU image (first step) always uses a
+    // single coadd, and the through-slit steps revert to the explicit acquisition coadds
+    // (default 1). The 10s × 6 = 60s integration resolves AUTO to FAINT, so a sky frame is
+    // added (5 steps): slitImage(1), fieldSky(6), field(6), throughSlitSky(1), throughSlit(1).
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gnirs {
+                acquisition {
+                  nextAtom {
+                    steps {
+                      instrumentConfig { coadds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "gnirs": {
+                "acquisition": {
+                  "nextAtom": {
+                    "steps": [
+                      { "instrumentConfig": { "coadds": 1 } },
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 1 } },
+                      { "instrumentConfig": { "coadds": 1 } }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
   // Focused query checking the first-atom step exposure/coadds/filter/readMode.
   def firstAtomConfigQuery(oid: Observation.Id): String =
     s"""
