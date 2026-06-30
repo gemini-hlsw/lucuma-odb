@@ -3,6 +3,8 @@
 
 package lucuma.odb.sequence.visitor
 
+import cats.Eq
+import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
@@ -26,6 +28,9 @@ final case class Config(
       case _ => Right(())
 
 object Config:
+
+  given Eq[Config] =
+    Eq.by(a => (a.mode, a.centralWavelength, a.name, a.totalRequestTime))
 
   given HashBytes[Config] with
     def hashBytes(c: Config): Array[Byte] =

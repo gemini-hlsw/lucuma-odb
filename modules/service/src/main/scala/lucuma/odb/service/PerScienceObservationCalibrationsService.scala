@@ -36,6 +36,7 @@ import lucuma.odb.otel.given
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.exposureTimeMode.*
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
@@ -431,7 +432,7 @@ object PerScienceObservationCalibrationsService:
 
         def updateTargetModeType(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(mode =>
-            S.session.execute(Statements.updateObservingModeType)(mode.some, mode.instrument.some, targetOid)
+            S.session.execute(Statements.updateObservingModeType)(mode.some, mode.instrumentOption, targetOid)
           ).void
 
         def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =

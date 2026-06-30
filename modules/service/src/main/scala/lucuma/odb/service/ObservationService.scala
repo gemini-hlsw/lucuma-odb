@@ -67,6 +67,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
@@ -735,7 +736,7 @@ object ObservationService {
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
-          SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
+          SET.observingMode.flatMap(_.observingModeType).flatMap(_.instrumentOption),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
@@ -1166,7 +1167,7 @@ object ObservationService {
       void"UPDATE t_observation " |+|
          void"SET " |+|
             sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void", " |+|
-            sql"c_instrument = ${instrument.opt}"(newMode.map(_.instrument)) |+| void" " |+|
+            sql"c_instrument = ${instrument.opt}"(newMode.flatMap(_.instrumentOption)) |+| void" " |+|
        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
 
     /**

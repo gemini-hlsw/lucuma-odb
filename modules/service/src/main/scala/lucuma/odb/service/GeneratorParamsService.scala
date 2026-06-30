@@ -51,6 +51,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gnirs
@@ -289,6 +290,56 @@ object GeneratorParamsService {
 
         observingMode(obsParams.targets, config, obsParams.calibrationRole).flatMap:
 
+          // Exchange Modes (no ITC, like visitors)
+          case exc: exchange.Config =>
+            GeneratorParams(
+              MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("(exchange mode)"))).asLeft,
+              obsParams.scienceBand,
+              exc,
+              obsParams.calibrationRole,
+              obsParams.declaredState,
+              obsParams.executionState,
+              obsParams.stepCount,
+              obsParams.isSplittable
+            ).asRight
+
+          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
+            val sciReadMode  = f2.exposureTimeMode match
+                                 case ExposureTimeMode.SignalToNoiseMode(_, _) =>
+                                   Flamingos2ReadMode.Bright // In practice this will be ignored by the ITC
+                                 case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                                   f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
+
+            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, sciReadMode, fpu)
+
+            spectroscopyGeneratorParams(
+              obsMode = f2,
+              acqMode = InstrumentMode.Flamingos2Imaging(
+                acq.exposureTimeMode,
+                acq.filter,
+                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
+              ),
+              sciMode = sciMode
+            ).asRight
+
+          case f2 @ flamingos2.imaging.Config(filters = fs) =>
+            // An input per filter.
+            val inputs = fs.map: f =>
+              ImagingParameters(
+                obsParams.constraints.toInput,
+                InstrumentMode.Flamingos2Imaging(f.exposureTimeMode, f.filter, f2.readMode)
+              )
+
+            val itcInput =
+              obsParams
+                .targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.Imaging(inputs, _))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(itcInput, obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
               ExposureTimeMode.timeAndCount.getOption(red.value.exposureTimeMode),
@@ -354,56 +405,6 @@ object GeneratorParamsService {
               ),
               sciMode  = sciMode
             ).asRight
-
-          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
-            val sciReadMode  = f2.exposureTimeMode match
-                                 case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                   Flamingos2ReadMode.Bright // In practice this will be ignored by the ITC
-                                 case ExposureTimeMode.TimeAndCountMode(time = time) =>
-                                   f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
-
-            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, sciReadMode, fpu)
-
-            spectroscopyGeneratorParams(
-              obsMode = f2,
-              acqMode = InstrumentMode.Flamingos2Imaging(
-                acq.exposureTimeMode,
-                acq.filter,
-                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
-              ),
-              sciMode = sciMode
-            ).asRight
-
-          case f2 @ flamingos2.imaging.Config(filters = fs) =>
-            // An input per filter.
-            val inputs = fs.map: f =>
-              ImagingParameters(
-                obsParams.constraints.toInput,
-                InstrumentMode.Flamingos2Imaging(f.exposureTimeMode, f.filter, f2.readMode)
-              )
-
-            val itcInput =
-              obsParams
-                .targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
-
-            GeneratorParams(itcInput, obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
-          case ig: igrins2.longslit.Config =>
-            val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
-            val consInput = obsParams.constraints.toInput
-            val science   = SpectroscopyParameters(consInput, sciMode)
-
-            val itcInput =
-              obsParams.targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.ScienceOnlySpectroscopy(science, _))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
-
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
@@ -479,6 +480,20 @@ object GeneratorParamsService {
                 ),
                 sciMode = sciMode
               )
+
+          case ig: igrins2.longslit.Config =>
+            val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
+            val consInput = obsParams.constraints.toInput
+            val science   = SpectroscopyParameters(consInput, sciMode)
+
+            val itcInput =
+              obsParams.targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.ScienceOnlySpectroscopy(science, _))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           // Visitor Modes
           case vis: visitor.Config =>

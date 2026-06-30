@@ -8,6 +8,7 @@ import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ExchangeView
 import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GhostDynamicTable
@@ -29,6 +30,7 @@ import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.graphql.table.VisitorTable
 
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
+                               with ExchangeView[F]
                                with ExposureTimeModeView[F]
                                with Flamingos2DynamicView[F]
                                with GhostDynamicTable[F]
@@ -56,6 +58,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
     List(
       timeSpanMappingAtPath(AllocationType / "duration",   AllocationTable.Duration)(AllocationTable.ProgramId, AllocationTable.Category, AllocationTable.ScienceBand),
       timeSpanMappingAtPath(ConditionsExpectationType / "timeframe", ChronConditionsEntryView.Intuition.Expectation.Timespan)(ChronConditionsEntryView.Intuition.Expectation.SyntheticId),
+      timeSpanMappingAtPath(ExchangeType / "totalRequestTime", ExchangeView.TotalRequestTime)(ExchangeView.TotalRequestTimeId),
       timeSpanMappingAtPath(GhostIfuType    / "slitViewingCameraExposureTime", GhostIfuView.SlitViewingCamera.ExposureTime)(GhostIfuView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(GhostStaticType / "slitViewingCameraExposureTime", GhostStaticView.SlitViewingCamera.ExposureTime)(GhostStaticView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),

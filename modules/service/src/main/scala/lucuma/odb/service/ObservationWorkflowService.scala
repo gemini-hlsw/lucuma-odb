@@ -13,15 +13,19 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
+import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -50,6 +54,7 @@ import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.syntax.instrument.*
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.*
@@ -130,14 +135,16 @@ case class ObservationValidationInfo(
   generatorParams:    Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   cfpInfo:            Option[CfpInfo] = None,
   programAllocations: Option[NonEmptyList[ScienceBand]] = None,
-  otherConfigErrors:  List[String] = Nil
+  otherConfigErrors:  List[String] = Nil,
+  keckInstrument:     Option[KeckInstrument] = None,   // set for exchange_keck observations
+  subaruInstrument:   Option[SubaruInstrument] = None  // set for exchange_subaru observations
 ) {
 
   def isDeclaredComplete: Boolean =
     declaredExecutionState === Some(CoreExecutionState.DeclaredComplete)
 
   def instrument: Option[Instrument] =
-    observingMode.map(_.instrument)
+    observingMode.flatMap(_.instrumentOption)
 
   def effectiveUserState: Option[UserState] =
     // Per-observation calibrations (tellurics, daytime pinhole flats) inherit
@@ -172,10 +179,13 @@ case class ObservationValidationInfo(
 }
 
 case class CfpInfo(
-  cfpid:       CallForProposals.Id,
-  limits:      CallCoordinatesLimits,
-  active:      DateInterval,
-  instruments: List[Instrument]
+  cfpid:             CallForProposals.Id,
+  observatory:       Observatory,
+  limits:            CallCoordinatesLimits,
+  active:            DateInterval,
+  instruments:       List[Instrument],        // Gemini instruments allowed by the call
+  keckInstruments:   List[KeckInstrument],    // Keck exchange instruments allowed by the call
+  subaruInstruments: List[SubaruInstrument]   // Subaru exchange instruments allowed by the call
 ) {
 
   def midpoint(at: Site): Instant =
@@ -205,6 +215,12 @@ object ObservationWorkflowService {
 
     def invalidScienceBand(b: ScienceBand): String =
       s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
+
+    def exchangeObservatoryMismatch(modeObs: Observatory, cfpObs: Observatory): String =
+      s"Exchange observation requires a $modeObs Call for Proposals, but the proposal's observatory is $cfpObs."
+
+    def invalidExchangeInstrument(instr: String): String =
+      s"Instrument $instr is not part of the Call for Proposals."
   }
 
   extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
@@ -289,6 +305,21 @@ object ObservationWorkflowService {
                   input.map: (oid, info) =>
                     oid -> info.copy(cfpInfo = info.cfpid.flatMap(results.get))
 
+        // Enriches exchange observations with their chosen Keck/Subaru instrument.
+        // Only exchange-mode observations are looked up, so non-exchange programs
+        // pay nothing here.
+        def addExchangeInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
+          val exchangeOids =
+            input.collect:
+              case (oid, info) if info.observingMode.exists(_.isExchange) => oid
+            .toList
+          if exchangeOids.isEmpty then input.pure[F]
+          else
+            exchangeService.select(exchangeOids).map: configs =>
+              input.map: (oid, info) =>
+                configs.get(oid).fold(oid -> info): cfg =>
+                  oid -> info.copy(keckInstrument = cfg.keckInstrument, subaruInstrument = cfg.subaruInstrument)
+
         def addProgramAllocations(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
           NonEmptyList.fromList(input.values.map(_.pid).toList.distinct) match
             case None => input.pure[F]
@@ -367,6 +398,7 @@ object ObservationWorkflowService {
               .flatMap(addAsterisms)
               .flatMap(addGeneratorParams)
               .flatMap(addCfpInfos)
+              .flatMap(addExchangeInfos)
               .flatMap(addProgramAllocations)
               .flatMap(addCoordinates)
               .flatMap(addOtherConfigErrors)
@@ -502,6 +534,27 @@ object ObservationWorkflowService {
               if cfp.instruments.contains(inst) then ObservationValidationMap.empty
               else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidInstrument(inst)))
 
+        // Exchange observations must match the proposal's observatory, and (when
+        // the call restricts instruments) use one of its allowed exchange instruments.
+        val exchangeValidator: Validator = info =>
+          info.observingMode match
+            case Some(e: ExchangeObservingModeType) =>
+              info.cfpInfo.foldMap: cfp =>
+                if cfp.observatory =!= e.observatory then
+                  ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.exchangeObservatoryMismatch(e.observatory, cfp.observatory)))
+                else e match
+                  case ExchangeObservingModeType.ExchangeKeck =>
+                    if cfp.keckInstruments.isEmpty then ObservationValidationMap.empty
+                    else info.keckInstrument.foldMap: inst =>
+                      if cfp.keckInstruments.contains(inst) then ObservationValidationMap.empty
+                      else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(inst.tag)))
+                  case ExchangeObservingModeType.ExchangeSubaru =>
+                    if cfp.subaruInstruments.isEmpty then ObservationValidationMap.empty
+                    else info.subaruInstrument.foldMap: inst =>
+                      if cfp.subaruInstruments.contains(inst) then ObservationValidationMap.empty
+                      else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(inst.tag)))
+            case _ => ObservationValidationMap.empty
+
         val cfpRaDecValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>
             info.site.foldMap: site =>
@@ -532,6 +585,7 @@ object ObservationWorkflowService {
         val scienceValidator1: Validator =
           generatorValidator     |+|
           cfpInstrumentValidator |+|
+          exchangeValidator      |+|
           cfpRaDecValidator      |+|
           bandValidator          |+|
           otherConfigErrors
@@ -833,6 +887,7 @@ object ObservationWorkflowService {
       sql"""
         SELECT
           c.c_cfp_id,
+          c.c_observatory,
           c.c_north_ra_start,
           c.c_north_ra_end,
           c.c_north_dec_start,
@@ -843,15 +898,37 @@ object ObservationWorkflowService {
           c.c_south_dec_end,
           c.c_active_start,
           c.c_active_end,
+          c.c_keck_instruments,
+          c.c_subaru_instruments,
           i.c_instrument
         FROM t_cfp c
         LEFT JOIN t_gemini_cfp_instrument i
         ON c.c_cfp_id = i.c_cfp_id
         WHERE c.c_cfp_id in ($enc)
-      """.query(cfp_id *: right_ascension *: right_ascension *: declination *: declination *: right_ascension *: right_ascension *: declination *: declination *: date_interval *: instrument.opt)
-        .map:
-          case (id, n_ra_s, n_ra_e, n_dec_s, n_dec_e, s_ra_s, s_ra_e, s_dec_s, s_dec_e, active, oinst) =>
-            (CfpInfo(id, CallCoordinatesLimits(lucuma.core.model.SiteCoordinatesLimits.apply(n_ra_s, n_ra_e, n_dec_s, n_dec_e), SiteCoordinatesLimits(s_ra_s, s_ra_e, s_dec_s, s_dec_e)), active, Nil), oinst)
+      """.query(
+          cfp_id                 *:
+          observatory            *:
+          right_ascension        *: // north limits
+          right_ascension        *: // north limits
+          declination            *: // north limits
+          declination            *: // north liits
+          right_ascension.opt    *: // south limits
+          right_ascension.opt    *: // south limits
+          declination.opt        *: // south limits
+          declination.opt        *: // south limits
+          date_interval          *: // active period
+          _keck_instrument.opt   *:
+          _subaru_instrument.opt *:
+          instrument.opt
+        ).map:
+          // The south coordinate limits are null for exchange (keck/subaru) calls,
+          // which use only the northern limits.  Exchange observations have no site
+          // and so never exercise the coordinate-limit validation; we fall back to
+          // the north limits to keep CallCoordinatesLimits total.
+          case (id, obs, n_ra_s, n_ra_e, n_dec_s, n_dec_e, s_ra_s, s_ra_e, s_dec_s, s_dec_e, active, keck, subaru, oinst) =>
+            val north = SiteCoordinatesLimits(n_ra_s, n_ra_e, n_dec_s, n_dec_e)
+            val south = (s_ra_s, s_ra_e, s_dec_s, s_dec_e).mapN(SiteCoordinatesLimits.apply).getOrElse(north)
+            (CfpInfo(id, obs, CallCoordinatesLimits(north, south), active, Nil, keck.orEmpty, subaru.orEmpty), oinst)
 
     val UpdateUserState: Command[(Option[UserState], Observation.Id)] =
       sql"""
