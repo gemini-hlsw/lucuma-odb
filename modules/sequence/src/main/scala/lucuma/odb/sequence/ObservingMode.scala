@@ -95,7 +95,7 @@ object ObservingMode:
           case _: GmosNorthLongSlit  => Instrument.GmosNorth.some
           case _: GmosSouthImaging   => Instrument.GmosSouth.some
           case _: GmosSouthLongSlit  => Instrument.GmosSouth.some
-          case _: GnirsSpectroscopy  => Instrument.Gnirs
+          case _: GnirsSpectroscopy  => Instrument.Gnirs.some
           case _: Igrins2LongSlit    => Instrument.Igrins2.some
           case v: Visitor            => v.mode.instrument.some
 

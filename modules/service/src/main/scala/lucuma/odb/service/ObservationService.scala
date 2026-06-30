@@ -16,7 +16,6 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
@@ -421,9 +420,9 @@ object ObservationService {
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
 
               (existingMode, oEdit) match {
-                case (Some(_: ExchangeObservingModeType), Some(edit)) if exchangeInPlace =>
+//                case (Some(_: ExchangeObservingModeType), Some(edit)) if exchangeInPlace =>
                   // update existing exchange mode in place
-                  observingModeServices.update(edit, matchingOids)
+//                  observingModeServices.update(edit, matchingOids)
 
                 // `forall` (rather than `contains`) so a partial edit whose mode type is
                 // indeterminate (None) — e.g. a GNIRS spectroscopy edit that doesn't change
