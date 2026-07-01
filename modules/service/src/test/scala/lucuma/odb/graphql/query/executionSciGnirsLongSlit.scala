@@ -203,7 +203,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
   test("[gnirs] off-slit offsets don't contribute to S/N (extra cycles)"):
     // The SHORT_BLUE + MIRROR slit is 99" long, so |q| > 49.5" falls off slit.
     // Here q=+2 is on slit but q=+60 is off, so only 1 of the 2 steps per cycle
-    // is on source.  exposureCount=3 therefore needs 3 cycles (not 2).
+    // is on source. exposureCount=3 therefore needs 3 cycles (not 2).
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
@@ -340,6 +340,44 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
                   "possibleFuture" -> List(expectedAtom, expectedAtom, calAtom(60, 60)).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
+  test("[gnirs] nod-to-sky sky position off the slit end (p=0, q>slit) counts as sky"):
+    // A sky nod along the slit direction (p=0) that runs past the slit end is
+    // off slit and so doesn't contribute to the S/N — the q check matters, not
+    // just p. The SHORT_BLUE + MIRROR slit is 99", so slit/2 = 49.5"; q = 49.6"
+    // is just one deci-arcsecond past the edge and therefore off slit. Only the
+    // on-axis step is on source, so exposureCount=3 needs 3 cycles.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- setToSkyTelescopeConfigs(oid,
+                 """[
+                   { offset: { p: { arcseconds: 0 }, q: { arcseconds:  0   } }, guiding: ENABLED  },
+                   { offset: { p: { arcseconds: 0 }, q: { arcseconds: 49.6 } }, guiding: DISABLED }
+                 ]"""
+               )
+      yield oid
+
+    setup.flatMap: oid =>
+      val expectedAtom = gnirsExpectedScienceAtom(DynamicSnapshot,
+        (0, 0, Enabled), (0, 49.6, Disabled)
+      )
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom"       -> expectedAtom,
+                  "possibleFuture" -> List(expectedAtom, expectedAtom, calAtom(0, BigDecimal("49.6"))).asJson,
                   "hasMore"        -> false.asJson
                 )
               )

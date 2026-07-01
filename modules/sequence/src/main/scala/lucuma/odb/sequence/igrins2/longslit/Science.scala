@@ -8,7 +8,6 @@ package longslit
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -17,7 +16,6 @@ import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.math.Angle
@@ -49,25 +47,21 @@ object Science:
   val SlitLength: Angle =
     Angle.fromBigDecimalArcseconds(5.0)
 
-  private def isOnTarget(mode: SlitOffsetMode, o: Offset): Boolean =
-    mode match
-      case SlitOffsetMode.NodAlongSlit => isOnSlit(SlitLength, o)
-      case SlitOffsetMode.NodToSky     => o.p.toAngle.toMicroarcseconds === 0L
-
   object Igrins2SequenceState extends SequenceState[Igrins2DynamicConfig]:
     override val initialDynamicConfig: Igrins2DynamicConfig =
       Igrins2DynamicConfig(TimeSpan.Min)
 
-    def igrins2ScienceStep(mode: SlitOffsetMode, obsClass: ObserveClass)(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
-      val guideState = if isOnTarget(mode, o) then Enabled else Disabled
+    // A step is on source (guided, and contributes to the S/N) only when it is
+    // on the slit — both p and q — regardless of nod mode, matching Flamingos 2.
+    def igrins2ScienceStep(obsClass: ObserveClass)(o: Offset): State[Igrins2DynamicConfig, ProtoStep[Igrins2DynamicConfig]] =
+      val guideState = if isOnSlit(SlitLength, o) then Enabled else Disabled
       scienceStep(TelescopeConfig(o, guideState), obsClass)
 
   case class StepDefinition(
-    scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]],
-    offsetMode:   SlitOffsetMode
+    scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]]
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[Igrins2DynamicConfig](isOnTarget(offsetMode, _), scienceSteps.toList, t)
+      calculateCycleCount[Igrins2DynamicConfig](isOnSlit(SlitLength, _), scienceSteps.toList, t)
 
   object StepDefinition:
 
@@ -84,9 +78,9 @@ object Science:
           val sciSteps = Igrins2SequenceState.eval:
             for
               _  <- State.modify[Igrins2DynamicConfig](_.copy(exposure = time.exposureTime))
-              ss <- nel.traverse(Igrins2SequenceState.igrins2ScienceStep(config.offsetMode, sciClass))
+              ss <- nel.traverse(Igrins2SequenceState.igrins2ScienceStep(sciClass))
             yield ss
-          StepDefinition(sciSteps, config.offsetMode)
+          StepDefinition(sciSteps)
 
   case class Generator(
     steps:      StepDefinition,

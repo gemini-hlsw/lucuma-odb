@@ -23,7 +23,6 @@ import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.geom.gnirs.all as GnirsGeometry
 import lucuma.core.math.Angle
@@ -80,38 +79,27 @@ object Science:
 
   private object SeqState extends gnirs.GnirsSequenceState
 
-  /**
-   * Whether an offset keeps the target on the slit (and so contributes to the
-   * science S/N).  When nodding along the slit the target stays on-slit as long
-   * as the offset falls within the slit; when nodding to sky, sky positions are
-   * offset in p, so only on-axis (p = 0) steps are on target.
-   */
-  private def isOnTarget(mode: SlitOffsetMode, slitLength: Angle, o: Offset): Boolean =
-    mode match
-      case SlitOffsetMode.NodAlongSlit => isOnSlit(slitLength, o)
-      case SlitOffsetMode.NodToSky     => o.p.toAngle.toMicroarcseconds === 0L
-
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    offsetMode:   SlitOffsetMode,
     slitLength:   Angle,
     // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
-     * number of on-source exposures.  Sky steps (target off the slit) don't
+     * number of on-source exposures. Sky steps (target off the slit) don't
      * contribute to the S/N, so cycles with sky offsets require extra repeats.
+     * A step counts as on source only when it is on the slit (both p and q),
+     * regardless of nod mode — matching Flamingos 2 and IGRINS-2.
      */
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount(isOnTarget(offsetMode, slitLength, _), scienceSteps.toList, t)
+      calculateCycleCount(isOnSlit(slitLength, _), scienceSteps.toList, t)
 
   object StepDefinition:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-      offsetMode:   SlitOffsetMode,
       slitLength:   Angle,
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
@@ -127,11 +115,11 @@ object Science:
         def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
-        cals.fold(EitherT.pure(StepDefinition(scienceSteps, offsetMode, slitLength, none))): (flat, arc) =>
+        cals.fold(EitherT.pure(StepDefinition(scienceSteps, slitLength, none))): (flat, arc) =>
           for
             fs <- EitherT(expander.expandStep(static, flat))
             rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, offsetMode, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
+          yield StepDefinition(scienceSteps, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
 
     object PreDef:
 
@@ -180,7 +168,6 @@ object Science:
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
           yield PreDef(
             ss,
-            config.telescopeConfigs.offsetsType,
             GnirsGeometry.slitLength(config.camera, config.prism),
             Option.when(includeCals)((f, r))
           )
