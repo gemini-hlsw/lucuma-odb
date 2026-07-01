@@ -171,6 +171,47 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asLeft
       )
 
+  test("[igrins2] nod to sky, sky position off the slit end (p=0, q>slit) counts as sky"):
+    // A sky nod along the slit direction (p=0) that runs past the slit end is
+    // off slit, so it doesn't contribute to the S/N (the q check matters, not
+    // just p). The slit is 5", so slit/2 = 2.5"; q = 2.6" is just one
+    // deci-arcsecond past the edge and therefore off slit. Only the on-axis
+    // step is on source, so exposureCount=4 needs 4 cycles. Under the previous
+    // p-only logic q=2.6" (p=0) would have counted as on target -> 2 cycles.
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createIgrins2LongSlitObservationAs(pi, p, t)
+        _ <- setOffsets(o, SlitOffsetMode.NodToSky,
+               """[
+                 { p: { arcseconds: 0 }, q: { arcseconds: 0   } },
+                 { p: { arcseconds: 0 }, q: { arcseconds: 2.6 } }
+               ]"""
+             )
+      } yield o
+
+    setup.flatMap: oid =>
+      val expectedAtom = igrins2ExpectedScienceAtom(ExposureTime,
+        (0, 0, Enabled), (0, 2.6, Disabled)
+      )
+      expect(
+        user     = pi,
+        query    = igrins2ScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "igrins2" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom"       -> expectedAtom,
+                  "possibleFuture" -> List(expectedAtom, expectedAtom, expectedAtom).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
   // This is legal though we nay need to forbid setting q larger than the slit?
   test("[igrins2] mode nod along slit, 3 offsets on slit"):
     val setup: IO[Observation.Id] =

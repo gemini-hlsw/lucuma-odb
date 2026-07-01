@@ -200,24 +200,24 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
-  test("[gnirs] all offsets off-slit are cycled blindly (no error)"):
-    // Deliberate divergence from IGRINS-2: GNIRS does not filter off-slit
-    // offsets out of the cycle.  Provide |q| > slit length and observe that
-    // we still get a valid atom (rather than a "must be on slit" error).
+  test("[gnirs] off-slit offsets don't contribute to S/N (extra cycles)"):
+    // The SHORT_BLUE + MIRROR slit is 99" long, so |q| > 49.5" falls off slit.
+    // Here q=+2 is on slit but q=+60 is off, so only 1 of the 2 steps per cycle
+    // is on source. exposureCount=3 therefore needs 3 cycles (not 2).
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
         _   <- setAlongSlitTelescopeConfigs(oid,
                  """[
-                   { q: { arcseconds: 10 }, guiding: ENABLED },
-                   { q: { arcseconds: 20 }, guiding: ENABLED }
+                   { q: { arcseconds:  2 }, guiding: ENABLED  },
+                   { q: { arcseconds: 60 }, guiding: DISABLED }
                  ]"""
                )
       yield oid
 
     setup.flatMap: oid =>
       val expectedAtom = gnirsExpectedScienceAtom(DynamicSnapshot,
-        (0, 10, Enabled), (0, 20, Enabled)
+        (0, 2, Enabled), (0, 60, Disabled)
       )
       expect(
         user     = pi,
@@ -228,12 +228,36 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
-                  "possibleFuture" -> List(expectedAtom, calAtom(0, 20)).asJson,
+                  "possibleFuture" -> List(expectedAtom, expectedAtom, calAtom(0, 60)).asJson,
                   "hasMore"        -> false.asJson
                 )
               )
             )
           ).asRight
+      )
+
+  test("[gnirs] all along-slit offsets off slit -> error"):
+    // When no science step lands on the slit there are no on-source exposures,
+    // so the sequence cannot be generated.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- setAlongSlitTelescopeConfigs(oid,
+                 """[
+                   { q: { arcseconds: 60 }, guiding: DISABLED },
+                   { q: { arcseconds: 60 }, guiding: DISABLED }
+                 ]"""
+               )
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          List(
+            s"Could not generate a sequence for $oid: At least one exposure must be taken on slit."
+          ).asLeft
       )
 
   test("[gnirs] telluric sequences omit the inline flats & arcs"):
@@ -289,6 +313,8 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       )
 
   test("[gnirs] nod-to-sky offsets carry full P/Q + per-entry guiding"):
+    // The sky position (p=60) is off target, so only the on-axis (p=0) step
+    // contributes to the S/N: exposureCount=3 requires 3 cycles.
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
@@ -313,7 +339,45 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               "gnirs" -> Json.obj(
                 "science" -> Json.obj(
                   "nextAtom"       -> expectedAtom,
-                  "possibleFuture" -> List(expectedAtom, calAtom(60, 60)).asJson,
+                  "possibleFuture" -> List(expectedAtom, expectedAtom, calAtom(60, 60)).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
+  test("[gnirs] nod-to-sky sky position off the slit end (p=0, q>slit) counts as sky"):
+    // A sky nod along the slit direction (p=0) that runs past the slit end is
+    // off slit and so doesn't contribute to the S/N — the q check matters, not
+    // just p. The SHORT_BLUE + MIRROR slit is 99", so slit/2 = 49.5"; q = 49.6"
+    // is just one deci-arcsecond past the edge and therefore off slit. Only the
+    // on-axis step is on source, so exposureCount=3 needs 3 cycles.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- setToSkyTelescopeConfigs(oid,
+                 """[
+                   { offset: { p: { arcseconds: 0 }, q: { arcseconds:  0   } }, guiding: ENABLED  },
+                   { offset: { p: { arcseconds: 0 }, q: { arcseconds: 49.6 } }, guiding: DISABLED }
+                 ]"""
+               )
+      yield oid
+
+    setup.flatMap: oid =>
+      val expectedAtom = gnirsExpectedScienceAtom(DynamicSnapshot,
+        (0, 0, Enabled), (0, 49.6, Disabled)
+      )
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom"       -> expectedAtom,
+                  "possibleFuture" -> List(expectedAtom, expectedAtom, calAtom(0, BigDecimal("49.6"))).asJson,
                   "hasMore"        -> false.asJson
                 )
               )

@@ -9,6 +9,7 @@ import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.State
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -23,6 +24,8 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
+import lucuma.core.geom.gnirs.all as GnirsGeometry
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -78,25 +81,26 @@ object Science:
 
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+    slitLength:   Angle,
     // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
-     * number of exposures. Sky-only offsets in the cycle (if any) are not
-     * given special treatment — we cycle blindly through whatever the
-     * observing mode defines.
+     * number of on-source exposures. Sky steps (target off the slit) don't
+     * contribute to the S/N, so cycles with sky offsets require extra repeats.
+     * A step counts as on source only when it is on the slit (both p and q),
+     * regardless of nod mode — matching Flamingos 2 and IGRINS-2.
      */
-    def cycleCount(t: IntegrationTime): NonNegInt =
-      val required = t.exposureCount.value
-      val perCycle = scienceSteps.length
-      NonNegInt.unsafeFrom((required + (perCycle - 1)) / perCycle)
+    def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
+      calculateCycleCount(isOnSlit(slitLength, _), scienceSteps.toList, t)
 
   object StepDefinition:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+      slitLength:   Angle,
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
     ):
@@ -111,11 +115,11 @@ object Science:
         def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
-        cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
+        cals.fold(EitherT.pure(StepDefinition(scienceSteps, slitLength, none))): (flat, arc) =>
           for
             fs <- EitherT(expander.expandStep(static, flat))
             rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
+          yield StepDefinition(scienceSteps, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
 
     object PreDef:
 
@@ -162,7 +166,11 @@ object Science:
             ct  = ss.last.telescopeConfig.copy(guiding = Disabled)
             f  <- SeqState.flatStep(ct, ObserveClass.NightCal)
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
-          yield PreDef(ss, Option.when(includeCals)((f, r)))
+          yield PreDef(
+            ss,
+            GnirsGeometry.slitLength(config.camera, config.prism),
+            Option.when(includeCals)((f, r))
+          )
 
     def compute[F[_]: Monad](
       config:   Config,
@@ -339,11 +347,12 @@ object Science:
       t <- posTime
       s <- StepDefinition.compute(config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
       e <- cycleEstimate(s)
+      c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
       e,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
-      s.cycleCount(t)
+      c
     ): SequenceGenerator[GnirsDynamicConfig]
 
     gen.value
