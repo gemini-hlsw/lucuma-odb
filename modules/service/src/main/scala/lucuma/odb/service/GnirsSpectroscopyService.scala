@@ -26,12 +26,12 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
 import lucuma.core.model.sequence.gnirs.GnirsFpu
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -220,7 +220,7 @@ object GnirsSpectroscopyService:
       private def validateTelescopeConfigKind(
         SET:   GnirsSpectroscopyInput.Edit,
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Result[Unit]] =
+      ): F[Result[Unit]] =
         val slitOverride = SET.explicitTelescopeConfigsSlit.isPresent
         val ifuOverride  = SET.explicitTelescopeConfigsIfu.isPresent
         if SET.fpu.isDefined || !(slitOverride || ifuOverride) then Result.unit.pure[F]
