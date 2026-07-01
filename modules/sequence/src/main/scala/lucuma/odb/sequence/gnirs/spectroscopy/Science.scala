@@ -9,6 +9,7 @@ import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.State
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -22,7 +23,10 @@ import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState.Disabled
+import lucuma.core.geom.gnirs.all as GnirsGeometry
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -76,27 +80,39 @@ object Science:
 
   private object SeqState extends gnirs.GnirsSequenceState
 
+  /**
+   * Whether an offset keeps the target on the slit (and so contributes to the
+   * science S/N).  When nodding along the slit the target stays on-slit as long
+   * as the offset falls within the slit; when nodding to sky, sky positions are
+   * offset in p, so only on-axis (p = 0) steps are on target.
+   */
+  private def isOnTarget(mode: SlitOffsetMode, slitLength: Angle, o: Offset): Boolean =
+    mode match
+      case SlitOffsetMode.NodAlongSlit => isOnSlit(slitLength, o)
+      case SlitOffsetMode.NodToSky     => o.p.toAngle.toMicroarcseconds === 0L
+
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+    offsetMode:   SlitOffsetMode,
+    slitLength:   Angle,
     // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
-     * number of exposures. Sky-only offsets in the cycle (if any) are not
-     * given special treatment — we cycle blindly through whatever the
-     * observing mode defines.
+     * number of on-source exposures.  Sky steps (target off the slit) don't
+     * contribute to the S/N, so cycles with sky offsets require extra repeats.
      */
-    def cycleCount(t: IntegrationTime): NonNegInt =
-      val required = t.exposureCount.value
-      val perCycle = scienceSteps.length
-      NonNegInt.unsafeFrom((required + (perCycle - 1)) / perCycle)
+    def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
+      calculateCycleCount(isOnTarget(offsetMode, slitLength, _), scienceSteps.toList, t)
 
   object StepDefinition:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+      offsetMode:   SlitOffsetMode,
+      slitLength:   Angle,
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
     ):
@@ -111,11 +127,11 @@ object Science:
         def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
-        cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
+        cals.fold(EitherT.pure(StepDefinition(scienceSteps, offsetMode, slitLength, none))): (flat, arc) =>
           for
             fs <- EitherT(expander.expandStep(static, flat))
             rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
+          yield StepDefinition(scienceSteps, offsetMode, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
 
     object PreDef:
 
@@ -162,7 +178,12 @@ object Science:
             ct  = ss.last.telescopeConfig.copy(guiding = Disabled)
             f  <- SeqState.flatStep(ct, ObserveClass.NightCal)
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
-          yield PreDef(ss, Option.when(includeCals)((f, r)))
+          yield PreDef(
+            ss,
+            config.telescopeConfigs.offsetsType,
+            GnirsGeometry.slitLength(config.camera, config.prism),
+            Option.when(includeCals)((f, r))
+          )
 
     def compute[F[_]: Monad](
       config:   Config,
@@ -339,11 +360,12 @@ object Science:
       t <- posTime
       s <- StepDefinition.compute(config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
       e <- cycleEstimate(s)
+      c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
       e,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
-      s.cycleCount(t)
+      c
     ): SequenceGenerator[GnirsDynamicConfig]
 
     gen.value
