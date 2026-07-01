@@ -22,8 +22,11 @@ object SmartGnirsLoader:
   import SmartGcalTable.Col
 
   given Encoder[SmartGcalValue.LegacyInstrumentConfig] =
-    interval.contramap[SmartGcalValue.LegacyInstrumentConfig]:
-      _.exposureTime.toDuration
+    (
+      interval *:
+      int4_pos
+    ).contramap[SmartGcalValue.LegacyInstrumentConfig]: c =>
+      (c.exposureTime.toDuration, c.coadds)
 
   given Encoder[SmartGcalValue.Legacy] =
     SmartGcalTable.valueEncoder
@@ -65,7 +68,10 @@ object SmartGnirsLoader:
     Gnirs,
     Col("c_step_order", "int8"),
     keyColumns,
-    NonEmptyList.one(Col("c_exposure_time", "interval"))
+    NonEmptyList.of(
+      Col("c_exposure_time", "interval"),
+      Col("c_coadds", "int4")
+    )
   )
 
   object Gn extends SmartGcalLoader(

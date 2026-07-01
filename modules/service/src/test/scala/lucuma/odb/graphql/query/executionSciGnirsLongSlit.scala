@@ -51,11 +51,12 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
     )
 
   // Inline "Nighttime Calibrations" for the default config (2200 nm, SHALLOW,
-  // D111, MIRROR, 0.15"/pix, 0.30" slit): one flat (20s) then one arc (10s),
-  // taken unguided at the last science offset.  See the smart gcal fixture in
-  // ExecutionTestSupportForGnirs.
+  // D111, MIRROR, 0.15"/pix, 0.30" slit): one flat (20s, 2 coadds) then one arc
+  // (10s, 3 coadds), taken unguided at the last science offset.  The coadds come
+  // from the smart gcal fixture, not the science config (1 coadd).  See the
+  // smart gcal fixture in ExecutionTestSupportForGnirs.
   private def calAtom(p: BigDecimal, q: BigDecimal): Json =
-    gnirsExpectedCalAtom(DynamicSnapshot, p, q, 20.secondTimeSpan, 1, 10.secondTimeSpan, 1)
+    gnirsExpectedCalAtom(DynamicSnapshot, p, q, 20.secondTimeSpan, 2, 1, 10.secondTimeSpan, 3, 1)
 
   // Default offset pattern's last position is q = +2.
   val DefaultCalAtom: Json = calAtom(0, 2)
