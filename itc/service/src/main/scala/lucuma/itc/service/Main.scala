@@ -17,6 +17,7 @@ import dev.profunktor.redis4cats.data.RedisCodec
 import dev.profunktor.redis4cats.log4cats.*
 import fs2.compression.Compression
 import fs2.io.net.Network
+import lucuma.common.middleware.CorsUtils
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes
 import lucuma.itc.cache.BinaryEffectfulCache
@@ -104,14 +105,14 @@ object Main extends IOApp with ItcCacheOrRemote {
 
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
-  /** A middleware that adds CORS headers. In production the origin must match the cookie domain. */
-  def cors(env: ExecutionEnvironment, domain: Option[String]): CORSPolicy =
+  /** A middleware that adds CORS headers. In production the origin must match one of the allowed domains. */
+  def cors(env: ExecutionEnvironment, domain: List[String]): CORSPolicy =
     env match
       case Local | Review | Staging =>
         CORS.policy
       case Production               =>
         CORS.policy
-          .withAllowOriginHostCi(u => domain.exists(d => u.host.value === d || u.host.value.endsWith("." + d)))
+          .withAllowOriginHost(u => CorsUtils.isAllowed(u.host.value, domain))
 
   def cacheMiddleware[F[_]: Functor](service: HttpRoutes[F]): HttpRoutes[F] =
     Kleisli: (req: Request[F]) =>
@@ -181,7 +182,7 @@ object Main extends IOApp with ItcCacheOrRemote {
     yield wsb =>
       otelMiddleware.asHttpRoutesMiddleware:
         GZip:
-          cors(cfg.environment, none):
+          cors(cfg.environment, Nil):
             cacheMiddleware:
               Metrics[F](metricsOps):
                 Routes.forService(_ => GraphQLService[F](mapping).some.pure[F], wsb, "itc")

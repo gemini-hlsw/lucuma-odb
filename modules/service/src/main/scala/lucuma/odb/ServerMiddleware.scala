@@ -8,6 +8,7 @@ import cats.data.Kleisli
 import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
+import lucuma.common.middleware.CorsUtils
 import lucuma.core.model.User
 import lucuma.odb.otel.given
 import lucuma.odb.service.Services
@@ -62,7 +63,7 @@ object ServerMiddleware {
   def cors[F[_]: Monad](corsOverHttps: Boolean, domain: List[String]): Middleware[F] =
     CORS.policy
       .withAllowCredentials(true)
-      .withAllowOriginHost(u => (!corsOverHttps || (u.scheme === Scheme.https)) && domain.exists(d => u.host.value === d || u.host.value.endsWith("." + d)))
+      .withAllowOriginHost(u => (!corsOverHttps || (u.scheme === Scheme.https)) && CorsUtils.isAllowed(u.host.value, domain))
       .withMaxAge(1.day)
       .apply
 

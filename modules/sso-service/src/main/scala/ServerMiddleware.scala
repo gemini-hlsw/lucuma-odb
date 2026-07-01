@@ -5,6 +5,7 @@ package lucuma.sso.service
 
 import cats.*
 import cats.effect.*
+import lucuma.common.middleware.CorsUtils
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.Environment.*
@@ -49,11 +50,11 @@ object ServerMiddleware {
       serviceErrorLogAction   = Logger[F].error(_)(_)
     )
 
-  /** A middleware that adds CORS headers. The origin must match the cookie domain. */
-  def cors[F[_]: Monad](domain: String): Middleware[F] =
+  /** A middleware that adds CORS headers. The origin must match one of the allowed domains. */
+  def cors[F[_]: Monad](domain: List[String]): Middleware[F] =
     CORS.policy
       .withAllowCredentials(true)
-      .withAllowOriginHost(u => u.host.value === domain || u.host.value.endsWith("." + domain))
+      .withAllowOriginHost(u => CorsUtils.isAllowed(u.host.value, domain))
       .withMaxAge(1.day)
       .apply
 
@@ -62,7 +63,7 @@ object ServerMiddleware {
     config: Config,
   ): Middleware[F] =
     List[Middleware[F]](
-      cors(config.cookieDomain),
+      cors(List(config.cookieDomain)),
       logging(config.environment),
       natchez,
       errorReporting,
