@@ -38,7 +38,7 @@ class createObservation_GnirsIfu extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuIfu: LOW_RESOLUTION
+                        ifu: { fpu: LOW_RESOLUTION }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -57,10 +57,8 @@ class createObservation_GnirsIfu extends OdbSuite:
                       instrument
                       mode
                       gnirsSpectroscopy {
-                        fpuSlit
-                        fpuIfu
-                        initialFpuSlit
-                        initialFpuIfu
+                        slit { fpu }
+                        ifu { fpu initialFpu }
                         decker
                         defaultDecker
                       }
@@ -77,10 +75,11 @@ class createObservation_GnirsIfu extends OdbSuite:
                     "instrument": "GNIRS",
                     "mode": "GNIRS_IFU",
                     "gnirsSpectroscopy": {
-                      "fpuSlit": null,
-                      "fpuIfu": "LOW_RESOLUTION",
-                      "initialFpuSlit": null,
-                      "initialFpuIfu": "LOW_RESOLUTION",
+                      "slit": null,
+                      "ifu": {
+                        "fpu": "LOW_RESOLUTION",
+                        "initialFpu": "LOW_RESOLUTION"
+                      },
                       "decker": "LOW_RESOLUTION_IFU",
                       "defaultDecker": "LOW_RESOLUTION_IFU"
                     }
@@ -91,7 +90,7 @@ class createObservation_GnirsIfu extends OdbSuite:
           """)
         )
 
-  test("create GNIRS IFU rejects providing both fpuSlit and fpuIfu"):
+  test("create GNIRS IFU rejects providing both slit and ifu"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>
         expect(
@@ -117,8 +116,8 @@ class createObservation_GnirsIfu extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
-                        fpuIfu: LOW_RESOLUTION
+                        slit: { fpu: LONG_SLIT_0_30 }
+                        ifu: { fpu: LOW_RESOLUTION }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                       }
@@ -127,5 +126,140 @@ class createObservation_GnirsIfu extends OdbSuite:
                 }) { observation { id } }
               }
             """,
-          expected = Left(List("Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: Only one of 'fpuSlit' or 'fpuIfu' may be provided."))
+          expected = Left(List("Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: Only one of 'slit' or 'ifu' may be provided."))
         )
+
+  test("GNIRS IFU default telescope configs (extended source); slit configs null"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: IFU
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsSpectroscopy: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        ifu: { fpu: LOW_RESOLUTION }
+                        filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
+                        exposureTimeMode: {
+                          timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }
+                        }
+                      }
+                    }
+                  }
+                }) {
+                  observation {
+                    observingMode {
+                      gnirsSpectroscopy {
+                        slit { telescopeConfigs { offsetMode } }
+                        ifu { telescopeConfigs { offset { p { microarcseconds } q { microarcseconds } } guiding } }
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsSpectroscopy": {
+                      "slit": null,
+                      "ifu": {
+                        "telescopeConfigs": [
+                          { "offset": { "p": { "microarcseconds": 150000 },    "q": { "microarcseconds": 150000 } },    "guiding": "ENABLED" },
+                          { "offset": { "p": { "microarcseconds": 10000000 },  "q": { "microarcseconds": 10000000 } },  "guiding": "DISABLED" },
+                          { "offset": { "p": { "microarcseconds": -150000 },   "q": { "microarcseconds": -150000 } },   "guiding": "ENABLED" },
+                          { "offset": { "p": { "microarcseconds": -10000000 }, "q": { "microarcseconds": -10000000 } }, "guiding": "DISABLED" }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  test("create GNIRS IFU rejects slit configs provided alongside ifu"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query =
+            s"""
+              mutation {
+                createObservation(input: {
+                  programId: "$pid"
+                  SET: {
+                    targetEnvironment: { asterism: [ "$tid" ] }
+                    scienceRequirements: {
+                      spectroscopy: {
+                        wavelength: { nanometers: 2200 }
+                        resolution: 1000
+                        wavelengthCoverage: { nanometers: 200 }
+                        focalPlane: IFU
+                        focalPlaneAngle: { microarcseconds: 0 }
+                      }
+                    }
+                    observingMode: {
+                      gnirsSpectroscopy: {
+                        grating: D111
+                        prism: MIRROR
+                        camera: SHORT_BLUE
+                        ifu: { fpu: LOW_RESOLUTION }
+                        filter: ORDER3
+                        centralWavelength: { nanometers: 2200 }
+                        slit: { explicitTelescopeConfigs: { toSky: [ { offset: { p: { arcseconds: 1 }, q: { arcseconds: 1 } }, guiding: ENABLED } ] } }
+                      }
+                    }
+                  }
+                }) { observation { id } }
+              }
+            """,
+          expected = Left(List("Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: Only one of 'slit' or 'ifu' may be provided."))
+        )
+
+  test("update GNIRS IFU rejects slit telescope configs when the FPU is unchanged"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGnirsIfuObservationAs(pi, pid, tid)
+      _   <- expect(
+        user  = pi,
+        query =
+          s"""
+            mutation {
+              updateObservations(input: {
+                SET: {
+                  observingMode: {
+                    gnirsSpectroscopy: {
+                      slit: { explicitTelescopeConfigs: { toSky: [ { offset: { p: { arcseconds: 1 }, q: { arcseconds: 1 } }, guiding: ENABLED } ] } }
+                    }
+                  }
+                }
+                WHERE: { id: { EQ: "$oid" } }
+              }) { observations { id } }
+            }
+          """,
+        expected = Left(List("'slit.explicitTelescopeConfigs' is only valid with a long-slit FPU."))
+      )
+    yield ()

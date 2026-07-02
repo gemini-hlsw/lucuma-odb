@@ -213,7 +213,7 @@ object ObservingModeServices:
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
           input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
           input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which).map(_.success)),
-          input.gnirsSpectroscopy.map(m => gnirsSpectroscopyService.update(m, which).map(_.success)),
+          input.gnirsSpectroscopy.map(m => gnirsSpectroscopyService.update(m, which)),
           input.visitor.map(m => visitorService.update(m, which).map(_.success))
         ).flattenOption match
           case List(r) => r

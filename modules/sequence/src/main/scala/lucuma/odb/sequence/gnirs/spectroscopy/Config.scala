@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.gnirs.spectroscopy
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -16,8 +17,8 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
-import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFpu
@@ -98,7 +99,7 @@ case class Config(
   wellDepth:               GnirsWellDepth,
   exposureTimeMode:        ExposureTimeMode,
   coadds:                  PosInt,
-  telescopeConfigs:        SlitTelescopeConfigs,
+  telescopeConfigs:        NonEmptyList[TelescopeConfig],
   acquisition:             AcquisitionConfig,
   telluricType:            TelluricType
 ) derives Eq:
@@ -131,7 +132,7 @@ case class Config(
     out.write(exposureTimeMode.hashBytes)
     out.write(coadds.value.hashBytes)
 
-    telescopeConfigs.telescopeConfigs.toList.foreach: tc =>
+    telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)
 
     out.write(acquisition.hashBytes)

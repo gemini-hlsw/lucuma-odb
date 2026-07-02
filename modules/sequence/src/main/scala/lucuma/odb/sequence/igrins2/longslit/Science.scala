@@ -61,7 +61,7 @@ object Science:
     scienceSteps: NonEmptyList[ProtoStep[Igrins2DynamicConfig]]
   ):
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[Igrins2DynamicConfig](isOnSlit(SlitLength, _), scienceSteps.toList, t)
+      calculateCycleCount[Igrins2DynamicConfig](s => isOnSlit(SlitLength, s.telescopeConfig.offset), scienceSteps.toList, t)
 
   object StepDefinition:
 

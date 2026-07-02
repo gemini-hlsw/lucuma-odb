@@ -40,6 +40,10 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
     val FpuIfuConfig: ColumnRef     = col("c_fpu_ifu", gnirs_fpu_ifu.embedded)
     val InitialFpuSlit: ColumnRef   = col("c_initial_fpu_slit", gnirs_fpu_slit.opt)
     val InitialFpuIfu: ColumnRef    = col("c_initial_fpu_ifu", gnirs_fpu_ifu.opt)
+    // Embedded aliases for the initial FPUs, used as non-key columns inside the
+    // GnirsSlit / GnirsIfu sub-objects (present only for the matching variant).
+    val InitialFpuSlitConfig: ColumnRef = col("c_initial_fpu_slit", gnirs_fpu_slit.embedded)
+    val InitialFpuIfuConfig: ColumnRef  = col("c_initial_fpu_ifu", gnirs_fpu_ifu.embedded)
 
     // Filter
     val Filter: ColumnRef           = col("c_filter", gnirs_filter)
@@ -59,9 +63,10 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
     val ExplicitTelescopeConfigs: ColumnRef = col("c_telescope_configs", text.opt)
 
     // View-computed defaults/effective for telescope configs
-    val DefaultSlitOffsetMode: ColumnRef     = col("c_slit_offset_mode_default", slit_offset_mode)
+    // Slit offset mode default/effective are NULL for IFU rows.
+    val DefaultSlitOffsetMode: ColumnRef     = col("c_slit_offset_mode_default", slit_offset_mode.opt)
     val DefaultTelescopeConfigs: ColumnRef   = col("c_telescope_configs_default", text)
-    val SlitOffsetModeEffective: ColumnRef   = col("c_slit_offset_mode_effective", slit_offset_mode)
+    val SlitOffsetModeEffective: ColumnRef   = col("c_slit_offset_mode_effective", slit_offset_mode.opt)
     val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
 
     // Acquisition config (ETM stored in t_exposure_time_mode via FK)

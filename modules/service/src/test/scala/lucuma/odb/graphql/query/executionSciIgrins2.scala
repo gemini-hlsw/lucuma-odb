@@ -103,7 +103,7 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         query    = igrins2ScienceQuery(oid),
         expected =
           List(
-            s"Could not generate a sequence for $oid: At least one exposure must be taken on slit."
+            s"Could not generate a sequence for $oid: At least one exposure must be on slit (if longslit) or guided (if IFU)."
           ).asLeft
       )
 
@@ -167,7 +167,7 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         query    = igrins2ScienceQuery(oid),
         expected =
           List(
-            s"Could not generate a sequence for $oid: At least one exposure must be taken on slit."
+            s"Could not generate a sequence for $oid: At least one exposure must be on slit (if longslit) or guided (if IFU)."
           ).asLeft
       )
 

@@ -26,12 +26,16 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
 import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.core.model.sequence.gnirs.defaultIfuTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsSpectroscopyInput
 import lucuma.odb.sequence.gnirs.spectroscopy.AcquisitionConfig
@@ -60,7 +64,7 @@ trait GnirsSpectroscopyService[F[_]]:
   def update(
     SET:   GnirsSpectroscopyInput.Edit,
     which: List[Observation.Id]
-  )(using Transaction[F]): F[Unit]
+  )(using Transaction[F]): F[Result[Unit]]
 
   def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit]
 
@@ -96,11 +100,9 @@ object GnirsSpectroscopyService:
         gnirs_well_depth                 *: // c_well_depth_effective
         // Focus motor steps (nullable = Best)
         int4.opt                         *:
-        // Telescope configs: explicit (both nullable) + default
-        slit_offset_mode.opt             *: // c_slit_offset_mode (explicit)
-        text.opt                         *: // c_telescope_configs (explicit)
-        slit_offset_mode                 *: // c_slit_offset_mode_default
-        text                             *: // c_telescope_configs_default
+        // Telescope configs effective: slit offset mode (NULL for IFU) + JSON
+        slit_offset_mode.opt             *: // c_slit_offset_mode_effective
+        text                             *: // c_telescope_configs_effective
         // Acquisition fields (inline cols + acq ETM joined from t_exposure_time_mode via FK)
         gnirs_acquisition_type.opt       *: // c_acq_type (None => AUTO mode)
         int4                             *: // c_acq_coadds
@@ -116,16 +118,20 @@ object GnirsSpectroscopyService:
               readModeExp *:
               wellDepthEff *:
               focusMotorSteps *:
-              slitOffsetModeExp *: tcExp *: slitOffsetModeDef *: tcDef *:
+              slitOffsetModeEff *: tcEff *:
               acqType *: acqCoadds *: acqFilterExp *: acqSkyOffP *: acqSkyOffQ *:
               acqEtm *: telluricType *: EmptyTuple) =>
-          SlitTelescopeConfigsFormat.getOption((slitOffsetModeDef, tcDef))
-            .toRight(s"Could not parse default telescope configs from '$tcDef'")
-            .flatMap: defaultTC =>
-              val explicitTC = (slitOffsetModeExp, tcExp).mapN: (mode, json) =>
-                SlitTelescopeConfigsFormat.getOption((mode, json))
-                  .toRight(s"Could not parse explicit telescope configs from '$json'")
-              explicitTC.sequence.flatMap { explicitTCOpt =>
+          // IFU (slit offset mode NULL) carries a plain [TelescopeConfig]; long slit resolves
+          // its SlitTelescopeConfigs to the same.
+          val telescopeConfigs: Either[String, NonEmptyList[TelescopeConfig]] =
+            slitOffsetModeEff match
+              case Some(mode) =>
+                SlitTelescopeConfigsFormat.getOption((mode, tcEff)).map(_.telescopeConfigs)
+                  .toRight(s"Could not parse telescope configs from '$tcEff'")
+              case None       =>
+                ToSkyFormat.getOption(tcEff)
+                  .toRight(s"Could not parse IFU telescope configs from '$tcEff'")
+          telescopeConfigs.flatMap { resolvedTC =>
                 PosInt.from(coadds)
                   .leftMap(e => s"Invalid coadds $coadds: $e")
                   .flatMap: coaddsP =>
@@ -155,7 +161,7 @@ object GnirsSpectroscopyService:
                           wellDepthEff,
                           sciEtm,
                           coaddsP,
-                          explicitTCOpt.getOrElse(defaultTC),
+                          resolvedTC,
                           acq,
                           telluricType
                           )
@@ -209,14 +215,37 @@ object GnirsSpectroscopyService:
           _ <- update(input.exposureTimeMode, ExposureTimeModeRole.Science)
         yield ()
 
+      // A NonNull telescope-config override of a specific kind must match the persisted FPU.
+      // The input validates this against an edited FPU; when the FPU is unchanged we check the
+      // persisted observing-mode type here (the DB CHECK is the final backstop).
+      private def validateTelescopeConfigKind(
+        SET:   GnirsSpectroscopyInput.Edit,
+        which: List[Observation.Id]
+      ): F[Result[Unit]] =
+        val slitOverride = SET.explicitTelescopeConfigsSlit.isPresent
+        val ifuOverride  = SET.telescopeConfigsIfu.isDefined
+        if SET.fpu.isDefined || !(slitOverride || ifuOverride) then Result.unit.pure[F]
+        else
+          NonEmptyList.fromList(which).fold(Result.unit.pure[F]): oids =>
+            val af = Statements.selectObservingModeTypes(oids)
+            session.prepareR(af.fragment.query(observing_mode_type)).use: pq =>
+              pq.stream(af.argument, chunkSize = 1024).compile.toList
+            .map: types =>
+              if slitOverride && types.exists(_ =!= ObservingModeType.GnirsLongSlit) then
+                OdbError.InvalidArgument("'slit.explicitTelescopeConfigs' is only valid with a long-slit FPU.".some).asFailure
+              else if ifuOverride && types.exists(_ =!= ObservingModeType.GnirsIfu) then
+                OdbError.InvalidArgument("'ifu.telescopeConfigs' is only valid with an IFU FPU.".some).asFailure
+              else Result.unit
+
       override def update(
         SET:   GnirsSpectroscopyInput.Edit,
         which: List[Observation.Id]
-      )(using Transaction[F]): F[Unit] =
-        for
-          _ <- updateExposureTimeModes(SET, which)
-          _ <- Statements.updateGnirsSpectroscopy(SET, which).fold(F.unit)(session.exec)
-        yield ()
+      )(using Transaction[F]): F[Result[Unit]] =
+        (for
+          _ <- ResultT(validateTelescopeConfigKind(SET, which))
+          _ <- ResultT.liftF(updateExposureTimeModes(SET, which))
+          _ <- ResultT.liftF(Statements.updateGnirsSpectroscopy(SET, which).fold(F.unit)(session.exec))
+        yield ()).value
 
       override def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit] =
         session.exec(Statements.cloneGnirs(originalId, newId))
@@ -247,10 +276,8 @@ object GnirsSpectroscopyService:
           ls.c_read_mode,
           ls.c_well_depth_effective,
           ls.c_focus_motor_steps,
-          ls.c_slit_offset_mode,
-          ls.c_telescope_configs,
-          ls.c_slit_offset_mode_default,
-          ls.c_telescope_configs_default,
+          ls.c_slit_offset_mode_effective,
+          ls.c_telescope_configs_effective,
           ls.c_acq_type,
           ls.c_acq_coadds,
           ls.c_acq_filter,
@@ -394,7 +421,16 @@ object GnirsSpectroscopyService:
       observationId: Observation.Id,
       input:         GnirsSpectroscopyInput.Create
     ): AppliedFragment =
-      val explicitTC = input.explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
+      // Slit configs persist (offset mode, JSON); IFU configs persist as JSON with a NULL mode.
+      // IFU configs are always seeded: the provided value, or the FPU's default preset.
+      val explicitSlitTC = input.explicitTelescopeConfigsSlit.map(SlitTelescopeConfigsFormat.reverseGet)
+      val explicitSlitMode = explicitSlitTC.map(_._1)
+      val ifuTcJson: Option[String] =
+        input.fpu match
+          case GnirsFpu.Spectroscopy.Ifu(ifu) =>
+            ToSkyFormat.reverseGet(input.telescopeConfigsIfu.getOrElse(defaultIfuTelescopeConfigs(ifu))).some
+          case GnirsFpu.Spectroscopy.Slit(_)  => none
+      val explicitTcJson   = explicitSlitTC.map(_._2).orElse(ifuTcJson)
       val acqSkyOffP = input.acquisition.flatMap(_.skyOffset).map(o => Angle.microarcseconds.get(o.p.toAngle))
       val acqSkyOffQ = input.acquisition.flatMap(_.skyOffset).map(o => Angle.microarcseconds.get(o.q.toAngle))
       InsertGnirsSpectroscopy.apply(
@@ -413,8 +449,8 @@ object GnirsSpectroscopyService:
         input.explicitFocusMotorSteps,
         input.explicitReadMode,
         input.explicitWellDepth,
-        explicitTC.map(_._1),
-        explicitTC.map(_._2),
+        explicitSlitMode,
+        explicitTcJson,
         explicitAcqType(input),
         input.acquisition.flatMap(_.coadds).map(_.value).getOrElse(1),
         input.acquisition.flatMap(_.explicitFilter.toOption),
@@ -422,6 +458,9 @@ object GnirsSpectroscopyService:
         acqSkyOffQ,
         input.telluricType
       )
+
+    def selectObservingModeTypes(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"SELECT DISTINCT c_observing_mode_type FROM t_gnirs_spectroscopy WHERE " |+| observationIdIn(oids)
 
     def deleteGnirs(which: List[Observation.Id]): Option[AppliedFragment] =
       NonEmptyList.fromList(which).map: oids =>
@@ -457,13 +496,19 @@ object GnirsSpectroscopyService:
       val upAcqSkyOffP   = sql"c_acq_sky_offset_p  = ${int8.opt}"
       val upAcqSkyOffQ   = sql"c_acq_sky_offset_q  = ${int8.opt}"
 
+      // Slit and IFU configs are mutually exclusive (input-validated) and share the
+      // (c_slit_offset_mode, c_telescope_configs) columns. Slit explicit is clearable
+      // (Nullable); IFU is a plain value with a NULL mode (Option: set or leave unedited).
       val upTelescope: Option[List[AppliedFragment]] =
-        SET.explicitTelescopeConfigs.toOptionOption.map:
+        SET.explicitTelescopeConfigsSlit.toOptionOption.map:
           case Some(tc) =>
             val (mode, off) = SlitTelescopeConfigsFormat.reverseGet(tc)
             List(upSlitMode(Some(mode)), upOffsets(Some(off)))
           case None =>
             List(upSlitMode(None), upOffsets(None))
+        .orElse:
+          SET.telescopeConfigsIfu.map: cs =>
+            List(upOffsets(Some(ToSkyFormat.reverseGet(cs))))
 
       // Acquisition sub-field updates (exposureTimeMode is handled separately via
       // updateExposureTimeModes). The acquisition type and sky offset are coupled:

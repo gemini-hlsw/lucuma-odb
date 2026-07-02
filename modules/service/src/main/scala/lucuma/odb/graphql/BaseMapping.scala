@@ -237,6 +237,8 @@ trait BaseMapping[F[_]]
   lazy val GnirsGratingType                        = schema.ref("GnirsGrating")
   lazy val GnirsSpectroscopyAcquisitionType        = schema.ref("GnirsSpectroscopyAcquisition")
   lazy val GnirsSpectroscopyType                   = schema.ref("GnirsSpectroscopy")
+  lazy val GnirsSlitType                           = schema.ref("GnirsSlit")
+  lazy val GnirsIfuType                            = schema.ref("GnirsIfu")
   lazy val GnirsPrismType                          = schema.ref("GnirsPrism")
   lazy val GnirsCameraType                         = schema.ref("GnirsCamera")
   lazy val GnirsAcquisitionTypeType                = schema.ref("GnirsAcquisitionType")
