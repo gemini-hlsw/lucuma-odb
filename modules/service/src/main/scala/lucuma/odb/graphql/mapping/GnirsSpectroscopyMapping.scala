@@ -116,14 +116,14 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlObject("centralWavelength"),
       SqlObject("initialCentralWavelength"),
 
-      // Camera + FPU + Filter + Wavelength
+      // Camera + Filter + Wavelength
       SqlField("camera",        GnirsSpectroscopyView.Camera),
       SqlField("initialCamera", GnirsSpectroscopyView.InitialCamera),
-      // FPU: exactly one of fpuSlit / fpuIfu is non-null (+ initial snapshots).
-      SqlField("fpuSlit",        GnirsSpectroscopyView.FpuSlit),
-      SqlField("fpuIfu",         GnirsSpectroscopyView.FpuIfu),
-      SqlField("initialFpuSlit", GnirsSpectroscopyView.InitialFpuSlit),
-      SqlField("initialFpuIfu",  GnirsSpectroscopyView.InitialFpuIfu),
+      // FPU + telescope configs are grouped, by variant, into the slit / ifu
+      // sub-objects. Exactly one is non-null per row (discriminated by which FPU
+      // column is set); see GnirsSlitMapping / GnirsIfuMapping.
+      SqlObject("slit"),
+      SqlObject("ifu"),
       SqlField("filter",        GnirsSpectroscopyView.Filter),
       SqlField("initialFilter", GnirsSpectroscopyView.InitialFilter),
       SqlField("coadds",        GnirsSpectroscopyView.Coadds),
@@ -145,7 +145,25 @@ trait GnirsSpectroscopyMapping[F[_]]
       // Focus motor steps (null = best)
       SqlField("explicitFocusMotorSteps", GnirsSpectroscopyView.FocusMotorSteps),
 
-      // Telescope configs raw columns (hidden, used for cursor fields)
+      // Acquisition sub-object
+      SqlObject("acquisition"),
+
+      // Telluric type (stored as jsonb)
+      SqlJson("telluricType", GnirsSpectroscopyView.TelluricType),
+
+    )
+
+  // Long-slit variant. Keyed on c_fpu_slit (embedded): null for IFU rows, so the
+  // whole object resolves to null on `GnirsSpectroscopy.slit` for IFU observations.
+  lazy val GnirsSlitMapping: ObjectMapping =
+    ObjectMapping(GnirsSlitType)(
+
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
+
+      SqlField("fpu",        GnirsSpectroscopyView.FpuSlitConfig, key = true),
+      SqlField("initialFpu", GnirsSpectroscopyView.InitialFpuSlitConfig),
+
+      // Raw columns (hidden) backing the telescope config cursor fields.
       SqlField("slitOffsetModeEffRaw",  GnirsSpectroscopyView.SlitOffsetModeEffective,  hidden = true),
       SqlField("tcEffRaw",              GnirsSpectroscopyView.TelescopeConfigsEffective, hidden = true),
       SqlField("slitOffsetModeDefRaw",  GnirsSpectroscopyView.DefaultSlitOffsetMode,     hidden = true),
@@ -153,9 +171,9 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlField("slitOffsetModeExpRaw",  GnirsSpectroscopyView.ExplicitSlitOffsetMode,    hidden = true),
       SqlField("tcExpRaw",              GnirsSpectroscopyView.ExplicitTelescopeConfigs,  hidden = true),
 
-      // Slit vs IFU is discriminated by the slit offset mode: present => long slit, NULL => IFU.
-      // telescopeConfigsSlit / telescopeConfigsIfu: effective (explicit coalesce default).
-      CursorFieldJson("telescopeConfigsSlit",
+      // effective (explicit coalesce default) and default: the offset mode is always
+      // present for a long slit row, so these never resolve to null here.
+      CursorFieldJson("telescopeConfigs",
         cursor =>
           for
             modeEff <- cursor.field("slitOffsetModeEffRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
@@ -163,16 +181,7 @@ trait GnirsSpectroscopyMapping[F[_]]
           yield modeEff.fold(Json.Null)(slitTelescopeConfigsJson(_, tcEff)),
         List("slitOffsetModeEffRaw", "tcEffRaw")
       ),
-      CursorFieldJson("telescopeConfigsIfu",
-        cursor =>
-          for
-            modeEff <- cursor.field("slitOffsetModeEffRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            tcEff   <- cursor.field("tcEffRaw", None).flatMap(_.as[String])
-          yield if modeEff.isEmpty then ifuTelescopeConfigsJson(tcEff) else Json.Null,
-        List("slitOffsetModeEffRaw", "tcEffRaw")
-      ),
-
-      CursorFieldJson("defaultTelescopeConfigsSlit",
+      CursorFieldJson("defaultTelescopeConfigs",
         cursor =>
           for
             modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
@@ -180,17 +189,8 @@ trait GnirsSpectroscopyMapping[F[_]]
           yield modeDef.fold(Json.Null)(slitTelescopeConfigsJson(_, tcDef)),
         List("slitOffsetModeDefRaw", "tcDefRaw")
       ),
-      CursorFieldJson("defaultTelescopeConfigsIfu",
-        cursor =>
-          for
-            modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            tcDef   <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
-          yield if modeDef.isEmpty then ifuTelescopeConfigsJson(tcDef) else Json.Null,
-        List("slitOffsetModeDefRaw", "tcDefRaw")
-      ),
-
-      // explicit (nullable): present only when an explicit override of the matching kind is set.
-      CursorFieldJson("explicitTelescopeConfigsSlit",
+      // explicit (nullable): present only when an explicit override is set.
+      CursorFieldJson("explicitTelescopeConfigs",
         cursor =>
           for
             modeOpt <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
@@ -198,23 +198,25 @@ trait GnirsSpectroscopyMapping[F[_]]
           yield (modeOpt, jsonOpt).mapN(slitTelescopeConfigsJson).getOrElse(Json.Null),
         List("slitOffsetModeExpRaw", "tcExpRaw")
       ),
-      CursorFieldJson("explicitTelescopeConfigsIfu",
-        cursor =>
-          for
-            modeOpt <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            jsonOpt <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
-          yield (modeOpt, jsonOpt) match
-            case (None, Some(json)) => ifuTelescopeConfigsJson(json)
-            case _                  => Json.Null,
-        List("slitOffsetModeExpRaw", "tcExpRaw")
+    )
+
+  // IFU variant. Keyed on c_fpu_ifu (embedded): null for long slit rows, so the
+  // whole object resolves to null on `GnirsSpectroscopy.ifu` for long slit observations.
+  lazy val GnirsIfuMapping: ObjectMapping =
+    ObjectMapping(GnirsIfuType)(
+
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
+
+      SqlField("fpu",        GnirsSpectroscopyView.FpuIfuConfig, key = true),
+      SqlField("initialFpu", GnirsSpectroscopyView.InitialFpuIfuConfig),
+
+      // IFU configs are a single stored value (seeded at creation), a plain
+      // [TelescopeConfig] with no slit offset mode — no default / explicit split.
+      SqlField("tcRaw", GnirsSpectroscopyView.TelescopeConfigsEffective, hidden = true),
+      CursorFieldJson("telescopeConfigs",
+        cursor => cursor.field("tcRaw", None).flatMap(_.as[String]).map(ifuTelescopeConfigsJson),
+        List("tcRaw")
       ),
-
-      // Acquisition sub-object
-      SqlObject("acquisition"),
-
-      // Telluric type (stored as jsonb)
-      SqlJson("telluricType", GnirsSpectroscopyView.TelluricType),
-
     )
 
   lazy val GnirsSpectroscopyElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =

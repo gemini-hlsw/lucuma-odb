@@ -455,6 +455,8 @@ object OdbMapping {
                 Igrins2StaticMapping,
                 GnirsSpectroscopyAcquisitionMapping,
                 GnirsSpectroscopyMapping,
+                GnirsSlitMapping,
+                GnirsIfuMapping,
                 GnirsDynamicMapping,
                 GnirsStaticMapping,
                 ImagingConfigOptionMapping,

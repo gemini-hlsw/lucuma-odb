@@ -10295,18 +10295,16 @@ type GnirsSpectroscopy {
   initialCamera: GnirsCamera!
 
   """
-  Long-slit FPU, when this is a long-slit configuration. Exactly one of
-  `fpuSlit` / `fpuIfu` is present (and one of `initialFpuSlit` / `initialFpuIfu`).
+  Long-slit configuration (FPU + along-slit telescope configs), when this is a
+  long-slit observation. Exactly one of `slit` / `ifu` is present.
   """
-  fpuSlit: GnirsFpuSlit
-  initialFpuSlit: GnirsFpuSlit
+  slit: GnirsSlit
 
   """
-  IFU FPU, when this is an integral field unit configuration. Exactly one of
-  `fpuSlit` / `fpuIfu` is present (and one of `initialFpuSlit` / `initialFpuIfu`).
+  IFU configuration (FPU + p/q telescope configs), when this is an integral field
+  unit observation. Exactly one of `slit` / `ifu` is present.
   """
-  fpuIfu: GnirsFpuIfu
-  initialFpuIfu: GnirsFpuIfu
+  ifu: GnirsIfu
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
@@ -10325,16 +10323,6 @@ type GnirsSpectroscopy {
 
   explicitFocusMotorSteps: Int
 
-  "Long-slit telescope configs. Present iff the FPU is a long slit (`fpuSlit`); null for IFU."
-  telescopeConfigsSlit: SlitTelescopeConfigs
-  defaultTelescopeConfigsSlit: SlitTelescopeConfigs
-  explicitTelescopeConfigsSlit: SlitTelescopeConfigs
-
-  "IFU telescope configs (full p/q offsets). Present iff the FPU is an IFU (`fpuIfu`); null for long slit."
-  telescopeConfigsIfu: [TelescopeConfig!]
-  defaultTelescopeConfigsIfu: [TelescopeConfig!]
-  explicitTelescopeConfigsIfu: [TelescopeConfig!]
-
   acquisition: GnirsSpectroscopyAcquisition!
 
   """
@@ -10342,6 +10330,37 @@ type GnirsSpectroscopy {
   """
   telluricType: TelluricType!
 
+}
+
+"""
+GNIRS long-slit-specific configuration: the slit FPU plus the telescope configs
+taken along the slit. Present on `GnirsSpectroscopy.slit` iff the observation is a
+long slit; null for IFU.
+"""
+type GnirsSlit {
+  fpu: GnirsFpuSlit!
+  initialFpu: GnirsFpuSlit!
+
+  "Effective telescope configs (explicit override coalesced with the default)."
+  telescopeConfigs: SlitTelescopeConfigs!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+  explicitTelescopeConfigs: SlitTelescopeConfigs
+}
+
+"""
+GNIRS IFU-specific configuration: the IFU FPU plus the telescope configs as full
+p/q offsets. Present on `GnirsSpectroscopy.ifu` iff the observation is an IFU; null
+for long slit.
+"""
+type GnirsIfu {
+  fpu: GnirsFpuIfu!
+  initialFpu: GnirsFpuIfu!
+
+  """
+  Telescope configs (full p/q offsets). Unlike the long slit these have no derived
+  default: they are seeded from the FPU at creation and then edited in place.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
 }
 
 input GnirsSpectroscopyAcquisitionInput {
@@ -10381,6 +10400,26 @@ input SlitTelescopeConfigsInput {
 }
 
 """
+GNIRS long-slit-specific configuration input. `fpu` is required on create.
+"""
+input GnirsSlitInput {
+  fpu: GnirsFpuSlit
+
+  "Long-slit telescope configs. Null clears an explicit override back to the default."
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
+}
+
+"""
+GNIRS IFU-specific configuration input. `fpu` is required on create. A missing
+`telescopeConfigs` is left unedited (and on create is seeded from the FPU).
+"""
+input GnirsIfuInput {
+  fpu: GnirsFpuIfu
+
+  telescopeConfigs: [TelescopeConfigInput!]
+}
+
+"""
 Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
 """
 input GnirsSpectroscopyInput {
@@ -10391,15 +10430,11 @@ input GnirsSpectroscopyInput {
 
   filter: GnirsFilter
 
-  """
-  Long-slit FPU. On create, exactly one of `fpuSlit` / `fpuIfu` is required.
-  """
-  fpuSlit: GnirsFpuSlit
+  "Long-slit configuration. On create, exactly one of `slit` / `ifu` is required."
+  slit: GnirsSlitInput
 
-  """
-  IFU FPU. On create, exactly one of `fpuSlit` / `fpuIfu` is required.
-  """
-  fpuIfu: GnirsFpuIfu
+  "IFU configuration. On create, exactly one of `slit` / `ifu` is required."
+  ifu: GnirsIfuInput
 
   camera: GnirsCamera
 
@@ -10420,12 +10455,6 @@ input GnirsSpectroscopyInput {
   explicitReadMode: GnirsReadMode
 
   explicitWellDepth: GnirsWellDepth
-
-  "Long-slit telescope configs. Only valid with a long-slit FPU (`fpuSlit`)."
-  explicitTelescopeConfigsSlit: SlitTelescopeConfigsInput
-
-  "IFU telescope configs. Only valid with an IFU FPU (`fpuIfu`)."
-  explicitTelescopeConfigsIfu: [TelescopeConfigInput!]
 
   acquisition: GnirsSpectroscopyAcquisitionInput
 

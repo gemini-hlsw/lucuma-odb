@@ -41,7 +41,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -66,8 +66,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         initialPrism
                         camera
                         initialCamera
-                        fpuSlit
-                        initialFpuSlit
                         filter
                         initialFilter
                         coadds
@@ -81,10 +79,14 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         defaultWellDepth
                         explicitWellDepth
                         explicitFocusMotorSteps
-                        telescopeConfigsSlit {
-                          offsetMode
-                          alongSlit { q { arcseconds } guiding }
-                          toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+                        slit {
+                          fpu
+                          initialFpu
+                          telescopeConfigs {
+                            offsetMode
+                            alongSlit { q { arcseconds } guiding }
+                            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+                          }
                         }
                         exposureTimeMode {
                           timeAndCount { time { seconds } count at { nanometers } }
@@ -119,8 +121,6 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "initialPrism": "MIRROR",
                       "camera": "SHORT_BLUE",
                       "initialCamera": "SHORT_BLUE",
-                      "fpuSlit": "LONG_SLIT_0_30",
-                      "initialFpuSlit": "LONG_SLIT_0_30",
                       "filter": "ORDER3",
                       "initialFilter": "ORDER3",
                       "coadds": 1,
@@ -134,15 +134,19 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "defaultWellDepth": "SHALLOW",
                       "explicitWellDepth": null,
                       "explicitFocusMotorSteps": null,
-                      "telescopeConfigsSlit": {
-                        "offsetMode": "NOD_ALONG_SLIT",
-                        "alongSlit": [
-                          { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" },
-                          { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
-                          { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
-                          { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" }
-                        ],
-                        "toSky": null
+                      "slit": {
+                        "fpu": "LONG_SLIT_0_30",
+                        "initialFpu": "LONG_SLIT_0_30",
+                        "telescopeConfigs": {
+                          "offsetMode": "NOD_ALONG_SLIT",
+                          "alongSlit": [
+                            { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" },
+                            { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
+                            { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
+                            { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" }
+                          ],
+                          "toSky": null
+                        }
                       },
                       "exposureTimeMode": {
                         "timeAndCount": {
@@ -198,7 +202,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -342,7 +346,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D32
                         prism: LXD
                         camera: LONG_RED
-                        fpuSlit: LONG_SLIT_0_45
+                        slit: { fpu: LONG_SLIT_0_45 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2100 }
                         coadds: 2
@@ -367,7 +371,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating
                         prism
                         camera
-                        fpuSlit
+                        slit { fpu }
                         filter
                         coadds
                         decker
@@ -395,7 +399,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "grating": "D32",
                       "prism": "LXD",
                       "camera": "LONG_RED",
-                      "fpuSlit": "LONG_SLIT_0_45",
+                      "slit": { "fpu": "LONG_SLIT_0_45" },
                       "filter": "ORDER3",
                       "coadds": 2,
                       "decker": "ACQUISITION",
@@ -497,7 +501,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                           grating: D111
                           prism: MIRROR
                           camera: SHORT_BLUE
-                          fpuSlit: LONG_SLIT_0_30
+                          slit: { fpu: LONG_SLIT_0_30 }
                           filter: ORDER3
                           centralWavelength: { nanometers: 2200 }
                           explicitFocusMotorSteps: 500
@@ -545,7 +549,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         explicitFocusMotorSteps: 500
@@ -716,7 +720,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   grating
                   prism
                   camera
-                  fpuSlit
+                  slit { fpu }
                   filter
                 }
               }
@@ -739,7 +743,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "grating": "D111",
                       "prism": "MIRROR",
                       "camera": "SHORT_BLUE",
-                      "fpuSlit": "LONG_SLIT_0_30",
+                      "slit": { "fpu": "LONG_SLIT_0_30" },
                       "filter": "ORDER3"
                     }
                   }
@@ -750,7 +754,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "grating": "D111",
                       "prism": "MIRROR",
                       "camera": "SHORT_BLUE",
-                      "fpuSlit": "LONG_SLIT_0_30",
+                      "slit": { "fpu": "LONG_SLIT_0_30" },
                       "filter": "ORDER3"
                     }
                   }
@@ -786,7 +790,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -856,7 +860,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -906,7 +910,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         acquisition: {
@@ -950,7 +954,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         acquisition: {
@@ -993,7 +997,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -1067,7 +1071,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -1126,7 +1130,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpuSlit: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         telluricType: { tag: SOLAR }

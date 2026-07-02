@@ -40,6 +40,10 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
     val FpuIfuConfig: ColumnRef     = col("c_fpu_ifu", gnirs_fpu_ifu.embedded)
     val InitialFpuSlit: ColumnRef   = col("c_initial_fpu_slit", gnirs_fpu_slit.opt)
     val InitialFpuIfu: ColumnRef    = col("c_initial_fpu_ifu", gnirs_fpu_ifu.opt)
+    // Embedded aliases for the initial FPUs, used as non-key columns inside the
+    // GnirsSlit / GnirsIfu sub-objects (present only for the matching variant).
+    val InitialFpuSlitConfig: ColumnRef = col("c_initial_fpu_slit", gnirs_fpu_slit.embedded)
+    val InitialFpuIfuConfig: ColumnRef  = col("c_initial_fpu_ifu", gnirs_fpu_ifu.embedded)
 
     // Filter
     val Filter: ColumnRef           = col("c_filter", gnirs_filter)

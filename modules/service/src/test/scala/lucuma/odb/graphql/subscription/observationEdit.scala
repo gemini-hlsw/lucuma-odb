@@ -802,7 +802,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
               gnirsSpectroscopy {
                 grating
                 filter
-                fpuSlit
+                slit { fpu }
               }
             }
           }
@@ -820,7 +820,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
               "gnirsSpectroscopy": {
                 "grating": ${grating.tag},
                 "filter": "ORDER3",
-                "fpuSlit": "LONG_SLIT_0_30"
+                "slit": { "fpu": "LONG_SLIT_0_30" }
               }
             }
           }

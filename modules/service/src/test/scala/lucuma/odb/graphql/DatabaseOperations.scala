@@ -1308,7 +1308,7 @@ trait DatabaseOperations { this: OdbSuite =>
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpuSlit: LONG_SLIT_0_30
+            slit: { fpu: LONG_SLIT_0_30 }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
@@ -1326,7 +1326,7 @@ trait DatabaseOperations { this: OdbSuite =>
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpuIfu: LOW_RESOLUTION
+            ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
@@ -1497,7 +1497,7 @@ trait DatabaseOperations { this: OdbSuite =>
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpuSlit: LONG_SLIT_0_30
+            slit: { fpu: LONG_SLIT_0_30 }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
@@ -1515,7 +1515,7 @@ trait DatabaseOperations { this: OdbSuite =>
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpuIfu: LOW_RESOLUTION
+            ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
