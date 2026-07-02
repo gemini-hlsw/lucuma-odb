@@ -70,7 +70,9 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       ),
       GcalBaselineType.Night,
       PosInt.unsafeFrom(1),
-      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(20_000_000L))
+      // Distinct from the science coadds (1) so tests verify the calibration
+      // uses its own coadds rather than inheriting the science step's.
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(20_000_000L), PosInt.unsafeFrom(2))
     )
 
   val gnirsSmartArc: SmartGcalValue.Legacy =
@@ -83,7 +85,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       ),
       GcalBaselineType.Night,
       PosInt.unsafeFrom(1),
-      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(10_000_000L))
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(10_000_000L), PosInt.unsafeFrom(3))
     )
 
   // Compose with any seeding contributed by other mixed-in support traits
@@ -517,6 +519,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   protected def gnirsExpectedCal(
     cfg:      GnirsDynamicSnapshot,
     exposure: TimeSpan,
+    coadds:   Int,
     p:        BigDecimal,
     q:        BigDecimal
   ): Json =
@@ -532,7 +535,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       {
         "instrumentConfig": {
           "exposure":             { "seconds": ${exposure.toSeconds} },
-          "coadds":               ${cfg.coadds.asJson},
+          "coadds":               ${coadds.asJson},
           "centralWavelength":    { "nanometers": ${cfg.centralWavelengthNm.asJson} },
           "filter":               ${cfg.filter.asJson},
           "decker":               ${cfg.decker.asJson},
@@ -560,12 +563,14 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
     p:            BigDecimal,
     q:            BigDecimal,
     flatExposure: TimeSpan,
+    flatCoadds:   Int,
     flatCount:    Int,
     arcExposure:  TimeSpan,
+    arcCoadds:    Int,
     arcCount:     Int
   ): Json =
-    val flats = List.fill(flatCount)(gnirsExpectedCal(cfg, flatExposure, p, q))
-    val arcs  = List.fill(arcCount)(gnirsExpectedCal(cfg, arcExposure, p, q))
+    val flats = List.fill(flatCount)(gnirsExpectedCal(cfg, flatExposure, flatCoadds, p, q))
+    val arcs  = List.fill(arcCount)(gnirsExpectedCal(cfg, arcExposure, arcCoadds, p, q))
     Json.obj(
       "description"  -> "Nighttime Calibrations".asJson,
       "observeClass" -> "NIGHT_CAL".asJson,
