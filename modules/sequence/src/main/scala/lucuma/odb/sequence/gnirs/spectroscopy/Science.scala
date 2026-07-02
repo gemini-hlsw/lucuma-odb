@@ -23,7 +23,7 @@ import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState.Disabled
+import lucuma.core.enums.StepGuideState
 import lucuma.core.geom.gnirs.all as GnirsGeometry
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
@@ -81,25 +81,31 @@ object Science:
 
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+    fpu:          GnirsFpu.Spectroscopy,
     slitLength:   Angle,
     // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
-     * number of on-source exposures. Sky steps (target off the slit) don't
-     * contribute to the S/N, so cycles with sky offsets require extra repeats.
-     * A step counts as on source only when it is on the slit (both p and q),
-     * regardless of nod mode — matching Flamingos 2 and IGRINS-2.
+     * number of on-source exposures. Sky steps don't contribute to the S/N, so
+     * cycles with sky offsets require extra repeats. On-source means on the slit
+     * (both p and q) for a slit FPU; for an IFU (no slit) it means the guided
+     * dither positions, the large unguided offsets being sky.
      */
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount(isOnSlit(slitLength, _), scienceSteps.toList, t)
+      val onSource: ProtoStep[GnirsDynamicConfig] => Boolean =
+        fpu match
+          case GnirsFpu.Spectroscopy.Slit(_) => s => isOnSlit(slitLength, s.telescopeConfig.offset)
+          case GnirsFpu.Spectroscopy.Ifu(_)  => s => isGuided(s.telescopeConfig.guiding)
+      calculateCycleCount(onSource, scienceSteps.toList, t)
 
   object StepDefinition:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+      fpu:          GnirsFpu.Spectroscopy,
       slitLength:   Angle,
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
@@ -115,11 +121,11 @@ object Science:
         def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
-        cals.fold(EitherT.pure(StepDefinition(scienceSteps, slitLength, none))): (flat, arc) =>
+        cals.fold(EitherT.pure(StepDefinition(scienceSteps, fpu, slitLength, none))): (flat, arc) =>
           for
             fs <- EitherT(expander.expandStep(static, flat))
             rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
+          yield StepDefinition(scienceSteps, fpu, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
 
     object PreDef:
 
@@ -163,11 +169,12 @@ object Science:
                       readMode          = resolvedReadMode
                     )
             ss <- config.telescopeConfigs.traverse(SeqState.scienceStep(_, sciClass))
-            ct  = ss.last.telescopeConfig.copy(guiding = Disabled)
+            ct  = ss.last.telescopeConfig.copy(guiding = StepGuideState.Disabled)
             f  <- SeqState.flatStep(ct, ObserveClass.NightCal)
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
           yield PreDef(
             ss,
+            config.fpu,
             GnirsGeometry.slitLength(config.camera, config.prism),
             Option.when(includeCals)((f, r))
           )
@@ -293,7 +300,7 @@ object Science:
                    focus             = config.focus,
                    readMode          = config.explicitReadMode.getOrElse(GnirsReadMode.Bright)
                  )
-          f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, Disabled), ObserveClass.DayCal)
+          f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
         yield f
 
     EitherT(expander.expandStep(static, flat))
