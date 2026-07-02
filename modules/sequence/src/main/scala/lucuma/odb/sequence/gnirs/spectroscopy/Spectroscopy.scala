@@ -6,6 +6,8 @@ package gnirs.spectroscopy
 
 import cats.Monad
 import cats.data.EitherT
+import cats.syntax.applicative.*
+import cats.syntax.either.*
 import fs2.Pure
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
@@ -34,14 +36,16 @@ object Spectroscopy:
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
     val static = staticFrom(config)
     // Daytime pinhole flats have no acquisition sequence.
-    val acquisition: Either[OdbError, SequenceGenerator[GnirsDynamicConfig]] =
-      if calRole.contains(CalibrationRole.DaytimePinhole) then Right(SequenceGenerator.empty[GnirsDynamicConfig])
+    // IFU acquisition sequences require smart gcal, so generation is effectful.
+    val acquisition: F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
+      if calRole.contains(CalibrationRole.DaytimePinhole) then
+        SequenceGenerator.empty[GnirsDynamicConfig].asRight.pure[F]
       else Acquisition.instantiate(
-             observationId, estimator, static, namespace, config,
+             observationId, estimator, static, namespace, expander, config,
              itc.map(_.acquisition.focus.value)
            )
     (for
-      a <- EitherT.fromEither(acquisition)
+      a <- EitherT(acquisition)
       s <- EitherT(Science.instantiate(
              observationId, estimator, static, namespace, expander, config,
              itc.map(_.science.focus.value), calRole

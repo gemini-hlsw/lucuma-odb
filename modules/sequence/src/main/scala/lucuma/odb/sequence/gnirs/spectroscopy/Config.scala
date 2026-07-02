@@ -15,6 +15,7 @@ import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
@@ -35,9 +36,16 @@ case class AcquisitionConfig(
   coadds:           PosInt,
 ):
 
-  /** The acquisition mode: the explicit choice if set, else the default for the integration time. */
-  def resolvedMode(time: IntegrationTime): GnirsAcquisitionMode =
-    explicitAcqMode.getOrElse(GnirsAcquisitionMode.defaultFor(time.exposureTime, resolvedCoadds(time)))
+  /**
+   * The acquisition mode: the explicit choice if set, else the default for the
+   * integration time, carrying the given sky offset when that default is Faint (the
+   * default offset differs between long slit and IFU).
+   */
+  def resolvedMode(time: IntegrationTime, defaultFaintSkyOffset: Offset): GnirsAcquisitionMode =
+    explicitAcqMode.getOrElse:
+      GnirsAcquisitionMode.defaultFor(time.exposureTime, resolvedCoadds(time)) match
+        case GnirsAcquisitionMode.Faint(_) => GnirsAcquisitionMode.Faint(defaultFaintSkyOffset)
+        case other                         => other
 
   /**
    * The selected acquisition filter: the explicit filter if set, otherwise the

@@ -32,6 +32,7 @@ val logbackVersion               = "1.5.37"
 val log4catsVersion              = "2.8.0"
 val lucumaCoreVersion            = "0.216.3"
 val lucumaGraphQLRoutesVersion   = "0.13.7"
+val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.3"
 val munitCatsEffectVersion       = "2.2.0"   // check test output if you attempt to update this
@@ -772,6 +773,7 @@ lazy val sequence = project
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
+      "edu.gemini"    %% "lucuma-refined"     % lucumaRefinedVersion,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
       "org.scalameta" %% "munit-scalacheck"   % munitScalacheckVersion % Test,
       "org.typelevel" %% "discipline-munit"   % munitDisciplineVersion % Test
