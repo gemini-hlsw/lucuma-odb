@@ -485,11 +485,10 @@ type GeminiCallProperties {
   nonPartnerDeadline: Timestamp
 
   """
-  Exchange partners that may apply for Gemini time on this call, if any.
-  These partners use the `submissionDeadlineDefault` from the shared CfP
-  properties.
+  Exchange partners that may apply for Gemini time on this call, if any, each
+  with an optional submission deadline override.
   """
-  exchangePartners: [ExchangePartner!]!
+  exchangePartners: [CallForProposalsExchangePartner!]!
 }
 
 """
@@ -520,12 +519,13 @@ input GeminiCallPropertiesInput {
   proprietaryMonths: NonNegInt
 
   """
-  Exchange partners that may apply for Gemini time on this call, if any. These
-  partners use the `submissionDeadlineDefault` from the shared CfP properties.
-  This value is optional and defaults to an empty array.  It may be assigned a
-  null value to reset it to the empty array.
+  Exchange partners that may apply for Gemini time on this call, if any, each
+  with an optional submission deadline override.  This value is optional and
+  defaults to an empty array.  It may be assigned a null value to reset it to
+  the empty array.  When editing, supply the entire list of exchange partners to
+  set.
   """
-  exchangePartners: [ExchangePartner!]
+  exchangePartners: [CallForProposalsExchangePartnerInput!]
 
 }
 
@@ -855,6 +855,34 @@ input CallForProposalsPartnerInput {
   """
   If this partner has an explicit submission deadline that overrides the
   Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
+  Otherwise, the partner deadline is the default deadline for the call.
+  """
+  submissionDeadlineOverride: Timestamp
+}
+
+type CallForProposalsExchangePartner {
+  exchangePartner: ExchangePartner!
+
+  """
+  Sets the submission deadline for this exchange partner, overriding the
+  'submissionDeadlineDefault' for the Call for Proposals.
+  """
+  submissionDeadlineOverride: Timestamp
+
+  """
+  The submission deadline for this exchange partner.  This will be the
+  'submissionDeadlineOverride' if specified, but otherwise the
+  'submissionDeadlineDefault' of the Call for Proposals itself.
+  """
+  submissionDeadline: Timestamp
+}
+
+input CallForProposalsExchangePartnerInput {
+  exchangePartner: ExchangePartner!
+
+  """
+  If this exchange partner has an explicit submission deadline that overrides
+  the Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
   Otherwise, the partner deadline is the default deadline for the call.
   """
   submissionDeadlineOverride: Timestamp

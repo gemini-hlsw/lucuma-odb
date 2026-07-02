@@ -215,7 +215,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   def callForProposalsResultSubquery(cids: List[CallForProposals.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
       predicate       = Predicates.callForProposals.id.in(cids),
-      order           = OrderSelection[CallForProposals.Id](GeminiCallForProposalsType / "id"),
+      order           = OrderSelection[CallForProposals.Id](CallForProposalsType / "id"),
       limit           = limit,
       collectionField = "callsForProposals",
       child
@@ -780,7 +780,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     }
 
   private lazy val UpdateCallsForProposals: MutationField =
-    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(GeminiCallForProposalsType))): (input, child) =>
+    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(CallForProposalsType))): (input, child) =>
       services.useTransactionally:
         selectForUpdate(input).flatMap: res =>
           res.flatTraverse: checked =>

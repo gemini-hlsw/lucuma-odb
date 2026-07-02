@@ -994,3 +994,61 @@ class createCallForProposals extends OdbSuite:
         }
       """.asRight
     )
+
+  test("exchange partners with per-partner deadline override"):
+    expect(
+      user = staff,
+      query = """
+        mutation {
+          createCallForProposals(
+            input: {
+              SET: {
+                semester:                  "2025A"
+                activeStart:               "2025-02-01"
+                activeEnd:                 "2025-07-31"
+                submissionDeadlineDefault: "2025-01-15T00:00:00Z"
+                gemini: {
+                  type: REGULAR_SEMESTER
+                  exchangePartners: [
+                    { exchangePartner: SUBARU }
+                    { exchangePartner: KECK, submissionDeadlineOverride: "2025-01-10T00:00:00Z" }
+                  ]
+                }
+              }
+            }
+          ) {
+            callForProposals {
+              gemini {
+                exchangePartners {
+                  exchangePartner
+                  submissionDeadlineOverride
+                  submissionDeadline
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "createCallForProposals": {
+            "callForProposals": {
+              "gemini": {
+                "exchangePartners": [
+                  {
+                    "exchangePartner": "KECK",
+                    "submissionDeadlineOverride": "2025-01-10T00:00:00Z",
+                    "submissionDeadline": "2025-01-10T00:00:00Z"
+                  },
+                  {
+                    "exchangePartner": "SUBARU",
+                    "submissionDeadlineOverride": null,
+                    "submissionDeadline": "2025-01-15T00:00:00Z"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      """.asRight
+    )
