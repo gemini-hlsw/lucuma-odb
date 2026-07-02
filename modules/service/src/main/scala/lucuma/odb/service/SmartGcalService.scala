@@ -7,6 +7,7 @@ import cats.effect.Concurrent
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.enums.Flamingos2Disperser
@@ -486,11 +487,11 @@ object SmartGcalService:
     private def selectGcal(
       tableName:  String,
       where:      List[AppliedFragment],
-      valueCols:  List[String] = List("s.c_exposure_time")
+      valueCols:  List[String] = List("c_exposure_time")
     ): AppliedFragment =
       sql"""
         SELECT #${gcalColumns("g")},
-               #${valueCols.mkString(",\n               ")}
+               #${encodeColumns("s".some, valueCols)}
           FROM #$tableName s
           JOIN t_gcal      g ON s.c_instrument = g.c_instrument
                             AND s.c_gcal_id    = g.c_gcal_id
@@ -788,7 +789,7 @@ object SmartGcalService:
         whereSmartGcalType(sgt),
       )
 
-      selectGcal("t_smart_gnirs", where, List("s.c_exposure_time", "s.c_coadds"))
+      selectGcal("t_smart_gnirs", where, List("c_exposure_time", "c_coadds"))
 
     val InsertIgrins2: Fragment[(
       Instrument ,
