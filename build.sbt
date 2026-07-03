@@ -544,7 +544,7 @@ ThisBuild / ocsLocal       := ocsBuildInfo.value._4
 // Contains the grackle server
 lazy val itcService = project
   .in(file("itc/service"))
-  .dependsOn(itcModel.jvm, binding, otel, common)
+  .dependsOn(itcModel.jvm, binding, otel)
   .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, JavaServerAppPackaging)
   .settings(itcCommonSettings)
   .settings(

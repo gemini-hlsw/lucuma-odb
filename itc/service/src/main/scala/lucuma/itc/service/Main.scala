@@ -106,7 +106,6 @@ object Main extends IOApp with ItcCacheOrRemote {
 
   /**
    * CORS policy. ITC serves public, unauthenticated calculations, so any origin is allowed.
-   * (This policy does not enable credentials, so reflecting any origin is safe.)
    */
   val corsPolicy: CORSPolicy =
     CORS.policy
