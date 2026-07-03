@@ -715,11 +715,12 @@ lazy val itcLegacyTests = project
 
 lazy val common = project
   .in(file("modules/common-middleware"))
+  .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-core" % http4sVersion,
-      "org.typelevel" %% "cats-core" % catsVersion,
+      "org.http4s"    %% "http4s-core" % http4sVersion,
+      "org.typelevel" %% "cats-core"   % catsVersion,
       "org.typelevel" %% "cats-effect" % catsEffectVersion
     )
   )
