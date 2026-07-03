@@ -49,7 +49,6 @@ trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with T
   def session = ResourceMain.singleSession[IO](databaseConfig)
 
   protected def databaseConfig: DatabaseConfiguration =
-    println(s"Container ${container.host} username ${container.username}")
     DatabaseConfiguration(
       maxConnections = 10,
       host = Host.unsafeFromString(container.host),
