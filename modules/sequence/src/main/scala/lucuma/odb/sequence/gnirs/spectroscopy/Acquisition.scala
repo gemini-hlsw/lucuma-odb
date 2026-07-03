@@ -135,17 +135,19 @@ object Acquisition:
   ):
     private val hasSky = fieldSky.isDefined
 
+    // The field image is taken twice.
     val initialAtom: NonEmptyList[ProtoStep[GnirsDynamicConfig]] =
       if hasSky then
         NonEmptyList.of(
           slitImage,
           fieldSky.get,
           field,
+          field,
           throughSlitSky.get,
           throughSlit.withBreakpoint
         )
       else
-        NonEmptyList.of(slitImage, field, throughSlit.withBreakpoint)
+        NonEmptyList.of(slitImage, field, field, throughSlit.withBreakpoint)
 
     val repeatingAtom: NonEmptyList[ProtoStep[GnirsDynamicConfig]] =
       NonEmptyList.of(throughSlit)
