@@ -18,7 +18,8 @@ import org.http4s.Method.POST
 import org.http4s.Response
 import org.http4s.client.dsl.io.*
 
-import Status.{ Ok, Forbidden }
+import Status.Ok
+import Status.Forbidden
 
 class ChownSuite extends OdbSuite:
 
