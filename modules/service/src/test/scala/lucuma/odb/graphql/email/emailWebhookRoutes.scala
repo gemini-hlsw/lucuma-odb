@@ -16,7 +16,6 @@ import lucuma.odb.data.EmailId
 import lucuma.odb.service.EmailWebhookService
 import lucuma.refined.*
 import org.http4s.*
-import org.http4s.circe.*
 import org.http4s.implicits.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger

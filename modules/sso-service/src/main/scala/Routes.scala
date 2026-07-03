@@ -4,7 +4,7 @@
 package lucuma.sso.service
 
 import cats.effect.*
-import cats.implicits.*
+import cats.syntax.all.*
 import lucuma.core.model.StandardRole
 import lucuma.core.util.Gid
 import lucuma.sso.client.*
@@ -30,6 +30,7 @@ object Routes {
   // This is the main event. Here are the routes we're serving.
   def apply[F[_]: Async: Logger: Trace](
     dbPool:    Resource[F, Database[F]],
+    odb:       OdbClient[F],
     orcid:     OrcidService[F],
     jwtReader: SsoJwtReader[F],
     jwtWriter: SsoJwtWriter[F],
@@ -157,15 +158,17 @@ object Routes {
             _        <- oguest.traverse(traceUser(_))
             token    <-
               oguest match {
-                // TODO: neither case below tells us who the user is, so we can't trace it. They just give us the SessionToken
                 case None =>
                   db.canonicalizeUser(access, person, RoleRequest.Pi)
-                case Some(g) =>
-                  db.promoteGuestUser(access, person, g.id, RoleRequest.Pi).flatMap {
+                case Some(guestUser) =>
+                  // We used to be a guest but we are now a standard user, so either promote the guest user or 
+                  // chown the guest's programs, depending on whether the standard user is new or not.
+                  db.promoteGuestUser(access, person, guestUser.id, RoleRequest.Pi).flatMap {
                     case (None, tok) => tok.pure[F]
                     case (Some(existing), tok) =>
-                      Sync[F].delay(println(s"==> TODO: chown ${g.id} -> $existing"))
-                        .as(tok)
+                      db.findStandardUserFromToken(tok).flatMap:
+                        case Some(standardUser) => odb.transferOwnership(guestUser, standardUser).as(tok)
+                        case None => Async[F].raiseError(RuntimeException(s"Unpossible: promoteGuestUser returned a non-standard token for $existing"))
                   }
               }
             cookie   <- cookies.sessionCookie(token)
@@ -177,5 +180,3 @@ object Routes {
   }
 
 }
-
-

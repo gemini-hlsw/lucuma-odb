@@ -15,6 +15,7 @@ object CorsSuite extends SsoSuite {
     ServerMiddleware.cors[IO](domain).apply(
       Routes[IO](
         dbPool    = null,
+        odb       = null,
         orcid     = null,
         jwtReader = null,
         jwtWriter = null,

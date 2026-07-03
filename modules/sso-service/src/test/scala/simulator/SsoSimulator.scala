@@ -4,12 +4,16 @@
 package lucuma.sso.service
 package simulator
 
+import cats.Monad
 import cats.effect.*
 import cats.effect.std.Console
 import cats.syntax.all.*
 import fs2.io.net.Network
 import grackle.skunk.SkunkMonitor
+import lucuma.core.model.GuestUser
+import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
+import lucuma.core.model.User
 import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.Environment
@@ -31,6 +35,16 @@ import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 
 object SsoSimulator {
 
+  /** An OdbClient that just generates the request and returns. */              
+  def odbClient[F[_]: Monad](
+    ssoJwtWriter: SsoJwtWriter[F],
+    odbRootUri: Uri,
+    serviceUser: ServiceUser
+  ): OdbClient[F] =
+    new OdbClient[F]:
+      def transferOwnership(from: GuestUser, to: StandardUser): F[Unit] =
+        chownRequest(from, to, ssoJwtWriter, odbRootUri, serviceUser).void
+
   // The exact same routes and database used by SSO, but a fake ORCID back end
   private def httpRoutes[F[_]: Async: Console: Logger: Network]: Resource[F, (Resource[F, Database[F]], OrcidSimulator[F], HttpRoutes[F], SsoJwtReader[F], SsoJwtWriter[F])] =
     for {
@@ -39,10 +53,12 @@ object SsoSimulator {
       pool    <- FMain.databasePoolResource[F](config.database)
       chans   <- SsoMapping.Channels(pool)
       dbPool   = pool.map(Database.fromSession(_))
+      svcUser <- dbPool.evalMap(_.getSsoServiceUser)
       schema  <- Resource.eval(SsoMapping.loadSchema[F])
     } yield (dbPool, sim, Routes[F](
         dbPool    = dbPool,
         orcid     = OrcidService(OrcidConfig.orcidHost(Environment.Production), "unused", "unused", sim.client),
+        odb       = odbClient[F](config.ssoJwtWriter, config.odbRootUri, svcUser),
         jwtReader = config.ssoJwtReader,
         jwtWriter = config.ssoJwtWriter,
         publicUri = config.publicUri,

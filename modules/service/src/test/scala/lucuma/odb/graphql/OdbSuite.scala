@@ -86,7 +86,9 @@ import munit.CatsEffectSuite
 import munit.Location
 import munit.diff.console.AnsiColors
 import natchez.Trace
+import org.http4s.Uri
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.circe.jsonEncoderOf
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
@@ -139,6 +141,23 @@ object OdbSuite:
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
+  // This is generally useful so put it here
+  given EntityEncoder[IO, Json] = jsonEncoderOf
+
+  /**
+    * Run an http request against the test ODB.
+    * @param user an Auth header will be added for this user
+    * @param mkReq allows you to get the base URI, necessary for constructing requests
+    */
+  def runHttpRequestAs(user: User)(mkReq: Uri => Request[IO]): Resource[IO, Response[IO]] =
+    for
+      svr    <- server
+      auth   <- Resource.eval(authorizationHeader(user))
+      req     = mkReq(svr.baseUri).putHeaders(auth)
+      client <- httpClientResource
+      res    <- client.run(req)
+    yield res
+    
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any])(using Location): IO[Unit] =
     fa.attempt.flatMap {
@@ -319,7 +338,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
-  protected val httpClientResource: Resource[IO, Client[IO]] =
+  val httpClientResource: Resource[IO, Client[IO]] =
     for
       tctx <- TLSContext.Builder.forAsync[IO].insecureResource
       http <- EmberClientBuilder.default[IO].withTLSContext(tctx).withTimeout(5.seconds).build
@@ -464,6 +483,15 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def session: Resource[IO, Session[IO]] =
     Resource.unit.flatMap: _ => // Newer versions of munit-cats-effect just don't run the tests without this line.
       FMain.singleSession(databaseConfig)
+
+  def httpClient(user: User)(svr: Server) =
+    val uri  = svr.baseUri / "odb"
+    for {
+      auth <- Resource.eval(authorizationHeader(user))
+      xbe  <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
+      xc   <-
+        Resource.eval(Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(using Async[IO], xbe, Logger[IO]))
+    } yield xbe
 
   private def transactionalClient(user: User)(svr: Server): Resource[IO, FetchClient[IO, Nothing]] =
       val uri  = svr.baseUri / "odb"

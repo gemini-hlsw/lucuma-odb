@@ -34,6 +34,7 @@ final case class Config(
   hostname:     String,
   heroku:       Option[HerokuConfig],
   honeycomb:    Option[HoneycombConfig],
+  odbHostName:  String,
 ) {
 
   def versionText: String =
@@ -65,6 +66,8 @@ final case class Config(
       )
     )
 
+  val odbRootUri = Uri.unsafeFromString(s"https://$odbHostName/")
+
 }
 
 object Config {
@@ -92,6 +95,7 @@ object Config {
       "local.lucuma.xyz",
       None,
       honeycomb,
+      "local.lucuma.xyz" // ???
     )
 
   }
@@ -116,10 +120,11 @@ object Config {
           envOrProp("LUCUMA_SSO_HOSTNAME"),
           HerokuConfig.config.option,
           HoneycombConfig.config.option,
-        ).parTupled.flatMap { case (port, dbc, orc, pkey, text, pass, domain, host, heroku, honeycomb) =>
+          envOrProp("LUCUMA_ODB_HOSTNAME"),
+        ).parTupled.flatMap { case (port, dbc, orc, pkey, text, pass, domain, host, heroku, honeycomb, odb) =>
           for {
             skey <- default(text).as[PrivateKey](using privateKey(pass))
-          } yield Config(envi, dbc, orc, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, honeycomb)
+          } yield Config(envi, dbc, orc, pkey, skey, port, domain, Uri.Scheme.https, host, heroku, honeycomb, odb)
         }
 
       }
