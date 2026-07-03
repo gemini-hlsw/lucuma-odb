@@ -12,7 +12,7 @@ import org.typelevel.ci.CIString
 object CorsSuite extends SsoSuite {
 
   def routes(domain: String): HttpRoutes[IO] =
-    ServerMiddleware.cors[IO](domain).apply(
+    ServerMiddleware.cors[IO](List(domain)).apply(
       Routes[IO](
         dbPool    = null,
         orcid     = null,

@@ -5,7 +5,7 @@ package lucuma.sso.service
 
 import cats.*
 import cats.effect.*
-import lucuma.common.middleware.CorsUtils
+import lucuma.common.middleware.CorsMiddleware
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.Environment.*
@@ -54,7 +54,7 @@ object ServerMiddleware {
   def cors[F[_]: Monad](domain: List[String]): Middleware[F] =
     CORS.policy
       .withAllowCredentials(true)
-      .withAllowOriginHost(u => CorsUtils.isAllowed(u.host.value, domain))
+      .withAllowOriginHost(u => CorsMiddleware.isAllowed(u.host, domain))
       .withMaxAge(1.day)
       .apply
 

@@ -3,7 +3,10 @@
 
 package lucuma.common.middleware
 
-object CorsUtils {
+import org.http4s.Uri
+import cats.syntax.eq.*
+
+object CorsMiddleware:
   /**
    * Checks if a host matches any of the allowed domains, allowing for exact match
    * or subdomain matching (e.g., "sub.domain.com" matches "domain.com").
@@ -12,6 +15,8 @@ object CorsUtils {
    * @param allowedDomains A list of trusted domains (e.g., List("example.com"))
    * @return true if the host is allowed, false otherwise
    */
-  def isAllowed(host: String, allowedDomains: List[String]): Boolean =
-    allowedDomains.exists(d => host == d || host.endsWith("." + d))
-}
+  def isAllowed(host: Uri.Host, allowedDomains: List[String]): Boolean =
+    val h = host.value.toLowerCase
+    allowedDomains.exists: d =>
+      val dd = d.toLowerCase
+      h === dd || h.endsWith("." + dd)
