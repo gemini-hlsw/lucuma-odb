@@ -6,6 +6,7 @@ package lucuma.odb.graphql.topic
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
+import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -47,9 +48,12 @@ object ObservationTopic:
         ).tupled
     }
 
-  def apply[F[_]: Concurrent: Logger: Tracer](
+  def create[F[_]: Concurrent: Logger](sup: Supervisor[F]): F[Topic[F, Element]] =
+    topic.create(sup)
+
+  def feed[F[_]: Concurrent: Logger: Tracer](
     s:         Session[F],
     maxQueued: Int,
-    sup:       Supervisor[F]
-  ): F[Topic[F, Element]] =
-    topic.create(s, maxQueued, sup)
+    top:       Topic[F, Element]
+  ): Stream[F, Unit] =
+    topic.feed(s, maxQueued, top)
