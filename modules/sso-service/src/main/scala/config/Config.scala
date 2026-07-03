@@ -95,7 +95,7 @@ object Config {
       "local.lucuma.xyz",
       None,
       honeycomb,
-      "local.lucuma.xyz" // ???
+      "local.lucuma.xyz"
     )
 
   }

@@ -338,7 +338,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         FakeItcVersions.pure[IO]
     }
 
-  val httpClientResource: Resource[IO, Client[IO]] =
+  protected val httpClientResource: Resource[IO, Client[IO]] =
     for
       tctx <- TLSContext.Builder.forAsync[IO].insecureResource
       http <- EmberClientBuilder.default[IO].withTLSContext(tctx).withTimeout(5.seconds).build
@@ -483,15 +483,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   protected def session: Resource[IO, Session[IO]] =
     Resource.unit.flatMap: _ => // Newer versions of munit-cats-effect just don't run the tests without this line.
       FMain.singleSession(databaseConfig)
-
-  def httpClient(user: User)(svr: Server) =
-    val uri  = svr.baseUri / "odb"
-    for {
-      auth <- Resource.eval(authorizationHeader(user))
-      xbe  <- JdkHttpClient.simple[IO].map(Http4sHttpBackend[IO](_))
-      xc   <-
-        Resource.eval(Http4sHttpClient.of[IO, Nothing](uri, headers = Headers(auth))(using Async[IO], xbe, Logger[IO]))
-    } yield xbe
 
   private def transactionalClient(user: User)(svr: Server): Resource[IO, FetchClient[IO, Nothing]] =
       val uri  = svr.baseUri / "odb"
