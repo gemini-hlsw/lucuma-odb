@@ -10,6 +10,7 @@ object all
     with GmosNorthGratingSyntax
     with GmosNorthFpuSyntax
     with GmosSouthFpuSyntax
+    with GmosCustomSlitWidthSyntax
     with Flamingos2FpuSyntax
     with Flamingos2DisperserSyntax
     with Flamingos2FilterSyntax
@@ -23,6 +24,7 @@ object all
     with GnirsCrossDispersedSyntax
     with GnirsReadModeSyntax
     with GnirsSlitWidthSyntax
+    with GnirsFpuIfuSyntax
     with GnirsWellDepthSyntax
     with ConditionsSyntax
     with CoolStarModelSyntax

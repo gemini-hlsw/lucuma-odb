@@ -10,6 +10,7 @@ import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
@@ -48,6 +49,9 @@ trait GnirsCodecs:
   val gnirs_fpu_slit: Codec[GnirsFpuSlit] =
     enumerated(Type.varchar)
 
+  val gnirs_fpu_ifu: Codec[GnirsFpuIfu] =
+    enumerated(Type("e_gnirs_fpu_ifu"))
+
   val gnirs_fpu_other: Codec[GnirsFpuOther] =
     enumerated(Type("e_gnirs_fpu_other"))
 
@@ -75,18 +79,31 @@ trait GnirsCodecs:
   val gnirs_static: Codec[GnirsStaticConfig] =
     gnirs_well_depth.imap(GnirsStaticConfig(_))(_.wellDepth)
 
-  // FPU: exactly one of the long-slit slit value or the non-slit "other" value.
-  private val gnirs_fpu: Codec[GnirsFpu] =
-    (gnirs_fpu_slit.opt *: gnirs_fpu_other.opt).eimap {
-      case (Some(s), None)    => GnirsFpu.Slit(s).asRight[String]
-      case (None,    Some(o)) => GnirsFpu.Other(o).asRight[String]
-      case (None,    None)    => "GNIRS FPU: neither slit nor other defined".asLeft
-      case (Some(_), Some(_)) => "GNIRS FPU: both slit and other defined".asLeft
+  // Spectroscopy FPU: exactly one of the long-slit slit value or the IFU value.
+  val gnirs_fpu_spectroscopy: Codec[GnirsFpu.Spectroscopy] =
+    (gnirs_fpu_slit.opt *: gnirs_fpu_ifu.opt).eimap {
+      case (Some(s), None) => GnirsFpu.Spectroscopy.Slit(s).asRight[String]
+      case (None, Some(i)) => GnirsFpu.Spectroscopy.Ifu(i).asRight[String]
+      case (None, None)    => "GNIRS spectroscopy FPU: neither slit nor ifu defined".asLeft
+      case _               => "GNIRS spectroscopy FPU: both slit and ifu defined".asLeft
     } { fpu =>
-      (GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu))
+      (GnirsFpu.Spectroscopy.slit.getOption(fpu), GnirsFpu.Spectroscopy.ifu.getOption(fpu))
     }
 
-  // Spectroscopy config carried when the acquisition mirror is "out".  The
+  // FPU: exactly one of the long-slit slit value, the IFU value or the non-slit
+  // "other" value.
+  private val gnirs_fpu: Codec[GnirsFpu] =
+    (gnirs_fpu_slit.opt *: gnirs_fpu_other.opt *: gnirs_fpu_ifu.opt).eimap {
+      case (Some(s), None,    None)    => GnirsFpu.Spectroscopy.Slit(s).asRight[String]
+      case (None,    Some(o), None)    => GnirsFpu.Other(o).asRight[String]
+      case (None,    None,    Some(i)) => GnirsFpu.Spectroscopy.Ifu(i).asRight[String]
+      case (None,    None,    None)    => "GNIRS FPU: no slit, ifu or other defined".asLeft
+      case _                           => "GNIRS FPU: more than one of slit, ifu or other defined".asLeft
+    } { fpu =>
+      (GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu), GnirsFpu.ifu.getOption(fpu))
+    }
+
+  // Spectroscopy config carried when the acquisition mirror is "out". The
   // three values are present together (mirror out) or absent together (in).
   private val gnirs_acquisition_mirror_mode: Codec[GnirsAcquisitionMirrorMode] =
     (gnirs_prism.opt *: gnirs_grating.opt *: gnirs_grating_wavelength.opt).eimap {
@@ -98,7 +115,7 @@ trait GnirsCodecs:
       case GnirsAcquisitionMirrorMode.In           => (none, none, none)
     }
 
-  // Focus motor steps.  Absent means "Best" (instrument-chosen) focus.
+  // Focus motor steps. Absent means "Best" (instrument-chosen) focus.
   private val gnirs_focus: Codec[GnirsFocus] =
     int4.opt.eimap[GnirsFocus] {
       case None    => GnirsFocus.Best.asRight

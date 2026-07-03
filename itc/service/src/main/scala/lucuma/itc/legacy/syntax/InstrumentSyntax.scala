@@ -320,7 +320,32 @@ trait GnirsSlitWidthSyntax:
 
 object gnirsslitwidth extends GnirsSlitWidthSyntax
 
+trait GnirsFpuIfuSyntax:
+  import lucuma.core.enums.GnirsFpuIfu
+  extension (self: GnirsFpuIfu)
+    def ocs2Tag: String =
+      self match
+        case GnirsFpuIfu.LowResolution  => "LR_IFU"
+        case GnirsFpuIfu.HighResolution => "HR_IFU"
+
+object gnirsfpuifu extends GnirsFpuIfuSyntax
+
 trait GnirsWellDepthSyntax:
   import lucuma.core.enums.GnirsWellDepth
   extension (self: GnirsWellDepth) def ocs2Tag: String = self.shortName.toUpperCase
 object gnirswelldepth extends GnirsWellDepthSyntax
+
+trait GmosCustomSlitWidthSyntax:
+  import lucuma.core.enums.GmosCustomSlitWidth
+  import lucuma.core.enums.GmosCustomSlitWidth.*
+  extension (self: GmosCustomSlitWidth)
+    def ocs2Tag: String =
+      self match
+        case CustomWidth_0_25 => "CUSTOM_WIDTH_0_25"
+        case CustomWidth_0_50 => "CUSTOM_WIDTH_0_50"
+        case CustomWidth_0_75 => "CUSTOM_WIDTH_0_75"
+        case CustomWidth_1_00 => "CUSTOM_WIDTH_1_00"
+        case CustomWidth_1_50 => "CUSTOM_WIDTH_1_50"
+        case CustomWidth_2_00 => "CUSTOM_WIDTH_2_00"
+        case CustomWidth_5_00 => "CUSTOM_WIDTH_5_00"
+object gmoscustomslitwidth extends GmosCustomSlitWidthSyntax

@@ -67,6 +67,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
@@ -398,11 +399,23 @@ object ObservationService {
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
           for {
             m <- selectObservingModes(oids.toList)
-            _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
+            // Rewrite the observation's mode type to match the edit:
+            //  - delete (oEdit = None): null the type so it no longer references the deleted row.
+            //  - full edit (observingModeType = Some): set the new type.
+            //  - partial in-place edit (observingModeType = None): leave it as-is; nulling would
+            //    orphan the mode row. This happens e.g. for a GNIRS spectroscopy edit that doesn't
+            //    change the FPU and so can't determine slit vs ifu.
+            _ <- oEdit match
+                   case None       => updateObservingModeType(None, oids)
+                   case Some(edit) => edit.observingModeType.traverse_(t => updateObservingModeType(Some(t), oids))
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
 
               (existingMode, oEdit) match {
-                case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
+                // `forall` (rather than `contains`) so a partial edit whose mode type is
+                // indeterminate (None) — e.g. a GNIRS spectroscopy edit that doesn't change
+                // the FPU, and so can't say slit vs ifu — updates the existing mode in place
+                // instead of replacing it. Modes whose input always yields Some are unaffected.
+                case (Some(ex), Some(edit)) if edit.observingModeType.forall(_ === ex) =>
                   // update existing
                   observingModeServices.update(edit, matchingOids)
 
@@ -723,7 +736,7 @@ object ObservationService {
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
-          SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
+          SET.observingMode.flatMap(_.observingModeType).flatMap(_.instrumentOption),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
@@ -1154,7 +1167,7 @@ object ObservationService {
       void"UPDATE t_observation " |+|
          void"SET " |+|
             sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void", " |+|
-            sql"c_instrument = ${instrument.opt}"(newMode.map(_.instrument)) |+| void" " |+|
+            sql"c_instrument = ${instrument.opt}"(newMode.flatMap(_.instrumentOption)) |+| void" " |+|
        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
 
     /**

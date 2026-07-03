@@ -11,15 +11,15 @@ val catsParseVersion             = "1.1.0"
 val catsScalacheckVersion        = "0.3.2"
 val catsTimeVersion              = "0.6.0"
 val catsVersion                  = "2.13.0"
-val circeVersion                 = "0.14.15"
+val circeVersion                 = "0.14.16"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.0"
-val clueVersion                  = "0.53.2"
+val clueVersion                  = "0.55.0"
 val declineVersion               = "2.6.2"
-val flywayVersion                = "12.9.0"
+val flywayVersion                = "12.10.0"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
-val grackleVersion               = "0.27.1"
+val grackleVersion               = "0.28.1"
 val http4sVersion                = "0.23.34"
 val http4sBlazeVersion           = "0.23.17"
 val http4sJdkHttpClientVersion   = "0.10.0"
@@ -28,10 +28,11 @@ val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
-val logbackVersion               = "1.5.34"
+val logbackVersion               = "1.5.37"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.213.0"
-val lucumaGraphQLRoutesVersion   = "0.13.6"
+val lucumaCoreVersion            = "0.216.4"
+val lucumaGraphQLRoutesVersion   = "0.13.7"
+val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.3"
 val munitCatsEffectVersion       = "2.2.0"   // check test output if you attempt to update this
@@ -44,10 +45,10 @@ val openTelemetryVersion         = "1.63.0"
 val openTelemetryInstrVersion    = "2.26.1-alpha"
 val otel4sVersion                = "1.0.1"
 val paigesVersion                = "0.4.4"
-val postgresVersion              = "42.7.11"
+val postgresVersion              = "42.7.12"
 val pprintVersion                = "0.9.6"
 val redis4CatsVersion            = "2.0.5"
-val refinedVersion               = "0.11.3"
+val refinedVersion               = "0.11.4"
 val skunkVersion                 = "1.1-c0fa0b0-SNAPSHOT"
 val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
@@ -55,7 +56,7 @@ val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 val weaverVersion                = "0.13.0"
 
-ThisBuild / tlBaseVersion      := "0.83"
+ThisBuild / tlBaseVersion      := "0.85"
 ThisBuild / scalaVersion       := "3.8.4"
 ThisBuild / crossScalaVersions := Seq("3.8.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -772,6 +773,7 @@ lazy val sequence = project
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
+      "edu.gemini"    %% "lucuma-refined"     % lucumaRefinedVersion,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
       "org.scalameta" %% "munit-scalacheck"   % munitScalacheckVersion % Test,
       "org.typelevel" %% "discipline-munit"   % munitDisciplineVersion % Test

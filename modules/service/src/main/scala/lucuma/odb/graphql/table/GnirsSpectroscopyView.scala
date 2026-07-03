@@ -9,9 +9,9 @@ import lucuma.odb.util.GnirsCodecs.*
 import skunk.circe.codec.json.*
 import skunk.codec.all.*
 
-trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
+trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
 
-  object GnirsLongSlitView extends TableDef("v_gnirs_long_slit"):
+  object GnirsSpectroscopyView extends TableDef("v_gnirs_spectroscopy"):
 
     val ObservationId: ColumnRef    = col("c_observation_id", observation_id)
 
@@ -29,9 +29,21 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val Camera: ColumnRef           = col("c_camera", gnirs_camera)
     val InitialCamera: ColumnRef    = col("c_initial_camera", gnirs_camera)
 
-    // FPU
-    val Fpu: ColumnRef              = col("c_fpu", gnirs_fpu_slit)
-    val InitialFpu: ColumnRef       = col("c_initial_fpu", gnirs_fpu_slit)
+    // FPU: exactly one of slit / ifu is non-null per row.
+    val FpuSlit: ColumnRef          = col("c_fpu_slit", gnirs_fpu_slit.opt)
+    val FpuIfu: ColumnRef           = col("c_fpu_ifu", gnirs_fpu_ifu.opt)
+    // Embedded (FailedJoin-on-null) aliases used as discriminator keys in the
+    // configuration mappings: c_fpu_slit is set only for long slit rows and
+    // c_fpu_ifu only for IFU rows, so keying on them yields a null object for
+    // the other variant instead of reading a null required field.
+    val FpuSlitConfig: ColumnRef    = col("c_fpu_slit", gnirs_fpu_slit.embedded)
+    val FpuIfuConfig: ColumnRef     = col("c_fpu_ifu", gnirs_fpu_ifu.embedded)
+    val InitialFpuSlit: ColumnRef   = col("c_initial_fpu_slit", gnirs_fpu_slit.opt)
+    val InitialFpuIfu: ColumnRef    = col("c_initial_fpu_ifu", gnirs_fpu_ifu.opt)
+    // Embedded aliases for the initial FPUs, used as non-key columns inside the
+    // GnirsSlit / GnirsIfu sub-objects (present only for the matching variant).
+    val InitialFpuSlitConfig: ColumnRef = col("c_initial_fpu_slit", gnirs_fpu_slit.embedded)
+    val InitialFpuIfuConfig: ColumnRef  = col("c_initial_fpu_ifu", gnirs_fpu_ifu.embedded)
 
     // Filter
     val Filter: ColumnRef           = col("c_filter", gnirs_filter)
@@ -51,9 +63,10 @@ trait GnirsLongSlitView[F[_]] extends BaseMapping[F]:
     val ExplicitTelescopeConfigs: ColumnRef = col("c_telescope_configs", text.opt)
 
     // View-computed defaults/effective for telescope configs
-    val DefaultSlitOffsetMode: ColumnRef     = col("c_slit_offset_mode_default", slit_offset_mode)
+    // Slit offset mode default/effective are NULL for IFU rows.
+    val DefaultSlitOffsetMode: ColumnRef     = col("c_slit_offset_mode_default", slit_offset_mode.opt)
     val DefaultTelescopeConfigs: ColumnRef   = col("c_telescope_configs_default", text)
-    val SlitOffsetModeEffective: ColumnRef   = col("c_slit_offset_mode_effective", slit_offset_mode)
+    val SlitOffsetModeEffective: ColumnRef   = col("c_slit_offset_mode_effective", slit_offset_mode.opt)
     val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
 
     // Acquisition config (ETM stored in t_exposure_time_mode via FK)

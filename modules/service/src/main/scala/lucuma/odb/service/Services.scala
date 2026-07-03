@@ -125,6 +125,10 @@ trait Services[F[_]]:
   /** The `DatasetService`. */
   def datasetService: DatasetService[F]
 
+  def emailService: EmailService[F]
+
+  def exchangeService: ExchangeService[F]
+
   /** The `ExecutionDigestService`. */
   def executionDigestService: ExecutionDigestService[F]
 
@@ -161,20 +165,20 @@ trait Services[F[_]]:
   /** The `GmosSequenceService` */
   def gmosSequenceService: GmosSequenceService[F]
 
+  /** The `GnirsSequenceService` */
+  def gnirsSequenceService: GnirsSequenceService[F]
+
+  /** The `GnirsSpectroscopyService`. */
+  def gnirsSpectroscopyService: GnirsSpectroscopyService[F]
+
   /** The `GroupService`. */
   def groupService: GroupService[F]
 
   /** The `Igrins2LongSlitService`. */
   def igrins2LongSlitService: Igrins2LongSlitService[F]
 
-  /** The `GnirsLongSlitService`. */
-  def gnirsLongSlitService: GnirsLongSlitService[F]
-
   /** The `Igrins2SequenceService` */
   def igrins2SequenceService: Igrins2SequenceService[F]
-
-  /** The `GnirsSequenceService` */
-  def gnirsSequenceService: GnirsSequenceService[F]
 
   /** The `ObsAttachmentAssignmentService`. */
   def obsAttachmentAssignmentService: ObsAttachmentAssignmentService[F]
@@ -248,8 +252,6 @@ trait Services[F[_]]:
 
   /** The `UserInvitationService` */
   def userInvitationService: UserInvitationService[F]
-
-  def emailService: EmailService[F]
 
   def visitorService: VisitorService[F]
 
@@ -345,22 +347,23 @@ object Services:
       lazy val chronicleService = ChronicleService.instantiate
       lazy val configurationService = ConfigurationService.instantiate
       lazy val datasetService = DatasetService.instantiate
+      lazy val exchangeService = ExchangeService.instantiate
       lazy val executionDigestService = ExecutionDigestService.instantiate
       lazy val executionEventService = ExecutionEventService.instantiate
       lazy val exposureTimeModeService = ExposureTimeModeService.instantiate
       lazy val generatorParamsService = GeneratorParamsService.instantiate
+      lazy val flamingos2ImagingService = Flamingos2ImagingService.instantiate
       lazy val flamingos2LongSlitService = Flamingos2LongSlitService.instantiate
       lazy val flamingos2SequenceService = Flamingos2SequenceService.instantiate
       lazy val ghostIfuService = GhostIfuService.instantiate
       lazy val ghostSequenceService = GhostSequenceService.instantiate
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
-      lazy val flamingos2ImagingService = Flamingos2ImagingService.instantiate
       lazy val gmosImagingService = GmosImagingService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
-      lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
-      lazy val gnirsLongSlitService = GnirsLongSlitService.instantiate
-      lazy val igrins2SequenceService = Igrins2SequenceService.instantiate
       lazy val gnirsSequenceService = GnirsSequenceService.instantiate
+      lazy val gnirsSpectroscopyService = GnirsSpectroscopyService.instantiate
+      lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
+      lazy val igrins2SequenceService = Igrins2SequenceService.instantiate
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
       lazy val observationService = ObservationService.instantiate
       lazy val observingModeServices = ObservingModeServices.instantiate
@@ -415,6 +418,7 @@ object Services:
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
     def configurationService[F[_]](using Services[F]): ConfigurationService[F] = summon[Services[F]].configurationService
     def datasetService[F[_]](using Services[F]): DatasetService[F] = summon[Services[F]].datasetService
+    def exchangeService[F[_]](using Services[F]) = summon[Services[F]].exchangeService
     def executionDigestService[F[_]](using Services[F]): ExecutionDigestService[F] = summon[Services[F]].executionDigestService
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService
     def exposureTimeModeService[F[_]](using Services[F]): ExposureTimeModeService[F] = summon[Services[F]].exposureTimeModeService
@@ -427,11 +431,11 @@ object Services:
     def flamingos2ImagingService[F[_]](using Services[F]): Flamingos2ImagingService[F] = summon[Services[F]].flamingos2ImagingService
     def gmosImagingService[F[_]](using Services[F]): GmosImagingService[F] = summon[Services[F]].gmosImagingService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
+    def gnirsSequenceService[F[_]](using Services[F]): GnirsSequenceService[F] = summon[Services[F]].gnirsSequenceService
+    def gnirsSpectroscopyService[F[_]](using Services[F]): GnirsSpectroscopyService[F] = summon[Services[F]].gnirsSpectroscopyService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
-    def gnirsLongSlitService[F[_]](using Services[F]): GnirsLongSlitService[F] = summon[Services[F]].gnirsLongSlitService
     def igrins2SequenceService[F[_]](using Services[F]): Igrins2SequenceService[F] = summon[Services[F]].igrins2SequenceService
-    def gnirsSequenceService[F[_]](using Services[F]): GnirsSequenceService[F] = summon[Services[F]].gnirsSequenceService
     def obsAttachmentAssignmentService[F[_]](using Services[F]): ObsAttachmentAssignmentService[F] = summon[Services[F]].obsAttachmentAssignmentService
     def observationService[F[_]](using Services[F]): ObservationService[F] = summon[Services[F]].observationService
     def observationWorkflowService[F[_]](using Services[F]): ObservationWorkflowService[F] = summon[Services[F]].observationWorkflowService

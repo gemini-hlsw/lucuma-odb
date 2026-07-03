@@ -20,10 +20,13 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
@@ -208,6 +211,42 @@ trait DatabaseOperations { this: OdbSuite =>
               partners: ${geminiPartnerListInput(partners)}
               subaru: {
                 type: ${subaruType.tag.toScreamingSnakeCase}
+                ${if instruments.isEmpty then "" else instruments.map(_.tag.toScreamingSnakeCase).mkString("instruments: [ ", ", ", "]")}
+              }
+            }
+          }
+        ) {
+          callForProposals {
+            id
+          }
+        }
+      }
+    """
+    ).map:
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "id")
+       .require[CallForProposals.Id]
+
+  def createKeckCallForProposalsAs(
+     user:        User,
+     semester:    Semester               = Semester.unsafeFromString("2025A"),
+     activeStart: LocalDate              = LocalDate.parse("2025-02-01"),
+     activeEnd:   LocalDate              = LocalDate.parse("2025-07-31"),
+     deadline:    Option[Timestamp]      = Timestamp.Max.some,
+     partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
+     instruments: List[KeckInstrument]   = Nil
+  ): IO[CallForProposals.Id] =
+    query(user, s"""
+      mutation {
+        createCallForProposals(
+          input: {
+            SET: {
+              semester:    "${semester.format}"
+              activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
+              activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
+              ${deadlineString(deadline)}
+              partners: ${geminiPartnerListInput(partners)}
+              keck: {
                 ${if instruments.isEmpty then "" else instruments.map(_.tag.toScreamingSnakeCase).mkString("instruments: [ ", ", ", "]")}
               }
             }
@@ -863,6 +902,9 @@ trait DatabaseOperations { this: OdbSuite =>
   def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
+  def createGnirsIfuObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsIfu, ImageQuality.Preset.PointEight, None, tids*)
+
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -874,6 +916,9 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def createVisitorModeObservationAs(user: User, pid: Program.Id, mode: VisitorObservingModeType, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, mode, ImageQuality.Preset.PointEight, None, tids*)
+
+  def createExchangeModeObservationAs(user: User, pid: Program.Id, mode: ExchangeObservingModeType, tids: Target.Id*): IO[Observation.Id] =
+    createObservationAs(user, pid, mode.some, tids*)
 
   private def createObservationWithSpatialOffsets(
     user:          User,
@@ -1117,6 +1162,16 @@ trait DatabaseOperations { this: OdbSuite =>
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          spectroscopy: {
+            wavelength: { nanometers: 2200 }
+            resolution: 1000
+            wavelengthCoverage: { nanometers: 200 }
+            focalPlane: IFU
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
       case ObservingModeType.Igrins2LongSlit =>
         """{
           spectroscopy: {
@@ -1177,6 +1232,15 @@ trait DatabaseOperations { this: OdbSuite =>
 
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
+      case e: ExchangeObservingModeType =>
+        s"""{
+          exchange: {
+            keckInstrument: ${if e.observatory === Observatory.Keck then "HIRES" else "null"}
+            subaruInstrument: ${if e.observatory === Observatory.Subaru then "FOCAS" else "null"}
+            totalRequestTime: { hours: 1 }
+          }
+        }"""
+
       case ObservingModeType.Flamingos2Imaging =>
         """{
           flamingos2Imaging: {
@@ -1240,11 +1304,29 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            slit: { fpu: LONG_SLIT_0_30 }
+            filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          gnirsSpectroscopy: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
@@ -1411,11 +1493,29 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            slit: { fpu: LONG_SLIT_0_30 }
+            filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          gnirsSpectroscopy: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {

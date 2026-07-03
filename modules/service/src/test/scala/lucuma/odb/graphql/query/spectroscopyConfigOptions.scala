@@ -34,9 +34,11 @@ class spectroscopyConfigOptions extends OdbSuite {
         s.execute(sql"insert into t_spectroscopy_config_option values('Ghost', 1, 'SR-IFU 1x1', 'ifu', 'SR-IFU', 1200000, 1200000, 'echelle', NULL, 347000, 1060000, 703500, 713000, 56000, false, NULL, 'gs')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option values('Flamingos2', 1, 'R3K + H + 0.36\"', 'single_slit', 'Long Slit 8px', 144000, 263000000, 'R3000', 'H', 1486000, 1775000, 1630500, 289000, 700, false, NULL, 'gs')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option values('Gnirs', 1, 'SC', 'single_slit', '0.3', 300000, 99000000, '32', 'X', 1030000, 1170000, 1100000, 331000, 1700, false, NULL, 'gn')".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option values('Gnirs', 2, 'LR-IFU', 'ifu', 'LR-IFU', 3150000, 4800000, '32', 'X', 1030000, 1170000, 1100000, 331000, 1700, false, NULL, 'gn')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_ghost values('Ghost', 1, 'one_by_one', 'standard')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit_8', 'R3000', 'H')".command) *>
-        s.execute(sql"insert into t_spectroscopy_config_option_gnirs values('Gnirs', 1, 'D32', 'Order6', 'LongSlit_0_30', 'Mirror', 'ShortBlue')".command)
+        s.execute(sql"insert into t_spectroscopy_config_option_gnirs (c_instrument, c_index, c_grating, c_filter, c_fpu_slit, c_prism, c_camera) values('Gnirs', 1, 'D32', 'Order6', 'LongSlit_0_30', 'Mirror', 'ShortBlue')".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option_gnirs (c_instrument, c_index, c_grating, c_filter, c_fpu_ifu, c_prism, c_camera) values('Gnirs', 2, 'D32', 'Order6', 'LowResolution', 'Mirror', 'ShortBlue')".command)
       ).void
     )
 
@@ -628,7 +630,8 @@ class spectroscopyConfigOptions extends OdbSuite {
             gnirs {
               grating
               filter
-              fpu
+              fpuSlit
+              fpuIfu
             }
           }
         }
@@ -637,11 +640,21 @@ class spectroscopyConfigOptions extends OdbSuite {
         {
           "spectroscopyConfigOptions": [
             {
+              "name": "LR-IFU",
+              "gnirs": {
+                "grating": "D32",
+                "filter": "ORDER6",
+                "fpuSlit": null,
+                "fpuIfu": "LOW_RESOLUTION"
+              }
+            },
+            {
               "name": "SC",
               "gnirs": {
                 "grating": "D32",
                 "filter": "ORDER6",
-                "fpu": "LONG_SLIT_0_30"
+                "fpuSlit": "LONG_SLIT_0_30",
+                "fpuIfu": null
               }
             }
           ]

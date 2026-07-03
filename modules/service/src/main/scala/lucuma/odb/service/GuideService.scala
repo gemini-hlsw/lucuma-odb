@@ -55,6 +55,7 @@ import lucuma.core.model.probes
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.ghost.CentralWavelength as GhostCentralWavelength
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.igrins2.CentralWavelength as Igrins2CentralWavelength
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -71,6 +72,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gmos
@@ -290,6 +292,11 @@ object GuideService {
 
     val (site, observingModeType, agsWavelength): (Site, ObservingModeType, Wavelength) =
       params.observingMode match
+        case c: exchange.Config                               =>
+          // Exchange observations are not supported by AGS.  No guide probe is
+          // defined for exchange modes, so `agsParamsFor` is always empty and
+          // these placeholder values are never used for catalog queries.
+          (Site.GN, c.mode, Wavelength.Min)
         case mode: flamingos2.longslit.Config                 =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
         case flamingos2.imaging.Config(filters = filters) =>
@@ -304,12 +311,22 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosSouth             =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
-        case mode: gnirs.longslit.Config                      =>
-          (Site.GN, ObservingModeType.GnirsLongSlit, mode.filter.centralWavelength)
+        case mode: gnirs.spectroscopy.Config                  =>
+          val tpe = mode.fpu match
+            case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
+            case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
+          (Site.GN, tpe, mode.filter.centralWavelength)
         case _: igrins2.longslit.Config                       =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
         case visitor.Config(mode, wavelength, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
+
+    // Extra static coordinates AGS should treat like science positions.
+    // only GHOST supplies an optional one for the sky fiber position
+    val extraSciencePositions: List[Coordinates] =
+      params.observingMode match
+        case g: ghost.ifu.Config => g.skyPosition.toList
+        case _                   => Nil
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
@@ -348,9 +365,11 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS2) =>
+          // AGS for the long slit; IFU guiding is not yet modeled in lucuma-ags, so IFU
+          // configs fall through to `none` below (no AGS params).
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
-          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS1) =>
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
@@ -806,7 +825,7 @@ object GuideService {
                                obsInfo.constraints,
                                wavelength,
                                baseCoords,
-                               scienceCoords.toList,
+                               scienceCoords.toList ++ genInfo.extraSciencePositions,
                                blindOffset,
                                obsInfo.availabilityAngles,
                                genInfo.acqOffsets,
@@ -922,6 +941,7 @@ object GuideService {
           scienceCoords <- ResultT.fromResult:
                              asterismTracking.toList
                                .traverse(_.at(obsTime.toInstant))
+                               .map(_ ++ genInfo.extraSciencePositions)
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for science targets in observation $oid"

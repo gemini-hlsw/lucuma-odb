@@ -7,6 +7,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
@@ -15,6 +16,7 @@ import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails
@@ -42,14 +44,14 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
     analysisMethod = lsAnalysisMethod
   )
 
-  val gnirs = ObservingMode.SpectroscopyMode.GnirsLongSlit(
+  val gnirs = ObservingMode.SpectroscopyMode.GnirsSpectroscopy(
     centralWavelength = centralWavelength,
     grating = GnirsGrating.D32,
     filter = GnirsFilter.Order3,
     camera = GnirsCamera.ShortBlue,
     prism = GnirsPrism.Mirror,
     readMode = GnirsReadMode.Bright,
-    slitWidth = GnirsFpuSlit.LongSlit_0_30,
+    fpu = GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
     wellDepth = GnirsWellDepth.Shallow,
     coadds = PosInt.unsafeFrom(1),
     portDisposition = PortDisposition.Bottom
@@ -66,6 +68,20 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gnirs signal-to-noise base config yields valid results".tag(LegacyITCTest)):
     val result = localItc.calculate(baseParams.asJson.noSpaces)
     assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+
+  // Exercises both IFU FPU mappings through the real OCS jars: the slitWidth field
+  // encodes to LR_IFU / HR_IFU, crossDispersed to NO, and the analysis method is
+  // "sum of 2x2 elements at the center" with a single sky fibre (the production
+  // default). Each resolution requires its specific camera.
+  test("gnirs IFU".tag(LegacyITCTest)):
+    Enumerated[GnirsFpuIfu].all.foreach: ifu =>
+      val ifuMode = gnirs.copy(
+        fpu = GnirsFpu.Spectroscopy.Ifu(ifu),
+        camera = gnirsCameraForIfu(ifu)
+      )
+      val result  = localItc.calculate:
+        bodyConf(sourceDefinition, obs, ifuMode, gnirsIfuAnalysisMethod).asJson.noSpaces
+      assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
   test("gnirs grating".tag(LegacyITCTest)):
     Enumerated[GnirsGrating].all.foreach: g =>
@@ -100,7 +116,10 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   test("gnirs slit width".tag(LegacyITCTest)):
     Enumerated[GnirsFpuSlit].all.foreach: s =>
       val result = localItc.calculate:
-        bodyConf(sourceDefinition, obs, gnirs.copy(slitWidth = s)).asJson.noSpaces
+        bodyConf(sourceDefinition,
+                 obs,
+                 gnirs.copy(fpu = GnirsFpu.Spectroscopy.Slit(s))
+        ).asJson.noSpaces
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs well depth".tag(LegacyITCTest)):

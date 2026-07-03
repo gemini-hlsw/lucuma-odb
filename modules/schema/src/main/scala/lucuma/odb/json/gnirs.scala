@@ -14,6 +14,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
@@ -96,7 +97,8 @@ trait GnirsCodec:
         coadds            <- c.downField("coadds").as[PosInt]
         filter            <- c.downField("filter").as[GnirsFilter]
         decker            <- c.downField("decker").as[GnirsDecker]
-        fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(GnirsFpu.Slit(_)) orElse
+        fpu               <- c.downField("fpuSlit").as[GnirsFpuSlit].map(GnirsFpu.Spectroscopy.Slit(_)) orElse
+                             c.downField("fpuIfu").as[GnirsFpuIfu].map(GnirsFpu.Spectroscopy.Ifu(_)) orElse
                              c.downField("fpuOther").as[GnirsFpuOther].map(GnirsFpu.Other(_))
         acqMirror         <- c.downField("acquisitionMirrorOut").as[GnirsAcquisitionMirrorMode]
         camera            <- c.downField("camera").as[GnirsCamera]
@@ -123,6 +125,7 @@ trait GnirsCodec:
         "filter"               -> a.filter.asJson,
         "decker"               -> a.decker.asJson,
         "fpuSlit"              -> GnirsFpu.slit.getOption(a.fpu).fold(Json.Null)(_.asJson),
+        "fpuIfu"               -> GnirsFpu.ifu.getOption(a.fpu).fold(Json.Null)(_.asJson),
         "fpuOther"             -> GnirsFpu.other.getOption(a.fpu).fold(Json.Null)(_.asJson),
         "acquisitionMirrorOut" -> a.acquisitionMirror.asJson,
         "camera"               -> a.camera.asJson,

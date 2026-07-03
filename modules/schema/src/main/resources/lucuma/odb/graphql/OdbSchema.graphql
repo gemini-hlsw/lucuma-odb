@@ -5226,6 +5226,12 @@ type SmartGcal implements StepConfig {
 Edit or create an observation's observing mode
 """
 input ObservingModeInput @oneOf {
+
+  """
+  An exchange instrument mode (Keck/Subaru). It cannot be unset with a null value.
+  """
+  exchange: ExchangeInput
+
   """
   The flamingos2Imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -5267,9 +5273,9 @@ input ObservingModeInput @oneOf {
   igrins2LongSlit: Igrins2LongSlitInput
 
   """
-  The gnirsLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The gnirsSpectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  gnirsLongSlit: GnirsLongSlitInput
+  gnirsSpectroscopy: GnirsSpectroscopyInput
 
   """
   A visiting instrument mode. It cannot be unset with a null value.
@@ -5316,6 +5322,42 @@ type Visitor {
   Optional total requested observing time.
   """
   totalRequestTime: TimeSpan
+}
+
+input ExchangeInput {
+  """
+  Keck instrument. Required (and only allowed) when mode is EXCHANGE_KECK.
+  """
+  keckInstrument: KeckInstrument
+
+  """
+  Subaru instrument. Required (and only allowed) when mode is EXCHANGE_SUBARU.
+  """
+  subaruInstrument: SubaruInstrument
+
+  """
+  Total requested observing time.
+  """
+  totalRequestTime: TimeSpanInput
+}
+
+type Exchange {
+  mode: ExchangeObservingModeType!
+
+  """
+  Keck instrument, present when mode is EXCHANGE_KECK.
+  """
+  keckInstrument: KeckInstrument
+
+  """
+  Subaru instrument, present when mode is EXCHANGE_SUBARU.
+  """
+  subaruInstrument: SubaruInstrument
+
+  """
+  Total requested observing time.
+  """
+  totalRequestTime: TimeSpan!
 }
 
 """
@@ -7364,6 +7406,18 @@ enum ObservingModeType {
   ALOPEKE_WIDE_FIELD
 
   """
+  ObservingModeType ExchangeKeck.  Refers to an observation executed at the
+  Keck observatory.
+  """
+  EXCHANGE_KECK
+
+  """
+  ObservingModeType ExchangeSubaru.  Refers to an observation executed at the
+  Subaru observatory.
+  """
+  EXCHANGE_SUBARU
+
+  """
   ObservingModeType Flamingos2Imaging
   """
   FLAMINGOS_2_IMAGING
@@ -7404,6 +7458,11 @@ enum ObservingModeType {
   GNIRS_LONG_SLIT
 
   """
+  ObservingModeType GnirsIfu
+  """
+  GNIRS_IFU
+
+  """
   ObservingModeType Igrins2LongSlit
   """
   IGRINS_2_LONG_SLIT
@@ -7432,6 +7491,7 @@ enum ObservingModeType {
   ObservingModeType ZorroWideField
   """
   ZORRO_WIDE_FIELD
+
 }
 
 """
@@ -7445,6 +7505,14 @@ enum VisitorObservingModeType {
   VISITOR_SOUTH
   ZORRO_SPECKLE
   ZORRO_WIDE_FIELD
+}
+
+"""
+ExchangeObservingModeType
+"""
+enum ExchangeObservingModeType {
+  EXCHANGE_KECK
+  EXCHANGE_SUBARU
 }
 
 type ConstraintSet {
@@ -8141,9 +8209,9 @@ Execution configuration.  All but one of the instruments will be `null`.
 type ExecutionConfig {
   """
   Instrument type.  This will indicate which of the instrument-specific fields
-  is defined.
+  is defined.  Null for exchange observations, which have no Gemini instrument.
   """
-  instrument: Instrument!
+  instrument: Instrument
 
   """
   Flamingos 2 execution config.  This will be null unless the `instrument` is
@@ -8169,16 +8237,17 @@ type ExecutionConfig {
   gmosSouth: GmosSouthExecutionConfig
 
   """
+  GNIRS execution config.  This will be null unless the `instrument` is
+  `GNIRS`.
+  """
+  gnirs: GnirsExecutionConfig
+
+  """
   IGRINS-2 execution config.  This will be null unless the `instrument` is
   `IGRINS2`.
   """
   igrins2: Igrins2ExecutionConfig
 
-  """
-  GNIRS execution config.  This will be null unless the `instrument` is
-  `GNIRS`.
-  """
-  gnirs: GnirsExecutionConfig
 }
 
 """
@@ -8780,6 +8849,11 @@ type GnirsDynamic {
   a long-slit FPU.
   """
   fpuOther: GnirsFpuOther
+
+  """
+  IFU FPU value, when the FPU is an integral field unit.
+  """
+  fpuIfu: GnirsFpuIfu
 
   """
   Spectroscopy configuration carried when the acquisition mirror is "out" of
@@ -10186,7 +10260,7 @@ input Igrins2LongSlitInput {
 
 }
 
-type GnirsLongSlitAcquisition {
+type GnirsSpectroscopyAcquisition {
   exposureTimeMode: ExposureTimeMode!
 
   coadds: PosInt!
@@ -10200,9 +10274,9 @@ type GnirsLongSlitAcquisition {
 }
 
 """
-GNIRS Long Slit mode
+GNIRS Spectroscopy mode (long slit or IFU, distinguished by the FPU).
 """
-type GnirsLongSlit {
+type GnirsSpectroscopy {
 
   exposureTimeMode: ExposureTimeMode!
 
@@ -10220,8 +10294,17 @@ type GnirsLongSlit {
   camera: GnirsCamera!
   initialCamera: GnirsCamera!
 
-  fpu: GnirsFpuSlit!
-  initialFpu: GnirsFpuSlit!
+  """
+  Long-slit configuration (FPU + along-slit telescope configs), when this is a
+  long-slit observation. Exactly one of `slit` / `ifu` is present.
+  """
+  slit: GnirsSlit
+
+  """
+  IFU configuration (FPU + p/q telescope configs), when this is an integral field
+  unit observation. Exactly one of `slit` / `ifu` is present.
+  """
+  ifu: GnirsIfu
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
@@ -10240,11 +10323,7 @@ type GnirsLongSlit {
 
   explicitFocusMotorSteps: Int
 
-  telescopeConfigs: SlitTelescopeConfigs!
-  defaultTelescopeConfigs: SlitTelescopeConfigs!
-  explicitTelescopeConfigs: SlitTelescopeConfigs
-
-  acquisition: GnirsLongSlitAcquisition!
+  acquisition: GnirsSpectroscopyAcquisition!
 
   """
   Telluric type configuration for this observation.
@@ -10253,7 +10332,38 @@ type GnirsLongSlit {
 
 }
 
-input GnirsLongSlitAcquisitionInput {
+"""
+GNIRS long-slit-specific configuration: the slit FPU plus the telescope configs
+taken along the slit. Present on `GnirsSpectroscopy.slit` iff the observation is a
+long slit; null for IFU.
+"""
+type GnirsSlit {
+  fpu: GnirsFpuSlit!
+  initialFpu: GnirsFpuSlit!
+
+  "Effective telescope configs (explicit override coalesced with the default)."
+  telescopeConfigs: SlitTelescopeConfigs!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+  explicitTelescopeConfigs: SlitTelescopeConfigs
+}
+
+"""
+GNIRS IFU-specific configuration: the IFU FPU plus the telescope configs as full
+p/q offsets. Present on `GnirsSpectroscopy.ifu` iff the observation is an IFU; null
+for long slit.
+"""
+type GnirsIfu {
+  fpu: GnirsFpuIfu!
+  initialFpu: GnirsFpuIfu!
+
+  """
+  Telescope configs (full p/q offsets). Unlike the long slit these have no derived
+  default: they are seeded from the FPU at creation and then edited in place.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
+}
+
+input GnirsSpectroscopyAcquisitionInput {
   explicitFilter: GnirsFilter
   explicitAcquisitionType: GnirsAcquisitionType
   coadds: PosInt
@@ -10290,9 +10400,29 @@ input SlitTelescopeConfigsInput {
 }
 
 """
-Edit or create GNIRS Long Slit configuration
+GNIRS long-slit-specific configuration input. `fpu` is required on create.
 """
-input GnirsLongSlitInput {
+input GnirsSlitInput {
+  fpu: GnirsFpuSlit
+
+  "Long-slit telescope configs. Null clears an explicit override back to the default."
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
+}
+
+"""
+GNIRS IFU-specific configuration input. `fpu` is required on create. A missing
+`telescopeConfigs` is left unedited (and on create is seeded from the FPU).
+"""
+input GnirsIfuInput {
+  fpu: GnirsFpuIfu
+
+  telescopeConfigs: [TelescopeConfigInput!]
+}
+
+"""
+Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
+"""
+input GnirsSpectroscopyInput {
 
   exposureTimeMode: ExposureTimeModeInput
 
@@ -10300,7 +10430,11 @@ input GnirsLongSlitInput {
 
   filter: GnirsFilter
 
-  fpu: GnirsFpuSlit
+  "Long-slit configuration. On create, exactly one of `slit` / `ifu` is required."
+  slit: GnirsSlitInput
+
+  "IFU configuration. On create, exactly one of `slit` / `ifu` is required."
+  ifu: GnirsIfuInput
 
   camera: GnirsCamera
 
@@ -10322,9 +10456,7 @@ input GnirsLongSlitInput {
 
   explicitWellDepth: GnirsWellDepth
 
-  explicitTelescopeConfigs: SlitTelescopeConfigsInput
-
-  acquisition: GnirsLongSlitAcquisitionInput
+  acquisition: GnirsSpectroscopyAcquisitionInput
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
@@ -12552,7 +12684,19 @@ type SpectroscopyConfigOptionGmosSouth {
 type SpectroscopyConfigOptionGnirs {
   grating: GnirsGrating!
   filter: GnirsFilter!
-  fpu: GnirsFpuSlit!
+
+  """
+  Long-slit FPU, when this option is a single-slit configuration. Exactly one of
+  `fpuSlit` / `fpuIfu` is present.
+  """
+  fpuSlit: GnirsFpuSlit
+
+  """
+  IFU FPU, when this option is an integral field unit configuration. Exactly one
+  of `fpuSlit` / `fpuIfu` is present.
+  """
+  fpuIfu: GnirsFpuIfu
+
   prism: GnirsPrism!
   camera: GnirsCamera!
 }
@@ -12604,6 +12748,14 @@ enum GnirsFpuSlit {
 }
 
 """
+IFU FPU options for GNIRS (low- and high-resolution integral field units).
+"""
+enum GnirsFpuIfu {
+  LOW_RESOLUTION
+  HIGH_RESOLUTION
+}
+
+"""
 Non-slit FPU options for GNIRS (acquisition, pupil viewer, pinholes).
 """
 enum GnirsFpuOther {
@@ -12642,6 +12794,8 @@ enum GnirsDecker {
   LONG_CAM_LONG_SLIT
   SHORT_CAM_LONG_SLIT
   LONG_CAM_CROSS_DISPERSED
+  LOW_RESOLUTION_IFU
+  HIGH_RESOLUTION_IFU
 }
 
 """
@@ -13333,7 +13487,7 @@ type ConfigurationConditions {
 }
 
 type ConfigurationObservingMode {
-  instrument: Instrument!
+  instrument: Instrument
   mode: ObservingModeType!
   gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
   gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
@@ -13341,6 +13495,7 @@ type ConfigurationObservingMode {
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
   gnirsLongSlit: ConfigurationGnirsLongSlit
+  gnirsIfu: ConfigurationGnirsIfu
   igrins2LongSlit: ConfigurationIgrins2LongSlit
   visitor: ConfigurationVisitor
 }
@@ -13374,6 +13529,11 @@ type ConfigurationGnirsLongSlit {
   grating: GnirsGrating!
   camera: GnirsCamera!
   prism: GnirsPrism!
+}
+
+type ConfigurationGnirsIfu {
+  grating: GnirsGrating!
+  fpu: GnirsFpuIfu!
 }
 
 type ConfigurationIgrins2LongSlit {
@@ -14584,14 +14744,19 @@ Base science mode
 """
 type ObservingMode {
   """
-  Instrument
+  Instrument, or null for exchange observations (which have no Gemini instrument).
   """
-  instrument: Instrument!
+  instrument: Instrument
 
   """
   Mode type
   """
   mode: ObservingModeType!
+
+  """
+  Observations executed at Keck or Subaru.
+  """
+  exchange: Exchange
 
   """
   Flamingos 2 Imaging mode
@@ -14636,7 +14801,7 @@ type ObservingMode {
   """
   GNIRS Long Slit mode
   """
-  gnirsLongSlit: GnirsLongSlit
+  gnirsSpectroscopy: GnirsSpectroscopy
 
   visitor: Visitor
 
@@ -20635,10 +20800,10 @@ input GnirsAcquisitionMirrorOutInput {
 """
 GNIRS dynamic step configuration input.
 
-Exactly one of `fpuSlit` / `fpuOther` must be provided.  `acquisitionMirrorOut`
-is provided when the acquisition mirror is "out" (spectroscopy mode); its
-absence indicates the mirror is "in".  `focusMotorSteps` is omitted when focus
-is "Best" (instrument-chosen).
+Exactly one of `fpuSlit` / `fpuOther` / `fpuIfu` must be provided.
+`acquisitionMirrorOut` is provided when the acquisition mirror is "out"
+(spectroscopy mode); its absence indicates the mirror is "in".  `focusMotorSteps`
+is omitted when focus is "Best" (instrument-chosen).
 """
 input GnirsDynamicInput {
   exposure: TimeSpanInput!
@@ -20647,6 +20812,7 @@ input GnirsDynamicInput {
   decker: GnirsDecker!
   fpuSlit: GnirsFpuSlit
   fpuOther: GnirsFpuOther
+  fpuIfu: GnirsFpuIfu
   acquisitionMirrorOut: GnirsAcquisitionMirrorOutInput
   camera: GnirsCamera!
   focusMotorSteps: Int

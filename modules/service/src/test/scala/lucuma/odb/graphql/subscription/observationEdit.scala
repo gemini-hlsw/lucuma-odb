@@ -799,10 +799,10 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           editType
           value {
             observingMode {
-              gnirsLongSlit {
+              gnirsSpectroscopy {
                 grating
                 filter
-                fpu
+                slit { fpu }
               }
             }
           }
@@ -817,10 +817,10 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           "editType": "UPDATED",
           "value": {
             "observingMode": {
-              "gnirsLongSlit": {
+              "gnirsSpectroscopy": {
                 "grating": ${grating.tag},
                 "filter": "ORDER3",
-                "fpu": "LONG_SLIT_0_30"
+                "slit": { "fpu": "LONG_SLIT_0_30" }
               }
             }
           }
@@ -836,7 +836,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   explicitGrating: ${grating.tag}
                 }
               }

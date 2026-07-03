@@ -3,12 +3,13 @@
 
 package lucuma.odb.sequence
 package gnirs
-package longslit
+package spectroscopy
 
 import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
 import cats.data.State
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.NonNegInt
@@ -22,7 +23,9 @@ import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.enums.StepGuideState.Disabled
+import lucuma.core.enums.StepGuideState
+import lucuma.core.geom.gnirs.all as GnirsGeometry
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -78,25 +81,32 @@ object Science:
 
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+    fpu:          GnirsFpu.Spectroscopy,
+    slitLength:   Angle,
     // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
-     * number of exposures. Sky-only offsets in the cycle (if any) are not
-     * given special treatment — we cycle blindly through whatever the
-     * observing mode defines.
+     * number of on-source exposures. Sky steps don't contribute to the S/N, so
+     * cycles with sky offsets require extra repeats. On-source means on the slit
+     * (both p and q) for a slit FPU; for an IFU (no slit) it means the guided
+     * dither positions, the large unguided offsets being sky.
      */
-    def cycleCount(t: IntegrationTime): NonNegInt =
-      val required = t.exposureCount.value
-      val perCycle = scienceSteps.length
-      NonNegInt.unsafeFrom((required + (perCycle - 1)) / perCycle)
+    def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
+      val onSource: ProtoStep[GnirsDynamicConfig] => Boolean =
+        fpu match
+          case GnirsFpu.Spectroscopy.Slit(_) => s => isOnSlit(slitLength, s.telescopeConfig.offset)
+          case GnirsFpu.Spectroscopy.Ifu(_)  => s => isGuided(s.telescopeConfig.guiding)
+      calculateCycleCount(onSource, scienceSteps.toList, t)
 
   object StepDefinition:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
+      fpu:          GnirsFpu.Spectroscopy,
+      slitLength:   Angle,
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
     ):
@@ -111,11 +121,11 @@ object Science:
         def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
-        cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
+        cals.fold(EitherT.pure(StepDefinition(scienceSteps, fpu, slitLength, none))): (flat, arc) =>
           for
             fs <- EitherT(expander.expandStep(static, flat))
             rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
+          yield StepDefinition(scienceSteps, fpu, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
 
     object PreDef:
 
@@ -152,17 +162,22 @@ object Science:
                       coadds            = config.coadds,
                       filter            = config.filter,
                       decker            = config.decker,
-                      fpu               = GnirsFpu.Slit(config.fpu),
+                      fpu               = config.fpu,
                       acquisitionMirror = acqMirror,
                       camera            = config.camera,
                       focus             = config.focus,
                       readMode          = resolvedReadMode
                     )
-            ss <- config.telescopeConfigs.telescopeConfigs.traverse(SeqState.scienceStep(_, sciClass))
-            ct  = ss.last.telescopeConfig.copy(guiding = Disabled)
+            ss <- config.telescopeConfigs.traverse(SeqState.scienceStep(_, sciClass))
+            ct  = ss.last.telescopeConfig.copy(guiding = StepGuideState.Disabled)
             f  <- SeqState.flatStep(ct, ObserveClass.NightCal)
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
-          yield PreDef(ss, Option.when(includeCals)((f, r)))
+          yield PreDef(
+            ss,
+            config.fpu,
+            GnirsGeometry.slitLength(config.camera, config.prism),
+            Option.when(includeCals)((f, r))
+          )
 
     def compute[F[_]: Monad](
       config:   Config,
@@ -285,7 +300,7 @@ object Science:
                    focus             = config.focus,
                    readMode          = config.explicitReadMode.getOrElse(GnirsReadMode.Bright)
                  )
-          f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, Disabled), ObserveClass.DayCal)
+          f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
         yield f
 
     EitherT(expander.expandStep(static, flat))
@@ -339,11 +354,12 @@ object Science:
       t <- posTime
       s <- StepDefinition.compute(config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
       e <- cycleEstimate(s)
+      c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
       e,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
-      s.cycleCount(t)
+      c
     ): SequenceGenerator[GnirsDynamicConfig]
 
     gen.value

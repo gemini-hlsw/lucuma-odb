@@ -53,19 +53,20 @@ object CalibrationConfigMatcher:
         Flamingos2LS
       case (Igrins2LongSlit, CalibrationRole.Telluric)                                =>
         Igrins2LS
-      case (GnirsLongSlit, CalibrationRole.Telluric)                                  =>
+      case (GnirsLongSlit | GnirsIfu, CalibrationRole.Telluric)                       =>
         GnirsLS
       case (_, _)                                                                      =>
         UnknownConfig
 
   def matcherFor(config: CalibrationConfigSubset, calibRole: CalibrationRole): CalibrationConfigMatcher =
     val modeType = config match
+      case ExchangeConfigSubset(e)     => e.mode
       case GhostConfigs                => GhostIfu
       case _: GmosNConfigs             => GmosNorthLongSlit
       case _: GmosSConfigs             => GmosSouthLongSlit
       case _: GmosNImagingConfigs      => GmosNorthImaging
       case _: GmosSImagingConfigs      => GmosSouthImaging
-      case _: GnirsLongSlitConfigs     => GnirsLongSlit
+      case g: GnirsSpectroscopyConfigs => g.modeType
       case _: Flamingos2Configs        => Flamingos2LongSlit
       case _: Flamingos2ImagingConfigs => Flamingos2Imaging
       case Igrins2Configs              => Igrins2LongSlit

@@ -7,6 +7,7 @@ import cats.effect.Concurrent
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import lucuma.core.enums.Flamingos2Disperser
@@ -259,12 +260,20 @@ object SmartGcalService:
         selectGcal(Statements.selectIgrins2(key, sgt)): exposureTime =>
           Igrins2.exposure.replace(exposureTime)
 
+      // GNIRS also stores its own coadds in the smart gcal table, so the
+      // calibration steps use those rather than inheriting the science coadds.
       def selectGnirs(
         key: GnirsSearchKey,
         sgt: SmartGcalType
       )(using GuestAccess): F[List[(Gnirs => Gnirs, Gcal)]] =
-        selectGcal(Statements.selectGnirs(key, sgt)): exposureTime =>
-          _.copy(exposure = exposureTime)
+        val af: AppliedFragment = Statements.selectGnirs(key, sgt)
+        session
+          .prepareR(af.fragment.query(step_config_gcal ~ int4_pos ~ time_span ~ int4_pos))
+          .use(_.stream(af.argument, chunkSize = 16).compile.to(List))
+          .map:
+            _.flatMap: 
+              case (((gcal, count), exposureTime), coadds) =>
+                List.fill(count.value)(((_: Gnirs).copy(exposure = exposureTime, coadds = coadds)) -> gcal)
 
       override def insertGhost(
         id:   Int,
@@ -440,7 +449,8 @@ object SmartGcalService:
               row.key.wavelengthRange                ,
               row.key.fpu                            ,
               row.key.wellDepth                      ,
-              row.value.instrumentConfig.exposureTime
+              row.value.instrumentConfig.exposureTime ,
+              row.value.instrumentConfig.coadds
             )
           ).void
 
@@ -474,10 +484,14 @@ object SmartGcalService:
     def gcalColumns(prefix: String): String =
       GcalColumns.map(c => s"$prefix.$c").mkString(",\n")
 
-    private def selectGcal(tableName: String, where: List[AppliedFragment]): AppliedFragment =
+    private def selectGcal(
+      tableName:  String,
+      where:      List[AppliedFragment],
+      valueCols:  List[String] = List("c_exposure_time")
+    ): AppliedFragment =
       sql"""
         SELECT #${gcalColumns("g")},
-               s.c_exposure_time
+               #${encodeColumns("s".some, valueCols)}
           FROM #$tableName s
           JOIN t_gcal      g ON s.c_instrument = g.c_instrument
                             AND s.c_gcal_id    = g.c_gcal_id
@@ -767,6 +781,7 @@ object SmartGcalService:
         sql"s.c_cross_dispersed IS NOT DISTINCT FROM ${gnirs_prism.opt}"(key.crossDispersed),
         sql"s.c_fpu_slit        IS NOT DISTINCT FROM ${gnirs_fpu_slit.opt}"(GnirsFpu.slit.getOption(key.fpu)),
         sql"s.c_fpu_other       IS NOT DISTINCT FROM ${gnirs_fpu_other.opt}"(GnirsFpu.other.getOption(key.fpu)),
+        sql"s.c_fpu_ifu         IS NOT DISTINCT FROM ${gnirs_fpu_ifu.opt}"(GnirsFpu.ifu.getOption(key.fpu)),
         sql"s.c_well_depth      = ${gnirs_well_depth}"(key.wellDepth),
         key.wavelength.fold(void"s.c_wavelength_range IS NULL")(
           sql"s.c_wavelength_range @> ${wavelength_pm}"
@@ -774,7 +789,7 @@ object SmartGcalService:
         whereSmartGcalType(sgt),
       )
 
-      selectGcal("t_smart_gnirs", where)
+      selectGcal("t_smart_gnirs", where, List("c_exposure_time", "c_coadds"))
 
     val InsertIgrins2: Fragment[(
       Instrument ,
@@ -805,7 +820,8 @@ object SmartGcalService:
       BoundedInterval[Wavelength] ,
       GnirsFpu                    ,
       GnirsWellDepth              ,
-      TimeSpan
+      TimeSpan                    ,
+      PosInt
     )] =
       sql"""
         INSERT INTO t_smart_gnirs (
@@ -818,8 +834,10 @@ object SmartGcalService:
           c_wavelength_range,
           c_fpu_slit,
           c_fpu_other,
+          c_fpu_ifu,
           c_well_depth,
-          c_exposure_time
+          c_exposure_time,
+          c_coadds
         ) SELECT
           $instrument,
           $int4,
@@ -830,8 +848,10 @@ object SmartGcalService:
           $wavelength_pm_range,
           ${gnirs_fpu_slit.opt},
           ${gnirs_fpu_other.opt},
+          ${gnirs_fpu_ifu.opt},
           $gnirs_well_depth,
-          $time_span
+          $time_span,
+          $int4_pos
       """.contramap[(
         Instrument                  ,
         Int                         ,
@@ -842,7 +862,8 @@ object SmartGcalService:
         BoundedInterval[Wavelength] ,
         GnirsFpu                    ,
         GnirsWellDepth              ,
-        TimeSpan
-      )] { case (i, g, l, ps, disp, xd, wr, fpu, wd, t) =>
-        (i, g, l, ps, disp, xd, wr, GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu), wd, t)
+        TimeSpan                    ,
+        PosInt
+      )] { case (i, g, l, ps, disp, xd, wr, fpu, wd, t, c) =>
+        (i, g, l, ps, disp, xd, wr, GnirsFpu.slit.getOption(fpu), GnirsFpu.other.getOption(fpu), GnirsFpu.ifu.getOption(fpu), wd, t, c)
       }

@@ -1,27 +1,29 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gnirs.longslit
+package lucuma.odb.sequence.gnirs.spectroscopy
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
-import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.model.sequence.gnirs.GnirsFocus
-import lucuma.core.util.TimeSpan
+import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -34,9 +36,16 @@ case class AcquisitionConfig(
   coadds:           PosInt,
 ):
 
-  /** The acquisition mode: the explicit choice if set, else the default for the integration time. */
-  def resolvedMode(acqExposureTime: TimeSpan): GnirsAcquisitionMode =
-    explicitAcqMode.getOrElse(GnirsAcquisitionMode.defaultFor(acqExposureTime, coadds))
+  /**
+   * The acquisition mode: the explicit choice if set, else the default for the
+   * integration time, carrying the given sky offset when that default is Faint (the
+   * default offset differs between long slit and IFU).
+   */
+  def resolvedMode(time: IntegrationTime, defaultFaintSkyOffset: Offset): GnirsAcquisitionMode =
+    explicitAcqMode.getOrElse:
+      GnirsAcquisitionMode.defaultFor(time.exposureTime, resolvedCoadds(time)) match
+        case GnirsAcquisitionMode.Faint(_) => GnirsAcquisitionMode.Faint(defaultFaintSkyOffset)
+        case other                         => other
 
   /**
    * The selected acquisition filter: the explicit filter if set, otherwise the
@@ -51,6 +60,17 @@ case class AcquisitionConfig(
         mode match
           case GnirsAcquisitionMode.VeryBright => Right(GnirsFilter.H2)
           case _                               => GnirsFilter.fromAcquisitionWavelength(wavelength)
+
+  /**
+   * Coadds for the acquisition steps. In S/N mode the ITC sizes the acquisition, so we
+   * use its exposure count — the number of exposures needed to reach the target S/N — as
+   * the coadds. In time-and-count mode the user controls the acquisition directly, so the
+   * explicit coadds are used.
+   */
+  def resolvedCoadds(time: IntegrationTime): PosInt =
+    exposureTimeMode match
+      case ExposureTimeMode.SignalToNoiseMode(_, _)   => time.exposureCount
+      case ExposureTimeMode.TimeAndCountMode(_, _, _) => coadds
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(128)
@@ -77,7 +97,7 @@ object AcquisitionConfig:
 case class Config(
   filter:                  GnirsFilter,
   decker:                  GnirsDecker,
-  fpu:                     GnirsFpuSlit,
+  fpu:                     GnirsFpu.Spectroscopy,
   prism:                   GnirsPrism,
   grating:                 GnirsGrating,
   centralWavelength:       Wavelength,
@@ -87,7 +107,7 @@ case class Config(
   wellDepth:               GnirsWellDepth,
   exposureTimeMode:        ExposureTimeMode,
   coadds:                  PosInt,
-  telescopeConfigs:        SlitTelescopeConfigs,
+  telescopeConfigs:        NonEmptyList[TelescopeConfig],
   acquisition:             AcquisitionConfig,
   telluricType:            TelluricType
 ) derives Eq:
@@ -98,7 +118,14 @@ case class Config(
 
     out.writeChars(filter.tag)
     out.writeChars(decker.tag)
-    out.writeChars(fpu.tag)
+    // FPU: discriminator byte + leaf tag, so slit and IFU tag namespaces can't collide.
+    fpu match
+      case GnirsFpu.Spectroscopy.Slit(s) =>
+        out.writeByte(0)
+        out.writeChars(s.tag)
+      case GnirsFpu.Spectroscopy.Ifu(i)  =>
+        out.writeByte(1)
+        out.writeChars(i.tag)
     out.writeChars(prism.tag)
     out.writeChars(grating.tag)
     out.write(centralWavelength.hashBytes)
@@ -113,7 +140,7 @@ case class Config(
     out.write(exposureTimeMode.hashBytes)
     out.write(coadds.value.hashBytes)
 
-    telescopeConfigs.telescopeConfigs.toList.foreach: tc =>
+    telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)
 
     out.write(acquisition.hashBytes)
