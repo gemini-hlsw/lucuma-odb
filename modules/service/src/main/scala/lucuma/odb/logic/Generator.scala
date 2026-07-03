@@ -442,8 +442,8 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.resetGmosSouthAcquisition(observationId, s.acquisition)))
 
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
-              // GNIRS acquisition sequence not yet implemented.
-              EitherT.pure(())
+              EitherT(streaming.generateGnirsSpectroscopy(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.resetGnirsAcquisition(observationId, s.acquisition)))
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT.pure(())

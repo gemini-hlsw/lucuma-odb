@@ -118,6 +118,30 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
   // 5_000_000 µs = 5 s  → Bright (1s < 5s ≤ 10s), readMode=BRIGHT
   val Brightµs: Long = 5_000_000L
 
+  def initialBrightAcquisition: Json =
+    json"""
+      {
+        "executionConfig": {
+          "gnirs": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Initial Acquisition",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
+                  ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
+                ]
+              },
+              "possibleFuture": ${brightFineAdjustments(RepeatingAtomCount)},
+              "hasMore": false
+            }
+          }
+        }
+      }
+    """
+
   test("Bright acquisition — initial atom (4 steps, no sky)"):
     val setup: IO[Observation.Id] =
       for
@@ -132,28 +156,30 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       expect(
         user     = pi,
         query    = gnirsAcqNarrowQuery(oid),
-        expected = json"""
-          {
-            "executionConfig": {
-              "gnirs": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Initial Acquisition",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
-                      ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                      ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                      ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
-                    ]
-                  },
-                  "possibleFuture": ${brightFineAdjustments(RepeatingAtomCount)},
-                  "hasMore": false
-                }
-              }
-            }
-          }
-        """.asRight
+        expected = initialBrightAcquisition.asRight
+      )
+
+  test("Bright acquisition — execute first step, reset regenerates from the top"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+        _ <- setAcquisitionFilter(o, "ORDER4")
+        v <- recordVisitAs(serviceUser, o)
+
+        // Execute the first step, then reset the acquisition.
+        s <- firstAcquisitionStepId(serviceUser, o)
+        _ <- addEndStepEvent(s, v)
+        _ <- resetAcquisitionAs(serviceUser, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsAcqNarrowQuery(oid),
+        expected = initialBrightAcquisition.asRight
       )
 
   def brightFineAdjustments(n: Int): Json =
