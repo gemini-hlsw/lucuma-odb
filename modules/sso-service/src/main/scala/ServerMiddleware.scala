@@ -12,11 +12,8 @@ import lucuma.sso.service.config.Environment.*
 import natchez.Trace
 import natchez.http4s.NatchezMiddleware
 import org.http4s.HttpRoutes
-import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.*
 
 /** A module of all the middlewares we apply to the server routes. */
 object ServerMiddleware {
@@ -50,20 +47,12 @@ object ServerMiddleware {
       serviceErrorLogAction   = Logger[F].error(_)(_)
     )
 
-  /** A middleware that adds CORS headers. The origin must match one of the allowed domains. */
-  def cors[F[_]: Monad](domain: List[String]): Middleware[F] =
-    CORS.policy
-      .withAllowCredentials(true)
-      .withAllowOriginHost(u => CorsMiddleware.isAllowed(u.host, domain))
-      .withMaxAge(1.day)
-      .apply
-
   /** A middleware that composes all the others defined in this module. */
   def apply[F[_]: Async: Trace: Logger](
     config: Config,
   ): Middleware[F] =
     List[Middleware[F]](
-      cors(List(config.cookieDomain)),
+      CorsMiddleware.cors(domain = List(config.cookieDomain)),
       logging(config.environment),
       natchez,
       errorReporting,

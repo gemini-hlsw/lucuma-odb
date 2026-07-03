@@ -719,9 +719,11 @@ lazy val common = project
   .settings(
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
-      "org.http4s"    %% "http4s-core" % http4sVersion,
-      "org.typelevel" %% "cats-core"   % catsVersion,
-      "org.typelevel" %% "cats-effect" % catsEffectVersion
+      "org.http4s"    %% "http4s-core"    % http4sVersion,
+      "org.http4s"    %% "http4s-server"  % http4sVersion,
+      "org.typelevel" %% "cats-core"      % catsVersion,
+      "org.typelevel" %% "cats-effect"    % catsEffectVersion,
+      "org.scalameta" %% "munit"          % munitVersion % Test
     )
   )
 

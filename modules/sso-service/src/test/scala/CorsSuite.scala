@@ -4,6 +4,7 @@
 package lucuma.sso.service
 
 import cats.effect.*
+import lucuma.common.middleware.CorsMiddleware
 import natchez.Trace.Implicits.noop
 import org.http4s.*
 import org.http4s.implicits.*
@@ -12,7 +13,7 @@ import org.typelevel.ci.CIString
 object CorsSuite extends SsoSuite {
 
   def routes(domain: String): HttpRoutes[IO] =
-    ServerMiddleware.cors[IO](List(domain)).apply(
+    CorsMiddleware.cors[IO](domain = List(domain)).apply(
       Routes[IO](
         dbPool    = null,
         orcid     = null,
