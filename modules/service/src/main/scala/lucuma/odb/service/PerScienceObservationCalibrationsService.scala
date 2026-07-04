@@ -141,6 +141,7 @@ object PerScienceObservationCalibrationsService:
         val targetEnvironment = TargetEnvironmentInput.Create(
           explicitBase = none,
           asterism = none, // We resolve the target later
+          signalToNoiseTargetId = none,
           useBlindOffset = false.some,
           blindOffsetTarget = none,
           blindOffsetType = BlindOffsetType.Manual

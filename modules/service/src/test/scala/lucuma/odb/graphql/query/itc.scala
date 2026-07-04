@@ -199,6 +199,65 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
+  test("success, two targets, signal-to-noise target pins the selected result"):
+    setup2.flatMap { case (_, oid, tid0, tid1) =>
+      val pin =
+        s"""
+          mutation {
+            updateObservations(input: {
+              SET: { targetEnvironment: { signalToNoiseTargetId: "$tid1" } }
+              WHERE: { id: { EQ: "$oid" } }
+            }) { observations { id } }
+          }
+        """
+      query(user, pin) *>
+      expect(
+        user = user,
+        query =
+          s"""
+            query {
+              observation(observationId: "$oid") {
+                itc {
+                  ... on ItcSpectroscopy {
+                    spectroscopyScience {
+                      selected {
+                        targetId
+                      }
+                      all {
+                        targetId
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+              "observation": {
+                "itc": {
+                  "spectroscopyScience": {
+                    "selected": {
+                      "targetId": $tid1
+                    },
+                    "all": [
+                      {
+                        "targetId": $tid0
+                      },
+                      {
+                        "targetId": $tid1
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          """
+        )
+      )
+    }
+
   test("success, point emission lines target") {
     for {
       pid <- createProgram

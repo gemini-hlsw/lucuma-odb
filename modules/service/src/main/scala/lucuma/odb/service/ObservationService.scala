@@ -353,6 +353,13 @@ object ObservationService {
                       asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
                 .as(oid)
             .flatMap: oid =>
+              // Must run after the asterism is inserted so membership can be
+              // validated against it.
+              ResultT:
+                Services.asSuperUser:
+                  asterismService.setSignalToNoiseTarget(pid, NonEmptyList.one(oid), SET.signalToNoiseTargetId)
+              .as(oid)
+            .flatMap: oid =>
               SET
                 .targetEnvironment
                 .flatMap(te => te.blindOffsetTarget.map((_, te.blindOffsetType)))

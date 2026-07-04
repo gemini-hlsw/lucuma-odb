@@ -332,6 +332,7 @@ object ItcService {
       private def toTargetResults(
         targets: NonEmptyList[ItcInput.TargetDefinition],
         results: NonEmptyList[ClientCalculationResult],
+        signalToNoiseTargetId: Option[Target.Id] = none
       ): Either[OdbError, NonEmptyList[Zipper[Itc.Result]]] =
 
         def convertErrors(
@@ -347,10 +348,16 @@ object ItcService {
            .partitionErrors
            .leftMap(convertErrors)
            .map: a =>
-             a.value.zipWithIndex.map { case (intTime, index) =>
+             val z = a.value.zipWithIndex.map { case (intTime, index) =>
                val t = targets.get(index).get
                Itc.Result(t.targetId, intTime.times.focus, intTime.signalToNoiseAt)
              }
+             // Pin the "selected" result to the user's signal-to-noise target,
+             // if one is set and present; otherwise keep the automatic
+             // (brightest) focus.
+             signalToNoiseTargetId
+               .flatMap(id => z.findFocus(_.targetId === id))
+               .getOrElse(z)
 
       sealed trait Imaging[A]:
         def pf: PartialFunction[InstrumentMode, A]
@@ -411,7 +418,7 @@ object ItcService {
         for
           fs <- EitherT.fromEither(extractFilters(input.science.map(_.mode).toList, Nil))
           cs <- EitherT(clientCalculationResults)
-          ts <- EitherT.fromEither(toTargetResults(input.targets, cs))
+          ts <- EitherT.fromEither(toTargetResults(input.targets, cs, input.signalToNoiseTargetId))
         yield im.wrap(fs.zip(ts).toNem)
 
 
@@ -474,24 +481,24 @@ object ItcService {
         def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
-            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr), sp.signalToNoiseTargetId).map(_.head))
             acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
           yield Itc.Spectroscopy(acq, sci)
 
         def igrins2Spectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
-            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr), sp.signalToNoiseTargetId).map(_.head))
           yield Itc.Igrins2Spectroscopy(sci)
 
         (input match
-          case im @ ItcInput.Imaging(_, _) =>
+          case im @ ItcInput.Imaging(_, _, _) =>
             imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _) =>
+          case sp @ ItcInput.Spectroscopy(_, _, _, _, _) =>
             spectroscopy(sp)
-          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets) =>
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets, _) =>
             ghost(gh, targets)
-          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _) =>
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _, _) =>
             igrins2Spectroscopy(sp)
           case _ =>
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))

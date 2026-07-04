@@ -862,6 +862,16 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             }).flatMap(_ => accum)
           }.value
 
+      // Must run after setAsterisms so membership is validated against the
+      // post-edit asterism (and re-applies after the delete/reinsert).
+      def setSignalToNoiseTargets(m: Map[Program.Id, List[Observation.Id]])(using Services[F], Transaction[F], SuperUserAccess): ResultT[F, Unit] =
+        ResultT:
+          m.toList.foldRight(ResultT(Result.unit.pure[F])) { case ((pid, oids), accum) =>
+            ResultT(NonEmptyList.fromList(oids).fold(Result.unit.pure[F]) { os =>
+              asterismService.setSignalToNoiseTarget(pid, os, input.signalToNoiseTargetId)
+            }).flatMap(_ => accum)
+          }.value
+
       def resetAcquisitionIfNecessary(
         approval: Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]
       ): F[Unit] =
@@ -886,7 +896,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                     .flatMap:
                       case (map, query) =>
                         Services.asSuperUser:
-                          setAsterisms(map).as(query)
+                          setAsterisms(map).flatMap(_ => setSignalToNoiseTargets(map)).as(query)
                     .value
                     .flatTap: q =>
                       transaction.rollback.unlessA(q.hasValue)

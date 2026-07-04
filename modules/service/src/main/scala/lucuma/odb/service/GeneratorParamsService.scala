@@ -176,7 +176,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -280,7 +280,8 @@ object GeneratorParamsService {
                 acquisition,
                 science,
                 regularTargetInputs,
-                blindOffsetTargetInput
+                blindOffsetTargetInput,
+                obsParams.signalToNoiseTargetId
               )
             }
             .leftMap(MissingParamSet.fromParams)
@@ -334,7 +335,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -360,7 +361,7 @@ object GeneratorParamsService {
               val itcInput  =
                 obsParams.targets
                   .traverse(itcTargetParams)
-                  .map(ItcInput.ScienceOnlySpectroscopy(science, _))
+                  .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
                   .leftMap(MissingParamSet.fromParams)
                   .toEither
 
@@ -418,7 +419,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -436,7 +437,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -489,7 +490,7 @@ object GeneratorParamsService {
             val itcInput =
               obsParams.targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.ScienceOnlySpectroscopy(science, _))
+                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -545,23 +546,24 @@ object GeneratorParamsService {
     }
 
   case class ParamsRow(
-    observationId:       Observation.Id,
-    calibrationRole:     Option[CalibrationRole],
-    constraints:         ConstraintSet,
-    exposureTimeMode:    Option[ExposureTimeMode],
-    observingMode:       Option[ObservingModeType],
-    scienceBand:         Option[ScienceBand],
-    blindTargetId:       Option[Target.Id],
-    blindRadialVelocity: Option[RadialVelocity],
-    blindSourceProfile:  Option[SourceProfile],
-    targetId:            Option[Target.Id],
-    radialVelocity:      Option[RadialVelocity],
-    sourceProfile:       Option[SourceProfile],
-    declaredState:       Option[DeclaredExecutionState],
-    executionState:      ExecutionState,
-    stepCount:           Long,
-    isSplittable:        Boolean,
-    customSedTimestamp:  Option[Timestamp] = none
+    observationId:         Observation.Id,
+    calibrationRole:       Option[CalibrationRole],
+    constraints:           ConstraintSet,
+    exposureTimeMode:      Option[ExposureTimeMode],
+    observingMode:         Option[ObservingModeType],
+    scienceBand:           Option[ScienceBand],
+    blindTargetId:         Option[Target.Id],
+    blindRadialVelocity:   Option[RadialVelocity],
+    blindSourceProfile:    Option[SourceProfile],
+    targetId:              Option[Target.Id],
+    radialVelocity:        Option[RadialVelocity],
+    sourceProfile:         Option[SourceProfile],
+    isSignalToNoiseTarget: Boolean,
+    declaredState:         Option[DeclaredExecutionState],
+    executionState:        ExecutionState,
+    stepCount:             Long,
+    isSplittable:          Boolean,
+    customSedTimestamp:    Option[Timestamp] = none
   )
 
   case class TargetParams(
@@ -572,18 +574,19 @@ object GeneratorParamsService {
   )
 
   case class ObsParams(
-    observationId:     Observation.Id,
-    calibrationRole:   Option[CalibrationRole],
-    constraints:       ConstraintSet,
-    exposureTimeMode:  Option[ExposureTimeMode],
-    observingMode:     Option[ObservingModeType],
-    scienceBand:       Option[ScienceBand],
-    blindOffset:       Option[TargetParams],
-    targets:           NonEmptyList[TargetParams],
-    declaredState:     Option[DeclaredExecutionState],
-    executionState:    ExecutionState,
-    stepCount:         Long,
-    isSplittable:      Boolean
+    observationId:         Observation.Id,
+    calibrationRole:       Option[CalibrationRole],
+    constraints:           ConstraintSet,
+    exposureTimeMode:      Option[ExposureTimeMode],
+    observingMode:         Option[ObservingModeType],
+    scienceBand:           Option[ScienceBand],
+    blindOffset:           Option[TargetParams],
+    targets:               NonEmptyList[TargetParams],
+    signalToNoiseTargetId: Option[Target.Id],
+    declaredState:         Option[DeclaredExecutionState],
+    executionState:        ExecutionState,
+    stepCount:             Long,
+    isSplittable:          Boolean
   )
 
   object ObsParams {
@@ -599,6 +602,7 @@ object GeneratorParamsService {
           oParams.head.blindTargetId.map(btid => TargetParams(btid.some, oParams.head.blindRadialVelocity, oParams.head.blindSourceProfile, None)),
           oParams.map: r =>
             TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
+          oParams.collectFirst { case r if r.isSignalToNoiseTarget => r.targetId }.flatten,
           oParams.head.declaredState,
           oParams.head.executionState,
           oParams.head.stepCount,
@@ -641,12 +645,13 @@ object GeneratorParamsService {
        target_id.opt           *:
        radial_velocity.opt     *:
        source_profile.opt      *:
+       bool                    *:
        declared_execution_state.opt *:
        execution_state         *:
        int8                    *:
        bool
-      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc, split) =>
-        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc, split, None))
+      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, split) =>
+        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, split, None))
 
     private def ParamColumns(tab: String): String =
       s"""
@@ -673,6 +678,7 @@ object GeneratorParamsService {
         $tab.c_target_id,
         $tab.c_sid_rv,
         $tab.c_source_profile,
+        $tab.c_is_signal_to_noise_target,
         $tab.c_declared_state,
         $tab.c_execution_state,
         $tab.c_step_count,
