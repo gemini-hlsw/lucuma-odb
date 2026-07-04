@@ -77,7 +77,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
-      signalToNoiseTargetObject("signalToNoiseTarget"),
+      signalToNoiseTargetObject("explicitSignalToNoiseTarget"),
       SqlObject("explicitBase"),
       SqlField("useBlindOffset", ObservationView.UseBlindOffset),
       blindOffsetTargetObject("blindOffsetTarget"),
@@ -149,7 +149,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         Unique(singleTargetQuery(child))
       }
 
-    case (TargetEnvironmentType, "signalToNoiseTarget", Nil) =>
+    case (TargetEnvironmentType, "explicitSignalToNoiseTarget", Nil) =>
       Elab.transformChild { child =>
         Unique(singleTargetQuery(child))
       }

@@ -205,7 +205,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         s"""
           mutation {
             updateObservations(input: {
-              SET: { targetEnvironment: { signalToNoiseTargetId: "$tid1" } }
+              SET: { targetEnvironment: { explicitSignalToNoiseTargetId: "$tid1" } }
               WHERE: { id: { EQ: "$oid" } }
             }) { observations { id } }
           }

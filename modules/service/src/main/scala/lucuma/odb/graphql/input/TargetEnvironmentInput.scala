@@ -17,12 +17,12 @@ sealed trait TargetEnvironmentInput
 object TargetEnvironmentInput:
 
   final case class Create(
-    explicitBase:          Option[CoordinatesInput.Create],
-    asterism:              Option[List[Target.Id]],
-    signalToNoiseTargetId: Option[Target.Id],
-    useBlindOffset:        Option[Boolean],
-    blindOffsetTarget:     Option[TargetPropertiesInput.Create],
-    blindOffsetType:       BlindOffsetType
+    explicitBase:                  Option[CoordinatesInput.Create],
+    asterism:                      Option[List[Target.Id]],
+    explicitSignalToNoiseTargetId: Option[Target.Id],
+    useBlindOffset:                Option[Boolean],
+    blindOffsetTarget:             Option[TargetPropertiesInput.Create],
+    blindOffsetType:               BlindOffsetType
   ) extends TargetEnvironmentInput
   object Create:
     val Binding: Matcher[Create] =
@@ -30,7 +30,7 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Create.Binding.Option("explicitBase", rBase),
           TargetIdBinding.List.Option("asterism", rAsterism),
-          TargetIdBinding.Option("signalToNoiseTargetId", rSnTarget),
+          TargetIdBinding.Option("explicitSignalToNoiseTargetId", rSnTarget),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget),
           BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)
@@ -40,16 +40,16 @@ object TargetEnvironmentInput:
 
 
   final case class Edit(
-    explicitBase:          Nullable[CoordinatesInput.Edit],
-    asterism:              Nullable[List[Target.Id]],
-    signalToNoiseTargetId: Nullable[Target.Id],
-    useBlindOffset:        Option[Boolean],
-    blindOffsetTarget:     Nullable[TargetPropertiesInput.Create],
-    blindOffsetType:       BlindOffsetType
+    explicitBase:                  Nullable[CoordinatesInput.Edit],
+    asterism:                      Nullable[List[Target.Id]],
+    explicitSignalToNoiseTargetId: Nullable[Target.Id],
+    useBlindOffset:                Option[Boolean],
+    blindOffsetTarget:             Nullable[TargetPropertiesInput.Create],
+    blindOffsetType:               BlindOffsetType
   ) extends TargetEnvironmentInput:
     def limitToPreExecution(access: Access): Boolean =
       // staff can edit the blind offset for ongoing observations
-      access <= Access.Pi || asterism.isDefined || explicitBase.isDefined || signalToNoiseTargetId.isDefined
+      access <= Access.Pi || asterism.isDefined || explicitBase.isDefined || explicitSignalToNoiseTargetId.isDefined
 
   object Edit:
     val Binding: Matcher[Edit] =
@@ -57,7 +57,7 @@ object TargetEnvironmentInput:
         case List(
           CoordinatesInput.Edit.Binding.Nullable("explicitBase", rBase),
           TargetIdBinding.List.Nullable("asterism", rAsterism),
-          TargetIdBinding.Nullable("signalToNoiseTargetId", rSnTarget),
+          TargetIdBinding.Nullable("explicitSignalToNoiseTargetId", rSnTarget),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget),
           BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)

@@ -16,7 +16,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 
-class signalToNoiseTarget extends OdbSuite:
+class explicitSignalToNoiseTarget extends OdbSuite:
 
   val pi: User = TestUsers.Standard.pi(nextId, nextId)
 
@@ -30,14 +30,14 @@ class signalToNoiseTarget extends OdbSuite:
         query {
           observation(observationId: "${oid.show}") {
             targetEnvironment {
-              signalToNoiseTarget { id }
+              explicitSignalToNoiseTarget { id }
             }
           }
         }
       """
     ).map:
       _.hcursor
-       .downFields("observation", "targetEnvironment", "signalToNoiseTarget")
+       .downFields("observation", "targetEnvironment", "explicitSignalToNoiseTarget")
        .focus
        .getOrElse(Json.Null)
 
@@ -51,12 +51,12 @@ class signalToNoiseTarget extends OdbSuite:
       query = s"""
         mutation {
           updateObservations(input: {
-            SET: { targetEnvironment: { signalToNoiseTargetId: ${tid.fold("null")(t => s"\"${t.show}\"")} } }
+            SET: { targetEnvironment: { explicitSignalToNoiseTargetId: ${tid.fold("null")(t => s"\"${t.show}\"")} } }
             WHERE: { id: { EQ: "${oid.show}" } }
           }) {
             observations {
               id
-              targetEnvironment { signalToNoiseTarget { id } }
+              targetEnvironment { explicitSignalToNoiseTarget { id } }
             }
           }
         }
@@ -69,7 +69,7 @@ class signalToNoiseTarget extends OdbSuite:
       query = s"""
         mutation {
           updateObservations(input: {
-            SET: { targetEnvironment: { signalToNoiseTargetId: "${tid.show}" } }
+            SET: { targetEnvironment: { explicitSignalToNoiseTargetId: "${tid.show}" } }
             WHERE: { id: { EQ: "${oid.show}" } }
           }) {
             observations { id }
@@ -194,12 +194,12 @@ class signalToNoiseTarget extends OdbSuite:
           SET: {
             targetEnvironment: {
               asterism: ${targetIdList(asterism)}
-              ${sn.fold("")(t => s"signalToNoiseTargetId: \"${t.show}\"")}
+              ${sn.fold("")(t => s"explicitSignalToNoiseTargetId: \"${t.show}\"")}
             }
           }
         }) {
           observation {
-            targetEnvironment { signalToNoiseTarget { id } }
+            targetEnvironment { explicitSignalToNoiseTarget { id } }
           }
         }
       }
@@ -214,7 +214,7 @@ class signalToNoiseTarget extends OdbSuite:
           SET: {
             targetEnvironment: {
               asterism: ${targetIdList(asterism)}
-              ${sn.fold("")(t => s"signalToNoiseTargetId: \"${t.show}\"")}
+              ${sn.fold("")(t => s"explicitSignalToNoiseTargetId: \"${t.show}\"")}
             }
           }
           WHERE: { id: { EQ: "${oid.show}" } }
@@ -235,7 +235,7 @@ class signalToNoiseTarget extends OdbSuite:
                    "createObservation": {
                      "observation": {
                        "targetEnvironment": {
-                         "signalToNoiseTarget": { "id": ${t1.asJson} }
+                         "explicitSignalToNoiseTarget": { "id": ${t1.asJson} }
                        }
                      }
                    }

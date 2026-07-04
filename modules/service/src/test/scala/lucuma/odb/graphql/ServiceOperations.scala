@@ -59,7 +59,7 @@ trait ServiceOperations { this: OdbSuite =>
     TargetEnvironmentInput.Edit(
       explicitBase = Nullable.Absent,
       asterism = Nullable.Absent,
-      signalToNoiseTargetId = Nullable.Absent,
+      explicitSignalToNoiseTargetId = Nullable.Absent,
       useBlindOffset = none,
       blindOffsetTarget = Nullable.NonNull(defaultCreateTargetInput(name)),
       blindOffsetType = blindOffsetType

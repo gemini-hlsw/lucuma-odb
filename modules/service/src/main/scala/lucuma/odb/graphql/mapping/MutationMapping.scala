@@ -868,7 +868,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         ResultT:
           m.toList.foldRight(ResultT(Result.unit.pure[F])) { case ((pid, oids), accum) =>
             ResultT(NonEmptyList.fromList(oids).fold(Result.unit.pure[F]) { os =>
-              asterismService.setSignalToNoiseTarget(pid, os, input.signalToNoiseTargetId)
+              asterismService.setSignalToNoiseTarget(pid, os, input.explicitSignalToNoiseTargetId)
             }).flatMap(_ => accum)
           }.value
 

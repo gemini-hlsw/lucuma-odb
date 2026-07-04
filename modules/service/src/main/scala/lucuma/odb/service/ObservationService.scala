@@ -357,7 +357,7 @@ object ObservationService {
               // validated against it.
               ResultT:
                 Services.asSuperUser:
-                  asterismService.setSignalToNoiseTarget(pid, NonEmptyList.one(oid), SET.signalToNoiseTargetId)
+                  asterismService.setSignalToNoiseTarget(pid, NonEmptyList.one(oid), SET.explicitSignalToNoiseTargetId)
               .as(oid)
             .flatMap: oid =>
               SET

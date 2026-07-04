@@ -6183,12 +6183,13 @@ input TargetEnvironmentInput {
   asterism: [TargetId!]
 
   """
-  Selects which asterism target drives the signal-to-noise (ITC) calculation.
-  The target must be a member of the observation's asterism (after applying any
-  `asterism` edit in the same input). Assign null to clear the selection and let
-  a representative target be chosen automatically.
+  Explicitly selects which asterism target drives the signal-to-noise (ITC)
+  calculation, overriding the automatic choice. The target must be a member of
+  the observation's asterism (after applying any `asterism` edit in the same
+  input). Assign null to clear the selection and let a representative target be
+  chosen automatically.
   """
-  signalToNoiseTargetId: TargetId
+  explicitSignalToNoiseTargetId: TargetId
 
   """
   Whether blind offset is enabled for this observation
@@ -12964,7 +12965,7 @@ Contains the result of calling the ITC for all targets, but a single instrument
 configuration.  Since the observation may contain multiple targets, there may
 be multiple results. The "selected" field contains the representative result
 for all targets.  If a signal-to-noise target has been chosen for the
-observation (see `TargetEnvironment.signalToNoiseTarget`), that target's result
+observation (see `TargetEnvironment.explicitSignalToNoiseTarget`), that target's result
 is used.  Otherwise the brightest target (the one requiring the shortest
 exposure time) is used.  If there is a mix of failures and successes, the
 overall "selected" result will be a failure. The "all" field contains results
@@ -16830,13 +16831,15 @@ type TargetEnvironment {
   ): Target
 
   """
-  The asterism target selected to drive the signal-to-noise (ITC) calculation.
-  This is always one of the observation's asterism targets. When null, a
-  representative target is chosen automatically. It is set with
-  `TargetEnvironmentInput.signalToNoiseTargetId` and is cleared automatically if
-  the target is removed from the asterism.
+  The asterism target explicitly selected to drive the signal-to-noise (ITC)
+  calculation, overriding the automatic choice. This is always one of the
+  observation's asterism targets. When null, no explicit selection has been
+  made and a representative target is chosen automatically; the target that will
+  actually be used in that case is available via the `itc` field's `selected`
+  result. It is set with `TargetEnvironmentInput.explicitSignalToNoiseTargetId`
+  and is cleared automatically if the target is removed from the asterism.
   """
-  signalToNoiseTarget: Target
+  explicitSignalToNoiseTarget: Target
 
   """
   The base position used by navigate to slew and track the target.

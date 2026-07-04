@@ -38,9 +38,9 @@ object ObservationPropertiesInput {
           case TargetEnvironmentInput.Create(_, asterism, _, _, _, _) => Nullable.orAbsent(asterism.flatMap(NonEmptyList.fromList))
           case TargetEnvironmentInput.Edit(_, asterism, _, _, _, _)   => asterism.flatMap(tids => Nullable.orAbsent(NonEmptyList.fromList(tids)))
 
-    // The signal-to-noise (ITC) target selection, as a Nullable. Absent leaves
-    // it unchanged, Null clears it, NonNull selects the given target.
-    def signalToNoiseTargetId: Nullable[Target.Id] =
+    // The explicit signal-to-noise (ITC) target selection, as a Nullable. Absent
+    // leaves it unchanged, Null clears it, NonNull selects the given target.
+    def explicitSignalToNoiseTargetId: Nullable[Target.Id] =
       Nullable.orAbsent(targetEnvironment).flatMap:
         case TargetEnvironmentInput.Create(_, _, sn, _, _, _) => Nullable.orAbsent(sn)
         case TargetEnvironmentInput.Edit(_, _, sn, _, _, _)   => sn

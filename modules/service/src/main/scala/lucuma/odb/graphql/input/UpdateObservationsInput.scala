@@ -23,8 +23,8 @@ final case class UpdateObservationsInput(
   def asterism: Nullable[NonEmptyList[Target.Id]] =
     SET.asterism
 
-  def signalToNoiseTargetId: Nullable[Target.Id] =
-    SET.signalToNoiseTargetId
+  def explicitSignalToNoiseTargetId: Nullable[Target.Id] =
+    SET.explicitSignalToNoiseTargetId
 
   def updatesAcquisition: Boolean =
     SET.updatesAcquisition
