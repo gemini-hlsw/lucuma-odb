@@ -413,6 +413,8 @@ lazy val ssoService = project
   .settings(buildInfoSettings)
   .settings(
     name := "lucuma-sso-service",
+    // Include internal (unpublished) project dependencies, like common, in the package
+    projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     libraryDependencies ++= Seq(
       "org.typelevel"       %% "grackle-skunk"              % grackleVersion,
       "org.tpolecat"        %% "skunk-core"                 % skunkVersion,
@@ -549,6 +551,8 @@ lazy val itcService = project
   .settings(itcCommonSettings)
   .settings(
     name                  := "lucuma-itc-service",
+    // Include internal (unpublished) project dependencies in the package
+    projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     description              := "ITC Server",
     scalacOptions -= "-Vtype-diffs",
     reStart / javaOptions := Seq(
