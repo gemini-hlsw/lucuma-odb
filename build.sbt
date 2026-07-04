@@ -408,7 +408,7 @@ lazy val ssoBackendClient = project
 
 lazy val ssoService = project
   .in(file("modules/sso-service"))
-  .dependsOn(ssoBackendClient, binding)
+  .dependsOn(ssoBackendClient, binding, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .settings(
@@ -713,6 +713,20 @@ lazy val itcLegacyTests = project
 
 // START ODB
 
+lazy val common = project
+  .in(file("modules/common-middleware"))
+  .enablePlugins(NoPublishPlugin)
+  .settings(
+    name := "lucuma-common-middleware",
+    libraryDependencies ++= Seq(
+      "org.http4s"    %% "http4s-core"    % http4sVersion,
+      "org.http4s"    %% "http4s-server"  % http4sVersion,
+      "org.typelevel" %% "cats-core"      % catsVersion,
+      "org.typelevel" %% "cats-effect"    % catsEffectVersion,
+      "org.scalameta" %% "munit"          % munitVersion % Test
+    )
+  )
+
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
@@ -799,7 +813,7 @@ lazy val smartgcal = project
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(binding, otel, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
+  .dependsOn(binding, otel, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .settings(
@@ -937,7 +951,7 @@ lazy val resourceModel =
 
 lazy val resourceService = project
   .in(file("resource/service"))
-  .dependsOn(resourceModel, binding, otel, schema.jvm)
+  .dependsOn(resourceModel, binding, otel, schema.jvm, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(resourceCommonSettings, buildInfoSettings)
   .settings(

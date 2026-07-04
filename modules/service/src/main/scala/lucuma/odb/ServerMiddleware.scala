@@ -8,6 +8,7 @@ import cats.data.Kleisli
 import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
+import lucuma.common.middleware.CorsMiddleware
 import lucuma.core.model.User
 import lucuma.odb.otel.given
 import lucuma.odb.service.Services
@@ -16,7 +17,6 @@ import lucuma.sso.client.SsoClient
 import org.http4s.HttpRoutes
 import org.http4s.Query
 import org.http4s.Uri
-import org.http4s.Uri.Scheme
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Upgrade
 import org.http4s.otel4s.middleware.metrics.OtelMetrics
@@ -26,7 +26,6 @@ import org.http4s.otel4s.middleware.trace.redact
 import org.http4s.otel4s.middleware.trace.redact.HeaderRedactor
 import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
-import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.http4s.server.middleware.Metrics
 import org.typelevel.log4cats.Logger
@@ -36,7 +35,6 @@ import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
 import scala.collection.immutable.TreeMap
-import scala.concurrent.duration.*
 
 /** A module of all the middlewares we apply to the server routes. */
 object ServerMiddleware {
@@ -57,14 +55,6 @@ object ServerMiddleware {
       messageFailureLogAction = Logger[F].error(_)(_),
       serviceErrorLogAction   = Logger[F].error(_)(_)
     )
-
-  /** A middleware that adds CORS headers. The origin must match the cookie domain. */
-  def cors[F[_]: Monad](corsOverHttps: Boolean, domain: List[String]): Middleware[F] =
-    CORS.policy
-      .withAllowCredentials(true)
-      .withAllowOriginHost(u => (!corsOverHttps || (u.scheme === Scheme.https)) && domain.exists(u.host.value.endsWith))
-      .withMaxAge(1.day)
-      .apply
 
   /**
    * A middleware that updates the user table when it sees a user it hasn't seen before, or when
@@ -164,7 +154,7 @@ object ServerMiddleware {
         Kleisli(req => if (req.headers.get[Upgrade].isDefined) routes(req) else withMetrics(req))
 
       List[Middleware[F]](
-        cors(corsOverHttps, domain),
+        CorsMiddleware.cors(corsOverHttps, domain),
         logging,
         httpMetrics,
         otel.asHttpRoutesMiddleware,

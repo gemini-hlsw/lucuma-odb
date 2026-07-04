@@ -8,10 +8,10 @@ import cats.data.OptionT
 import cats.effect.*
 import cats.syntax.all.*
 import fs2.compression.Compression
+import lucuma.common.middleware.CorsMiddleware
 import org.http4s.HttpRoutes
 import org.http4s.Query
 import org.http4s.Uri
-import org.http4s.Uri.Scheme
 import org.http4s.headers.Upgrade
 import org.http4s.metrics.MetricsOps
 import org.http4s.otel4s.middleware.metrics.OtelMetrics
@@ -20,7 +20,6 @@ import org.http4s.otel4s.middleware.trace.redact.PathRedactor
 import org.http4s.otel4s.middleware.trace.redact.QueryRedactor
 import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
-import org.http4s.server.middleware.CORS
 import org.http4s.server.middleware.ErrorAction
 import org.http4s.server.middleware.GZip
 import org.http4s.server.middleware.Logger as Http4sLogger
@@ -29,8 +28,6 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.TracerProvider
-
-import scala.concurrent.duration.*
 
 object ServerMiddleware {
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
@@ -62,13 +59,7 @@ object ServerMiddleware {
       )
     val spanDataProvider              = ServerSpanDataProvider.openTelemetry(redactor)
 
-    val cors: Middleware[F] =
-      CORS.policy
-        .withAllowCredentials(true)
-        .withAllowOriginHost: u =>
-          (!corsOverHttps || (u.scheme === Scheme.https)) && domain.exists(u.host.value.endsWith)
-        .withMaxAge(1.day)
-        .apply
+    val cors: Middleware[F] = CorsMiddleware.cors(corsOverHttps, domain.toList)
 
     (
       OtelServerMiddleware.builder[F](spanDataProvider).build,
