@@ -17,10 +17,14 @@ import grackle.ResultT
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 import table.ObservationView
 
 trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
+
+  protected def T: Tracer[F]
 
   protected def effectHandler[E, R](
     readEnv:   Env => Result[E],
@@ -45,22 +49,24 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
         }
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          ctx <- ResultT(queryContext(queries).pure[F])
-          obs <- ctx.distinct.traverse { case (pid, oid, env) =>
-                   ResultT(calculate(pid, oid, env)).map((oid, env, _))
-                 }
-          res <- ResultT(ctx
-                   .flatMap { case (_, oid, env) => obs.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
-                   .zip(queries)
-                   .traverse { case (result, (query, parentCursor)) =>
-                     Query.childContext(parentCursor.context, query).map { childContext =>
-                       CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
-                     }
-                   }.pure[F]
-                 )
-          } yield res
-        ).value
+        T.span("effect.perObs", Attribute("count", queries.size.toLong)).surround {
+          (for {
+            ctx <- ResultT(queryContext(queries).pure[F])
+            obs <- ctx.distinct.traverse { case (pid, oid, env) =>
+                     ResultT(calculate(pid, oid, env)).map((oid, env, _))
+                   }
+            res <- ResultT(ctx
+                     .flatMap { case (_, oid, env) => obs.find(r => r._1 === oid && r._2 === env).map(_._3).toList }
+                     .zip(queries)
+                     .traverse { case (result, (query, parentCursor)) =>
+                       Query.childContext(parentCursor.context, query).map { childContext =>
+                         CirceCursor(childContext, result.asJson, Some(parentCursor), parentCursor.fullEnv)
+                       }
+                     }.pure[F]
+                   )
+            } yield res
+          ).value
+        }
     }
 
 }

@@ -319,6 +319,9 @@ object OdbMapping {
           val schema: Schema =
             schema0.getOrElse(unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema)
 
+          // Tracer for the effect-handler spans in the mapping traits.
+          override protected def T: Tracer[F] = summon[Tracer[F]]
+
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
           override val goaUsers = goaUsers0

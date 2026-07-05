@@ -16,13 +16,11 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.ResultT
 import grackle.TypeRef
-import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ExecutionState
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
@@ -43,6 +41,7 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
+import org.typelevel.otel4s.Attribute
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                                 with ObscalcTable[F]
@@ -133,7 +132,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                 oids.map(oid => states.getOrElse(oid, ExecutionState.NotDefined).asJson)
 
       override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (
+        T.span("effect:execution.executionState", Attribute("count", queries.size.toLong)).surround {
+         (
           for
             oids <- ResultT.fromResult(queryContext(queries))
             stat <- ResultT.liftF(execute(oids))
@@ -148,7 +148,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                         }
 
           yield res
-        ).value
+         ).value
+        }
 
   private lazy val digestHandler: EffectHandler[F] =
     new EffectHandler[F]:
@@ -157,7 +158,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
           case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
 
       override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (
+        T.span("effect:execution.digest", Attribute("count", queries.size.toLong)).surround {
+         (
           for
             oids    <- ResultT.fromResult(queryContext(queries))
             digests <- ResultT.liftF(services.useTransactionally(obscalcService.selectManyExecutionDigest(oids)))
@@ -177,7 +179,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                               childContext <- Query.childContext(parentCursor.context, query)
                             yield CirceCursor(childContext, j, Some(parentCursor), parentCursor.fullEnv)
           yield res
-        ).value
+         ).value
+        }
 
   // Batched to avoid an N+1: resolve every observation's time charge in a single transaction with
   // one grouped query, rather than one transaction and one query per observation.
@@ -188,7 +191,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
           case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
 
       override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (
+        T.span("effect:execution.timeCharge", Attribute("count", queries.size.toLong)).surround {
+         (
           for
             oids  <- ResultT.fromResult(queryContext(queries))
             times <- ResultT.liftF(services.useTransactionally {
@@ -202,6 +206,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                              val json = times.getOrElse(oid, CategorizedTime.Zero).asJson
                              CirceCursor(childContext, json, Some(parentCursor), parentCursor.fullEnv)
           yield res
-        ).value
+         ).value
+        }
 
 }

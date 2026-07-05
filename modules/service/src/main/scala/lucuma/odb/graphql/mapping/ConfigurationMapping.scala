@@ -17,7 +17,6 @@ import lucuma.catalog.clients.GaiaClient
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Region
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.table.ConfigurationRequestView
@@ -28,10 +27,13 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import org.http4s.client.Client
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Tracer
 
 trait ConfigurationMapping[F[_]]
   extends ObservationView[F] with ConfigurationRequestView[F] {
 
+  protected def T: Tracer[F]
   def services: Resource[F, Services[F]]
   def itcClient: ItcClient[F]
   def httpClient: Client[F]
@@ -76,71 +78,65 @@ trait ConfigurationMapping[F[_]]
     // the cursor, and we don't need the environment at all. Would be nice to abstract something out.
     new EffectHandler[F] {
 
-      // Batched to avoid an N+1: Grackle hands us every observation in the result at once, so we
-      // resolve them in a single session, issuing one tracking query per distinct reference time
-      // (observations sharing a CFP share a time) rather than one query -- and one session -- per
-      // observation.
-      def calculateAll(
-        obs: List[(Observation.Id, Option[Timestamp])]
-      ): F[Result[Map[Observation.Id, Option[Either[Coordinates, Region]]]]] =
-        services.use { implicit s =>
-          Services.asSuperUser:
-            obs
-              .collect { case (oid, Some(at)) => at -> oid }
-              .groupMap(_._1)(_._2)
-              .toList
-              .flatTraverse { case (at, oids) =>
-                s.trackingService
-                  .getCoordinatesSnapshotOrRegion(oids, at, false)
-                  .map(_.toList)
-              }
-              .map { entries =>
-                entries
-                  .traverse { case (oid, res) =>
-                    val converted: Result[Option[Either[Coordinates, Region]]] =
-                      if res.isFailure then Result(none[Either[Coordinates, Region]]) // important, don't fail here
-                      else res.map {
-                        case Left(a)             => Left(a.base).some // non-opportunity
-                        case Right((_, Some(c))) => Left(c).some      // opportunity with explicit base
-                        case Right((r, None))    => Right(r).some     // opportunity without explicit base
-                      }
-                    converted.tupleLeft(oid)
-                  }
-                  .map(_.toMap)
-              }
-        }
-
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
+      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Observation.Id, Option[Timestamp])]] =
         queries.parTraverse: (_, cursor) =>
           (
-            cursor.fieldAs[Program.Id]("programId"),
             cursor.fieldAs[Observation.Id]("id"),
             cursor.fieldAs[Option[Timestamp]]("referenceTime")
           ).parTupled
 
+      // Compute the configuration coordinates/region for every observation, batching the tracking
+      // lookups by reference time (the CFP midpoint, which most observations share) rather than
+      // issuing one query per observation. Returns a map keyed by observation id. N.B. we use
+      // `services.use` (not `useTransactionally`) because `getCoordinatesSnapshotOrRegion` manages
+      // its own transaction internally; wrapping it would nest transactions.
+      private def calculateAll(
+        ctx: List[(Observation.Id, Option[Timestamp])]
+      ): F[Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]]] =
+        val byTime: Map[Timestamp, List[Observation.Id]] =
+          ctx.collect { case (oid, Some(t)) => t -> oid }.groupMap(_._1)(_._2)
+        val noTime: Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]] =
+          ctx.collect { case (oid, None) => oid -> Result(None) }.toMap
+        services.use { implicit s =>
+          Services.asSuperUser:
+            byTime.toList.foldLeftM(noTime): (acc, entry) =>
+              val (at, oids) = entry
+              s.trackingService
+                .getCoordinatesSnapshotOrRegion(oids, at, false)
+                .map: results =>
+                  acc ++ results.map: (oid, res) =>
+                    oid -> (
+                      if res.isFailure then Result(None) // important, don't fail here
+                      else res.map:
+                        case Left(a)             => Left(a.base).some // non-opportunity
+                        case Right((_, Some(c))) => Left(c).some      // opportunity with explicit base
+                        case Right((r, None))    => Right(r).some      // opportunity without explicit base
+                    )
+        }
+
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          ctx       <- ResultT(queryContext(queries).pure[F])
-          resultMap <- ResultT(calculateAll(ctx.distinct.map { case (_, oid, ldt) => (oid, ldt) }))
-          res       <- ResultT(ctx
-                   .map { case (_, oid, _) => resultMap.getOrElse(oid, None) }
-                   .zip(queries)
-                   .traverse { case (result, (query, parentCursor)) =>
-                     Query.childContext(parentCursor.context, query).map { childContext =>
-                       CirceCursor(
-                        childContext,
-                        Json.obj(
-                          "coordinates" -> result.flatMap(_.left.toOption).asJson,
-                          "region"      -> result.flatMap(_.toOption).asJson,
-                        ),
-                        Some(parentCursor),
-                        parentCursor.fullEnv
-                      )
-                     }
-                   }.pure[F]
-                 )
+        T.span("effect:configuration.target", Attribute("count", queries.size.toLong)).surround {
+         (for {
+          ctx     <- ResultT(queryContext(queries).pure[F])
+          results <- ResultT.liftF(T.span("effect:configuration.target.calculateAll").surround(calculateAll(ctx)))
+          res     <- ResultT.fromResult:
+                       ctx.map(_._1).zip(queries).traverse { case (oid, (query, parentCursor)) =>
+                         for {
+                           result       <- results.getOrElse(oid, Result(None))
+                           childContext <- Query.childContext(parentCursor.context, query)
+                         } yield CirceCursor(
+                           childContext,
+                           Json.obj(
+                             "coordinates" -> result.flatMap(_.left.toOption).asJson,
+                             "region"      -> result.flatMap(_.toOption).asJson,
+                           ),
+                           Some(parentCursor),
+                           parentCursor.fullEnv
+                         )
+                       }
           } yield res
-        ).value
+         ).value
+        }
 
     }
 
