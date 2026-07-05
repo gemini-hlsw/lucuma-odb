@@ -35,9 +35,10 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
   /**
    * Batched effect handler keyed by observation id: `calculateAll` receives every observation id in
    * the result at once and returns a per-observation result map, replacing the
-   * one-transaction-per-observation N+1 of `effectHandler`. The map must contain an entry for every
-   * requested id; a missing key fails that observation's field. `spanName` names the tracing span so
-   * each field remains individually attributable in traces.
+   * one-transaction-per-observation N+1 of `effectHandler`. `calculateAll` must return an entry for
+   * every requested id; a missing id is a programming error and fails the whole effect (grackle's
+   * `Result` traverse is not per-field). `spanName` names the tracing span so each field remains
+   * individually attributable in traces.
    */
   protected def batchedEffectHandler[R](
     spanName: String
@@ -49,6 +50,9 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
       private def oids(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
         queries.traverse { case (_, cursor) => cursor.fieldAs[Observation.Id]("id") }
 
+      private def missing(oid: Observation.Id): Result[R] =
+        Result.failure(s"No result computed for observation $oid")
+
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         T.span(spanName, Attribute("count", queries.size.toLong)).surround {
           (for {
@@ -56,7 +60,7 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
             map <- ResultT.liftF(T.span(s"$spanName.calculateAll").surround(calculateAll(os)))
             res <- ResultT(os.zip(queries).traverse { case (oid, (query, parentCursor)) =>
                      for {
-                       r            <- map.getOrElse(oid, Result.failure(s"No result computed for observation $oid"))
+                       r            <- map.getOrElse(oid, missing(oid))
                        childContext <- Query.childContext(parentCursor.context, query)
                      } yield CirceCursor(childContext, r.asJson, Some(parentCursor), parentCursor.fullEnv)
                    }.pure[F])

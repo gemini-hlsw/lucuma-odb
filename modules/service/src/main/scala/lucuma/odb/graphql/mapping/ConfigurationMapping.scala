@@ -67,7 +67,7 @@ trait ConfigurationMapping[F[_]]
       // associated CFP (if any). The reference time is used when computing coordintes for approved
       // configurations; it is not related to visualization time.
       SqlField("referenceTime", ObservationView.ReferenceTime, hidden = true),
-      EffectField("target", targetQueryHandler, List("id", "programId", "referenceTime")),
+      EffectField("target", targetQueryHandler, List("id", "referenceTime")),
       SqlObject("conditions"),
       SqlObject("observingMode"),
     )
@@ -118,7 +118,9 @@ trait ConfigurationMapping[F[_]]
         T.span("effect:configuration.target", Attribute("count", queries.size.toLong)).surround {
          (for {
           ctx     <- ResultT(queryContext(queries).pure[F])
-          results <- ResultT.liftF(T.span("effect:configuration.target.calculateAll").surround(calculateAll(ctx)))
+          results <- ResultT.liftF:
+                       T.span("effect:configuration.target.calculateAll")
+                         .surround(calculateAll(ctx))
           res     <- ResultT.fromResult:
                        ctx.map(_._1).zip(queries).traverse { case (oid, (query, parentCursor)) =>
                          for {
