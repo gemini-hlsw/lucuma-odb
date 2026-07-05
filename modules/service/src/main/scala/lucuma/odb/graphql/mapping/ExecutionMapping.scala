@@ -8,19 +8,15 @@ import cats.effect.Resource
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
-import grackle.Cursor
-import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
-import grackle.ResultT
 import grackle.TypeRef
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ExecutionState
 import lucuma.core.model.ExecutionEvent
-import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
@@ -41,7 +37,6 @@ import lucuma.odb.logic.Generator
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.http4s.client.Client
-import org.typelevel.otel4s.Attribute
 
 trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
                                 with ObscalcTable[F]
@@ -119,94 +114,36 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   }
 
   private lazy val executionStateHandler: EffectHandler[F] =
-    new EffectHandler[F]:
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
-        queries.traverse { case (_, cursor) => cursor.fieldAs[Observation.Id]("id") }
-
-      private def execute(oids: List[Observation.Id]): F[List[Json]] =
-        services
-          .useTransactionally:
-            generatorParamsService
-              .selectExecutionStates(oids)
-              .map: states =>
-                oids.map(oid => states.getOrElse(oid, ExecutionState.NotDefined).asJson)
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        T.span("effect:execution.executionState", Attribute("count", queries.size.toLong)).surround {
-         (
-          for
-            oids <- ResultT.fromResult(queryContext(queries))
-            stat <- ResultT.liftF(execute(oids))
-            res  <- ResultT.fromResult:
-                      stat
-                        .zip(queries)
-                        .traverse { case (state, (query, parentCursor)) =>
-                          Query
-                            .childContext(parentCursor.context, query)
-                            .map: childContext =>
-                              CirceCursor(childContext, state, Some(parentCursor), parentCursor.fullEnv)
-                        }
-
-          yield res
-         ).value
-        }
+    batchedEffectHandler("effect:execution.executionState"): oids =>
+      services.useTransactionally:
+        generatorParamsService
+          .selectExecutionStates(oids)
+          .map: states =>
+            oids.map(oid => oid -> Result(states.getOrElse(oid, ExecutionState.NotDefined))).toMap
 
   private lazy val digestHandler: EffectHandler[F] =
-    new EffectHandler[F]:
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
-        queries.traverse:
-          case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        T.span("effect:execution.digest", Attribute("count", queries.size.toLong)).surround {
-         (
-          for
-            oids    <- ResultT.fromResult(queryContext(queries))
-            digests <- ResultT.liftF(services.useTransactionally(obscalcService.selectManyExecutionDigest(oids)))
-            res     <- ResultT.fromResult:
-                         oids.zip(queries).traverse:
-                           case (oid, (query, parentCursor)) =>
-                            val json: Result[Json] =
-                              digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>
-                                cv
-                                  .map: res =>
-                                    res.map(_.asJson) match
-                                      case Result.Failure(ps) => Result.Warning(ps, Json.Null)
-                                      case r                  => r
-                                  .sequence.map(_.asJson)
-                            for
-                              j            <- json
-                              childContext <- Query.childContext(parentCursor.context, query)
-                            yield CirceCursor(childContext, j, Some(parentCursor), parentCursor.fullEnv)
-          yield res
-         ).value
-        }
+    batchedEffectHandler[Json]("effect:execution.digest"): oids =>
+      services.useTransactionally(obscalcService.selectManyExecutionDigest(oids)).map: digests =>
+        oids.map: oid =>
+          val json: Result[Json] =
+            digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>
+              cv
+                .map: res =>
+                  res.map(_.asJson) match
+                    case Result.Failure(ps) => Result.Warning(ps, Json.Null)
+                    case r                  => r
+                .sequence.map(_.asJson)
+          oid -> json
+        .toMap
 
   // Batched to avoid an N+1: resolve every observation's time charge in a single transaction with
-  // one grouped query, rather than one transaction and one query per observation.
+  // one grouped query, rather than one transaction and one query per observation. Observations with
+  // no visits default to `CategorizedTime.Zero`.
   private lazy val timeChargeHandler: EffectHandler[F] =
-    new EffectHandler[F]:
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
-        queries.traverse:
-          case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        T.span("effect:execution.timeCharge", Attribute("count", queries.size.toLong)).surround {
-         (
-          for
-            oids  <- ResultT.fromResult(queryContext(queries))
-            times <- ResultT.liftF(services.useTransactionally {
-                       Services.asSuperUser:
-                         timeAccountingService.selectObservations(oids)
-                     })
-            res   <- ResultT.fromResult:
-                       oids.zip(queries).traverse:
-                         case (oid, (query, parentCursor)) =>
-                           Query.childContext(parentCursor.context, query).map: childContext =>
-                             val json = times.getOrElse(oid, CategorizedTime.Zero).asJson
-                             CirceCursor(childContext, json, Some(parentCursor), parentCursor.fullEnv)
-          yield res
-         ).value
-        }
+    batchedEffectHandler("effect:execution.timeCharge"): oids =>
+      services.useTransactionally:
+        Services.asSuperUser:
+          timeAccountingService.selectObservations(oids).map: times =>
+            oids.map(oid => oid -> Result(times.getOrElse(oid, CategorizedTime.Zero))).toMap
 
 }

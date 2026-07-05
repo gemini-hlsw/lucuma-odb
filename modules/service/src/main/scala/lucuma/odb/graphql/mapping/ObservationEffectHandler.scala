@@ -32,6 +32,38 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
   )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =
     readQueryAndCursorEffectHander((_, c) => readEnv(c.fullEnv), calculate)
 
+  /**
+   * Batched effect handler keyed by observation id: `calculateAll` receives every observation id in
+   * the result at once and returns a per-observation result map, replacing the
+   * one-transaction-per-observation N+1 of `effectHandler`. The map must contain an entry for every
+   * requested id; a missing key fails that observation's field. `spanName` names the tracing span so
+   * each field remains individually attributable in traces.
+   */
+  protected def batchedEffectHandler[R](
+    spanName: String
+  )(
+    calculateAll: List[Observation.Id] => F[Map[Observation.Id, Result[R]]]
+  )(using io.circe.Encoder[R]): EffectHandler[F] =
+    new EffectHandler[F] {
+
+      private def oids(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
+        queries.traverse { case (_, cursor) => cursor.fieldAs[Observation.Id]("id") }
+
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        T.span(spanName, Attribute("count", queries.size.toLong)).surround {
+          (for {
+            os  <- ResultT(oids(queries).pure[F])
+            map <- ResultT.liftF(T.span(s"$spanName.calculateAll").surround(calculateAll(os)))
+            res <- ResultT(os.zip(queries).traverse { case (oid, (query, parentCursor)) =>
+                     for {
+                       r            <- map.getOrElse(oid, Result.failure(s"No result computed for observation $oid"))
+                       childContext <- Query.childContext(parentCursor.context, query)
+                     } yield CirceCursor(childContext, r.asJson, Some(parentCursor), parentCursor.fullEnv)
+                   }.pure[F])
+          } yield res).value
+        }
+    }
+
   protected def readQueryAndCursorEffectHander[E, R](
     readQueryAndCursor:   (Query, Cursor) => Result[E],
     calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
