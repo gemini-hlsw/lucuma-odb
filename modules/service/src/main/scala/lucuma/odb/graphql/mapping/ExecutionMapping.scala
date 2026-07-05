@@ -25,6 +25,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
@@ -178,16 +179,29 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
           yield res
         ).value
 
-  private lazy val timeChargeHandler: EffectHandler[F] = {
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (_, oid, _) => {
-        services.useTransactionally {
-          Services.asSuperUser:
-            timeAccountingService.selectObservation(oid).map(_.asJson.success)
-        }
-      }
+  // Batched to avoid an N+1: resolve every observation's time charge in a single transaction with
+  // one grouped query, rather than one transaction and one query per observation.
+  private lazy val timeChargeHandler: EffectHandler[F] =
+    new EffectHandler[F]:
+      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
+        queries.traverse:
+          case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
 
-    effectHandler(_ => ().success, calculate)
-  }
+      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (
+          for
+            oids  <- ResultT.fromResult(queryContext(queries))
+            times <- ResultT.liftF(services.useTransactionally {
+                       Services.asSuperUser:
+                         timeAccountingService.selectObservations(oids)
+                     })
+            res   <- ResultT.fromResult:
+                       oids.zip(queries).traverse:
+                         case (oid, (query, parentCursor)) =>
+                           Query.childContext(parentCursor.context, query).map: childContext =>
+                             val json = times.getOrElse(oid, CategorizedTime.Zero).asJson
+                             CirceCursor(childContext, json, Some(parentCursor), parentCursor.fullEnv)
+          yield res
+        ).value
 
 }
