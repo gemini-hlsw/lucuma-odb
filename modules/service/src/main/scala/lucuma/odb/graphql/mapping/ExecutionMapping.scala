@@ -114,7 +114,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   }
 
   private lazy val executionStateHandler: EffectHandler[F] =
-    batchedEffectHandler("effect:execution.executionState"): oids =>
+    batchedEffectHandler: oids =>
       services.useTransactionally:
         generatorParamsService
           .selectExecutionStates(oids)
@@ -122,13 +122,12 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
             oids.map(oid => oid -> Result(states.getOrElse(oid, ExecutionState.NotDefined))).toMap
 
   private lazy val digestHandler: EffectHandler[F] =
-    batchedEffectHandler[Json]("effect:execution.digest"): oids =>
+    batchedEffectHandler: oids =>
       services.useTransactionally(obscalcService.selectManyExecutionDigest(oids)).map: digests =>
         oids.map: oid =>
-          val json: Result[Json] =
-            digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>
-              cv
-                .map: res =>
+          val json =
+            digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)):
+              _.map: res =>
                   res.map(_.asJson) match
                     case Result.Failure(ps) => Result.Warning(ps, Json.Null)
                     case r                  => r
@@ -136,11 +135,8 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
           oid -> json
         .toMap
 
-  // Batched to avoid an N+1: resolve every observation's time charge in a single transaction with
-  // one grouped query, rather than one transaction and one query per observation. Observations with
-  // no visits default to `CategorizedTime.Zero`.
   private lazy val timeChargeHandler: EffectHandler[F] =
-    batchedEffectHandler("effect:execution.timeCharge"): oids =>
+    batchedEffectHandler: oids =>
       services.useTransactionally:
         Services.asSuperUser:
           timeAccountingService.selectObservations(oids).map: times =>

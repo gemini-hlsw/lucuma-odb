@@ -270,7 +270,7 @@ object TimeAccountingService {
         observationIds: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, CategorizedTime]] =
         NonEmptyList.fromList(observationIds.distinct) match
-          case None      => Applicative[F].pure(Map.empty)
+          case None      => Map.empty.pure
           case Some(nel) =>
             session.execute(Statements.selectObservations(nel))(nel).map(_.toMap)
 

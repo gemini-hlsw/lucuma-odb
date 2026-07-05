@@ -27,13 +27,10 @@ import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import org.http4s.client.Client
-import org.typelevel.otel4s.Attribute
-import org.typelevel.otel4s.trace.Tracer
 
 trait ConfigurationMapping[F[_]]
   extends ObservationView[F] with ConfigurationRequestView[F] {
 
-  protected def T: Tracer[F]
   def services: Resource[F, Services[F]]
   def itcClient: ItcClient[F]
   def httpClient: Client[F]
@@ -87,9 +84,8 @@ trait ConfigurationMapping[F[_]]
 
       // Compute the configuration coordinates/region for every observation, batching the tracking
       // lookups by reference time (the CFP midpoint, which most observations share) rather than
-      // issuing one query per observation. Returns a map keyed by observation id. N.B. we use
-      // `services.use` (not `useTransactionally`) because `getCoordinatesSnapshotOrRegion` manages
-      // its own transaction internally; wrapping it would nest transactions.
+      // one query per observation. 
+      // Returns a map keyed by observation id. 
       private def calculateAll(
         ctx: List[(Observation.Id, Option[Timestamp])]
       ): F[Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]]] =
@@ -110,17 +106,14 @@ trait ConfigurationMapping[F[_]]
                       else res.map:
                         case Left(a)             => Left(a.base).some // non-opportunity
                         case Right((_, Some(c))) => Left(c).some      // opportunity with explicit base
-                        case Right((r, None))    => Right(r).some      // opportunity without explicit base
+                        case Right((r, None))    => Right(r).some     // opportunity without explicit base
                     )
         }
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        T.span("effect:configuration.target", Attribute("count", queries.size.toLong)).surround {
          (for {
           ctx     <- ResultT(queryContext(queries).pure[F])
-          results <- ResultT.liftF:
-                       T.span("effect:configuration.target.calculateAll")
-                         .surround(calculateAll(ctx))
+          results <- ResultT.liftF(calculateAll(ctx))
           res     <- ResultT.fromResult:
                        ctx.map(_._1).zip(queries).traverse { case (oid, (query, parentCursor)) =>
                          for {
@@ -138,7 +131,6 @@ trait ConfigurationMapping[F[_]]
                        }
           } yield res
          ).value
-        }
 
     }
 
