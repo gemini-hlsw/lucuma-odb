@@ -17,6 +17,7 @@ import lucuma.odb.phase0.Flamingos2SpectroscopyRow
 import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
+import lucuma.odb.phase0.GnirsImagingRow
 import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
@@ -328,6 +329,30 @@ object Phase0Table {
         "c_filter",
       )
   }
+
+  val ImagingGnirs = new Phase0Table[GnirsImagingRow]:
+
+    override def name: String =
+      s"${Imaging.name}_gnirs"
+
+    override def encoder: Encoder[GnirsImagingRow] =
+      (
+        instrument   *:
+        gnirs_filter *:
+        gnirs_camera
+      ).contramap[GnirsImagingRow]: row =>
+        (
+          row.img.instrument,
+          row.filter,
+          row.camera
+        )
+
+    override def columns: List[String] =
+      List(
+        "c_instrument",
+        "c_filter",
+        "c_camera"
+      )
 
   val ImagingFlamingos2 = new Phase0Table[Flamingos2ImagingRow] {
 
