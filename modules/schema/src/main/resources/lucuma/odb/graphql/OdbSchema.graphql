@@ -12899,6 +12899,11 @@ type ImagingConfigOption {
   """
   flamingos2: ImagingConfigOptionFlamingos2
 
+  """
+  For GNIRS options, the GNIRS configuration.  Null for other instruments.
+  """
+  gnirs: ImagingConfigOptionGnirs
+
 }
 
 type ImagingConfigOptionGmosNorth {
@@ -12911,6 +12916,11 @@ type ImagingConfigOptionGmosSouth {
 
 type ImagingConfigOptionFlamingos2 {
   filter: Flamingos2Filter!
+}
+
+type ImagingConfigOptionGnirs {
+  filter: GnirsFilter!
+  camera: GnirsCamera!
 }
 
 """

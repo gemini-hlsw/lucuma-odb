@@ -18,6 +18,7 @@ import lucuma.odb.phase0.Flamingos2SpectroscopyRow
 import lucuma.odb.phase0.GhostIfuRow
 import lucuma.odb.phase0.GmosImagingRow
 import lucuma.odb.phase0.GmosSpectroscopyRow
+import lucuma.odb.phase0.GnirsImagingRow
 import lucuma.odb.phase0.GnirsSpectroscopyRow
 import lucuma.odb.phase0.ImagingRow
 import lucuma.odb.phase0.SpectroscopyRow
@@ -114,6 +115,7 @@ object Phase0Loader {
       new Phase0Loader[GmosImagingRow.GmosNorth, ImagingRow](Instrument.GmosNorth, rdr.gmosNorthImaging, _.img, Phase0Table.ImagingGmosNorth.some),
       new Phase0Loader[GmosImagingRow.GmosSouth, ImagingRow](Instrument.GmosSouth, rdr.gmosSouthImaging, _.img, Phase0Table.ImagingGmosSouth.some),
       new Phase0Loader[Flamingos2ImagingRow, ImagingRow](Instrument.Flamingos2, rdr.flamingos2Imaging, _.img, Phase0Table.ImagingFlamingos2.some),
+      new Phase0Loader[GnirsImagingRow, ImagingRow](Instrument.Gnirs, rdr.gnirsImaging, _.img, Phase0Table.ImagingGnirs.some),
       new Phase0Loader[ImagingRow, ImagingRow](Instrument.Alopeke, rdr.alopekeImaging, identity, none),
       new Phase0Loader[ImagingRow, ImagingRow](Instrument.Zorro, rdr.zorroImaging, identity, none),
     ).traverse_(_.load(bc, ConfigModeVariant.Imaging, is))
