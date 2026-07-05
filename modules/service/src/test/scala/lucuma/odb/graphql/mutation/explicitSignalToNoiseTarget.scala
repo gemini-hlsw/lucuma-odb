@@ -357,3 +357,107 @@ class explicitSignalToNoiseTarget extends OdbSuite:
       _    <- assertSnTarget(oid1, none)
       _    <- assertSnTarget(oid2, none)
     yield ()
+
+  // cloneObservation with an inline SET, returning the clone's signal-to-noise
+  // target selection.
+  private def cloneQuery(oid: Observation.Id, setBody: String): String =
+    s"""
+      mutation {
+        cloneObservation(input: {
+          observationId: "${oid.show}"
+          SET: { $setBody }
+        }) {
+          newObservation {
+            targetEnvironment { explicitSignalToNoiseTarget { id } }
+          }
+        }
+      }
+    """
+
+  test("cloning copies the explicit signal-to-noise target"):
+    for
+      pid  <- createProgramAs(pi)
+      t0   <- createTargetAs(pi, pid, "Larry")
+      t1   <- createTargetAs(pi, pid, "Curly")
+      oid  <- createObservationAs(pi, pid, t0, t1)
+      _    <- setSnTarget(oid, t1.some)
+      oid2 <- cloneObservationAs(pi, oid)
+      _    <- assertSnTarget(oid2, t1.some)
+      _    <- assertSnTarget(oid, t1.some) // original unchanged
+    yield ()
+
+  test("cloning with no selection copies nothing"):
+    for
+      pid  <- createProgramAs(pi)
+      t0   <- createTargetAs(pi, pid, "Larry")
+      t1   <- createTargetAs(pi, pid, "Curly")
+      oid  <- createObservationAs(pi, pid, t0, t1)
+      oid2 <- cloneObservationAs(pi, oid)
+      _    <- assertSnTarget(oid2, none)
+    yield ()
+
+  test("cloning with a new asterism that drops the selected target clears it"):
+    for
+      pid <- createProgramAs(pi)
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
+      t2  <- createTargetAs(pi, pid, "Moe")
+      oid <- createObservationAs(pi, pid, t0, t1)
+      _   <- setSnTarget(oid, t1.some)
+      _   <- expect(
+               user = pi,
+               query = cloneQuery(oid, s"""targetEnvironment: { asterism: [ "${t0.show}", "${t2.show}" ] }"""),
+               expected = Right(json"""
+                 {
+                   "cloneObservation": {
+                     "newObservation": {
+                       "targetEnvironment": { "explicitSignalToNoiseTarget": null }
+                     }
+                   }
+                 }
+               """)
+             )
+      _   <- assertSnTarget(oid, t1.some) // original unchanged
+    yield ()
+
+  test("cloning applies an explicit signal-to-noise target from the clone input"):
+    for
+      pid <- createProgramAs(pi)
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
+      oid <- createObservationAs(pi, pid, t0, t1)
+      // Original has no selection; the clone input selects t0.
+      _   <- expect(
+               user = pi,
+               query = cloneQuery(oid, s"""targetEnvironment: { explicitSignalToNoiseTargetId: "${t0.show}" }"""),
+               expected = Right(json"""
+                 {
+                   "cloneObservation": {
+                     "newObservation": {
+                       "targetEnvironment": { "explicitSignalToNoiseTarget": { "id": ${t0.asJson} } }
+                     }
+                   }
+                 }
+               """)
+             )
+      _   <- assertSnTarget(oid, none) // original unchanged
+    yield ()
+
+  test("cloning with a signal-to-noise target not in the asterism fails cleanly and creates no clone"):
+    for
+      pid   <- createProgramAs(pi)
+      t0    <- createTargetAs(pi, pid, "Larry")
+      t1    <- createTargetAs(pi, pid, "Curly")
+      alien <- createTargetAs(pi, pid, "Moe")
+      oid   <- createObservationAs(pi, pid, t0, t1)
+      _     <- expectOdbError(
+                 user  = pi,
+                 query = cloneQuery(oid, s"""targetEnvironment: { explicitSignalToNoiseTargetId: "${alien.show}" }"""),
+                 expected = {
+                   case OdbError.InvalidArgument(Some(m)) if m.contains("not in the asterism") => ()
+                 }
+               )
+      // The failed clone must not leave an orphan observation behind.
+      obs   <- observationsWhere(pi, s"""program: { id: { EQ: "${pid.show}" } }""")
+      _     <- IO(assertEquals(obs, List(oid)))
+    yield ()

@@ -673,13 +673,25 @@ object ObservationService {
       def cloneObservation(
         input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
       )(using Transaction[F]): F[Result[ObservationService.CloneIds]] =
-        input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
-          cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
-            res.flatTraverse: (pid, newOid) =>
-              Services.asSuperUser:
-                asterismService
-                  .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
-                  .map(_.as(CloneIds(origOid, newOid)))
+        // The asterism (including any signal-to-noise target flag) is copied by
+        // cloneAsterism inside cloneObservationUnconditionally. Any asterism edits
+        // from the input are applied first, then the explicit signal-to-noise
+        // target, so membership is validated against the post-edit asterism.
+        val cloned: F[Result[CloneIds]] =
+          input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
+            cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
+              res.flatTraverse: (pid, newOid) =>
+                Services.asSuperUser:
+                  (for
+                    _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
+                    _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
+                  yield CloneIds(origOid, newOid)).value
+
+        // A single rollback covering the whole clone: this runs in one transaction
+        // and `transaction.rollback` is a full rollback, so any failure (a cloned
+        // sub-item or a partial edit) undoes everything and never leaves an orphan
+        // observation behind.
+        cloned.flatTap(r => transaction.rollback.unlessA(r.hasValue))
 
       override def selectBands(
         pid: Program.Id
