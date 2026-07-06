@@ -226,6 +226,7 @@ object FMain extends AnsiColor {
         jwtWriter = config.ssoJwtWriter,
         publicUri = config.publicUri,
         cookies   = CookieService[F](config.cookieDomain, config.scheme === Scheme.https),
+        cookieDomain = config.cookieDomain,
       ) <+>
       GraphQLRoutes(localClient, pool, channels, SkunkMonitor.noopMonitor[F], wsb, schema)
     }

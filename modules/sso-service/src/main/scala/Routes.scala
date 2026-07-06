@@ -5,6 +5,7 @@ package lucuma.sso.service
 
 import cats.effect.*
 import cats.implicits.*
+import lucuma.common.middleware.CorsMiddleware
 import lucuma.core.model.StandardRole
 import lucuma.core.util.Gid
 import lucuma.sso.client.*
@@ -35,6 +36,7 @@ object Routes {
     jwtWriter: SsoJwtWriter[F],
     cookies:   CookieService[F],
     publicUri: Uri,
+    cookieDomain: String,
   ): HttpRoutes[F] = {
     object FDsl extends Http4sDsl[F]
     import FDsl._
@@ -43,6 +45,14 @@ object Routes {
     // a URL that makes sense to the user's browser!
     val Stage2Uri: Uri =
       publicUri.copy(path = Path.unsafeFromString("/auth/v1/stage2"))
+
+    // Post-auth redirects come from the caller-supplied `state` value. Only allow relative URIs
+    // (same origin) or absolute URIs whose host is the cookie domain or a subdomain of it,
+    // otherwise the auth flow is an open redirect / phishing vector.
+    def validRedirect(uri: Uri): Boolean =
+      uri.host match
+        case None    => true // relative, same-origin
+        case Some(h) => CorsMiddleware.isAllowed(h, List(cookieDomain))
 
     // Some parameter matchers. The parameter names are NOT arbitrary! They are requied by ORCID.
     object OrcidCode   extends QueryParamDecoderMatcher[String]("code")
@@ -140,13 +150,19 @@ object Routes {
 
       // Authentication Stage 1: Send the user to ORCID.
       case GET -> Root / "auth" / "v1" / "stage1" :? RedirectUri(redirectUrl) =>
-        for {
-          uri <- orcid.authenticationUri(Stage2Uri, Some(redirectUrl.toString))
-          res <- Found(Location(uri))
-        } yield res
+        if (!validRedirect(redirectUrl))
+          BadRequest("Invalid redirect URI.")
+        else
+          for {
+            uri <- orcid.authenticationUri(Stage2Uri, Some(redirectUrl.toString))
+            res <- Found(Location(uri))
+          } yield res
 
       // Authentication Stage 2: The user has returned from ORCID.
       // Insert/update a standard user, set a refresh token, and redirect to wherever the user asked to go in Stage 1.
+      case r@(GET -> Root / "auth" / "v1" / "stage2" :? OrcidCode(code) +& RedirectUri(redir)) if !validRedirect(redir) =>
+        BadRequest("Invalid redirect URI.")
+
       case r@(GET -> Root / "auth" / "v1" / "stage2" :? OrcidCode(code) +& RedirectUri(redir)) =>
         dbPool.use { db =>
           for {
@@ -177,5 +193,3 @@ object Routes {
   }
 
 }
-
-
