@@ -203,7 +203,7 @@ object FMain extends AnsiColor {
   def orcidServiceResource[F[_]: Async: Trace: Network](config: OrcidConfig) =
     EmberClientBuilder.default[F].build.map(org.http4s.client.middleware.Logger[F](
       logHeaders = true,
-      logBody    = true,
+      logBody    = false, // bodies carry the ORCID client_secret and user access tokens
     )).map { client =>
       OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
     }
