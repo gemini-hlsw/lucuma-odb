@@ -46,11 +46,11 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 
+import java.nio.file.Files
+import java.nio.file.Path as NIOPath
 import scala.concurrent.duration.*
 import scala.io.AnsiColor
 import scala.io.Source
-import java.nio.file.Files
-import java.nio.file.{Path => NIOPath}
 
 object OdbMapping {
 
