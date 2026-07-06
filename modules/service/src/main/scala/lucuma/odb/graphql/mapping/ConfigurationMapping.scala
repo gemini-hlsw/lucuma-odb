@@ -84,16 +84,20 @@ trait ConfigurationMapping[F[_]]
 
       // Compute the configuration coordinates/region for every observation, batching the tracking
       // lookups by reference time (the CFP midpoint, which most observations share) rather than
-      // one query per observation. 
-      // Returns a map keyed by observation id. 
+      // one query per observation.
+      // Returns a map keyed by observation id.
       private def calculateAll(
         ctx: List[(Observation.Id, Option[Timestamp])]
       ): F[Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]]] =
         val byTime: Map[Timestamp, List[Observation.Id]] =
-          ctx.collect { case (oid, Some(t)) => t -> oid }.groupMap(_._1)(_._2)
+          ctx.collect:
+            case (oid, Some(t)) => t -> oid
+          .groupMap(_._1)(_._2)
         val noTime: Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]] =
-          ctx.collect { case (oid, None) => oid -> Result(None) }.toMap
-        services.use { implicit s =>
+          ctx.collect:
+            case (oid, None) => oid -> Result(none)
+          .toMap
+        services.use { s =>
           Services.asSuperUser:
             byTime.toList.foldLeftM(noTime): (acc, entry) =>
               val (at, oids) = entry
@@ -102,11 +106,11 @@ trait ConfigurationMapping[F[_]]
                 .map: results =>
                   acc ++ results.map: (oid, res) =>
                     oid -> (
-                      if res.isFailure then Result(None) // important, don't fail here
+                      if res.isFailure then Result(none) // important, don't fail here
                       else res.map:
-                        case Left(a)             => Left(a.base).some // non-opportunity
-                        case Right((_, Some(c))) => Left(c).some      // opportunity with explicit base
-                        case Right((r, None))    => Right(r).some     // opportunity without explicit base
+                        case Left(a)             => a.base.asLeft.some // non-opportunity
+                        case Right((_, Some(c))) => c.asLeft.some      // opportunity with explicit base
+                        case Right((r, None))    => r.asRight.some     // opportunity without explicit base
                     )
         }
 
