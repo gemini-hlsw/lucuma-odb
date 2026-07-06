@@ -27,16 +27,20 @@ object ConfigurationRequestPropertiesInput {
       ObjectFieldsBinding.rmap:
         case List(
           StatusBinding.Option("status", rStatus),
-          NonEmptyStringBinding.Option("justification", rJust)
+          NonEmptyStringBinding.Option("justification", rJust),
+          NonEmptyStringBinding.Option("feedback", rFeedback)
         ) =>
-          (rStatus, rJust).tupled.flatMap:
-            case (None, just) => Result(Create(just))
-            case (Some(_), _) =>
+          (rStatus, rJust, rFeedback).tupled.flatMap:
+            case (None, just, None) => Result(Create(just))
+            case (Some(_), _, _)    =>
               OdbError.InvalidArgument(Some("Status may not be specified on creation")).asFailure
+            case (_, _, Some(_))    =>
+              OdbError.InvalidArgument(Some("Feedback may not be specified on creation")).asFailure
 
   case class Update(
     status: Option[ConfigurationRequestStatus],
-    justification: Nullable[NonEmptyString]
+    justification: Nullable[NonEmptyString],
+    feedback: Nullable[NonEmptyString]
   )
 
   object Update:
@@ -44,8 +48,9 @@ object ConfigurationRequestPropertiesInput {
       ObjectFieldsBinding.rmap:
         case List(
           StatusBinding.Option("status", rStatus),
-          NonEmptyStringBinding.Nullable("justification", rJust)
+          NonEmptyStringBinding.Nullable("justification", rJust),
+          NonEmptyStringBinding.Nullable("feedback", rFeedback)
         ) =>
-          (rStatus, rJust).parMapN(Update.apply)
+          (rStatus, rJust, rFeedback).parMapN(Update.apply)
 
 }

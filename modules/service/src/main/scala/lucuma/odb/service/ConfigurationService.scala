@@ -105,12 +105,16 @@ object ConfigurationService {
 
       override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
         val doUpdate = impl.updateRequests(SET, where).value
-        SET.status match
-          case None                                       |
-               Some(ConfigurationRequestStatus.Requested) |
-               Some(ConfigurationRequestStatus.Withdrawn) => requirePiAccess(doUpdate)
-          case Some(ConfigurationRequestStatus.Approved)  |
-               Some(ConfigurationRequestStatus.Denied)    => requireStaffAccess(doUpdate)
+        val statusRequiresStaff =
+          SET.status match
+            case None                                       |
+                 Some(ConfigurationRequestStatus.Requested) |
+                 Some(ConfigurationRequestStatus.Withdrawn) => false
+            case Some(ConfigurationRequestStatus.Approved)  |
+                 Some(ConfigurationRequestStatus.Denied)    => true
+        // Feedback may only be modified by staff, regardless of status.
+        if statusRequiresStaff || !SET.feedback.isAbsent then requireStaffAccess(doUpdate)
+        else requirePiAccess(doUpdate)
 
       override def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]] =
         impl.selectRequests(pairs).value
@@ -1386,9 +1390,10 @@ object ConfigurationService {
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =
       val statusExpr: AppliedFragment = SET.status.fold(void"c_status")(sql"$configuration_request_status".apply)
       val justExpr = SET.justification.fold(void"null", void"c_justification", sql"$text_nonempty".apply)
+      val feedbackExpr = SET.feedback.fold(void"null", void"c_feedback", sql"$text_nonempty".apply)
       void"""
         update t_configuration_request
-        set c_status = """ |+| statusExpr |+| void", c_justification = " |+| justExpr |+|
+        set c_status = """ |+| statusExpr |+| void", c_justification = " |+| justExpr |+| void", c_feedback = " |+| feedbackExpr |+|
       void" where c_configuration_request_id in (" |+| which |+| void""")
         returning c_configuration_request_id
       """

@@ -199,6 +199,36 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
       yield assert(req1 === req2)    
   }
 
+  test("can't specify feedback on creation") {
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGmosNorthLongSlitObservationAs(pi, pid, List(tid)).flatMap { oid =>
+            expectOdbError(
+              user = admin,
+              query = s"""
+                mutation {
+                  createConfigurationRequest(input: {
+                    observationId: "$oid"
+                    SET: {
+                      feedback: "Pre-emptive feedback."
+                    }
+                  }) {
+                    id
+                  }
+                }
+              """,
+              expected = {
+                case OdbError.InvalidArgument(Some(msg)) if msg.contains("Feedback may not be specified on creation") => // expected
+              }
+            )
+          }
+        }
+      }
+    }
+  }
+
   test("identical requests are canonicalized, even if justifications differ") {
     for
         cfpid <- createGeminiCallForProposalsAs(admin)
