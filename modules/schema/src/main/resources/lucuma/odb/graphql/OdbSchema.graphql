@@ -3812,6 +3812,11 @@ Configuration request properties.
 input ConfigurationRequestProperties {
   status: ConfigurationRequestStatus
   justification: NonEmptyString
+
+  """
+  Staff feedback on the request.  May only be set by staff.
+  """
+  feedback: NonEmptyString
 }
 
 """
@@ -13603,6 +13608,22 @@ type ConfigurationRequest {
   program: Program!
   status: ConfigurationRequestStatus!
   justification: NonEmptyString
+
+  """
+  Staff feedback on the request.
+  """
+  feedback: NonEmptyString
+
+  """
+  Time at which the request was created.
+  """
+  createdAt: Timestamp!
+
+  """
+  Time at which the request was last updated.
+  """
+  updatedAt: Timestamp!
+
   configuration: Configuration!
   applicableObservations: [ObservationId!]!
 }
@@ -18487,6 +18508,26 @@ input WhereConfigurationRequest {
   Matches the configuration request status.
   """
   status: WhereOrderConfigurationRequestStatus
+
+  """
+  Matches the justification.
+  """
+  justification: WhereOptionString
+
+  """
+  Matches the staff feedback.
+  """
+  feedback: WhereOptionString
+
+  """
+  Matches the creation time.
+  """
+  createdAt: WhereOrderTimestamp
+
+  """
+  Matches the last update time.
+  """
+  updatedAt: WhereOrderTimestamp
 }
 
 input WhereObservationReference {
