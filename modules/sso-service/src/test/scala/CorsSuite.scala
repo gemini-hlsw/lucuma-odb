@@ -21,6 +21,7 @@ object CorsSuite extends SsoSuite {
         jwtWriter = null,
         publicUri = uri"http://unused",
         cookies   = null,
+        cookieDomain = domain,
       )
     )
 
@@ -75,4 +76,3 @@ object CorsSuite extends SsoSuite {
   }
 
 }
-

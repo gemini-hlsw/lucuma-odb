@@ -9,6 +9,7 @@ import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
 import lucuma.common.middleware.CorsMiddleware
+import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.User
 import lucuma.odb.otel.given
 import lucuma.odb.service.Services
@@ -41,12 +42,9 @@ object ServerMiddleware {
 
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
 
-  /** A middleware that logs request and response. Headers are redacted in staging/production. */
+  /** A middleware that logs request and response. Sensitive headers are always redacted. */
   def logging[F[_]: Async]: Middleware[F] =
-    org.http4s.server.middleware.Logger.httpRoutes[F](
-      logHeaders        = true,
-      logBody           = false,
-    )
+    LoggingMiddleware.logging[F]()
 
   /** A middleware that reports errors during requets processing. */
   def errorReporting[F[_]: MonadThrow: Logger]: Middleware[F] = routes =>

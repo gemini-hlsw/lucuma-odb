@@ -18,6 +18,7 @@ import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
 import grackle.skunk.SkunkMonitor
+import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.util.Gid
@@ -200,13 +201,11 @@ object FMain extends AnsiColor {
     }
 
   /** A resource that yields an OrcidService. */
-  def orcidServiceResource[F[_]: Async: Trace: Network](config: OrcidConfig) =
-    EmberClientBuilder.default[F].build.map(org.http4s.client.middleware.Logger[F](
-      logHeaders = true,
-      logBody    = true,
-    )).map { client =>
-      OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
-    }
+  def orcidServiceResource[F[_]: Async: Trace: Network](config: OrcidConfig, env: Environment) =
+    EmberClientBuilder.default[F].build
+      .map(LoggingMiddleware.client[F](revealSensitiveHeaders = env == Environment.Local))
+      .map: client =>
+        OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Tracer: Meter: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
@@ -214,7 +213,7 @@ object FMain extends AnsiColor {
       pool     <- databasePoolResource[F](config.database)
       schema <- SsoMapping.loadSchema[F].toResource
       channels <- SsoMapping.Channels(pool)
-      orcid    <- orcidServiceResource(config.orcid)
+      orcid    <- orcidServiceResource(config.orcid, config.environment)
     } yield wsb => ServerMiddleware[F](config).apply {
       val dbPool = pool.map(Database.fromSession(_))
       val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect:
@@ -226,6 +225,7 @@ object FMain extends AnsiColor {
         jwtWriter = config.ssoJwtWriter,
         publicUri = config.publicUri,
         cookies   = CookieService[F](config.cookieDomain, config.scheme === Scheme.https),
+        cookieDomain = config.cookieDomain,
       ) <+>
       GraphQLRoutes(localClient, pool, channels, SkunkMonitor.noopMonitor[F], wsb, schema)
     }
