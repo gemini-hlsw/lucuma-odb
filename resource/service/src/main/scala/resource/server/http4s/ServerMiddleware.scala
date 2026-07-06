@@ -9,6 +9,7 @@ import cats.effect.*
 import cats.syntax.all.*
 import fs2.compression.Compression
 import lucuma.common.middleware.CorsMiddleware
+import lucuma.common.middleware.LoggingMiddleware
 import org.http4s.HttpRoutes
 import org.http4s.Query
 import org.http4s.Uri
@@ -22,7 +23,6 @@ import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerM
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
 import org.http4s.server.middleware.ErrorAction
 import org.http4s.server.middleware.GZip
-import org.http4s.server.middleware.Logger as Http4sLogger
 import org.http4s.server.middleware.Metrics
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -41,10 +41,7 @@ object ServerMiddleware {
   ): F[Middleware[F]] = {
     given Logger[F] = Slf4jLogger.getLogger[F]
 
-    val logging = Http4sLogger.httpRoutes[F](
-      logHeaders = true,
-      logBody = false
-    )
+    val logging = LoggingMiddleware.logging[F]()
 
     def httpMetrics(metricsOps: MetricsOps[F]): Middleware[F] =
       routes =>

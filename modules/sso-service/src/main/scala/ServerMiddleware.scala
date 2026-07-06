@@ -6,12 +6,12 @@ package lucuma.sso.service
 import cats.*
 import cats.effect.*
 import lucuma.common.middleware.CorsMiddleware
+import lucuma.common.middleware.LoggingMiddleware
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.Environment.*
 import natchez.Trace
 import natchez.http4s.NatchezMiddleware
-import org.http4s.Headers
 import org.http4s.HttpRoutes
 import org.http4s.server.middleware.ErrorAction
 import org.typelevel.log4cats.Logger
@@ -29,16 +29,10 @@ object ServerMiddleware {
   def logging[F[_]: Async](
     env:          Environment,
   ): Middleware[F] =
-    org.http4s.server.middleware.Logger.httpRoutes[F](
-      logHeaders        = true,
-      logBody           = false,
-      redactHeadersWhen = { h =>
-        env match {
-          case Local                         => false
-          case Review | Staging | Production => Headers.SensitiveHeaders.contains(h)
-        }
-      }
-    )
+    LoggingMiddleware.logging[F](revealSensitiveHeaders = env match {
+      case Local                         => true
+      case Review | Staging | Production => false
+    })
 
   /** A middleware that reports errors during requets processing. */
   def errorReporting[F[_]: MonadThrow: Logger]: Middleware[F] = routes =>
