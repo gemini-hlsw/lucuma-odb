@@ -29,10 +29,11 @@ object ServerMiddleware {
   def logging[F[_]: Async](
     env:          Environment,
   ): Middleware[F] =
-    LoggingMiddleware.logging[F](revealSensitiveHeaders = env match {
-      case Local                         => true
-      case Review | Staging | Production => false
-    })
+    LoggingMiddleware.logging[F](revealSensitiveHeaders = 
+      env match
+        case Local                         => true
+        case Review | Staging | Production => false
+    )
 
   /** A middleware that reports errors during requets processing. */
   def errorReporting[F[_]: MonadThrow: Logger]: Middleware[F] = routes =>

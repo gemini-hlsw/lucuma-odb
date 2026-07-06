@@ -14,11 +14,11 @@ object LoggingMiddleware:
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
 
   /**
-   * A middleware that logs requests and responses. Bodies are never logged, since they may carry
-   * secrets (tokens, client secrets). Sensitive headers (Authorization, Cookie, ...) are redacted
-   * unless `revealSensitiveHeaders` is true, which should only be enabled in local development.
+   * A middleware that logs requests and responses.
    *
-   * @param revealSensitiveHeaders when true, log sensitive headers in the clear (dev only)
+   * Bodies are never logged, since they may carry secrets (tokens, client secrets).
+   * Sensitive headers (Authorization, Cookie, ...) are redacted unless `revealSensitiveHeaders`
+   * is true, which should only be enabled in local development.
    */
   def logging[F[_]: Async](revealSensitiveHeaders: Boolean = false): Middleware[F] =
     Logger.httpRoutes[F](

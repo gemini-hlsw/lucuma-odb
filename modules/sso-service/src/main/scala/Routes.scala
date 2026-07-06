@@ -46,9 +46,10 @@ object Routes {
     val Stage2Uri: Uri =
       publicUri.copy(path = Path.unsafeFromString("/auth/v1/stage2"))
 
-    // Post-auth redirects come from the caller-supplied `state` value. Only allow relative URIs
-    // (same origin) or absolute URIs whose host is the cookie domain or a subdomain of it,
-    // otherwise the auth flow is an open redirect / phishing vector.
+    // Post-auth redirects come from the caller-supplied `state` value, thus it could be any domain.
+    // Only allow relative URIs (same origin) or absolute URIs whose host is the cookie domain
+    // or a subdomain of it
+    // Otherwise the auth flow is an open redirect / phishing vector.
     def validRedirect(uri: Uri): Boolean =
       uri.host match
         case None    => true // relative, same-origin
