@@ -92,6 +92,22 @@ Subscribers:
 - **GraphQL `obscalcUpdate` subscription** — delivered to clients via `ObscalcUpdateMapping`.
 - **Calibrations daemon** — same channel; filters on workflow-state changes to trigger calibration regeneration (see `calibration-generation-flow.md`).
 
+## Downstream Triggers on `t_obscalc`
+
+Beyond the NOTIFY channel, other subsystems hang **row-level triggers** off
+`t_obscalc` that fire when obscalc writes a result. These make `c_last_update`
+(and the cascade-delete of the row) a load-bearing part of an external contract,
+so changes to the write path must preserve them.
+
+| Trigger | Fires | Purpose |
+|---------|-------|---------|
+| `cascade_telluric_invalidation_trigger` | `AFTER UPDATE OF c_last_update`, when `c_workflow_state IN ('ready','defined')` and the obs is not a calibration | Re-queues telluric target resolution in `t_telluric_resolution` (`V1072`). |
+| `cascade_calibration_invalidation_trigger` | `AFTER UPDATE OF c_last_update`, when `c_obscalc_state = 'ready'` and the obs is not a calibration | Enqueues durable calibration recalculation in `t_calibration_calc` (see `calibrations/calibration-generation-flow.md`). |
+
+These triggers give the calibrations subsystem a **durable** work queue: even if
+its daemon is down, obscalc's result write leaves a `pending` row behind that is
+drained on restart. Two consequences follow from the coupling:
+
 ## Obscalc Daemon
 
 ### Main Loop

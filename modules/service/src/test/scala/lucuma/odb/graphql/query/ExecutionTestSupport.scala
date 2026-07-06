@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptyList
 import cats.effect.Clock
 import cats.effect.IO
 import cats.syntax.all.*
@@ -275,6 +276,26 @@ trait ExecutionTestSupport extends OdbSuite with ObservingModeSetupOperations wi
                   services
                     .calibrationsService
                     .recalculateCalibrations(pid, when, oid)
+        yield r
+
+  /**
+   * Recalculates calibrations for a set of changed science observations in a single call
+   */
+  def recalculateCalibrations(
+    pid:          Program.Id,
+    when:         Instant,
+    changedOids:  NonEmptyList[Observation.Id]
+  ): IO[(List[Observation.Id], List[Observation.Id])] =
+    import Tracer.Implicits.noop
+    runProgramObscalc(pid) *>
+      withServices(serviceUser): services =>
+        for
+          _ <- Services.asSuperUser(UserService.fromSession(services.session).canonicalizeUser(serviceUser))
+          r <- services.transactionally:
+                Services.asSuperUser:
+                  services
+                    .calibrationsService
+                    .recalculateCalibrations(pid, when, changedOids)
         yield r
 
   /**
