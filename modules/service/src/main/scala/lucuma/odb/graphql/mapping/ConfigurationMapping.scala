@@ -17,7 +17,6 @@ import lucuma.catalog.clients.GaiaClient
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Region
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.table.ConfigurationRequestView
@@ -65,7 +64,7 @@ trait ConfigurationMapping[F[_]]
       // associated CFP (if any). The reference time is used when computing coordintes for approved
       // configurations; it is not related to visualization time.
       SqlField("referenceTime", ObservationView.ReferenceTime, hidden = true),
-      EffectField("target", targetQueryHandler, List("id", "programId", "referenceTime")),
+      EffectField("target", targetQueryHandler, List("id", "referenceTime")),
       SqlObject("conditions"),
       SqlObject("observingMode"),
     )
@@ -76,56 +75,66 @@ trait ConfigurationMapping[F[_]]
     // the cursor, and we don't need the environment at all. Would be nice to abstract something out.
     new EffectHandler[F] {
 
-      def calculate(oid: Observation.Id, oRefTime: Option[Timestamp]): F[Result[Option[Either[Coordinates, Region]]]] =
-        oRefTime
-          .traverse: at =>
-            services.use { implicit s =>
-              Services.asSuperUser:
-                s.trackingService
-                  .getCoordinatesSnapshotOrRegion(oid, at, false)
-                  .map: res =>
-                    if res.isFailure then Result(None) // important, don't fail here
-                    else res
-                      .map:
-                        case Left(a)             => Left(a.base).some // non-opportunity
-                        case Right((_, Some(c))) => Left(c).some      // opportunity with explicit base
-                        case Right((r, None))    => Right(r).some     // opportunity without explicit base
-              }
-          .map(_.sequence.map(_.flatten))
-
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Program.Id, Observation.Id, Option[Timestamp])]] =
+      private def queryContext(queries: List[(Query, Cursor)]): Result[List[(Observation.Id, Option[Timestamp])]] =
         queries.parTraverse: (_, cursor) =>
           (
-            cursor.fieldAs[Program.Id]("programId"),
             cursor.fieldAs[Observation.Id]("id"),
             cursor.fieldAs[Option[Timestamp]]("referenceTime")
           ).parTupled
 
+      // Compute the configuration coordinates/region for every observation, batching the tracking
+      // lookups by reference time (the CFP midpoint, which most observations share) rather than
+      // one query per observation.
+      // Returns a map keyed by observation id.
+      private def calculateAll(
+        ctx: List[(Observation.Id, Option[Timestamp])]
+      ): F[Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]]] =
+        val byTime: Map[Timestamp, List[Observation.Id]] =
+          ctx.collect:
+            case (oid, Some(t)) => t -> oid
+          .groupMap(_._1)(_._2)
+        val noTime: Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]] =
+          ctx.collect:
+            case (oid, None) => oid -> Result(none)
+          .toMap
+        services.use { s =>
+          Services.asSuperUser:
+            byTime.toList.foldLeftM(noTime): (acc, entry) =>
+              val (at, oids) = entry
+              s.trackingService
+                .getCoordinatesSnapshotOrRegion(oids, at, false)
+                .map: results =>
+                  acc ++ results.map: (oid, res) =>
+                    oid -> (
+                      if res.isFailure then Result(none) // important, don't fail here
+                      else res.map:
+                        case Left(a)             => a.base.asLeft.some // non-opportunity
+                        case Right((_, Some(c))) => c.asLeft.some      // opportunity with explicit base
+                        case Right((r, None))    => r.asRight.some     // opportunity without explicit base
+                    )
+        }
+
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (for {
-          ctx <- ResultT(queryContext(queries).pure[F])
-          obs <- ctx.distinct.traverse { case (pid, oid, ldt) =>
-                   ResultT(calculate(oid, ldt)).map((oid, _))
-                 }
-          res <- ResultT(ctx
-                   .flatMap { case (pid, oid, ldt) => obs.find(r => r._1 === oid).map(_._2).toList }
-                   .zip(queries)
-                   .traverse { case (result, (query, parentCursor)) =>
-                     Query.childContext(parentCursor.context, query).map { childContext =>
-                       CirceCursor(
-                        childContext,
-                        Json.obj(
-                          "coordinates" -> result.flatMap(_.left.toOption).asJson,
-                          "region"      -> result.flatMap(_.toOption).asJson,
-                        ),
-                        Some(parentCursor),
-                        parentCursor.fullEnv
-                      )
-                     }
-                   }.pure[F]
-                 )
+         (for {
+          ctx     <- ResultT(queryContext(queries).pure[F])
+          results <- ResultT.liftF(calculateAll(ctx))
+          res     <- ResultT.fromResult:
+                       ctx.map(_._1).zip(queries).traverse { case (oid, (query, parentCursor)) =>
+                         for {
+                           result       <- results.getOrElse(oid, Result(None))
+                           childContext <- Query.childContext(parentCursor.context, query)
+                         } yield CirceCursor(
+                           childContext,
+                           Json.obj(
+                             "coordinates" -> result.flatMap(_.left.toOption).asJson,
+                             "region"      -> result.flatMap(_.toOption).asJson,
+                           ),
+                           Some(parentCursor),
+                           parentCursor.fullEnv
+                         )
+                       }
           } yield res
-        ).value
+         ).value
 
     }
 
