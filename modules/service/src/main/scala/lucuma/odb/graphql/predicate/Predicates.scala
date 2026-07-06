@@ -20,7 +20,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val atomEvent                     = ExecutionEventPredicates(Path.from(AtomEventType))
     val atomRecord                    = AtomRecordPredicates(Path.from(AtomRecordType))
     val attachment                    = AttachmentPredicates(Path.from(AttachmentType))
-    val callForProposals              = CallForProposalsPredicates(Path.from(GeminiCallForProposalsType))
+    val callForProposals              = CallForProposalsPredicates(Path.from(CallForProposalsType))
     val cloneGroupResult              = CloneGroupResultPredicates(Path.from(CloneGroupResultType))
     val cloneObservationResult        = CloneObservationResultPredicates(Path.from(CloneObservationResultType))
     val cloneTargetResult             = CloneTargetResultPredicates(Path.from(CloneTargetResultType))

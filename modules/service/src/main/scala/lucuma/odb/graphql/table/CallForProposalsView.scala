@@ -42,7 +42,6 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F]:
       val Proprietary        = col("c_gemini_proprietary",           int4_nonneg.embedded)
       val AllowsNonPartner   = col("c_gemini_allows_non_partner",    bool.embedded)
       val NonPartnerDeadline = col("c_gemini_non_partner_deadline",  core_timestamp.opt)
-      val ExchangePartners   = col("c_gemini_exchange_partners",     _exchange_partner.embedded)
 
     object keck:
       val Id                 = col("c_keck_cfp_id",          cfp_id.embedded)
@@ -56,6 +55,12 @@ trait CallForProposalsView[F[_]] extends BaseMapping[F]:
   object CallForProposalsPartnerView extends TableDef("v_gemini_cfp_partner"):
     val CfpId            = col("c_cfp_id",            cfp_id)
     val GeminiPartner    = col("c_partner",           partner)
+    val DeadlineOverride = col("c_deadline_override", core_timestamp.opt)
+    val Deadline         = col("c_deadline",          core_timestamp.opt)
+
+  object CallForProposalsExchangePartnerView extends TableDef("v_gemini_cfp_exchange_partner"):
+    val CfpId            = col("c_cfp_id",            cfp_id)
+    val ExchangePartner  = col("c_exchange_partner",  exchange_partner)
     val DeadlineOverride = col("c_deadline_override", core_timestamp.opt)
     val Deadline         = col("c_deadline",          core_timestamp.opt)
 
