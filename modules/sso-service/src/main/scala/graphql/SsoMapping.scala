@@ -88,6 +88,17 @@ object SsoMapping {
                   db.canonicalizeRole(uid, roleRequest)
                     .map(Result.success)
 
+      def deleteRole(env: Env): F[Result[Boolean]] =
+        if user.role.access < Access.Admin then
+          Result.failure(s"User ${user.id} is not authorized to perform this action.").pure[F]
+        else
+          (
+            env.getR[StandardRole.Id]("roleId"), 
+          ) .flatTraverse:
+              case (roleId) =>
+                pool.map(Database.fromSession(_)).use: db =>
+                  db.deleteRole(roleId).as(Result.success(true))
+
       def deleteApiKey(env: Env): F[Result[Boolean]] =
         env
           .getR[PosLong]("id")
@@ -136,6 +147,7 @@ object SsoMapping {
                   RootEffect.computeEncodable("createApiKey")((_, e) => createApiKey(e)),
                   RootEffect.computeEncodable("deleteApiKey")((_, e) => deleteApiKey(e)),
                   RootEffect.computeEncodable("addRole")((_, e) => addRole(e)),
+                  RootEffect.computeEncodable("deleteRole")((_, e) => deleteRole(e)),
                 )
               ),
               ObjectMapping(
@@ -207,6 +219,10 @@ object SsoMapping {
           case (MutationType, "deleteApiKey", List(Binding("id", Value.StringValue(hexString)))) =>
             val rKeyId = Result.fromOption(lucuma.sso.client.ApiKey.Id.fromString.getOption(hexString), s"Not a valid API key id: $hexString")
             Elab.liftR(rKeyId).flatMap { keyId => Elab.env("id" -> keyId)}
+
+          case (MutationType, "deleteRole", List(Binding("roleId", Value.StringValue(roleString)))) =>
+            val rRoleId = Result.fromOption(StandardRole.Id.parse(roleString), s"Not a valid API key id: $roleString")
+            Elab.liftR(rRoleId).flatMap { roleId => Elab.env("roleId" -> roleId)}
 
           case (MutationType, "addRole", List(
             Binding("userId", Value.StringValue(id)), 

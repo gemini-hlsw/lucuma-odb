@@ -3,7 +3,7 @@
 
 package lucuma.sso.service
 package graphql
-package query
+package mutation
 
 import io.circe.literal.*
 import lucuma.sso.service.database.RoleRequest

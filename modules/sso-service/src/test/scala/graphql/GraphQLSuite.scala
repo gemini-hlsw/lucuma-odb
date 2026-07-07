@@ -102,7 +102,7 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
     def expectQuery(query: String, expected: Json): IO[Expectations] =
       expectQueryWithUser(_ => query, expected)
 
-    def expectQueryWithUser(query: StandardUser => String, expected: Json): IO[Expectations] =
+    def expectQueryWithUser(query: StandardUser => String, expected: => Json): IO[Expectations] =
       queryAs(person, query, withRole, withOrcidId).map: result =>
         if result != expected then
           println(s"Result: $result\n\nExpected: $expected")

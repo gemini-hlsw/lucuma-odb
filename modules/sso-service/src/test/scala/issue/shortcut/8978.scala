@@ -73,7 +73,7 @@ object Shortcut_8978 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
                 _     <- expect.same(u, None).failFast
               yield success
 
-  test("deleteRole; if it's the last role then logging in again creates a new PI role but not a new user"):
+  test("deleteRole; can't delete PI role"):
     randomOrcidId.flatMap: bobId =>
       createOrLoginAs(Bob, bobId).flatMap: (_, user) =>
         SsoSimulator[IO].map(_._1).use: db =>
@@ -81,8 +81,7 @@ object Shortcut_8978 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
               for
                 _     <- db.deleteRole(user.role.id) // the last role!
                 user2 <- createOrLoginAs(Bob, bobId).map(_._2)
-                _     <- expect.same(user.id, user2.id).failFast // same user id
-                _     <- expect(user.role.id =!= user2.role.id).failFast // a new PI role
+                _     <- expect.same(user, user2).failFast // same everything
               yield success
 
   test("deleteRole; if it's an unused role then existing tokens should continue to work"):

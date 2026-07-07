@@ -3,7 +3,7 @@
 
 package lucuma.sso.service
 package graphql
-package query
+package mutation
 
 import cats.syntax.show.*
 import io.circe.literal.*

@@ -214,7 +214,7 @@ object Database extends Codecs {
       def deleteRole(id: StandardRole.Id): F[Unit] =
         deleteAllSessionTokensForRole(id) >>
         Trace[F].span("deleteAllSessionTokensForRole") {
-          s.prepareR(sql"DELETE FROM lucuma_role WHERE role_id = $role_id".command)
+          s.prepareR(sql"DELETE FROM lucuma_role WHERE role_id = $role_id AND role_type <> 'pi'".command)
             .use(_.execute(id))
             .void
         }
