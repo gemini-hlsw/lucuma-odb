@@ -69,6 +69,7 @@ object CalibrationConfigMatcher:
       case g: GnirsSpectroscopyConfigs => g.modeType
       case _: Flamingos2Configs        => Flamingos2LongSlit
       case _: Flamingos2ImagingConfigs => Flamingos2Imaging
+      case _: GnirsImagingConfigs      => GnirsImaging
       case Igrins2Configs              => Igrins2LongSlit
       case VisitorConfigSubset(v)      => v.mode
     matchers(modeType, calibRole)

@@ -341,6 +341,35 @@ object GeneratorParamsService {
 
             GeneratorParams(itcInput, obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
+          case gnm @ gnirs.imaging.Config(filters = fs) =>
+            // An input per filter. In S/N mode the read mode is derived per step from
+            // the ITC exposure time, so the value passed here is ignored by the ITC.
+            val inputs = fs.map: f =>
+              val readMode = f.exposureTimeMode match
+                case ExposureTimeMode.SignalToNoiseMode(_, _)       => GnirsReadMode.Bright
+                case ExposureTimeMode.TimeAndCountMode(time = time) => gnm.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+              ImagingParameters(
+                obsParams.constraints.toInput,
+                InstrumentMode.GnirsImaging(
+                  exposureTimeMode = f.exposureTimeMode,
+                  filter           = f.filter,
+                  camera           = gnm.camera,
+                  readMode         = readMode,
+                  wellDepth        = gnm.wellDepth,
+                  coadds           = gnm.coadds
+                )
+              )
+
+            val itcInput =
+              obsParams
+                .targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(itcInput, obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
               ExposureTimeMode.timeAndCount.getOption(red.value.exposureTimeMode),

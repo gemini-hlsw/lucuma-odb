@@ -899,6 +899,9 @@ trait DatabaseOperations { this: OdbSuite =>
   def createFlamingos2ImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2Imaging, ImageQuality.Preset.PointEight, None, tids*)
 
+  def createGnirsImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsImaging, ImageQuality.Preset.PointEight, None, tids*)
+
   def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
 
@@ -1152,6 +1155,16 @@ trait DatabaseOperations { this: OdbSuite =>
               focalPlaneAngle: { microarcseconds: 0 }
             }
           }"""
+      case ObservingModeType.GnirsImaging =>
+        """{
+          gnirsImaging: {
+            camera: SHORT_BLUE
+            filters: [
+              { filter: J },
+              { filter: ORDER4 }
+            ]
+          }
+        }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
           spectroscopy: {
@@ -1300,6 +1313,16 @@ trait DatabaseOperations { this: OdbSuite =>
             filter: R_PRIME
             fpu: LONG_SLIT_0_50
             centralWavelength: { nanometers: 500 }
+          }
+        }"""
+      case ObservingModeType.GnirsImaging =>
+        """{
+          gnirsImaging: {
+            camera: SHORT_BLUE
+            filters: [
+              { filter: J },
+              { filter: ORDER4 }
+            ]
           }
         }"""
       case ObservingModeType.GnirsLongSlit =>
@@ -1489,6 +1512,16 @@ trait DatabaseOperations { this: OdbSuite =>
                 }
               }
             }
+          }
+        }"""
+      case ObservingModeType.GnirsImaging =>
+        """{
+          gnirsImaging: {
+            camera: SHORT_BLUE
+            filters: [
+              { filter: J },
+              { filter: ORDER4 }
+            ]
           }
         }"""
       case ObservingModeType.GnirsLongSlit =>

@@ -141,6 +141,9 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.GnirsLongslitMaxVisit.time
       )
 
+    lazy val gnirsImagingSetup: SetupTimeEstimateCalculator =
+      gnirsLongSlitSetup
+
 
     lazy val flamingos2Step: StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
       stepCalculatorfromEstimators(cce.flamingos2, de.flamingos2)

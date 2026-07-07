@@ -18,6 +18,7 @@ import lucuma.core.data.ZipperCodec
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -95,6 +96,9 @@ trait ItcCodec:
   given Decoder[Itc.GmosSouthImaging] =
     imagingScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(Itc.GmosSouthImaging.apply)
 
+  given Decoder[Itc.GnirsImaging] =
+    imagingScienceNemDecoder[GnirsFilter]("gnirsImagingScience").map(Itc.GnirsImaging.apply)
+
   given Decoder[Itc.Igrins2Spectroscopy] =
     Decoder.instance:
       _.downField("spectroscopyScience").as[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
@@ -146,6 +150,13 @@ trait ItcCodec:
         "gmosSouthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosSouthFilter])
       )
 
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GnirsImaging] =
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"             -> Itc.Type.GnirsImaging.asJson,
+        "gnirsImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GnirsFilter])
+      )
+
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Igrins2Spectroscopy] =
     Encoder.instance: a =>
       Json.obj(
@@ -170,6 +181,7 @@ trait ItcCodec:
          case Itc.Type.GhostIfu            => Decoder[Itc.GhostIfu].apply(c)
          case Itc.Type.GmosNorthImaging    => Decoder[Itc.GmosNorthImaging].apply(c)
          case Itc.Type.GmosSouthImaging    => Decoder[Itc.GmosSouthImaging].apply(c)
+         case Itc.Type.GnirsImaging        => Decoder[Itc.GnirsImaging].apply(c)
          case Itc.Type.Igrins2Spectroscopy => Decoder[Itc.Igrins2Spectroscopy].apply(c)
          case Itc.Type.Spectroscopy        => Decoder[Itc.Spectroscopy].apply(c)
 
@@ -179,6 +191,7 @@ trait ItcCodec:
       case a @ Itc.GhostIfu(_, _)         => Encoder[Itc.GhostIfu].apply(a)
       case a @ Itc.GmosNorthImaging(_)    => Encoder[Itc.GmosNorthImaging].apply(a)
       case a @ Itc.GmosSouthImaging(_)    => Encoder[Itc.GmosSouthImaging].apply(a)
+      case a @ Itc.GnirsImaging(_)        => Encoder[Itc.GnirsImaging].apply(a)
       case a @ Itc.Igrins2Spectroscopy(_) => Encoder[Itc.Igrins2Spectroscopy].apply(a)
       case a @ Itc.Spectroscopy(_, _)     => Encoder[Itc.Spectroscopy].apply(a)
 

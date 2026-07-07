@@ -32,6 +32,7 @@ import lucuma.core.enums.Band
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -385,6 +386,13 @@ object ItcService {
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosSouthImaging(nem)
 
+        case object GnirsImaging extends Imaging[GnirsFilter]:
+          override def pf: PartialFunction[InstrumentMode, GnirsFilter] =
+            case InstrumentMode.GnirsImaging(filter = f) => f
+
+          override def wrap(nem: NonEmptyMap[GnirsFilter, Zipper[Itc.Result]]): Itc =
+            Itc.GnirsImaging(nem)
+
       private def callRemoteImagingItc[A: Order](
         oid:   Observation.Id,
         input: ItcInput.Imaging,
@@ -473,6 +481,9 @@ object ItcService {
 
             case InstrumentMode.GmosSouthImaging(_, _, _, _) =>
               callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
+
+            case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
+              callRemoteImagingItc(oid, im, Imaging.GnirsImaging)
 
             case m                                     =>
               EitherT.leftT:
