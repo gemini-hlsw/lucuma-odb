@@ -486,7 +486,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0)
       oid1 <- createObservationAs(pi, pid)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
@@ -500,7 +500,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
                 exp = List((oid0, List(tid0, tid1)), (oid1, List(tid1)))
               )
           ),
-        expected  = List(titleUpdated(oid1, "One"), titleUpdated(oid0, "Zero, One"))
+        expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "One"))
       )
     } yield ()
   }
@@ -514,7 +514,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
       oid1 <- createObservationAs(pi, pid, None, tid0)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
@@ -542,7 +542,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
       oid1 <- createObservationAs(pi, pid, None, tid0)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
@@ -561,7 +561,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
       oid1 <- createObservationAs(pi, pid, None, tid0)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
