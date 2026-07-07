@@ -7,7 +7,6 @@ package query
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import io.circe.ACursor
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -201,8 +200,26 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
         _ <- runObscalcUpdate(p, o)
       yield (p, o)
 
-    // Nothing has been executed yet, so the (manual sequence) digest should
-    // agree exactly with the recorded original estimate.
+    // Nothing has been executed yet, so the (manual sequence) digest estimate
+    // should agree exactly with the recorded original estimate.  Both are
+    // ObservationTimeEstimate values, so they may be compared directly.
+    val estimateFields: String =
+      """
+        setup {
+          full { microseconds }
+          reacquisition { microseconds }
+        }
+        setupCount
+        science {
+          program { microseconds }
+          nonCharged { microseconds }
+        }
+        fullTimeEstimate {
+          program { microseconds }
+          nonCharged { microseconds }
+        }
+      """
+
     setup.flatMap: (_, oid) =>
       query(
         user  = pi,
@@ -212,37 +229,13 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
               execution {
                 digest {
                   value {
-                    setup {
-                      full { microseconds }
-                      reacquisition { microseconds }
-                    }
-                    setupCount
-                    science {
-                      timeEstimate {
-                        program { microseconds }
-                        nonCharged { microseconds }
-                      }
-                    }
-                    fullTimeEstimate {
-                      program { microseconds }
-                      nonCharged { microseconds }
+                    estimate {
+                      $estimateFields
                     }
                   }
                 }
                 originalEstimate {
-                  setup {
-                    full { microseconds }
-                    reacquisition { microseconds }
-                  }
-                  setupCount
-                  science {
-                    program { microseconds }
-                    nonCharged { microseconds }
-                  }
-                  fullTimeEstimate {
-                    program { microseconds }
-                    nonCharged { microseconds }
-                  }
+                  $estimateFields
                 }
               }
             }
@@ -250,16 +243,6 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
         """
       ).map: js =>
         val exec = js.hcursor.downFields("observation", "execution")
-        val dig  = exec.downFields("digest", "value")
-        val est  = exec.downField("originalEstimate")
-
-        def micro(c: ACursor, fields: String*): Long =
-          fields.foldLeft(c)(_.downField(_)).downField("microseconds").require[Long]
-
-        assertEquals(micro(est, "setup", "full"),          micro(dig, "setup", "full"))
-        assertEquals(micro(est, "setup", "reacquisition"), micro(dig, "setup", "reacquisition"))
-        assertEquals(est.downField("setupCount").require[Int], dig.downField("setupCount").require[Int])
-        assertEquals(micro(est, "science", "program"),     micro(dig, "science", "timeEstimate", "program"))
-        assertEquals(micro(est, "science", "nonCharged"),  micro(dig, "science", "timeEstimate", "nonCharged"))
-        assertEquals(micro(est, "fullTimeEstimate", "program"),    micro(dig, "fullTimeEstimate", "program"))
-        assertEquals(micro(est, "fullTimeEstimate", "nonCharged"), micro(dig, "fullTimeEstimate", "nonCharged"))
+        val dig  = exec.downFields("digest", "value", "estimate").require[Json]
+        val est  = exec.downField("originalEstimate").require[Json]
+        assertEquals(est.spaces2, dig.spaces2)

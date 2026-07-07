@@ -128,11 +128,17 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
-        "setup"            -> a.setup.asJson,
-        "setupCount"       -> a.setupCount.asJson,
+        "estimate"         -> Json.obj(
+          "setup"            -> a.setup.asJson,
+          "setupCount"       -> a.setupCount.asJson,
+          "science"          -> a.science.timeEstimate.asJson,
+          "fullTimeEstimate" -> a.fullTimeEstimate.asJson
+        ),
+        "setup"            -> a.setup.asJson,        // deprecated, use estimate.setup
+        "setupCount"       -> a.setupCount.asJson,   // deprecated, use estimate.setupCount
         "acquisition"      -> a.acquisition.asJson,
         "science"          -> a.science.asJson,
-        "fullTimeEstimate" -> a.fullTimeEstimate.asJson
+        "fullTimeEstimate" -> a.fullTimeEstimate.asJson  // deprecated, use estimate.fullTimeEstimate
       )
     }
 

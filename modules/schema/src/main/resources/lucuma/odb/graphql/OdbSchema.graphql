@@ -8375,11 +8375,14 @@ enum Existence {
 "Summarizes the execution setup time and sequences."
 type ExecutionDigest {
 
+  "Time estimate for executing the observation."
+  estimate: ObservationTimeEstimate!
+
   "Setup time calculations."
-  setup: SetupTime!
+  setup: SetupTime! @deprecated(reason: "Use `estimate.setup` instead.")
 
   "Estimated number of setups required to complete this observation."
-  setupCount: NonNegInt!
+  setupCount: NonNegInt! @deprecated(reason: "Use `estimate.setupCount` instead.")
 
   "Acquisition sequence summary."
   acquisition: SequenceDigest
@@ -8388,26 +8391,26 @@ type ExecutionDigest {
   science: SequenceDigest
 
   "Full time estimate: science time plus full setup time for every setup."
-  fullTimeEstimate: CategorizedTime!
+  fullTimeEstimate: CategorizedTime! @deprecated(reason: "Use `estimate.fullTimeEstimate` instead.")
 
 }
 
 """
-A snapshot of the observation's execution time estimate, as recorded when the
-first 'observe' visit was created for the observation.  Unlike the execution
-digest, which is continually updated (and whose time estimate reduces) as the
-observation is executed, this value is fixed at the start of execution so that
-the estimate may be compared with the actual time required after the fact.
+Time estimate for executing an observation: the setup time(s) and the science
+sequence time.  In the execution digest this estimate is continually updated
+(and reduces) as the observation is executed; in `originalEstimate` it is
+fixed at the start of execution so that the estimate may be compared with the
+actual time required after the fact.
 """
 type ObservationTimeEstimate {
 
-  "Setup time estimates as they stood at the start of execution."
+  "Setup time estimates."
   setup: SetupTime!
 
   "Expected number of setups."
   setupCount: NonNegInt!
 
-  "Science sequence time estimate at the start of execution."
+  "Science sequence time estimate."
   science: CategorizedTime!
 
   "Full time estimate: science time plus full setup time for every setup."
