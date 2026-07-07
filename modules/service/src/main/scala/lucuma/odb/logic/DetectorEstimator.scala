@@ -114,11 +114,10 @@ object DetectorEstimator {
 
     extension (gn: GnirsDynamicConfig) {
       def datasetEstimate: DatasetEstimate =
-        // Readout time per step = read mode's per-coadd readout × coadds.
-        val readout = gn.readMode.readoutTimePerCoadd *| gn.coadds.value
+        // c_exposure is per coadd, so both exposure and readout scale with the coadd count.
         DatasetEstimate(
-          gn.exposure,
-          readout,
+          gn.exposure *| gn.coadds.value,
+          gn.readMode.readoutTimePerCoadd *| gn.coadds.value,
           ctx.enums.TimeEstimate.GnirsWrite.time
         )
     }
