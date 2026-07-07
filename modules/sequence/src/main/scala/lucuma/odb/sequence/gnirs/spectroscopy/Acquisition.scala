@@ -59,18 +59,6 @@ object Acquisition:
   val RepeatingAtomCount: Int = 10
 
   /**
-   * The offset at which the sky is imaged through the IFU, both for the fixed
-   * "offset IFU image" step (Very Bright / Bright) and, by default, for the
-   * Faint-mode sky steps.
-   */
-  val IfuImageOffset: Offset =
-    Offset(Offset.P(-10.arcsec), Offset.Q(0.arcsec))
-
-  /** The default Faint-mode sky offset for IFU acquisitions. */
-  val IfuDefaultFaintSkyOffset: Offset =
-    IfuImageOffset
-
-  /**
    * The offset IFU image (Very Bright / Bright) is a fixed short single-coadd
    * exposure, always in H (Order4).
    */
@@ -82,8 +70,8 @@ object Acquisition:
   /** The default Faint-mode sky offset when the acquisition mode is auto-resolved. */
   private def defaultFaintSkyOffset(fpu: GnirsFpu.Spectroscopy): Offset =
     fpu match
-      case GnirsFpu.Spectroscopy.Slit(_) => GnirsAcquisitionMode.Faint.DefaultSkyOffset
-      case GnirsFpu.Spectroscopy.Ifu(_)  => IfuDefaultFaintSkyOffset
+      case GnirsFpu.Spectroscopy.Slit(_) => GnirsAcquisitionMode.Faint.DefaultSlitSkyOffset
+      case GnirsFpu.Spectroscopy.Ifu(_)  => GnirsAcquisitionMode.Faint.DefaultIfuSkyOffset
 
   /**
    * The filter and (fixed, single-coadd) exposure time for the FPU image — the first
@@ -323,7 +311,7 @@ object Acquisition:
                                       decker   = ifuDecker,
                                       fpu      = config.fpu
                                     )
-                             s <- scienceStep(TelescopeConfig(IfuImageOffset, Enabled), ObserveClass.Acquisition)
+                             s <- scienceStep(TelescopeConfig(GnirsAcquisitionMode.Faint.DefaultIfuSkyOffset, Enabled), ObserveClass.Acquisition)
                            yield s
           // Through-IFU steps: back to the IFU decker/FPU and the explicit acquisition
           // coadds (the ITC count is used only for the field).
