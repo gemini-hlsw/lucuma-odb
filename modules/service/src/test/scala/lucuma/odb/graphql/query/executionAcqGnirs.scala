@@ -94,9 +94,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
       tc(10, 0, StepGuideState.Disabled))
 
-  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int) =
+  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "ACQUISITION", none, "ACQUISITION".some, readMode,
-      tc(pArc, qArc, StepGuideState.Enabled))
+      tc(pArc, qArc, StepGuideState.Enabled), breakpoint)
 
   def throughSlitStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
@@ -130,7 +130,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                 "steps": [
                   ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
                   ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")},
                   ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
                 ]
               },
@@ -225,7 +225,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
-                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
+                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")}
                     ]
