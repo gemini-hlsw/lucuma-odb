@@ -20,7 +20,10 @@ class guideEnvironmentGnirs extends ExecutionTestSupportForGnirs
   override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
     createGnirsLongSlitObservationAs(user, pid, tids*)
 
-  private def gnirsPwfs2Result(title: String): Either[List[String], Json] =
+  private def gnirsPwfs2Result(
+    title:           String,
+    posAngleDegrees: BigDecimal = BigDecimal("270.000000")
+  ): Either[List[String], Json] =
     json"""
     {
       "observation": {
@@ -28,7 +31,7 @@ class guideEnvironmentGnirs extends ExecutionTestSupportForGnirs
         "targetEnvironment": {
           "guideEnvironment": {
             "posAngle": {
-              "degrees": 270.000000
+              "degrees": $posAngleDegrees
             },
             "guideTargets": [
               {
@@ -106,6 +109,34 @@ class guideEnvironmentGnirs extends ExecutionTestSupportForGnirs
 
     setup.flatMap: oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = gnirsPwfs2Result("V1647 Orionis"))
+
+  // GNIRS imaging guides with PWFS2, like the long slit. The PWFS patrol field and
+  // the 20" protected radius are shared, so AGS selects the same star.
+  test("imaging sidereal target - AGS picks best star with PWFS2"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsImagingObservationAs(pi, p, t)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = gnirsPwfs2Result("V1647 Orionis"))
+
+  // GNIRS IFU guides with PWFS2, like the long slit, and selects the same star. Its
+  // small science area shifts the optimal position angle (240 vs the long slit's 270).
+  test("IFU sidereal target - AGS picks best star with PWFS2"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsIfuObservationAs(pi, p, t)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = gnirsPwfs2Result("V1647 Orionis", BigDecimal("240.000000")))
 
   test("nonsidereal target with PWFS2"):
     val setup: IO[Observation.Id] =

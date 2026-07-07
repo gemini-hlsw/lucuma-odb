@@ -19,8 +19,8 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 /**
- * Configuration for the GNIRS imaging science mode. Keyhole imaging fixes the
- * FPU (acquisition keyhole), the decker (acquisition) and the acquisition
+ * Configuration for the GNIRS imaging science mode. Imaging fixes the
+ * FPU (acquisition), the decker (acquisition) and the acquisition
  * mirror (in), so none of them appears here.
  */
 case class Config(
