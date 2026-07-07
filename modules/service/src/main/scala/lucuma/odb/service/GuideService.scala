@@ -375,10 +375,10 @@ object GuideService {
             AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS2.some
           case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1) =>
             AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS1.some
-          case (gnirs.imaging.Config(camera = camera), GuideProbe.PWFS2) =>
-            AgsParams.GnirsImaging(camera, PortDisposition.Bottom).withPWFS2.some
-          case (gnirs.imaging.Config(camera = camera), GuideProbe.PWFS1) =>
-            AgsParams.GnirsImaging(camera, PortDisposition.Bottom).withPWFS1.some
+          case (c: gnirs.imaging.Config, GuideProbe.PWFS2) =>
+            AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS2.some
+          case (c: gnirs.imaging.Config, GuideProbe.PWFS1) =>
+            AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
           case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX         =>
