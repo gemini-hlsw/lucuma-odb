@@ -151,6 +151,11 @@ BEGIN
       ) THEN
         NULL;
 
+      WHEN obs_mode IN ('exchange_keck', 'exchange_subaru') THEN
+        IF acq_count <> 0 OR sci_count <> 0 THEN
+          RAISE EXCEPTION 'Observation % with mode % should not have acquisition nor science exposure time modes', obs_id, obs_mode;
+        END IF;
+
       ELSE
         RAISE EXCEPTION 'Unknown observing mode % for observation %', obs_mode, obs_id;
     END CASE;
