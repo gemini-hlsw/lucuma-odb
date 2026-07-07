@@ -367,12 +367,18 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          // AGS for the long slit; IFU and keyhole-imaging guiding are not yet modeled
-          // in lucuma-ags, so those configs fall through to `none` below (no AGS params).
           case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
           case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS2) =>
+            AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS2.some
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1) =>
+            AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS1.some
+          case (gnirs.imaging.Config(camera = camera), GuideProbe.PWFS2) =>
+            AgsParams.GnirsImaging(camera, PortDisposition.Bottom).withPWFS2.some
+          case (gnirs.imaging.Config(camera = camera), GuideProbe.PWFS1) =>
+            AgsParams.GnirsImaging(camera, PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
           case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX         =>

@@ -18,7 +18,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.data.Zipper
 import lucuma.core.enums.GnirsFilter
-import lucuma.core.enums.GnirsFpuOther.Acquisition as AcquisitionKeyhole
+import lucuma.core.enums.GnirsFpuOther.Acquisition
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
@@ -48,9 +48,9 @@ object Science:
     def setup(config: Config): State[GnirsDynamicConfig, Unit] =
       for
         // The initial dynamic config already has the acquisition decker,
-        // acquisition mirror in, and best focus; only the keyhole FPU and the
+        // acquisition mirror in, and best focus; only the acquisition FPU and the
         // mode's camera and coadds need setting.
-        _ <- GnirsDynamicConfig.fpu    := GnirsFpu.Other(AcquisitionKeyhole)
+        _ <- GnirsDynamicConfig.fpu    := GnirsFpu.Other(Acquisition)
         _ <- GnirsDynamicConfig.camera := config.camera
         _ <- GnirsDynamicConfig.coadds := config.coadds
       yield ()
