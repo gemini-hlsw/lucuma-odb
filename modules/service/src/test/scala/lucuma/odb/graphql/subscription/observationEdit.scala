@@ -865,6 +865,80 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       )
     } yield ()
 
+  val ghostConfigSubscription: String =
+    s"""
+      subscription {
+        observationEdit {
+          editType
+          value {
+            observingMode {
+              ghostIfu {
+                red {
+                  binning
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def ghostRedBinningObservationEdit(binning: String): Json =
+    json"""
+      {
+        "observationEdit": {
+          "editType": "UPDATED",
+          "value": {
+            "observingMode": {
+              "ghostIfu": {
+                "red": {
+                  "binning": $binning
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def updateGhostRedBinning(user: User, oid: Observation.Id, binning: String): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                ghostIfu: {
+                  red: { explicitBinning: $binning }
+                }
+              }
+            },
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  test("triggers for changing ghost ifu configuration"):
+    import Group1.pi
+
+    for {
+      pid <- createProgram(pi, "foo")
+      tid <- createTargetAs(pi, pid, "Target")
+      oid <- createGhostIfuObservationAs(pi, pid, None, tid)
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = ghostConfigSubscription,
+        mutations = Right(updateGhostRedBinning(pi, oid, "TWO_BY_TWO")),
+        expected  = List(ghostRedBinningObservationEdit("TWO_BY_TWO"))
+      )
+    } yield ()
+
   test("triggers for hard delete sends valid notification payload"):
     import Group1.{ pi, service }
     def deleteCalibrationObservation(oid: Observation.Id) =
