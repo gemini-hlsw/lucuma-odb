@@ -311,6 +311,8 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosSouth             =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
+        case gnirs.imaging.Config(filters = filters)          =>
+          (Site.GN, ObservingModeType.GnirsImaging, filters.map(_.filter.centralWavelength).maximum)
         case mode: gnirs.spectroscopy.Config                  =>
           val tpe = mode.fpu match
             case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
@@ -365,8 +367,8 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          // AGS for the long slit; IFU guiding is not yet modeled in lucuma-ags, so IFU
-          // configs fall through to `none` below (no AGS params).
+          // AGS for the long slit; IFU and keyhole-imaging guiding are not yet modeled
+          // in lucuma-ags, so those configs fall through to `none` below (no AGS params).
           case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
           case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) =>

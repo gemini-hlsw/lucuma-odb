@@ -25,6 +25,7 @@ object ObservingModeInput:
     gmosNorthLongSlit:  Option[GmosLongSlitInput.Create.North],
     gmosSouthImaging:   Option[GmosImagingInput.Create.South],
     gmosSouthLongSlit:  Option[GmosLongSlitInput.Create.South],
+    gnirsImaging:       Option[GnirsImagingInput.Create],
     gnirsSpectroscopy:  Option[GnirsSpectroscopyInput.Create],
     igrins2LongSlit:    Option[Igrins2LongSlitInput.Create],
     visitor:            Option[VisitorInput.Create]
@@ -41,6 +42,7 @@ object ObservingModeInput:
         .orElse(gmosNorthLongSlit.map(_.observingModeType))
         .orElse(gmosSouthImaging.as(ObservingModeType.GmosSouthImaging))
         .orElse(gmosSouthLongSlit.map(_.observingModeType))
+        .orElse(gnirsImaging.map(_.observingModeType))
         .orElse(gnirsSpectroscopy.map(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
         .orElse(visitor.map(_.mode))
@@ -61,8 +63,9 @@ object ObservingModeInput:
           GmosLongSlitInput.Create.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosImagingInput.Create.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
           GmosLongSlitInput.Create.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          Igrins2LongSlitInput.Create.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
+          GnirsImagingInput.Create.Binding.Option("gnirsImaging", rGnirsImaging),
           GnirsSpectroscopyInput.Create.Binding.Option("gnirsSpectroscopy", rGnirsSpectroscopy),
+          Igrins2LongSlitInput.Create.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
           VisitorInput.CreateBinding.Option("visitor", rVisitor)
         ) =>
           (rExchange,
@@ -73,11 +76,12 @@ object ObservingModeInput:
            rGmosNorthLongSlit,
            rGmosSouthImaging,
            rGmosSouthLongSlit,
-           rIgrins2LongSlit,
+           rGnirsImaging,
            rGnirsSpectroscopy,
+           rIgrins2LongSlit,
            rVisitor
           ).parTupled.flatMap:
-            case (exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit, gnirsSpectroscopy, visitor) =>
+            case (exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, gnirsImaging, gnirsSpectroscopy, igrins2LongSlit, visitor) =>
               oneOrFail(
                 exchange           -> "exchange",
                 flamingos2Imaging  -> "flamingos2Imaging",
@@ -87,10 +91,11 @@ object ObservingModeInput:
                 gmosNorthLongSlit  -> "gmosNorthLongSlit",
                 gmosSouthImaging   -> "gmosSouthImaging",
                 gmosSouthLongSlit  -> "gmosSouthLongSlit",
-                igrins2LongSlit    -> "igrins2LongSlit",
+                gnirsImaging       -> "gnirsImaging",
                 gnirsSpectroscopy  -> "gnirsSpectroscopy",
+                igrins2LongSlit    -> "igrins2LongSlit",
                 visitor            -> "visitor"
-              ).as(Create(exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, gnirsSpectroscopy, igrins2LongSlit, visitor))
+              ).as(Create(exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, gnirsImaging, gnirsSpectroscopy, igrins2LongSlit, visitor))
 
   final case class Edit(
     exchange:           Option[ExchangeInput.Edit],
@@ -101,6 +106,7 @@ object ObservingModeInput:
     gmosNorthLongSlit:  Option[GmosLongSlitInput.Edit.North],
     gmosSouthImaging:   Option[GmosImagingInput.Edit.South],
     gmosSouthLongSlit:  Option[GmosLongSlitInput.Edit.South],
+    gnirsImaging:       Option[GnirsImagingInput.Edit],
     gnirsSpectroscopy:  Option[GnirsSpectroscopyInput.Edit],
     igrins2LongSlit:    Option[Igrins2LongSlitInput.Edit],
     visitor:            Option[VisitorInput.Edit]
@@ -120,6 +126,7 @@ object ObservingModeInput:
         gmosNorthLongSlit.exists(_.limitToPreExecution(access))  ||
         gmosSouthImaging.isDefined                               ||
         gmosSouthLongSlit.exists(_.limitToPreExecution(access))  ||
+        gnirsImaging.isDefined                                   ||
         gnirsSpectroscopy.isDefined                              ||
         igrins2LongSlit.isDefined
 
@@ -135,6 +142,7 @@ object ObservingModeInput:
         .orElse(gmosNorthLongSlit.map(_.observingModeType))
         .orElse(gmosSouthImaging.as(ObservingModeType.GmosSouthImaging))
         .orElse(gmosSouthLongSlit.map(_.observingModeType))
+        .orElse(gnirsImaging.map(_.observingModeType))
         .orElse(gnirsSpectroscopy.flatMap(_.observingModeType))
         .orElse(igrins2LongSlit.map(_.observingModeType))
         .orElse(visitor.flatMap(_.mode))
@@ -148,6 +156,7 @@ object ObservingModeInput:
        gmosNorthLongSlit.traverse(_.toCreate),
        gmosSouthImaging.traverse(_.toCreate),
        gmosSouthLongSlit.traverse(_.toCreate),
+       gnirsImaging.traverse(_.toCreate),
        gnirsSpectroscopy.traverse(_.toCreate),
        igrins2LongSlit.traverse(_.toCreate),
        visitor.traverse(_.toCreate)
@@ -166,8 +175,9 @@ object ObservingModeInput:
           GmosLongSlitInput.Edit.North.Binding.Option("gmosNorthLongSlit", rGmosNorthLongSlit),
           GmosImagingInput.Edit.SouthBinding.Option("gmosSouthImaging", rGmosSouthImaging),
           GmosLongSlitInput.Edit.South.Binding.Option("gmosSouthLongSlit", rGmosSouthLongSlit),
-          Igrins2LongSlitInput.Edit.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
+          GnirsImagingInput.Edit.Binding.Option("gnirsImaging", rGnirsImaging),
           GnirsSpectroscopyInput.Edit.Binding.Option("gnirsSpectroscopy", rGnirsSpectroscopy),
+          Igrins2LongSlitInput.Edit.Binding.Option("igrins2LongSlit", rIgrins2LongSlit),
           VisitorInput.EditBinding.Option("visitor", rVisitor),
         ) =>
           (rExchange,
@@ -178,11 +188,12 @@ object ObservingModeInput:
            rGmosNorthLongSlit,
            rGmosSouthImaging,
            rGmosSouthLongSlit,
-           rIgrins2LongSlit,
+           rGnirsImaging,
            rGnirsSpectroscopy,
+           rIgrins2LongSlit,
            rVisitor,
           ).parTupled.flatMap:
-            case (exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, igrins2LongSlit, gnirsSpectroscopy, visitor) =>
+            case (exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, gnirsImaging, gnirsSpectroscopy, igrins2LongSlit, visitor) =>
               oneOrFail(
                 exchange           -> "exchange",
                 flamingos2Imaging  -> "flamingos2Imaging",
@@ -192,7 +203,8 @@ object ObservingModeInput:
                 gmosNorthLongSlit  -> "gmosNorthLongSlit",
                 gmosSouthImaging   -> "gmosSouthImaging",
                 gmosSouthLongSlit  -> "gmosSouthLongSlit",
-                igrins2LongSlit    -> "igrins2LongSlit",
+                gnirsImaging       -> "gnirsImaging",
                 gnirsSpectroscopy  -> "gnirsSpectroscopy",
+                igrins2LongSlit    -> "igrins2LongSlit",
                 visitor            -> "visitor"
-              ).as(Edit(exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, gnirsSpectroscopy, igrins2LongSlit, visitor))
+              ).as(Edit(exchange, flamingos2Imaging, flamingos2LongSlit, ghostIfu, gmosNorthImaging, gmosNorthLongSlit, gmosSouthImaging, gmosSouthLongSlit, gnirsImaging, gnirsSpectroscopy, igrins2LongSlit, visitor))

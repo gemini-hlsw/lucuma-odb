@@ -125,6 +125,14 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
 
+  def selectOrGenerateGnirsImaging(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
+
+  def generateGnirsImaging(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]]
+
 object GeneratorStreaming:
 
   def requireGhostItc(
@@ -329,6 +337,29 @@ object GeneratorStreaming:
           itc  = requireSpectroscopyItc(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT(Spectroscopy.instantiate(context.oid, calculator.gnirsStep, context.namespace, exp.gnirs, cfg, itc, rol))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+      override def selectOrGenerateGnirsImaging(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
+        (for
+          cfg <- extractMode(ObservingMode.GnirsImagingName, context)(_.asGnirsImaging)
+          res <- EitherT(selectOrGenerate(
+                   cfg.staticConfig,
+                   sequenceService.selectGnirsSequence(context.oid, _, _),
+                   generateGnirsImaging(context)
+                 ))
+        yield res).value
+
+      override def generateGnirsImaging(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GnirsStatic, GnirsDynamic]]] =
+        import lucuma.odb.sequence.gnirs.imaging.Imaging
+        (for
+          cfg <- extractMode(ObservingMode.GnirsImagingName, context)(_.asGnirsImaging)
+          itc  = requireImagingItc(ObservingMode.GnirsImagingName, context.oid, context.itcRes, Itc.gnirsImaging.getOption)
+          gen <- EitherT(Imaging.gnirs(calculator.gnirsStep, context.namespace, cfg, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

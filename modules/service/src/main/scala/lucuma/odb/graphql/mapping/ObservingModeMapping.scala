@@ -15,6 +15,7 @@ trait ObservingModeMapping[F[_]]
   extends ObservationView[F]
      with ExchangeView[F]
      with Flamingos2ImagingView[F]
+     with GnirsImagingView[F]
      with Flamingos2LongSlitView[F]
      with GhostIfuView[F]
      with GmosImagingView[F]
@@ -32,6 +33,7 @@ trait ObservingModeMapping[F[_]]
 
       SqlObject("exchange",           Join(ObservationView.Id, ExchangeView.ObservationId)),
       SqlObject("flamingos2Imaging",  Join(ObservationView.Id, Flamingos2ImagingView.ObservationId)),
+      SqlObject("gnirsImaging",       Join(ObservationView.Id, GnirsImagingView.ObservationId)),
       SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
       SqlObject("ghostIfu",           Join(ObservationView.Id, GhostIfuView.ObservationId)),
       SqlObject("gmosNorthImaging",   Join(ObservationView.Id, GmosNorthImagingView.Common.ObservationId)),

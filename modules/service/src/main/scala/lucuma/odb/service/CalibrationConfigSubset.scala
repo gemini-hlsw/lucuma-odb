@@ -23,6 +23,8 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Wavelength
@@ -40,6 +42,7 @@ import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
+import lucuma.odb.sequence.gnirs.imaging.Config as GnirsImagingConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopyConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
@@ -122,6 +125,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -149,6 +153,7 @@ object CalibrationConfigSubset:
         none,
         none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none,
         none,
         none
@@ -194,6 +199,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -228,6 +234,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -251,6 +258,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -258,6 +266,12 @@ object CalibrationConfigSubset:
     filters: NonEmptyList[Flamingos2Filter]
   ) extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Flamingos2Imaging
+
+  case class GnirsImagingConfigs(
+    filters: NonEmptyList[GnirsFilter],
+    camera:  GnirsCamera
+  ) extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.GnirsImaging
 
   case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit
@@ -283,6 +297,9 @@ object CalibrationConfigSubset:
 
         case c: GnirsSpectroscopyConfig =>
           GnirsSpectroscopyConfigs(c)
+
+        case gnm: GnirsImagingConfig =>
+          GnirsImagingConfigs(gnm.filters.map(_.filter), gnm.camera)
 
         case gn: Config.GmosNorth =>
           GmosNConfigs(

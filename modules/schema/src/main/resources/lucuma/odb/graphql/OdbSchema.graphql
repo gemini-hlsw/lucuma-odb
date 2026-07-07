@@ -5301,14 +5301,19 @@ input ObservingModeInput @oneOf {
   gmosSouthLongSlit: GmosSouthLongSlitInput
 
   """
-  The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The gnirsImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  igrins2LongSlit: Igrins2LongSlitInput
+  gnirsImaging: GnirsImagingInput
 
   """
   The gnirsSpectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gnirsSpectroscopy: GnirsSpectroscopyInput
+
+  """
+  The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  igrins2LongSlit: Igrins2LongSlitInput
 
   """
   A visiting instrument mode. It cannot be unset with a null value.
@@ -7493,6 +7498,11 @@ enum ObservingModeType {
   ObservingModeType GmosSouthLongSlit
   """
   GMOS_SOUTH_LONG_SLIT
+
+  """
+  ObservingModeType GnirsImaging
+  """
+  GNIRS_IMAGING
 
   """
   ObservingModeType GnirsLongSlit
@@ -10302,6 +10312,135 @@ input Igrins2LongSlitInput {
 
 }
 
+type GnirsImagingFilter {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: GnirsFilter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Defines a GNIRS imaging filter to use along with its exposure time mode.
+"""
+input GnirsImagingFilterInput {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: GnirsFilter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+GNIRS Imaging mode.  Keyhole imaging fixes the FPU (acquisition keyhole), the
+decker (acquisition) and the acquisition mirror (in), so none of them appears
+here.
+"""
+type GnirsImaging {
+
+  """
+  Details specific to the type of imaging being performed.
+  """
+  variant: ImagingVariant!
+
+  """
+  The filters (at least one is required) to be used for data collection.
+  """
+  filters: [GnirsImagingFilter!]!
+
+  """
+  Filters as initially selected when creating the imaging mode.
+  """
+  initialFilters: [GnirsImagingFilter!]!
+
+  """
+  The camera (determines the pixel scale).
+  """
+  camera: GnirsCamera!
+
+  """
+  Coadds per exposure.
+  """
+  coadds: PosInt!
+
+  """
+  Optional explicitly specified read mode.  If not set, the read mode is
+  derived from each filter's exposure time.
+  """
+  explicitReadMode: GnirsReadMode
+
+  """
+  The wellDepth field is either explicitly specified in explicitWellDepth or
+  else taken from defaultWellDepth.
+  """
+  wellDepth: GnirsWellDepth!
+
+  """
+  Optional explicitly specified well depth. If set it overrides the default.
+  """
+  explicitWellDepth: GnirsWellDepth
+
+  """
+  Default well depth (determined by the camera).
+  """
+  defaultWellDepth: GnirsWellDepth!
+
+}
+
+"""
+GNIRS Imaging creation and edit input parameters.
+"""
+input GnirsImagingInput {
+
+  """
+  Details specific to the type of imaging being performed.  On creation, if not
+  specified, defaults to a grouped variant with an increasing-wavelength,
+  10 arcsec spiral offset generator.
+  """
+  variant: ImagingVariantInput
+
+  """
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
+  """
+  filters: [GnirsImagingFilterInput!]
+
+  """
+  The camera (determines the pixel scale).  Required on creation.
+  """
+  camera: GnirsCamera
+
+  """
+  Coadds per exposure.  On creation, if not specified, defaults to 1.
+  """
+  coadds: PosInt
+
+  """
+  The explicitReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadMode: GnirsReadMode
+
+  """
+  The explicitWellDepth field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWellDepth: GnirsWellDepth
+
+}
+
 type GnirsSpectroscopyAcquisition {
   exposureTimeMode: ExposureTimeMode!
 
@@ -12988,6 +13127,7 @@ enum ItcType {
   GHOST_IFU,
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING,
+  GNIRS_IMAGING,
   IGRINS_2_SPECTROSCOPY,
   GNIRS_SPECTROSCOPY,
   SPECTROSCOPY
@@ -13038,6 +13178,15 @@ type ItcGmosSouthImagingResultSet {
 }
 
 """
+Combines a GNIRS filter with an `ItcResultSet`. In other words, ITC results
+for all targets but a single filter.
+"""
+type ItcGnirsImagingResultSet {
+  filter:  GnirsFilter!
+  results: ItcResultSet!
+}
+
+"""
 ITC results for a particular observation, including relevant instrument
 configurations and targets.  There are specific instances for each `ItcType`.
 """
@@ -13082,6 +13231,14 @@ set.
 type ItcGmosSouthImaging implements Itc {
   itcType: ItcType!
   gmosSouthImagingScience: [ItcGmosSouthImagingResultSet!]!
+}
+
+"""
+GNIRS imaging ITC results.  Here each filter is paired with its result set.
+"""
+type ItcGnirsImaging implements Itc {
+  itcType: ItcType!
+  gnirsImagingScience: [ItcGnirsImagingResultSet!]!
 }
 
 """
@@ -14864,14 +15021,19 @@ type ObservingMode {
   gmosSouthLongSlit: GmosSouthLongSlit
 
   """
-  IGRINS-2 Long Slit mode
+  GNIRS Imaging mode
   """
-  igrins2LongSlit: Igrins2LongSlit
+  gnirsImaging: GnirsImaging
 
   """
   GNIRS Long Slit mode
   """
   gnirsSpectroscopy: GnirsSpectroscopy
+
+  """
+  IGRINS-2 Long Slit mode
+  """
+  igrins2LongSlit: Igrins2LongSlit
 
   visitor: Visitor
 

@@ -192,6 +192,7 @@ object OdbMapping {
           with Flamingos2StaticMapping[F]
           with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
+          with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
           with GnirsDynamicMapping[F]
           with GnirsAcquisitionMirrorOutMapping[F]
@@ -609,6 +610,7 @@ object OdbMapping {
                 Flamingos2FpuMaskMappings,
                 Flamingos2ImagingMappings,
                 GnirsAcquisitionMirrorOutMappings,
+                GnirsImagingMappings,
                 GhostDynamicMappings,
                 GhostIfuMappings,
                 GmosCcdModeMappings,
@@ -649,6 +651,7 @@ object OdbMapping {
                 Flamingos2ImagingElaborator,
                 Flamingos2LongSlitElaborator,
                 Igrins2LongSlitElaborator,
+                GnirsImagingElaborator,
                 GnirsSpectroscopyElaborator,
                 GhostIfuElaborator,
                 GmosNorthImagingElaborator,
