@@ -15,6 +15,7 @@ import lucuma.core.data.Zipper
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.model.Target
 import lucuma.core.util.Enumerated
@@ -176,7 +177,13 @@ object Itc:
    */
   case class Spectroscopy(
     acquisition: Zipper[Result],
-    science:     Zipper[Result]
+    science:     Zipper[Result],
+    // The GNIRS acquisition mode resolved by the ITC brightness classification.
+    // Only GNIRS long slit / IFU auto-resolution sets it; other instruments leave
+    // it None.  It pins the mode the sequence uses so it isn't re-derived (and
+    // possibly mis-classified) from the final exposure time.  See the two-pass
+    // acquisition ITC in ItcService.
+    gnirsAcqType: Option[GnirsAcquisitionType] = None
   ) extends Itc:
 
     override def dataType: Type =
@@ -190,7 +197,8 @@ object Itc:
       Eq.by: a =>
         (
           a.acquisition,
-          a.science
+          a.science,
+          a.gnirsAcqType
         )
 
   val spectroscopy: Prism[Itc, Spectroscopy] =

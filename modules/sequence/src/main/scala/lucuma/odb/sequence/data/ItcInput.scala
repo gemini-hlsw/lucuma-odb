@@ -90,7 +90,11 @@ object ItcInput:
     science:     SpectroscopyParameters,
     targets:     NonEmptyList[TargetDefinition],
     blindOffset: Option[TargetDefinition],
-    signalToNoiseTargetId: Option[Target.Id]
+    signalToNoiseTargetId: Option[Target.Id],
+    // When set (GNIRS S/N mode with acquisition mode and filter both auto), the ITC
+    // resolves the acquisition mode via a brightness classification pass before the
+    // real exposure-time pass. See the two-pass acquisition ITC in ItcService.
+    gnirsAcqAutoClassify: Boolean = false
   ) extends ItcInput derives Eq:
 
     def acquisitionTargets: NonEmptyList[TargetDefinition] =
@@ -109,7 +113,8 @@ object ItcInput:
           a.acquisition.hashBytes,
           a.science.hashBytes,
           hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets)),
-          a.signalToNoiseTargetId.hashBytes
+          a.signalToNoiseTargetId.hashBytes,
+          a.gnirsAcqAutoClassify.hashBytes
         )
 
   /**
@@ -157,5 +162,5 @@ object ItcInput:
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
         case in @ Imaging(_, _, _)                  => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _, _)       => in.hashBytes
+        case in @ Spectroscopy(_, _, _, _, _, _)    => in.hashBytes
         case in @ ScienceOnlySpectroscopy(_, _, _)  => in.hashBytes

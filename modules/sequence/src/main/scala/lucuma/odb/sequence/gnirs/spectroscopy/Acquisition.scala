@@ -18,6 +18,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -354,7 +355,11 @@ object Acquisition:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
-    time:          Either[OdbError, IntegrationTime]
+    time:          Either[OdbError, IntegrationTime],
+    // The acquisition mode resolved by the ITC brightness classification, when the
+    // S/N-mode two-pass path ran. Pins the mode so it isn't re-derived from the final
+    // exposure time (see AcquisitionConfig.resolvedMode).
+    pinnedType:    Option[GnirsAcquisitionType]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
     def sequenceError(msg: String): OdbError =
       OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: $msg".some)
@@ -370,7 +375,7 @@ object Acquisition:
                        _.exposureTime.toNonNegMicroseconds.value > 0,
                        sequenceError("GNIRS Spectroscopy requires a positive acquisition exposure time.")
                      )
-        mode       = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu))
+        mode       = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedType)
         selFilter <- config.acquisition
                        .selectedFilter(mode, config.centralWavelength)
                        .leftMap(sequenceError)
