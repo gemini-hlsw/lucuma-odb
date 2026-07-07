@@ -9,6 +9,10 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.Observation
+import lucuma.core.util.CalculationState
+import lucuma.odb.util.Codecs.observation_id
+import skunk.*
+import skunk.implicits.*
 
 
 class executionPlannedTime_GhostIfu extends ExecutionTestSupportForGhost:
@@ -265,3 +269,46 @@ class executionPlannedTime_GhostIfu extends ExecutionTestSupportForGhost:
             }
           """.asRight
       )
+
+  test("obscalc invalidates when GHOST detector binning/read mode change"):
+    def forceReady(o: Observation.Id): IO[Unit] =
+      withSession: session =>
+        session.execute(
+          sql"""
+            UPDATE t_obscalc
+               SET c_obscalc_state = 'ready' :: e_calculation_state
+             WHERE c_observation_id = $observation_id
+          """.command
+        )(o).void
+
+    def setGhostRedReadMode(o: Observation.Id): IO[Unit] =
+      withSession: session =>
+        session.execute(
+          sql"""UPDATE t_ghost_ifu SET c_red_read_mode = 'fast'
+                   WHERE c_observation_id = $observation_id""".command
+        )(o).void
+
+    def setGhostBlueBinning(o: Observation.Id): IO[Unit] =
+      withSession: session =>
+        session.execute(
+          sql"""UPDATE t_ghost_ifu SET c_blue_binning = 'four_by_four'
+                   WHERE c_observation_id = $observation_id""".command
+        )(o).void
+
+    def obscalcState(o: Observation.Id): IO[Option[CalculationState]] =
+      selectCalculationStates.map(_.get(o))
+
+    for
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      o  <- createObservationWithModeAs(pi, p, List(t), GhostIfuInput)
+      _  <- forceReady(o)
+      _  <- assertIO(obscalcState(o), Some(CalculationState.Ready))
+      // red read mode: slow -> fast
+      _  <- setGhostRedReadMode(o)
+      _  <- assertIO(obscalcState(o), Some(CalculationState.Pending))
+      // blue binning: two_by_two -> four_by_four
+      _  <- forceReady(o)
+      _  <- setGhostBlueBinning(o)
+      _  <- assertIO(obscalcState(o), Some(CalculationState.Pending))
+    yield ()
