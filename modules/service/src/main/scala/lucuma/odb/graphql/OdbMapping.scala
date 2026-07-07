@@ -229,6 +229,7 @@ object OdbMapping {
           with ObservationMapping[F]
           with ObservationReferenceMapping[F]
           with ObservationSelectResultMapping[F]
+          with ObservationTimeEstimateMapping[F]
           with ObservingModeGroupMapping[F]
           with ObservingModeGroupSelectResultMapping[F]
           with ObservingModeMapping[F]
@@ -624,6 +625,7 @@ object OdbMapping {
                 GmosSouthGratingConfigMappings,
                 LeafMappings,
                 ObservationSelectResultMappings,
+                ObservationTimeEstimateMappings,
                 TelescopeConfigGeneratorMappings,
                 OffsetMappings,
                 RegionMappings,

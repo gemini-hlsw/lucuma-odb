@@ -61,6 +61,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("visits"),
+      SqlObject("originalEstimate"),
       EffectField("timeCharge", timeChargeHandler, List("id", "programId")),
       SqlField("scienceSequenceIsMaterialized", ObservationView.ScienceSequenceIsMaterialized),
       SqlField("acquisitionSequenceIsMaterialized", ObservationView.AcquisitionSequenceIsMaterialized)
