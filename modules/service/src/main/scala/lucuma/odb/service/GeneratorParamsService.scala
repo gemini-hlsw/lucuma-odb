@@ -364,7 +364,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
