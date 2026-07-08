@@ -735,6 +735,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
     }
 
+  // Like `subscriptionExpect`, but ignores the order in which events are
+  // received.  Use when a single mutation produces events for multiple
+  // entities (e.g., editing a target shared by several observations), where
+  // the relative notification order is unspecified (it depends on the order
+  // in which row-level triggers happen to fire).
+  def subscriptionExpectUnordered(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expected: List[Json], variables: Option[JsonObject] = None)(using Location) =
+    subscription(user, query, mutations, variables).map { obt =>
+      assertEquals(obt.map(_.spaces2).sorted, expected.map(_.spaces2).sorted)  // by comparing strings we get more useful errors
+    }
+
   def subscriptionExpectF(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None)(using Location) =
     subscription(user, query, mutations, variables).flatMap { obt =>
       expectedF.map { expected =>
