@@ -100,11 +100,26 @@ sealed trait Generator[F[_]]:
     observationId: Observation.Id
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
+  /**
+   * Materializes the execution sequence (if not already materialized) and then,
+   * in the same transaction, executes the given action.  The generator context
+   * used for the materialization is passed to the action.
+   */
   def materializeAndThen[A](
     oid:  Observation.Id
   )(
-    f: Transaction[F] ?=> F[Either[OdbError, A]]
+    f: GeneratorContext => Transaction[F] ?=> F[Either[OdbError, A]]
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]]
+
+  /**
+   * Calculates the ExecutionDigest from an already resolved generator context,
+   * reading the materialized sequence when present and generating it otherwise.
+   * No cached digest is consulted, so the result always reflects the current
+   * state of the sequence.
+   */
+  def calculateDigest(
+    ctx: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, ExecutionDigest]]
 
 object Generator:
 
@@ -462,10 +477,15 @@ object Generator:
             case _: VisitorObservingModeType =>
               EitherT.pure(())
 
+      override def calculateDigest(
+        ctx: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, ExecutionDigest]] =
+        calcDigestFromContext(ctx).value
+
       override def materializeAndThen[A](
         oid:  Observation.Id
       )(
-        f: Transaction[F] ?=> F[Either[OdbError, A]]
+        f: GeneratorContext => Transaction[F] ?=> F[Either[OdbError, A]]
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]] =
 
         def materializeExecutionConfig(
@@ -520,10 +540,10 @@ object Generator:
               EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>
-          materializeExecutionConfig(ctx) *> EitherT(f)
+          materializeExecutionConfig(ctx) *> EitherT(f(ctx))
 
 
       override def materialize(
         oid:  Observation.Id,
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
-        materializeAndThen(oid)(().asRight[OdbError].pure[F])
+        materializeAndThen(oid)(_ => ().asRight[OdbError].pure[F])
