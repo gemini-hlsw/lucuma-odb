@@ -37,6 +37,10 @@ extension (self: SourceProfile)
       )
       .getOrElse(self)
 
+  def hasBand(band: Band): Boolean =
+    SourceProfile.integratedBrightnesses.getOption(self).exists(_.contains(band)) ||
+      SourceProfile.surfaceBrightnesses.getOption(self).exists(_.contains(band))
+
 def observationIdIn(
   oids: NonEmptyList[Observation.Id],
   prefix: Option[String] = None
