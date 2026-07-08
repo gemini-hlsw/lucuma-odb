@@ -23,6 +23,7 @@ trait KeckProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val KeckProposalTypeMapping: ObjectMapping =
     ObjectMapping(KeckProposalTypeType)(
       SqlField("id", ProposalView.Keck.Id, key = true, hidden = true),
+      SqlField("minPercentTime", ProposalView.MinPercent),
       SqlObject("partnerSplits", Join(ProposalView.Keck.Id, PartnerSplitTable.ProgramId))
     )
 

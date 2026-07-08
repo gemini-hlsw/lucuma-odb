@@ -695,12 +695,16 @@ object ProposalService {
             SET.subaru match
               case Some(s) => (Observatory.Subaru, Nullable.orAbsent(s.callType))
               case None    => (Observatory.Keck, Nullable.Null)
+          // The minimum percent time comes from whichever exchange type is
+          // present; when omitted the existing value is left unchanged.
+          val minPercentTime: Option[IntPercent] =
+            SET.keck.flatMap(_.minPercentTime).orElse(SET.subaru.flatMap(_.minPercentTime))
           List(
             sql"c_observatory = ${observatory}"(obs).some,
             subaruType.foldPresent(sql"c_subaru_proposal_type = ${subaru_proposal_type.opt}"),
             sql"c_science_subtype = ${science_subtype.opt}"(none).some,
             sql"c_too_activation = ${too_activation}"(ToOActivation.None).some,
-            sql"c_min_percent = ${int_percent}"(IntPercent.unsafeFrom(0)).some,
+            minPercentTime.map(sql"c_min_percent = ${int_percent}"),
             sql"c_min_percent_total = ${int_percent.opt}"(none).some,
             sql"c_total_time = ${time_span.opt}"(none).some,
             sql"c_reviewer_id = ${program_user_id.opt}"(none).some,
@@ -797,11 +801,15 @@ object ProposalService {
     // An external (exchange) proposal has no science subtype; it carries an
     // observatory and (for Subaru) a Subaru proposal type instead.  The
     // Gemini-specific columns take their table defaults; c_min_percent has no
-    // default and must be 0 for an external proposal.
+    // default and is taken from the exchange proposal type (defaulting to 100%).
     private def insertExternalProposal(
       pid: Program.Id,
       c:   ProposalPropertiesInput.Create
     ): AppliedFragment =
+      val minPercentTime =
+        c.keck.map(_.minPercentTime)
+          .orElse(c.subaru.map(_.minPercentTime))
+          .getOrElse(IntPercent.unsafeFrom(100))
       sql"""
         INSERT INTO t_proposal (
           c_program_id,
@@ -823,7 +831,7 @@ object ProposalService {
         c.category,
         c.observatory,
         c.subaruProposalType,
-        IntPercent.unsafeFrom(0)
+        minPercentTime
       )
 
     // The science subtype, observatory and Subaru proposal type are mirrored

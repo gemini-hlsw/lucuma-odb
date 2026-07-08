@@ -14,29 +14,35 @@ import lucuma.odb.graphql.binding.*
 
 object SubaruProposalTypeInput:
 
+  private val HundredPercent = IntPercent.unsafeFrom(100)
+
   case class Create(
-    callType:      SubaruCallForProposalsType = SubaruCallForProposalsType.Normal,
-    partnerSplits: Map[Partner, IntPercent]   = Map.empty
+    callType:       SubaruCallForProposalsType = SubaruCallForProposalsType.Normal,
+    minPercentTime: IntPercent                 = HundredPercent,
+    partnerSplits:  Map[Partner, IntPercent]   = Map.empty
   ):
     def asEdit: Edit =
-      Edit(callType.some, Nullable.NonNull(partnerSplits))
+      Edit(callType.some, minPercentTime.some, Nullable.NonNull(partnerSplits))
 
   object Create:
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(
           SubaruCallForProposalsTypeBinding.Option("type", rType),
+          IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitInput.BindingAll.Option("partnerSplits", rSplits)
-        ) => (rType, rSplits).parMapN: (t, splits) =>
-          Create(t.getOrElse(SubaruCallForProposalsType.Normal), splits.getOrElse(Map.empty))
+        ) => (rType, rMin, rSplits).parMapN: (t, min, splits) =>
+          Create(t.getOrElse(SubaruCallForProposalsType.Normal), min.getOrElse(HundredPercent), splits.getOrElse(Map.empty))
 
   case class Edit(
-    callType:      Option[SubaruCallForProposalsType] = none,
-    partnerSplits: Nullable[Map[Partner, IntPercent]] = Nullable.Null
+    callType:       Option[SubaruCallForProposalsType] = none,
+    minPercentTime: Option[IntPercent]                 = none,
+    partnerSplits:  Nullable[Map[Partner, IntPercent]] = Nullable.Null
   ):
     def asCreate: Create =
       Create(
         callType.getOrElse(SubaruCallForProposalsType.Normal),
+        minPercentTime.getOrElse(HundredPercent),
         partnerSplits.toOption.getOrElse(Map.empty)
       )
 
@@ -45,5 +51,6 @@ object SubaruProposalTypeInput:
       ObjectFieldsBinding.rmap:
         case List(
           SubaruCallForProposalsTypeBinding.Option("type", rType),
+          IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitInput.BindingAll.Nullable("partnerSplits", rSplits)
-        ) => (rType, rSplits).parMapN(Edit.apply)
+        ) => (rType, rMin, rSplits).parMapN(Edit.apply)

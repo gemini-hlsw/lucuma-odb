@@ -4515,6 +4515,12 @@ interface GeminiProposalType {
 Proposal properties for an exchange proposal requesting time at Keck.
 """
 type KeckProposalType {
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
   "Describes how time for the program will be apportioned across partners."
   partnerSplits: [PartnerSplit!]!
 }
@@ -4525,6 +4531,12 @@ Proposal properties for an exchange proposal requesting time at Subaru.
 type SubaruProposalType {
   "The Subaru call for proposals type (normal or intensive)."
   type: SubaruCallForProposalsType!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
 
   "Describes how time for the program will be apportioned across partners."
   partnerSplits: [PartnerSplit!]!
@@ -4792,6 +4804,12 @@ Properties for an exchange proposal requesting time at Keck.
 """
 input KeckProposalTypeInput {
   """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
+  """
   The partnerSplits field specifies how time is apportioned over partners. This
   will default to empty but if specified, the partner percents must sum to 100.
   By submission time, it must be specified.
@@ -4807,6 +4825,12 @@ input SubaruProposalTypeInput {
   The Subaru call for proposals type.  If not specified, NORMAL is assumed.
   """
   type: SubaruCallForProposalsType
+
+  """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
 
   """
   The partnerSplits field specifies how time is apportioned over partners. This

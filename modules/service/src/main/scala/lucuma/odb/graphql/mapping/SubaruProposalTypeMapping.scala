@@ -24,6 +24,7 @@ trait SubaruProposalTypeMapping[F[_]] extends BaseMapping[F]
     ObjectMapping(SubaruProposalTypeType)(
       SqlField("id", ProposalView.Subaru.Id, key = true, hidden = true),
       SqlField("type", ProposalView.Subaru.CallType),
+      SqlField("minPercentTime", ProposalView.MinPercent),
       SqlObject("partnerSplits", Join(ProposalView.Subaru.Id, PartnerSplitTable.ProgramId))
     )
 

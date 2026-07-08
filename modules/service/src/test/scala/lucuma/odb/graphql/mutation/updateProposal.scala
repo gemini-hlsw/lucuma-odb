@@ -129,6 +129,111 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     }
   }
 
+  test("✓ set minPercentTime on a Keck exchange proposal") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      // Switch to a Keck exchange proposal with an explicit minPercentTime...
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  keck: {
+                    minPercentTime: 25
+                    partnerSplits: [{ partner: US, percent: 100 }]
+                  }
+                }
+              }
+            ) {
+              proposal {
+                keck { minPercentTime }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "keck": { "minPercentTime": 25 }
+              }
+            }
+          }
+        """.asRight
+      ) *>
+      // ...then edit just the minPercentTime.
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  keck: { minPercentTime: 40 }
+                }
+              }
+            ) {
+              proposal {
+                keck { minPercentTime }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "keck": { "minPercentTime": 40 }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ set minPercentTime on a Subaru exchange proposal") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  subaru: {
+                    type: INTENSIVE
+                    minPercentTime: 25
+                    partnerSplits: [{ partner: US, percent: 100 }]
+                  }
+                }
+              }
+            ) {
+              proposal {
+                subaru { type minPercentTime }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "subaru": { "type": "INTENSIVE", "minPercentTime": 25 }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
   test("⨯ cannot have both partner splits and an exchange partner") {
     createProgramAs(pi).flatMap { pid =>
       addProposal(pi, pid) *>
