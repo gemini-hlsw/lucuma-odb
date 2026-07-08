@@ -9,6 +9,7 @@ import cats.effect.Async
 import cats.implicits.*
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.DeclaredExecutionState
@@ -221,6 +222,8 @@ object ObservationWorkflowService {
 
     def invalidExchangeInstrument(instr: String): String =
       s"Instrument $instr is not part of the Call for Proposals."
+
+    val MissingVMagnitude = "Please add a V magnitude."
   }
 
   extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
@@ -572,6 +575,13 @@ object ObservationWorkflowService {
           if hasItc(info.oid) || info.isVisitor then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
+        // V magnitudes are used by Observe to set the GHOST slit viewing
+        // camera exposure time, so every target in a GHOST observation needs one.
+        val ghostVMagnitudeValidator: Validator = info =>
+          if info.observingMode.contains(ObservingModeType.GhostIfu) && info.asterism.exists(!_.sourceProfile.hasBand(Band.V)) then
+            ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.MissingVMagnitude))
+          else ObservationValidationMap.empty
+
         val otherConfigErrors: Validator = info =>
           NonEmptyChain.fromSeq(info.otherConfigErrors) match
             case None       => ObservationValidationMap.empty
@@ -583,11 +593,12 @@ object ObservationWorkflowService {
           ObservationValidationMap.empty
 
         val scienceValidator1: Validator =
-          generatorValidator     |+|
-          cfpInstrumentValidator |+|
-          exchangeValidator      |+|
-          cfpRaDecValidator      |+|
-          bandValidator          |+|
+          generatorValidator       |+|
+          cfpInstrumentValidator   |+|
+          exchangeValidator        |+|
+          cfpRaDecValidator        |+|
+          bandValidator            |+|
+          ghostVMagnitudeValidator |+|
           otherConfigErrors
 
         val scienceValidator2: Validator =
@@ -673,7 +684,7 @@ object ObservationWorkflowService {
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
           execs                  = executionStates(errorFree)
           workflows              = computeWorkflows(infos, errs, execs)
-          withModes = 
+          withModes =
             workflows.map:
               case (oid, wf) =>
                 oid -> (wf, infos.get(oid).flatMap(_.observingMode))
@@ -756,7 +767,7 @@ object ObservationWorkflowService {
 
                     // Everyone, but logic differs for visitors
                     case (Completed, Ongoing) =>
-                      val ds: Option[ExecutionState] = 
+                      val ds: Option[ExecutionState] =
                         if mode.exists(_.isVisitorMode) then Some(Ongoing) else None
                       updateDeclaredState(oid, ds)
                         .as(Result(w.copy(state = state)))
@@ -767,7 +778,7 @@ object ObservationWorkflowService {
                         .as(Result(w.copy(state = state)))
 
                     // Same for everyone; note that this needs to be the last case
-                    case (a, b) if a.isUserState || b.isUserState => 
+                    case (a, b) if a.isUserState || b.isUserState =>
                       updateUserState(oid, b.asUserState)
                         .as(Result(w.copy(state = state)))
 
@@ -859,7 +870,7 @@ object ObservationWorkflowService {
           s.c_workflow_user_state
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
-        LEFT JOIN t_proposal x 
+        LEFT JOIN t_proposal x
           ON o.c_program_id = x.c_program_id
         LEFT JOIN t_observation s
           ON  o.c_calibration_role = ANY(ARRAY['telluric','daytime_pinhole']::e_calibration_role[])
@@ -870,7 +881,7 @@ object ObservationWorkflowService {
       .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
         case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, cfp, sci, Nil, state2) 
+          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
