@@ -39,7 +39,8 @@ object GnirsImagingInput extends ImagingFilterCheck:
         )
       ),
       none,
-      Nullable.Absent
+      Nullable.Absent,
+      none
     )
 
   val DefaultCoadds: PosInt = 1.refined

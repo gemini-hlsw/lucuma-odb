@@ -374,6 +374,53 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         expected = expectedResult(json).asRight
       )
 
+  test("grouped, offsets, exposuresPerOffset"):
+    // With exposuresPerOffset = 3 each object offset position gets three
+    // consecutive exposures.  The filter with the most exposures is Y (30), so
+    // the generator produces ceil(30 / 3) = 10 distinct offset positions
+    // (0..9), each visited three times; shorter filters take a prefix.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservation(p, t, Site.GN):
+          s"""{
+            gmosNorthImaging: {
+              variant: {
+                grouped: {
+                  offsets: {
+                    ${enumerated((0 until 12).toList.fproduct(identity) *)}
+                  }
+                  skyCount: 0
+                  exposuresPerOffset: 3
+                }
+              }
+              filters: [
+                { filter: G_PRIME },
+                { filter: I_PRIME },
+                { filter: Y       }
+              ]
+            }
+          }"""
+      yield o
+
+    def grouped(f: GmosNorthFilter, t: IntegrationTime, positions: Int): List[Json] =
+      (0 until positions).toList.flatMap(n => List.fill(3)(n)).map: n =>
+        gnAtom(Step(f, t).withOffset(n, n))
+
+    // 6 exposures -> 2 positions, 12 -> 4 positions, 30 -> 10 positions.
+    val json: List[Json] =
+      grouped(GmosNorthFilter.GPrime, Time120x06,  2) ++
+      grouped(GmosNorthFilter.IPrime, Time060x12,  4) ++
+      grouped(GmosNorthFilter.Y,      Time030x30, 10)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gmosNorthScienceQuery(oid, 100.some),
+        expected = expectedResult(json).asRight
+      )
+
   test("grouped, no offsets, sky"):
     val setup: IO[Observation.Id] =
       for

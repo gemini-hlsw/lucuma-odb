@@ -13935,6 +13935,13 @@ type GroupedImagingVariant {
   Offset generator to use for the sky datasets.
   """
   skyOffsets: TelescopeConfigGenerator!
+
+  """
+  Number of consecutive science exposures to collect at each object offset
+  position before moving to the next position.  The overall exposure count still
+  caps the total, so the final position may receive fewer exposures.
+  """
+  exposuresPerOffset: PosInt!
 }
 
 """
@@ -13969,6 +13976,13 @@ input GroupedImagingVariantInput {
   be used.
   """
   skyOffsets: TelescopeConfigGeneratorInput
+
+  """
+  Number of consecutive science exposures to collect at each object offset
+  position before moving to the next position.  Defaults to 1 on creation,
+  absent (i.e., not modified) on update.
+  """
+  exposuresPerOffset: PosInt
 
 }
 

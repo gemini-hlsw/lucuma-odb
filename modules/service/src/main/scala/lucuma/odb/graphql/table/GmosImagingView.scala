@@ -26,6 +26,7 @@ trait GmosImagingView[F[_]] extends BaseMapping[F]:
     object Grouped:
       val ObservationId: ColumnRef   = col("c_grouped_observation_id", observation_id.embedded)
       val WavelengthOrder: ColumnRef = col("c_wavelength_order", wavelength_order)
+      val ExposuresPerOffset: ColumnRef = col("c_exposures_per_offset", int4_pos)
 
     object Interleaved:
       val ObservationId: ColumnRef = col("c_interleaved_observation_id", observation_id.embedded)

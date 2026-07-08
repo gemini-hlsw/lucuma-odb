@@ -8,6 +8,7 @@ import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -25,7 +26,7 @@ sealed trait Variant:
 
   def variantType: ImagingVariantType =
     this match
-      case Grouped(_, _, _, _)    => ImagingVariantType.Grouped
+      case Grouped(_, _, _, _, _) => ImagingVariantType.Grouped
       case Interleaved(_, _, _)   => ImagingVariantType.Interleaved
       case PreImaging(_, _, _, _) => ImagingVariantType.PreImaging
   def fold[A](
@@ -34,7 +35,7 @@ sealed trait Variant:
     fp: PreImaging  => A
   ): A =
     this match
-      case g @ Grouped(_, _, _, _)    => fg(g)
+      case g @ Grouped(_, _, _, _, _) => fg(g)
       case i @ Interleaved(_, _, _)   => fi(i)
       case p @ PreImaging(_, _, _, _) => fp(p)
 
@@ -50,20 +51,22 @@ sealed trait Variant:
 object Variant:
 
   case class Grouped(
-    order:      WavelengthOrder,
-    offsets:    TelescopeConfigGenerator,
-    skyCount:   NonNegInt,
-    skyOffsets: TelescopeConfigGenerator
+    order:          WavelengthOrder,
+    offsets:        TelescopeConfigGenerator,
+    skyCount:       NonNegInt,
+    skyOffsets:     TelescopeConfigGenerator,
+    exposuresPerOffset: PosInt
   ) extends Variant
 
   object Grouped:
 
     val Default: Grouped =
       Grouped(
-        order      = WavelengthOrder.Increasing,
-        offsets    = TelescopeConfigGenerator.NoGenerator,
-        skyCount   = NonNegInt.MinValue,
-        skyOffsets = TelescopeConfigGenerator.NoGenerator
+        order           = WavelengthOrder.Increasing,
+        offsets         = TelescopeConfigGenerator.NoGenerator,
+        skyCount        = NonNegInt.MinValue,
+        skyOffsets      = TelescopeConfigGenerator.NoGenerator,
+        exposuresPerOffset = PosInt.MinValue
       )
 
     given HashBytes[Grouped] with
@@ -75,6 +78,7 @@ object Variant:
         out.write(g.offsets.hashBytes)
         out.write(g.skyCount.hashBytes)
         out.write(g.skyOffsets.hashBytes)
+        out.write(g.exposuresPerOffset.hashBytes)
 
         out.close()
         bao.toByteArray
@@ -85,7 +89,8 @@ object Variant:
           g.order,
           g.offsets,
           g.skyCount,
-          g.skyOffsets
+          g.skyOffsets,
+          g.exposuresPerOffset
         )
 
   case class Interleaved(
@@ -158,41 +163,42 @@ object Variant:
 
   val offsets: Optional[Variant, TelescopeConfigGenerator] =
     Optional.apply[Variant, TelescopeConfigGenerator] {
-      case Variant.Grouped(_, o, _, _)    => o.some
+      case Variant.Grouped(_, o, _, _, _) => o.some
       case Variant.Interleaved(o, _, _)   => o.some
       case Variant.PreImaging(_, _, _, _) => none
     } { og => {
-      case v @ Variant.Grouped(_, _, _, _)    => v.copy(offsets = og)
+      case v @ Variant.Grouped(_, _, _, _, _) => v.copy(offsets = og)
       case v @ Variant.Interleaved(_, _, _)   => v.copy(offsets = og)
       case v @ Variant.PreImaging(_, _, _, _) => v
     }}
 
   val skyOffsets: Optional[Variant, TelescopeConfigGenerator] =
     Optional.apply[Variant, TelescopeConfigGenerator] {
-      case Variant.Grouped(_, _, _, s)    => s.some
+      case Variant.Grouped(_, _, _, s, _) => s.some
       case Variant.Interleaved(_, _, s)   => s.some
       case Variant.PreImaging(_, _, _, _) => none
     } { og => {
-      case v @ Variant.Grouped(_, _, _, _)    => v.copy(skyOffsets = og)
+      case v @ Variant.Grouped(_, _, _, _, _) => v.copy(skyOffsets = og)
       case v @ Variant.Interleaved(_, _, _)   => v.copy(skyOffsets = og)
       case v @ Variant.PreImaging(_, _, _, _) => v
     }}
 
   case class Fields(
-    variantType: ImagingVariantType,
-    order:       WavelengthOrder,
-    skyCount:    NonNegInt,
-    offset1:     Offset,
-    offset2:     Offset,
-    offset3:     Offset,
-    offset4:     Offset
+    variantType:     ImagingVariantType,
+    order:           WavelengthOrder,
+    skyCount:        NonNegInt,
+    exposuresPerOffset: PosInt,
+    offset1:         Offset,
+    offset2:         Offset,
+    offset3:         Offset,
+    offset4:         Offset
   ):
     def toVariant(
       objectGen: TelescopeConfigGenerator,
       skyGen:    TelescopeConfigGenerator
     ): Variant =
       variantType match
-        case ImagingVariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen)
+        case ImagingVariantType.Grouped     => Grouped(order, objectGen, skyCount, skyGen, exposuresPerOffset)
         case ImagingVariantType.Interleaved => Interleaved(objectGen, skyCount, skyGen)
         case ImagingVariantType.PreImaging  => PreImaging(offset1, offset2, offset3, offset4)
 
@@ -204,7 +210,7 @@ object Variant:
   given Eq[Variant] with
     def eqv(x: Variant, y: Variant): Boolean =
       (x, y) match
-        case (a @ Grouped(_, _, _, _),    b @ Grouped(_, _, _, _))    => a === b
+        case (a @ Grouped(_, _, _, _, _),    b @ Grouped(_, _, _, _, _))    => a === b
         case (a @ Interleaved(_, _, _),   b @ Interleaved(_, _, _))   => a === b
         case (a @ PreImaging(_, _, _, _), b @ PreImaging(_, _, _, _)) => a === b
         case _                                                        => false

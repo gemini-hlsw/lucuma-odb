@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
@@ -28,6 +29,7 @@ object ImagingStatements:
     "c_variant",
     "c_wavelength_order",
     "c_sky_count",
+    "c_exposures_per_offset",
     "c_pre_imaging_off1_p",
     "c_pre_imaging_off1_q",
     "c_pre_imaging_off2_p",
@@ -67,15 +69,16 @@ object ImagingStatements:
           sql"c_sky_count = $int4_nonneg"(sc)
 
     def grouped: List[AppliedFragment] =
-      val upOrder = sql"c_wavelength_order = ${wavelength_order}"
+      val upOrder           = sql"c_wavelength_order = ${wavelength_order}"
+      val upExposuresPerOffset = sql"c_exposures_per_offset = ${int4_pos}"
       input match
-        case ImagingVariantInput.Grouped(order, _, skyCount, _) =>
+        case ImagingVariantInput.Grouped(order, _, skyCount, _, exposuresPerOffset) =>
           List(
             upVariant(ImagingVariantType.Grouped),
             upSkyCount(ImagingVariantType.Grouped, skyCount)
-          ) ++ order.map(upOrder).toList
-        case _                                                  =>
-          List(upOrder(WavelengthOrder.Increasing))
+          ) ++ order.map(upOrder).toList ++ exposuresPerOffset.map(upExposuresPerOffset).toList
+        case _                                                                   =>
+          List(upOrder(WavelengthOrder.Increasing), upExposuresPerOffset(PosInt.MinValue))
 
     def interleaved: List[AppliedFragment] =
       input match
