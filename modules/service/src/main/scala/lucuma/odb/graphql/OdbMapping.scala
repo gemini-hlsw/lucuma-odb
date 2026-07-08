@@ -686,26 +686,28 @@ object OdbMapping {
             L.debug("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
             super.defaultRootCursor(query, tpe, parentCursor)
 
+          // Slow/large query instrumentation. Allocated once per mapping instance rather than
+          // on every `fetch` call.
+          private val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
+
+          // Maybe it should be an env variable
+          private val SlowQueryThreshold = 5.millis
+          private val MaxSqlLength       = 1024
+          private val DumpThreshold      = 500
+
+          // When `ODB_FETCH_DUMP_DIR` is set, large statements are written raw to a file on that
+          // dir and a reference added to the trace via `db.statement_file`
+          private val dumpDir: Option[String] = sys.env.get("ODB_FETCH_DUMP_DIR")
+
+          private def truncateSql(s: String): String =
+            if s.length <= MaxSqlLength then s
+            else s"${s.take(MaxSqlLength)}... (${s.length - MaxSqlLength} more chars)"
+
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
-            val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
-
-            // Maybe it should be an env variable
-            val SlowQueryThreshold = 5.second
-            val MaxSqlLength       = 1024
-
             val sql = fragment.fragment.sql
 
-            def truncateSql(s: String): String =
-              if s.length <= MaxSqlLength then s
-              else s"${s.take(MaxSqlLength)}... (${s.length - MaxSqlLength} more chars)"
-
-            // When `ODB_FETCH_DUMP_DIR` is set, large statements are written raw to a file on that
-            // dir and a reference added to the trace via `db.statement_file`
-            val dumpDir = sys.env.get("ODB_FETCH_DUMP_DIR")
-
-            val DumpThreshold = 50000
-            val big           = sql.length > DumpThreshold
+            val big = sql.length > DumpThreshold
 
             // Write raw SQL to a file iff dumping is enabled and the statement is large.
             val dumpSqlToFile: F[Option[String]] =
