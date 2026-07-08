@@ -690,8 +690,14 @@ object OdbMapping {
           // on every `fetch` call.
           private val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
 
-          // Maybe it should be an env variable
-          private val SlowQueryThreshold = 5.millis
+          // Threshold above which a query is logged as slow. Read directly from
+          // `ODB_SLOW_QUERY_THRESHOLD_MS` (milliseconds); falls back to 5ms when unset or unparseable.
+          private val SlowQueryThreshold: FiniteDuration =
+            sys.env
+              .get("ODB_SLOW_QUERY_THRESHOLD_MS")
+              .flatMap(_.toIntOption)
+              .map(_.millis)
+              .getOrElse(5.seconds)
           private val MaxSqlLength       = 1024
           private val DumpThreshold      = 500
 
