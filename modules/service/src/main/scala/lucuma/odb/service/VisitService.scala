@@ -388,13 +388,13 @@ object VisitService:
     val SetOriginalTimeEstimate: Command[(ExecutionDigest, Observation.Id)] =
       sql"""
         UPDATE t_observation
-           SET c_orig_est_full_setup_time       = $time_span,
-               c_orig_est_reacq_setup_time      = $time_span,
-               c_orig_est_setup_count           = $int4_nonneg,
-               c_orig_est_sci_non_charged_time  = $time_span,
-               c_orig_est_sci_program_time      = $time_span,
-               c_orig_est_full_non_charged_time = $time_span,
-               c_orig_est_full_program_time     = $time_span
+           SET c_orig_est_full_setup_time        = $time_span,
+               c_orig_est_reacq_setup_time       = $time_span,
+               c_orig_est_setup_count            = $int4_nonneg,
+               c_orig_est_sci_non_charged_time   = $time_span,
+               c_orig_est_sci_program_time       = $time_span,
+               c_orig_est_total_non_charged_time = $time_span,
+               c_orig_est_total_program_time     = $time_span
          WHERE c_observation_id = $observation_id
            AND c_orig_est_setup_count IS NULL
       """.command.contramap: (digest, oid) =>

@@ -54,7 +54,7 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
                 nonCharged { seconds }
                 total { seconds }
               }
-              fullTimeEstimate {
+              total {
                 program { seconds }
                 nonCharged { seconds }
                 total { seconds }
@@ -92,7 +92,7 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
                 "nonCharged": { "seconds": 0.000000 },
                 "total": { "seconds": ${ProgramTime.asJson} }
               },
-              "fullTimeEstimate": {
+              "total": {
                 "program": { "seconds": ${FullTime.asJson} },
                 "nonCharged": { "seconds": 0.000000 },
                 "total": { "seconds": ${FullTime.asJson} }
@@ -214,7 +214,7 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
           program { microseconds }
           nonCharged { microseconds }
         }
-        fullTimeEstimate {
+        total {
           program { microseconds }
           nonCharged { microseconds }
         }

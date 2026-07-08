@@ -8391,7 +8391,7 @@ type ExecutionDigest {
   science: SequenceDigest
 
   "Full time estimate: science time plus full setup time for every setup."
-  fullTimeEstimate: CategorizedTime! @deprecated(reason: "Use `estimate.fullTimeEstimate` instead.")
+  fullTimeEstimate: CategorizedTime! @deprecated(reason: "Use `estimate.total` instead.")
 
 }
 
@@ -8413,8 +8413,8 @@ type ObservationTimeEstimate {
   "Science sequence time estimate."
   science: CategorizedTime!
 
-  "Full time estimate: science time plus full setup time for every setup."
-  fullTimeEstimate: CategorizedTime!
+  "Total time estimate: science time plus full setup time for every setup."
+  total: CategorizedTime!
 
 }
 

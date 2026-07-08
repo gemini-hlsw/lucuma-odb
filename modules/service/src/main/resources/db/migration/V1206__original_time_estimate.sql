@@ -13,18 +13,18 @@
 --     to the SetupTime and setup count of the execution digest;
 --   * sci(ence) non-charged / program times are the CategorizedTime estimate
 --     for the science sequence;
---   * full non-charged / program times are the full time estimate: science
+--   * total non-charged / program times are the full time estimate: science
 --     time plus full setup time for every setup, charged according to the
 --     science sequence observe class.
 
 ALTER TABLE t_observation
-  ADD COLUMN c_orig_est_full_setup_time       interval NULL CHECK (c_orig_est_full_setup_time       >= interval '0 seconds'),
-  ADD COLUMN c_orig_est_reacq_setup_time      interval NULL CHECK (c_orig_est_reacq_setup_time      >= interval '0 seconds'),
-  ADD COLUMN c_orig_est_setup_count           int4     NULL CHECK (c_orig_est_setup_count           >= 0),
-  ADD COLUMN c_orig_est_sci_non_charged_time  interval NULL CHECK (c_orig_est_sci_non_charged_time  >= interval '0 seconds'),
-  ADD COLUMN c_orig_est_sci_program_time      interval NULL CHECK (c_orig_est_sci_program_time      >= interval '0 seconds'),
-  ADD COLUMN c_orig_est_full_non_charged_time interval NULL CHECK (c_orig_est_full_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_orig_est_full_program_time     interval NULL CHECK (c_orig_est_full_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_full_setup_time        interval NULL CHECK (c_orig_est_full_setup_time        >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_reacq_setup_time       interval NULL CHECK (c_orig_est_reacq_setup_time       >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_setup_count            int4     NULL CHECK (c_orig_est_setup_count            >= 0),
+  ADD COLUMN c_orig_est_sci_non_charged_time   interval NULL CHECK (c_orig_est_sci_non_charged_time   >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_sci_program_time       interval NULL CHECK (c_orig_est_sci_program_time       >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_total_non_charged_time interval NULL CHECK (c_orig_est_total_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_total_program_time     interval NULL CHECK (c_orig_est_total_program_time     >= interval '0 seconds'),
 
   -- The original estimate is recorded in a single step: either every column
   -- is null (not yet executed) or every column is set.
@@ -35,8 +35,8 @@ ALTER TABLE t_observation
       c_orig_est_setup_count,
       c_orig_est_sci_non_charged_time,
       c_orig_est_sci_program_time,
-      c_orig_est_full_non_charged_time,
-      c_orig_est_full_program_time
+      c_orig_est_total_non_charged_time,
+      c_orig_est_total_program_time
     ) IN (0, 7)
   );
 
