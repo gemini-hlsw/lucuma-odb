@@ -156,6 +156,17 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
         val ObservationDuration: ColumnRef = col("c_observation_duration", time_span.embedded)
       }
 
+      object OriginalEstimate {
+        val SyntheticId: ColumnRef        = col("c_original_estimate_id",           observation_id.embedded)
+        val FullSetupTime: ColumnRef      = col("c_orig_est_full_setup_time",       time_span.embedded)
+        val ReacqSetupTime: ColumnRef     = col("c_orig_est_reacq_setup_time",      time_span.embedded)
+        val SetupCount: ColumnRef         = col("c_orig_est_setup_count",           int4_nonneg.embedded)
+        val SciNonChargedTime: ColumnRef  = col("c_orig_est_sci_non_charged_time",  time_span.embedded)
+        val SciProgramTime: ColumnRef     = col("c_orig_est_sci_program_time",      time_span.embedded)
+        val TotalNonChargedTime: ColumnRef = col("c_orig_est_total_non_charged_time", time_span.embedded)
+        val TotalProgramTime: ColumnRef    = col("c_orig_est_total_program_time",     time_span.embedded)
+      }
+
     }
 
 }

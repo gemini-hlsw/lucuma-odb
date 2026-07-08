@@ -27,7 +27,7 @@ object GnirsImagingInput extends ImagingFilterCheck:
   // Variant = Grouped
   // Order = Increasing
   // Offsets = Spiral
-  // Size = 10 (the keyhole is far smaller than the F2/GMOS fields)
+  // Size = 10 (the GNIRS imaging field is far smaller than the F2/GMOS fields)
   val DefaultVariant: ImagingVariantInput =
     ImagingVariantInput.Grouped(
       WavelengthOrder.Increasing.some,

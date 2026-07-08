@@ -117,9 +117,26 @@ trait SequenceCodec {
 
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
+      // `ExecutionDigest` has four canonical fields: `setup`, `setupCount`,
+      // `acquisition` and `science`.  Everything else the encoder emits --
+      // `fullTimeEstimate` and the entire `estimate` object (`estimate.science`,
+      // `estimate.total`) -- is a derived, output-only projection with no place
+      // to live in the model, so it is intentionally ignored here and recomputed
+      // from the fields below.
+      //
+      // `setup` and `setupCount` appear twice in the encoded form: under the
+      // (current) `estimate` object and as deprecated top-level fields.  Read
+      // the non-deprecated location first, falling back to the deprecated one,
+      // so this decoder accepts older / third-party payloads AND keeps working
+      // once the deprecated top-level fields are removed.  `acquisition` and
+      // `science` are not duplicated -- they exist only at the top level.
+      val est = c.downField("estimate")
+      def read[A: Decoder](name: String): Decoder.Result[A] =
+        val fromEstimate = est.downField(name).as[A]
+        if fromEstimate.isRight then fromEstimate else c.downField(name).as[A]
       for {
-        t <- c.downField("setup").as[SetupTime]
-        n <- c.downField("setupCount").as[NonNegInt]
+        t <- read[SetupTime]("setup")
+        n <- read[NonNegInt]("setupCount")
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
       } yield ExecutionDigest(t, n, a, s)
@@ -128,11 +145,17 @@ trait SequenceCodec {
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
-        "setup"            -> a.setup.asJson,
-        "setupCount"       -> a.setupCount.asJson,
+        "estimate"         -> Json.obj(
+          "setup"            -> a.setup.asJson,
+          "setupCount"       -> a.setupCount.asJson,
+          "science"          -> a.science.timeEstimate.asJson,
+          "total"            -> a.fullTimeEstimate.asJson
+        ),
+        "setup"            -> a.setup.asJson,        // deprecated, use estimate.setup
+        "setupCount"       -> a.setupCount.asJson,   // deprecated, use estimate.setupCount
         "acquisition"      -> a.acquisition.asJson,
         "science"          -> a.science.asJson,
-        "fullTimeEstimate" -> a.fullTimeEstimate.asJson
+        "fullTimeEstimate" -> a.fullTimeEstimate.asJson  // deprecated, use estimate.total
       )
     }
 
