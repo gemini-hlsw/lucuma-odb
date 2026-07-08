@@ -5,15 +5,14 @@ package lucuma.sso.service
 package graphql
 package mutation
 
-import lucuma.sso.service.orcid.OrcidIdGenerator
 import cats.effect.IO
+import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.Partner
 import lucuma.core.model.StandardUser
 import lucuma.sso.service.database.RoleRequest
-import lucuma.core.enums.Partner
-import io.circe.Json
-import cats.syntax.all.*
 import lucuma.sso.service.database.RoleType
+import lucuma.sso.service.orcid.OrcidIdGenerator
 
 object deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests with OrcidIdGenerator[IO]:
 

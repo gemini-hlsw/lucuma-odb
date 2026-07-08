@@ -6,9 +6,9 @@ package graphql
 package mutation
 
 import io.circe.literal.*
-import lucuma.sso.service.database.RoleRequest
 import lucuma.core.enums.Partner
 import lucuma.core.model.StandardRole
+import lucuma.sso.service.database.RoleRequest
 
 object addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
