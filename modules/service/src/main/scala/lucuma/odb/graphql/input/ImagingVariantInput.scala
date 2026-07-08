@@ -7,6 +7,7 @@ package input
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.syntax.*
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
@@ -23,10 +24,11 @@ sealed trait ImagingVariantInput:
 object ImagingVariantInput:
 
   case class Grouped(
-    order:      Option[WavelengthOrder],
-    offsets:    Nullable[TelescopeConfigGeneratorInput],
-    skyCount:   Option[NonNegInt],
-    skyOffsets: Nullable[TelescopeConfigGeneratorInput]
+    order:           Option[WavelengthOrder],
+    offsets:         Nullable[TelescopeConfigGeneratorInput],
+    skyCount:        Option[NonNegInt],
+    skyOffsets:      Nullable[TelescopeConfigGeneratorInput],
+    exposuresPerOffset: Option[PosInt]
   ) extends ImagingVariantInput:
     def variantType: ImagingVariantType =
       ImagingVariantType.Grouped
@@ -59,48 +61,57 @@ object ImagingVariantInput:
 
   val order: Optional[ImagingVariantInput, Option[WavelengthOrder]] =
     Optional[ImagingVariantInput, Option[WavelengthOrder]] {
-      case Grouped(o, _, _, _) => o.some
-      case _                   => none
+      case Grouped(o, _, _, _, _) => o.some
+      case _                      => none
     } { order => {
-      case Grouped(_, offsets, skyCount, skyOffsets) => Grouped(order, offsets, skyCount, skyOffsets)
-      case in                                        => in
+      case g: Grouped => g.copy(order = order)
+      case in         => in
     }}
 
   val offsets: Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] =
     Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] {
-      case Grouped(_, o, _, _)  => o.some
-      case Interleaved(o, _, _) => o.some
-      case _                    => none
+      case Grouped(_, o, _, _, _) => o.some
+      case Interleaved(o, _, _)   => o.some
+      case _                      => none
     } { gen => {
-      case Grouped(order, _, skyCount, skyOffsets) => Grouped(order, gen, skyCount, skyOffsets)
-      case Interleaved(_, skyCount, skyOffsets)    => Interleaved(gen, skyCount, skyOffsets)
-      case in                                      => in
+      case g: Grouped                           => g.copy(offsets = gen)
+      case Interleaved(_, skyCount, skyOffsets) => Interleaved(gen, skyCount, skyOffsets)
+      case in                                   => in
     }}
 
   val skyCount: Optional[ImagingVariantInput, Option[NonNegInt]] =
     Optional[ImagingVariantInput, Option[NonNegInt]] {
-      case Grouped(_, _, c, _)  => c.some
-      case Interleaved(_, c, _) => c.some
-      case _                    => none
+      case Grouped(_, _, c, _, _) => c.some
+      case Interleaved(_, c, _)   => c.some
+      case _                      => none
     } { skyCount => {
-      case Grouped(order, offsets, _, skyOffsets) => Grouped(order, offsets, skyCount, skyOffsets)
-      case Interleaved(offsets, _, skyOffsets)    => Interleaved(offsets, skyCount, skyOffsets)
-      case in                                     => in
+      case g: Grouped                          => g.copy(skyCount = skyCount)
+      case Interleaved(offsets, _, skyOffsets) => Interleaved(offsets, skyCount, skyOffsets)
+      case in                                  => in
     }}
 
   val skyOffsets: Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] =
     Optional[ImagingVariantInput, Nullable[TelescopeConfigGeneratorInput]] {
-      case Grouped(_, _, _, o)  => o.some
-      case Interleaved(_, _, o) => o.some
-      case _                    => none
+      case Grouped(_, _, _, o, _) => o.some
+      case Interleaved(_, _, o)   => o.some
+      case _                      => none
     } { gen => {
-      case Grouped(order, offsets, skyCount, _) => Grouped(order, offsets, skyCount, gen)
-      case Interleaved(offsets, skyCount, _)    => Interleaved(offsets, skyCount, gen)
-      case in                                   => in
+      case g: Grouped                        => g.copy(skyOffsets = gen)
+      case Interleaved(offsets, skyCount, _) => Interleaved(offsets, skyCount, gen)
+      case in                                => in
+    }}
+
+  val exposuresPerOffset: Optional[ImagingVariantInput, Option[PosInt]] =
+    Optional[ImagingVariantInput, Option[PosInt]] {
+      case Grouped(_, _, _, _, k) => k.some
+      case _                      => none
+    } { k => {
+      case g: Grouped => g.copy(exposuresPerOffset = k)
+      case in         => in
     }}
 
   val Default: ImagingVariantInput =
-    Grouped(none, Nullable.Absent, none, Nullable.Absent)
+    Grouped(none, Nullable.Absent, none, Nullable.Absent, none)
 
   val Binding: Matcher[ImagingVariantInput] =
     val GroupedBinding: Matcher[ImagingVariantInput] =
@@ -109,10 +120,11 @@ object ImagingVariantInput:
           WavelengthOrderBinding.Option("order", rOrder),
           TelescopeConfigGeneratorInput.Binding.Nullable("offsets", rOffsets),
           NonNegIntBinding.Option("skyCount", rSkyCount),
-          TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets)
-        ) => (rOrder, rOffsets, rSkyCount, rSkyOffsets).parMapN:
-          (order, offsets, skyCount, skyOffsets) =>
-            Grouped(order, offsets, skyCount, skyOffsets)
+          TelescopeConfigGeneratorInput.Binding.Nullable("skyOffsets", rSkyOffsets),
+          PosIntBinding.Option("exposuresPerOffset", rExposuresPerOffset)
+        ) => (rOrder, rOffsets, rSkyCount, rSkyOffsets, rExposuresPerOffset).parMapN:
+          (order, offsets, skyCount, skyOffsets, exposuresPerOffset) =>
+            Grouped(order, offsets, skyCount, skyOffsets, exposuresPerOffset)
 
     val InterleavedBinding: Matcher[ImagingVariantInput] =
       ObjectFieldsBinding.rmap:

@@ -220,7 +220,7 @@ object GnirsImagingService:
           val offsetUpdates =
             SET.variant.fold(().pure[F]): v =>
               val (o, s) = v match
-                case ImagingVariantInput.Grouped(_, offsets, _, skyOffsets)  => (offsets, skyOffsets)
+                case ImagingVariantInput.Grouped(_, offsets, _, skyOffsets, _)  => (offsets, skyOffsets)
                 case ImagingVariantInput.Interleaved(offsets, _, skyOffsets) => (offsets, skyOffsets)
                 case _                                                       => (Nullable.Null, Nullable.Null)
               updateOffsetForRole(o, v.variantType, TelescopeConfigGeneratorRole.Object) *>
@@ -326,6 +326,7 @@ object GnirsImagingService:
             $imaging_variant,
             $wavelength_order,
             $int4_nonneg,
+            $int4_pos,
             $offset,
             $offset,
             $offset,
@@ -340,6 +341,7 @@ object GnirsImagingService:
             input.variant.variantType,
             ImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(WavelengthOrder.Increasing),
             ImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
+            ImagingVariantInput.exposuresPerOffset.getOption(input.variant).flatten.getOrElse(PosInt.MinValue),
             ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset1).getOrElse(Offset.Zero),
             ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset2).getOrElse(Offset.Zero),
             ImagingVariantInput.preImaging.getOption(input.variant).flatMap(_.offset3).getOrElse(Offset.Zero),

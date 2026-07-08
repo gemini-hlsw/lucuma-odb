@@ -36,11 +36,12 @@ trait GnirsImagingMapping[F[_]]
 
   lazy val GnirsGroupedImagingMapping: ObjectMapping =
     ObjectMapping(GnirsImagingType / "variant" / "grouped")(
-      SqlField("observationId", GnirsImagingView.Grouped.ObservationId, key = true, hidden = true),
-      SqlField("order",         GnirsImagingView.Grouped.WavelengthOrder),
-      SqlField("skyCount",      GnirsImagingView.Sky.Count),
-      SqlObject("offsets",      Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",   Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+      SqlField("observationId",   GnirsImagingView.Grouped.ObservationId, key = true, hidden = true),
+      SqlField("order",           GnirsImagingView.Grouped.WavelengthOrder),
+      SqlField("skyCount",        GnirsImagingView.Sky.Count),
+      SqlField("exposuresPerOffset", GnirsImagingView.Grouped.ExposuresPerOffset),
+      SqlObject("offsets",        Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",     Join(GnirsImagingView.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val GnirsInterleavedImagingMapping: ObjectMapping =

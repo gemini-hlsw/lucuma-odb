@@ -33,7 +33,8 @@ object GnirsImagingInput extends ImagingFilterCheck:
       WavelengthOrder.Increasing.some,
       Nullable.NonNull(TelescopeConfigGeneratorInput.SpiralInput(Angle.fromMicroarcseconds(10_000_000L), none, none)),
       none,
-      Nullable.Absent
+      Nullable.Absent,
+      none
     )
 
   val DefaultCoadds: PosInt = 1.refined

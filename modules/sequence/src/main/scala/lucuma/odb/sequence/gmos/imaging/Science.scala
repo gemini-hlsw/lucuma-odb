@@ -13,6 +13,7 @@ import cats.data.State
 import cats.effect.Sync
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import fs2.Chunk
 import fs2.Pure
 import fs2.Stream
@@ -75,10 +76,11 @@ object Science:
       yield ()
 
     def grouped(
-      config:     Config[L],
-      time:       NonEmptyMap[L, Zipper[Result]],
-      offsets:    List[TelescopeConfig],
-      skyOffsets: List[TelescopeConfig]
+      config:          Config[L],
+      time:            NonEmptyMap[L, Zipper[Result]],
+      offsets:         List[TelescopeConfig],
+      skyOffsets:      List[TelescopeConfig],
+      exposuresPerOffset: PosInt
     )(using Order[L]): Stream[Pure, ProtoAtom[ProtoStep[D]]] =
 
       def oneFilter(filter: L): State[D, Stream[Pure, ProtoAtom[ProtoStep[D]]]] =
@@ -88,7 +90,10 @@ object Science:
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.NightCal)
-          obj <- offsets.take(integrationTime.exposureCount.value)
+          // Each object offset position gets `exposuresPerOffset` consecutive
+          // exposures.  The overall exposure count from the ITC still caps the
+          // total, so the final position may receive fewer than that many.
+          obj <- offsets.flatMap(o => List.fill(exposuresPerOffset.value)(o)).take(integrationTime.exposureCount.value)
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
         yield
@@ -218,11 +223,14 @@ object Science:
           yield (o, s)
 
         val protoAtoms = config.variant match
-          case Variant.Grouped(_, offsets, skyCount, skyOffsets)  =>
+          case Variant.Grouped(_, offsets, skyCount, skyOffsets, exposuresPerOffset)  =>
             // The same pattern is repeated for each filter so we need enough
-            // offsets to cover the filter with the most exposures.
-            generateOffsets(offsets, skyCount, skyOffsets)(_.max).map: (o, s) =>
-              state.grouped(config, nem, o, s)
+            // offsets to cover the filter with the most exposures.  Each offset
+            // position is visited `exposuresPerOffset` times, so we only need
+            // ceil(max / exposuresPerOffset) distinct positions.
+            val k = exposuresPerOffset.value
+            generateOffsets(offsets, skyCount, skyOffsets)(cs => (cs.max + k - 1) / k).map: (o, s) =>
+              state.grouped(config, nem, o, s, exposuresPerOffset)
 
           case Variant.Interleaved(offsets, skyCount, skyOffsets) =>
             // The offset pattern is applied to the sequence as a whole so we
@@ -237,7 +245,7 @@ object Science:
               NonEmptyList.of(o1, o2, o3, o4).map(o => TelescopeConfig(o, StepGuideState.Enabled))
             val skyOffsets = TelescopeConfigGenerator.NoGenerator
             generateOffsets(offsets, NonNegInt.MinValue, skyOffsets)(_.max).map: (o, s) =>
-              state.grouped(config, nem, o, s)
+              state.grouped(config, nem, o, s, PosInt.MinValue)
 
         protoAtoms.map: v =>
           ImagingSequence.makeGenerator(estimator, static, namespace, v)

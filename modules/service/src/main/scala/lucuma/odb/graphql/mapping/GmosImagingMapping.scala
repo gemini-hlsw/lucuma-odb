@@ -39,11 +39,12 @@ trait GmosImagingMapping[F[_]] extends GmosImagingView[F]
     c: GmosImagingCommonColumns
   ): ObjectMapping =
     ObjectMapping(p)(
-      SqlField("observationId", c.Grouped.ObservationId, key = true, hidden = true),
-      SqlField("order",         c.Grouped.WavelengthOrder),
-      SqlField("skyCount",      c.Sky.Count),
-      SqlObject("offsets",      Join(c.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
-      SqlObject("skyOffsets",   Join(c.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
+      SqlField("observationId",   c.Grouped.ObservationId, key = true, hidden = true),
+      SqlField("order",           c.Grouped.WavelengthOrder),
+      SqlField("skyCount",        c.Sky.Count),
+      SqlField("exposuresPerOffset", c.Grouped.ExposuresPerOffset),
+      SqlObject("offsets",        Join(c.ObservationId, TelescopeConfigGeneratorView.ObjectObservationId)),
+      SqlObject("skyOffsets",     Join(c.ObservationId, TelescopeConfigGeneratorView.SkyObservationId)),
     )
 
   lazy val GmosNorthGroupedImagingMapping: ObjectMapping =

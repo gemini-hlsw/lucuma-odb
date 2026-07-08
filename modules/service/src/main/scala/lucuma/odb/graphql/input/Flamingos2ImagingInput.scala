@@ -30,7 +30,8 @@ object Flamingos2ImagingInput extends ImagingFilterCheck:
       WavelengthOrder.Increasing.some,
       Nullable.NonNull(TelescopeConfigGeneratorInput.SpiralInput(Angle.fromMicroarcseconds(30_000_000L), none, none)),
       none,
-      Nullable.Absent
+      Nullable.Absent,
+      none
     )
 
   case class Create(

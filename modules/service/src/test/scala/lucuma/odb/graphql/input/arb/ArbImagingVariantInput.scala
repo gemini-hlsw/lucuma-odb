@@ -5,6 +5,7 @@ package lucuma.odb.graphql.input
 package arb
 
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.WavelengthOrder
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset
@@ -28,7 +29,8 @@ trait ArbImagingVariantInput:
         of <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
         sc <- Gen.option(Gen.choose(0, 100).map(NonNegInt.unsafeFrom))
         so <- arbitrary[Nullable[TelescopeConfigGeneratorInput]]
-      yield ImagingVariantInput.Grouped(wo, of, sc, so)
+        ic <- Gen.option(Gen.choose(1, 10).map(PosInt.unsafeFrom))
+      yield ImagingVariantInput.Grouped(wo, of, sc, so, ic)
 
   given arbVariantInputInterleaved: Arbitrary[ImagingVariantInput.Interleaved] =
     Arbitrary:

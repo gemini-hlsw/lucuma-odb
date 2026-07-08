@@ -193,7 +193,7 @@ object Science:
           yield (o, s)
 
         val protoAtoms = config.variant match
-          case Variant.Grouped(_, offsets, skyCount, skyOffsets)  =>
+          case Variant.Grouped(_, offsets, skyCount, skyOffsets, _)  =>
             // The same pattern is repeated for each filter so we need enough
             // offsets to cover the filter with the most exposures.
             generateOffsets(offsets, skyCount, skyOffsets)(_.max).map: (o, s) =>
