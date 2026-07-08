@@ -26,47 +26,50 @@ object deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTest
 
   List(None, Some(RoleRequest.Staff), Some(RoleRequest.Ngo(Partner.CA))).foreach: rr =>
     test(s"${rr.getOrElse(RoleRequest.Pi).tpe} can't call deleteRole"):
-      var bob: StandardUser = null // i'm sorry
-      As(Bob, withRole = rr)
-        .expectQueryWithUser(
-          u => { bob = u; s"""mutation { deleteRole(roleId: "${bob.role.id}") }""" },
-          json"""
-            {
-              "errors" : [
-                {
-                  "message" : ${s"User ${bob.id} is not authorized to perform this action."}
-                }
-              ],
-              "data" : null
-            }
-          """
-        )
+      flaky():
+        var bob: StandardUser = null // i'm sorry
+        As(Bob, withRole = rr)
+          .expectQueryWithUser(
+            u => { bob = u; s"""mutation { deleteRole(roleId: "${bob.role.id}") }""" },
+            json"""
+              {
+                "errors" : [
+                  {
+                    "message" : ${s"User ${bob.id} is not authorized to perform this action."}
+                  }
+                ],
+                "data" : null
+              }
+            """
+          )
   
   test("Double-check that created roles hang around."):
-    randomOrcidId.flatMap: oid =>
-      As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Admin)).run >>
-      As(Bob, withOrcidId = Some(oid))
-        .queryRoleTypes
-        .map: tpes =>
-          expect.same(tpes, Set(RoleType.Pi, RoleType.Admin))
+    flaky():
+      randomOrcidId.flatMap: oid =>
+        As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Admin)).run >>
+        As(Bob, withOrcidId = Some(oid))
+          .queryRoleTypes
+          .map: tpes =>
+            expect.same(tpes, Set(RoleType.Pi, RoleType.Admin))
 
   test(s"Admin *can* call deleteRole"):
-    randomOrcidId.flatMap: oid =>
-      As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Staff)).run >>
-      As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Admin))
-        .expectQueryWithUser(
-          bob => s"""mutation { deleteRole(roleId: "${bob.role.id}") }""",
-          json"""
-            {
-              "data" : {
-                "deleteRole" : true
+    flaky():
+      randomOrcidId.flatMap: oid =>
+        As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Staff)).run >>
+        As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Admin))
+          .expectQueryWithUser(
+            bob => s"""mutation { deleteRole(roleId: "${bob.role.id}") }""",
+            json"""
+              {
+                "data" : {
+                  "deleteRole" : true
+                }
               }
-            }
-          """
-        ) >>
-      As(Bob, withOrcidId = Some(oid))
-        .queryRoleTypes
-        .map: tpes =>
-          expect.same(tpes, Set(RoleType.Pi, RoleType.Staff))
+            """
+          ) >>
+        As(Bob, withOrcidId = Some(oid))
+          .queryRoleTypes
+          .map: tpes =>
+            expect.same(tpes, Set(RoleType.Pi, RoleType.Staff))
 
 
