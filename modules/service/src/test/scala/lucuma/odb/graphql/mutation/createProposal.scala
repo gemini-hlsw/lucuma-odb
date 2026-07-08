@@ -1688,6 +1688,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   category: EXOPLANET_HOST_STAR
                   keck: {
+                    minPercentTime: 30
                     partnerSplits: [{ partner: US, percent: 100 }]
                   }
                 }
@@ -1697,6 +1698,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 category
                 gemini { scienceSubtype }
                 keck {
+                  minPercentTime
                   partnerSplits {
                     partner
                     percent
@@ -1714,11 +1716,47 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category": "EXOPLANET_HOST_STAR",
                 "gemini": null,
                 "keck": {
+                  "minPercentTime": 30,
                   "partnerSplits": [
                     { "partner": "US", "percent": 100 }
                   ]
                 },
                 "subaru": null
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("✓ Keck exchange proposal defaults minPercentTime to 100"):
+    createProgramAs(pi, "Keck Proposal Default").flatMap: pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  keck: {
+                    partnerSplits: [{ partner: US, percent: 100 }]
+                  }
+                }
+              }
+            ) {
+              proposal {
+                keck { minPercentTime }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "keck": {
+                  "minPercentTime": 100
+                }
               }
             }
           }
@@ -1737,6 +1775,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   subaru: {
                     type: INTENSIVE
+                    minPercentTime: 30
                     partnerSplits: [{ partner: US, percent: 100 }]
                   }
                 }
@@ -1747,6 +1786,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 keck { partnerSplits { partner } }
                 subaru {
                   type
+                  minPercentTime
                   partnerSplits { partner percent }
                 }
               }
@@ -1761,6 +1801,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "keck": null,
                 "subaru": {
                   "type": "INTENSIVE",
+                  "minPercentTime": 30,
                   "partnerSplits": [
                     { "partner": "US", "percent": 100 }
                   ]
@@ -1788,7 +1829,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                subaru { type }
+                subaru { type minPercentTime }
               }
             }
           }
@@ -1798,7 +1839,8 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal": {
               "proposal": {
                 "subaru": {
-                  "type": "NORMAL"
+                  "type": "NORMAL",
+                  "minPercentTime": 100
                 }
               }
             }
