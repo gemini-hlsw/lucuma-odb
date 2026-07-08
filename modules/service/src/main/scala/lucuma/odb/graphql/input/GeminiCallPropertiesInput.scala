@@ -7,7 +7,6 @@ package input
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
-import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.syntax.string.*
@@ -22,7 +21,7 @@ object GeminiCallPropertiesInput:
     coordinateLimits: SiteCoordinateLimitsInput.Create,
     instruments:      List[Instrument],
     proprietary:      Option[NonNegInt],
-    exchangePartners: List[ExchangePartner]
+    exchangePartners: List[CallForProposalsExchangePartnerInput]
   )
 
   object Create:
@@ -34,11 +33,11 @@ object GeminiCallPropertiesInput:
           SiteCoordinateLimitsInput.Create.Binding.Option("coordinateLimits", rLimits),
           InstrumentBinding.List.Option("instruments", rInstruments),
           NonNegIntBinding.Option("proprietaryMonths", rProprietary),
-          ExchangePartnerBinding.List.Option("exchangePartners", rExchange)
+          CallForProposalsExchangePartnerInput.Binding.List.Option("exchangePartners", rExchange)
         ) =>
           val rTypeʹ        = rType.flatMap(Result.fromOption(_, Matcher.validationProblem("'type' is required for Gemini calls.")))
           val rInstrumentsʹ = dedup("instruments",      rInstruments)(_.tag.toScreamingSnakeCase).map(_.toList.flatten)
-          val rExchangeʹ    = dedup("exchangePartners", rExchange)(_.tag.toScreamingSnakeCase).map(_.toList.flatten)
+          val rExchangeʹ    = dedup("exchangePartners", rExchange)(_.exchangePartner.tag.toScreamingSnakeCase).map(_.toList.flatten)
           (
             rTypeʹ,
             rLimits,
@@ -60,7 +59,7 @@ object GeminiCallPropertiesInput:
     coordinateLimits: Option[SiteCoordinateLimitsInput.Edit],
     instruments:      Nullable[List[Instrument]],
     proprietary:      Option[NonNegInt],
-    exchangePartners: Nullable[List[ExchangePartner]]
+    exchangePartners: Nullable[List[CallForProposalsExchangePartnerInput]]
   )
 
   object Edit:
@@ -72,10 +71,10 @@ object GeminiCallPropertiesInput:
           SiteCoordinateLimitsInput.Edit.Binding.Option("coordinateLimits", rLimits),
           InstrumentBinding.List.Nullable("instruments", rInstruments),
           NonNegIntBinding.Option("proprietaryMonths", rProprietary),
-          ExchangePartnerBinding.List.Nullable("exchangePartners", rExchange)
+          CallForProposalsExchangePartnerInput.Binding.List.Nullable("exchangePartners", rExchange)
         ) =>
           val rInstrumentsʹ = dedup("instruments",      rInstruments)(_.tag.toScreamingSnakeCase)
-          val rExchangeʹ    = dedup("exchangePartners", rExchange)(_.tag.toScreamingSnakeCase)
+          val rExchangeʹ    = dedup("exchangePartners", rExchange)(_.exchangePartner.tag.toScreamingSnakeCase)
           (
             rType,
             rLimits,

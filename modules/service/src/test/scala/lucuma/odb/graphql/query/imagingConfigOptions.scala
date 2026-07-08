@@ -32,11 +32,15 @@ class imagingConfigOptions extends OdbSuite {
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_capability, c_site) values('Alopeke', 4, 3000000, 'EO466', false, 'speckle', 'gn')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Flamingos2', 5, 366000000, 'Y', false, 'gs')".command) *>
       s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Flamingos2', 6, 366000000, 'K-short', false, 'gs')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Gnirs', 7, 20000000, 'H', true, 'gn')".command) *>
+      s.execute(sql"insert into t_imaging_config_option (c_instrument, c_index, c_fov, c_filter_label, c_ao, c_site) values('Gnirs', 8, 16000000, 'Y', true, 'gn')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 1, 'ZPrime_CaT')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_north values('GmosNorth', 2, 'OVI')".command) *>
       s.execute(sql"insert into t_imaging_config_option_gmos_south values('GmosSouth', 3, 'OVIC')".command) *>
       s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 5, 'Y')".command) *>
-      s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 6, 'KShort')".command)).void
+      s.execute(sql"insert into t_imaging_config_option_flamingos_2 values('Flamingos2', 6, 'KShort')".command) *>
+      s.execute(sql"insert into t_imaging_config_option_gnirs values('Gnirs', 7, 'Order4', 'ShortBlue')".command) *>
+      s.execute(sql"insert into t_imaging_config_option_gnirs values('Gnirs', 8, 'Y', 'LongBlue')".command)).void
   }
 
   case class ConfigOption(
@@ -173,7 +177,7 @@ class imagingConfigOptions extends OdbSuite {
   }
 
   test("adaptiveOptics false") {
-    val expect = allOptions  // for now, all are AO-free
+    val expect = allOptions.map(_.filter(!_.ao))
     val actual = optionsWhere(s"""adaptiveOptics: { EQ: false }""")
     for {
       es <- expect
@@ -182,9 +186,12 @@ class imagingConfigOptions extends OdbSuite {
   }
 
   test("adaptiveOptics true") {
-    optionsWhere(s"""adaptiveOptics: { EQ: true }""").map { a =>
-      assertEquals(List.empty[ConfigOption], a) // for now, there are none
-    }
+    val expect = allOptions.map(_.filter(_.ao))
+    val actual = optionsWhere(s"""adaptiveOptics: { EQ: true }""")
+    for {
+      es <- expect
+      as <- actual
+    } yield assertEquals(es, as)
   }
 
   test("""100" < FoV < 400"""") {
@@ -338,6 +345,44 @@ class imagingConfigOptions extends OdbSuite {
             {
               "flamingos2": {
                 "filter": "Y"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("Gnirs") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          imagingConfigOptions(
+            WHERE: {
+              instrument: { EQ: GNIRS }
+            }
+          ) {
+            gnirs {
+              filter
+              camera
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "imagingConfigOptions": [
+            {
+              "gnirs": {
+                "filter": "ORDER4",
+                "camera": "SHORT_BLUE"
+              }
+            },
+            {
+              "gnirs": {
+                "filter": "Y",
+                "camera": "LONG_BLUE"
               }
             }
           ]

@@ -20,7 +20,7 @@ val flywayVersion                = "12.10.0"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
 val grackleVersion               = "0.28.1"
-val http4sVersion                = "0.23.34"
+val http4sVersion                = "0.23.36"
 val http4sBlazeVersion           = "0.23.17"
 val http4sJdkHttpClientVersion   = "0.10.0"
 val http4sOtel4sVersion          = "0.18.0"
@@ -30,7 +30,7 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.5.37"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.216.4"
+val lucumaCoreVersion            = "0.217.0"
 val lucumaGraphQLRoutesVersion   = "0.13.7"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -45,7 +45,7 @@ val openTelemetryVersion         = "1.63.0"
 val openTelemetryInstrVersion    = "2.26.1-alpha"
 val otel4sVersion                = "1.0.1"
 val paigesVersion                = "0.4.4"
-val postgresVersion              = "42.7.12"
+val postgresVersion              = "42.7.13"
 val pprintVersion                = "0.9.6"
 val redis4CatsVersion            = "2.0.5"
 val refinedVersion               = "0.11.4"
@@ -408,11 +408,13 @@ lazy val ssoBackendClient = project
 
 lazy val ssoService = project
   .in(file("modules/sso-service"))
-  .dependsOn(ssoBackendClient, binding)
+  .dependsOn(ssoBackendClient, binding, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .settings(
     name := "lucuma-sso-service",
+    // Include internal (unpublished) project dependencies, like common, in the package
+    projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     libraryDependencies ++= Seq(
       "org.typelevel"       %% "grackle-skunk"              % grackleVersion,
       "org.tpolecat"        %% "skunk-core"                 % skunkVersion,
@@ -549,6 +551,8 @@ lazy val itcService = project
   .settings(itcCommonSettings)
   .settings(
     name                  := "lucuma-itc-service",
+    // Include internal (unpublished) project dependencies in the package
+    projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     description              := "ITC Server",
     scalacOptions -= "-Vtype-diffs",
     reStart / javaOptions := Seq(
@@ -713,6 +717,21 @@ lazy val itcLegacyTests = project
 
 // START ODB
 
+lazy val common = project
+  .in(file("modules/common-middleware"))
+  .enablePlugins(NoPublishPlugin)
+  .settings(
+    name := "lucuma-common-middleware",
+    libraryDependencies ++= Seq(
+      "org.http4s"    %% "http4s-client"  % http4sVersion,
+      "org.http4s"    %% "http4s-core"    % http4sVersion,
+      "org.http4s"    %% "http4s-server"  % http4sVersion,
+      "org.typelevel" %% "cats-core"      % catsVersion,
+      "org.typelevel" %% "cats-effect"    % catsEffectVersion,
+      "org.scalameta" %% "munit"          % munitVersion % Test
+    )
+  )
+
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
@@ -799,7 +818,7 @@ lazy val smartgcal = project
 
 lazy val service = project
   .in(file("modules/service"))
-  .dependsOn(binding, otel, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient)
+  .dependsOn(binding, otel, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .settings(
@@ -937,7 +956,7 @@ lazy val resourceModel =
 
 lazy val resourceService = project
   .in(file("resource/service"))
-  .dependsOn(resourceModel, binding, otel, schema.jvm)
+  .dependsOn(resourceModel, binding, otel, schema.jvm, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(resourceCommonSettings, buildInfoSettings)
   .settings(

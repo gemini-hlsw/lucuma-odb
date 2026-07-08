@@ -104,14 +104,11 @@ object Main extends IOApp with ItcCacheOrRemote {
 
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
-  /** A middleware that adds CORS headers. In production the origin must match the cookie domain. */
-  def cors(env: ExecutionEnvironment, domain: Option[String]): CORSPolicy =
-    env match
-      case Local | Review | Staging =>
-        CORS.policy
-      case Production               =>
-        CORS.policy
-          .withAllowOriginHostCi(domain.contains)
+  /**
+   * CORS policy. ITC serves public, unauthenticated calculations, so any origin is allowed.
+   */
+  val corsPolicy: CORSPolicy =
+    CORS.policy
 
   def cacheMiddleware[F[_]: Functor](service: HttpRoutes[F]): HttpRoutes[F] =
     Kleisli: (req: Request[F]) =>
@@ -181,7 +178,7 @@ object Main extends IOApp with ItcCacheOrRemote {
     yield wsb =>
       otelMiddleware.asHttpRoutesMiddleware:
         GZip:
-          cors(cfg.environment, none):
+          corsPolicy:
             cacheMiddleware:
               Metrics[F](metricsOps):
                 Routes.forService(_ => GraphQLService[F](mapping).some.pure[F], wsb, "itc")

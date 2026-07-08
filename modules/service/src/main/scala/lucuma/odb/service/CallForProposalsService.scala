@@ -16,7 +16,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
-import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
@@ -32,6 +31,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.CallForProposalsExchangePartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPartnerInput
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput.Create
 import lucuma.odb.graphql.input.CallForProposalsPropertiesInput.Edit
@@ -153,6 +153,12 @@ object CallForProposalsService:
               case Create.ObservatoryCallProperties.Gemini(g) => g.instruments
               case _                                          => Nil
 
+          // Exchange partners now live in their own table (t_gemini_cfp_exchange_partner).
+          val exchangePartners: List[CallForProposalsExchangePartnerInput] =
+            SET.observatoryCall match
+              case Create.ObservatoryCallProperties.Gemini(g) => g.exchangePartners
+              case _                                          => Nil
+
           case class UsingCid(cid: CallForProposals.Id):
             val cids = List(cid)
 
@@ -175,11 +181,18 @@ object CallForProposalsService:
                 .use(_.execute(cids, geminiInstruments))
                 .whenA(geminiInstruments.nonEmpty)
 
+            val insertExchangePartners: F[Unit] =
+              session
+                .prepareR(Statements.InsertExchangePartners(cids, exchangePartners))
+                .use(_.execute(cids, exchangePartners))
+                .whenA(exchangePartners.nonEmpty)
+
           (for
             cid <- ResultT(insertCfp)
             usingCid = UsingCid(cid)
             _   <- ResultT.liftF(usingCid.insertPartners)
             _   <- ResultT.liftF(usingCid.insertInstruments)
+            _   <- ResultT.liftF(usingCid.insertExchangePartners)
           yield cid).value
 
       private def updateCfpTable(
@@ -234,6 +247,24 @@ object CallForProposalsService:
           .fold(delete, Concurrent[F].unit, is => delete *> insert(is))
           .map(_.success)
 
+      private def updateExchangePartners(
+        cids:     List[CallForProposals.Id],
+        partners: Nullable[List[CallForProposalsExchangePartnerInput]]
+      ): F[Result[Unit]] =
+        val delete =
+          session.executeCommand(Statements.DeleteExchangePartners(cids)).void
+
+        def insert(vals: List[CallForProposalsExchangePartnerInput]) =
+          session
+            .prepareR(Statements.InsertExchangePartners(cids, vals))
+            .use(_.execute(cids, vals))
+            .whenA(vals.nonEmpty)
+            .void
+
+        partners
+          .fold(delete, Concurrent[F].unit, is => delete *> insert(is))
+          .map(_.success)
+
       // Changing the observatory of an existing CfP would require rewriting all
       // of the observatory-discriminated columns (and re-deriving coordinate
       // limit defaults per row).  That switch is not yet supported, so we reject
@@ -262,11 +293,17 @@ object CallForProposalsService:
               case Some(Edit.ObservatoryCallProperties.Gemini(g)) => g.instruments
               case _                                              => Nullable.Absent
 
+          val exchangePartners: Nullable[List[CallForProposalsExchangePartnerInput]] =
+            SET.observatoryCall match
+              case Some(Edit.ObservatoryCallProperties.Gemini(g)) => g.exchangePartners
+              case _                                              => Nullable.Absent
+
           (for
             _    <- ResultT(checkObservatory(SET, which))
             cids <- ResultT(updateCfpTable(SET, which))
             _    <- ResultT(updatePartners(cids, SET.partners))
             _    <- ResultT(updateGeminiInstruments(cids, geminiInstruments))
+            _    <- ResultT(updateExchangePartners(cids, exchangePartners))
           yield cids).value
 
   object Statements:
@@ -301,7 +338,6 @@ object CallForProposalsService:
       north:       CoordinateLimitsInput.Create,
       south:       Option[CoordinateLimitsInput.Create],
       proprietary: Option[NonNegInt],
-      exchange:    Option[List[ExchangePartner]],
       keck:        Option[List[KeckInstrument]],
       subaru:      Option[List[SubaruInstrument]],
       subaruType:  Option[SubaruCallForProposalsType]
@@ -316,7 +352,6 @@ object CallForProposalsService:
             north       = g.coordinateLimits.north,
             south       = g.coordinateLimits.south.some,
             proprietary = g.proprietary,
-            exchange    = g.exchangePartners.some,
             keck        = none,
             subaru      = none,
             subaruType  = none
@@ -327,7 +362,6 @@ object CallForProposalsService:
             north       = k.coordinateLimits,
             south       = none,
             proprietary = none,
-            exchange    = none,
             keck        = k.instruments.some,
             subaru      = none,
             subaruType  = none
@@ -338,7 +372,6 @@ object CallForProposalsService:
             north       = s.coordinateLimits,
             south       = none,
             proprietary = none,
-            exchange    = none,
             keck        = none,
             subaru      = s.instruments.some,
             subaruType  = s.subaruType.some
@@ -363,7 +396,6 @@ object CallForProposalsService:
           c_active_start,
           c_active_end,
           c_gemini_proprietary,
-          c_gemini_exchange_partners,
           c_keck_instruments,
           c_subaru_instruments,
           c_subaru_proposal_type,
@@ -386,7 +418,6 @@ object CallForProposalsService:
           $date,
           $date,
           COALESCE(${int4_nonneg.opt}, (SELECT c_proprietary FROM t_gemini_cfp_type WHERE c_type = ${gemini_proposal_type.opt})),
-          ${_exchange_partner.opt},
           ${_keck_instrument.opt},
           ${_subaru_instrument.opt},
           ${subaru_proposal_type.opt},
@@ -413,7 +444,6 @@ object CallForProposalsService:
           input.active.end,
           c.proprietary,
           c.cfpType,           // for the proprietary-default subquery
-          c.exchange,
           c.keck,
           c.subaru,
           c.subaruType,
@@ -478,6 +508,31 @@ object CallForProposalsService:
           WHERE c_cfp_id IN ${cfp_id.list(cids.length).values}
       """.apply(cids)
 
+    def InsertExchangePartners(
+      cids:     List[CallForProposals.Id],
+      partners: List[CallForProposalsExchangePartnerInput]
+    ): Command[(cids.type, partners.type)] =
+      sql"""
+        INSERT INTO t_gemini_cfp_exchange_partner (
+          c_cfp_id,
+          c_exchange_partner,
+          c_deadline_override
+        ) VALUES ${(
+          cfp_id           *:
+          exchange_partner *:
+          core_timestamp.opt
+        ).values.list(cids.length * partners.length)}
+      """.command
+         .contramap:
+           case (cids, partners) => cids.flatMap: cid =>
+             partners.map(p => (cid, p.exchangePartner, p.deadline))
+
+    def DeleteExchangePartners(cids: List[CallForProposals.Id]): AppliedFragment =
+      sql"""
+        DELETE FROM t_gemini_cfp_exchange_partner
+          WHERE c_cfp_id IN ${cfp_id.list(cids.length).values}
+      """.apply(cids)
+
     def UpdateCallsForProposals(
       SET:   Edit,
       which: AppliedFragment
@@ -497,7 +552,6 @@ object CallForProposalsService:
       val upSemester     = sql"c_semester                 = $semester"
       val upType         = sql"c_gemini_proposal_type     = $gemini_proposal_type"
       val upProprietary  = sql"c_gemini_proprietary       = $int4_nonneg"
-      val upExchange     = sql"c_gemini_exchange_partners = ${_exchange_partner}"
       val upKeckInstr    = sql"c_keck_instruments         = ${_keck_instrument}"
       val upSubaruInstr  = sql"c_subaru_instruments       = ${_subaru_instrument}"
       val upSubaruType   = sql"c_subaru_proposal_type     = $subaru_proposal_type"
@@ -513,9 +567,7 @@ object CallForProposalsService:
             List(
               g.cfpType.map(upType),
               g.proprietary.map(upProprietary),
-              // The Gemini discriminant requires a non-null array, so a null
-              // reset is stored as the empty array.
-              g.exchangePartners.fold(List.empty[ExchangePartner].some, none, _.some).map(upExchange),
+              // Exchange partners are updated separately (updateExchangePartners).
               north.flatMap(_.raStart).map(gnRaStart),
               north.flatMap(_.raEnd).map(gnRaEnd),
               north.flatMap(_.decStart).map(gnDecStart),

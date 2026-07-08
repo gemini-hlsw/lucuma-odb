@@ -165,6 +165,9 @@ trait Services[F[_]]:
   /** The `GmosSequenceService` */
   def gmosSequenceService: GmosSequenceService[F]
 
+  /** The `GnirsImagingService`. */
+  def gnirsImagingService: GnirsImagingService[F]
+
   /** The `GnirsSequenceService` */
   def gnirsSequenceService: GnirsSequenceService[F]
 
@@ -360,6 +363,7 @@ object Services:
       lazy val gmosLongSlitService = GmosLongSlitService.instantiate
       lazy val gmosImagingService = GmosImagingService.instantiate
       lazy val gmosSequenceService = GmosSequenceService.instantiate
+      lazy val gnirsImagingService = GnirsImagingService.instantiate
       lazy val gnirsSequenceService = GnirsSequenceService.instantiate
       lazy val gnirsSpectroscopyService = GnirsSpectroscopyService.instantiate
       lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
@@ -431,6 +435,7 @@ object Services:
     def flamingos2ImagingService[F[_]](using Services[F]): Flamingos2ImagingService[F] = summon[Services[F]].flamingos2ImagingService
     def gmosImagingService[F[_]](using Services[F]): GmosImagingService[F] = summon[Services[F]].gmosImagingService
     def gmosSequenceService[F[_]](using Services[F]): GmosSequenceService[F] = summon[Services[F]].gmosSequenceService
+    def gnirsImagingService[F[_]](using Services[F]): GnirsImagingService[F] = summon[Services[F]].gnirsImagingService
     def gnirsSequenceService[F[_]](using Services[F]): GnirsSequenceService[F] = summon[Services[F]].gnirsSequenceService
     def gnirsSpectroscopyService[F[_]](using Services[F]): GnirsSpectroscopyService[F] = summon[Services[F]].gnirsSpectroscopyService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService

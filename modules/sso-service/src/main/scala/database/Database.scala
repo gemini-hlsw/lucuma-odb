@@ -83,6 +83,9 @@ trait Database[F[_]] {
   /** Return the SSO service user itself. Requests to other services should be done on behalf of this user. */
   def getSsoServiceUser: F[ServiceUser]
 
+  def deleteAllSessionTokensForUser(uid: User.Id): F[Unit]
+  def deleteAllSessionTokensForRole(id: StandardRole.Id): F[Unit]
+  def deleteRole(id: StandardRole.Id): F[Unit]
 }
 
 object Database extends Codecs {
@@ -168,7 +171,7 @@ object Database extends Codecs {
       def getUserFromToken(token: SessionToken): F[User] =
         Trace[F].span("getUserFromToken") {
           findUserFromToken(token)
-            .flatMap(_.toRight(new RuntimeException(s"No user for session token: ${token.value}")).liftTo[F])
+            .flatMap(_.toRight(new RuntimeException(s"Invalid session token: ${token.value}")).liftTo[F])
         }
 
       def promoteGuestUser(
@@ -208,6 +211,21 @@ object Database extends Codecs {
         Trace[F].span("deleteAllSessionTokensForUser") {
           s.prepareR(sql"DELETE FROM lucuma_session WHERE user_id = $user_id".command)
             .use(_.execute(uid))
+            .void
+        }
+
+      def deleteAllSessionTokensForRole(id: StandardRole.Id): F[Unit] =
+        Trace[F].span("deleteAllSessionTokensForRole") {
+          s.prepareR(sql"DELETE FROM lucuma_session WHERE role_id = $role_id".command)
+            .use(_.execute(id))
+            .void
+        }
+
+      def deleteRole(id: StandardRole.Id): F[Unit] =
+        deleteAllSessionTokensForRole(id) >>
+        Trace[F].span("deleteAllSessionTokensForRole") {
+          s.prepareR(sql"DELETE FROM lucuma_role WHERE role_id = $role_id AND role_type <> 'pi'".command)
+            .use(_.execute(id))
             .void
         }
 
@@ -275,6 +293,7 @@ object Database extends Codecs {
       //   s.prepareR(SelectDefaultRole).use(_.option(id))
 
       def deleteUser(id: User.Id): F[Boolean] =
+        deleteAllSessionTokensForUser(id) >>
         Trace[F].span("deleteUser") {
           s.prepareR(DeleteUser).use { pq =>
             pq.execute(id).map {

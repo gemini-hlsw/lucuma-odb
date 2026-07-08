@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.Applicative
+import cats.data.NonEmptyList
 import cats.data.StateT
 import cats.effect.Concurrent
 import cats.syntax.all.*
@@ -62,6 +63,14 @@ trait TimeAccountingService[F[_]] {
   def selectObservation(
     observationId: Observation.Id
   )(using Transaction[F], SuperUserAccess): F[Option[CategorizedTime]]
+
+  /**
+   * Sums the final time accounting result for each of the given observations. Observations with
+   * no visits are absent from the resulting map.
+   */
+  def selectObservations(
+    observationIds: List[Observation.Id]
+  )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, CategorizedTime]]
 
   /**
    * Sums the final time accounting result for all observations of a program.
@@ -256,6 +265,14 @@ object TimeAccountingService {
       )(using Transaction[F], SuperUserAccess): F[Option[CategorizedTime]] =
         session
           .option(SelectObservation)(observationId)
+
+      def selectObservations(
+        observationIds: List[Observation.Id]
+      )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, CategorizedTime]] =
+        NonEmptyList.fromList(observationIds.distinct) match
+          case None      => Map.empty.pure
+          case Some(nel) =>
+            session.execute(Statements.selectObservations(nel))(nel).map(_.toMap)
 
       def selectProgram(
         programId: Program.Id
@@ -544,6 +561,19 @@ object TimeAccountingService {
         FROM t_visit
         WHERE c_observation_id = $observation_id
       """.query(categorized_time)
+
+    def selectObservations(
+      oids: NonEmptyList[Observation.Id]
+    ): Query[oids.type, (Observation.Id, CategorizedTime)] =
+      sql"""
+        SELECT
+          c_observation_id,
+          COALESCE(SUM(c_final_non_charged_time), '0'::interval),
+          COALESCE(SUM(c_final_program_time), '0'::interval)
+        FROM t_visit
+        WHERE c_observation_id IN (${observation_id.nel(oids)})
+        GROUP BY c_observation_id
+      """.query(observation_id *: categorized_time)
 
     val SelectProgram: Query[Program.Id, BandedTime] =
       sql"""

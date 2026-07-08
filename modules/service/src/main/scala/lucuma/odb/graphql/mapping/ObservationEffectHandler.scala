@@ -14,6 +14,7 @@ import grackle.Query
 import grackle.Query.EffectHandler
 import grackle.Result
 import grackle.ResultT
+import io.circe.Encoder as CirceEncoder
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -25,13 +26,44 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
   protected def effectHandler[E, R](
     readEnv:   Env => Result[E],
     calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
-  )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =
+  )(using Eq[E], CirceEncoder[R]): EffectHandler[F] =
     readQueryAndCursorEffectHander((_, c) => readEnv(c.fullEnv), calculate)
+
+  /**
+   * Batched effect handler keyed by observation id
+   * `calculateAll` receives every observation id in the result at once and returns a per-observation
+   * result map.
+   * It replaces the one transaction per observation N+1 of `effectHandler`.
+   */
+  protected def batchedEffectHandler[R](
+    calculateAll: List[Observation.Id] => F[Map[Observation.Id, Result[R]]]
+  )(using CirceEncoder[R]): EffectHandler[F] =
+    new EffectHandler[F] {
+
+      private def oids(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
+        queries.traverse:
+          case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
+
+      private def missing(oid: Observation.Id): Result[R] =
+        Result.failure(s"No result computed for observation $oid")
+
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (for {
+          os  <- ResultT(oids(queries).pure[F])
+          map <- ResultT.liftF(calculateAll(os))
+          res <- ResultT(os.zip(queries).traverse { case (oid, (query, parentCursor)) =>
+                   for {
+                     r            <- map.getOrElse(oid, missing(oid))
+                     childContext <- Query.childContext(parentCursor.context, query)
+                   } yield CirceCursor(childContext, r.asJson, Some(parentCursor), parentCursor.fullEnv)
+                 }.pure)
+        } yield res).value
+    }
 
   protected def readQueryAndCursorEffectHander[E, R](
     readQueryAndCursor:   (Query, Cursor) => Result[E],
     calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
-  )(using Eq[E], io.circe.Encoder[R]): EffectHandler[F] =
+  )(using Eq[E], CirceEncoder[R]): EffectHandler[F] =
 
     new EffectHandler[F] {
 

@@ -31,6 +31,13 @@ import scala.collection.mutable.ArrayBuilder
 sealed trait ItcInput:
   def targets: NonEmptyList[ItcInput.TargetDefinition]
 
+  /**
+   * The asterism target the user selected to drive the signal-to-noise
+   * calculation, if any. When present, the ITC "selected" result is pinned to
+   * this target rather than chosen automatically (brightest).
+   */
+  def signalToNoiseTargetId: Option[Target.Id]
+
 object ItcInput:
 
   private given HashBytes[TargetInput]            = HashBytes.forJsonEncoder
@@ -58,6 +65,7 @@ object ItcInput:
   case class Imaging(
     science: NonEmptyList[ImagingParameters],
     targets: NonEmptyList[TargetDefinition],
+    signalToNoiseTargetId: Option[Target.Id]
   ) extends ItcInput derives Eq:
 
     def scienceInput: NonEmptyList[ImagingInput] =
@@ -70,6 +78,7 @@ object ItcInput:
         a.science.toList.foreach: params =>
           bld.addAll(params.hashBytes)
         bld.addAll(hashTargets(a.targets))
+        bld.addAll(a.signalToNoiseTargetId.hashBytes)
         bld.result()
 
   /**
@@ -80,7 +89,8 @@ object ItcInput:
     acquisition: ImagingParameters,
     science:     SpectroscopyParameters,
     targets:     NonEmptyList[TargetDefinition],
-    blindOffset: Option[TargetDefinition]
+    blindOffset: Option[TargetDefinition],
+    signalToNoiseTargetId: Option[Target.Id]
   ) extends ItcInput derives Eq:
 
     def acquisitionTargets: NonEmptyList[TargetDefinition] =
@@ -98,7 +108,8 @@ object ItcInput:
         Array.concat(
           a.acquisition.hashBytes,
           a.science.hashBytes,
-          hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets))
+          hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets)),
+          a.signalToNoiseTargetId.hashBytes
         )
 
   /**
@@ -107,7 +118,8 @@ object ItcInput:
     */
   case class ScienceOnlySpectroscopy(
     science: SpectroscopyParameters,
-    targets: NonEmptyList[TargetDefinition]
+    targets: NonEmptyList[TargetDefinition],
+    signalToNoiseTargetId: Option[Target.Id]
   ) extends ItcInput derives Eq:
 
     def scienceInput: SpectroscopyInput =
@@ -118,7 +130,8 @@ object ItcInput:
       def hashBytes(a: ScienceOnlySpectroscopy): Array[Byte] =
         Array.concat(
           a.science.hashBytes,
-          hashTargets(a.targets)
+          hashTargets(a.targets),
+          a.signalToNoiseTargetId.hashBytes
         )
 
   val spectroscopy: Prism[ItcInput, ItcInput.Spectroscopy] =
@@ -143,6 +156,6 @@ object ItcInput:
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _)                  => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _)       => in.hashBytes
-        case in @ ScienceOnlySpectroscopy(_, _)  => in.hashBytes
+        case in @ Imaging(_, _, _)                  => in.hashBytes
+        case in @ Spectroscopy(_, _, _, _, _)       => in.hashBytes
+        case in @ ScienceOnlySpectroscopy(_, _, _)  => in.hashBytes

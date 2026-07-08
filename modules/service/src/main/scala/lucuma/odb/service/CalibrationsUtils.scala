@@ -352,6 +352,7 @@ trait CalibrationObservations {
                 List(tid).some,
                 none,
                 none,
+                none,
                 BlindOffsetType.Manual
               ).some,
               constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
@@ -392,6 +393,7 @@ trait CalibrationObservations {
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,
+                none,
                 none,
                 none,
                 BlindOffsetType.Manual

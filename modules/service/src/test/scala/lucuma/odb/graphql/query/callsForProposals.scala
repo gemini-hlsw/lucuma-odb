@@ -296,6 +296,44 @@ class callsForProposals extends OdbSuite:
         """.asRight
       )
 
+  test("WHERE isOpen (active exchange partner only)"):
+    // No Gemini partner deadline and no default; the call is open solely because
+    // an exchange partner still has a future submission deadline.
+    createCall(s"""
+      semester:    "2025B"
+      activeStart: "2025-02-02"
+      activeEnd:   "2099-07-30"
+      gemini: {
+        type: DEMO_SCIENCE
+        exchangePartners: [
+          { exchangePartner: KECK, submissionDeadlineOverride: "3000-01-01 00:00:00" }
+        ]
+      }
+    """.stripMargin
+    ).flatMap: id =>
+      expect(pi,
+        s"""
+          query {
+            callsForProposals(WHERE: { AND: [{ isOpen: { EQ: true } }, { id: { EQ: "$id" } }] }) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "callsForProposals": {
+              "matches": [
+                {
+                  "id": $id
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
   test("WHERE allowsNonPartnerPi"):
     expect(pi,
       s"""
@@ -390,7 +428,11 @@ class callsForProposals extends OdbSuite:
                 proprietaryMonths
                 allowsNonPartnerPi
                 nonPartnerDeadline
-                exchangePartners
+                exchangePartners {
+                  exchangePartner
+                  submissionDeadlineOverride
+                  submissionDeadline
+                }
               }
               keck {
                 instruments

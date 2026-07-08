@@ -13,25 +13,26 @@ import skunk.codec.all.*
 trait ObservationView[F[_]] extends BaseMapping[F] {
 
     object ObservationView extends TableDef("v_observation") {
-      val ProgramId: ColumnRef           = col("c_program_id",             program_id)
-      val Id: ColumnRef                  = col("c_observation_id",         observation_id)
-      val ObservationIndex: ColumnRef    = col("c_observation_index",      int4_pos)
-      val Existence: ColumnRef           = col("c_existence",              existence)
-      val Title: ColumnRef               = col("c_title",                  text_nonempty)
-      val Subtitle: ColumnRef            = col("c_subtitle",               text_nonempty.opt)
-      val Instrument: ColumnRef          = col("c_instrument",             instrument.opt)
-      val ScienceBand: ColumnRef         = col("c_science_band",           science_band.opt)
-      val ObservationTime: ColumnRef     = col("c_observation_time",       core_timestamp.opt)
-      val AsterismGroup: ColumnRef       = col("c_asterism_group",         jsonb)
-      val GroupId: ColumnRef             = col("c_group_id",               group_id.opt)
-      val GroupIndex: ColumnRef          = col("c_group_index",            int2_nonneg)
-      val CalibrationRole: ColumnRef     = col("c_calibration_role",       calibration_role.opt)
-      val ObserverNotes: ColumnRef       = col("c_observer_notes",         text_nonempty.opt)
-      val ReferenceTime: ColumnRef       = col("c_reference_time",         core_timestamp.opt)
-      val UseBlindOffset: ColumnRef      = col("c_use_blind_offset",       bool)
-      val BlindOffsetTargetId: ColumnRef = col("c_blind_offset_target_id", target_id.opt)
-      val BlindOffsetType: ColumnRef     = col("c_blind_offset_type",      blind_offset_type)
-      val IsSplittable: ColumnRef        = col("c_is_splittable",          bool)
+      val ProgramId: ColumnRef             = col("c_program_id",                program_id)
+      val Id: ColumnRef                    = col("c_observation_id",            observation_id)
+      val ObservationIndex: ColumnRef      = col("c_observation_index",         int4_pos)
+      val Existence: ColumnRef             = col("c_existence",                 existence)
+      val Title: ColumnRef                 = col("c_title",                     text_nonempty)
+      val Subtitle: ColumnRef              = col("c_subtitle",                  text_nonempty.opt)
+      val Instrument: ColumnRef            = col("c_instrument",                instrument.opt)
+      val ScienceBand: ColumnRef           = col("c_science_band",              science_band.opt)
+      val ObservationTime: ColumnRef       = col("c_observation_time",          core_timestamp.opt)
+      val AsterismGroup: ColumnRef         = col("c_asterism_group",            jsonb)
+      val GroupId: ColumnRef               = col("c_group_id",                  group_id.opt)
+      val GroupIndex: ColumnRef            = col("c_group_index",               int2_nonneg)
+      val CalibrationRole: ColumnRef       = col("c_calibration_role",          calibration_role.opt)
+      val ObserverNotes: ColumnRef         = col("c_observer_notes",            text_nonempty.opt)
+      val ReferenceTime: ColumnRef         = col("c_reference_time",            core_timestamp.opt)
+      val UseBlindOffset: ColumnRef        = col("c_use_blind_offset",          bool)
+      val BlindOffsetTargetId: ColumnRef   = col("c_blind_offset_target_id",    target_id.opt)
+      val BlindOffsetType: ColumnRef       = col("c_blind_offset_type",         blind_offset_type)
+      val SignalToNoiseTargetId: ColumnRef = col("c_signal_to_noise_target_id", target_id.opt)
+      val IsSplittable: ColumnRef          = col("c_is_splittable",             bool)
 
       val AcquisitionSequenceIsMaterialized: ColumnRef =
         col("c_acquisition_sequence_is_materialized", bool)
@@ -153,6 +154,17 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       object ObservationDuration {
         val SyntheticId: ColumnRef = col("c_observation_duration_id", observation_id.embedded)
         val ObservationDuration: ColumnRef = col("c_observation_duration", time_span.embedded)
+      }
+
+      object OriginalEstimate {
+        val SyntheticId: ColumnRef        = col("c_original_estimate_id",           observation_id.embedded)
+        val FullSetupTime: ColumnRef      = col("c_orig_est_full_setup_time",       time_span.embedded)
+        val ReacqSetupTime: ColumnRef     = col("c_orig_est_reacq_setup_time",      time_span.embedded)
+        val SetupCount: ColumnRef         = col("c_orig_est_setup_count",           int4_nonneg.embedded)
+        val SciNonChargedTime: ColumnRef  = col("c_orig_est_sci_non_charged_time",  time_span.embedded)
+        val SciProgramTime: ColumnRef     = col("c_orig_est_sci_program_time",      time_span.embedded)
+        val TotalNonChargedTime: ColumnRef = col("c_orig_est_total_non_charged_time", time_span.embedded)
+        val TotalProgramTime: ColumnRef    = col("c_orig_est_total_program_time",     time_span.embedded)
       }
 
     }

@@ -63,6 +63,7 @@ object SsoSimulator {
         jwtWriter = config.ssoJwtWriter,
         publicUri = config.publicUri,
         cookies   = CookieService[F]("lucuma.xyz", true),
+        cookieDomain = "lucuma.xyz",
       ) <+> GraphQLRoutes(
         LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su },
         pool,

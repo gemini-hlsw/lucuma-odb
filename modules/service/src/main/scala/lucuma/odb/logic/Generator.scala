@@ -100,11 +100,26 @@ sealed trait Generator[F[_]]:
     observationId: Observation.Id
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]]
 
+  /**
+   * Materializes the execution sequence (if not already materialized) and then,
+   * in the same transaction, executes the given action.  The generator context
+   * used for the materialization is passed to the action.
+   */
   def materializeAndThen[A](
     oid:  Observation.Id
   )(
-    f: Transaction[F] ?=> F[Either[OdbError, A]]
+    f: GeneratorContext => Transaction[F] ?=> F[Either[OdbError, A]]
   )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]]
+
+  /**
+   * Calculates the ExecutionDigest from an already resolved generator context,
+   * reading the materialized sequence when present and generating it otherwise.
+   * No cached digest is consulted, so the result always reflects the current
+   * state of the sequence.
+   */
+  def calculateDigest(
+    ctx: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, ExecutionDigest]]
 
 object Generator:
 
@@ -236,6 +251,8 @@ object Generator:
               EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImagingSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
+            case ObservingModeType.GnirsImaging       =>
+              EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, calculator.gnirsImagingSetup))
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, calculator.gnirsLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
@@ -295,6 +312,7 @@ object Generator:
           case ObservingModeType.GmosNorthLongSlit  => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
           case ObservingModeType.GmosSouthImaging   => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
           case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
+          case ObservingModeType.GnirsImaging       => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
           case _: VisitorObservingModeType          =>
@@ -390,6 +408,11 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
 
+            case ObservingModeType.GnirsImaging       =>
+              EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
+                .flatMap(s => EitherT.liftF(executionConfig(s)))
+                .map(InstrumentExecutionConfig.Gnirs.apply)
+
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
@@ -441,9 +464,12 @@ object Generator:
               EitherT(streaming.generateGmosSouthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.resetGmosSouthAcquisition(observationId, s.acquisition)))
 
-            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
-              // GNIRS acquisition sequence not yet implemented.
+            case ObservingModeType.GnirsImaging       =>
               EitherT.pure(())
+
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
+              EitherT(streaming.generateGnirsSpectroscopy(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.resetGnirsAcquisition(observationId, s.acquisition)))
 
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT.pure(())
@@ -451,10 +477,15 @@ object Generator:
             case _: VisitorObservingModeType =>
               EitherT.pure(())
 
+      override def calculateDigest(
+        ctx: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, ExecutionDigest]] =
+        calcDigestFromContext(ctx).value
+
       override def materializeAndThen[A](
         oid:  Observation.Id
       )(
-        f: Transaction[F] ?=> F[Either[OdbError, A]]
+        f: GeneratorContext => Transaction[F] ?=> F[Either[OdbError, A]]
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, A]] =
 
         def materializeExecutionConfig(
@@ -490,6 +521,10 @@ object Generator:
               EitherT(streaming.generateGmosSouthLongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
 
+            case ObservingModeType.GnirsImaging       =>
+              EitherT(streaming.generateGnirsImaging(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s)))
+
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               EitherT(streaming.generateGnirsSpectroscopy(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s)))
@@ -505,10 +540,10 @@ object Generator:
               EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>
-          materializeExecutionConfig(ctx) *> EitherT(f)
+          materializeExecutionConfig(ctx) *> EitherT(f(ctx))
 
 
       override def materialize(
         oid:  Observation.Id,
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
-        materializeAndThen(oid)(().asRight[OdbError].pure[F])
+        materializeAndThen(oid)(_ => ().asRight[OdbError].pure[F])

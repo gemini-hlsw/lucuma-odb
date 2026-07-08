@@ -485,11 +485,10 @@ type GeminiCallProperties {
   nonPartnerDeadline: Timestamp
 
   """
-  Exchange partners that may apply for Gemini time on this call, if any.
-  These partners use the `submissionDeadlineDefault` from the shared CfP
-  properties.
+  Exchange partners that may apply for Gemini time on this call, if any, each
+  with an optional submission deadline override.
   """
-  exchangePartners: [ExchangePartner!]!
+  exchangePartners: [CallForProposalsExchangePartner!]!
 }
 
 """
@@ -520,12 +519,13 @@ input GeminiCallPropertiesInput {
   proprietaryMonths: NonNegInt
 
   """
-  Exchange partners that may apply for Gemini time on this call, if any. These
-  partners use the `submissionDeadlineDefault` from the shared CfP properties.
-  This value is optional and defaults to an empty array.  It may be assigned a
-  null value to reset it to the empty array.
+  Exchange partners that may apply for Gemini time on this call, if any, each
+  with an optional submission deadline override.  This value is optional and
+  defaults to an empty array.  It may be assigned a null value to reset it to
+  the empty array.  When editing, supply the entire list of exchange partners to
+  set.
   """
-  exchangePartners: [ExchangePartner!]
+  exchangePartners: [CallForProposalsExchangePartnerInput!]
 
 }
 
@@ -855,6 +855,34 @@ input CallForProposalsPartnerInput {
   """
   If this partner has an explicit submission deadline that overrides the
   Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
+  Otherwise, the partner deadline is the default deadline for the call.
+  """
+  submissionDeadlineOverride: Timestamp
+}
+
+type CallForProposalsExchangePartner {
+  exchangePartner: ExchangePartner!
+
+  """
+  Sets the submission deadline for this exchange partner, overriding the
+  'submissionDeadlineDefault' for the Call for Proposals.
+  """
+  submissionDeadlineOverride: Timestamp
+
+  """
+  The submission deadline for this exchange partner.  This will be the
+  'submissionDeadlineOverride' if specified, but otherwise the
+  'submissionDeadlineDefault' of the Call for Proposals itself.
+  """
+  submissionDeadline: Timestamp
+}
+
+input CallForProposalsExchangePartnerInput {
+  exchangePartner: ExchangePartner!
+
+  """
+  If this exchange partner has an explicit submission deadline that overrides
+  the Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
   Otherwise, the partner deadline is the default deadline for the call.
   """
   submissionDeadlineOverride: Timestamp
@@ -3784,6 +3812,11 @@ Configuration request properties.
 input ConfigurationRequestProperties {
   status: ConfigurationRequestStatus
   justification: NonEmptyString
+
+  """
+  Staff feedback on the request.  May only be set by staff.
+  """
+  feedback: NonEmptyString
 }
 
 """
@@ -5268,14 +5301,19 @@ input ObservingModeInput @oneOf {
   gmosSouthLongSlit: GmosSouthLongSlitInput
 
   """
-  The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  The gnirsImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  igrins2LongSlit: Igrins2LongSlitInput
+  gnirsImaging: GnirsImagingInput
 
   """
   The gnirsSpectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gnirsSpectroscopy: GnirsSpectroscopyInput
+
+  """
+  The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  igrins2LongSlit: Igrins2LongSlitInput
 
   """
   A visiting instrument mode. It cannot be unset with a null value.
@@ -6181,6 +6219,15 @@ input TargetEnvironmentInput {
   """
   explicitBase: CoordinatesInput
   asterism: [TargetId!]
+
+  """
+  Explicitly selects which asterism target drives the signal-to-noise (ITC)
+  calculation, overriding the automatic choice. The target must be a member of
+  the observation's asterism (after applying any `asterism` edit in the same
+  input). Assign null to clear the selection and let a representative target be
+  chosen automatically.
+  """
+  explicitSignalToNoiseTargetId: TargetId
 
   """
   Whether blind offset is enabled for this observation
@@ -7453,6 +7500,11 @@ enum ObservingModeType {
   GMOS_SOUTH_LONG_SLIT
 
   """
+  ObservingModeType GnirsImaging
+  """
+  GNIRS_IMAGING
+
+  """
   ObservingModeType GnirsLongSlit
   """
   GNIRS_LONG_SLIT
@@ -8187,6 +8239,14 @@ type Execution {
     LIMIT: NonNegInt
   ): VisitSelectResult!
 
+  """
+  The observation time estimate as it stood when the first 'observe' visit was
+  recorded, at which point the execution sequence was fixed and execution
+  began.  This is null until the first observe visit is recorded, and never
+  changes thereafter.
+  """
+  originalEstimate: ObservationTimeEstimate
+
   "Time accounting calculation for this observation."
   timeCharge: CategorizedTime!
 
@@ -8315,11 +8375,14 @@ enum Existence {
 "Summarizes the execution setup time and sequences."
 type ExecutionDigest {
 
+  "Time estimate for executing the observation."
+  estimate: ObservationTimeEstimate!
+
   "Setup time calculations."
-  setup: SetupTime!
+  setup: SetupTime! @deprecated(reason: "Use `estimate.setup` instead.")
 
   "Estimated number of setups required to complete this observation."
-  setupCount: NonNegInt!
+  setupCount: NonNegInt! @deprecated(reason: "Use `estimate.setupCount` instead.")
 
   "Acquisition sequence summary."
   acquisition: SequenceDigest
@@ -8328,7 +8391,30 @@ type ExecutionDigest {
   science: SequenceDigest
 
   "Full time estimate: science time plus full setup time for every setup."
-  fullTimeEstimate: CategorizedTime!
+  fullTimeEstimate: CategorizedTime! @deprecated(reason: "Use `estimate.total` instead.")
+
+}
+
+"""
+Time estimate for executing an observation: the setup time(s) and the science
+sequence time.  In the execution digest this estimate is continually updated
+(and reduces) as the observation is executed; in `originalEstimate` it is
+fixed at the start of execution so that the estimate may be compared with the
+actual time required after the fact.
+"""
+type ObservationTimeEstimate {
+
+  "Setup time estimates."
+  setup: SetupTime!
+
+  "Expected number of setups."
+  setupCount: NonNegInt!
+
+  "Science sequence time estimate."
+  science: CategorizedTime!
+
+  "Total time estimate: science time plus full setup time for every setup."
+  total: CategorizedTime!
 
 }
 
@@ -10257,6 +10343,135 @@ input Igrins2LongSlitInput {
   On create the default is HOT.
   """
   telluricType: TelluricTypeInput
+
+}
+
+type GnirsImagingFilter {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: GnirsFilter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Defines a GNIRS imaging filter to use along with its exposure time mode.
+"""
+input GnirsImagingFilterInput {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: GnirsFilter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+GNIRS Imaging mode.  Keyhole imaging fixes the FPU (acquisition keyhole), the
+decker (acquisition) and the acquisition mirror (in), so none of them appears
+here.
+"""
+type GnirsImaging {
+
+  """
+  Details specific to the type of imaging being performed.
+  """
+  variant: ImagingVariant!
+
+  """
+  The filters (at least one is required) to be used for data collection.
+  """
+  filters: [GnirsImagingFilter!]!
+
+  """
+  Filters as initially selected when creating the imaging mode.
+  """
+  initialFilters: [GnirsImagingFilter!]!
+
+  """
+  The camera (determines the pixel scale).
+  """
+  camera: GnirsCamera!
+
+  """
+  Coadds per exposure.
+  """
+  coadds: PosInt!
+
+  """
+  Optional explicitly specified read mode.  If not set, the read mode is
+  derived from each filter's exposure time.
+  """
+  explicitReadMode: GnirsReadMode
+
+  """
+  The wellDepth field is either explicitly specified in explicitWellDepth or
+  else taken from defaultWellDepth.
+  """
+  wellDepth: GnirsWellDepth!
+
+  """
+  Optional explicitly specified well depth. If set it overrides the default.
+  """
+  explicitWellDepth: GnirsWellDepth
+
+  """
+  Default well depth (determined by the camera).
+  """
+  defaultWellDepth: GnirsWellDepth!
+
+}
+
+"""
+GNIRS Imaging creation and edit input parameters.
+"""
+input GnirsImagingInput {
+
+  """
+  Details specific to the type of imaging being performed.  On creation, if not
+  specified, defaults to a grouped variant with an increasing-wavelength,
+  10 arcsec spiral offset generator.
+  """
+  variant: ImagingVariantInput
+
+  """
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
+  """
+  filters: [GnirsImagingFilterInput!]
+
+  """
+  The camera (determines the pixel scale).  Required on creation.
+  """
+  camera: GnirsCamera
+
+  """
+  Coadds per exposure.  On creation, if not specified, defaults to 1.
+  """
+  coadds: PosInt
+
+  """
+  The explicitReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadMode: GnirsReadMode
+
+  """
+  The explicitWellDepth field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWellDepth: GnirsWellDepth
 
 }
 
@@ -12899,6 +13114,11 @@ type ImagingConfigOption {
   """
   flamingos2: ImagingConfigOptionFlamingos2
 
+  """
+  For GNIRS options, the GNIRS configuration.  Null for other instruments.
+  """
+  gnirs: ImagingConfigOptionGnirs
+
 }
 
 type ImagingConfigOptionGmosNorth {
@@ -12911,6 +13131,11 @@ type ImagingConfigOptionGmosSouth {
 
 type ImagingConfigOptionFlamingos2 {
   filter: Flamingos2Filter!
+}
+
+type ImagingConfigOptionGnirs {
+  filter: GnirsFilter!
+  camera: GnirsCamera!
 }
 
 """
@@ -12936,6 +13161,7 @@ enum ItcType {
   GHOST_IFU,
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING,
+  GNIRS_IMAGING,
   IGRINS_2_SPECTROSCOPY,
   GNIRS_SPECTROSCOPY,
   SPECTROSCOPY
@@ -12944,11 +13170,13 @@ enum ItcType {
 """
 Contains the result of calling the ITC for all targets, but a single instrument
 configuration.  Since the observation may contain multiple targets, there may
-be multiple results. The "result" field contains the selected, representative,
-result for all targets.  If there are multiple successful results, this will
-be the one that prescribes the longest observation. If there is a mix of
-failures and successes, the overall "result" will be a failure. The "all" field
-contains results for all targets regardless.
+be multiple results. The "selected" field contains the representative result
+for all targets.  If a signal-to-noise target has been chosen for the
+observation (see `TargetEnvironment.explicitSignalToNoiseTarget`), that target's result
+is used.  Otherwise the brightest target (the one requiring the shortest
+exposure time) is used.  If there is a mix of failures and successes, the
+overall "selected" result will be a failure. The "all" field contains results
+for all targets regardless.
 """
 type ItcResultSet {
   selected: ItcResult!
@@ -12980,6 +13208,15 @@ results for all targets but a single filter.
 """
 type ItcGmosSouthImagingResultSet {
   filter:  GmosSouthFilter!
+  results: ItcResultSet!
+}
+
+"""
+Combines a GNIRS filter with an `ItcResultSet`. In other words, ITC results
+for all targets but a single filter.
+"""
+type ItcGnirsImagingResultSet {
+  filter:  GnirsFilter!
   results: ItcResultSet!
 }
 
@@ -13028,6 +13265,14 @@ set.
 type ItcGmosSouthImaging implements Itc {
   itcType: ItcType!
   gmosSouthImagingScience: [ItcGmosSouthImagingResultSet!]!
+}
+
+"""
+GNIRS imaging ITC results.  Here each filter is paired with its result set.
+"""
+type ItcGnirsImaging implements Itc {
+  itcType: ItcType!
+  gnirsImagingScience: [ItcGnirsImagingResultSet!]!
 }
 
 """
@@ -13554,6 +13799,22 @@ type ConfigurationRequest {
   program: Program!
   status: ConfigurationRequestStatus!
   justification: NonEmptyString
+
+  """
+  Staff feedback on the request.
+  """
+  feedback: NonEmptyString
+
+  """
+  Time at which the request was created.
+  """
+  createdAt: Timestamp!
+
+  """
+  Time at which the request was last updated.
+  """
+  updatedAt: Timestamp!
+
   configuration: Configuration!
   applicableObservations: [ObservationId!]!
 }
@@ -14794,14 +15055,19 @@ type ObservingMode {
   gmosSouthLongSlit: GmosSouthLongSlit
 
   """
-  IGRINS-2 Long Slit mode
+  GNIRS Imaging mode
   """
-  igrins2LongSlit: Igrins2LongSlit
+  gnirsImaging: GnirsImaging
 
   """
   GNIRS Long Slit mode
   """
   gnirsSpectroscopy: GnirsSpectroscopy
+
+  """
+  IGRINS-2 Long Slit mode
+  """
+  igrins2LongSlit: Igrins2LongSlit
 
   visitor: Visitor
 
@@ -16810,6 +17076,17 @@ type TargetEnvironment {
   ): Target
 
   """
+  The asterism target explicitly selected to drive the signal-to-noise (ITC)
+  calculation, overriding the automatic choice. This is always one of the
+  observation's asterism targets. When null, no explicit selection has been
+  made and a representative target is chosen automatically; the target that will
+  actually be used in that case is available via the `itc` field's `selected`
+  result. It is set with `TargetEnvironmentInput.explicitSignalToNoiseTargetId`
+  and is cleared automatically if the target is removed from the asterism.
+  """
+  explicitSignalToNoiseTarget: Target
+
+  """
   The base position used by navigate to slew and track the target.
   Uses the observation's stored observation time.
   Returns a GraphQL error when the observation time is required
@@ -18427,6 +18704,26 @@ input WhereConfigurationRequest {
   Matches the configuration request status.
   """
   status: WhereOrderConfigurationRequestStatus
+
+  """
+  Matches the justification.
+  """
+  justification: WhereOptionString
+
+  """
+  Matches the staff feedback.
+  """
+  feedback: WhereOptionString
+
+  """
+  Matches the creation time.
+  """
+  createdAt: WhereOrderTimestamp
+
+  """
+  Matches the last update time.
+  """
+  updatedAt: WhereOrderTimestamp
 }
 
 input WhereObservationReference {

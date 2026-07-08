@@ -27,7 +27,6 @@ import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
-import lucuma.odb.data.BasePosition
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.basePosition.given
 import lucuma.odb.service.GuideService
@@ -65,12 +64,19 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       Join(ObservationView.BlindOffsetTargetId, TargetView.TargetId)
     )
 
+  private def signalToNoiseTargetObject(name: String): SqlObject =
+    SqlObject(
+      name,
+      Join(ObservationView.SignalToNoiseTargetId, TargetView.TargetId)
+    )
+
   lazy val TargetEnvironmentMapping: ObjectMapping =
     ObjectMapping(TargetEnvironmentType)(
       SqlField("programId", ObservationView.ProgramId, hidden = true),
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       asterismObject("asterism"),
       asterismObject("firstScienceTarget"),
+      signalToNoiseTargetObject("explicitSignalToNoiseTarget"),
       SqlObject("explicitBase"),
       SqlField("useBlindOffset", ObservationView.UseBlindOffset),
       blindOffsetTargetObject("blindOffsetTarget"),
@@ -84,7 +90,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         ,
         List("instrument")
       ),
-      EffectField("basePosition", basePositionQueryHandler, List("id", "programId")),
+      EffectField("basePosition", basePositionQueryHandler, List("id")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId")),
       EffectField("guideTargetName", guideTargetNameQueryHandler, List("id", "programId"))
@@ -99,9 +105,11 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       child  = child
     )
 
-  private def blindOffsetTargetQuery(child: Query): Query =
+  // A singular target reached via a database join (blind offset / signal-to-noise
+  // target). Handled via joins, not GraphQL predicates.
+  private def singleTargetQuery(child: Query): Query =
     FilterOrderByOffsetLimit(
-      pred   = none, // Blind offset targets are handled via database joins, not GraphQL predicates
+      pred   = none,
       oss    = none,
       offset = none,
       limit  = 1.some,
@@ -137,21 +145,21 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
     case (TargetEnvironmentType, "blindOffsetTarget", Nil) =>
       Elab.transformChild { child =>
-        Unique(blindOffsetTargetQuery(child))
+        Unique(singleTargetQuery(child))
+      }
+
+    case (TargetEnvironmentType, "explicitSignalToNoiseTarget", Nil) =>
+      Elab.transformChild { child =>
+        Unique(singleTargetQuery(child))
       }
   }
 
-  def basePositionQueryHandler: EffectHandler[F] = {
-    val readEnv: Env => Result[Unit] = _ => ().success
-
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Option[BasePosition]]] =
-      (_, oid, _) =>
-        services.use: s =>
-          Services.asSuperUser:
-            s.trackingService.getBasePosition(oid)
-
-    effectHandler(readEnv, calculate)
-  }
+  def basePositionQueryHandler: EffectHandler[F] =
+    // Collapse the per-observation N+1 by resolving the whole batch in a single session. 
+    batchedEffectHandler: oids =>
+      services.use: s =>
+        Services.asSuperUser:
+          oids.traverse(oid => s.trackingService.getBasePosition(oid).tupleLeft(oid)).map(_.toMap)
 
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success

@@ -26,8 +26,10 @@ import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
+import lucuma.core.util.Enumerated
 import skunk.Codec
 import skunk.codec.numeric.int4
+import skunk.data.Arr
 import skunk.data.Type
 
 trait GnirsCodecs:
@@ -45,6 +47,9 @@ trait GnirsCodecs:
 
   val gnirs_filter: Codec[GnirsFilter] =
     enumerated(Type.varchar)
+
+  val _gnirs_filter: Codec[Arr[GnirsFilter]] =
+    Codec.array(_.tag, s => Enumerated[GnirsFilter].fromTag(s).toRight(s"Invalid GNIRS filter tag: $s"), Type("_d_tag", List(Type("d_tag"))))
 
   val gnirs_fpu_slit: Codec[GnirsFpuSlit] =
     enumerated(Type.varchar)

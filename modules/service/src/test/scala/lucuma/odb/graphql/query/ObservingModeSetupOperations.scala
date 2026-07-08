@@ -38,9 +38,12 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     )
 
   def createGhostIfuObservationAs(
-    user: User,
-    pid:  Program.Id,
-    tids: List[Target.Id]
+    user:           User,
+    pid:            Program.Id,
+    tids:           List[Target.Id],
+    resolutionMode: String         = "STANDARD",
+    redReadMode:    Option[String] = None,
+    ifu1Agitator:   Option[String] = None
   ): IO[Observation.Id] =
     createObservationWithModeAs(
       user,
@@ -49,7 +52,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       s"""
         ghostIfu: {
           stepCount: 1
-          resolutionMode: STANDARD
+          resolutionMode: $resolutionMode
           red: {
             exposureTimeMode: {
               timeAndCount: {
@@ -58,6 +61,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
                 at: { nanometers: 500 }
               }
             }
+            ${redReadMode.fold("")(m => s"explicitReadMode: $m")}
           }
           blue: {
             exposureTimeMode: {
@@ -68,6 +72,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
               }
             }
           }
+          ${ifu1Agitator.fold("")(a => s"explicitIfu1Agitator: $a")}
         }
       """
     )

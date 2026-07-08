@@ -345,10 +345,10 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
         _ <- setAcquisitionFilter(o, "ORDER4")
       yield o
 
-    // In S/N mode the fake imaging result is IntegrationTime(10s, 6): only the field
-    // steps take their coadds from the ITC exposure count (6); the through-IFU steps
-    // revert to the explicit acquisition coadds (default 1). The 10s × 6 = 60s
-    // integration resolves AUTO to Faint (5 steps with skies).
+    // In S/N mode the fake imaging result is IntegrationTime(10s, 6): every step takes its
+    // coadds from the ITC exposure count (6) — there is no fixed-exposure FPU image in the
+    // Faint LR-IFU path. The 10s × 6 = 60s integration resolves AUTO to Faint (5 steps with
+    // skies).
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -376,9 +376,9 @@ class executionAcqGnirsIfu extends ExecutionTestSupportForGnirs:
                     "steps": [
                       { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } },
-                      { "instrumentConfig": { "coadds": 1 } },
-                      { "instrumentConfig": { "coadds": 1 } },
-                      { "instrumentConfig": { "coadds": 1 } }
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } }
                     ]
                   }
                 }

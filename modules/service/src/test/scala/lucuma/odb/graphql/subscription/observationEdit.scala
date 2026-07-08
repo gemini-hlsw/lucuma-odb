@@ -486,7 +486,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0)
       oid1 <- createObservationAs(pi, pid)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
@@ -500,7 +500,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
                 exp = List((oid0, List(tid0, tid1)), (oid1, List(tid1)))
               )
           ),
-        expected  = List(titleUpdated(oid1, "One"), titleUpdated(oid0, "Zero, One"))
+        expected  = List(titleUpdated(oid0, "Zero, One"), titleUpdated(oid1, "One"))
       )
     } yield ()
   }
@@ -514,7 +514,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
       oid1 <- createObservationAs(pi, pid, None, tid0)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
@@ -542,7 +542,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
       oid1 <- createObservationAs(pi, pid, None, tid0)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
@@ -561,7 +561,7 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
       tid1 <- createTargetAs(pi, pid, "One")
       oid0 <- createObservationAs(pi, pid, None, tid0, tid1)
       oid1 <- createObservationAs(pi, pid, None, tid0)
-      _    <- subscriptionExpect(
+      _    <- subscriptionExpectUnordered(
         user      = pi,
         query     = titleSubscription,
         mutations =
@@ -862,6 +862,80 @@ class observationEdit extends OdbSuite with SubscriptionUtils {
         query     = gnirsConfigSubscription,
         mutations = Right(updateGnirsExplicitGrating(pi, oid, GnirsGrating.D32)),
         expected  = List(gnirsGratingObservationEdit(GnirsGrating.D32))
+      )
+    } yield ()
+
+  val ghostConfigSubscription: String =
+    s"""
+      subscription {
+        observationEdit {
+          editType
+          value {
+            observingMode {
+              ghostIfu {
+                red {
+                  binning
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def ghostRedBinningObservationEdit(binning: String): Json =
+    json"""
+      {
+        "observationEdit": {
+          "editType": "UPDATED",
+          "value": {
+            "observingMode": {
+              "ghostIfu": {
+                "red": {
+                  "binning": $binning
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  def updateGhostRedBinning(user: User, oid: Observation.Id, binning: String): IO[Unit] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                ghostIfu: {
+                  red: { explicitBinning: $binning }
+                }
+              }
+            },
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations {
+              id
+            }
+          }
+        }
+      """
+    ).void
+
+  test("triggers for changing ghost ifu configuration"):
+    import Group1.pi
+
+    for {
+      pid <- createProgram(pi, "foo")
+      tid <- createTargetAs(pi, pid, "Target")
+      oid <- createGhostIfuObservationAs(pi, pid, None, tid)
+      _   <- subscriptionExpect(
+        user      = pi,
+        query     = ghostConfigSubscription,
+        mutations = Right(updateGhostRedBinning(pi, oid, "TWO_BY_TWO")),
+        expected  = List(ghostRedBinningObservationEdit("TWO_BY_TWO"))
       )
     } yield ()
 

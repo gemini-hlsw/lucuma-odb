@@ -94,9 +94,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
       tc(10, 0, StepGuideState.Disabled))
 
-  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int) =
+  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "ACQUISITION", none, "ACQUISITION".some, readMode,
-      tc(pArc, qArc, StepGuideState.Enabled))
+      tc(pArc, qArc, StepGuideState.Enabled), breakpoint)
 
   def throughSlitStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
@@ -118,6 +118,30 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
   // 5_000_000 µs = 5 s  → Bright (1s < 5s ≤ 10s), readMode=BRIGHT
   val Brightµs: Long = 5_000_000L
 
+  def initialBrightAcquisition: Json =
+    json"""
+      {
+        "executionConfig": {
+          "gnirs": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Initial Acquisition",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")},
+                  ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
+                ]
+              },
+              "possibleFuture": ${brightFineAdjustments(RepeatingAtomCount)},
+              "hasMore": false
+            }
+          }
+        }
+      }
+    """
+
   test("Bright acquisition — initial atom (4 steps, no sky)"):
     val setup: IO[Observation.Id] =
       for
@@ -132,28 +156,30 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       expect(
         user     = pi,
         query    = gnirsAcqNarrowQuery(oid),
-        expected = json"""
-          {
-            "executionConfig": {
-              "gnirs": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Initial Acquisition",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
-                      ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                      ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                      ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
-                    ]
-                  },
-                  "possibleFuture": ${brightFineAdjustments(RepeatingAtomCount)},
-                  "hasMore": false
-                }
-              }
-            }
-          }
-        """.asRight
+        expected = initialBrightAcquisition.asRight
+      )
+
+  test("Bright acquisition — execute first step, reset regenerates from the top"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+        _ <- setAcquisitionFilter(o, "ORDER4")
+        v <- recordVisitAs(serviceUser, o)
+
+        // Execute the first step, then reset the acquisition.
+        s <- firstAcquisitionStepId(serviceUser, o)
+        _ <- addEndStepEvent(s, v)
+        _ <- resetAcquisitionAs(serviceUser, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsAcqNarrowQuery(oid),
+        expected = initialBrightAcquisition.asRight
       )
 
   def brightFineAdjustments(n: Int): Json =
@@ -199,7 +225,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
-                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
+                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")}
                     ]
@@ -380,12 +406,11 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       yield o
 
     // In S/N mode the ITC sizes the acquisition: the fake imaging result is
-    // IntegrationTime(10s, 6), so only the acquisition-FPU/decker field steps take their
+    // IntegrationTime(10s, 6), so every step except the fixed-exposure FPU image takes its
     // coadds from the ITC exposure count (6). The FPU image (first step) always uses a
-    // single coadd, and the through-slit steps revert to the explicit acquisition coadds
-    // (default 1). The 10s × 6 = 60s integration resolves AUTO to FAINT, so a sky frame is
-    // added (6 steps): slitImage(1), fieldSky(6), field(6), field(6), throughSlitSky(1),
-    // throughSlit(1).
+    // single coadd. The 10s × 6 = 60s integration resolves AUTO to FAINT, so a sky frame is
+    // added (6 steps): slitImage(1), fieldSky(6), field(6), field(6), throughSlitSky(6),
+    // throughSlit(6).
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -415,8 +440,8 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } },
-                      { "instrumentConfig": { "coadds": 1 } },
-                      { "instrumentConfig": { "coadds": 1 } }
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } }
                     ]
                   }
                 }

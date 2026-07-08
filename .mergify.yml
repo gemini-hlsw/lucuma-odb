@@ -55,6 +55,14 @@ pull_request_rules:
       add:
       - client
       remove: []
+- name: Label common-middleware PRs
+  conditions:
+  - files~=^modules/common-middleware/
+  actions:
+    label:
+      add:
+      - common-middleware
+      remove: []
 - name: Label legacy-tests PRs
   conditions:
   - files~=^itc/legacy-tests/

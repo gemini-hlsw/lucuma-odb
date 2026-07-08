@@ -10,11 +10,13 @@ import lucuma.core.math.Angle
 import table.EnumeratedOffsetView
 import table.Flamingos2ImagingView
 import table.GmosImagingView
+import table.GnirsImagingView
 import table.TelescopeConfigGeneratorView
 import table.StepRecordView
 
 trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
                              with Flamingos2ImagingView[F]
+                             with GnirsImagingView[F]
                              with GmosImagingView[F]
                              with TelescopeConfigGeneratorView[F]
                              with StepRecordView[F]:
@@ -92,10 +94,22 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
       PI.Offset4P, PI.Offset4Q
     )
 
+  private lazy val gnirsPreImagingMappings: List[TypeMapping] =
+    import GnirsImagingView.PreImaging as PI
+    preImagingMappings(
+      GnirsImagingType / "variant" / "preImaging",
+      PI.ObservationId,
+      PI.Offset1P, PI.Offset1Q,
+      PI.Offset2P, PI.Offset2Q,
+      PI.Offset3P, PI.Offset3Q,
+      PI.Offset4P, PI.Offset4Q
+    )
+
   lazy val OffsetMappings: List[TypeMapping] =
     gmosPreImagingMappings(GmosNorthImagingType / "variant" / "preImaging", GmosNorthImagingView.Common) ++
     gmosPreImagingMappings(GmosSouthImagingType / "variant" / "preImaging", GmosSouthImagingView.Common) ++
     flamingos2PreImagingMappings ++
+    gnirsPreImagingMappings ++
     List(
       offsetMappingAtPath(EnumeratedPath, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),
       offsetComponentMappingAtPath(EnumeratedPath / "p", EnumeratedOffsetView.OffsetP, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),

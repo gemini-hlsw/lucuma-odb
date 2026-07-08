@@ -35,9 +35,11 @@ trait ArbItcInput:
         ss <- Gen.listOfN(cp, arbitrary[ImagingParameters])
         ct <- Gen.choose(1, 10)
         ts <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
+        sn <- Gen.option(Gen.oneOf(ts.map(_.targetId)))
       yield ItcInput.Imaging(
         NonEmptyList.fromListUnsafe(ss),
-        NonEmptyList.fromListUnsafe(ts)
+        NonEmptyList.fromListUnsafe(ts),
+        sn
       )
 
   given Arbitrary[ItcInput.Spectroscopy] =
@@ -48,11 +50,13 @@ trait ArbItcInput:
         ct  <- Gen.choose(1, 10)
         ts  <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
         bo  <- Gen.option(genTargetDefinition(ct + 1L))
+        sn  <- Gen.option(Gen.oneOf(ts.map(_.targetId)))
       yield ItcInput.Spectroscopy(
         acq,
         sci,
         NonEmptyList.fromListUnsafe(ts),
-        bo
+        bo,
+        sn
       )
 
   given Arbitrary[ItcInput.ScienceOnlySpectroscopy] =
@@ -61,9 +65,11 @@ trait ArbItcInput:
         sci <- arbitrary[SpectroscopyParameters]
         ct  <- Gen.choose(1, 10)
         ts  <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
+        sn  <- Gen.option(Gen.oneOf(ts.map(_.targetId)))
       yield ItcInput.ScienceOnlySpectroscopy(
         sci,
-        NonEmptyList.fromListUnsafe(ts)
+        NonEmptyList.fromListUnsafe(ts),
+        sn
       )
 
   given Arbitrary[ItcInput] =

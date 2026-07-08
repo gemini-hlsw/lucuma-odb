@@ -170,7 +170,7 @@ object ImagingRow extends RowParsers {
   val filterOptions: Parser[Set[String]] =
     string.map { s =>
       Set.from(
-        s.split(',')
+        s.split(',').map(_.trim)
       )
     }
 

@@ -803,6 +803,159 @@ class updateCallsForProposals extends OdbSuite {
     }
   }
 
+  test("exchange partners") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                gemini: {
+                  exchangePartners: [
+                    {
+                      exchangePartner: SUBARU
+                      submissionDeadlineOverride: "2025-08-15T04:00:00Z"
+                    },
+                    {
+                      exchangePartner: KECK
+                    }
+                  ]
+                }
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                gemini {
+                  exchangePartners {
+                    exchangePartner
+                    submissionDeadlineOverride
+                    submissionDeadline
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "gemini": {
+                    "exchangePartners": [
+                      {
+                        "exchangePartner": "KECK",
+                        "submissionDeadlineOverride": null,
+                        "submissionDeadline": "2025-07-31T10:00:01Z"
+                      },
+                      {
+                        "exchangePartner": "SUBARU",
+                        "submissionDeadlineOverride": "2025-08-15T04:00:00Z",
+                        "submissionDeadline": "2025-08-15T04:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("exchange partners - delete") {
+    createCall.flatMap { id =>
+      // First add some, then null them out.
+      val add =
+        query(
+          staff,
+          s"""
+            mutation {
+              updateCallsForProposals(input: {
+                SET: { gemini: { exchangePartners: [ { exchangePartner: KECK } ] } }
+                WHERE: { id: { EQ: "$id" } }
+              }) { callsForProposals { id } }
+            }
+          """
+        )
+      add >>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                gemini: {
+                  exchangePartners: null
+                }
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                gemini {
+                  exchangePartners {
+                    exchangePartner
+                  }
+                }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "updateCallsForProposals": {
+              "callsForProposals": [
+                {
+                  "gemini": {
+                    "exchangePartners": []
+                  }
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("exchange partners - duplicate") {
+    createCall.flatMap { id =>
+      expect(
+        staff,
+        s"""
+          mutation {
+            updateCallsForProposals(input: {
+              SET: {
+                gemini: {
+                  exchangePartners: [
+                    { exchangePartner: KECK }
+                    { exchangePartner: KECK }
+                  ]
+                }
+              },
+              WHERE: {
+                id: { EQ: "$id" }
+              }
+            }) {
+              callsForProposals {
+                gemini {
+                  exchangePartners { exchangePartner }
+                }
+              }
+            }
+          }
+        """,
+        List("Argument 'input.SET.gemini' is invalid: duplicate 'exchangePartners' specified: KECK").asLeft
+      )
+    }
+  }
+
   test("existence") {
     createCall.flatMap { id =>
       expect(
