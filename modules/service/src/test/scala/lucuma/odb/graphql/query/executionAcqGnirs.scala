@@ -94,9 +94,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
       tc(10, 0, StepGuideState.Disabled))
 
-  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int) =
+  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "ACQUISITION", none, "ACQUISITION".some, readMode,
-      tc(pArc, qArc, StepGuideState.Enabled))
+      tc(pArc, qArc, StepGuideState.Enabled), breakpoint)
 
   def throughSlitStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
@@ -130,7 +130,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                 "steps": [
                   ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
                   ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")},
                   ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
                 ]
               },
@@ -225,7 +225,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
-                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
+                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")}
                     ]
@@ -406,12 +406,11 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       yield o
 
     // In S/N mode the ITC sizes the acquisition: the fake imaging result is
-    // IntegrationTime(10s, 6), so only the acquisition-FPU/decker field steps take their
+    // IntegrationTime(10s, 6), so every step except the fixed-exposure FPU image takes its
     // coadds from the ITC exposure count (6). The FPU image (first step) always uses a
-    // single coadd, and the through-slit steps revert to the explicit acquisition coadds
-    // (default 1). The 10s × 6 = 60s integration resolves AUTO to FAINT, so a sky frame is
-    // added (6 steps): slitImage(1), fieldSky(6), field(6), field(6), throughSlitSky(1),
-    // throughSlit(1).
+    // single coadd. The 10s × 6 = 60s integration resolves AUTO to FAINT, so a sky frame is
+    // added (6 steps): slitImage(1), fieldSky(6), field(6), field(6), throughSlitSky(6),
+    // throughSlit(6).
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -441,8 +440,8 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } },
                       { "instrumentConfig": { "coadds": 6 } },
-                      { "instrumentConfig": { "coadds": 1 } },
-                      { "instrumentConfig": { "coadds": 1 } }
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } }
                     ]
                   }
                 }

@@ -20,7 +20,7 @@ case class GnirsImagingRow(
 
 object GnirsImagingRow:
 
-  // Keyhole imaging filter set: the small MK filters Y/J/K plus the full-size X and H
+  // GNIRS imaging filter set: the small MK filters Y/J/K plus the full-size X and H
   // order-blockers. Short names are unambiguous within this set, unlike in the full
   // enum, where the broadband J/K repeat the order-blocker names.
   val ImagingFilters: NonEmptyList[GnirsFilter] =

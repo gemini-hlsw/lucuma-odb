@@ -1157,12 +1157,19 @@ trait DatabaseOperations { this: OdbSuite =>
           }"""
       case ObservingModeType.GnirsImaging =>
         """{
-          gnirsImaging: {
-            camera: SHORT_BLUE
-            filters: [
-              { filter: J },
-              { filter: ORDER4 }
-            ]
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1250 }
+            }
+          }
+          imaging: {
+            minimumFov: {
+              arcseconds: 100
+            },
+            narrowFilters: false
+            broadFilters: false
+            combinedFilters: true
           }
         }"""
       case ObservingModeType.GnirsLongSlit =>
