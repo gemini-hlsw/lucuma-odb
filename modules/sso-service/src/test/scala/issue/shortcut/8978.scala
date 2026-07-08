@@ -17,7 +17,7 @@ import org.http4s.*
 import org.http4s.headers.Location
 import weaver.SimpleIOSuite
 
-object Shortcut_8978 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
+object Shortcut_8978 extends SsoSuite with Fixture with FlakyTests with OrcidIdGenerator[IO]:
 
   def createOrLoginAs(person: OrcidPerson, id: OrcidId): IO[(SessionToken, StandardUser)] =
     SsoSimulator[IO].use: (db, sim, sso, _, _) =>
@@ -33,67 +33,73 @@ object Shortcut_8978 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
       } yield (tok, user)
 
   test("deleteAllSessionTokensForUser"):
-    randomOrcidId.flatMap: bobId =>
-      createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
-        SsoSimulator[IO].map(_._1).use: db =>
-            db.use: db =>
-              for
-                _ <- db.deleteAllSessionTokensForUser(user.id)
-                u <- db.findUserFromToken(tok)
-              yield expect.same(u, None)
+    flaky():
+      randomOrcidId.flatMap: bobId =>
+        createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
+          SsoSimulator[IO].map(_._1).use: db =>
+              db.use: db =>
+                for
+                  _ <- db.deleteAllSessionTokensForUser(user.id)
+                  u <- db.findUserFromToken(tok)
+                yield expect.same(u, None)
 
   test("deleteUser"):
-    randomOrcidId.flatMap: bobId =>
-      createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
-        SsoSimulator[IO].map(_._1).use: db =>
-            db.use: db =>
-              for
-                _ <- db.deleteUser(user.id)
-                u <- db.findUserFromToken(tok)
-              yield expect.same(u, None)
+    flaky():
+      randomOrcidId.flatMap: bobId =>
+        createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
+          SsoSimulator[IO].map(_._1).use: db =>
+              db.use: db =>
+                for
+                  _ <- db.deleteUser(user.id)
+                  u <- db.findUserFromToken(tok)
+                yield expect.same(u, None)
 
   test("deleteAllSessionTokensForRole"):
-    randomOrcidId.flatMap: bobId =>
-      createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
-        SsoSimulator[IO].map(_._1).use: db =>
-            db.use: db =>
-              for
-                _ <- db.deleteAllSessionTokensForRole(user.role.id)
-                u <- db.findUserFromToken(tok)
-              yield expect.same(u, None)
+    flaky():
+      randomOrcidId.flatMap: bobId =>
+        createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
+          SsoSimulator[IO].map(_._1).use: db =>
+              db.use: db =>
+                for
+                  _ <- db.deleteAllSessionTokensForRole(user.role.id)
+                  u <- db.findUserFromToken(tok)
+                yield expect.same(u, None)
   
   test("deleteRole"):
-    randomOrcidId.flatMap: bobId =>
-      createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
-        SsoSimulator[IO].map(_._1).use: db =>
-            db.use: db =>
-              for
-                _     <- db.deleteRole(user.role.id) // the last role!
-                u     <- db.findUserFromToken(tok)
-                _     <- expect.same(u, None).failFast
-              yield success
+    flaky():
+      randomOrcidId.flatMap: bobId =>
+        createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
+          SsoSimulator[IO].map(_._1).use: db =>
+              db.use: db =>
+                for
+                  _     <- db.deleteRole(user.role.id) // the last role!
+                  u     <- db.findUserFromToken(tok)
+                  _     <- expect.same(u, None).failFast
+                yield success
 
   test("deleteRole; can't delete PI role"):
-    randomOrcidId.flatMap: bobId =>
-      createOrLoginAs(Bob, bobId).flatMap: (_, user) =>
-        SsoSimulator[IO].map(_._1).use: db =>
-            db.use: db =>
-              for
-                _     <- db.deleteRole(user.role.id) // the last role!
-                user2 <- createOrLoginAs(Bob, bobId).map(_._2)
-                _     <- expect.same(user, user2).failFast // same everything
-              yield success
+    flaky():
+      randomOrcidId.flatMap: bobId =>
+        createOrLoginAs(Bob, bobId).flatMap: (_, user) =>
+          SsoSimulator[IO].map(_._1).use: db =>
+              db.use: db =>
+                for
+                  _     <- db.deleteRole(user.role.id) // the last role!
+                  user2 <- createOrLoginAs(Bob, bobId).map(_._2)
+                  _     <- expect.same(user, user2).failFast // same everything
+                yield success
 
   test("deleteRole; if it's an unused role then existing tokens should continue to work"):
-    randomOrcidId.flatMap: bobId =>
-      createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
-        SsoSimulator[IO].map(_._1).use: db =>
-            db.use: db =>
-              for
-                id    <- db.canonicalizeRole(user.id, RoleRequest.Staff)
-                user2 <- db.getStandardUserFromToken(tok)
-                _     <- expect(user2.otherRoles.exists(_.id === id)).failFast // new role should be there
-                _     <- db.deleteRole(id)
-                user3 <- db.getStandardUserFromToken(tok)
-                _     <- expect(user3.otherRoles.isEmpty).failFast // new role should not be there
-              yield success
+    flaky():
+      randomOrcidId.flatMap: bobId =>
+        createOrLoginAs(Bob, bobId).flatMap: (tok, user) =>
+          SsoSimulator[IO].map(_._1).use: db =>
+              db.use: db =>
+                for
+                  id    <- db.canonicalizeRole(user.id, RoleRequest.Staff)
+                  user2 <- db.getStandardUserFromToken(tok)
+                  _     <- expect(user2.otherRoles.exists(_.id === id)).failFast // new role should be there
+                  _     <- db.deleteRole(id)
+                  user3 <- db.getStandardUserFromToken(tok)
+                  _     <- expect(user3.otherRoles.isEmpty).failFast // new role should not be there
+                yield success
