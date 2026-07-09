@@ -203,7 +203,7 @@ The instance ID and API key are found in the Grafana Cloud page under the OpenTe
 
 ## SQL Query Instrumentation
 
-The GraphQL `fetch` layer (grackle → skunk) records timing and row-count attributes on every
+The GraphQL `fetch` layer (grackle -> skunk) records timing and row-count attributes on every
 `grackle.fetch` trace span. The following optional environment variables control slow-query
 logging and large-statement dumping.
 
@@ -211,8 +211,8 @@ logging and large-statement dumping.
 
 | Variable | Required | Description |
 |---|---|---|
-| `ODB_SLOW_QUERY_THRESHOLD_MS` | No | Threshold in milliseconds. Queries slower than this are logged as `WARN` via the `lucuma-odb-slow-query` logger and flagged with `db.slow_query=true` on the `grackle.fetch` span. Defaults to `5`. |
-| `ODB_FETCH_DUMP_DIR` | No | Path to a directory. When set, SQL statements larger than 500 chars are written raw to a file in this directory and referenced from the trace/log via `db.statement_file`, instead of being truncated inline. Mainly useful for local debugging of large generated queries. |
+| `ODB_SLOW_QUERY_THRESHOLD_MS` | No | Threshold in milliseconds. Queries slower than this are logged as `WARN` via the `lucuma-odb-slow-query` logger and flagged with `db.slow_query=true` on the `grackle.fetch` span. Defaults to `5000`. |
+| `ODB_FETCH_DUMP_DIR` | No | Path to a directory. When set, SQL statements larger than 500 chars are written raw to a file in this directory and referenced from the trace/log via `db.statement_file`, instead of being truncated inline. Only useful for local debugging of large generated queries. |
 
 ## SOPS Setup for Nix Users
 

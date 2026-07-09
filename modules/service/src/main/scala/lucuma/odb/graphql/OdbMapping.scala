@@ -81,6 +81,14 @@ object OdbMapping {
       } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst)
   }
 
+  val dumpDir: Option[String] = sys.env.get("ODB_FETCH_DUMP_DIR")
+  val slowQueryThreshold: FiniteDuration =
+    sys.env
+      .get("ODB_SLOW_QUERY_THRESHOLD_MS")
+      .flatMap(_.toIntOption)
+      .map(_.millis)
+      .getOrElse(5.seconds)
+
   // Loads a GraphQL file from the classpath, relative to this Class.
   def unsafeLoadSchema(fileName: String): Schema = {
     val stream = getClass.getResourceAsStream(fileName)
@@ -689,21 +697,8 @@ object OdbMapping {
           // Slow/large query instrumentation. Allocated once per mapping instance rather than
           // on every `fetch` call.
           private val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
-
-          // Threshold above which a query is logged as slow. Read directly from
-          // `ODB_SLOW_QUERY_THRESHOLD_MS` (milliseconds); falls back to 5ms when unset or unparseable.
-          private val SlowQueryThreshold: FiniteDuration =
-            sys.env
-              .get("ODB_SLOW_QUERY_THRESHOLD_MS")
-              .flatMap(_.toIntOption)
-              .map(_.millis)
-              .getOrElse(5.seconds)
-          private val MaxSqlLength       = 1024
-          private val DumpThreshold      = 500
-
-          // When `ODB_FETCH_DUMP_DIR` is set, large statements are written raw to a file on that
-          // dir and a reference added to the trace via `db.statement_file`
-          private val dumpDir: Option[String] = sys.env.get("ODB_FETCH_DUMP_DIR")
+          private val MaxSqlLength               = 1024
+          private val DumpThreshold              = 500
 
           private def truncateSql(s: String): String =
             if s.length <= MaxSqlLength then s
@@ -742,7 +737,7 @@ object OdbMapping {
             logQuery.flatMap: dumpPath =>
               T.span("grackle.fetch").use: span =>
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
-                  val slowQuery = elapsed > SlowQueryThreshold
+                  val slowQuery = elapsed > slowQueryThreshold
 
                   val columnCount = codecs.size
 
