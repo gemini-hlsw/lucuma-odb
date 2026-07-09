@@ -15,6 +15,7 @@ import lucuma.core.data.Zipper
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.model.Target
 import lucuma.core.util.Enumerated
@@ -173,10 +174,14 @@ object Itc:
   /**
    * Spectroscopy results for all instruments. Spectroscopy has separate
    * acquisition and science results.
+   * 
+   * GNIRS acquisition is particular in that it also must compute the acquisition
+   * type in this layer. See the two-pass acquisition ITC in ItcService.
    */
   case class Spectroscopy(
     acquisition: Zipper[Result],
-    science:     Zipper[Result]
+    science:     Zipper[Result],
+    gnirsAcqType: Option[GnirsAcquisitionType] = None
   ) extends Itc:
 
     override def dataType: Type =
@@ -190,7 +195,8 @@ object Itc:
       Eq.by: a =>
         (
           a.acquisition,
-          a.science
+          a.science,
+          a.gnirsAcqType
         )
 
   val spectroscopy: Prism[Itc, Spectroscopy] =
