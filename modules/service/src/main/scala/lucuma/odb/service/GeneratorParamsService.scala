@@ -262,9 +262,10 @@ object GeneratorParamsService {
       ): Either[Error, GeneratorParams] =
 
         def spectroscopyGeneratorParams(
-          obsMode: ObservingMode,
-          acqMode: InstrumentMode,
-          sciMode: InstrumentMode
+          obsMode:              ObservingMode,
+          acqMode:              InstrumentMode,
+          sciMode:              InstrumentMode,
+          gnirsAcqAutoClassify: Boolean = false
         ): GeneratorParams =
 
           val consInput   = obsParams.constraints.toInput
@@ -281,7 +282,8 @@ object GeneratorParamsService {
                 science,
                 regularTargetInputs,
                 blindOffsetTargetInput,
-                obsParams.signalToNoiseTargetId
+                obsParams.signalToNoiseTargetId,
+                gnirsAcqAutoClassify
               )
             }
             .leftMap(MissingParamSet.fromParams)
@@ -498,6 +500,18 @@ object GeneratorParamsService {
                 wellDepth         = gn.wellDepth,
                 coadds            = gn.coadds
               )
+
+              // Two-pass acquisition ITC only when the mode and filter are both auto and
+              // we're in S/N mode: only then does the resolved filter depend on the
+              // ITC-derived exposure time (Very Bright → H2), creating the circularity.
+              val acqAutoClassify: Boolean =
+                gn.acquisition.explicitAcqMode.isEmpty &&
+                gn.acquisition.explicitFilter.isEmpty && {
+                  gn.acquisition.exposureTimeMode match
+                    case ExposureTimeMode.SignalToNoiseMode(_, _)   => true
+                    case ExposureTimeMode.TimeAndCountMode(_, _, _) => false
+                }
+
               spectroscopyGeneratorParams(
                 obsMode = gn,
                 acqMode = InstrumentMode.GnirsImaging(
@@ -508,7 +522,8 @@ object GeneratorParamsService {
                   wellDepth        = gn.wellDepth,
                   coadds           = gn.acquisition.coadds
                 ),
-                sciMode = sciMode
+                sciMode = sciMode,
+                gnirsAcqAutoClassify = acqAutoClassify
               )
 
           case ig: igrins2.longslit.Config =>

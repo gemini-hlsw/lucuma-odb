@@ -12,6 +12,7 @@ import lucuma.core.data.arb.ArbZipper
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
@@ -139,11 +140,12 @@ trait ArbItc:
       for
         a <- arbitrary[Zipper[Itc.Result]]
         s <- arbitrary[Zipper[Itc.Result]]
-      yield Itc.Spectroscopy(a, s)
+        t <- arbitrary[Option[GnirsAcquisitionType]]
+      yield Itc.Spectroscopy(a, s, t)
 
   given Cogen[Itc.Spectroscopy] =
-    Cogen[(Zipper[Itc.Result], Zipper[Itc.Result])].contramap: a =>
-      (a.acquisition, a.science)
+    Cogen[(Zipper[Itc.Result], Zipper[Itc.Result], Option[GnirsAcquisitionType])].contramap: a =>
+      (a.acquisition, a.science, a.gnirsAcqType)
 
   given Arbitrary[Itc.Igrins2Spectroscopy] =
     Arbitrary:
