@@ -698,7 +698,7 @@ object OdbMapping {
           // on every `fetch` call.
           private val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
           private val MaxSqlLength               = 1024
-          private val DumpThreshold              = 500
+          private val DumpThreshold              = 50000
 
           private def truncateSql(s: String): String =
             if s.length <= MaxSqlLength then s
