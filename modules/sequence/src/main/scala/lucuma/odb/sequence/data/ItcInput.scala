@@ -84,6 +84,11 @@ object ItcInput:
   /**
    * Spectroscopy inputs include imaging parameters (for acquisition),
    * the main spectrocopy input, and an optional blind offset target.
+   * 
+   * When `gnirsAcqAutoClassify` is set (in the case we are in GNIRS S/N mode
+   * with acquisition mode and filter both auto), the ITC resolves the
+   * acquisition mode via a brightness classification pass before the real
+   * exposure-time pass. See the two-pass acquisition ITC in ItcService.
    */
   case class Spectroscopy(
     acquisition: ImagingParameters,
@@ -91,9 +96,6 @@ object ItcInput:
     targets:     NonEmptyList[TargetDefinition],
     blindOffset: Option[TargetDefinition],
     signalToNoiseTargetId: Option[Target.Id],
-    // When set (GNIRS S/N mode with acquisition mode and filter both auto), the ITC
-    // resolves the acquisition mode via a brightness classification pass before the
-    // real exposure-time pass. See the two-pass acquisition ITC in ItcService.
     gnirsAcqAutoClassify: Boolean = false
   ) extends ItcInput derives Eq:
 

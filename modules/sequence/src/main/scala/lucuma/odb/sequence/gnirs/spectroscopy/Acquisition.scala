@@ -348,6 +348,9 @@ object Acquisition:
                 builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, repeatingAtom)
       yield Stream.emits(a0 :: as)).runA(StepTimeEstimateCalculator.Last.empty[GnirsDynamicConfig]).value
 
+  // `pinnedAcqType` is the acquisition mode resolved by the ITC brightness
+  // classification, when the S/N-mode two-pass path ran. Pins the mode so it
+  // isn't re-derived from the final exposure time (see AcquisitionConfig.resolvedMode).
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
@@ -356,10 +359,7 @@ object Acquisition:
     expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
     time:          Either[OdbError, IntegrationTime],
-    // The acquisition mode resolved by the ITC brightness classification, when the
-    // S/N-mode two-pass path ran. Pins the mode so it isn't re-derived from the final
-    // exposure time (see AcquisitionConfig.resolvedMode).
-    pinnedType:    Option[GnirsAcquisitionType]
+    pinnedAcqType:  Option[GnirsAcquisitionType]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
     def sequenceError(msg: String): OdbError =
       OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: $msg".some)
@@ -375,7 +375,7 @@ object Acquisition:
                        _.exposureTime.toNonNegMicroseconds.value > 0,
                        sequenceError("GNIRS Spectroscopy requires a positive acquisition exposure time.")
                      )
-        mode       = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedType)
+        mode       = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedAcqType)
         selFilter <- config.acquisition
                        .selectedFilter(mode, config.centralWavelength)
                        .leftMap(sequenceError)

@@ -174,15 +174,13 @@ object Itc:
   /**
    * Spectroscopy results for all instruments. Spectroscopy has separate
    * acquisition and science results.
+   * 
+   * GNIRS acquisition is particular in that it also must compute the acquisition
+   * type in this layer. See the two-pass acquisition ITC in ItcService.
    */
   case class Spectroscopy(
     acquisition: Zipper[Result],
     science:     Zipper[Result],
-    // The GNIRS acquisition mode resolved by the ITC brightness classification.
-    // Only GNIRS long slit / IFU auto-resolution sets it; other instruments leave
-    // it None.  It pins the mode the sequence uses so it isn't re-derived (and
-    // possibly mis-classified) from the final exposure time.  See the two-pass
-    // acquisition ITC in ItcService.
     gnirsAcqType: Option[GnirsAcquisitionType] = None
   ) extends Itc:
 

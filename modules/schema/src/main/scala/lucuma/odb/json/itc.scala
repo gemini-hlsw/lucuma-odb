@@ -119,7 +119,6 @@ trait ItcCodec:
       for
         acquisition <- c.downField("acquisition").as[Zipper[Itc.Result]]
         science     <- c.downField("spectroscopyScience").as[Zipper[Itc.Result]]
-        // Absent in rows written before the two-pass acquisition ITC → None.
         acqType     <- c.downField("gnirsAcqType").as[Option[GnirsAcquisitionType]]
       yield Itc.Spectroscopy(acquisition, science, acqType)
 
