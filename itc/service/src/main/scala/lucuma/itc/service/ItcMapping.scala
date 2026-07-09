@@ -96,9 +96,9 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   def calculateImagingIntegrationTime[F[
     _
   ]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
-    cache:       BinaryEffectfulCache[F],
-    itc:         Itc[F],
-    config:      Config
+    cache:  BinaryEffectfulCache[F],
+    itc:    Itc[F],
+    config: Config
   )(asterismRequest: AsterismImagingTimeRequest): F[Result[CalculationResult]] =
     Tracer[F]
       .span("process imaging_targets_parallel")
@@ -192,9 +192,9 @@ object ItcMapping extends ItcCacheOrRemote with Version {
             s"Error calculating spectroscopy integration time and graph for input: $asterismRequest"
 
   def apply[F[_]: Sync: Logger: Parallel: Tracer: CustomSed.Resolver](
-    cache:       BinaryEffectfulCache[F],
-    itc:         Itc[F],
-    config:      Config
+    cache:  BinaryEffectfulCache[F],
+    itc:    Itc[F],
+    config: Config
   ): F[Mapping[F]] =
     loadSchema[F].map { loadedSchema =>
       new CirceMapping[F] {
