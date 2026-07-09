@@ -18693,6 +18693,11 @@ input WhereObservation {
   Matches on the observation workflow state.
   """
   workflow: WhereCalculatedObservationWorkflow
+
+  """
+  Matches the calibration role.
+  """
+  calibrationRole: WhereOptionEqCalibrationRole
 }
 
 """

@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
@@ -81,6 +82,7 @@ object WhereObservation {
     val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
     val SiteBinding = siteBinding(enumeratedBinding[Site])
     val WorkflowBinding = WhereCalculatedObservationWorkflow.binding(path / "workflow")
+    val CalibrationRoleBinding = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
 
     lazy val WhereObservationBinding = binding(path)
     ObjectFieldsBinding.rmap {
@@ -96,10 +98,11 @@ object WhereObservation {
         InstrumentBinding.Option("instrument", rInstrument),
         ObservingModeTypeBinding.Option("observingModeType", rObservingModeType),
         SiteBinding.Option("site", rSite),
-        WorkflowBinding.Option("workflow", rWorkflow)
+        WorkflowBinding.Option("workflow", rWorkflow),
+        CalibrationRoleBinding.Option("calibrationRole", rCalibrationRole)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rObservingModeType, rSite, rWorkflow).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, observingModeType, site, workflow) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rObservingModeType, rSite, rWorkflow, rCalibrationRole).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, observingModeType, site, workflow, calibrationRole) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -112,7 +115,8 @@ object WhereObservation {
               instrument,
               observingModeType,
               site,
-              workflow
+              workflow,
+              calibrationRole
             ).flatten)
         }
     }
