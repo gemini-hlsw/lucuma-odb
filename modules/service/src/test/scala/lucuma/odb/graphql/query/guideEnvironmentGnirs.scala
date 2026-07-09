@@ -111,7 +111,10 @@ class guideEnvironmentGnirs extends ExecutionTestSupportForGnirs
       expect(pi, guideEnvironmentQuery(oid), expected = gnirsPwfs2Result("V1647 Orionis"))
 
   // GNIRS imaging guides with PWFS2, like the long slit. The PWFS patrol field and
-  // the 20" protected radius are shared, so AGS selects the same star.
+  // the 20" protected radius are shared, so AGS selects the same star. The imaging
+  // field is symmetric under a 180 degree flip, so 90 and 270 are equally valid and
+  // the random spiral dither breaks the tie; the test-support layer pins the dither
+  // seed (DefaultImagingDitherSeed) so the resulting angle is deterministic.
   test("imaging sidereal target - AGS picks best star with PWFS2"):
     val setup: IO[Observation.Id] =
       for
@@ -122,7 +125,7 @@ class guideEnvironmentGnirs extends ExecutionTestSupportForGnirs
       yield o
 
     setup.flatMap: oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = gnirsPwfs2Result("V1647 Orionis"))
+      expect(pi, guideEnvironmentQuery(oid), expected = gnirsPwfs2Result("V1647 Orionis", BigDecimal("90.000000")))
 
   // GNIRS IFU guides with PWFS2, like the long slit, and selects the same star. Its
   // small science area shifts the optimal position angle (240 vs the long slit's 270).
