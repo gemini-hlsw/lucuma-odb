@@ -85,9 +85,7 @@ import lucuma.itc.SeriesDataType
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
-import lucuma.itc.service.ItcMapping.versionDateTimeFormatter
 
-import java.time.Instant
 import scala.collection.immutable.SortedMap
 
 val atWavelength = Wavelength.fromIntNanometers(600).get
@@ -103,7 +101,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GmosSpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -126,7 +124,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GmosMosSpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -149,7 +147,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GmosSouthMosSpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -172,7 +170,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.Flamingos2SpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -195,7 +193,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.Igrins2SpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -218,7 +216,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GhostSpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -241,7 +239,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GmosImagingInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -264,7 +262,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.Flamingos2ImagingInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -291,7 +289,7 @@ class WiringSuite extends ClientSuite:
       toITC,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -314,7 +312,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GnirsImagingInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -341,7 +339,7 @@ class WiringSuite extends ClientSuite:
       toITC,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -364,7 +362,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GraphInput,
       SpectroscopyIntegrationTimeAndGraphsResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismTimeAndGraphsResult(
@@ -441,7 +439,7 @@ class WiringSuite extends ClientSuite:
       toTC,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -464,7 +462,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.SpectroscopyEmissionLinesInput,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -496,7 +494,7 @@ class WiringSuite extends ClientSuite:
       toTC,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -519,7 +517,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GmosSpectroscopyExactValuesInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -542,7 +540,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GmosImagingExactValuesInputData,
       ClientCalculationResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismIntegrationTimeOutcomes:
@@ -565,7 +563,7 @@ class WiringSuite extends ClientSuite:
       WiringSuite.GraphExactValuesInput,
       SpectroscopyIntegrationTimeAndGraphsResult(
         ItcVersions(
-          versionDateTimeFormatter.format(Instant.ofEpochMilli(buildinfo.BuildInfo.buildDateTime)),
+          buildinfo.BuildInfo.itcSourceHash,
           BuildInfo.ocslibHash.some
         ),
         AsterismTimeAndGraphsResult(

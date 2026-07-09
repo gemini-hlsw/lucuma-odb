@@ -491,6 +491,17 @@ lazy val itcModel = crossProject(JVMPlatform, JSPlatform)
     )
   )
 
+lazy val itcSourceHash = taskKey[String]("hash of itc service and model scala sources")
+ThisBuild / itcSourceHash / fileInputs +=
+  (itcService / baseDirectory).value.toGlob / "src" / "main" / "scala" / ** / "*.scala"
+ThisBuild / itcSourceHash / fileInputs +=
+  (LocalRootProject / baseDirectory).value.toGlob / "itc" / "model" / "src" / "main" / "scala" / ** / "*.scala"
+ThisBuild / itcSourceHash := {
+  val files  = itcSourceHash.inputFiles.filter(_.toString.endsWith(".scala")).sorted.map(_.toFile)
+  val hashes = files.map(Hash(_))
+  Hash.toHex(Hash(hashes.toArray.flatten))
+}
+
 lazy val ocslibHash = taskKey[String]("hash of ocslib and graphql schema")
 ThisBuild / ocslibHash / fileInputs += (itcService / baseDirectory).value.toGlob / "ocslib" / "*.jar"
 ThisBuild / ocslibHash / fileInputs += (itcService / Compile / resourceDirectory).value.toGlob / "graphql" / "*.graphql"
@@ -592,6 +603,7 @@ lazy val itcService = project
       sbtVersion,
       git.gitHeadCommit,
       "buildDateTime" -> System.currentTimeMillis(),
+      itcSourceHash,
       ocslibHash,
       ocsGitHash,
       ocsGitBranch,
