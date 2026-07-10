@@ -112,21 +112,21 @@ sequenceDiagram
     participant Obs as Observe app
     participant Event as ExecutionEventService
     participant DB as PostgreSQL
-    participant Trig as event_time_accounting_invalidate()
+    participant Trig as event trigger
     participant Daemon as Obscalc Daemon
     participant TA as TimeAccountingService.updateAll
     participant Calc as ObscalcService.calculateAndUpdate
 
-    Obs->>Event: addStepEvent / addDatasetEvent / …
-    Event->>DB: INSERT t_execution_event   (cheap; no recompute)
+    Obs->>Event: addStepEvent / addDatasetEvent
+    Event->>DB: INSERT t_execution_event, cheap, no recompute
     DB->>Trig: AFTER INSERT
-    Trig->>DB: UPDATE t_visit SET c_ta_invalidation = now()  (that visit)
-    Trig->>DB: CALL invalidate_obscalc(observation)  → t_obscalc 'pending'
-    DB-->>Daemon: NOTIFY ch_obscalc_update (pending)
-    Daemon->>TA: updateAll(oid) — own transaction
-    TA->>DB: recompute each DIRTY visit; set its c_ta_update
-    Daemon->>Calc: calculateAndUpdate(oid) — ITC / digest / workflow
-    Calc->>DB: storeResult → 'ready' (or 'retry' if a visit is still dirty)
+    Trig->>DB: UPDATE t_visit c_ta_invalidation = now, for that visit
+    Trig->>DB: CALL invalidate_obscalc, t_obscalc becomes pending
+    DB-->>Daemon: NOTIFY ch_obscalc_update, pending
+    Daemon->>TA: updateAll in its own transaction
+    TA->>DB: recompute each DIRTY visit, set its c_ta_update
+    Daemon->>Calc: calculateAndUpdate, ITC / digest / workflow
+    Calc->>DB: storeResult ready, or retry if a visit still dirty
 ```
 
 Key point: `updateAll` runs in **its own transaction, before and independent of**
