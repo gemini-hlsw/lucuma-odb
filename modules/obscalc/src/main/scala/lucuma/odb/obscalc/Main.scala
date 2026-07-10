@@ -189,11 +189,23 @@ object CalcMain extends MainParams:
           Logger[F].debug(s"Loaded PendingCalc ${pc.observationId}. Last invalidated at ${pc.lastInvalidation}.")
         .parEvalMapUnordered(connectionsLimit): pc =>
           T.span("obscalc.calculate").surround:
-            services.useNonTransactionally:
-              requireServiceAccessOrThrow:
-                obscalcService
-                  .calculateAndUpdate(pc)
-                  .tupleLeft(pc)
+            for
+              // Recompute time accounting for the observation's visits in its
+              // own transaction, independent of the ITC/digest calculation so an
+              // ITC failure can never stall or revert it.  A no-op if the
+              // observation has no visits.  Best effort: a failure here must not
+              // take down the daemon nor block the obscalc calculation.
+              _ <- T.span("obscalc.timeAccounting").surround:
+                     services
+                       .useTransactionally:
+                         requireServiceAccessOrThrow:
+                           timeAccountingService.updateAll(pc.observationId)
+                       .handleErrorWith: t =>
+                         Logger[F].warn(t)(s"Time accounting update failed for ${pc.observationId}")
+              r <- services.useNonTransactionally:
+                     requireServiceAccessOrThrow:
+                       obscalcService.calculateAndUpdate(pc)
+            yield (pc, r)
         .evalTap: (pc, meta) =>
           Logger[F].debug(s"Stored obscalc result for ${pc.observationId}. Current status: $meta.")
         .void
