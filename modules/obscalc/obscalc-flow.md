@@ -137,6 +137,7 @@ flowchart TD
     T --> S2[storeResult]
     S2 --> CK{c_last_invalidation == pending.lastInvalidation?}
     CK -->|no| BP[state = pending — recompute]
+    CK -->|yes, a visit still time-accounting-dirty| RT2[state = retry — TA recompute failed]
     CK -->|yes, error is RemoteServiceCallError| RT[state = retry, bump failure_count, set retry_at]
     CK -->|yes, otherwise| RD[state = ready]
 ```
@@ -151,7 +152,7 @@ flowchart TD
 
 ### Result Storage Guard
 
-`storeResult` (`ObscalcService.scala:286`) locks the row and re-reads `c_last_invalidation`. If it changed during calculation, the result is *still* written but the state is forced back to `pending` so the next pickup re-runs against the newer inputs.
+`storeResult` (`ObscalcService.scala:286`) locks the row and re-reads `c_last_invalidation`. If it changed during calculation, the result is *still* written but the state is forced back to `pending` so the next pickup re-runs against the newer inputs. It also checks whether any of the observation's visits is still time-accounting-dirty (a recompute that failed): if so — and `c_last_invalidation` is unchanged — the state is forced to `retry` so the time-accounting update is attempted again. See [`time-accounting-flow.md`](../service/time-accounting-flow.md).
 
 ### Retry Backoff
 
