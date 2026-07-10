@@ -19,6 +19,7 @@ import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.common.middleware.TracingMiddleware
 import lucuma.core.data.EmailAddress
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -77,7 +78,8 @@ case class Config(
   // People also send us their API keys. We need to be able to exchange them for [longer-lived] JWTs
   // via an API call to SSO, so we need an HTTP client for that.
   def httpClientResource[F[_]: Async: Network]: Resource[F, Client[F]] =
-    EmberClientBuilder.default[F]
+    EmberClientBuilder
+      .default[F]
       .withTimeout(httpClient.timeout)
       .withIdleConnectionTime(httpClient.effectiveIdleConnectionTime)
       .build
@@ -85,11 +87,12 @@ case class Config(
   private def otelHttpClient[F[_]: Async: Network: TracerProvider]: Resource[F, Client[F]] =
     for {
       client         <- httpClientResource[F]
-      otelMiddleware <- Resource.eval(
-                          ClientMiddleware
-                            .builder(ClientSpanDataProvider.openTelemetry(ServerMiddleware.redactor))
-                            .build
-                        )
+      otelMiddleware <-
+        Resource.eval(
+          ClientMiddleware
+            .builder(ClientSpanDataProvider.openTelemetry(TracingMiddleware.redactor))
+            .build
+        )
     } yield otelMiddleware(client)
 
   def horizonsClientResource[F[_]: Async: Network: Logger: TracerProvider]: Resource[F, HorizonsClient[F]] =
@@ -106,12 +109,13 @@ case class Config(
       GaiaClient.build[F](GZip()(httpClient), adapters = GaiaClient.DefaultAdapters)
 
   // Telluric client resource
-  def telluricClient[F[_]: Async: Network: LoggerFactory: Tracer: TracerProvider]: Resource[F, TelluricTargetsClient[F]] =
+  def telluricClient[F[_]: Async: Network: LoggerFactory: Tracer: TracerProvider]
+    : Resource[F, TelluricTargetsClient[F]] =
     for {
-      httpClient   <- otelHttpClient[F]
-      sedMatcher   <- Resource.eval(SEDDataLoader.loadMatcher[F])
-      simbadClient  = SimbadClient.build(httpClient, sedMatcher)
-      result       <- Resource.eval(TelluricTargetsClient.build(telluric.root, httpClient, simbadClient))
+      httpClient  <- otelHttpClient[F]
+      sedMatcher  <- Resource.eval(SEDDataLoader.loadMatcher[F])
+      simbadClient = SimbadClient.build(httpClient, sedMatcher)
+      result      <- Resource.eval(TelluricTargetsClient.build(telluric.root, httpClient, simbadClient))
     } yield result
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
@@ -154,20 +158,20 @@ object Config:
 
   object Telluric:
     lazy val fromCiris: ConfigValue[Effect, Telluric] =
-      envOrProp("ODB_TELLURIC_ROOT").as[Uri]
+      envOrProp("ODB_TELLURIC_ROOT")
+        .as[Uri]
         .default(uri"https://telluric-targets.gpp.gemini.edu/")
         .map(Telluric.apply)
 
-
   case class Database(
-    maxConnections: Int,
+    maxConnections:            Int,
     maxCalibrationConnections: Int,
-    maxObscalcConnections: Int,
-    host: String,
-    port: Int,
-    database: String,
-    user: String,
-    password: String,
+    maxObscalcConnections:     Int,
+    host:                      String,
+    port:                      Int,
+    database:                  String,
+    user:                      String,
+    password:                  String
   ):
     // We use Flyway (which uses JDBC) to perform schema migrations. Savor the irony.
     def jdbcUrl: String = s"jdbc:postgresql://${host}:${port}/${database}?sslmode=require"
@@ -179,10 +183,10 @@ object Config:
 
     // postgres://username:password@host:port/database name
     def fromHerokuUri(
-      maxConnections: Int,
+      maxConnections:            Int,
       maxCalibrationConnections: Int,
-      maxObscalcConnections: Int,
-      uri: URI
+      maxObscalcConnections:     Int,
+      uri:                       URI
     ): Option[Database] =
       uri.getUserInfo.split(":") match
         case Array(user, password) =>
@@ -268,9 +272,9 @@ object Config:
     exploreUrl:        Uri
   ):
     // add to environment?
-    lazy val baseUri = uri"https://api.mailgun.net/v3"
+    lazy val baseUri        = uri"https://api.mailgun.net/v3"
     lazy val sendMessageUri = baseUri / domain.value / "messages"
-    lazy val eventsUri = baseUri / domain.value / "events"
+    lazy val eventsUri      = baseUri / domain.value / "events"
 
   object Email:
     lazy val fromCiris: ConfigValue[Effect, Email] = (
@@ -286,7 +290,7 @@ object Config:
         EmailAddress.from(s).toOption
 
   case class HttpClient(
-    timeout: Duration,
+    timeout:            Duration,
     idleConnectionTime: Duration
   ):
     val effectiveIdleConnectionTime: Duration =
@@ -297,7 +301,9 @@ object Config:
   object HttpClient:
     lazy val fromCiris: ConfigValue[Effect, HttpClient] = (
       envOrProp("HTTP_CLIENT_TIMEOUT").as[Duration].default(45.seconds), // 45s is Ember's default
-      envOrProp("HTTP_CLIENT_IDLE_CONNECTION_TIME").as[Duration].default(60.seconds) // 60s is Ember's default
+      envOrProp("HTTP_CLIENT_IDLE_CONNECTION_TIME")
+        .as[Duration]
+        .default(60.seconds) // 60s is Ember's default
     ).parMapN(HttpClient.apply)
 
   private given ConfigDecoder[String, PublicKey] =
@@ -318,11 +324,13 @@ object Config:
     ConfigDecoder[String].mapOption("Gid[A]")(Gid[A].fromString.getOption)
 
   private given [A](using ConfigDecoder[String, A]): ConfigDecoder[String, List[A]] =
-    ConfigDecoder[String].map(_.split(",").map(_.trim).toList).mapEither: (key, ss) =>
-      ss.traverse(ConfigDecoder[String, A].decode(key, _))
+    ConfigDecoder[String]
+      .map(_.split(",").map(_.trim).toList)
+      .mapEither: (key, ss) =>
+        ss.traverse(ConfigDecoder[String, A].decode(key, _))
 
   private def envOrProp(name: String): ConfigValue[Effect, String] =
-    env(name) or prop(name)
+    env(name).or(prop(name))
 
   private def optValue[A](key: String, value: => Option[A]): ConfigValue[Effect, A] =
     value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
