@@ -8,6 +8,7 @@ import cats.data.NonEmptyList
 import cats.derived.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -37,15 +38,24 @@ case class AcquisitionConfig(
 ):
 
   /**
-   * The acquisition mode: the explicit choice if set, else the default for the
-   * integration time, carrying the given sky offset when that default is Faint (the
-   * default offset differs between long slit and IFU).
+   * The acquisition mode: the explicit choice if set, else the brightness
+   * classification, carrying the given sky offset when that classification is Faint
+   * (the default offset differs between long slit and IFU).
+   *
+   * The classification is `pinnedType` when the ITC resolved it (the S/N-mode two-pass
+   * acquisition path), otherwise it is derived here from the integration time. Pinning
+   * matters because the final (user-S/N) exposure time can misclassify — e.g. a Bright
+   * target whose short exposure would otherwise read as Very Bright.
    */
-  def resolvedMode(time: IntegrationTime, defaultFaintSkyOffset: Offset): GnirsAcquisitionMode =
+  def resolvedMode(
+    time:                  IntegrationTime,
+    defaultFaintSkyOffset: Offset,
+    pinnedType:            Option[GnirsAcquisitionType] = None
+  ): GnirsAcquisitionMode =
     explicitAcqMode.getOrElse:
-      GnirsAcquisitionMode.defaultFor(time.exposureTime, resolvedCoadds(time)) match
-        case GnirsAcquisitionMode.Faint(_) => GnirsAcquisitionMode.Faint(defaultFaintSkyOffset)
-        case other                         => other
+      val tpe: GnirsAcquisitionType = pinnedType.getOrElse:
+        GnirsAcquisitionMode.defaultFor(time.exposureTime, resolvedCoadds(time)).acquisitionType
+      GnirsAcquisitionMode.forTypeAndOffset(tpe, Some(defaultFaintSkyOffset))
 
   /**
    * The selected acquisition filter: the explicit filter if set, otherwise the

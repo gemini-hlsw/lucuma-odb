@@ -520,12 +520,15 @@ object GuideService {
         oid:             Observation.Id,
         start:           Timestamp,
         end:             Timestamp,
+        explicitBase:    Option[Coordinates],
         tracking:        Tracking,
         probe:           GuideProbe,
         wavelength:      Wavelength,
         constraints:     ConstraintSet
       ): Result[ADQLQuery] =
-        (tracking.at(start.toInstant), tracking.at(end.toInstant))
+        val coordsAtStartO = explicitBase.orElse(tracking.at(start.toInstant))
+        val coordsAtEndO   = explicitBase.orElse(tracking.at(end.toInstant))
+        (coordsAtStartO, coordsAtEndO)
           .mapN { (a, b) =>
             // If caching is implemented for the guide star results, `ags.widestConstraints` should be
             // used for the brightness constraints.
@@ -560,32 +563,34 @@ object GuideService {
             .handleError(e => gaiaError(e.getMessage()).asFailure)
 
       def getAllCandidates(
-        oid:         Observation.Id,
-        start:       Timestamp,
-        end:         Timestamp,
-        tracking:    Tracking,
-        wavelength:  Wavelength,
-        probe:       GuideProbe,
-        constraints: ConstraintSet
+        oid:          Observation.Id,
+        start:        Timestamp,
+        end:          Timestamp,
+        explicitBase: Option[Coordinates],
+        tracking:     Tracking,
+        wavelength:   Wavelength,
+        probe:        GuideProbe,
+        constraints:  ConstraintSet
       ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
           query      <- ResultT.fromResult(
-                          getGaiaQuery(oid, start, end, tracking, probe, wavelength, constraints)
+                          getGaiaQuery(oid, start, end, explicitBase, tracking, probe, wavelength, constraints)
                         )
           candidates <- ResultT(callGaia(query))
         } yield candidates).value
 
       def getAllCandidatesNonEmpty(
-        oid:         Observation.Id,
-        start:       Timestamp,
-        end:         Timestamp,
-        tracking:    Tracking,
-        wavelength:  Wavelength,
-        probe:       GuideProbe,
-        constraints: ConstraintSet
+        oid:          Observation.Id,
+        start:        Timestamp,
+        end:          Timestamp,
+        explicitBase: Option[Coordinates],
+        tracking:     Tracking,
+        wavelength:   Wavelength,
+        probe:        GuideProbe,
+        constraints:  ConstraintSet
       ): F[Result[NonEmptyList[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
-          candidates <- ResultT(getAllCandidates(oid, start, end, tracking, wavelength, probe, constraints))
+          candidates <- ResultT(getAllCandidates(oid, start, end, explicitBase, tracking, wavelength, probe, constraints))
           nel        <- ResultT.fromResult(
                           NonEmptyList.fromList(candidates)
                             .toResult(generalError("No potential guidestars found on Gaia.").asProblem)
@@ -729,7 +734,7 @@ object GuideService {
                                   getAllCandidates(
                                     obsInfo.id,
                                     candPeriod.start,
-                                    candPeriod.end, t.base,
+                                    candPeriod.end, obsInfo.explicitBase, t.base,
                                     genInfo.agsWavelength,
                                     agsParams.probe,
                                     obsInfo.constraints
@@ -934,12 +939,13 @@ object GuideService {
                            )
           original      <- ResultT(
                              oGuideStarName.fold(
-                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints)
+                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, obsInfo.explicitBase, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints)
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
                            )
           candidates     = original.map(_._2.at(obsTime.toInstant)) // PM corrected
           baseCoords    <- ResultT.fromResult(
-                             baseTracking.at(obsTime.toInstant)
+                             obsInfo.explicitBase
+                               .orElse(baseTracking.at(obsTime.toInstant))
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for asterism in observation $oid"

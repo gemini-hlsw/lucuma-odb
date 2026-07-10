@@ -23,11 +23,13 @@ import lucuma.core.enums.PartnerLinkType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Access
 import lucuma.core.model.GuestRole
+import lucuma.core.model.GuestUser
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.ServiceRole
 import lucuma.core.model.StandardRole
+import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -37,6 +39,7 @@ import lucuma.odb.graphql.input.ChangePrincipalInvestigatorInput
 import lucuma.odb.graphql.input.ChangeProgramUserRoleInput
 import lucuma.odb.graphql.input.LinkUserInput
 import lucuma.odb.graphql.input.ProgramUserPropertiesInput
+import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.educational_status
 import lucuma.odb.util.Codecs.exchange_partner
 import lucuma.odb.util.Codecs.gender
@@ -147,6 +150,12 @@ trait ProgramUserService[F[_]]:
   def userHasWriteAccess(
     programId: Program.Id
   )(using Transaction[F]): F[Boolean]
+
+
+  def chown(
+    from: GuestUser, 
+    to: StandardUser
+  )(using ServiceAccess, Transaction[F]): F[Result[List[Program.Id]]]
 
 object ProgramUserService:
   def instantiate[F[_]: Concurrent](using Services[F]): ProgramUserService[F] =
@@ -337,10 +346,30 @@ object ProgramUserService:
           session.prepareR(stmt).use: pg =>
             pg.unique(af.argument)
 
+      override def chown(from: GuestUser, to: StandardUser)(using ServiceAccess, Transaction[F]): F[Result[List[Program.Id]]] =
+        session.prepareR(Statements.SelectOwnedPrograms).use: pq =>
+          pq.stream(from.id, 1024).compile.toList.flatMap: pids =>
+            pids
+              .traverse: (pid, old_puid) => // traverse rather than evalTap so we accumulate errors
+                for
+                  _    <- ResultT(unlinkUser(old_puid))                 
+                  _    <- ResultT(linkUser(LinkUserInput(old_puid, to.id)))
+                yield pid
+              .value
+
   end instantiate
 
   object Statements:
 
+    val SelectOwnedPrograms: Query[User.Id, (Program.Id, ProgramUser.Id)] =
+      sql"""
+        SELECT c_program_id, c_program_user_id
+        FROM   t_program_user
+        WHERE  c_role = 'pi'::e_program_user_role
+        AND    c_user_id = $user_id
+        ORDER BY c_program_id ASC
+      """.query(program_id ~ program_user_id)
+  
     val InsertAndLinkUnconditionally: Query[(Program.Id, User.Id, UserType, ProgramUserRole, PartnerLink), ProgramUser.Id] =
       sql"""
         INSERT INTO t_program_user (
@@ -538,7 +567,7 @@ object ProgramUserService:
       sourceUser:      User  // user doing the program user update
     ): Result[Option[AppliedFragment]] =
       targetRole match
-        case ProgramUserRole.Pi               => OdbError.UpdateFailed("PIs are fixed at program creation time.".some).asFailure
+        case ProgramUserRole.Pi               => if sourceUser.role.access === Access.Service then Result.success(None) else OdbError.UpdateFailed("PIs are fixed at program creation time.".some).asFailure
         case ProgramUserRole.Coi              => isPiOrBetter(action, targetProgramId, sourceUser)
         case ProgramUserRole.CoiRO          |
              ProgramUserRole.External         => isCoiOrBetter(action, targetProgramId, sourceUser)

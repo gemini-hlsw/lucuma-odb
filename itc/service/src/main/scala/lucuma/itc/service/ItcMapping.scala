@@ -33,10 +33,8 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
     SchemaStitcher.load("graphql/itc.graphql")
 
-  def versions[F[_]: Applicative](
-    environment: ExecutionEnvironment
-  ): F[Result[ItcVersions]] =
-    Result(ItcVersions(version(environment).value, BuildInfo.ocslibHash.some)).pure[F]
+  def versions[F[_]: Applicative]: F[Result[ItcVersions]] =
+    Result(ItcVersions(version.value, BuildInfo.ocslibHash.some)).pure[F]
 
   private val buildError: Throwable => Error =
     case SourceTooBright(hw)      => Error.SourceTooBright(hw)
@@ -67,7 +65,6 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   def calculateSpectroscopyIntegrationTime[F[
     _
   ]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
-    environment:     ExecutionEnvironment,
     cache:           BinaryEffectfulCache[F],
     itc:             Itc[F],
     config:          Config
@@ -88,7 +85,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
           .span("build spectroscopy_result")
           .surround:
             CalculationResult(
-              ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
+              ItcVersions(version.value, BuildInfo.ocslibHash.some),
               AsterismIntegrationTimeOutcomes(targetOutcomes)
             ).toResult.pure[F]
       .onError: t =>
@@ -99,10 +96,9 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   def calculateImagingIntegrationTime[F[
     _
   ]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
-    environment: ExecutionEnvironment,
-    cache:       BinaryEffectfulCache[F],
-    itc:         Itc[F],
-    config:      Config
+    cache:  BinaryEffectfulCache[F],
+    itc:    Itc[F],
+    config: Config
   )(asterismRequest: AsterismImagingTimeRequest): F[Result[CalculationResult]] =
     Tracer[F]
       .span("process imaging_targets_parallel")
@@ -129,7 +125,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
           .span("build imaging_result")
           .surround:
             CalculationResult(
-              ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
+              ItcVersions(version.value, BuildInfo.ocslibHash.some),
               AsterismIntegrationTimeOutcomes(targetOutcomes)
             ).toResult.pure[F]
       .onError: t =>
@@ -166,7 +162,6 @@ object ItcMapping extends ItcCacheOrRemote with Version {
   def spectroscopyIntegrationTimeAndGraphs[F[
     _
   ]: MonadThrow: Parallel: Logger: CustomSed.Resolver: Tracer](
-    environment:     ExecutionEnvironment,
     cache:           BinaryEffectfulCache[F],
     itc:             Itc[F],
     config:          Config
@@ -188,7 +183,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
           .span("build time_and_graphs_result")
           .surround:
             SpectroscopyTimeAndGraphsResult(
-              ItcVersions(version(environment).value, BuildInfo.ocslibHash.some),
+              ItcVersions(version.value, BuildInfo.ocslibHash.some),
               AsterismTimeAndGraphsOutcomes(targetTimesAndGraphs)
             ).toResult.pure[F]
       .onError: t =>
@@ -197,10 +192,9 @@ object ItcMapping extends ItcCacheOrRemote with Version {
             s"Error calculating spectroscopy integration time and graph for input: $asterismRequest"
 
   def apply[F[_]: Sync: Logger: Parallel: Tracer: CustomSed.Resolver](
-    environment: ExecutionEnvironment,
-    cache:       BinaryEffectfulCache[F],
-    itc:         Itc[F],
-    config:      Config
+    cache:  BinaryEffectfulCache[F],
+    itc:    Itc[F],
+    config: Config
   ): F[Mapping[F]] =
     loadSchema[F].map { loadedSchema =>
       new CirceMapping[F] {
@@ -220,13 +214,13 @@ object ItcMapping extends ItcCacheOrRemote with Version {
             ObjectMapping(
               tpe = QueryType,
               fieldMappings = List(
-                RootEffect.computeEncodable("versions")((_, _) => versions(environment)),
+                RootEffect.computeEncodable("versions")((_, _) => versions),
                 RootEffect.computeEncodable("spectroscopy") { (_, env) =>
                   env
                     .getR[SpectroscopyInput]("input")
                     .flatMap(AsterismSpectroscopyTimeRequest.fromInput)
                     .flatTraverse:
-                      calculateSpectroscopyIntegrationTime[F](environment, cache, itc, config)
+                      calculateSpectroscopyIntegrationTime[F](cache, itc, config)
                     .toGraphQLErrors
                 },
                 RootEffect.computeEncodable("imaging") { (_, env) =>
@@ -234,7 +228,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                     .getR[ImagingInput]("input")
                     .flatMap(AsterismImagingTimeRequest.fromInput)
                     .flatTraverse:
-                      calculateImagingIntegrationTime(environment, cache, itc, config)
+                      calculateImagingIntegrationTime(cache, itc, config)
                     .toGraphQLErrors
                 },
                 RootEffect.computeEncodable("spectroscopyIntegrationTimeAndGraphs") { (_, env) =>
@@ -245,7 +239,7 @@ object ItcMapping extends ItcCacheOrRemote with Version {
                         .fromInput(input)
                         .map((_, input.significantFigures))
                     .flatTraverse: (tr, fig) =>
-                      spectroscopyIntegrationTimeAndGraphs(environment, cache, itc, config)(tr, fig)
+                      spectroscopyIntegrationTimeAndGraphs(cache, itc, config)(tr, fig)
                     .toGraphQLErrors
                 }
               )

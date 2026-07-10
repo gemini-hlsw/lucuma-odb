@@ -42,7 +42,8 @@ object Spectroscopy:
         SequenceGenerator.empty[GnirsDynamicConfig].asRight.pure[F]
       else Acquisition.instantiate(
              observationId, estimator, static, namespace, expander, config,
-             itc.map(_.acquisition.focus.value)
+             itc.map(_.acquisition.focus.value),
+             itc.toOption.flatMap(_.gnirsAcqType)
            )
     (for
       a <- EitherT(acquisition)

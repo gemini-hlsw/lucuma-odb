@@ -86,7 +86,9 @@ import munit.CatsEffectSuite
 import munit.Location
 import munit.diff.console.AnsiColors
 import natchez.Trace
+import org.http4s.Uri
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.circe.jsonEncoderOf
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
@@ -139,6 +141,23 @@ object OdbSuite:
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
+  // This is generally useful so put it here
+  given EntityEncoder[IO, Json] = jsonEncoderOf
+
+  /**
+    * Run an http request against the test ODB.
+    * @param user an Auth header will be added for this user
+    * @param mkReq allows you to get the base URI, necessary for constructing requests
+    */
+  def runHttpRequestAs(user: User)(mkReq: Uri => Request[IO]): Resource[IO, Response[IO]] =
+    for
+      svr    <- server
+      auth   <- Resource.eval(authorizationHeader(user))
+      req     = mkReq(svr.baseUri).putHeaders(auth)
+      client <- httpClientResource
+      res    <- client.run(req)
+    yield res
+    
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any])(using Location): IO[Unit] =
     fa.attempt.flatMap {

@@ -28,13 +28,13 @@ val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
-val logbackVersion               = "1.5.37"
+val logbackVersion               = "1.5.38"
 val log4catsVersion              = "2.8.0"
 val lucumaCoreVersion            = "0.217.0"
 val lucumaGraphQLRoutesVersion   = "0.13.8"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
-val munitVersion                 = "1.3.3"
+val munitVersion                 = "1.3.4"
 val munitCatsEffectVersion       = "2.2.0"   // check test output if you attempt to update this
 val munitDisciplineVersion       = "2.0.0"   // check test output if you attempt to update this
 val munitScalacheckVersion       = "1.3.0"   // check test output if you attempt to update this
@@ -56,7 +56,7 @@ val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 val weaverVersion                = "0.13.0"
 
-ThisBuild / tlBaseVersion      := "0.85"
+ThisBuild / tlBaseVersion      := "0.86"
 ThisBuild / scalaVersion       := "3.8.4"
 ThisBuild / crossScalaVersions := Seq("3.8.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -491,6 +491,17 @@ lazy val itcModel = crossProject(JVMPlatform, JSPlatform)
     )
   )
 
+lazy val itcSourceHash = taskKey[String]("hash of itc service and model scala sources")
+ThisBuild / itcSourceHash / fileInputs +=
+  (itcService / baseDirectory).value.toGlob / "src" / "main" / "scala" / ** / "*.scala"
+ThisBuild / itcSourceHash / fileInputs +=
+  (LocalRootProject / baseDirectory).value.toGlob / "itc" / "model" / "src" / "main" / "scala" / ** / "*.scala"
+ThisBuild / itcSourceHash := {
+  val files  = itcSourceHash.inputFiles.filter(_.toString.endsWith(".scala")).sorted.map(_.toFile)
+  val hashes = files.map(Hash(_))
+  Hash.toHex(Hash(hashes.toArray.flatten))
+}
+
 lazy val ocslibHash = taskKey[String]("hash of ocslib and graphql schema")
 ThisBuild / ocslibHash / fileInputs += (itcService / baseDirectory).value.toGlob / "ocslib" / "*.jar"
 ThisBuild / ocslibHash / fileInputs += (itcService / Compile / resourceDirectory).value.toGlob / "graphql" / "*.graphql"
@@ -592,6 +603,7 @@ lazy val itcService = project
       sbtVersion,
       git.gitHeadCommit,
       "buildDateTime" -> System.currentTimeMillis(),
+      itcSourceHash,
       ocslibHash,
       ocsGitHash,
       ocsGitBranch,
