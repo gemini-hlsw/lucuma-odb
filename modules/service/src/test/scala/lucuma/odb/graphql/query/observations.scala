@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
@@ -1104,5 +1105,27 @@ class observations extends OdbSuite with ObservingModeSetupOperations {
                 )
               )
     yield ()
+
+  test("select by calibration role"):
+    for
+      pid  <- createProgramAs(pi3)
+      tid  <- createTargetWithProfileAs(pi3, pid)
+      oid1 <- createObservationAs(pi3, pid, tid)
+      oid2 <- createObservationAs(pi3, pid, tid)
+      _    <- setObservationCalibrationRole(List(oid2), CalibrationRole.Twilight)
+      oid3 <- createObservationAs(pi3, pid, tid)
+      _    <- setObservationCalibrationRole(List(oid3), CalibrationRole.SpectroPhotometric)
+      pidF  = s"""program: { id: { EQ: "$pid" } }"""
+      twi  <- observationsWhere(pi3, s"""$pidF, calibrationRole: { EQ: TWILIGHT }""")
+      spec <- observationsWhere(pi3, s"""$pidF, calibrationRole: { EQ: SPECTROPHOTOMETRIC }""")
+      in   <- observationsWhere(pi3, s"""$pidF, calibrationRole: { IN: [ TWILIGHT, SPECTROPHOTOMETRIC ] }""")
+      none <- observationsWhere(pi3, s"""$pidF, calibrationRole: { IS_NULL: true }""")
+      any  <- observationsWhere(pi3, s"""$pidF, calibrationRole: { IS_NULL: false }""")
+    yield
+      assertEquals(twi, List(oid2))
+      assertEquals(spec, List(oid3))
+      assertEquals(in, List(oid2, oid3))
+      assertEquals(none, List(oid1))
+      assertEquals(any, List(oid2, oid3))
 
 }
