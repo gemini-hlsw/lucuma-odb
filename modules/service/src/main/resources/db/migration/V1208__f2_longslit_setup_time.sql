@@ -4,10 +4,10 @@ UPDATE t_time_estimate
  WHERE c_tag = 'f2_longslit_setup';
 
 -- The setup time estimate feeds into obscalc, so previously-computed Flamingos 2
--- results are stale and must be recalculated. 
+-- results are stale and must be recalculated. Only 'ready' observations require a refresh
 UPDATE t_obscalc c
    SET c_obscalc_state = 'pending'
   FROM t_observation o
  WHERE c.c_observation_id = o.c_observation_id
    AND o.c_instrument = 'Flamingos2'
-   AND c.c_workflow_state NOT IN ('inactive', 'ongoing', 'completed');
+   AND c.c_workflow_state = 'ready';
