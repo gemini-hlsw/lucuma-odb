@@ -81,11 +81,11 @@ jobs:
 
       - name: Make target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
-        run: mkdir -p itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
+        run: mkdir -p itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target modules/common-middleware/target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
 
       - name: Compress target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
-        run: tar cf targets.tar itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
+        run: tar cf targets.tar itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target modules/common-middleware/target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
 
       - name: Upload target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
