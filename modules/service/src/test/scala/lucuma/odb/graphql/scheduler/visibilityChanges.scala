@@ -10,6 +10,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Gid
@@ -17,6 +18,7 @@ import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.util.Codecs.*
 import org.http4s.*
 import org.http4s.implicits.*
+import skunk.codec.all.text
 import skunk.implicits.*
 
 import java.time.Instant
@@ -89,6 +91,21 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       s.execute(
         sql"UPDATE t_target SET c_sid_parallax = 1000000 WHERE c_target_id = $target_id".command
       )(tid).void
+
+  // Raw SQL so only the relevant child/parent row changes, exercising the trigger directly.
+  private def addTimingWindow(oid: Observation.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"INSERT INTO t_timing_window (c_observation_id, c_inclusion, c_start) VALUES ($observation_id, 'include', '2030-01-01T00:00:00')".command
+      )(oid).void
+
+  private def changeProgramActivePeriod(pid: Program.Id): IO[Unit] =
+    withSession: s =>
+      s.transaction.use: _ =>
+        s.unique(sql"select set_config('lucuma.user', $text, true)".query(text))(Gid[User.Id].show(pi.id)) >>
+          s.execute(
+            sql"UPDATE t_program SET c_active_end = '2098-06-30' WHERE c_program_id = $program_id".command
+          )(pid).void
 
   private def hasObs(body: String, oid: Observation.Id): Boolean =
     body.linesIterator.contains(s"OBSERVATION\t${Gid[Observation.Id].show(oid)}")
@@ -207,6 +224,51 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       assert(after.isAfter(cursor))
       assertEquals(st, Status.Ok)
       assert(hasTarget(b, t))
+
+  test("a timing-window change surfaces its observation"):
+    for
+      p         <- createProgram
+      t         <- createTargetWithProfileAs(pi, p)
+      o         <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _         <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
+      before    <- obsInvalidation(o)
+      cursor     = before.plusMillis(1)
+      (_,  b0)  <- fetchVisibilityChanges(serviceUser, cursor)
+      // A timing-window insert (a child-table write) re-stamps the parent observation.
+      _         <- addTimingWindow(o)
+      after     <- obsInvalidation(o)
+      (st, b)   <- fetchVisibilityChanges(serviceUser, cursor)
+    yield
+      assert(!hasObs(b0, o))
+      assert(after.isAfter(cursor))
+      assertEquals(st, Status.Ok)
+      assert(hasObs(b, o))
+
+  test("a program active-period change surfaces every observation in the program"):
+    for
+      p         <- createProgram
+      t         <- createTargetWithProfileAs(pi, p)
+      o1        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      o2        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _         <- setCalculatedWorkflowState(o1, ObservationWorkflowState.Ready)
+      _         <- setCalculatedWorkflowState(o2, ObservationWorkflowState.Ready)
+      before1   <- obsInvalidation(o1)
+      before2   <- obsInvalidation(o2)
+      cursor     = (if before1.isAfter(before2) then before1 else before2).plusMillis(1)
+      (_,  b0)  <- fetchVisibilityChanges(serviceUser, cursor)
+      // Editing the program active period fans out and re-stamps every program observation.
+      _         <- changeProgramActivePeriod(p)
+      after1    <- obsInvalidation(o1)
+      after2    <- obsInvalidation(o2)
+      (st, b)   <- fetchVisibilityChanges(serviceUser, cursor)
+    yield
+      assert(!hasObs(b0, o1))
+      assert(!hasObs(b0, o2))
+      assert(after1.isAfter(cursor))
+      assert(after2.isAfter(cursor))
+      assertEquals(st, Status.Ok)
+      assert(hasObs(b, o1))
+      assert(hasObs(b, o2))
 
   test("an observation that was completed after a given 'since' is not listed"):
     for
