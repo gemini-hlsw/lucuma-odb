@@ -732,7 +732,6 @@ lazy val itcLegacyTests = project
 lazy val common = project
   .in(file("modules/common-middleware"))
   .dependsOn(ssoBackendClient)
-  .enablePlugins(NoPublishPlugin)
   .settings(
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
