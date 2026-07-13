@@ -10,6 +10,7 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import fs2.compression.Compression
+import fs2.compression.DeflateParams
 import java.time.Instant
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
@@ -38,8 +39,7 @@ import lucuma.sso.client.SsoClient
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
-import org.http4s.headers.`Accept-Encoding`
-import org.typelevel.ci.*
+import org.http4s.server.middleware.GZip
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.trace.Tracer
@@ -114,6 +114,8 @@ object SchedulerRoutes:
     val dsl = Http4sDsl[F]
     import dsl._
 
+    given Compression[F] = Compression.forSync[F]
+
     given QueryParamDecoder[Timestamp] =
       QueryParamDecoder[String].emap: s =>
         Either
@@ -123,7 +125,7 @@ object SchedulerRoutes:
 
     object SinceMatcher extends QueryParamDecoderMatcher[Timestamp]("since")
 
-    HttpRoutes.of[F]:
+    val routes = HttpRoutes.of[F]:
       case req @ POST -> Root / "scheduler" / "atoms" =>
         val input: F[Either[NonEmptyList[String], List[Observation.Id]]] =
           req
@@ -147,28 +149,13 @@ object SchedulerRoutes:
                 services(user): s =>
                   Services.asSuperUser:
                     s.transactionally:
-
-                      val rawStream =
+                      Ok(
                         sequenceService
                           .selectAtomDigests(validIds)
                           .map(tsv)
                           .intersperse("\n")
                           .through(fs2.text.utf8.encode)
-
-                      val gzip: Boolean =
-                        req
-                          .headers
-                          .get[`Accept-Encoding`]
-                          .exists(_.values.exists(_ === ContentCoding.gzip))
-
-                      if gzip then
-                        val compressedStream =
-                          rawStream
-                            .through(Compression.forSync[F].gzip(deflateLevel = 9.some))
-                        Ok(compressedStream).map: resp =>
-                          resp.putHeaders(Header.Raw(ci"Content-Encoding", "gzip"))
-                      else
-                        Ok(rawStream)
+                      )
               }.handleErrorWith:
                  case _: AccessControlException => Forbidden()
                  case other                     => other.raiseError[F, Response[F]]
@@ -181,28 +168,19 @@ object SchedulerRoutes:
           services(user): s =>
             Services.asSuperUser:
               s.transactionally:
-
-                val rawStream =
+                Ok(
                   visibilityService
                     .selectVisibilityChanges(since)
                     .map(visibilityTsv)
                     .intersperse("\n")
                     .through(fs2.text.utf8.encode)
-
-                val gzip: Boolean =
-                  req
-                    .headers
-                    .get[`Accept-Encoding`]
-                    .exists(_.values.exists(_ === ContentCoding.gzip))
-
-                if gzip then
-                  val compressedStream =
-                    rawStream
-                      .through(Compression.forSync[F].gzip(deflateLevel = 9.some))
-                  Ok(compressedStream).map: resp =>
-                    resp.putHeaders(Header.Raw(ci"Content-Encoding", "gzip"))
-                else
-                  Ok(rawStream)
+                )
         }.handleErrorWith:
            case _: AccessControlException => Forbidden()
            case other                     => other.raiseError[F, Response[F]]
+
+    // Compress responses (level 9) when the client sends `Accept-Encoding: gzip`.
+    // Applied here, scoped to these bulk-dump routes, rather than as a global
+    // middleware — the GraphQL / websocket / attachment routes should not be
+    // blanket-compressed.
+    GZip(routes, level = DeflateParams.Level.NINE)
