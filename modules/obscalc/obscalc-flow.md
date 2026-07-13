@@ -152,7 +152,7 @@ flowchart TD
 
 ### Result Storage Guard
 
-`storeResult` (`ObscalcService.scala:286`) locks the row and re-reads `c_last_invalidation`. If it changed during calculation, the result is *still* written but the state is forced back to `pending` so the next pickup re-runs against the newer inputs. It also checks whether any of the observation's visits is still time-accounting-dirty (a recompute that failed): if so — and `c_last_invalidation` is unchanged — the state is forced to `retry` so the time-accounting update is attempted again. See [`time-accounting-flow.md`](../service/time-accounting-flow.md).
+`storeResult` (`ObscalcService.scala:286`) locks the row and re-reads `c_last_invalidation`. If it changed during calculation, the result is *still* written but the state is forced back to `pending` so the next pickup re-runs against the newer inputs. It also checks whether any of the observation's visits is still time-accounting-dirty (a recompute that failed): if so — and `c_last_invalidation` is unchanged — the state is forced to `retry` so the time-accounting update is attempted again. See [`time-accounting-flow.md`](time-accounting-flow.md).
 
 ### Retry Backoff
 

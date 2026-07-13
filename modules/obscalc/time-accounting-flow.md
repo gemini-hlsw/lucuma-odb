@@ -14,7 +14,7 @@ when events arrive. An execution event only marks the affected visit dirty; the
 worker picks the observation up and recomputes the dirty visits. This keeps the
 event-ingestion path (from the "Observe" application) cheap.
 
-See [`obscalc-flow.md`](../obscalc/obscalc-flow.md) for the worker/daemon
+See [`obscalc-flow.md`](obscalc-flow.md) for the worker/daemon
 machinery this rides on.
 
 ## Where it lives
