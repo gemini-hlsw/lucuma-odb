@@ -10,16 +10,19 @@ import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import fs2.compression.Compression
+import java.time.Instant
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.AccessControlException
 import lucuma.core.model.Observation
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Gid
+import lucuma.core.util.Timestamp
 import lucuma.core.util.Uid
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
@@ -30,6 +33,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.service.VisibilityChange
 import lucuma.sso.client.SsoClient
 import org.http4s.*
 import org.http4s.client.Client
@@ -98,12 +102,26 @@ object SchedulerRoutes:
       row._3.stepCount.value.toString
     ).intercalate("\t")
 
+  private def visibilityTsv(c: VisibilityChange): String =
+    c match
+      case VisibilityChange.ForObservation(id) => s"OBSERVATION\t${Gid[Observation.Id].show(id)}"
+      case VisibilityChange.ForTarget(id)      => s"TARGET\t${Gid[Target.Id].show(id)}"
+
   def apply[F[_]: Async](
     services:  [A] => User => (Services[F] => F[A]) => F[A],
     ssoClient: SsoClient[F, User]
   ): HttpRoutes[F] =
     val dsl = Http4sDsl[F]
     import dsl._
+
+    given QueryParamDecoder[Timestamp] =
+      QueryParamDecoder[String].emap: s =>
+        Either
+          .catchNonFatal(Instant.parse(s))
+          .leftMap(t => ParseFailure(s"Invalid timestamp '$s'", t.getMessage))
+          .flatMap(i => Timestamp.fromInstant(i).toRight(ParseFailure(s"Timestamp out of range: '$s'", s)))
+
+    object SinceMatcher extends QueryParamDecoderMatcher[Timestamp]("since")
 
     HttpRoutes.of[F]:
       case req @ POST -> Root / "scheduler" / "atoms" =>
@@ -156,3 +174,35 @@ object SchedulerRoutes:
                  case other                     => other.raiseError[F, Response[F]]
           )
         yield response
+
+      case req @ GET -> Root / "scheduler" / "visibility-changes" :? SinceMatcher(since) =>
+        ssoClient.require(req) { user =>
+          user.verifyAccess(Access.Service) *>
+          services(user): s =>
+            Services.asSuperUser:
+              s.transactionally:
+
+                val rawStream =
+                  visibilityService
+                    .selectVisibilityChanges(since)
+                    .map(visibilityTsv)
+                    .intersperse("\n")
+                    .through(fs2.text.utf8.encode)
+
+                val gzip: Boolean =
+                  req
+                    .headers
+                    .get[`Accept-Encoding`]
+                    .exists(_.values.exists(_ === ContentCoding.gzip))
+
+                if gzip then
+                  val compressedStream =
+                    rawStream
+                      .through(Compression.forSync[F].gzip(deflateLevel = 9.some))
+                  Ok(compressedStream).map: resp =>
+                    resp.putHeaders(Header.Raw(ci"Content-Encoding", "gzip"))
+                else
+                  Ok(rawStream)
+        }.handleErrorWith:
+           case _: AccessControlException => Forbidden()
+           case other                     => other.raiseError[F, Response[F]]
