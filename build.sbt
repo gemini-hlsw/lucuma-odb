@@ -731,16 +731,20 @@ lazy val itcLegacyTests = project
 
 lazy val common = project
   .in(file("modules/common-middleware"))
-  .enablePlugins(NoPublishPlugin)
+  .dependsOn(ssoBackendClient)
   .settings(
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
-      "org.http4s"    %% "http4s-client"  % http4sVersion,
-      "org.http4s"    %% "http4s-core"    % http4sVersion,
-      "org.http4s"    %% "http4s-server"  % http4sVersion,
-      "org.typelevel" %% "cats-core"      % catsVersion,
-      "org.typelevel" %% "cats-effect"    % catsEffectVersion,
-      "org.scalameta" %% "munit"          % munitVersion % Test
+      "edu.gemini"    %% "lucuma-core"                           % lucumaCoreVersion,
+      "org.http4s"    %% "http4s-client"                         % http4sVersion,
+      "org.http4s"    %% "http4s-core"                           % http4sVersion,
+      "org.http4s"    %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sVersion,
+      "org.http4s"    %% "http4s-server"                         % http4sVersion,
+      "org.typelevel" %% "cats-core"                             % catsVersion,
+      "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
+      "org.typelevel" %% "log4cats-core"                         % log4catsVersion,
+      "org.typelevel" %% "otel4s-core"                           % otel4sVersion,
+      "org.scalameta" %% "munit"                                 % munitVersion % Test
     )
   )
 
@@ -952,7 +956,7 @@ lazy val resourceModel =
   project
     .in(file("resource/model"))
     .enablePlugins(NoPublishPlugin)
-    .dependsOn(schema.jvm, otel)
+    .dependsOn(schema.jvm, otel, ssoBackendClient)
     .settings(resourceCommonSettings)
     .settings(
       name := "lucuma-resource-model",
@@ -985,6 +989,7 @@ lazy val resourceService = project
       "org.flywaydb"   % "flyway-database-postgresql"            % flywayVersion,
       "org.http4s"    %% "http4s-circe"                          % http4sVersion,
       "org.http4s"    %% "http4s-dsl"                            % http4sVersion,
+      "org.http4s"    %% "http4s-ember-client"                   % http4sVersion,
       "org.http4s"    %% "http4s-ember-server"                   % http4sVersion,
       "org.http4s"    %% "http4s-otel4s-middleware-metrics"      % http4sOtel4sVersion,
       "org.http4s"    %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
@@ -1008,7 +1013,7 @@ lazy val resourceService = project
     executableScriptName        := "resource-service",
     dockerExposedPorts ++= Seq(8484),
     // Load resources during compile so they are available for GraphQL schema macros
-    (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
+    (Compile / compile)         := (Compile / compile).dependsOn(Compile / copyResources).value
   )
 
 lazy val resourceCommonSettings = lucumaGlobalSettings ++ Seq(

@@ -3,30 +3,25 @@
 
 package resource.server.http4s
 import cats.*
-import cats.data.Kleisli
-import cats.data.OptionT
 import cats.effect.*
 import cats.syntax.all.*
 import fs2.compression.Compression
 import lucuma.common.middleware.CorsMiddleware
+import lucuma.common.middleware.ErrorReportingMiddleware
 import lucuma.common.middleware.LoggingMiddleware
+import lucuma.common.middleware.MetricsMiddleware
+import lucuma.common.middleware.TracingMiddleware
+import lucuma.core.model.User
+import lucuma.sso.client.SsoClient
 import org.http4s.HttpRoutes
-import org.http4s.Query
-import org.http4s.Uri
-import org.http4s.headers.Upgrade
-import org.http4s.metrics.MetricsOps
 import org.http4s.otel4s.middleware.metrics.OtelMetrics
-import org.http4s.otel4s.middleware.trace.redact
-import org.http4s.otel4s.middleware.trace.redact.PathRedactor
-import org.http4s.otel4s.middleware.trace.redact.QueryRedactor
 import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
-import org.http4s.server.middleware.ErrorAction
 import org.http4s.server.middleware.GZip
-import org.http4s.server.middleware.Metrics
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.otel4s.metrics.MeterProvider
+import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
 object ServerMiddleware {
@@ -35,47 +30,30 @@ object ServerMiddleware {
   /**
    * Create a combined middleware to all server routes
    */
-  def apply[F[_]: {Async, Compression, TracerProvider, MeterProvider}](
+  def apply[F[_]: {Async, Compression, Tracer, TracerProvider, MeterProvider}](
     corsOverHttps: Boolean,
-    domain:        Seq[String]
+    domain:        Seq[String],
+    ssoClient:     SsoClient[F, User]
   ): F[Middleware[F]] = {
     given Logger[F] = Slf4jLogger.getLogger[F]
 
-    val logging = LoggingMiddleware.logging[F]()
-
-    def httpMetrics(metricsOps: MetricsOps[F]): Middleware[F] =
-      routes =>
-        val withMetrics = Metrics[F](metricsOps)(routes)
-        Kleisli(req => if (req.headers.get[Upgrade].isDefined) routes(req) else withMetrics(req))
-
-    val errorReporting: Middleware[F] = routes =>
-      ErrorAction.httpRoutes.log(
-        httpRoutes = routes,
-        messageFailureLogAction = Logger[F].error(_)(_),
-        serviceErrorLogAction = Logger[F].error(_)(_)
-      )
-    val spanDataProvider              = ServerSpanDataProvider.openTelemetry(redactor)
-
-    val cors: Middleware[F] = CorsMiddleware.cors(corsOverHttps, domain.toList)
+    val logging          = LoggingMiddleware.logging[F]()
+    val spanDataProvider = ServerSpanDataProvider.openTelemetry(TracingMiddleware.redactor)
+    val cors             = CorsMiddleware.cors[F](corsOverHttps, domain.toList)
 
     (
       OtelServerMiddleware.builder[F](spanDataProvider).build,
-      OtelMetrics.serverMetricsOps[F]().map(httpMetrics)
+      OtelMetrics.serverMetricsOps[F]().map(MetricsMiddleware.httpMetrics[F])
     ).mapN: (otel, httpMetrics) =>
       List[Middleware[F]](
         cors,
         logging,
         httpMetrics,
         otel.asHttpRoutesMiddleware,
-        errorReporting,
+        TracingMiddleware.traceUser(ssoClient),
+        ErrorReportingMiddleware.errorReporting,
         GZip(_)
       ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
   }
-
-  private object redactor extends PathRedactor with QueryRedactor:
-    def redactPath(path: Uri.Path): Uri.Path = path
-    def redactQuery(query: Query): Query     =
-      if (query.isEmpty) query
-      else Query(redact.REDACTED -> None)
 
 }
