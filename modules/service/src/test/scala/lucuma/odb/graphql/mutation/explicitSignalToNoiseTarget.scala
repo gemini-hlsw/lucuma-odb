@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
-import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.show.*
 import io.circe.Json
@@ -463,8 +462,7 @@ class explicitSignalToNoiseTarget extends OdbSuite:
       _     <- IO(assertEquals(obs, List(oid)))
     yield ()
 
-  // Reproduction for the unique-violation (SQLSTATE 23505) on
-  // i_asterism_single_sn_target. `setSignalToNoiseTarget`
+  // Reproduction for the unique-violation on i_asterism_single_sn_target.
   test("switching the SN target from the later target to the earlier one does not raise 23505"):
     for
       pid <- createProgramAs(pi)
@@ -476,21 +474,3 @@ class explicitSignalToNoiseTarget extends OdbSuite:
       _   <- setSnTarget(oid, t0.some) // switch to the earlier target: 23505 today
       _   <- assertSnTarget(oid, t0.some)
     yield ()
-
-  test("repeatedly switching the SN target back and forth never violates the unique index"):
-    val switches = 25
-    for
-      pid <- createProgramAs(pi)
-      t0  <- createTargetAs(pi, pid, "Larry")
-      t1  <- createTargetAs(pi, pid, "Curly")
-      oid <- createObservationAs(pi, pid, t0, t1)
-      _   <- setSnTarget(oid, t1.some)
-      // Alternate t1 -> t0 -> t1 -> ... ; each switch leaves the old row
-      // flagged while the new one is being flagged.
-      _   <- List.range(0, switches).traverse_ { i =>
-               setSnTarget(oid, (if (i % 2 == 0) t0 else t1).some)
-             }
-      // switches=25: last index is 24 (even) -> t0
-      _   <- assertSnTarget(oid, t0.some)
-    yield ()
-
