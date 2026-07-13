@@ -78,6 +78,18 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
           .query(core_timestamp)
       )(tid).map(_.toInstant)
 
+  private def bumpRadialVelocity(tid: Target.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"UPDATE t_target SET c_sid_rv = 999.0 WHERE c_target_id = $target_id".command
+      )(tid).void
+
+  private def bumpParallax(tid: Target.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"UPDATE t_target SET c_sid_parallax = 1000000 WHERE c_target_id = $target_id".command
+      )(tid).void
+
   private def hasObs(body: String, oid: Observation.Id): Boolean =
     body.linesIterator.contains(s"OBSERVATION\t${Gid[Observation.Id].show(oid)}")
 
@@ -150,6 +162,44 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
       // A visibility-relevant edit re-stamps the target after the cursor.
       _        <- updateTargetPropertiesAs(pi, t, Coordinates(RightAscension.fromDoubleDegrees(42.0), Declination.fromDoubleDegrees(17.0).get))
+      after    <- targetInvalidation(t)
+      (st, b)  <- fetchVisibilityChanges(serviceUser, cursor)
+    yield
+      assert(!hasTarget(b0, t))
+      assert(after.isAfter(cursor))
+      assertEquals(st, Status.Ok)
+      assert(hasTarget(b, t))
+
+  test("a target whose radial velocity changes appears in the response"):
+    for
+      p        <- createProgram
+      t        <- createTargetWithProfileAs(pi, p)
+      o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _        <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
+      before   <- targetInvalidation(t)
+      cursor    = before.plusMillis(1)
+      (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
+      // An RV-only edit re-stamps the target after the cursor.
+      _        <- bumpRadialVelocity(t)
+      after    <- targetInvalidation(t)
+      (st, b)  <- fetchVisibilityChanges(serviceUser, cursor)
+    yield
+      assert(!hasTarget(b0, t))
+      assert(after.isAfter(cursor))
+      assertEquals(st, Status.Ok)
+      assert(hasTarget(b, t))
+
+  test("a target whose parallax changes appears in the response"):
+    for
+      p        <- createProgram
+      t        <- createTargetWithProfileAs(pi, p)
+      o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _        <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
+      before   <- targetInvalidation(t)
+      cursor    = before.plusMillis(1)
+      (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
+      // A parallax-only edit re-stamps the target after the cursor.
+      _        <- bumpParallax(t)
       after    <- targetInvalidation(t)
       (st, b)  <- fetchVisibilityChanges(serviceUser, cursor)
     yield
