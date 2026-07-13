@@ -11,7 +11,6 @@ import cats.effect.std.UUIDGen
 import cats.implicits.*
 import fs2.compression.Compression
 import fs2.compression.DeflateParams
-import java.time.Instant
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
@@ -44,6 +43,8 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
+
+import java.time.Instant
 
 object SchedulerRoutes:
 
