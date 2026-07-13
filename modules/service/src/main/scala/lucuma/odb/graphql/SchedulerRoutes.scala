@@ -179,8 +179,4 @@ object SchedulerRoutes:
            case _: AccessControlException => Forbidden()
            case other                     => other.raiseError[F, Response[F]]
 
-    // Compress responses (level 9) when the client sends `Accept-Encoding: gzip`.
-    // Applied here, scoped to these bulk-dump routes, rather than as a global
-    // middleware — the GraphQL / websocket / attachment routes should not be
-    // blanket-compressed.
     GZip(routes, level = DeflateParams.Level.NINE)
