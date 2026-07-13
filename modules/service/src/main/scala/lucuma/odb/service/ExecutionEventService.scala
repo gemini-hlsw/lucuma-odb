@@ -101,7 +101,7 @@ object ExecutionEventService:
         def invalidDataset: OdbError.InvalidDataset =
           OdbError.InvalidDataset(input.datasetId, Some(s"Dataset '${input.datasetId.show}' not found"))
 
-        val insert: F[Result[(Id, Timestamp, Visit.Id, Boolean)]] =
+        val insert: F[Result[(Id, Timestamp, Boolean)]] =
           session
             .option(Statements.InsertDatasetEvent)(input)
             .map(_.toResult(invalidDataset.asProblem))
@@ -126,7 +126,7 @@ object ExecutionEventService:
             case _                        => ().pure
 
         ResultT(insert)
-          .flatMap: (eid, time, _, wasInserted) =>
+          .flatMap: (eid, time, wasInserted) =>
             if wasInserted then
               ResultT.liftF(setDatasetTime(time).as(eid))
             else
@@ -236,7 +236,7 @@ object ExecutionEventService:
           c_visit_id = $visit_id
       """.query(timestamp_interval.opt)
 
-    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Visit.Id, Boolean)] =
+    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Boolean)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -272,9 +272,8 @@ object ExecutionEventService:
         RETURNING
           c_execution_event_id,
           c_received,
-          c_visit_id,
           xmax = 0 AS inserted
-      """.query(execution_event_id *: core_timestamp *: visit_id *: bool)
+      """.query(execution_event_id *: core_timestamp *: bool)
          .contramap(in => (in.datasetId, in.datasetStage, in.idempotencyKey, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Boolean)] =
