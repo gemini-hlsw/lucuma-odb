@@ -40,6 +40,7 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -488,6 +489,65 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       e.fold(insertSlewEvent(pid), insertSequenceEvent(pid), insertAtomEvent(pid), insertStepEvent(pid), insertDatasetEvent(pid))
     }
 
+  // The obscalc calculation state for an observation, if a row exists.
+  def obscalcState(oid: Observation.Id): IO[Option[CalculationState]] =
+    withSession: s =>
+      s.option(sql"""
+        SELECT c_obscalc_state
+        FROM t_obscalc
+        WHERE c_observation_id = $observation_id
+      """.query(calculation_state))(oid)
+
+  // Forces the obscalc entry into the 'ready' state so that a subsequent
+  // invalidation (e.g. by recording an execution event) is observable.
+  def setObscalcReady(pid: Program.Id, oid: Observation.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(sql"""
+        INSERT INTO t_obscalc (c_program_id, c_observation_id, c_obscalc_state)
+        VALUES ($program_id, $observation_id, 'ready' :: e_calculation_state)
+        ON CONFLICT ON CONSTRAINT t_obscalc_pkey
+          DO UPDATE SET c_obscalc_state = 'ready' :: e_calculation_state
+      """.command)(pid, oid).void
+
+  // Mirrors what the obscalc worker (obscalc/Main.scala) does for time
+  // accounting: recompute it for all of the observation's visits.
+  def runTimeAccounting(oid: Observation.Id): IO[Unit] =
+    withServices(serviceUser): s =>
+      s.session.transaction.use: xa =>
+        s.timeAccountingService.updateAll(oid)(using xa)
+
+  // The stored (final) program time summed over an observation's visits.
+  def finalProgramTime(oid: Observation.Id): IO[TimeSpan] =
+    withSession: s =>
+      s.unique(sql"""
+        SELECT COALESCE(SUM(c_final_program_time), '0'::interval)
+        FROM t_visit
+        WHERE c_observation_id = $observation_id
+      """.query(time_span))(oid)
+
+  // The stored (final) program time for a single visit.
+  def visitFinalProgramTime(vid: Visit.Id): IO[TimeSpan] =
+    withSession: s =>
+      s.unique(sql"""
+        SELECT c_final_program_time FROM t_visit WHERE c_visit_id = $visit_id
+      """.query(time_span))(vid)
+
+  // Overwrites the stored final program time for a visit, standing in for a
+  // value written by some previous run/algorithm.
+  def setFinalProgramTime(vid: Visit.Id, ts: TimeSpan): IO[Unit] =
+    withSession: s =>
+      s.execute(sql"""
+        UPDATE t_visit SET c_final_program_time = $time_span WHERE c_visit_id = $visit_id
+      """.command)((ts, vid)).void
+
+  // An obscalc invalidation NOT related to time accounting.
+  def invalidateObscalc(oid: Observation.Id): IO[Unit] =
+    withSession(_.execute(sql"CALL invalidate_obscalc($observation_id)".command)(oid).void)
+
+  // A time-accounting-relevant invalidation of a specific visit.
+  def invalidateTimeAccounting(vid: Visit.Id, oid: Observation.Id): IO[Unit] =
+    withSession(_.execute(sql"CALL invalidate_visit_time_accounting($visit_id, $observation_id)".command)((vid, oid)).void)
+
   test("timeChargeInvoice (no events)") {
     recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 0).flatMap { v =>
       expect(pi, invoiceQuery(v.oid), invoiceExected(TimeCharge.Invoice.Empty, Nil))
@@ -512,6 +572,105 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       _ <- expect(pi, invoiceQuery(v.oid), invoiceExected(invoice, Nil))
     } yield ()
 
+  }
+
+  test("timeChargeInvoice (computed asynchronously by the obscalc worker)") {
+    // Same scenario as "no discounts", but exercising the async path end to end:
+    // recording events must invalidate obscalc (so the worker picks the
+    // observation up) WITHOUT computing time accounting synchronously, and the
+    // worker's recompute (updateAll) must then produce the expected charge.
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    for {
+      v  <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9000)
+
+      // Establish a known 'ready' baseline so the event's invalidation is visible.
+      _  <- setObscalcReady(v.pid, v.oid)
+      _  <- assertIO(obscalcState(v.oid), CalculationState.Ready.some)
+
+      // Recording the events must invalidate obscalc (-> pending) ...
+      es  = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) }
+      _  <- insertEvents(v.pid, es)
+      _  <- assertIO(obscalcState(v.oid), CalculationState.Pending.some)
+
+      // ... but must NOT have updated time accounting synchronously.
+      _  <- assertIO(finalProgramTime(v.oid), 0.sec)
+
+      // The worker recomputes time accounting for the observation's visits.
+      _  <- runTimeAccounting(v.oid)
+      _  <- assertIO(finalProgramTime(v.oid), 10.sec)
+    } yield ()
+  }
+
+  test("time accounting is not recomputed on an unrelated obscalc invalidation") {
+    // The crux of the async design: a closed visit's stored charge must only be
+    // recomputed when something time-accounting-relevant changed -- never merely
+    // because obscalc was invalidated for an unrelated reason (a target/mode
+    // edit, or a migration that blanket-sets observations to 'pending').
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    val bogus = 999.sec
+
+    for {
+      v <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9100)
+      es = events.map { (c, t) => SequenceEvent(EventId, t, v.oid, v.vid, none, c) }
+      _ <- insertEvents(v.pid, es)
+
+      // The worker computes the real charge.
+      _ <- runTimeAccounting(v.oid)
+      _ <- assertIO(finalProgramTime(v.oid), 10.sec)
+
+      // Stand in a value from some previous algorithm, then invalidate obscalc
+      // for a reason unrelated to time accounting.
+      _ <- setFinalProgramTime(v.vid, bogus)
+      _ <- invalidateObscalc(v.oid)
+      _ <- runTimeAccounting(v.oid)
+      // Not time-accounting-dirty: the stored value is left exactly as it was.
+      _ <- assertIO(finalProgramTime(v.oid), bogus)
+
+      // A time-accounting-relevant invalidation does force the recompute.
+      _ <- invalidateTimeAccounting(v.vid, v.oid)
+      _ <- runTimeAccounting(v.oid)
+      _ <- assertIO(finalProgramTime(v.oid), 10.sec)
+    } yield ()
+  }
+
+  test("an execution event in one visit does not reprice another visit") {
+    // The corrections-integrity guarantee: recompute is scoped to the visit that
+    // changed.  An event in a new visit must not re-derive (and thus silently
+    // alter) a different, already-closed visit of the same observation.
+    val events = List(
+      (SequenceCommand.Start, t00),
+      (SequenceCommand.Stop,  t10)
+    )
+
+    val bogus = 999.sec
+
+    for {
+      // Visit 1 executes and its charge is computed.
+      v1 <- recordVisit(pi, serviceUser, mode, visitTime, 1, 1, 1, 9200)
+      _  <- insertEvents(v1.pid, events.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v1.vid, none, c) })
+      _  <- runTimeAccounting(v1.oid)
+      _  <- assertIO(visitFinalProgramTime(v1.vid), 10.sec)
+
+      // Stand in a staff-corrected / previous-algorithm value for the now-closed
+      // visit 1.
+      _  <- setFinalProgramTime(v1.vid, bogus)
+
+      // Later, a second visit of the SAME observation receives events.
+      v2 <- recordVisitAs(serviceUser, v1.oid)
+      _  <- insertEvents(v1.pid, events.map { (c, t) => SequenceEvent(EventId, t, v1.oid, v2, none, c) })
+      _  <- runTimeAccounting(v1.oid)
+
+      // Only visit 2 was recomputed; visit 1's stored value is left untouched.
+      _  <- assertIO(visitFinalProgramTime(v1.vid), bogus)
+    } yield ()
   }
 
   test("timeChargeInvoice (daylight discount)") {

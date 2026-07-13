@@ -17,6 +17,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
+import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
@@ -34,6 +35,7 @@ import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.core_timestamp
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
+import lucuma.odb.util.Codecs.visit_id
 import skunk.*
 import skunk.implicits.*
 
@@ -94,6 +96,19 @@ trait ObscalcServiceSuiteSupport extends ExecutionTestSupportForGmos:
       """.command
 
       session.execute(up)(o).void
+
+  // Marks a visit's time accounting dirty (c_ta_invalidation > c_ta_update)
+  // without touching t_obscalc.c_last_invalidation -- the state left behind when
+  // a time accounting recompute fails.
+  def markVisitTimeAccountingDirty(v: Visit.Id): IO[Unit] =
+    withSession: session =>
+      val up: Command[Visit.Id] = sql"""
+        UPDATE t_visit
+        SET c_ta_invalidation = c_ta_update + interval '1 second'
+        WHERE c_visit_id = $visit_id
+      """.command
+
+      session.execute(up)(v).void
 
   def calculationState(o: Observation.Id): IO[CalculationState] =
     withSession: session =>
@@ -320,6 +335,26 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
         calculateAndUpdate(lst.head) *> selectStates
 
     assertIO(res.map(_.values.toList.head), CalculationState.Retry)
+
+  test("still-dirty time accounting at obscalc finish -> retry"):
+    setup.flatMap: (p, o) =>
+      val pc = Obscalc.PendingCalc(p, o, randomTime)
+      for
+        v <- recordVisitAs(serviceUser, o)
+        // Baseline: no visit is dirty, so a successful calculation leaves the
+        // entry 'ready'.
+        _ <- insert(pc)
+        _ <- calculateAndUpdate(pc)
+        _ <- assertIO(calculationState(o), CalculationState.Ready)
+
+        // A visit's time accounting recompute failed (dirty, but
+        // c_last_invalidation unchanged).  Finishing the obscalc calculation
+        // must not leave the entry 'ready' -- it goes to 'retry' so the
+        // recompute is attempted again.
+        _ <- markVisitTimeAccountingDirty(v)
+        _ <- calculateAndUpdate(pc)
+        _ <- assertIO(calculationState(o), CalculationState.Retry)
+      yield ()
 
   test("insert visit sets state to pending"):
     val states = for

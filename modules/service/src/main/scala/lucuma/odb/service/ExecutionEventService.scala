@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
-import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -102,7 +101,7 @@ object ExecutionEventService:
         def invalidDataset: OdbError.InvalidDataset =
           OdbError.InvalidDataset(input.datasetId, Some(s"Dataset '${input.datasetId.show}' not found"))
 
-        val insert: F[Result[(Id, Timestamp, Visit.Id, Boolean)]] =
+        val insert: F[Result[(Id, Timestamp, Boolean)]] =
           session
             .option(Statements.InsertDatasetEvent)(input)
             .map(_.toResult(invalidDataset.asProblem))
@@ -127,17 +126,9 @@ object ExecutionEventService:
             case _                        => ().pure
 
         ResultT(insert)
-          .flatMap: (eid, time, vid, wasInserted) =>
+          .flatMap: (eid, time, wasInserted) =>
             if wasInserted then
-              // A note about the visit id.  Datasets have a visit id which is
-              // NOT NULL.  They are assigned via a BEFORE trigger on t_dataset.
-              // At the time of the insert, the dataset's step's atom must have
-              // been assigned already or the insert is rejected.  So, by the
-              // time we're getting events for a dataset, we know the associated
-              // atom has a visit.
-              ResultT.liftF:
-                setDatasetTime(time) *>
-                timeAccountingService.update(vid).as(eid)
+              ResultT.liftF(setDatasetTime(time).as(eid))
             else
               ResultT.pure(eid)
           .value
@@ -158,11 +149,7 @@ object ExecutionEventService:
                 invalidVisit.asFailureF
 
         ResultT(insert)
-          .flatMap: (eid, wasInserted) =>
-            if wasInserted then
-              ResultT.liftF(timeAccountingService.update(input.visitId).as(eid))
-            else
-              ResultT.pure(eid)
+          .map((eid, _) => eid)
           .value
 
       override def insertSlewEvent(
@@ -177,8 +164,7 @@ object ExecutionEventService:
         (for
           v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none))
           e <- ResultT(insert(v))
-          (eid, wasInserted) = e
-          _ <- ResultT.liftF(timeAccountingService.update(v)).whenA(wasInserted)
+          (eid, _) = e
         yield eid).value
 
       override def insertStepEvent(
@@ -200,11 +186,7 @@ object ExecutionEventService:
               case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
 
         ResultT(insert)
-          .flatMap: (eid, wasInserted) =>
-            if wasInserted then
-              ResultT.liftF(timeAccountingService.update(input.visitId).as(eid))
-            else
-              ResultT.pure(eid)
+          .map((eid, _) => eid)
           .value
 
       override def selectSequenceEvents(
@@ -254,7 +236,7 @@ object ExecutionEventService:
           c_visit_id = $visit_id
       """.query(timestamp_interval.opt)
 
-    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Visit.Id, Boolean)] =
+    val InsertDatasetEvent: Query[AddDatasetEventInput, (Id, Timestamp, Boolean)] =
       sql"""
         INSERT INTO t_execution_event (
           c_event_type,
@@ -290,9 +272,8 @@ object ExecutionEventService:
         RETURNING
           c_execution_event_id,
           c_received,
-          c_visit_id,
           xmax = 0 AS inserted
-      """.query(execution_event_id *: core_timestamp *: visit_id *: bool)
+      """.query(execution_event_id *: core_timestamp *: bool)
          .contramap(in => (in.datasetId, in.datasetStage, in.idempotencyKey, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Boolean)] =

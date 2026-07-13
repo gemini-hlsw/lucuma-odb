@@ -116,6 +116,9 @@ trait DatabaseOperations { this: OdbSuite =>
               .map(_.map(_.meta.lastInvalidation).getOrElse(Timestamp.Min))
 
         when.flatMap: t =>
+          // Mirror the obscalc daemon: recompute time accounting first (clearing
+          // its dirty marker) so the calculation can settle to 'ready'.
+          services.transactionally(timeAccountingService.updateAll(oid)) *>
           srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
     .void
 

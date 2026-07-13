@@ -290,7 +290,13 @@ object ObscalcService:
       )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.Meta]] =
         for
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
-          ns  = lu.map(lastUpdate => if lastUpdate === pending.lastInvalidation then expected else CalculationState.Pending)
+          ns  = lu.map: (lastInvalidation, timeAccountingDirty) =>
+                  // Re-invalidated during the calculation: go back to 'pending'.
+                  if lastInvalidation =!= pending.lastInvalidation then CalculationState.Pending
+                  // The obscalc result is fine but time accounting didn't get
+                  // updated (its recompute failed); retry so it is attempted again.
+                  else if timeAccountingDirty                      then CalculationState.Retry
+                  else                                                  expected
           af  = ns.map(newState => Statements.storeResult(pending, result, newState))
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
@@ -586,13 +592,23 @@ object ObscalcService:
         sql"c_workflow_validations = ${_observation_validation}"(r.workflow.validationErrors)
       )
 
-    val SelectLastInvalidationForUpdate: Query[Observation.Id, Timestamp] =
+    // Along with the last invalidation timestamp, reports whether any of the
+    // observation's visits still has dirty time accounting (its recompute failed
+    // or did not complete) so that the entry can be retried rather than left
+    // 'ready' with stale data.
+    val SelectLastInvalidationForUpdate: Query[Observation.Id, (Timestamp, Boolean)] =
       sql"""
-        SELECT c_last_invalidation
-        FROM t_obscalc
-        WHERE c_observation_id = $observation_id
+        SELECT
+          o.c_last_invalidation,
+          EXISTS (
+            SELECT 1 FROM t_visit v
+            WHERE v.c_observation_id  = o.c_observation_id
+              AND v.c_ta_invalidation > v.c_ta_update
+          )
+        FROM t_obscalc o
+        WHERE o.c_observation_id = $observation_id
         FOR UPDATE
-      """.query(core_timestamp)
+      """.query(core_timestamp *: bool)
 
     def storeResult(
       pending:  Obscalc.PendingCalc,
