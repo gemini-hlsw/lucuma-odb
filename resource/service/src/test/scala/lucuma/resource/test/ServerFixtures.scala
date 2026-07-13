@@ -64,7 +64,9 @@ trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with T
     for
       config <- IO(databaseConfig).toResource
       _      <- ResourceMain.migrateDatabase[IO](container.jdbcUrl, config).toResource
-      a      <- ResourceMain.routesResource[IO](config, true, Seq("unused")).map(_.map(_.orNotFound))
+      a      <- ResourceMain
+                  .routesResource[IO](config, true, Seq("unused"), TestSso.ssoClient)
+                  .map(_.map(_.orNotFound))
       s      <- EmberServerBuilder
                   .default[IO]
                   .withHost(ipv4"0.0.0.0")
