@@ -32,9 +32,14 @@ import lucuma.core.enums.Band
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.enums.GnirsFilter
+import lucuma.core.math.SignalToNoise
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.util.TimeSpan
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
@@ -42,6 +47,7 @@ import lucuma.itc.ItcGhostDetector
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
+import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyInput
@@ -51,6 +57,9 @@ import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.flamingos2
+import lucuma.odb.sequence.gmos
+import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.SuperUserAccess
@@ -279,15 +288,19 @@ object ItcService {
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
+      //
+      // The returned acquisition type is set only on the GNIRS S/N-mode two-pass path
+      // (see below); it pins the mode the sequence uses.
       private def safeAcquisitionCall(
-        oid:     Observation.Id,
-        input:   ImagingInput,
-        targets: NonEmptyList[ItcInput.TargetDefinition]
-      ): EitherT[F, OdbError, Zipper[Itc.Result]] =
-        def go(min: TimeSpan, max: TimeSpan): EitherT[F, OdbError, Zipper[Itc.Result]] =
+        oid:          Observation.Id,
+        input:        ImagingInput,
+        targets:      NonEmptyList[ItcInput.TargetDefinition],
+        autoClassify: Boolean
+      ): EitherT[F, OdbError, (Zipper[Itc.Result], Option[GnirsAcquisitionType])] =
+        def go(imInput: ImagingInput, min: TimeSpan, max: TimeSpan): EitherT[F, OdbError, Zipper[Itc.Result]] =
           EitherT:
             client
-              .imaging(input, useCache = false)
+              .imaging(imInput, useCache = false)
               .map: ccr =>
                 val modifiedTargetTimes =
                   ccr.targetTimes.modifyValue:
@@ -314,17 +327,48 @@ object ItcService {
                 case t =>
                   OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
+        def noType(z: EitherT[F, OdbError, Zipper[Itc.Result]]): EitherT[F, OdbError, (Zipper[Itc.Result], Option[GnirsAcquisitionType])] =
+          z.map((_, Option.empty[GnirsAcquisitionType]))
+
         input.mode match
           case InstrumentMode.GmosNorthImaging(_, _, _, _) |
                InstrumentMode.GmosSouthImaging(_, _, _, _) =>
-            go(lucuma.odb.sequence.gmos.MinAcquisitionExposureTime,
-               lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime)
+            noType(go(input, gmos.MinAcquisitionExposureTime, gmos.MaxAcquisitionExposureTime))
           case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
-            go(lucuma.odb.sequence.flamingos2.MinAcquisitionExposureTime,
-               lucuma.odb.sequence.flamingos2.MaxAcquisitionExposureTime)
-          case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
-            go(lucuma.odb.sequence.gnirs.MinAcquisitionExposureTime,
-               lucuma.odb.sequence.gnirs.MaxAcquisitionExposureTime)
+            noType(go(input, flamingos2.MinAcquisitionExposureTime, flamingos2.MaxAcquisitionExposureTime))
+          case InstrumentMode.GnirsImaging(etm, filter, camera, readMode, wellDepth, coadds, port) =>
+            val min: TimeSpan = gnirs.MinAcquisitionExposureTime
+            val max: TimeSpan = gnirs.MaxAcquisitionExposureTime
+            etm match
+              case ExposureTimeMode.SignalToNoiseMode(userSN, at) if autoClassify =>
+                // Two-pass. The acquisition mode (Very Bright / Bright / Faint) is a
+                // function of exposure time, but the exposure time depends on the filter
+                // (Very Bright images in H2) which depends on the mode — and, in S/N mode,
+                // a low requested S/N would shorten the exposure and misclassify a Bright
+                // target as Very Bright. So classify from a fixed brightness measurement
+                // (broadband filter, classification S/N) first, then compute the real
+                // exposure at the user's S/N in the mode-appropriate filter.
+                def gnirsInput(f: GnirsFilter, e: ExposureTimeMode): ImagingInput =
+                  ImagingInput.parameters
+                    .andThen(ImagingParameters.mode)
+                    .replace(InstrumentMode.GnirsImaging(e, f, camera, readMode, wellDepth, coadds, port))(input)
+
+                val classifySN:  SignalToNoise    = gnirs.AcquisitionClassificationSignalToNoise
+                val classifyEtm: ExposureTimeMode = ExposureTimeMode.SignalToNoiseMode(classifySN, at)
+                for
+                  z1                                <- go(gnirsInput(filter, classifyEtm), min, max)
+                  t1:      IntegrationTime           = z1.focus.value
+                  acqType: GnirsAcquisitionType      = GnirsAcquisitionMode.defaultFor(t1.exposureTime, t1.exposureCount).acquisitionType
+                  // Very Bright images through the acquisition filter in H2; the other
+                  // classifications keep the broadband filter (already `filter`).
+                  f2:      GnirsFilter               = if acqType === GnirsAcquisitionType.VeryBright then GnirsFilter.H2 else filter
+                  // Skip the second call when it would be identical to the first (same
+                  // filter and the user already asked for the classification S/N).
+                  z2                                <- if f2 === filter && userSN === classifySN then EitherT.pure[F, OdbError](z1)
+                                                       else go(gnirsInput(f2, etm), min, max)
+                yield (z2, acqType.some)
+              case _ =>
+                noType(go(input, min, max))
           case m                                                      =>
             EitherT.leftT:
               OdbError.InvalidObservation(oid, s"Acquisition is not supported for ${m.displayName}".some)
@@ -332,6 +376,7 @@ object ItcService {
       private def toTargetResults(
         targets: NonEmptyList[ItcInput.TargetDefinition],
         results: NonEmptyList[ClientCalculationResult],
+        signalToNoiseTargetId: Option[Target.Id] = none
       ): Either[OdbError, NonEmptyList[Zipper[Itc.Result]]] =
 
         def convertErrors(
@@ -347,10 +392,16 @@ object ItcService {
            .partitionErrors
            .leftMap(convertErrors)
            .map: a =>
-             a.value.zipWithIndex.map { case (intTime, index) =>
+             val z = a.value.zipWithIndex.map { case (intTime, index) =>
                val t = targets.get(index).get
                Itc.Result(t.targetId, intTime.times.focus, intTime.signalToNoiseAt)
              }
+             // Pin the "selected" result to the user's signal-to-noise target,
+             // if one is set and present; otherwise keep the automatic
+             // (brightest) focus.
+             signalToNoiseTargetId
+               .flatMap(id => z.findFocus(_.targetId === id))
+               .getOrElse(z)
 
       sealed trait Imaging[A]:
         def pf: PartialFunction[InstrumentMode, A]
@@ -377,6 +428,13 @@ object ItcService {
 
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[Itc.Result]]): Itc =
             Itc.GmosSouthImaging(nem)
+
+        case object GnirsImaging extends Imaging[GnirsFilter]:
+          override def pf: PartialFunction[InstrumentMode, GnirsFilter] =
+            case InstrumentMode.GnirsImaging(filter = f) => f
+
+          override def wrap(nem: NonEmptyMap[GnirsFilter, Zipper[Itc.Result]]): Itc =
+            Itc.GnirsImaging(nem)
 
       private def callRemoteImagingItc[A: Order](
         oid:   Observation.Id,
@@ -411,7 +469,7 @@ object ItcService {
         for
           fs <- EitherT.fromEither(extractFilters(input.science.map(_.mode).toList, Nil))
           cs <- EitherT(clientCalculationResults)
-          ts <- EitherT.fromEither(toTargetResults(input.targets, cs))
+          ts <- EitherT.fromEither(toTargetResults(input.targets, cs, input.signalToNoiseTargetId))
         yield im.wrap(fs.zip(ts).toNem)
 
 
@@ -467,6 +525,9 @@ object ItcService {
             case InstrumentMode.GmosSouthImaging(_, _, _, _) =>
               callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
 
+            case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
+              callRemoteImagingItc(oid, im, Imaging.GnirsImaging)
+
             case m                                     =>
               EitherT.leftT:
                 OdbError.InvalidObservation(oid, s"Imaging ITC lookup is not supported for ${m.displayName}.".some)
@@ -474,24 +535,24 @@ object ItcService {
         def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
-            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
-            acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets)
-          yield Itc.Spectroscopy(acq, sci)
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr), sp.signalToNoiseTargetId).map(_.head))
+            acq <- safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
+          yield Itc.Spectroscopy(acq._1, sci, acq._2)
 
         def igrins2Spectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
-            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr)).map(_.head))
+            sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr), sp.signalToNoiseTargetId).map(_.head))
           yield Itc.Igrins2Spectroscopy(sci)
 
         (input match
-          case im @ ItcInput.Imaging(_, _) =>
+          case im @ ItcInput.Imaging(_, _, _) =>
             imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _) =>
+          case sp @ ItcInput.Spectroscopy(_, _, _, _, _, _) =>
             spectroscopy(sp)
-          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets) =>
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets, _) =>
             ghost(gh, targets)
-          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _) =>
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _, _) =>
             igrins2Spectroscopy(sp)
           case _ =>
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))

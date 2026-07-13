@@ -15,6 +15,8 @@ import lucuma.core.data.Zipper
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.model.Target
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
@@ -62,6 +64,7 @@ object Itc:
     case GhostIfu            extends Type("ghost_ifu")
     case GmosNorthImaging    extends Type("gmos_north_imaging")
     case GmosSouthImaging    extends Type("gmos_south_imaging")
+    case GnirsImaging        extends Type("gnirs_imaging")
     case Igrins2Spectroscopy extends Type("igrins_2_spectroscopy")
     case Spectroscopy        extends Type("spectroscopy")
 
@@ -146,12 +149,39 @@ object Itc:
     GenPrism[Itc, GmosSouthImaging]
 
   /**
+   * GNIRS imaging results.  There are results per-GNIRS filter.
+   */
+  case class GnirsImaging(
+    science: NonEmptyMap[GnirsFilter, Zipper[Result]]
+  ) extends Itc:
+
+    override def dataType: Type =
+      Type.GnirsImaging
+
+    override def scienceExposureCount: PosInt =
+      PosInt.unsafeFrom:
+        science.foldLeft(0) { (cnt, z) =>
+          cnt + z.focus.value.exposureCount.value
+        }
+
+  object GnirsImaging:
+    given Eq[GnirsImaging] =
+      Eq.by(_.science)
+
+  val gnirsImaging: Prism[Itc, GnirsImaging] =
+    GenPrism[Itc, GnirsImaging]
+
+  /**
    * Spectroscopy results for all instruments. Spectroscopy has separate
    * acquisition and science results.
+   * 
+   * GNIRS acquisition is particular in that it also must compute the acquisition
+   * type in this layer. See the two-pass acquisition ITC in ItcService.
    */
   case class Spectroscopy(
     acquisition: Zipper[Result],
-    science:     Zipper[Result]
+    science:     Zipper[Result],
+    gnirsAcqType: Option[GnirsAcquisitionType] = None
   ) extends Itc:
 
     override def dataType: Type =
@@ -165,7 +195,8 @@ object Itc:
       Eq.by: a =>
         (
           a.acquisition,
-          a.science
+          a.science,
+          a.gnirsAcqType
         )
 
   val spectroscopy: Prism[Itc, Spectroscopy] =
@@ -197,6 +228,7 @@ object Itc:
       case (a: GhostIfu,            b: GhostIfu)            => a === b
       case (a: GmosNorthImaging,    b: GmosNorthImaging)    => a === b
       case (a: GmosSouthImaging,    b: GmosSouthImaging)    => a === b
+      case (a: GnirsImaging,        b: GnirsImaging)        => a === b
       case (a: Igrins2Spectroscopy, b: Igrins2Spectroscopy) => a === b
       case (a: Spectroscopy,        b: Spectroscopy)        => a === b
       case _                                                => false

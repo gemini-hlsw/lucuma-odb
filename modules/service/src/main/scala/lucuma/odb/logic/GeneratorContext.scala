@@ -49,18 +49,20 @@ case class GeneratorContext(
     // ITC
     itcRes.foreach: itc =>
       itc match
-        case Itc.Flamingos2Imaging(m)     =>
+        case Itc.Flamingos2Imaging(m)      =>
           m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.GhostIfu(r, b)           =>
+        case Itc.GhostIfu(r, b)            =>
           addResultSet(r)
           addResultSet(b)
-        case Itc.GmosNorthImaging(m)      =>
+        case Itc.GmosNorthImaging(m)       =>
           m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.GmosSouthImaging(m)      =>
+        case Itc.GmosSouthImaging(m)       =>
           m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.Igrins2Spectroscopy(sci) =>
+        case Itc.GnirsImaging(m)           =>
+          m.toNel.toList.foreach(addImagingResultSet)
+        case Itc.Igrins2Spectroscopy(sci)  =>
           addResultSet(sci)
-        case Itc.Spectroscopy(acq, sci)   =>
+        case Itc.Spectroscopy(acq, sci, _) =>
           addResultSet(acq)
           addResultSet(sci)
 

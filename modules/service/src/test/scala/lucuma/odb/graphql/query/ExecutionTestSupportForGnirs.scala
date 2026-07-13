@@ -17,6 +17,7 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
+import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
 import lucuma.core.enums.GnirsFpuSlit
 import lucuma.core.enums.GnirsGrating
@@ -55,7 +56,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(5600).get
       ),
-      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
+      GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
 
@@ -69,7 +70,9 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       ),
       GcalBaselineType.Night,
       PosInt.unsafeFrom(1),
-      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(20_000_000L))
+      // Distinct from the science coadds (1) so tests verify the calibration
+      // uses its own coadds rather than inheriting the science step's.
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(20_000_000L), PosInt.unsafeFrom(2))
     )
 
   val gnirsSmartArc: SmartGcalValue.Legacy =
@@ -82,7 +85,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       ),
       GcalBaselineType.Night,
       PosInt.unsafeFrom(1),
-      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(10_000_000L))
+      LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(10_000_000L), PosInt.unsafeFrom(3))
     )
 
   // Compose with any seeding contributed by other mixed-in support traits
@@ -97,12 +100,21 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       case GnirsPixelScale.PixelScale_0_05 => GnirsFpuOther.Pinhole1
       case GnirsPixelScale.PixelScale_0_15 => GnirsFpuOther.Pinhole3
 
+    // IFU resolution is tied to the camera pixel scale: LR-IFU on the 0.15"/pix
+    // short camera, HR-IFU on the 0.05"/pix long camera.
+    def ifuFpu(ps: GnirsPixelScale): GnirsFpuIfu = ps match
+      case GnirsPixelScale.PixelScale_0_05 => GnirsFpuIfu.HighResolution
+      case GnirsPixelScale.PixelScale_0_15 => GnirsFpuIfu.LowResolution
+
     val rows: List[Gnirs.TableRow] =
       List(GnirsPixelScale.PixelScale_0_05, GnirsPixelScale.PixelScale_0_15).flatMap: ps =>
         List(
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartFlat),
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps), gnirsSmartArc),
-          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat)
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat),
+          // IFU flat + arc, so IFU science sequences resolve smart gcal too.
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartFlat),
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
         )
 
     prior >>
@@ -127,8 +139,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
-                  explicitTelescopeConfigs: { alongSlit: $entries }
+                gnirsSpectroscopy: {
+                  slit: { explicitTelescopeConfigs: { alongSlit: $entries } }
                 }
               }
             }
@@ -149,8 +161,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
-                  explicitTelescopeConfigs: { toSky: $entries }
+                gnirsSpectroscopy: {
+                  slit: { explicitTelescopeConfigs: { toSky: $entries } }
                 }
               }
             }
@@ -171,7 +183,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   exposureTimeMode: {
                     timeAndCount: {
                       time:  { seconds: $seconds }
@@ -204,6 +216,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           decker
           fpuSlit
           fpuOther
+          fpuIfu
           acquisitionMirrorOut {
             prism
             grating
@@ -243,12 +256,40 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     exposureTimeMode: {
                       timeAndCount: {
                         time:  { seconds: $seconds }
                         count: $count
+                        at:    { nanometers: $atNm }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  def setAcquisitionSignalToNoise(oid: Observation.Id, value: BigDecimal, atNm: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  acquisition: {
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: $value
                         at:    { nanometers: $atNm }
                       }
                     }
@@ -273,7 +314,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitAcquisitionType: $acqType
                   }
@@ -297,7 +338,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     skyOffset: {
                       p: { arcseconds: $pArcsec }
@@ -328,7 +369,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitAcquisitionType: FAINT
                     skyOffset: { p: { arcseconds: $pArcsec }, q: { arcseconds: $qArcsec } }
@@ -353,7 +394,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   camera: $camera
                 }
               }
@@ -375,7 +416,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           updateObservations(input: {
             SET: {
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   acquisition: {
                     explicitFilter: $filter
                   }
@@ -402,6 +443,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
     decker:              String,
     fpuSlit:             Option[String],
     fpuOther:            Option[String],
+    fpuIfu:              Option[String],
     prism:               Option[String],
     grating:             Option[String],
     mirrorWavelengthNm:  Option[BigDecimal],
@@ -442,6 +484,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           "decker":               ${cfg.decker.asJson},
           "fpuSlit":              ${cfg.fpuSlit.asJson},
           "fpuOther":             ${cfg.fpuOther.asJson},
+          "fpuIfu":               ${cfg.fpuIfu.asJson},
           "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
           "camera":               ${cfg.camera.asJson},
           "focusMotorSteps":      ${cfg.focus.asJson},
@@ -476,6 +519,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
   protected def gnirsExpectedCal(
     cfg:      GnirsDynamicSnapshot,
     exposure: TimeSpan,
+    coadds:   Int,
     p:        BigDecimal,
     q:        BigDecimal
   ): Json =
@@ -491,12 +535,13 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       {
         "instrumentConfig": {
           "exposure":             { "seconds": ${exposure.toSeconds} },
-          "coadds":               ${cfg.coadds.asJson},
+          "coadds":               ${coadds.asJson},
           "centralWavelength":    { "nanometers": ${cfg.centralWavelengthNm.asJson} },
           "filter":               ${cfg.filter.asJson},
           "decker":               ${cfg.decker.asJson},
           "fpuSlit":              ${cfg.fpuSlit.asJson},
           "fpuOther":             ${cfg.fpuOther.asJson},
+          "fpuIfu":               ${cfg.fpuIfu.asJson},
           "acquisitionMirrorOut": ${cfg.acquisitionMirrorOut},
           "camera":               ${cfg.camera.asJson},
           "focusMotorSteps":      ${cfg.focus.asJson},
@@ -518,12 +563,14 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
     p:            BigDecimal,
     q:            BigDecimal,
     flatExposure: TimeSpan,
+    flatCoadds:   Int,
     flatCount:    Int,
     arcExposure:  TimeSpan,
+    arcCoadds:    Int,
     arcCount:     Int
   ): Json =
-    val flats = List.fill(flatCount)(gnirsExpectedCal(cfg, flatExposure, p, q))
-    val arcs  = List.fill(arcCount)(gnirsExpectedCal(cfg, arcExposure, p, q))
+    val flats = List.fill(flatCount)(gnirsExpectedCal(cfg, flatExposure, flatCoadds, p, q))
+    val arcs  = List.fill(arcCount)(gnirsExpectedCal(cfg, arcExposure, arcCoadds, p, q))
     Json.obj(
       "description"  -> "Nighttime Calibrations".asJson,
       "observeClass" -> "NIGHT_CAL".asJson,

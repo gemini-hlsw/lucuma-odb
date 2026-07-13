@@ -36,6 +36,7 @@ import lucuma.odb.otel.given
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.exposureTimeMode.*
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.syntax.*
@@ -140,6 +141,7 @@ object PerScienceObservationCalibrationsService:
         val targetEnvironment = TargetEnvironmentInput.Create(
           explicitBase = none,
           asterism = none, // We resolve the target later
+          explicitSignalToNoiseTargetId = none,
           useBlindOffset = false.some,
           blindOffsetTarget = none,
           blindOffsetType = BlindOffsetType.Manual
@@ -274,8 +276,8 @@ object PerScienceObservationCalibrationsService:
 
       private def isCrossDispersedGnirs(config: CalibrationConfigSubset): Boolean =
         config match
-          case g: CalibrationConfigSubset.GnirsLongSlitConfigs => g.isCrossDispersed
-          case _                                               => false
+          case g: CalibrationConfigSubset.GnirsSpectroscopyConfigs => g.isCrossDispersed
+          case _                                                   => false
 
       private def findDaytimePinholeObservations(gid: Group.Id): F[List[Observation.Id]] =
         session
@@ -431,7 +433,7 @@ object PerScienceObservationCalibrationsService:
 
         def updateTargetModeType(sm: Option[ObservingModeType]): F[Unit] =
           sm.traverse(mode =>
-            S.session.execute(Statements.updateObservingModeType)(mode.some, mode.instrument.some, targetOid)
+            S.session.execute(Statements.updateObservingModeType)(mode.some, mode.instrumentOption, targetOid)
           ).void
 
         def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =
@@ -446,7 +448,7 @@ object PerScienceObservationCalibrationsService:
             case Some(ObservingModeType.Flamingos2LongSlit) =>
               flamingos2LongSlitService.resetTelluricConfig(targetOid)
             case Some(ObservingModeType.GnirsLongSlit) =>
-              gnirsLongSlitService.resetTelluricConfig(targetOid)
+              gnirsSpectroscopyService.resetTelluricConfig(targetOid)
             case _ =>
               F.unit
 

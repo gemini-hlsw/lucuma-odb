@@ -215,7 +215,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
   def callForProposalsResultSubquery(cids: List[CallForProposals.Id], limit: Option[NonNegInt], child: Query): Result[Query] =
     mutationResultSubquery(
       predicate       = Predicates.callForProposals.id.in(cids),
-      order           = OrderSelection[CallForProposals.Id](GeminiCallForProposalsType / "id"),
+      order           = OrderSelection[CallForProposals.Id](CallForProposalsType / "id"),
       limit           = limit,
       collectionField = "callsForProposals",
       child
@@ -780,7 +780,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     }
 
   private lazy val UpdateCallsForProposals: MutationField =
-    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(GeminiCallForProposalsType))): (input, child) =>
+    MutationField("updateCallsForProposals", UpdateCallsForProposalsInput.binding(Path.from(CallForProposalsType))): (input, child) =>
       services.useTransactionally:
         selectForUpdate(input).flatMap: res =>
           res.flatTraverse: checked =>
@@ -862,6 +862,16 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             }).flatMap(_ => accum)
           }.value
 
+      // Must run after setAsterisms so membership is validated against the
+      // post-edit asterism (and re-applies after the delete/reinsert).
+      def setSignalToNoiseTargets(m: Map[Program.Id, List[Observation.Id]])(using Services[F], Transaction[F], SuperUserAccess): ResultT[F, Unit] =
+        ResultT:
+          m.toList.foldRight(ResultT(Result.unit.pure[F])) { case ((pid, oids), accum) =>
+            ResultT(NonEmptyList.fromList(oids).fold(Result.unit.pure[F]) { os =>
+              asterismService.setSignalToNoiseTarget(pid, os, input.explicitSignalToNoiseTargetId)
+            }).flatMap(_ => accum)
+          }.value
+
       def resetAcquisitionIfNecessary(
         approval: Result[AccessControl.CheckedWithIds[ObservationPropertiesInput.Edit, Observation.Id]]
       ): F[Unit] =
@@ -886,7 +896,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                     .flatMap:
                       case (map, query) =>
                         Services.asSuperUser:
-                          setAsterisms(map).as(query)
+                          setAsterisms(map).flatMap(_ => setSignalToNoiseTargets(map)).as(query)
                     .value
                     .flatTap: q =>
                       transaction.rollback.unlessA(q.hasValue)

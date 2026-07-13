@@ -113,7 +113,7 @@ When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in 
 - `service/ObservingModeServices.scala` — Add the new mode to the mode dispatcher.
 - `service/Services.scala` — Wire the new service into the DI trait + implementation.
 - `service/ConfigurationService.scala` — Add a `case` in `selectMany` for the new `ObservingModeType` / `Configuration.ObservingMode` variant.
-- `service/CalibrationConfigSubset.scala` — All call sites for `ObservingModeInput.Create(...)` must be updated when a new field is added to the constructor (add `none` for the new parameter).
+- `service/CalibrationConfigSubset.scala` — All call sites for `ObservingModeInput.Create(...)` must be updated when a new field is added to the constructor (add `none` for the new parameter). These call sites are **positional** (a single `.some` padded with `none`s): the compiler catches the arity change, but not a `none` inserted on the wrong side of the `.some` — check where each `Some` sits relative to the new field's position before padding.
 
 **Grackle mappings:**
 - `graphql/mapping/FooLongSlitMapping.scala` — `ObjectMapping` for the output type + `SqlField` / `CursorField` bindings.
@@ -134,7 +134,7 @@ When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in 
 - `graphql/mapping/TimeSpanMapping.scala` — Add `timeSpanMappingAtPath(FooLongSlitAcquisitionType / "exposureTime", ...)` for any inline acquisition `TimeSpan` field. Also extend the trait with the mode's view trait.
 - `graphql/mapping/WavelengthMapping.scala` — Add `wavelengthMappingAtPath(...)` for every `Wavelength` output field (both non-null and nullable). Extend the trait with the mode's view trait. For **nullable** `Wavelength` fields (e.g. `explicitGratingWavelength`): use the **nullable column** (`wavelength_pm.opt`) as the key (so null DB value → null GraphQL object) and a **non-nullable alias** of the same column (`wavelength_pm`) as the value column.
 - `graphql/mapping/LeafMappings.scala` — Add `LeafMapping[FooEnum](FooEnumType)` for every new enum exposed in the schema. Also add the corresponding `lazy val FooEnumType = schema.ref("FooEnum")` in `graphql/BaseMapping.scala`.
-- `graphql/mapping/ObservingModeMapping.scala` and `graphql/OdbMapping.scala` — Register the new mode's `ObjectMapping` instances.
+- `graphql/mapping/ObservingModeMapping.scala` and `graphql/OdbMapping.scala` — Register the new mode's `ObjectMapping` instances. **If the mode's mapping trait exposes an aggregate `Foo...Mappings: List[TypeMapping]` (the imaging modes do), register only that list** (in the `List(...).flatten` block) — registering an individual mapping that is *also* in the list produces a runtime `grackle.ValidationException` ("Ambiguous type mappings", both source positions pointing at the same line) and every request 500s. The singular registrations in the flat list (e.g. `GnirsSpectroscopyMapping`) are for traits that have no aggregate list.
 - `service/GeneratorParamsService.scala` — Add a `case foo: foo.longslit.Config =>` branch to `toObsGeneratorParams` that constructs the appropriate `InstrumentMode` and `ItcInput`.
 
 ## GraphQL Schema Pitfalls (Grackle)
@@ -158,7 +158,9 @@ Grackle validates all type references at startup during schema introspection. A 
 
 **General rule:** Input types follow `{Concept}Input` naming but not always; always verify against existing definitions before writing new schema references.
 
-**`ObjectFieldsBinding.rmap { case List(...) }` is positional.** Field names in the pattern are just labels; Grackle matches by position in the list against the schema's field declaration order. If a new input field is added to a union input (like `ObservingModeInput`) and placed in a different position than the existing binding, the `case List(...)` will silently fail to match (runtime "unhandled case" error). Always make the `case List(...)` order match the schema field order exactly.
+**`ObjectFieldsBinding.rmap { case List(...) }` is positional.** Field names in the pattern are just labels; Grackle matches by position in the list against the schema's field declaration order. If a new input field is added to a union input (like `ObservingModeInput`) and placed in a different position than the existing binding, the `case List(...)` will silently fail to match (runtime "unhandled case" error). Always make the `case List(...)` order match the schema field order exactly. Note this means the pattern is verified against the **schema**, not against the corresponding case class — the two orders can legally differ because the binding repacks the tuple explicitly, but keeping schema, binding, and case class in the same order avoids the trap entirely.
+
+**Runtime `ValidationException` vs `MatchError`:** a duplicate/ambiguous mapping registration (see the mapping-registration note in the checklist above) also surfaces only at runtime, as a 500 on every request. The real complaint is a `🛑 Ambiguous type mappings` block buried in the server log among many long-standing (tolerated) `Field mapping is unused` notices — look for the block whose two source positions are the same line.
 
 ## JSON Codecs (`modules/schema/src/main/scala/lucuma/odb/json/`)
 

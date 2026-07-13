@@ -7,6 +7,7 @@ package mapping
 
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.ObservingModeType
+import lucuma.odb.syntax.observingModeType.*
 
 import table.*
 
@@ -16,7 +17,7 @@ trait ConfigurationObservingModeMappings[F[_]]
      with Flamingos2LongSlitView[F]
      with GmosImagingView[F]
      with GmosLongSlitView[F]
-     with GnirsLongSlitView[F]
+     with GnirsSpectroscopyView[F]
      with Igrins2LongSlitView[F]
      with VisitorTable[F] {
 
@@ -28,7 +29,7 @@ trait ConfigurationObservingModeMappings[F[_]]
   private lazy val ConfigurationObservingModeMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ObservationView.ObservingMode.SyntheticId, key = true, hidden = true),
-      FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
+      FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
       SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
       SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitView.Common.ObservationId)),
@@ -36,14 +37,15 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosNorthImaging", Join(ObservationView.Id, GmosNorthImagingView.Common.ObservationId)),
       SqlObject("gmosSouthImaging", Join(ObservationView.Id, GmosSouthImagingView.Common.ObservationId)),
       SqlObject("igrins2LongSlit", Join(ObservationView.Id, Igrins2LongSlitView.ObservationId)),
-      SqlObject("gnirsLongSlit", Join(ObservationView.Id, GnirsLongSlitView.ObservationId)),
+      SqlObject("gnirsLongSlit", Join(ObservationView.Id, GnirsSpectroscopyView.ObservationId)),
+      SqlObject("gnirsIfu", Join(ObservationView.Id, GnirsSpectroscopyView.ObservationId)),
       SqlObject("visitor", Join(ObservationView.Id, VisitorTable.ObservationId)),
     )
 
   private lazy val ConfigurationRequestObservingModeMapping: ObjectMapping =
     ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode")(
       SqlField("synthetic_id", ConfigurationRequestView.Id, key = true, hidden = true),
-      FieldRef[ObservingModeType]("mode").as("instrument", _.instrument),
+      FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
       SqlField("mode", ConfigurationRequestView.ObservingModeType),
       SqlObject("flamingos2LongSlit"),
       SqlObject("gmosNorthLongSlit"),
@@ -51,6 +53,7 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosNorthImaging"),
       SqlObject("gmosSouthImaging"),
       SqlObject("gnirsLongSlit"),
+      SqlObject("gnirsIfu"),
       SqlObject("igrins2LongSlit"),
       SqlObject("visitor"),
     )

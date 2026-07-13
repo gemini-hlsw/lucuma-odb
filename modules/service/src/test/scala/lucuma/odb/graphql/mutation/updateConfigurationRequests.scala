@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
+import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
@@ -13,6 +14,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.User
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
@@ -26,13 +28,14 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
 
   object updateConfigurationRequestAs {
 
-    def query(rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None): String =
+    def query(rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None, feedback: Option[NonEmptyString] = None): String =
       s"""
         mutation {
           updateConfigurationRequests(input: {
-            SET: { 
+            SET: {
               status: ${status.tag.toUpperCase}
               justification: ${justification.asJson}
+              ${feedback.foldMap(f => s"feedback: ${f.asJson}")}
             }
             WHERE: { id: { EQ: ${rid.asJson} } }
           }) {
@@ -40,16 +43,17 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
               id
               status
               justification
+              feedback
             }
             hasMore
           }
         }
       """
 
-    def apply(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None): IO[Unit] =
+    def apply(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus, justification: Option[NonEmptyString] = None, feedback: Option[NonEmptyString] = None): IO[Unit] =
       expect(
         user = user,
-        query = query(rid, status, justification),
+        query = query(rid, status, justification, feedback),
         expected = Right(json"""
           {
             "updateConfigurationRequests" : {
@@ -57,11 +61,12 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
                 {
                   "id" : $rid,
                   "status" : $status,
-                  "justification": $justification
+                  "justification": $justification,
+                  "feedback": $feedback
                 }
               ],
               "hasMore" : false
-            }          
+            }
           }
         """)
       )
@@ -109,5 +114,63 @@ class updateConfigurationRequests extends OdbSuite with ObservingModeSetupOperat
   test("Should be able to update justification."):
     setup.flatMap: rid =>
       updateConfigurationRequestAs(pi, rid, ConfigurationRequestStatus.Requested, NonEmptyString.from("A new justification.").toOption)
+
+  val someFeedback = NonEmptyString.from("Please narrow the conditions.").toOption
+
+  test("Admin should be able to set feedback."):
+    setup.flatMap(updateConfigurationRequestAs(admin, _, ConfigurationRequestStatus.Denied, feedback = someFeedback))
+
+  test("Admin should be able to set feedback without changing status."):
+    setup.flatMap(updateConfigurationRequestAs(admin, _, ConfigurationRequestStatus.Requested, feedback = someFeedback))
+
+  test("PI should *not* be able to set feedback."):
+    interceptOdbError(setup.flatMap(updateConfigurationRequestAs(pi, _, ConfigurationRequestStatus.Requested, feedback = someFeedback))):
+      case OdbError.NotAuthorized(_, _) => () // expected
+
+  test("PI should *not* be able to clear feedback."):
+    interceptOdbError(
+      setup.flatMap: rid =>
+        query(
+          user = pi,
+          query = s"""
+            mutation {
+              updateConfigurationRequests(input: {
+                SET: { feedback: null }
+                WHERE: { id: { EQ: ${rid.asJson} } }
+              }) {
+                requests { id }
+              }
+            }
+          """
+        )
+    ):
+      case OdbError.NotAuthorized(_, _) => () // expected
+
+  test("updatedAt should advance on update, createdAt should not."):
+    def timestamps(rid: ConfigurationRequest.Id): IO[(Timestamp, Timestamp)] =
+      query(
+        user = admin,
+        query = s"""
+          query {
+            configurationRequests(WHERE: { id: { EQ: ${rid.asJson} } }) {
+              matches {
+                createdAt
+                updatedAt
+              }
+            }
+          }
+        """
+      ).map: json =>
+        val c = json.hcursor.downFields("configurationRequests", "matches").downArray
+        (c.downField("createdAt").require[Timestamp], c.downField("updatedAt").require[Timestamp])
+    for
+      rid          <- setup
+      (cre1, upd1) <- timestamps(rid)
+      _            <- updateConfigurationRequestAs(admin, rid, ConfigurationRequestStatus.Approved, feedback = someFeedback)
+      (cre2, upd2) <- timestamps(rid)
+    yield
+      assertEquals(cre1, cre2)
+      assertEquals(cre1, upd1)
+      assert(upd2 > upd1)
 
 }

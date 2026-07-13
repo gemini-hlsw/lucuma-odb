@@ -32,7 +32,7 @@ trait ArbGeneratorParams:
       .map: sp =>
         val acq = ImagingParameters.mode.replace(mo)(sp.acquisition)
         val sci = SpectroscopyParameters.mode.replace(mo)(sp.science)
-        ItcInput.Spectroscopy(acq, sci, sp.targets, sp.blindOffset)
+        ItcInput.Spectroscopy(acq, sci, sp.targets, sp.blindOffset, sp.signalToNoiseTargetId)
 
   val genGmosNorthLongSlit: Gen[GeneratorParams] =
     for

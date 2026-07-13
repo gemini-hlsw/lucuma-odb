@@ -185,7 +185,7 @@ object TelluricTargetsService:
                               .map(_.get(scienceObsId))
               ig2Config  <- igrins2LongSlitService.select(List(scienceObsId))
                               .map(_.get(scienceObsId))
-              gnirsConfig <- gnirsLongSlitService.select(List(scienceObsId))
+              gnirsConfig <- gnirsSpectroscopyService.select(List(scienceObsId))
                               .map(_.get(scienceObsId))
             yield coordsOpt.flatMap: coords =>
               f2Config.map: f2 =>

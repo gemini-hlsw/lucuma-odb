@@ -13,8 +13,15 @@ type Mutation {
   "Delete the specified API key, if owned by the current user. Returns the constant value `true`."
   deleteApiKey(id: ApiKeyId!): Boolean!
 
-  "Add a user role, or look up the role if it already exists."
+  "Add a user role, or look up the role if it already exists. Available only to admin and service users."
   addRole(userId: UserId!, roleType: RoleType!, partner: Partner): RoleId!
+
+  """
+  Delete the specified role. Available only to admin and service users. Sessions
+  associated with this role will be deleted and will fail to renew on the next attempt. Note
+  that the PI role cannot be deleted.
+  """
+  deleteRole(roleId: RoleId!): Boolean!
 
 }
 

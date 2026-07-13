@@ -6,10 +6,11 @@ package lucuma.odb.graphql.mapping
 import grackle.Path
 import io.circe.syntax.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.json.time.query.given
 
-trait CategorizedTimeMapping[F[_]] extends VisitTable[F]:
+trait CategorizedTimeMapping[F[_]] extends ObservationView[F] with VisitTable[F]:
 
   lazy val CategorizedTimeMappings: List[TypeMapping] =
     List(
@@ -25,6 +26,20 @@ trait CategorizedTimeMapping[F[_]] extends VisitTable[F]:
         VisitTable.Id,
         VisitTable.Final.NonChargedTime,
         VisitTable.Final.ProgramTime
+      ),
+
+      categorizedTimeMappingAtPath(
+        ExecutionType / "originalEstimate" / "science",
+        ObservationView.OriginalEstimate.SyntheticId,
+        ObservationView.OriginalEstimate.SciNonChargedTime,
+        ObservationView.OriginalEstimate.SciProgramTime
+      ),
+
+      categorizedTimeMappingAtPath(
+        ExecutionType / "originalEstimate" / "total",
+        ObservationView.OriginalEstimate.SyntheticId,
+        ObservationView.OriginalEstimate.TotalNonChargedTime,
+        ObservationView.OriginalEstimate.TotalProgramTime
       )
     )
 

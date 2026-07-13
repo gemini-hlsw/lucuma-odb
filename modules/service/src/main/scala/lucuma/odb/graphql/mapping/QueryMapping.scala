@@ -268,7 +268,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val CallsForProposals: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    val WhereCallForProposalsBinding = WhereCallForProposals.binding(Path.from(GeminiCallForProposalsType))
+    val WhereCallForProposalsBinding = WhereCallForProposals.binding(Path.from(CallForProposalsType))
     {
       case (QueryType, "callsForProposals", List(
         WhereCallForProposalsBinding.Option("WHERE", rWHERE),
@@ -287,7 +287,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                   WHERE.getOrElse(True)
                 ))),
                 oss = Some(List(
-                  OrderSelection[lucuma.core.model.CallForProposals.Id](GeminiCallForProposalsType / "id")
+                  OrderSelection[lucuma.core.model.CallForProposals.Id](CallForProposalsType / "id")
                 )),
                 offset = None,
                 limit = Some(limit + 1), // Select one extra row here.

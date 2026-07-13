@@ -7,6 +7,7 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.odb.util.GnirsCodecs.*
 import skunk.codec.boolean.bool
 
 trait ImagingConfigOptionTable[F[_]] extends BaseMapping[F] {
@@ -45,6 +46,14 @@ trait ImagingConfigOptionTable[F[_]] extends BaseMapping[F] {
     val Index      = col("c_index",       int4_pos)
 
     val Filter     = col("c_filter",      flamingos_2_filter)
+  }
+
+  object ImagingConfigOptionGnirsTable extends TableDef("t_imaging_config_option_gnirs") {
+    val Instrument = col("c_instrument",  instrument)
+    val Index      = col("c_index",       int4_pos)
+
+    val Filter     = col("c_filter",      gnirs_filter)
+    val Camera     = col("c_camera",      gnirs_camera)
   }
 
 }

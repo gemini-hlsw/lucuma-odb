@@ -108,6 +108,24 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
   def ifuAnalysisMethod =
     ItcObservationDetails.AnalysisMethod.Ifu.Single(skyFibres = 250, offset = 5.0)
 
+  // The production GNIRS IFU analysis method: "sum of 2x2 elements at the center"
+  // with a single sky fibre (see lucuma.itc.service.ObservingMode).
+  def gnirsIfuAnalysisMethod =
+    ItcObservationDetails.AnalysisMethod.Ifu.Summed(
+      skyFibres = 1,
+      numX = 2,
+      numY = 2,
+      centerX = 0.0,
+      centerY = 0.0
+    )
+
+  // The OCS GNIRS recipe requires a specific camera per IFU resolution: LR-IFU on the
+  // 0.15"/pix (Short) camera, HR-IFU on the 0.05"/pix (Long) camera.
+  def gnirsCameraForIfu(ifu: GnirsFpuIfu): GnirsCamera =
+    ifu match
+      case GnirsFpuIfu.LowResolution  => GnirsCamera.ShortBlue
+      case GnirsFpuIfu.HighResolution => GnirsCamera.LongBlue
+
   // Common telescope details - this will be used in tests
   def telescope = ItcTelescopeDetails(
     wfs = ItcWavefrontSensor.OIWFS,

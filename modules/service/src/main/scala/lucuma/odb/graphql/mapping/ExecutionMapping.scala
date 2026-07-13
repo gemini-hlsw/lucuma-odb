@@ -8,23 +8,18 @@ import cats.effect.Resource
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.cats.*
-import grackle.Cursor
-import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.EffectHandler
 import grackle.QueryCompiler.Elab
 import grackle.Result
-import grackle.ResultT
 import grackle.TypeRef
-import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ExecutionState
 import lucuma.core.model.ExecutionEvent
-import lucuma.core.model.Observation
-import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
@@ -66,6 +61,7 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
       SqlObject("datasets"),
       SqlObject("events"),
       SqlObject("visits"),
+      SqlObject("originalEstimate"),
       EffectField("timeCharge", timeChargeHandler, List("id", "programId")),
       SqlField("scienceSequenceIsMaterialized", ObservationView.ScienceSequenceIsMaterialized),
       SqlField("acquisitionSequenceIsMaterialized", ObservationView.AcquisitionSequenceIsMaterialized)
@@ -119,75 +115,32 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   }
 
   private lazy val executionStateHandler: EffectHandler[F] =
-    new EffectHandler[F]:
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
-        queries.traverse { case (_, cursor) => cursor.fieldAs[Observation.Id]("id") }
-
-      private def execute(oids: List[Observation.Id]): F[List[Json]] =
-        services
-          .useTransactionally:
-            generatorParamsService
-              .selectExecutionStates(oids)
-              .map: states =>
-                oids.map(oid => states.getOrElse(oid, ExecutionState.NotDefined).asJson)
-
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (
-          for
-            oids <- ResultT.fromResult(queryContext(queries))
-            stat <- ResultT.liftF(execute(oids))
-            res  <- ResultT.fromResult:
-                      stat
-                        .zip(queries)
-                        .traverse { case (state, (query, parentCursor)) =>
-                          Query
-                            .childContext(parentCursor.context, query)
-                            .map: childContext =>
-                              CirceCursor(childContext, state, Some(parentCursor), parentCursor.fullEnv)
-                        }
-
-          yield res
-        ).value
+    batchedEffectHandler: oids =>
+      services.useTransactionally:
+        generatorParamsService
+          .selectExecutionStates(oids)
+          .map: states =>
+            oids.map(oid => oid -> Result(states.getOrElse(oid, ExecutionState.NotDefined))).toMap
 
   private lazy val digestHandler: EffectHandler[F] =
-    new EffectHandler[F]:
-      private def queryContext(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
-        queries.traverse:
-          case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
+    batchedEffectHandler: oids =>
+      services.useTransactionally(obscalcService.selectManyExecutionDigest(oids)).map: digests =>
+        oids.map: oid =>
+          val json =
+            digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)):
+              _.map: res =>
+                  res.map(_.asJson) match
+                    case Result.Failure(ps) => Result.Warning(ps, Json.Null)
+                    case r                  => r
+                .sequence.map(_.asJson)
+          oid -> json
+        .toMap
 
-      override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
-        (
-          for
-            oids    <- ResultT.fromResult(queryContext(queries))
-            digests <- ResultT.liftF(services.useTransactionally(obscalcService.selectManyExecutionDigest(oids)))
-            res     <- ResultT.fromResult:
-                         oids.zip(queries).traverse:
-                           case (oid, (query, parentCursor)) =>
-                            val json: Result[Json] =
-                              digests.get(oid).fold(OdbError.SequenceUnavailable(oid).asWarning(Json.Null)): cv =>
-                                cv
-                                  .map: res =>
-                                    res.map(_.asJson) match
-                                      case Result.Failure(ps) => Result.Warning(ps, Json.Null)
-                                      case r                  => r
-                                  .sequence.map(_.asJson)
-                            for
-                              j            <- json
-                              childContext <- Query.childContext(parentCursor.context, query)
-                            yield CirceCursor(childContext, j, Some(parentCursor), parentCursor.fullEnv)
-          yield res
-        ).value
-
-  private lazy val timeChargeHandler: EffectHandler[F] = {
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Json]] =
-      (_, oid, _) => {
-        services.useTransactionally {
-          Services.asSuperUser:
-            timeAccountingService.selectObservation(oid).map(_.asJson.success)
-        }
-      }
-
-    effectHandler(_ => ().success, calculate)
-  }
+  private lazy val timeChargeHandler: EffectHandler[F] =
+    batchedEffectHandler: oids =>
+      services.useTransactionally:
+        Services.asSuperUser:
+          timeAccountingService.selectObservations(oids).map: times =>
+            oids.map(oid => oid -> Result(times.getOrElse(oid, CategorizedTime.Zero))).toMap
 
 }

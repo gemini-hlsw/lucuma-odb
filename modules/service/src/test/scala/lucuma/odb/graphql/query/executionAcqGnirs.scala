@@ -15,7 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
-import lucuma.odb.sequence.gnirs.longslit.Acquisition.RepeatingAtomCount
+import lucuma.odb.sequence.gnirs.spectroscopy.Acquisition.RepeatingAtomCount
 
 class executionAcqGnirs extends ExecutionTestSupportForGnirs:
 
@@ -94,9 +94,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
       tc(10, 0, StepGuideState.Disabled))
 
-  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int) =
+  def fieldStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "ACQUISITION", none, "ACQUISITION".some, readMode,
-      tc(pArc, qArc, StepGuideState.Enabled))
+      tc(pArc, qArc, StepGuideState.Enabled), breakpoint)
 
   def throughSlitStep(expµs: Long, coadds: Int, filter: String, readMode: String, pArc: Int, qArc: Int, breakpoint: String = "DISABLED") =
     acqStep(expµs, coadds, filter, "SHORT_CAM_LONG_SLIT", "LONG_SLIT_0_30".some, none, readMode,
@@ -118,7 +118,31 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
   // 5_000_000 µs = 5 s  → Bright (1s < 5s ≤ 10s), readMode=BRIGHT
   val Brightµs: Long = 5_000_000L
 
-  test("Bright acquisition — initial atom (3 steps, no sky)"):
+  def initialBrightAcquisition: Json =
+    json"""
+      {
+        "executionConfig": {
+          "gnirs": {
+            "acquisition": {
+              "nextAtom": {
+                "description": "Initial Acquisition",
+                "observeClass": "ACQUISITION",
+                "steps": [
+                  ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
+                  ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")},
+                  ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
+                ]
+              },
+              "possibleFuture": ${brightFineAdjustments(RepeatingAtomCount)},
+              "hasMore": false
+            }
+          }
+        }
+      }
+    """
+
+  test("Bright acquisition — initial atom (4 steps, no sky)"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -132,27 +156,30 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       expect(
         user     = pi,
         query    = gnirsAcqNarrowQuery(oid),
-        expected = json"""
-          {
-            "executionConfig": {
-              "gnirs": {
-                "acquisition": {
-                  "nextAtom": {
-                    "description": "Initial Acquisition",
-                    "observeClass": "ACQUISITION",
-                    "steps": [
-                      ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
-                      ${fieldStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0)},
-                      ${throughSlitStep(Brightµs, 1, "ORDER4", "BRIGHT", 0, 0, "ENABLED")}
-                    ]
-                  },
-                  "possibleFuture": ${brightFineAdjustments(RepeatingAtomCount)},
-                  "hasMore": false
-                }
-              }
-            }
-          }
-        """.asRight
+        expected = initialBrightAcquisition.asRight
+      )
+
+  test("Bright acquisition — execute first step, reset regenerates from the top"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+        _ <- setAcquisitionFilter(o, "ORDER4")
+        v <- recordVisitAs(serviceUser, o)
+
+        // Execute the first step, then reset the acquisition.
+        s <- firstAcquisitionStepId(serviceUser, o)
+        _ <- addEndStepEvent(s, v)
+        _ <- resetAcquisitionAs(serviceUser, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsAcqNarrowQuery(oid),
+        expected = initialBrightAcquisition.asRight
       )
 
   def brightFineAdjustments(n: Int): Json =
@@ -171,7 +198,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
   // 30_000_000 µs = 30 s → Faint (> 10s), readMode=FAINT
   val Faintµs: Long = 30_000_000L
 
-  test("Faint acquisition with sky offset — initial atom (5 steps with sky subtraction)"):
+  test("Faint acquisition with sky offset — initial atom (6 steps with sky subtraction)"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -198,6 +225,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       ${slitImgStep(HShortµs, 1, "ORDER4", "BRIGHT")},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0)},
+                      ${fieldStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 10)},
                       ${throughSlitStep(Faintµs, 1, "ORDER4", "FAINT", 0, 0, "ENABLED")}
                     ]
@@ -282,6 +310,10 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       {
                         "instrumentConfig": { "exposure": { "microseconds": $VeryBrightµs }, "readMode": "VERY_BRIGHT", "filter": "H2" },
                         "telescopeConfig": { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
+                      },
+                      {
+                        "instrumentConfig": { "exposure": { "microseconds": $VeryBrightµs }, "readMode": "VERY_BRIGHT", "filter": "H2" },
+                        "telescopeConfig": { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
                       }
                     ]
                   }
@@ -307,7 +339,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                    updateObservations(input: {
                      SET: {
                        observingMode: {
-                         gnirsLongSlit: {
+                         gnirsSpectroscopy: {
                            acquisition: { coadds: 7 }
                          }
                        }
@@ -320,7 +352,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
       yield o
 
     // 5s exposure × 7 coadds = 35s integration ≥ 10s ⇒ AUTO resolves to FAINT
-    // (a sky frame is added, so 5 steps); every step except the FPU image takes its
+    // (a sky frame is added, so 6 steps); every step except the FPU image takes its
     // coadds from the acquisition config (7), not from the ITC. The FPU image (first
     // step) always uses a single coadd.
     setup.flatMap: oid =>
@@ -352,7 +384,64 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
                       { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } },
+                      { "instrumentConfig": { "coadds": 7 } },
                       { "instrumentConfig": { "coadds": 7 } }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("Acquisition coadds come from the ITC exposure count in S/N mode"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionSignalToNoise(o, 100, 1645)
+        _ <- setAcquisitionFilter(o, "ORDER4")
+      yield o
+
+    // In S/N mode the ITC sizes the acquisition: the fake imaging result is
+    // IntegrationTime(10s, 6), so every step except the fixed-exposure FPU image takes its
+    // coadds from the ITC exposure count (6). The FPU image (first step) always uses a
+    // single coadd. The 10s × 6 = 60s integration resolves AUTO to FAINT, so a sky frame is
+    // added (6 steps): slitImage(1), fieldSky(6), field(6), field(6), throughSlitSky(6),
+    // throughSlit(6).
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gnirs {
+                acquisition {
+                  nextAtom {
+                    steps {
+                      instrumentConfig { coadds }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "executionConfig": {
+              "gnirs": {
+                "acquisition": {
+                  "nextAtom": {
+                    "steps": [
+                      { "instrumentConfig": { "coadds": 1 } },
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } },
+                      { "instrumentConfig": { "coadds": 6 } }
                     ]
                   }
                 }
@@ -418,6 +507,7 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
               "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
                 ${firstAtomConfig(fpuµs,    1, fpuFilter, fpuReadMode)},
                 ${firstAtomConfig(Brightµs, 1, selected,  "BRIGHT")},
+                ${firstAtomConfig(Brightµs, 1, selected,  "BRIGHT")},
                 ${firstAtomConfig(Brightµs, 1, selected,  "BRIGHT")}
               ] } } } }
             }
@@ -445,7 +535,9 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
             "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
               ${firstAtomConfig(HShortµs,        1, "ORDER4", "BRIGHT")},
               ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")},
+              ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")},
               ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")}
+
             ] } } } }
           }
         """.asRight

@@ -153,6 +153,11 @@ trait SequenceService[F[_]]:
     sequence:      Stream[F, Atom[GmosSouth]]
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
+  def resetGnirsAcquisition(
+    observationId: Observation.Id,
+    sequence:      Stream[F, Atom[GnirsDynamicConfig]]
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
   def insertFlamingos2Sequence(
     observationId: Observation.Id,
     sequenceType:  SequenceType,
@@ -809,6 +814,12 @@ object SequenceService:
         stream:        Stream[F, Atom[GmosSouth]]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         resetAcquisition(observationId, stream)(insertGmosSouthSequence)
+
+      override def resetGnirsAcquisition(
+        observationId: Observation.Id,
+        stream:        Stream[F, Atom[GnirsDynamicConfig]]
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        resetAcquisition(observationId, stream)(insertGnirsSequence)
 
       private def materializeExecutionConfig[S, D](
         observationId: Observation.Id,

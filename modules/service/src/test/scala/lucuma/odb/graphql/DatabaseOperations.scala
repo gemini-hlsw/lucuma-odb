@@ -20,10 +20,13 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.EmailStatus
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
@@ -208,6 +211,42 @@ trait DatabaseOperations { this: OdbSuite =>
               partners: ${geminiPartnerListInput(partners)}
               subaru: {
                 type: ${subaruType.tag.toScreamingSnakeCase}
+                ${if instruments.isEmpty then "" else instruments.map(_.tag.toScreamingSnakeCase).mkString("instruments: [ ", ", ", "]")}
+              }
+            }
+          }
+        ) {
+          callForProposals {
+            id
+          }
+        }
+      }
+    """
+    ).map:
+      _.hcursor
+       .downFields("createCallForProposals", "callForProposals", "id")
+       .require[CallForProposals.Id]
+
+  def createKeckCallForProposalsAs(
+     user:        User,
+     semester:    Semester               = Semester.unsafeFromString("2025A"),
+     activeStart: LocalDate              = LocalDate.parse("2025-02-01"),
+     activeEnd:   LocalDate              = LocalDate.parse("2025-07-31"),
+     deadline:    Option[Timestamp]      = Timestamp.Max.some,
+     partners:    List[(Partner, Option[Timestamp])] = List((Partner.US, none)),
+     instruments: List[KeckInstrument]   = Nil
+  ): IO[CallForProposals.Id] =
+    query(user, s"""
+      mutation {
+        createCallForProposals(
+          input: {
+            SET: {
+              semester:    "${semester.format}"
+              activeStart: "${activeStart.format(DateTimeFormatter.ISO_DATE)}"
+              activeEnd:   "${activeEnd.format(DateTimeFormatter.ISO_DATE)}"
+              ${deadlineString(deadline)}
+              partners: ${geminiPartnerListInput(partners)}
+              keck: {
                 ${if instruments.isEmpty then "" else instruments.map(_.tag.toScreamingSnakeCase).mkString("instruments: [ ", ", ", "]")}
               }
             }
@@ -860,8 +899,20 @@ trait DatabaseOperations { this: OdbSuite =>
   def createFlamingos2ImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2Imaging, ImageQuality.Preset.PointEight, None, tids*)
 
+  def createGnirsImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createGnirsImagingObservationAs(user, pid, None, tids*)
+
+  // The spiral dither generator's seed is always pinned so the generated science
+  // offsets — and hence AGS guide-star/pos-angle selection — are deterministic. An
+  // explicit `seed` overrides the DefaultImagingDitherSeed; `None` uses the default.
+  def createGnirsImagingObservationAs(user: User, pid: Program.Id, seed: Option[Long], tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsImaging, ImageQuality.Preset.PointEight, seed.map(_.toString), tids*)
+
   def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
+
+  def createGnirsIfuObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsIfu, ImageQuality.Preset.PointEight, None, tids*)
 
   def createIgrins2LongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Igrins2LongSlit, ImageQuality.Preset.PointEight, None, tids*)
@@ -874,6 +925,9 @@ trait DatabaseOperations { this: OdbSuite =>
 
   def createVisitorModeObservationAs(user: User, pid: Program.Id, mode: VisitorObservingModeType, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, mode, ImageQuality.Preset.PointEight, None, tids*)
+
+  def createExchangeModeObservationAs(user: User, pid: Program.Id, mode: ExchangeObservingModeType, tids: Target.Id*): IO[Observation.Id] =
+    createObservationAs(user, pid, mode.some, tids*)
 
   private def createObservationWithSpatialOffsets(
     user:          User,
@@ -1107,6 +1161,23 @@ trait DatabaseOperations { this: OdbSuite =>
               focalPlaneAngle: { microarcseconds: 0 }
             }
           }"""
+      case ObservingModeType.GnirsImaging =>
+        """{
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1250 }
+            }
+          }
+          imaging: {
+            minimumFov: {
+              arcseconds: 100
+            },
+            narrowFilters: false
+            broadFilters: false
+            combinedFilters: true
+          }
+        }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
           spectroscopy: {
@@ -1114,6 +1185,16 @@ trait DatabaseOperations { this: OdbSuite =>
             resolution: 1000
             wavelengthCoverage: { nanometers: 200 }
             focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          spectroscopy: {
+            wavelength: { nanometers: 2200 }
+            resolution: 1000
+            wavelengthCoverage: { nanometers: 200 }
+            focalPlane: IFU
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
@@ -1175,15 +1256,46 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
 
 
+  // Test-support default seed for imaging spatial-dither offset generators. Some
+  // imaging modes (GNIRS, Flamingos-2) default to a *randomly*-seeded spiral when
+  // no variant is specified, which makes the generated science offsets — and hence
+  // AGS pos-angle selection — non-deterministic across runs. We pin the seed here
+  // so every imaging observation these helpers create is reproducible.
+  val DefaultImagingDitherSeed: Long = 0L
+
+  // A grouped variant with a fixed-seed spiral offset generator of the given size,
+  // reproducing each imaging mode's default variant but with a deterministic seed.
+  private def pinnedSpiralVariant(sizeArcsec: Int, seed: String = DefaultImagingDitherSeed.toString): String =
+    s"""variant: {
+              grouped: {
+                offsets: {
+                  spiral: {
+                    size: { arcseconds: $sizeArcsec }
+                    seed: $seed
+                  }
+                }
+              }
+            }"""
+
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
+      case e: ExchangeObservingModeType =>
+        s"""{
+          exchange: {
+            keckInstrument: ${if e.observatory === Observatory.Keck then "HIRES" else "null"}
+            subaruInstrument: ${if e.observatory === Observatory.Subaru then "FOCAS" else "null"}
+            totalRequestTime: { hours: 1 }
+          }
+        }"""
+
       case ObservingModeType.Flamingos2Imaging =>
-        """{
+        s"""{
           flamingos2Imaging: {
             filters: [
               { filter: Y },
               { filter: J }
             ]
+            ${pinnedSpiralVariant(30)}
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
@@ -1238,13 +1350,42 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+      case ObservingModeType.GnirsImaging =>
+        s"""{
+          gnirsImaging: {
+            camera: SHORT_BLUE
+            filters: [
+              { filter: J },
+              { filter: ORDER4 }
+            ]
+            ${pinnedSpiralVariant(10)}
+          }
+        }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            slit: { fpu: LONG_SLIT_0_30 }
+            filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          gnirsSpectroscopy: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {
@@ -1409,13 +1550,47 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
+      case ObservingModeType.GnirsImaging =>
+        // For imaging, `offsets` (when present) carries an explicit spiral dither
+        // seed; otherwise we fall back to the pinned default. Either way the seed is
+        // fixed so the generated science offsets — and hence AGS pos-angle selection
+        // — are deterministic (the server-side default seed is random).
+        val seed = offsets.getOrElse(DefaultImagingDitherSeed.toString)
+        s"""{
+          gnirsImaging: {
+            camera: SHORT_BLUE
+            filters: [
+              { filter: J },
+              { filter: ORDER4 }
+            ]
+            ${pinnedSpiralVariant(10, seed)}
+          }
+        }"""
       case ObservingModeType.GnirsLongSlit =>
         """{
-          gnirsLongSlit: {
+          gnirsSpectroscopy: {
             grating: D111
             prism: MIRROR
             camera: SHORT_BLUE
-            fpu: LONG_SLIT_0_30
+            slit: { fpu: LONG_SLIT_0_30 }
+            filter: ORDER3
+            centralWavelength: { nanometers: 2200 }
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 30.0 }
+                count: 3
+                at: { nanometers: 2200 }
+              }
+            }
+          }
+        }"""
+      case ObservingModeType.GnirsIfu =>
+        """{
+          gnirsSpectroscopy: {
+            grating: D111
+            prism: MIRROR
+            camera: SHORT_BLUE
+            ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
             centralWavelength: { nanometers: 2200 }
             exposureTimeMode: {

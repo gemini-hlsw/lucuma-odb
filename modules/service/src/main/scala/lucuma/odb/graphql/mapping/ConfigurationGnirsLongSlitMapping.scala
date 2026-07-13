@@ -5,23 +5,28 @@ package lucuma.odb.graphql
 package mapping
 
 import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.GnirsLongSlitView
+import lucuma.odb.graphql.table.GnirsSpectroscopyView
 
 trait ConfigurationGnirsLongSlitMappings[F[_]]
-  extends GnirsLongSlitView[F]
+  extends GnirsSpectroscopyView[F]
      with ConfigurationRequestView[F] {
 
   lazy val ConfigurationGnirsLongSlitMappings = List(
     ConfigurationGnirsLongSlitMapping,
     ConfigurationRequestGnirsLongSlitMapping,
+    ConfigurationGnirsIfuMapping,
+    ConfigurationRequestGnirsIfuMapping,
   )
 
   private lazy val ConfigurationGnirsLongSlitMapping: ObjectMapping =
     ObjectMapping(ObservationType / "configuration" / "observingMode" / "gnirsLongSlit")(
-      SqlField("observationId", GnirsLongSlitView.ObservationId, key = true, hidden = true),
-      SqlField("grating", GnirsLongSlitView.GratingEffective),
-      SqlField("camera",  GnirsLongSlitView.Camera),
-      SqlField("prism",   GnirsLongSlitView.PrismEffective),
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
+      // Discriminator: c_fpu_slit is null (FailedJoin) for IFU rows, so this object
+      // resolves to null for IFU observations instead of returning long slit data.
+      SqlField("fpuSlit", GnirsSpectroscopyView.FpuSlitConfig, key = true, hidden = true),
+      SqlField("grating", GnirsSpectroscopyView.GratingEffective),
+      SqlField("camera",  GnirsSpectroscopyView.Camera),
+      SqlField("prism",   GnirsSpectroscopyView.PrismEffective),
     )
 
   private lazy val ConfigurationRequestGnirsLongSlitMapping: ObjectMapping =
@@ -30,6 +35,23 @@ trait ConfigurationGnirsLongSlitMappings[F[_]]
       SqlField("grating", ConfigurationRequestView.GnirsLongSlit.Grating),
       SqlField("camera",  ConfigurationRequestView.GnirsLongSlit.Camera),
       SqlField("prism",   ConfigurationRequestView.GnirsLongSlit.Prism),
+    )
+
+  private lazy val ConfigurationGnirsIfuMapping: ObjectMapping =
+    ObjectMapping(ObservationType / "configuration" / "observingMode" / "gnirsIfu")(
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
+      SqlField("grating", GnirsSpectroscopyView.GratingEffective),
+      // Discriminator + value: c_fpu_ifu is null (FailedJoin) for long slit rows, so
+      // this object resolves to null for long slit observations instead of reading a
+      // null required field.
+      SqlField("fpu",     GnirsSpectroscopyView.FpuIfuConfig, key = true),
+    )
+
+  private lazy val ConfigurationRequestGnirsIfuMapping: ObjectMapping =
+    ObjectMapping(ConfigurationRequestType / "configuration" / "observingMode" / "gnirsIfu")(
+      SqlField("id",      ConfigurationRequestView.GnirsIfu.Id, key = true, hidden = true),
+      SqlField("grating", ConfigurationRequestView.GnirsIfu.Grating),
+      SqlField("fpu",     ConfigurationRequestView.GnirsIfu.Fpu),
     )
 
 }

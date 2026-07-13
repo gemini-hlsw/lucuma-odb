@@ -7,6 +7,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import org.bouncycastle.bcpg.ArmoredOutputStream
 import org.bouncycastle.bcpg.PublicKeyAlgorithmTags
+import org.bouncycastle.bcpg.PublicKeyPacket
 import org.bouncycastle.openpgp.*
 import org.bouncycastle.openpgp.operator.jcajce.*
 import org.http4s.DecodeResult
@@ -42,7 +43,7 @@ object GpgPublicKeyReader {
   def armorText(publicKey: PublicKey): Either[Throwable, String] =
     try {
       val kc   = new JcaPGPKeyConverter
-      val pk   = kc.getPGPPublicKey(PublicKeyAlgorithmTags.RSA_SIGN, publicKey, new ju.Date)
+      val pk   = kc.getPGPPublicKey(PublicKeyPacket.VERSION_4, PublicKeyAlgorithmTags.RSA_GENERAL, publicKey, new ju.Date)
       val baos = new ByteArrayOutputStream
       val aos  = new ArmoredOutputStream(baos, new ju.Hashtable())
       pk.encode(aos, true)

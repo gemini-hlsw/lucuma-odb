@@ -173,3 +173,144 @@ class guideEnvironmentGhost extends ExecutionTestSupportForGhost
 
     setup.flatMap: oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = ghostPwfs2Result("Nonsidereal Target", BigDecimal("0.000000")))
+
+  // Creates a GHOST observation whose sky fiber position is set
+  private def createGhostIfuObservationWithSkyPositionAs(
+    user:          User,
+    pid:           Program.Id,
+    skyRaDegrees:  Double,
+    skyDecDegrees: Double,
+    tids:          Target.Id*
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids.toList,
+      s"""
+        ghostIfu: {
+          stepCount: 1
+          resolutionMode: STANDARD
+          red: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 1 }
+                count: 1
+                at: { nanometers: 500 }
+              }
+            }
+          }
+          blue: {
+            exposureTimeMode: {
+              timeAndCount: {
+                time: { seconds: 1 }
+                count: 1
+                at: { nanometers: 500 }
+              }
+            }
+          }
+          skyPosition: {
+            ra: { degrees: $skyRaDegrees }
+            dec: { degrees: $skyDecDegrees }
+          }
+        }
+      """
+    )
+
+  // Result asserted by the "sky position is included as a science position for
+  // AGS" test: with the sky fiber blocking the normally-preferred star, AGS picks
+  // the next-best star 3219118640218737920 instead.
+  private def ghostSkyPositionBlocksBestStarResult: Either[List[String], Json] =
+    json"""
+    {
+      "observation": {
+        "title": "V1647 Orionis",
+        "targetEnvironment": {
+          "guideEnvironment": {
+            "posAngle": {
+              "degrees": 0.000000
+            },
+            "guideTargets": [
+              {
+                "name": "Gaia DR3 3219118640218737920",
+                "probe": "PWFS2",
+                "sourceProfile": {
+                  "point": {
+                    "bandNormalized": {
+                      "brightnesses": [
+                        {
+                          "band": "GAIA"
+                        },
+                        {
+                          "band": "GAIA_RP"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "sidereal": {
+                  "catalogInfo": {
+                    "name": "GAIA",
+                    "id": "3219118640218737920",
+                    "objectType": null
+                  },
+                  "epoch": "J2016.000",
+                  "ra": {
+                    "microseconds": 20760247957,
+                    "hms": "05:46:00.247957",
+                    "hours": 5.766735543611111111111111111111111,
+                    "degrees": 86.50103315416666666666666666666667
+                  },
+                  "dec": {
+                    "dms": "-00:08:26.290793",
+                    "degrees": 359.85936366861114,
+                    "microarcseconds": 1295493709207
+                  },
+                  "radialVelocity": {
+                    "metersPerSecond": 0,
+                    "centimetersPerSecond": 0,
+                    "kilometersPerSecond": 0
+                  },
+                  "properMotion": {
+                    "ra": {
+                      "microarcsecondsPerYear": 806,
+                      "milliarcsecondsPerYear": 0.806
+                    },
+                    "dec": {
+                      "microarcsecondsPerYear": -1093,
+                      "milliarcsecondsPerYear": -1.093
+                    }
+                  },
+                  "parallax": {
+                    "microarcseconds": 2371,
+                    "milliarcseconds": 2.371
+                  }
+                },
+                "nonsidereal": null
+              }
+            ]
+          }
+        }
+      }
+    }
+    """.asRight
+
+  test("sky position is included as a science position for AGS"):
+    // Place the GHOST sky fiber exactly on the guide star AGS would normally pick
+    // (Gaia DR3 3219118090462918016). 
+    // Treating the sky position as a science position makes that star unselectable thus
+    // a different star (or none) must be returned. 
+    // Without the fix, this still returns 3219118090462918016.
+    val skyStarRa  = 86.5934741222927
+    val skyStarDec = -0.14795707230703778
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGhostIfuObservationWithSkyPositionAs(pi, p, skyStarRa, skyStarDec, t)
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _ <- setObservationPAC(pi, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = ghostSkyPositionBlocksBestStarResult)

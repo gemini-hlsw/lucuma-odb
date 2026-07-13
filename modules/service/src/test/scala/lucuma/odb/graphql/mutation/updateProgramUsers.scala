@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Gender
 import lucuma.core.enums.Partner.US
 import lucuma.core.enums.ProgramUserRole
@@ -73,6 +74,45 @@ class updateProgramUsers extends OdbSuite:
               linkType
               ... on HasGeminiPartner {
                 geminiPartner
+              }
+              ... on HasExchangePartner {
+                exchangePartner
+              }
+            }
+          }
+        }
+      }
+    """
+
+  // Program-scoped variant: filters by both program and user so the result is
+  // independent of any other program memberships the user may have accumulated.
+  def updateUserPartnerLinkMutation(pid: Program.Id, u: User, pl: PartnerLink): String =
+    s"""
+      mutation {
+        updateProgramUsers(
+          input: {
+            SET: {
+              partnerLink: {
+                ${pl.fold("linkType: HAS_UNSPECIFIED_PARTNER", "linkType: HAS_NON_PARTNER", p => s"geminiPartner: ${p.tag.toScreamingSnakeCase}", e => s"exchangePartner: ${e.tag.toScreamingSnakeCase}")}
+              }
+            }
+            WHERE: {
+              program: { id: { EQ: "$pid" } }
+              user:    { id: { EQ: "${u.id}" } }
+            }
+          }
+        ) {
+          hasMore
+          programUsers {
+            program { id }
+            user { id }
+            partnerLink {
+              linkType
+              ... on HasGeminiPartner {
+                geminiPartner
+              }
+              ... on HasExchangePartner {
+                exchangePartner
               }
             }
           }
@@ -328,9 +368,13 @@ class updateProgramUsers extends OdbSuite:
             "program" -> Json.obj("id" -> pid.asJson),
             "user"    -> Json.obj("id" -> user.id.asJson),
             "partnerLink" -> Json.fromFields(
-              ("linkType" -> link.linkType.tag.toScreamingSnakeCase.asJson) :: link.geminiPartnerOption.toList.map { p =>
-                "geminiPartner" -> p.tag.toScreamingSnakeCase.asJson
-              }
+              ("linkType" -> link.linkType.tag.toScreamingSnakeCase.asJson) ::
+                link.geminiPartnerOption.toList.map { p =>
+                  "geminiPartner" -> p.tag.toScreamingSnakeCase.asJson
+                } :::
+                link.exchangePartnerOption.toList.map { e =>
+                  "exchangePartner" -> e.tag.toScreamingSnakeCase.asJson
+                }
             )
           )
         }.asJson
@@ -466,6 +510,26 @@ class updateProgramUsers extends OdbSuite:
           user     = pi,
           query    = updateUserMutation(pi2, PartnerLink.HasNonPartner),
           expected = expected((pid, pi2, PartnerLink.HasNonPartner)).asRight
+        )
+
+  test("update coi to exchange partner"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
+        expect(
+          user     = pi,
+          query    = updateUserPartnerLinkMutation(pid, pi2, PartnerLink.HasExchangePartner(ExchangePartner.Keck)),
+          expected = expected((pid, pi2, PartnerLink.HasExchangePartner(ExchangePartner.Keck))).asRight
+        )
+
+  test("update coi from exchange partner back to gemini partner"):
+    createProgramAs(pi).flatMap: pid =>
+      addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasExchangePartner(ExchangePartner.Subaru)).flatMap: mid =>
+        linkUserAs(pi, mid, pi2.id) >>
+        expect(
+          user     = pi,
+          query    = updateUserPartnerLinkMutation(pid, pi2, PartnerLink.HasGeminiPartner(US)),
+          expected = expected((pid, pi2, PartnerLink.HasGeminiPartner(US))).asRight
         )
 
   test("update coi educational status"):

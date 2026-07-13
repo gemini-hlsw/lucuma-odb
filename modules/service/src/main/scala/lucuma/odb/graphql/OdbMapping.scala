@@ -46,6 +46,8 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 
+import java.nio.file.Files
+import java.nio.file.Path as NIOPath
 import scala.concurrent.duration.*
 import scala.io.AnsiColor
 import scala.io.Source
@@ -78,6 +80,14 @@ object OdbMapping {
         dst <- Resource.eval(DatasetTopic(ses, 1024, sup))
       } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst)
   }
+
+  val dumpDir: Option[String] = sys.env.get("ODB_FETCH_DUMP_DIR")
+  val slowQueryThreshold: FiniteDuration =
+    sys.env
+      .get("ODB_SLOW_QUERY_THRESHOLD_MS")
+      .flatMap(_.toIntOption)
+      .map(_.millis)
+      .getOrElse(5.seconds)
 
   // Loads a GraphQL file from the classpath, relative to this Class.
   def unsafeLoadSchema(fileName: String): Schema = {
@@ -173,6 +183,7 @@ object OdbMapping {
           with DeleteSequenceResultMapping[F]
           with ElevationRangeMapping[F]
           with EmailMapping[F]
+          with ExchangeMapping[F]
           with ExecutionMapping[F]
           with ExecutionEventAddedMapping[F]
           with ExecutionEventMapping[F]
@@ -189,7 +200,8 @@ object OdbMapping {
           with Flamingos2StaticMapping[F]
           with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
-          with GnirsLongSlitMapping[F]
+          with GnirsImagingMapping[F]
+          with GnirsSpectroscopyMapping[F]
           with GnirsDynamicMapping[F]
           with GnirsAcquisitionMirrorOutMapping[F]
           with GnirsStaticMapping[F]
@@ -225,6 +237,7 @@ object OdbMapping {
           with ObservationMapping[F]
           with ObservationReferenceMapping[F]
           with ObservationSelectResultMapping[F]
+          with ObservationTimeEstimateMapping[F]
           with ObservingModeGroupMapping[F]
           with ObservingModeGroupSelectResultMapping[F]
           with ObservingModeMapping[F]
@@ -427,6 +440,7 @@ object OdbMapping {
                 EngineeringProgramReferenceMapping,
                 ElevationRangeMapping,
                 ExampleProgramReferenceMapping,
+                ExchangeMapping,
                 ExecutionEventAddedMapping,
                 ExecutionEventMapping,
                 ExecutionMapping,
@@ -451,14 +465,17 @@ object OdbMapping {
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 Igrins2StaticMapping,
-                GnirsLongSlitAcquisitionMapping,
-                GnirsLongSlitMapping,
+                GnirsSpectroscopyAcquisitionMapping,
+                GnirsSpectroscopyMapping,
+                GnirsSlitMapping,
+                GnirsIfuMapping,
                 GnirsDynamicMapping,
                 GnirsStaticMapping,
                 ImagingConfigOptionMapping,
                 ImagingConfigOptionGmosNorthMapping,
                 ImagingConfigOptionGmosSouthMapping,
                 ImagingConfigOptionFlamingos2Mapping,
+                ImagingConfigOptionGnirsMapping,
                 ImagingScienceRequirementsMapping,
                 HourAngleRangeMapping,
                 LargeProgramMapping,
@@ -602,6 +619,7 @@ object OdbMapping {
                 Flamingos2FpuMaskMappings,
                 Flamingos2ImagingMappings,
                 GnirsAcquisitionMirrorOutMappings,
+                GnirsImagingMappings,
                 GhostDynamicMappings,
                 GhostIfuMappings,
                 GmosCcdModeMappings,
@@ -615,6 +633,7 @@ object OdbMapping {
                 GmosSouthGratingConfigMappings,
                 LeafMappings,
                 ObservationSelectResultMappings,
+                ObservationTimeEstimateMappings,
                 TelescopeConfigGeneratorMappings,
                 OffsetMappings,
                 RegionMappings,
@@ -642,7 +661,8 @@ object OdbMapping {
                 Flamingos2ImagingElaborator,
                 Flamingos2LongSlitElaborator,
                 Igrins2LongSlitElaborator,
-                GnirsLongSlitElaborator,
+                GnirsImagingElaborator,
+                GnirsSpectroscopyElaborator,
                 GhostIfuElaborator,
                 GmosNorthImagingElaborator,
                 GmosNorthLongSlitElaborator,
@@ -674,41 +694,73 @@ object OdbMapping {
             L.debug("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
             super.defaultRootCursor(query, tpe, parentCursor)
 
+          // Slow/large query instrumentation. Allocated once per mapping instance rather than
+          // on every `fetch` call.
+          private val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
+          private val MaxSqlLength               = 1024
+          private val DumpThreshold              = 50000
+
+          private def truncateSql(s: String): String =
+            if s.length <= MaxSqlLength then s
+            else s"${s.take(MaxSqlLength)}... (${s.length - MaxSqlLength} more chars)"
+
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
-            val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
+            val sql = fragment.fragment.sql
 
-            // Maybe it should be an env variable
-            val SlowQueryThreshold = 5.second
-            val MaxSqlLength       = 1024
+            val big = sql.length > DumpThreshold
 
-            def truncateSql(sql: String): String =
-              if sql.length <= MaxSqlLength then sql
-              else s"${sql.take(MaxSqlLength)}... (${sql.length - MaxSqlLength} more chars)"
+            // Write raw SQL to a file iff dumping is enabled and the statement is large.
+            val dumpSqlToFile: F[Option[String]] =
+              dumpDir match
+                case Some(dir) if big =>
+                  Sync[F].blocking:
+                    val hash = Integer.toHexString(sql.hashCode)
+                    val path = NIOPath.of(dir, s"odb-fetch-$hash.sql")
+                    Files.writeString(path, sql)
+                    path.toString.some
+                case _ =>
+                  none.pure[F]
 
-            L.debug {
-              val formatted = SqlFormatter.format(truncateSql(fragment.fragment.sql))
-              val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
-              val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
-              s"\n\n$colored\n\n"
-            } *>
-            T.span("grackle.fetch").use: span =>
+            // Dumped queries skip the pretty-printer, else logs the colored truncated statement
+            val logQuery: F[Option[String]] =
+              dumpSqlToFile.flatTap:
+                case Some(path) =>
+                  L.warn(s"[grackle.fetch] SQL ${sql.length} chars written to $path")
+                case None       =>
+                  L.debug:
+                    val formatted = SqlFormatter.format(truncateSql(sql))
+                    val cleanedUp = formatted.replaceAll("\\$ (\\d+)", "\\$$1") // turn $ 42 into $42
+                    val colored   = cleanedUp.linesIterator.map(s => s"${AnsiColor.GREEN}$s${AnsiColor.RESET}").mkString("\n")
+                    s"\n\n$colored\n\n"
+
+            logQuery.flatMap: dumpPath =>
+              T.span("grackle.fetch").use: span =>
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
-                  val slowQuery = elapsed > SlowQueryThreshold
+                  val slowQuery = elapsed > slowQueryThreshold
+
+                  val columnCount = codecs.size
 
                   // Add some attributes to every query and a few specific ones for slow queries
                   val baseAttrs =
                     span.addAttributes(
                       Attribute("db.duration_ms", elapsed.toMillis),
-                      Attribute("db.row_count", result.size.toLong)
-                    )
+                      Attribute("db.row_count", result.size.toLong),
+                      Attribute("db.column_count", columnCount.toLong),
+                      Attribute("db.cell_count", result.size.toLong * columnCount.toLong)
+                    ) *>
+                      dumpPath.traverse_(p => span.addAttribute(Attribute("db.statement_file", p)))
 
                   val slowQueryAttrsAndLog =
-                    val truncatedSql = truncateSql(fragment.fragment.sql)
-                    span.addAttributes(
-                      Attribute("db.statement", truncatedSql),
-                      Attribute("db.slow_query", true)) *>
-                      SlowQueryLogger.warn(s"Slow query (${elapsed.toMillis}ms):\n$truncatedSql")
+                    // For big queries the SQL lives in the dump file; don't push the
+                    // giant string into the trace, just flag it and point at the file.
+                    val stmtAttr =
+                      if dumpPath.isDefined then Attribute("db.statement", s"(${sql.length} chars, see db.statement_file)")
+                      else Attribute("db.statement", truncateSql(sql))
+                    span.addAttributes(stmtAttr, Attribute("db.slow_query", true)) *>
+                      SlowQueryLogger.warn(
+                        s"Slow query (${elapsed.toMillis}ms):\n${dumpPath.fold(truncateSql(sql))(p => s"(${sql.length} chars) $p")}"
+                      )
 
                   for {
                     _ <- baseAttrs

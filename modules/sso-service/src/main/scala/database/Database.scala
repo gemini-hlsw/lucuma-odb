@@ -79,9 +79,18 @@ trait Database[F[_]] {
    * Returns `true` if the API key was deleted, `false` if no such key exists.
    */
   def deleteApiKey(keyId: PosLong, userId: Option[User.Id]): F[Boolean]
+
+  /** Return the SSO service user itself. Requests to other services should be done on behalf of this user. */
+  def getSsoServiceUser: F[ServiceUser]
+
+  def deleteAllSessionTokensForUser(uid: User.Id): F[Unit]
+  def deleteAllSessionTokensForRole(id: StandardRole.Id): F[Unit]
+  def deleteRole(id: StandardRole.Id): F[Unit]
 }
 
 object Database extends Codecs {
+
+  val SsoServiceUserName = "Lucuma SSO"
 
   def fromSession[F[_]: Concurrent: Trace](s: Session[F]): Database[F] =
     new Database[F] {
@@ -89,6 +98,11 @@ object Database extends Codecs {
       def canonicalizeServiceUser(serviceName: String): F[ServiceUser] =
         Trace[F].span("canonicalizeServiceUser") {
           s.prepareR(CanonicalizeServiceUser).use(_.unique(serviceName))
+        }
+
+      def getSsoServiceUser: F[ServiceUser] =
+        Trace[F].span("getSsoServiceUser") {
+          canonicalizeServiceUser(SsoServiceUserName)
         }
 
       def createApiKey(roleId: StandardRole.Id): F[ApiKey] =
@@ -157,7 +171,7 @@ object Database extends Codecs {
       def getUserFromToken(token: SessionToken): F[User] =
         Trace[F].span("getUserFromToken") {
           findUserFromToken(token)
-            .flatMap(_.toRight(new RuntimeException(s"No user for session token: ${token.value}")).liftTo[F])
+            .flatMap(_.toRight(new RuntimeException(s"Invalid session token: ${token.value}")).liftTo[F])
         }
 
       def promoteGuestUser(
@@ -197,6 +211,21 @@ object Database extends Codecs {
         Trace[F].span("deleteAllSessionTokensForUser") {
           s.prepareR(sql"DELETE FROM lucuma_session WHERE user_id = $user_id".command)
             .use(_.execute(uid))
+            .void
+        }
+
+      def deleteAllSessionTokensForRole(id: StandardRole.Id): F[Unit] =
+        Trace[F].span("deleteAllSessionTokensForRole") {
+          s.prepareR(sql"DELETE FROM lucuma_session WHERE role_id = $role_id".command)
+            .use(_.execute(id))
+            .void
+        }
+
+      def deleteRole(id: StandardRole.Id): F[Unit] =
+        deleteAllSessionTokensForRole(id) >>
+        Trace[F].span("deleteAllSessionTokensForRole") {
+          s.prepareR(sql"DELETE FROM lucuma_role WHERE role_id = $role_id AND role_type <> 'pi'".command)
+            .use(_.execute(id))
             .void
         }
 
@@ -264,6 +293,7 @@ object Database extends Codecs {
       //   s.prepareR(SelectDefaultRole).use(_.option(id))
 
       def deleteUser(id: User.Id): F[Boolean] =
+        deleteAllSessionTokensForUser(id) >>
         Trace[F].span("deleteUser") {
           s.prepareR(DeleteUser).use { pq =>
             pq.execute(id).map {

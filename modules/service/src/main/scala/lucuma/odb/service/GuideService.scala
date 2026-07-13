@@ -55,6 +55,7 @@ import lucuma.core.model.probes
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.ghost.CentralWavelength as GhostCentralWavelength
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.igrins2.CentralWavelength as Igrins2CentralWavelength
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -71,6 +72,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gmos
@@ -290,6 +292,11 @@ object GuideService {
 
     val (site, observingModeType, agsWavelength): (Site, ObservingModeType, Wavelength) =
       params.observingMode match
+        case c: exchange.Config                               =>
+          // Exchange observations are not supported by AGS.  No guide probe is
+          // defined for exchange modes, so `agsParamsFor` is always empty and
+          // these placeholder values are never used for catalog queries.
+          (Site.GN, c.mode, Wavelength.Min)
         case mode: flamingos2.longslit.Config                 =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
         case flamingos2.imaging.Config(filters = filters) =>
@@ -304,12 +311,24 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosSouth             =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
-        case mode: gnirs.longslit.Config                      =>
-          (Site.GN, ObservingModeType.GnirsLongSlit, mode.filter.centralWavelength)
+        case gnirs.imaging.Config(filters = filters)          =>
+          (Site.GN, ObservingModeType.GnirsImaging, filters.map(_.filter.centralWavelength).maximum)
+        case mode: gnirs.spectroscopy.Config                  =>
+          val tpe = mode.fpu match
+            case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
+            case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
+          (Site.GN, tpe, mode.filter.centralWavelength)
         case _: igrins2.longslit.Config                       =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
         case visitor.Config(mode, wavelength, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
+
+    // Extra static coordinates AGS should treat like science positions.
+    // only GHOST supplies an optional one for the sky fiber position
+    val extraSciencePositions: List[Coordinates] =
+      params.observingMode match
+        case g: ghost.ifu.Config => g.skyPosition.toList
+        case _                   => Nil
 
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
@@ -348,10 +367,18 @@ object GuideService {
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS2) =>
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
-          case (gnirs.longslit.Config(fpu = fpu, prism = prism, camera = camera), GuideProbe.PWFS1) =>
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) =>
             AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS2) =>
+            AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS2.some
+          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1) =>
+            AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS1.some
+          case (c: gnirs.imaging.Config, GuideProbe.PWFS2) =>
+            AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS2.some
+          case (c: gnirs.imaging.Config, GuideProbe.PWFS1) =>
+            AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
           case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX         =>
@@ -493,12 +520,15 @@ object GuideService {
         oid:             Observation.Id,
         start:           Timestamp,
         end:             Timestamp,
+        explicitBase:    Option[Coordinates],
         tracking:        Tracking,
         probe:           GuideProbe,
         wavelength:      Wavelength,
         constraints:     ConstraintSet
       ): Result[ADQLQuery] =
-        (tracking.at(start.toInstant), tracking.at(end.toInstant))
+        val coordsAtStartO = explicitBase.orElse(tracking.at(start.toInstant))
+        val coordsAtEndO   = explicitBase.orElse(tracking.at(end.toInstant))
+        (coordsAtStartO, coordsAtEndO)
           .mapN { (a, b) =>
             // If caching is implemented for the guide star results, `ags.widestConstraints` should be
             // used for the brightness constraints.
@@ -533,32 +563,34 @@ object GuideService {
             .handleError(e => gaiaError(e.getMessage()).asFailure)
 
       def getAllCandidates(
-        oid:         Observation.Id,
-        start:       Timestamp,
-        end:         Timestamp,
-        tracking:    Tracking,
-        wavelength:  Wavelength,
-        probe:       GuideProbe,
-        constraints: ConstraintSet
+        oid:          Observation.Id,
+        start:        Timestamp,
+        end:          Timestamp,
+        explicitBase: Option[Coordinates],
+        tracking:     Tracking,
+        wavelength:   Wavelength,
+        probe:        GuideProbe,
+        constraints:  ConstraintSet
       ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
           query      <- ResultT.fromResult(
-                          getGaiaQuery(oid, start, end, tracking, probe, wavelength, constraints)
+                          getGaiaQuery(oid, start, end, explicitBase, tracking, probe, wavelength, constraints)
                         )
           candidates <- ResultT(callGaia(query))
         } yield candidates).value
 
       def getAllCandidatesNonEmpty(
-        oid:         Observation.Id,
-        start:       Timestamp,
-        end:         Timestamp,
-        tracking:    Tracking,
-        wavelength:  Wavelength,
-        probe:       GuideProbe,
-        constraints: ConstraintSet
+        oid:          Observation.Id,
+        start:        Timestamp,
+        end:          Timestamp,
+        explicitBase: Option[Coordinates],
+        tracking:     Tracking,
+        wavelength:   Wavelength,
+        probe:        GuideProbe,
+        constraints:  ConstraintSet
       ): F[Result[NonEmptyList[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
-          candidates <- ResultT(getAllCandidates(oid, start, end, tracking, wavelength, probe, constraints))
+          candidates <- ResultT(getAllCandidates(oid, start, end, explicitBase, tracking, wavelength, probe, constraints))
           nel        <- ResultT.fromResult(
                           NonEmptyList.fromList(candidates)
                             .toResult(generalError("No potential guidestars found on Gaia.").asProblem)
@@ -702,7 +734,7 @@ object GuideService {
                                   getAllCandidates(
                                     obsInfo.id,
                                     candPeriod.start,
-                                    candPeriod.end, t.base,
+                                    candPeriod.end, obsInfo.explicitBase, t.base,
                                     genInfo.agsWavelength,
                                     agsParams.probe,
                                     obsInfo.constraints
@@ -806,7 +838,7 @@ object GuideService {
                                obsInfo.constraints,
                                wavelength,
                                baseCoords,
-                               scienceCoords.toList,
+                               scienceCoords.toList ++ genInfo.extraSciencePositions,
                                blindOffset,
                                obsInfo.availabilityAngles,
                                genInfo.acqOffsets,
@@ -907,12 +939,13 @@ object GuideService {
                            )
           original      <- ResultT(
                              oGuideStarName.fold(
-                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints)
+                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, obsInfo.explicitBase, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints)
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
                            )
           candidates     = original.map(_._2.at(obsTime.toInstant)) // PM corrected
           baseCoords    <- ResultT.fromResult(
-                             baseTracking.at(obsTime.toInstant)
+                             obsInfo.explicitBase
+                               .orElse(baseTracking.at(obsTime.toInstant))
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for asterism in observation $oid"
@@ -922,6 +955,7 @@ object GuideService {
           scienceCoords <- ResultT.fromResult:
                              asterismTracking.toList
                                .traverse(_.at(obsTime.toInstant))
+                               .map(_ ++ genInfo.extraSciencePositions)
                                .toResult(
                                  generalError(
                                    s"Unable to get coordinates for science targets in observation $oid"

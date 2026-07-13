@@ -8,63 +8,33 @@ import cats.data.Kleisli
 import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
+import lucuma.common.middleware.CorsMiddleware
+import lucuma.common.middleware.ErrorReportingMiddleware
+import lucuma.common.middleware.LoggingMiddleware
+import lucuma.common.middleware.MetricsMiddleware
+import lucuma.common.middleware.TracingMiddleware
 import lucuma.core.model.User
-import lucuma.odb.otel.given
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
 import lucuma.sso.client.SsoClient
 import org.http4s.HttpRoutes
-import org.http4s.Query
-import org.http4s.Uri
-import org.http4s.Uri.Scheme
 import org.http4s.dsl.Http4sDsl
-import org.http4s.headers.Upgrade
 import org.http4s.otel4s.middleware.metrics.OtelMetrics
 import org.http4s.otel4s.middleware.server.RouteClassifier
-import org.http4s.otel4s.middleware.trace.client.UriRedactor
-import org.http4s.otel4s.middleware.trace.redact
 import org.http4s.otel4s.middleware.trace.redact.HeaderRedactor
 import org.http4s.otel4s.middleware.trace.server.ServerMiddleware as OtelServerMiddleware
 import org.http4s.otel4s.middleware.trace.server.ServerSpanDataProvider
-import org.http4s.server.middleware.CORS
-import org.http4s.server.middleware.ErrorAction
-import org.http4s.server.middleware.Metrics
 import org.typelevel.log4cats.Logger
-import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 
 import scala.collection.immutable.TreeMap
-import scala.concurrent.duration.*
 
 /** A module of all the middlewares we apply to the server routes. */
 object ServerMiddleware {
 
   type Middleware[F[_]] = Endo[HttpRoutes[F]]
-
-  /** A middleware that logs request and response. Headers are redacted in staging/production. */
-  def logging[F[_]: Async]: Middleware[F] =
-    org.http4s.server.middleware.Logger.httpRoutes[F](
-      logHeaders        = true,
-      logBody           = false,
-    )
-
-  /** A middleware that reports errors during requets processing. */
-  def errorReporting[F[_]: MonadThrow: Logger]: Middleware[F] = routes =>
-    ErrorAction.httpRoutes.log(
-      httpRoutes              = routes,
-      messageFailureLogAction = Logger[F].error(_)(_),
-      serviceErrorLogAction   = Logger[F].error(_)(_)
-    )
-
-  /** A middleware that adds CORS headers. The origin must match the cookie domain. */
-  def cors[F[_]: Monad](corsOverHttps: Boolean, domain: List[String]): Middleware[F] =
-    CORS.policy
-      .withAllowCredentials(true)
-      .withAllowOriginHost(u => (!corsOverHttps || (u.scheme === Scheme.https)) && domain.exists(u.host.value.endsWith))
-      .withMaxAge(1.day)
-      .apply
 
   /**
    * A middleware that updates the user table when it sees a user it hasn't seen before, or when
@@ -88,32 +58,6 @@ object ServerMiddleware {
         }
       }
     }
-
-  /**
-   * Add the user to the trace, if known.
-   */
-  def traceUser[F[_]: Monad: Tracer](
-    client: SsoClient[F, User]
-  ): Middleware[F] = routes =>
-    Kleisli { req =>
-      val putFields: F[Unit] =
-        client.find(req).flatMap {
-          case None    =>
-            Monad[F].unit
-          case Some(u) =>
-            Tracer[F].withCurrentSpanOrNoop:
-              _.addAttributes(Attributes.from(u))
-        }
-      OptionT(putFields >> routes(req).value)
-    }
-
-  val redactor: UriRedactor = new UriRedactor:
-    def redactPath(path: Uri.Path): Uri.Path = path
-    def redactQuery(query: Query): Query =
-      if (query.isEmpty) query
-      else Query(redact.REDACTED -> None)
-    def redactFragment(fragment: Uri.Fragment): Option[Uri.Fragment] =
-      Some(fragment)
 
   // Maps dynamic route paths to stable routes
   private def routeClassifier[F[_]]: RouteClassifier = {
@@ -146,7 +90,7 @@ object ServerMiddleware {
   ): Resource[F, Middleware[F]] =
     val spanDataProvider =
       ServerSpanDataProvider
-        .openTelemetry(redactor)
+        .openTelemetry(TracingMiddleware.redactor)
         .withRouteClassifier(routeClassifier)
         // These could be a bit expensive if there are lots of calls
         // OTOH a lot of traffic is via websockets
@@ -158,18 +102,13 @@ object ServerMiddleware {
       Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build),
       Resource.eval(OtelMetrics.serverMetricsOps[F]())
     ).mapN { (userCache, otel, metricsOps) =>
-      // Metrics middleware wrapped skips WebSocket requests as they can be very long lived
-      val httpMetrics: Middleware[F] = routes =>
-        val withMetrics = Metrics[F](metricsOps)(routes)
-        Kleisli(req => if (req.headers.get[Upgrade].isDefined) routes(req) else withMetrics(req))
-
       List[Middleware[F]](
-        cors(corsOverHttps, domain),
-        logging,
-        httpMetrics,
+        CorsMiddleware.cors(corsOverHttps, domain),
+        LoggingMiddleware.logging[F](),
+        MetricsMiddleware.httpMetrics(metricsOps),
         otel.asHttpRoutesMiddleware,
-        traceUser(client),
-        errorReporting,
+        TracingMiddleware.traceUser(client),
+        ErrorReportingMiddleware.errorReporting,
         userCache,
       ).reduce(_ andThen _) // N.B. the monoid for Endo uses `compose`
     }

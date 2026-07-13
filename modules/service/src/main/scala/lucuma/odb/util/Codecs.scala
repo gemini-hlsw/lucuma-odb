@@ -288,6 +288,9 @@ trait Codecs {
       Epoch.fromString.reverseGet
     )
 
+  val exchange_observing_mode_type: Codec[ExchangeObservingModeType] =
+    enumerated(Type("e_observing_mode_type"))
+
   val _exchange_partner: Codec[List[ExchangePartner]] =
     _enumerated[ExchangePartner](Type("_e_exchange_partner", List(Type("e_exchange_partner"))))
 

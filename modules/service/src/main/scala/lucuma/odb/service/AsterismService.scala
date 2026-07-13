@@ -72,6 +72,18 @@ trait AsterismService[F[_]] {
     update: AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
 
+  /**
+   * Sets (or clears) the signal-to-noise (ITC) target for the given
+   * observations. When `target` is `NonNull`, it must be a member of each
+   * observation's asterism; otherwise a failure is returned. `Null` clears the
+   * selection and `Absent` leaves it unchanged.
+   */
+  def setSignalToNoiseTarget(
+    programId:      Program.Id,
+    observationIds: NonEmptyList[Observation.Id],
+    target:         Nullable[Target.Id]
+  )(using Transaction[F], SuperUserAccess): F[Result[Unit]]
+
   def cloneAsterism(
     originalId: Observation.Id,
     newId: Observation.Id,
@@ -149,7 +161,7 @@ object AsterismService {
         observationIds: NonEmptyList[Observation.Id],
         targetIds:      Nullable[NonEmptyList[Target.Id]]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
-        targetIds match {
+        targetIds match
           case Nullable.Null          =>
             deleteAsterism(programId, observationIds)
 
@@ -157,9 +169,63 @@ object AsterismService {
             Result.unit.pure[F]
 
           case Nullable.NonNull(tids) =>
-            deleteAsterism(programId, observationIds) *>
-              insertAsterism(programId, observationIds, tids)
-        }
+            // Replacing the asterism deletes and reinserts the link rows, which
+            // would drop the signal-to-noise flag. Preserve it for any selected
+            // target that remains in the new asterism.
+            (for
+              saved <- ResultT.liftF(selectSignalToNoiseTargets(programId, observationIds))
+              _     <- ResultT(deleteAsterism(programId, observationIds))
+              _     <- ResultT(insertAsterism(programId, observationIds, tids))
+              _     <- ResultT.liftF(reapplySignalToNoiseTargets(programId, saved))
+            yield ()).value
+
+      private def selectSignalToNoiseTargets(
+        programId:      Program.Id,
+        observationIds: NonEmptyList[Observation.Id]
+      ): F[List[(Observation.Id, Target.Id)]] =
+        val af = Statements.selectSignalToNoiseTargets(programId, observationIds)
+        session.prepareR(af.fragment.query(observation_id *: target_id)).use: p =>
+          p.stream(af.argument, chunkSize = 1024).compile.toList
+
+      private def reapplySignalToNoiseTargets(
+        programId: Program.Id,
+        pairs:     List[(Observation.Id, Target.Id)]
+      ): F[Unit] =
+        NonEmptyList.fromList(pairs).traverse_ : nel =>
+          val af = Statements.applySignalToNoiseFlags(programId, nel)
+          session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
+
+      override def setSignalToNoiseTarget(
+        programId:      Program.Id,
+        observationIds: NonEmptyList[Observation.Id],
+        target:         Nullable[Target.Id]
+      )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
+        target match
+          case Nullable.Absent       =>
+            Result.unit.pure[F]
+
+          case Nullable.Null         =>
+            val af = Statements.clearSignalToNoiseTargets(programId, observationIds)
+            session.prepareR(af.fragment.command).use(_.execute(af.argument)).as(Result.unit)
+
+          case Nullable.NonNull(tid0) =>
+            val tid: Target.Id = tid0
+            // The target must be in every observation's asterism.
+            val check = Statements.observationsWithTarget(programId, observationIds, tid)
+            session
+              .prepareR(check.fragment.query(observation_id))
+              .use: p =>
+                p.stream(check.argument, chunkSize = 1024).compile.toList
+              .flatMap: present =>
+                val missing = observationIds.toList.filterNot(present.toSet)
+                missing match
+                  case Nil =>
+                    val af = Statements.setSignalToNoiseTarget(programId, observationIds, tid)
+                    session.prepareR(af.fragment.command).use(_.execute(af.argument)).as(Result.unit)
+                  case bad =>
+                    OdbError.InvalidArgument(
+                      s"Signal-to-noise target ${tid.show} is not in the asterism of observation(s): ${bad.map(_.show).mkString(", ")}.".some
+                    ).asFailureF
 
       override def updateAsterism(
         update: AccessControl.CheckedWithIds[EditAsterismsPatchInput, Observation.Id]
@@ -287,17 +353,69 @@ object AsterismService {
         INSERT INTO t_asterism_target (
           c_program_id,
           c_observation_id,
-          c_target_id
+          c_target_id,
+          c_is_signal_to_noise_target
         )
         SELECT
           t_asterism_target.c_program_id,
           $observation_id,
-          t_asterism_target.c_target_id
+          t_asterism_target.c_target_id,
+          t_asterism_target.c_is_signal_to_noise_target
         FROM t_asterism_target
         JOIN t_target ON t_target.c_target_id = t_asterism_target.c_target_id
         WHERE c_observation_id = $observation_id
         AND t_target.c_existence = 'present' -- don't clone references to deleted targets
       """.apply(newOid, originalOid)
+
+    def selectSignalToNoiseTargets(
+      programId:      Program.Id,
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      void"SELECT c_observation_id, c_target_id FROM t_asterism_target WHERE " |+|
+        programIdEqual(programId)                                              |+|
+        void" AND " |+| observationIdIn(observationIds)                        |+|
+        void" AND c_is_signal_to_noise_target"
+
+    def applySignalToNoiseFlags(
+      programId: Program.Id,
+      pairs:     NonEmptyList[(Observation.Id, Target.Id)]
+    ): AppliedFragment =
+      void"UPDATE t_asterism_target SET c_is_signal_to_noise_target = true WHERE "                  |+|
+        programIdEqual(programId)                                                                   |+|
+        void" AND (c_observation_id, c_target_id) IN ("                                             |+|
+        pairs.map { case (o, t) => sql"($observation_id, $target_id)"(o, t) }.intercalate(void", ") |+|
+        void")"
+
+    def clearSignalToNoiseTargets(
+      programId:      Program.Id,
+      observationIds: NonEmptyList[Observation.Id]
+    ): AppliedFragment =
+      void"UPDATE t_asterism_target SET c_is_signal_to_noise_target = false WHERE " |+|
+        programIdEqual(programId)                                                   |+|
+        void" AND " |+| observationIdIn(observationIds)                             |+|
+        void" AND c_is_signal_to_noise_target"
+
+    // Sets the flag on the chosen target and clears it from all others for the
+    // given observations, in a single statement (safe w.r.t. the single-target
+    // partial unique index).
+    def setSignalToNoiseTarget(
+      programId:      Program.Id,
+      observationIds: NonEmptyList[Observation.Id],
+      targetId:       Target.Id
+    ): AppliedFragment =
+      sql"UPDATE t_asterism_target SET c_is_signal_to_noise_target = (c_target_id = $target_id) WHERE "(targetId) |+|
+        programIdEqual(programId)                                                                                 |+|
+        void" AND " |+| observationIdIn(observationIds)
+
+    def observationsWithTarget(
+      programId:      Program.Id,
+      observationIds: NonEmptyList[Observation.Id],
+      targetId:       Target.Id
+    ): AppliedFragment =
+      void"SELECT c_observation_id FROM t_asterism_target WHERE " |+|
+        programIdEqual(programId)                                 |+|
+        void" AND " |+| observationIdIn(observationIds)           |+|
+        sql" AND c_target_id = $target_id"(targetId)
 
     def getAsterism(oid: Observation.Id): AppliedFragment =
       sql"""

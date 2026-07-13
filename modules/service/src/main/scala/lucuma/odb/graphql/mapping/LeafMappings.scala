@@ -60,7 +60,7 @@ import lucuma.odb.data.UserType
 
 import java.time.LocalDate
 
-trait LeafMappings[F[_]] extends BaseMapping[F] {
+trait LeafMappings[F[_]] extends BaseMapping[F]:
 
   private given io.circe.Encoder[Epoch] =
     e => Json.fromString(Epoch.fromString.reverseGet(e))
@@ -105,9 +105,10 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[EmailStatus](EmailStatusType),
       LeafMapping[EphemerisKeyType](EphemerisKeyTypeType),
       LeafMapping[Epoch](EpochStringType),
+      LeafMapping[ExchangeObservingModeType](ExchangeObservingModeTypeType),
+      LeafMapping[ExchangePartner](ExchangePartnerType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[ExecutionEventType](ExecutionEventTypeType),
-      LeafMapping[ExchangePartner](ExchangePartnerType),
       LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
@@ -157,6 +158,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[GnirsFilter](GnirsFilterType),
       LeafMapping[GnirsGrating](GnirsGratingType),
       LeafMapping[GnirsFpuSlit](GnirsFpuSlitType),
+      LeafMapping[GnirsFpuIfu](GnirsFpuIfuType),
       LeafMapping[GnirsFpuOther](GnirsFpuOtherType),
       LeafMapping[GnirsPrism](GnirsPrismType),
       LeafMapping[GnirsCamera](GnirsCameraType),
@@ -237,7 +239,5 @@ trait LeafMappings[F[_]] extends BaseMapping[F] {
       LeafMapping[Visit.Id](VisitIdType),
       LeafMapping[WaterVapor](WaterVaporType),
       LeafMapping[WavelengthOrder](WavelengthOrderType),
-      LeafMapping[VisitorObservingModeType](VisitorObservingModeTypeType),
+      LeafMapping[VisitorObservingModeType](VisitorObservingModeTypeType)
     )
-
-}

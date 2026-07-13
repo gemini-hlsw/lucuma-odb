@@ -40,12 +40,15 @@ import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.SpanKind
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
 
+import java.nio.file.Files
+import java.nio.file.Path as NIOPath
 import scala.concurrent.duration.*
 
 object GraphQLRoutes {
@@ -57,7 +60,7 @@ object GraphQLRoutes {
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
    * based on the `Authorization` header and discarded when `ttl` expires.
    */
-  def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory, SecureRandom}](
+  def apply[F[_]: {Async as F, Parallel, Tracer as T, Logger as L, LoggerFactory, SecureRandom}](
     gaiaClient:           GaiaClient[F],
     itcClient:            ItcClient[F],
     commitHash:           CommitHash,
@@ -124,13 +127,26 @@ object GraphQLRoutes {
                                     T.spanBuilder("graphql-query")
                                       .withSpanKind(SpanKind.Server)
                                       .build
-                                      .surround:
-                                        super.query(request, document, operationName).retryOnInvalidCursorName
-                                          .handleError(Result.InternalError.apply)
-                                          .flatTap {
-                                            case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                            case _                       => debug(user, s"Query (success).")
-                                          }
+                                      .use: span =>
+                                        F.timed(
+                                          super.query(request, document, operationName).retryOnInvalidCursorName
+                                            .handleError(Result.InternalError.apply)
+                                            .flatTap {
+                                              case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                              case _                       => debug(user, s"Query (success).")
+                                            }
+                                        ).flatMap: (elapsed, result) =>
+                                          val slow = elapsed > OdbMapping.slowQueryThreshold
+                                          val markSlow =
+                                            span.addAttribute(Attribute("graphql.slow_query", true)).whenA(slow)
+                                          val dumpGql: F[Unit] =
+                                            OdbMapping.dumpDir.filter(_ => slow).map: dir =>
+                                              F.blocking:
+                                                val hash = Integer.toHexString(document.hashCode)
+                                                val path = NIOPath.of(dir, s"odb-query-$hash.gql")
+                                                if !Files.exists(path) then {Files.writeString(path, document);()}
+                                            .getOrElse(F.unit)
+                                          markSlow *> dumpGql.as(result)
 
                                   override def subscribe(
                                     request:       Operation,

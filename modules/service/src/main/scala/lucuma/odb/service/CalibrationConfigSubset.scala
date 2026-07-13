@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
-import eu.timepit.refined.cats.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -24,10 +23,12 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
@@ -35,12 +36,14 @@ import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.sequence.ObservingMode
+import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2ImagingConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
-import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlitConfig
+import lucuma.odb.sequence.gnirs.imaging.Config as GnirsImagingConfig
+import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopyConfig
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 
@@ -49,6 +52,9 @@ sealed trait CalibrationConfigSubset derives Eq:
 
 object CalibrationConfigSubset:
 
+  case class ExchangeConfigSubset(config: ExchangeConfig) extends CalibrationConfigSubset:
+    def modeType: ObservingModeType = config.mode
+
   case class VisitorConfigSubset(config: VisitorConfig) extends CalibrationConfigSubset:
     def modeType: ObservingModeType = config.mode
 
@@ -56,8 +62,11 @@ object CalibrationConfigSubset:
   case object GhostConfigs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GhostIfu
 
-  case class GnirsLongSlitConfigs(config: GnirsLongSlitConfig) extends CalibrationConfigSubset derives Eq:
-    def modeType: ObservingModeType = ObservingModeType.GnirsLongSlit
+  case class GnirsSpectroscopyConfigs(config: GnirsSpectroscopyConfig) extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType =
+      config.fpu match
+        case _: GnirsFpu.Spectroscopy.Slit => ObservingModeType.GnirsLongSlit
+        case _: GnirsFpu.Spectroscopy.Ifu  => ObservingModeType.GnirsIfu
 
     /** Cross-dispersed configurations use the SXD or LXD prism (cross-disperser). */
     def isCrossDispersed: Boolean =
@@ -110,7 +119,9 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none,
         none,
         none,
@@ -140,7 +151,9 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosLongSlitInput.Create.South(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none,
         none,
         none
@@ -170,6 +183,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosImagingInput.Create(
           ImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
@@ -180,6 +194,7 @@ object CalibrationConfigSubset:
             roi.some
           )
         ).some,
+        none,
         none,
         none,
         none,
@@ -205,6 +220,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosImagingInput.Create(
           ImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
@@ -215,6 +231,7 @@ object CalibrationConfigSubset:
             roi.some
           )
         ).some,
+        none,
         none,
         none,
         none,
@@ -232,7 +249,9 @@ object CalibrationConfigSubset:
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
         none,
+        none,
         Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some,
+        none,
         none,
         none,
         none,
@@ -248,20 +267,39 @@ object CalibrationConfigSubset:
   ) extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Flamingos2Imaging
 
+  case class GnirsImagingConfigs(
+    filters: NonEmptyList[GnirsFilter],
+    camera:  GnirsCamera
+  ) extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.GnirsImaging
+
   case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit
 
   extension (mode: ObservingMode)
     def toConfigSubset: CalibrationConfigSubset =
       mode match
-        case v: VisitorConfig =>
-          VisitorConfigSubset(v)
+        case e: ExchangeConfig =>
+          ExchangeConfigSubset(e)
+
+        case f2: Flamingos2Config =>
+          Flamingos2Configs(
+            f2.disperser,
+            f2.filter,
+            f2.fpu
+          )
+
+        case f2i: Flamingos2ImagingConfig =>
+          Flamingos2ImagingConfigs(f2i.filters.map(_.filter))
 
         case _: GhostConfig =>
           GhostConfigs
 
-        case c: GnirsLongSlitConfig =>
-          GnirsLongSlitConfigs(c)
+        case c: GnirsSpectroscopyConfig =>
+          GnirsSpectroscopyConfigs(c)
+
+        case gnm: GnirsImagingConfig =>
+          GnirsImagingConfigs(gnm.filters.map(_.filter), gnm.camera)
 
         case gn: Config.GmosNorth =>
           GmosNConfigs(
@@ -275,6 +313,7 @@ object CalibrationConfigSubset:
             gn.ampGain,
             gn.roi
           )
+
         case gs: Config.GmosSouth =>
           GmosSConfigs(
             gs.grating,
@@ -287,6 +326,7 @@ object CalibrationConfigSubset:
             gs.ampGain,
             gs.roi
           )
+
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(
             gni.filters.map(_._1),
@@ -295,6 +335,7 @@ object CalibrationConfigSubset:
             gni.ampGain,
             gni.roi,
           )
+
         case gsi: ImagingConfig.GmosSouth =>
           GmosSImagingConfigs(
             gsi.filters.map(_._1),
@@ -303,13 +344,8 @@ object CalibrationConfigSubset:
             gsi.ampGain,
             gsi.roi
           )
-        case f2: Flamingos2Config =>
-          Flamingos2Configs(
-            f2.disperser,
-            f2.filter,
-            f2.fpu
-          )
-        case f2i: Flamingos2ImagingConfig =>
-          Flamingos2ImagingConfigs(f2i.filters.map(_.filter))
         case _: Igrins2Config =>
           Igrins2Configs
+
+        case v: VisitorConfig =>
+          VisitorConfigSubset(v)

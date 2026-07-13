@@ -2099,9 +2099,11 @@ class perScienceObservationCalibrations
         query {
           observation(observationId: "$oid") {
             observingMode {
-              gnirsLongSlit {
-                telescopeConfigs {
-                  alongSlit { q { arcseconds } }
+              gnirsSpectroscopy {
+                slit {
+                  telescopeConfigs {
+                    alongSlit { q { arcseconds } }
+                  }
                 }
               }
             }
@@ -2109,8 +2111,8 @@ class perScienceObservationCalibrations
         }"""
     ).map: c =>
       c.hcursor
-        .downField("observation").downField("observingMode").downField("gnirsLongSlit")
-        .downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.orEmpty
+        .downField("observation").downField("observingMode").downField("gnirsSpectroscopy")
+        .downField("slit").downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.orEmpty
         .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
 
   test("gnirs observation is placed in a obs calibration system group"):
@@ -2175,7 +2177,7 @@ class perScienceObservationCalibrations
         Wavelength.fromIntNanometers(900).get,
         Wavelength.fromIntNanometers(2560).get
       ),
-      GnirsFpu.Slit(GnirsFpuSlit.LongSlit_0_30),
+      GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
       GnirsWellDepth.Shallow
     )
     // The daytime pinhole flat looks up the same config but with the pinhole
@@ -2216,11 +2218,11 @@ class perScienceObservationCalibrations
               targetEnvironment: { asterism: ${List(tid).asJson} }
               scienceRequirements: ${scienceRequirementsObject(ObservingModeType.GnirsLongSlit)}
               observingMode: {
-                gnirsLongSlit: {
+                gnirsSpectroscopy: {
                   grating: D32
                   prism: SXD
                   camera: SHORT_BLUE
-                  fpu: LONG_SLIT_0_30
+                  slit: { fpu: LONG_SLIT_0_30 }
                   filter: ORDER3
                   centralWavelength: { nanometers: 1650 }
                   exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }

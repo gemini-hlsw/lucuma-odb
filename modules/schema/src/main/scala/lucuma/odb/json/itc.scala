@@ -18,11 +18,14 @@ import lucuma.core.data.ZipperCodec
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Target
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
@@ -95,16 +98,29 @@ trait ItcCodec:
   given Decoder[Itc.GmosSouthImaging] =
     imagingScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(Itc.GmosSouthImaging.apply)
 
+  given Decoder[Itc.GnirsImaging] =
+    imagingScienceNemDecoder[GnirsFilter]("gnirsImagingScience").map(Itc.GnirsImaging.apply)
+
   given Decoder[Itc.Igrins2Spectroscopy] =
     Decoder.instance:
       _.downField("spectroscopyScience").as[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
+
+  // GnirsAcquisitionType is a plain Enumerated; encode by tag.  Round-trips within
+  // this codec only (the value is stored in the Itc jsonb blob).
+  private given Encoder[GnirsAcquisitionType] =
+    Encoder[String].contramap(Enumerated[GnirsAcquisitionType].tag)
+
+  private given Decoder[GnirsAcquisitionType] =
+    Decoder[String].emap: s =>
+      Enumerated[GnirsAcquisitionType].fromTag(s).toRight(s"Invalid GnirsAcquisitionType: $s")
 
   given Decoder[Itc.Spectroscopy] =
     Decoder.instance: c =>
       for
         acquisition <- c.downField("acquisition").as[Zipper[Itc.Result]]
         science     <- c.downField("spectroscopyScience").as[Zipper[Itc.Result]]
-      yield Itc.Spectroscopy(acquisition, science)
+        acqType     <- c.downField("gnirsAcqType").as[Option[GnirsAcquisitionType]]
+      yield Itc.Spectroscopy(acquisition, science, acqType)
 
   private def imagingScienceNemEncoder[A: Encoder](
     using Encoder[TimeSpan], Encoder[Wavelength]
@@ -146,6 +162,13 @@ trait ItcCodec:
         "gmosSouthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosSouthFilter])
       )
 
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GnirsImaging] =
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"             -> Itc.Type.GnirsImaging.asJson,
+        "gnirsImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GnirsFilter])
+      )
+
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Igrins2Spectroscopy] =
     Encoder.instance: a =>
       Json.obj(
@@ -159,7 +182,8 @@ trait ItcCodec:
         "itcType"             -> Itc.Type.Spectroscopy.asJson,
         "acquisition"         -> a.acquisition.asJson,
         "spectroscopyScience" -> a.science.asJson
-      )
+      // Emitted only when set, so pre-existing rows' JSON is unaffected.
+      ).deepMerge(a.gnirsAcqType.fold(Json.obj())(t => Json.obj("gnirsAcqType" -> t.asJson)))
 
   given Decoder[Itc] =
     Decoder.instance: c =>
@@ -170,6 +194,7 @@ trait ItcCodec:
          case Itc.Type.GhostIfu            => Decoder[Itc.GhostIfu].apply(c)
          case Itc.Type.GmosNorthImaging    => Decoder[Itc.GmosNorthImaging].apply(c)
          case Itc.Type.GmosSouthImaging    => Decoder[Itc.GmosSouthImaging].apply(c)
+         case Itc.Type.GnirsImaging        => Decoder[Itc.GnirsImaging].apply(c)
          case Itc.Type.Igrins2Spectroscopy => Decoder[Itc.Igrins2Spectroscopy].apply(c)
          case Itc.Type.Spectroscopy        => Decoder[Itc.Spectroscopy].apply(c)
 
@@ -179,7 +204,8 @@ trait ItcCodec:
       case a @ Itc.GhostIfu(_, _)         => Encoder[Itc.GhostIfu].apply(a)
       case a @ Itc.GmosNorthImaging(_)    => Encoder[Itc.GmosNorthImaging].apply(a)
       case a @ Itc.GmosSouthImaging(_)    => Encoder[Itc.GmosSouthImaging].apply(a)
+      case a @ Itc.GnirsImaging(_)        => Encoder[Itc.GnirsImaging].apply(a)
       case a @ Itc.Igrins2Spectroscopy(_) => Encoder[Itc.Igrins2Spectroscopy].apply(a)
-      case a @ Itc.Spectroscopy(_, _)     => Encoder[Itc.Spectroscopy].apply(a)
+      case a @ Itc.Spectroscopy(_, _, _)  => Encoder[Itc.Spectroscopy].apply(a)
 
 object itc extends ItcCodec

@@ -86,7 +86,9 @@ import munit.CatsEffectSuite
 import munit.Location
 import munit.diff.console.AnsiColors
 import natchez.Trace
+import org.http4s.Uri
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.circe.jsonEncoderOf
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.headers.Authorization
@@ -139,6 +141,23 @@ object OdbSuite:
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
+  // This is generally useful so put it here
+  given EntityEncoder[IO, Json] = jsonEncoderOf
+
+  /**
+    * Run an http request against the test ODB.
+    * @param user an Auth header will be added for this user
+    * @param mkReq allows you to get the base URI, necessary for constructing requests
+    */
+  def runHttpRequestAs(user: User)(mkReq: Uri => Request[IO]): Resource[IO, Response[IO]] =
+    for
+      svr    <- server
+      auth   <- Resource.eval(authorizationHeader(user))
+      req     = mkReq(svr.baseUri).putHeaders(auth)
+      client <- httpClientResource
+      res    <- client.run(req)
+    yield res
+    
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any])(using Location): IO[Unit] =
     fa.attempt.flatMap {
@@ -733,6 +752,16 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def subscriptionExpect(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expected: List[Json], variables: Option[JsonObject] = None)(using Location) =
     subscription(user, query, mutations, variables).map { obt =>
       assertEquals(obt.map(_.spaces2), expected.map(_.spaces2))  // by comparing strings we get more useful errors
+    }
+
+  // Like `subscriptionExpect`, but ignores the order in which events are
+  // received.  Use when a single mutation produces events for multiple
+  // entities (e.g., editing a target shared by several observations), where
+  // the relative notification order is unspecified (it depends on the order
+  // in which row-level triggers happen to fire).
+  def subscriptionExpectUnordered(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expected: List[Json], variables: Option[JsonObject] = None)(using Location) =
+    subscription(user, query, mutations, variables).map { obt =>
+      assertEquals(obt.map(_.spaces2).sorted, expected.map(_.spaces2).sorted)  // by comparing strings we get more useful errors
     }
 
   def subscriptionExpectF(user: User, query: String, mutations: Either[List[(String, Option[JsonObject])], IO[Any]], expectedF: IO[List[Json]], variables: Option[JsonObject] = None)(using Location) =

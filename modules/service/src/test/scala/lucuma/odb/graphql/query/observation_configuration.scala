@@ -636,6 +636,113 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
     }
   }
 
+  test("select configuration for GNIRS long slit observation (gnirsIfu resolves to null)") {
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGnirsLongSlitObservationAs(pi, pid, tid).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      observingMode {
+                        instrument
+                        mode
+                        gnirsLongSlit {
+                          grating
+                          camera
+                          prism
+                        }
+                        gnirsIfu {
+                          grating
+                          fpu
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "observingMode" : {
+                        "instrument" : "GNIRS",
+                        "mode" : "GNIRS_LONG_SLIT",
+                        "gnirsLongSlit" : {
+                          "grating" : "D111",
+                          "camera" : "SHORT_BLUE",
+                          "prism" : "MIRROR"
+                        },
+                        "gnirsIfu" : null
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
+  test("select configuration for GNIRS IFU observation (gnirsLongSlit resolves to null)") {
+    createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
+      createProgramAs(pi, "Foo").flatMap { pid =>
+        addProposal(pi, pid, Some(cfpid), None) >>
+        createTargetWithProfileAs(pi, pid).flatMap { tid =>
+          createGnirsIfuObservationAs(pi, pid, tid).flatMap { oid =>
+            expect(
+              user = pi,
+              query = s"""
+                query {
+                  observation(observationId: "$oid") {
+                    configuration {
+                      observingMode {
+                        instrument
+                        mode
+                        gnirsLongSlit {
+                          grating
+                          camera
+                          prism
+                        }
+                        gnirsIfu {
+                          grating
+                          fpu
+                        }
+                      }
+                    }
+                  }
+                }
+              """,
+              expected = Right(json"""
+                {
+                  "observation" : {
+                    "configuration" : {
+                      "observingMode" : {
+                        "instrument" : "GNIRS",
+                        "mode" : "GNIRS_IFU",
+                        "gnirsLongSlit" : null,
+                        "gnirsIfu" : {
+                          "grating" : "D111",
+                          "fpu" : "LOW_RESOLUTION"
+                        }
+                      }
+                    }
+                  }
+                }
+              """)
+            )
+          }
+        }
+      }
+    }
+  }
+
   test("select configuration for fully-configured observation with opportunity target") {
     createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>

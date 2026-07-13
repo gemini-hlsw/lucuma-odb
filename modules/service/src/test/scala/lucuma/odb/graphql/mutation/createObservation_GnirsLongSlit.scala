@@ -37,11 +37,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -59,15 +59,13 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                     observingMode {
                       instrument
                       mode
-                      gnirsLongSlit {
+                      gnirsSpectroscopy {
                         grating
                         initialGrating
                         prism
                         initialPrism
                         camera
                         initialCamera
-                        fpu
-                        initialFpu
                         filter
                         initialFilter
                         coadds
@@ -81,10 +79,14 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         defaultWellDepth
                         explicitWellDepth
                         explicitFocusMotorSteps
-                        telescopeConfigs {
-                          offsetMode
-                          alongSlit { q { arcseconds } guiding }
-                          toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+                        slit {
+                          fpu
+                          initialFpu
+                          telescopeConfigs {
+                            offsetMode
+                            alongSlit { q { arcseconds } guiding }
+                            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+                          }
                         }
                         exposureTimeMode {
                           timeAndCount { time { seconds } count at { nanometers } }
@@ -112,15 +114,13 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   "observingMode": {
                     "instrument": "GNIRS",
                     "mode": "GNIRS_LONG_SLIT",
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "grating": "D111",
                       "initialGrating": "D111",
                       "prism": "MIRROR",
                       "initialPrism": "MIRROR",
                       "camera": "SHORT_BLUE",
                       "initialCamera": "SHORT_BLUE",
-                      "fpu": "LONG_SLIT_0_30",
-                      "initialFpu": "LONG_SLIT_0_30",
                       "filter": "ORDER3",
                       "initialFilter": "ORDER3",
                       "coadds": 1,
@@ -134,15 +134,19 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       "defaultWellDepth": "SHALLOW",
                       "explicitWellDepth": null,
                       "explicitFocusMotorSteps": null,
-                      "telescopeConfigs": {
-                        "offsetMode": "NOD_ALONG_SLIT",
-                        "alongSlit": [
-                          { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" },
-                          { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
-                          { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
-                          { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" }
-                        ],
-                        "toSky": null
+                      "slit": {
+                        "fpu": "LONG_SLIT_0_30",
+                        "initialFpu": "LONG_SLIT_0_30",
+                        "telescopeConfigs": {
+                          "offsetMode": "NOD_ALONG_SLIT",
+                          "alongSlit": [
+                            { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" },
+                            { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
+                            { "q": { "arcseconds": -4.000000 }, "guiding": "ENABLED" },
+                            { "q": { "arcseconds": 2.000000 },  "guiding": "ENABLED" }
+                          ],
+                          "toSky": null
+                        }
                       },
                       "exposureTimeMode": {
                         "timeAndCount": {
@@ -194,11 +198,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -221,7 +225,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsLongSlit {
+                      gnirsSpectroscopy {
                         acquisition {
                           explicitAcquisitionType
                           skyOffset { p { arcseconds } q { arcseconds } }
@@ -237,7 +241,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "createObservation": {
                 "observation": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "acquisition": {
                         "explicitAcquisitionType": "FAINT",
                         "skyOffset": {
@@ -266,7 +270,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   updateObservations(input: {
                     SET: {
                       observingMode: {
-                        gnirsLongSlit: {
+                        gnirsSpectroscopy: {
                           acquisition: {
                             explicitAcquisitionType: FAINT
                             skyOffset: {
@@ -281,7 +285,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   }) {
                     observations {
                       observingMode {
-                        gnirsLongSlit {
+                        gnirsSpectroscopy {
                           acquisition {
                             explicitAcquisitionType
                             skyOffset { p { arcseconds } q { arcseconds } }
@@ -298,7 +302,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   "observations": [
                     {
                       "observingMode": {
-                        "gnirsLongSlit": {
+                        "gnirsSpectroscopy": {
                           "acquisition": {
                             "explicitAcquisitionType": "FAINT",
                             "skyOffset": {
@@ -338,11 +342,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D32
                         prism: LXD
                         camera: LONG_RED
-                        fpu: LONG_SLIT_0_45
+                        slit: { fpu: LONG_SLIT_0_45 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2100 }
                         coadds: 2
@@ -363,11 +367,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsLongSlit {
+                      gnirsSpectroscopy {
                         grating
                         prism
                         camera
-                        fpu
+                        slit { fpu }
                         filter
                         coadds
                         decker
@@ -391,11 +395,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "createObservation": {
                 "observation": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "grating": "D32",
                       "prism": "LXD",
                       "camera": "LONG_RED",
-                      "fpu": "LONG_SLIT_0_45",
+                      "slit": { "fpu": "LONG_SLIT_0_45" },
                       "filter": "ORDER3",
                       "coadds": 2,
                       "decker": "ACQUISITION",
@@ -429,7 +433,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   updateObservations(input: {
                     SET: {
                       observingMode: {
-                        gnirsLongSlit: {
+                        gnirsSpectroscopy: {
                           explicitDecker: LONG_CAM_LONG_SLIT
                           explicitReadMode: VERY_FAINT
                           explicitWellDepth: DEEP
@@ -440,7 +444,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   }) {
                     observations {
                       observingMode {
-                        gnirsLongSlit {
+                        gnirsSpectroscopy {
                           explicitDecker
                           explicitReadMode
                           explicitWellDepth
@@ -456,7 +460,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   "observations": [
                     {
                       "observingMode": {
-                        "gnirsLongSlit": {
+                        "gnirsSpectroscopy": {
                           "explicitDecker": "LONG_CAM_LONG_SLIT",
                           "explicitReadMode": "VERY_FAINT",
                           "explicitWellDepth": "DEEP"
@@ -493,11 +497,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                         }
                       }
                       observingMode: {
-                        gnirsLongSlit: {
+                        gnirsSpectroscopy: {
                           grating: D111
                           prism: MIRROR
                           camera: SHORT_BLUE
-                          fpu: LONG_SLIT_0_30
+                          slit: { fpu: LONG_SLIT_0_30 }
                           filter: ORDER3
                           centralWavelength: { nanometers: 2200 }
                           explicitFocusMotorSteps: 500
@@ -541,11 +545,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         explicitFocusMotorSteps: 500
@@ -562,7 +566,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsLongSlit { explicitFocusMotorSteps }
+                      gnirsSpectroscopy { explicitFocusMotorSteps }
                     }
                   }
                 }
@@ -573,7 +577,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "createObservation": {
                 "observation": {
                   "observingMode": {
-                    "gnirsLongSlit": { "explicitFocusMotorSteps": 500 }
+                    "gnirsSpectroscopy": { "explicitFocusMotorSteps": 500 }
                   }
                 }
               }
@@ -595,7 +599,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                     updateObservations(input: {
                       SET: {
                         observingMode: {
-                          gnirsLongSlit: { explicitFocusMotorSteps: 500 }
+                          gnirsSpectroscopy: { explicitFocusMotorSteps: 500 }
                         }
                       }
                       WHERE: { id: { EQ: "$oid" } }
@@ -621,7 +625,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
           s"""
             mutation {
               updateObservations(input: {
-                SET: { observingMode: { gnirsLongSlit: { explicitFocusMotorSteps: 500 } } }
+                SET: { observingMode: { gnirsSpectroscopy: { explicitFocusMotorSteps: 500 } } }
                 WHERE: { id: { EQ: "$oid" } }
               }) { observations { id } }
             }
@@ -633,12 +637,12 @@ class createObservation_GnirsLongSlit extends OdbSuite:
           s"""
             mutation {
               updateObservations(input: {
-                SET: { observingMode: { gnirsLongSlit: { explicitFocusMotorSteps: null } } }
+                SET: { observingMode: { gnirsSpectroscopy: { explicitFocusMotorSteps: null } } }
                 WHERE: { id: { EQ: "$oid" } }
               }) {
                 observations {
                   observingMode {
-                    gnirsLongSlit { explicitFocusMotorSteps }
+                    gnirsSpectroscopy { explicitFocusMotorSteps }
                   }
                 }
               }
@@ -650,7 +654,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "observations": [
                 {
                   "observingMode": {
-                    "gnirsLongSlit": { "explicitFocusMotorSteps": null }
+                    "gnirsSpectroscopy": { "explicitFocusMotorSteps": null }
                   }
                 }
               ]
@@ -673,14 +677,14 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   updateObservations(input: {
                     SET: {
                       observingMode: {
-                        gnirsLongSlit: { explicitFocusMotorSteps: 500 }
+                        gnirsSpectroscopy: { explicitFocusMotorSteps: 500 }
                       }
                     }
                     WHERE: { id: { EQ: "$oid" } }
                   }) {
                     observations {
                       observingMode {
-                        gnirsLongSlit { explicitFocusMotorSteps }
+                        gnirsSpectroscopy { explicitFocusMotorSteps }
                       }
                     }
                   }
@@ -692,7 +696,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                   "observations": [
                     {
                       "observingMode": {
-                        "gnirsLongSlit": { "explicitFocusMotorSteps": 500 }
+                        "gnirsSpectroscopy": { "explicitFocusMotorSteps": 500 }
                       }
                     }
                   ]
@@ -712,11 +716,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
             """
             {
               observingMode {
-                gnirsLongSlit {
+                gnirsSpectroscopy {
                   grating
                   prism
                   camera
-                  fpu
+                  slit { fpu }
                   filter
                 }
               }
@@ -735,22 +739,22 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               {
                 "original": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "grating": "D111",
                       "prism": "MIRROR",
                       "camera": "SHORT_BLUE",
-                      "fpu": "LONG_SLIT_0_30",
+                      "slit": { "fpu": "LONG_SLIT_0_30" },
                       "filter": "ORDER3"
                     }
                   }
                 },
                 "cloned": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "grating": "D111",
                       "prism": "MIRROR",
                       "camera": "SHORT_BLUE",
-                      "fpu": "LONG_SLIT_0_30",
+                      "slit": { "fpu": "LONG_SLIT_0_30" },
                       "filter": "ORDER3"
                     }
                   }
@@ -782,11 +786,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -805,7 +809,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsLongSlit {
+                      gnirsSpectroscopy {
                         acquisition { explicitFilter }
                       }
                     }
@@ -818,7 +822,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "createObservation": {
                 "observation": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "acquisition": {
                         "explicitFilter": "H2"
                       }
@@ -852,11 +856,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -876,7 +880,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               }
             """,
           expected = Left(List(
-            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER6, ORDER5, ORDER4, H2, ORDER3, PAH"
+            "Argument 'input.SET.observingMode.gnirsSpectroscopy.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER6, ORDER5, ORDER4, H2, ORDER3, PAH"
           ))
         )
 
@@ -902,11 +906,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         acquisition: {
@@ -920,7 +924,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               }
             """,
           expected = Left(List(
-            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'skyOffset' is only valid when 'explicitAcquisitionType' is FAINT."
+            "Argument 'input.SET.observingMode.gnirsSpectroscopy.acquisition' is invalid: 'skyOffset' is only valid when 'explicitAcquisitionType' is FAINT."
           ))
         )
 
@@ -946,11 +950,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         acquisition: {
@@ -963,7 +967,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               }
             """,
           expected = Left(List(
-            "Argument 'input.SET.observingMode.gnirsLongSlit.acquisition' is invalid: 'explicitAcquisitionType' FAINT requires a 'skyOffset'."
+            "Argument 'input.SET.observingMode.gnirsSpectroscopy.acquisition' is invalid: 'explicitAcquisitionType' FAINT requires a 'skyOffset'."
           ))
         )
 
@@ -989,11 +993,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -1012,7 +1016,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsLongSlit {
+                      gnirsSpectroscopy {
                         acquisition {
                           explicitAcquisitionType
                           skyOffset { p { arcseconds } q { arcseconds } }
@@ -1028,7 +1032,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "createObservation": {
                 "observation": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "acquisition": {
                         "explicitAcquisitionType": "BRIGHT",
                         "skyOffset": null
@@ -1063,11 +1067,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         exposureTimeMode: {
@@ -1079,7 +1083,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsLongSlit { telluricType { tag starTypes } }
+                      gnirsSpectroscopy { telluricType { tag starTypes } }
                     }
                   }
                 }
@@ -1090,7 +1094,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "createObservation": {
                 "observation": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "telluricType": { "tag": "HOT", "starTypes": null }
                     }
                   }
@@ -1122,11 +1126,11 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                       }
                     }
                     observingMode: {
-                      gnirsLongSlit: {
+                      gnirsSpectroscopy: {
                         grating: D111
                         prism: MIRROR
                         camera: SHORT_BLUE
-                        fpu: LONG_SLIT_0_30
+                        slit: { fpu: LONG_SLIT_0_30 }
                         filter: ORDER3
                         centralWavelength: { nanometers: 2200 }
                         telluricType: { tag: SOLAR }
@@ -1139,7 +1143,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
                 }) {
                   observation {
                     observingMode {
-                      gnirsLongSlit { telluricType { tag starTypes } }
+                      gnirsSpectroscopy { telluricType { tag starTypes } }
                     }
                   }
                 }
@@ -1150,7 +1154,7 @@ class createObservation_GnirsLongSlit extends OdbSuite:
               "createObservation": {
                 "observation": {
                   "observingMode": {
-                    "gnirsLongSlit": {
+                    "gnirsSpectroscopy": {
                       "telluricType": { "tag": "SOLAR", "starTypes": null }
                     }
                   }

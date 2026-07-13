@@ -51,6 +51,7 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
+import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gnirs
@@ -175,7 +176,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -261,9 +262,10 @@ object GeneratorParamsService {
       ): Either[Error, GeneratorParams] =
 
         def spectroscopyGeneratorParams(
-          obsMode: ObservingMode,
-          acqMode: InstrumentMode,
-          sciMode: InstrumentMode
+          obsMode:              ObservingMode,
+          acqMode:              InstrumentMode,
+          sciMode:              InstrumentMode,
+          gnirsAcqAutoClassify: Boolean = false
         ): GeneratorParams =
 
           val consInput   = obsParams.constraints.toInput
@@ -279,7 +281,9 @@ object GeneratorParamsService {
                 acquisition,
                 science,
                 regularTargetInputs,
-                blindOffsetTargetInput
+                blindOffsetTargetInput,
+                obsParams.signalToNoiseTargetId,
+                gnirsAcqAutoClassify
               )
             }
             .leftMap(MissingParamSet.fromParams)
@@ -288,6 +292,85 @@ object GeneratorParamsService {
           GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
 
         observingMode(obsParams.targets, config, obsParams.calibrationRole).flatMap:
+
+          // Exchange Modes (no ITC, like visitors)
+          case exc: exchange.Config =>
+            GeneratorParams(
+              MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("(exchange mode)"))).asLeft,
+              obsParams.scienceBand,
+              exc,
+              obsParams.calibrationRole,
+              obsParams.declaredState,
+              obsParams.executionState,
+              obsParams.stepCount,
+              obsParams.isSplittable
+            ).asRight
+
+          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
+            val sciReadMode  = f2.exposureTimeMode match
+                                 case ExposureTimeMode.SignalToNoiseMode(_, _) =>
+                                   Flamingos2ReadMode.Bright // In practice this will be ignored by the ITC
+                                 case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                                   f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
+
+            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, sciReadMode, fpu)
+
+            spectroscopyGeneratorParams(
+              obsMode = f2,
+              acqMode = InstrumentMode.Flamingos2Imaging(
+                acq.exposureTimeMode,
+                acq.filter,
+                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
+              ),
+              sciMode = sciMode
+            ).asRight
+
+          case f2 @ flamingos2.imaging.Config(filters = fs) =>
+            // An input per filter.
+            val inputs = fs.map: f =>
+              ImagingParameters(
+                obsParams.constraints.toInput,
+                InstrumentMode.Flamingos2Imaging(f.exposureTimeMode, f.filter, f2.readMode)
+              )
+
+            val itcInput =
+              obsParams
+                .targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(itcInput, obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+
+          case gnm @ gnirs.imaging.Config(filters = fs) =>
+            // An input per filter. In S/N mode the read mode is derived per step from
+            // the ITC exposure time, so the value passed here is ignored by the ITC.
+            val inputs = fs.map: f =>
+              val readMode = f.exposureTimeMode match
+                case ExposureTimeMode.SignalToNoiseMode(_, _)       => GnirsReadMode.Bright
+                case ExposureTimeMode.TimeAndCountMode(time = time) => gnm.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+              ImagingParameters(
+                obsParams.constraints.toInput,
+                InstrumentMode.GnirsImaging(
+                  exposureTimeMode = f.exposureTimeMode,
+                  filter           = f.filter,
+                  camera           = gnm.camera,
+                  readMode         = readMode,
+                  wellDepth        = gnm.wellDepth,
+                  coadds           = gnm.coadds
+                )
+              )
+
+            val itcInput =
+              obsParams
+                .targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(itcInput, obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
@@ -309,7 +392,7 @@ object GeneratorParamsService {
               val itcInput  =
                 obsParams.targets
                   .traverse(itcTargetParams)
-                  .map(ItcInput.ScienceOnlySpectroscopy(science, _))
+                  .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
                   .leftMap(MissingParamSet.fromParams)
                   .toEither
 
@@ -355,56 +438,6 @@ object GeneratorParamsService {
               sciMode  = sciMode
             ).asRight
 
-          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
-            val sciReadMode  = f2.exposureTimeMode match
-                                 case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                   Flamingos2ReadMode.Bright // In practice this will be ignored by the ITC
-                                 case ExposureTimeMode.TimeAndCountMode(time = time) =>
-                                   f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
-
-            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, sciReadMode, fpu)
-
-            spectroscopyGeneratorParams(
-              obsMode = f2,
-              acqMode = InstrumentMode.Flamingos2Imaging(
-                acq.exposureTimeMode,
-                acq.filter,
-                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
-              ),
-              sciMode = sciMode
-            ).asRight
-
-          case f2 @ flamingos2.imaging.Config(filters = fs) =>
-            // An input per filter.
-            val inputs = fs.map: f =>
-              ImagingParameters(
-                obsParams.constraints.toInput,
-                InstrumentMode.Flamingos2Imaging(f.exposureTimeMode, f.filter, f2.readMode)
-              )
-
-            val itcInput =
-              obsParams
-                .targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
-
-            GeneratorParams(itcInput, obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
-          case ig: igrins2.longslit.Config =>
-            val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
-            val consInput = obsParams.constraints.toInput
-            val science   = SpectroscopyParameters(consInput, sciMode)
-
-            val itcInput =
-              obsParams.targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.ScienceOnlySpectroscopy(science, _))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
-
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
-
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
             val inputs = fs.map: f =>
@@ -417,7 +450,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -435,13 +468,13 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
             GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
-          case gn: gnirs.longslit.Config =>
+          case gn: gnirs.spectroscopy.Config =>
             for
               // Acquisition (imaging) filter for the ITC: the explicit acquisition
               // filter if set, otherwise the default for the spectroscopy wavelength.
@@ -457,9 +490,9 @@ object GeneratorParamsService {
 
               val sciMode = InstrumentMode.GnirsSpectroscopy(
                 exposureTimeMode  = gn.exposureTimeMode,
-                centralWavelength = gn.filter.centralWavelength,
+                centralWavelength = gn.centralWavelength,
                 filter            = gn.filter,
-                slitWidth         = gn.fpu,
+                fpu               = gn.fpu,
                 prism             = gn.prism,
                 grating           = gn.grating,
                 camera            = gn.camera,
@@ -467,6 +500,18 @@ object GeneratorParamsService {
                 wellDepth         = gn.wellDepth,
                 coadds            = gn.coadds
               )
+
+              // Two-pass acquisition ITC only when the mode and filter are both auto and
+              // we're in S/N mode: only then does the resolved filter depend on the
+              // ITC-derived exposure time (Very Bright → H2), creating the circularity.
+              val acqAutoClassify: Boolean =
+                gn.acquisition.explicitAcqMode.isEmpty &&
+                gn.acquisition.explicitFilter.isEmpty && {
+                  gn.acquisition.exposureTimeMode match
+                    case ExposureTimeMode.SignalToNoiseMode(_, _)   => true
+                    case ExposureTimeMode.TimeAndCountMode(_, _, _) => false
+                }
+
               spectroscopyGeneratorParams(
                 obsMode = gn,
                 acqMode = InstrumentMode.GnirsImaging(
@@ -477,8 +522,23 @@ object GeneratorParamsService {
                   wellDepth        = gn.wellDepth,
                   coadds           = gn.acquisition.coadds
                 ),
-                sciMode = sciMode
+                sciMode = sciMode,
+                gnirsAcqAutoClassify = acqAutoClassify
               )
+
+          case ig: igrins2.longslit.Config =>
+            val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
+            val consInput = obsParams.constraints.toInput
+            val science   = SpectroscopyParameters(consInput, sciMode)
+
+            val itcInput =
+              obsParams.targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           // Visitor Modes
           case vis: visitor.Config =>
@@ -530,23 +590,24 @@ object GeneratorParamsService {
     }
 
   case class ParamsRow(
-    observationId:       Observation.Id,
-    calibrationRole:     Option[CalibrationRole],
-    constraints:         ConstraintSet,
-    exposureTimeMode:    Option[ExposureTimeMode],
-    observingMode:       Option[ObservingModeType],
-    scienceBand:         Option[ScienceBand],
-    blindTargetId:       Option[Target.Id],
-    blindRadialVelocity: Option[RadialVelocity],
-    blindSourceProfile:  Option[SourceProfile],
-    targetId:            Option[Target.Id],
-    radialVelocity:      Option[RadialVelocity],
-    sourceProfile:       Option[SourceProfile],
-    declaredState:       Option[DeclaredExecutionState],
-    executionState:      ExecutionState,
-    stepCount:           Long,
-    isSplittable:        Boolean,
-    customSedTimestamp:  Option[Timestamp] = none
+    observationId:         Observation.Id,
+    calibrationRole:       Option[CalibrationRole],
+    constraints:           ConstraintSet,
+    exposureTimeMode:      Option[ExposureTimeMode],
+    observingMode:         Option[ObservingModeType],
+    scienceBand:           Option[ScienceBand],
+    blindTargetId:         Option[Target.Id],
+    blindRadialVelocity:   Option[RadialVelocity],
+    blindSourceProfile:    Option[SourceProfile],
+    targetId:              Option[Target.Id],
+    radialVelocity:        Option[RadialVelocity],
+    sourceProfile:         Option[SourceProfile],
+    isSignalToNoiseTarget: Boolean,
+    declaredState:         Option[DeclaredExecutionState],
+    executionState:        ExecutionState,
+    stepCount:             Long,
+    isSplittable:          Boolean,
+    customSedTimestamp:    Option[Timestamp] = none
   )
 
   case class TargetParams(
@@ -557,18 +618,19 @@ object GeneratorParamsService {
   )
 
   case class ObsParams(
-    observationId:     Observation.Id,
-    calibrationRole:   Option[CalibrationRole],
-    constraints:       ConstraintSet,
-    exposureTimeMode:  Option[ExposureTimeMode],
-    observingMode:     Option[ObservingModeType],
-    scienceBand:       Option[ScienceBand],
-    blindOffset:       Option[TargetParams],
-    targets:           NonEmptyList[TargetParams],
-    declaredState:     Option[DeclaredExecutionState],
-    executionState:    ExecutionState,
-    stepCount:         Long,
-    isSplittable:      Boolean
+    observationId:         Observation.Id,
+    calibrationRole:       Option[CalibrationRole],
+    constraints:           ConstraintSet,
+    exposureTimeMode:      Option[ExposureTimeMode],
+    observingMode:         Option[ObservingModeType],
+    scienceBand:           Option[ScienceBand],
+    blindOffset:           Option[TargetParams],
+    targets:               NonEmptyList[TargetParams],
+    signalToNoiseTargetId: Option[Target.Id],
+    declaredState:         Option[DeclaredExecutionState],
+    executionState:        ExecutionState,
+    stepCount:             Long,
+    isSplittable:          Boolean
   )
 
   object ObsParams {
@@ -584,6 +646,7 @@ object GeneratorParamsService {
           oParams.head.blindTargetId.map(btid => TargetParams(btid.some, oParams.head.blindRadialVelocity, oParams.head.blindSourceProfile, None)),
           oParams.map: r =>
             TargetParams(r.targetId, r.radialVelocity, r.sourceProfile, r.customSedTimestamp),
+          oParams.collectFirst { case r if r.isSignalToNoiseTarget => r.targetId }.flatten,
           oParams.head.declaredState,
           oParams.head.executionState,
           oParams.head.stepCount,
@@ -626,12 +689,13 @@ object GeneratorParamsService {
        target_id.opt           *:
        radial_velocity.opt     *:
        source_profile.opt      *:
+       bool                    *:
        declared_execution_state.opt *:
        execution_state         *:
        int8                    *:
        bool
-      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc, split) =>
-        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, dc, es, sc, split, None))
+      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, split) =>
+        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, split, None))
 
     private def ParamColumns(tab: String): String =
       s"""
@@ -658,6 +722,7 @@ object GeneratorParamsService {
         $tab.c_target_id,
         $tab.c_sid_rv,
         $tab.c_source_profile,
+        $tab.c_is_signal_to_noise_target,
         $tab.c_declared_state,
         $tab.c_execution_state,
         $tab.c_step_count,

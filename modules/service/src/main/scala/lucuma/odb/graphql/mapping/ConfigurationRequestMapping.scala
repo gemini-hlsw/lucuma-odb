@@ -31,6 +31,9 @@ trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with
       SqlField("id", ConfigurationRequestView.Id, key = true),
       SqlField("status", ConfigurationRequestView.Status),
       SqlField("justification", ConfigurationRequestView.Justification),
+      SqlField("feedback", ConfigurationRequestView.Feedback),
+      SqlField("createdAt", ConfigurationRequestView.CreatedAt),
+      SqlField("updatedAt", ConfigurationRequestView.UpdatedAt),
       SqlObject("program", Join(ConfigurationRequestView.ProgramId, ProgramView.Id)),
       SqlObject("configuration"),
       EffectField("applicableObservations", applicableObservationsHandler, List("id"))

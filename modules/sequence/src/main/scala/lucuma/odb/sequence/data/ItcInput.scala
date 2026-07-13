@@ -31,6 +31,13 @@ import scala.collection.mutable.ArrayBuilder
 sealed trait ItcInput:
   def targets: NonEmptyList[ItcInput.TargetDefinition]
 
+  /**
+   * The asterism target the user selected to drive the signal-to-noise
+   * calculation, if any. When present, the ITC "selected" result is pinned to
+   * this target rather than chosen automatically (brightest).
+   */
+  def signalToNoiseTargetId: Option[Target.Id]
+
 object ItcInput:
 
   private given HashBytes[TargetInput]            = HashBytes.forJsonEncoder
@@ -58,6 +65,7 @@ object ItcInput:
   case class Imaging(
     science: NonEmptyList[ImagingParameters],
     targets: NonEmptyList[TargetDefinition],
+    signalToNoiseTargetId: Option[Target.Id]
   ) extends ItcInput derives Eq:
 
     def scienceInput: NonEmptyList[ImagingInput] =
@@ -70,17 +78,25 @@ object ItcInput:
         a.science.toList.foreach: params =>
           bld.addAll(params.hashBytes)
         bld.addAll(hashTargets(a.targets))
+        bld.addAll(a.signalToNoiseTargetId.hashBytes)
         bld.result()
 
   /**
    * Spectroscopy inputs include imaging parameters (for acquisition),
    * the main spectrocopy input, and an optional blind offset target.
+   * 
+   * When `gnirsAcqAutoClassify` is set (in the case we are in GNIRS S/N mode
+   * with acquisition mode and filter both auto), the ITC resolves the
+   * acquisition mode via a brightness classification pass before the real
+   * exposure-time pass. See the two-pass acquisition ITC in ItcService.
    */
   case class Spectroscopy(
     acquisition: ImagingParameters,
     science:     SpectroscopyParameters,
     targets:     NonEmptyList[TargetDefinition],
-    blindOffset: Option[TargetDefinition]
+    blindOffset: Option[TargetDefinition],
+    signalToNoiseTargetId: Option[Target.Id],
+    gnirsAcqAutoClassify: Boolean = false
   ) extends ItcInput derives Eq:
 
     def acquisitionTargets: NonEmptyList[TargetDefinition] =
@@ -98,7 +114,9 @@ object ItcInput:
         Array.concat(
           a.acquisition.hashBytes,
           a.science.hashBytes,
-          hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets))
+          hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets)),
+          a.signalToNoiseTargetId.hashBytes,
+          a.gnirsAcqAutoClassify.hashBytes
         )
 
   /**
@@ -107,7 +125,8 @@ object ItcInput:
     */
   case class ScienceOnlySpectroscopy(
     science: SpectroscopyParameters,
-    targets: NonEmptyList[TargetDefinition]
+    targets: NonEmptyList[TargetDefinition],
+    signalToNoiseTargetId: Option[Target.Id]
   ) extends ItcInput derives Eq:
 
     def scienceInput: SpectroscopyInput =
@@ -118,7 +137,8 @@ object ItcInput:
       def hashBytes(a: ScienceOnlySpectroscopy): Array[Byte] =
         Array.concat(
           a.science.hashBytes,
-          hashTargets(a.targets)
+          hashTargets(a.targets),
+          a.signalToNoiseTargetId.hashBytes
         )
 
   val spectroscopy: Prism[ItcInput, ItcInput.Spectroscopy] =
@@ -143,6 +163,6 @@ object ItcInput:
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _)                  => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _)       => in.hashBytes
-        case in @ ScienceOnlySpectroscopy(_, _)  => in.hashBytes
+        case in @ Imaging(_, _, _)                  => in.hashBytes
+        case in @ Spectroscopy(_, _, _, _, _, _)    => in.hashBytes
+        case in @ ScienceOnlySpectroscopy(_, _, _)  => in.hashBytes

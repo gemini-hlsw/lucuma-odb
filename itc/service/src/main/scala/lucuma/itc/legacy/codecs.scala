@@ -24,6 +24,7 @@ import lucuma.core.math.dimensional.syntax.*
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.display.*
 import lucuma.core.syntax.string.*
 import lucuma.itc.GraphType
@@ -268,20 +269,26 @@ private[legacy] object codecs:
       "redCamera"     -> a.redDetector.multiplyCount(a.stepCount).asJson
     )
 
-  private val encodeGnirsLongSlitSpectroscopy
-    : Encoder[ObservingMode.SpectroscopyMode.GnirsLongSlit] = a =>
-    Json.obj(
-      "centralWavelength" -> a.centralWavelength.asJson,
-      "filter"            -> Json.fromString(a.filter.ocs2Tag),
-      "slitWidth"         -> Json.fromString(a.slitWidth.ocs2Tag),
-      "crossDispersed"    -> Json.fromString(a.prism.ocs2Tag),
-      "grating"           -> Json.fromString(a.grating.ocs2Tag),
-      "camera"            -> Json.fromString(a.camera.ocs2Tag),
-      "pixelScale"        -> Json.fromString(a.camera.pixelScale.ocs2Tag),
-      "readMode"          -> Json.fromString(a.readMode.ocs2Tag),
-      "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
-      "altair"            -> Json.Null
-    )
+  private val encodeGnirsSpectroscopy: Encoder[ObservingMode.SpectroscopyMode.GnirsSpectroscopy] =
+    a =>
+      // The OCS recipe takes the slit width and the IFU through the same `slitWidth`
+      // parameter (GNIRSParams.SlitWidth includes the LR/HR IFU values).
+      val slitWidthTag: String =
+        a.fpu match
+          case GnirsFpu.Spectroscopy.Slit(s) => s.ocs2Tag
+          case GnirsFpu.Spectroscopy.Ifu(i)  => i.ocs2Tag
+      Json.obj(
+        "centralWavelength" -> a.centralWavelength.asJson,
+        "filter"            -> Json.fromString(a.filter.ocs2Tag),
+        "slitWidth"         -> Json.fromString(slitWidthTag),
+        "crossDispersed"    -> Json.fromString(a.prism.ocs2Tag),
+        "grating"           -> Json.fromString(a.grating.ocs2Tag),
+        "camera"            -> Json.fromString(a.camera.ocs2Tag),
+        "pixelScale"        -> Json.fromString(a.camera.pixelScale.ocs2Tag),
+        "readMode"          -> Json.fromString(a.readMode.ocs2Tag),
+        "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
+        "altair"            -> Json.Null
+      )
 
   private val encodeGnirsImaging: Encoder[ObservingMode.ImagingMode.Gnirs] = a =>
     Json.obj(
@@ -300,26 +307,26 @@ private[legacy] object codecs:
   private given Encoder[ItcInstrumentDetails] = (a: ItcInstrumentDetails) =>
     a.mode match
       // Spectroscopy
-      case a: ObservingMode.SpectroscopyMode.GmosNorth     =>
+      case a: ObservingMode.SpectroscopyMode.GmosNorth         =>
         Json.obj("GmosParameters" -> encodeGmosNorthSpectroscopy(a))
-      case a: ObservingMode.SpectroscopyMode.GmosSouth     =>
+      case a: ObservingMode.SpectroscopyMode.GmosSouth         =>
         Json.obj("GmosParameters" -> encodeGmosSouthSpectroscopy(a))
-      case a: ObservingMode.SpectroscopyMode.Flamingos2    =>
+      case a: ObservingMode.SpectroscopyMode.Flamingos2        =>
         Json.obj("Flamingos2Parameters" -> encodeF2Spectroscopy(a))
-      case a: ObservingMode.SpectroscopyMode.Igrins2       =>
+      case a: ObservingMode.SpectroscopyMode.Igrins2           =>
         Json.obj("Igrins2Parameters" -> encodeIgrins2Spectroscopy(a))
-      case a: ObservingMode.SpectroscopyMode.Ghost         =>
+      case a: ObservingMode.SpectroscopyMode.Ghost             =>
         Json.obj("GhostParameters" -> encodeGhostSpectroscopy(a))
-      case a: ObservingMode.SpectroscopyMode.GnirsLongSlit =>
-        Json.obj("GnirsParameters" -> encodeGnirsLongSlitSpectroscopy(a))
+      case a: ObservingMode.SpectroscopyMode.GnirsSpectroscopy =>
+        Json.obj("GnirsParameters" -> encodeGnirsSpectroscopy(a))
       // Imaging
-      case a: ObservingMode.ImagingMode.Flamingos2         =>
+      case a: ObservingMode.ImagingMode.Flamingos2             =>
         Json.obj("Flamingos2Parameters" -> encodeF2Imaging(a))
-      case a: ObservingMode.ImagingMode.GmosNorth          =>
+      case a: ObservingMode.ImagingMode.GmosNorth              =>
         Json.obj("GmosParameters" -> encodeGmosNorthImaging(a))
-      case a: ObservingMode.ImagingMode.GmosSouth          =>
+      case a: ObservingMode.ImagingMode.GmosSouth              =>
         Json.obj("GmosParameters" -> encodeGmosSouthImaging(a))
-      case a: ObservingMode.ImagingMode.Gnirs              =>
+      case a: ObservingMode.ImagingMode.Gnirs                  =>
         Json.obj("GnirsParameters" -> encodeGnirsImaging(a))
 
   private given Encoder[ItcWavefrontSensor] = Encoder[String].contramap(_.ocs2Tag)

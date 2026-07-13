@@ -67,6 +67,7 @@ import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.UnsplittableAtom
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
@@ -352,6 +353,13 @@ object ObservationService {
                       asterismService.insertAsterism(pid, NonEmptyList.one(oid), a)
                 .as(oid)
             .flatMap: oid =>
+              // Must run after the asterism is inserted so membership can be
+              // validated against it.
+              ResultT:
+                Services.asSuperUser:
+                  asterismService.setSignalToNoiseTarget(pid, NonEmptyList.one(oid), SET.explicitSignalToNoiseTargetId)
+              .as(oid)
+            .flatMap: oid =>
               SET
                 .targetEnvironment
                 .flatMap(te => te.blindOffsetTarget.map((_, te.blindOffsetType)))
@@ -398,11 +406,23 @@ object ObservationService {
         nEdit.toOptionOption.fold(Result.unit.pure[F]) { oEdit =>
           for {
             m <- selectObservingModes(oids.toList)
-            _ <- updateObservingModeType(oEdit.flatMap(_.observingModeType), oids)
+            // Rewrite the observation's mode type to match the edit:
+            //  - delete (oEdit = None): null the type so it no longer references the deleted row.
+            //  - full edit (observingModeType = Some): set the new type.
+            //  - partial in-place edit (observingModeType = None): leave it as-is; nulling would
+            //    orphan the mode row. This happens e.g. for a GNIRS spectroscopy edit that doesn't
+            //    change the FPU and so can't determine slit vs ifu.
+            _ <- oEdit match
+                   case None       => updateObservingModeType(None, oids)
+                   case Some(edit) => edit.observingModeType.traverse_(t => updateObservingModeType(Some(t), oids))
             r <- m.toList.traverse { case (existingMode, matchingOids) =>
 
               (existingMode, oEdit) match {
-                case (Some(ex), Some(edit)) if edit.observingModeType.contains(ex) =>
+                // `forall` (rather than `contains`) so a partial edit whose mode type is
+                // indeterminate (None) — e.g. a GNIRS spectroscopy edit that doesn't change
+                // the FPU, and so can't say slit vs ifu — updates the existing mode in place
+                // instead of replacing it. Modes whose input always yields Some are unaffected.
+                case (Some(ex), Some(edit)) if edit.observingModeType.forall(_ === ex) =>
                   // update existing
                   observingModeServices.update(edit, matchingOids)
 
@@ -653,13 +673,25 @@ object ObservationService {
       def cloneObservation(
         input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
       )(using Transaction[F]): F[Result[ObservationService.CloneIds]] =
-        input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
-          cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
-            res.flatTraverse: (pid, newOid) =>
-              Services.asSuperUser:
-                asterismService
-                  .setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism))
-                  .map(_.as(CloneIds(origOid, newOid)))
+        // The asterism (including any signal-to-noise target flag) is copied by
+        // cloneAsterism inside cloneObservationUnconditionally. Any asterism edits
+        // from the input are applied first, then the explicit signal-to-noise
+        // target, so membership is validated against the post-edit asterism.
+        val cloned: F[Result[CloneIds]] =
+          input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
+            cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
+              res.flatTraverse: (pid, newOid) =>
+                Services.asSuperUser:
+                  (for
+                    _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
+                    _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
+                  yield CloneIds(origOid, newOid)).value
+
+        // A single rollback covering the whole clone: this runs in one transaction
+        // and `transaction.rollback` is a full rollback, so any failure (a cloned
+        // sub-item or a partial edit) undoes everything and never leaves an orphan
+        // observation behind.
+        cloned.flatTap(r => transaction.rollback.unlessA(r.hasValue))
 
       override def selectBands(
         pid: Program.Id
@@ -723,7 +755,7 @@ object ObservationService {
           cs.getOrElse(ConstraintSetInput.NominalConstraints),
           SET.scienceRequirements,
           SET.observingMode.flatMap(_.observingModeType),
-          SET.observingMode.flatMap(_.observingModeType).map(_.instrument),
+          SET.observingMode.flatMap(_.observingModeType).flatMap(_.instrumentOption),
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
@@ -1154,7 +1186,7 @@ object ObservationService {
       void"UPDATE t_observation " |+|
          void"SET " |+|
             sql"c_observing_mode_type = ${observing_mode_type.opt}"(newMode) |+| void", " |+|
-            sql"c_instrument = ${instrument.opt}"(newMode.map(_.instrument)) |+| void" " |+|
+            sql"c_instrument = ${instrument.opt}"(newMode.flatMap(_.instrumentOption)) |+| void" " |+|
        void"WHERE c_observation_id IN (" |+| which.map(sql"${observation_id}").intercalate(void", ") |+| void")"
 
     /**

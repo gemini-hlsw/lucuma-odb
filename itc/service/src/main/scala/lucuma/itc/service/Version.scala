@@ -5,28 +5,13 @@ package lucuma.itc.service
 
 import buildinfo.BuildInfo
 import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.itc.service.config.*
-
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 trait Version:
   val gitHash = BuildInfo.gitHeadCommit
 
-  val versionDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneId.from(ZoneOffset.UTC))
-
-  val versionDateTimeFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.from(ZoneOffset.UTC))
-
-  def version(environment: ExecutionEnvironment): NonEmptyString =
-    val instant = Instant.ofEpochMilli(BuildInfo.buildDateTime)
-    NonEmptyString.unsafeFrom(
-      environment match
-        case ExecutionEnvironment.Local => versionDateTimeFormatter.format(instant)
-        case _                          =>
-          versionDateFormatter.format(instant) +
-            "-" + gitHash.map(_.take(7)).getOrElse("NONE")
-    )
+  // The reported server version is a content hash of the ITC service and model
+  // Scala sources (see the `itcSourceHash` task in build.sbt). This way it only
+  // changes when the ITC code actually changes, avoiding needless invalidation of
+  // the ODB's cached ITC results (which are truncated whenever this version changes).
+  def version: NonEmptyString =
+    NonEmptyString.unsafeFrom(BuildInfo.itcSourceHash)

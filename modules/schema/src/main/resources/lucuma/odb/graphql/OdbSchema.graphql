@@ -485,11 +485,10 @@ type GeminiCallProperties {
   nonPartnerDeadline: Timestamp
 
   """
-  Exchange partners that may apply for Gemini time on this call, if any.
-  These partners use the `submissionDeadlineDefault` from the shared CfP
-  properties.
+  Exchange partners that may apply for Gemini time on this call, if any, each
+  with an optional submission deadline override.
   """
-  exchangePartners: [ExchangePartner!]!
+  exchangePartners: [CallForProposalsExchangePartner!]!
 }
 
 """
@@ -520,12 +519,13 @@ input GeminiCallPropertiesInput {
   proprietaryMonths: NonNegInt
 
   """
-  Exchange partners that may apply for Gemini time on this call, if any. These
-  partners use the `submissionDeadlineDefault` from the shared CfP properties.
-  This value is optional and defaults to an empty array.  It may be assigned a
-  null value to reset it to the empty array.
+  Exchange partners that may apply for Gemini time on this call, if any, each
+  with an optional submission deadline override.  This value is optional and
+  defaults to an empty array.  It may be assigned a null value to reset it to
+  the empty array.  When editing, supply the entire list of exchange partners to
+  set.
   """
-  exchangePartners: [ExchangePartner!]
+  exchangePartners: [CallForProposalsExchangePartnerInput!]
 
 }
 
@@ -855,6 +855,34 @@ input CallForProposalsPartnerInput {
   """
   If this partner has an explicit submission deadline that overrides the
   Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
+  Otherwise, the partner deadline is the default deadline for the call.
+  """
+  submissionDeadlineOverride: Timestamp
+}
+
+type CallForProposalsExchangePartner {
+  exchangePartner: ExchangePartner!
+
+  """
+  Sets the submission deadline for this exchange partner, overriding the
+  'submissionDeadlineDefault' for the Call for Proposals.
+  """
+  submissionDeadlineOverride: Timestamp
+
+  """
+  The submission deadline for this exchange partner.  This will be the
+  'submissionDeadlineOverride' if specified, but otherwise the
+  'submissionDeadlineDefault' of the Call for Proposals itself.
+  """
+  submissionDeadline: Timestamp
+}
+
+input CallForProposalsExchangePartnerInput {
+  exchangePartner: ExchangePartner!
+
+  """
+  If this exchange partner has an explicit submission deadline that overrides
+  the Call for Proposals 'defaultSubmissionDeadine' then it is specified here.
   Otherwise, the partner deadline is the default deadline for the call.
   """
   submissionDeadlineOverride: Timestamp
@@ -3784,6 +3812,11 @@ Configuration request properties.
 input ConfigurationRequestProperties {
   status: ConfigurationRequestStatus
   justification: NonEmptyString
+
+  """
+  Staff feedback on the request.  May only be set by staff.
+  """
+  feedback: NonEmptyString
 }
 
 """
@@ -4482,6 +4515,12 @@ interface GeminiProposalType {
 Proposal properties for an exchange proposal requesting time at Keck.
 """
 type KeckProposalType {
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
+
   "Describes how time for the program will be apportioned across partners."
   partnerSplits: [PartnerSplit!]!
 }
@@ -4492,6 +4531,12 @@ Proposal properties for an exchange proposal requesting time at Subaru.
 type SubaruProposalType {
   "The Subaru call for proposals type (normal or intensive)."
   type: SubaruCallForProposalsType!
+
+  """
+  Minimum percentage of observing time required to consider this proposal
+  successful.
+  """
+  minPercentTime: IntPercent!
 
   "Describes how time for the program will be apportioned across partners."
   partnerSplits: [PartnerSplit!]!
@@ -4759,6 +4804,12 @@ Properties for an exchange proposal requesting time at Keck.
 """
 input KeckProposalTypeInput {
   """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
+
+  """
   The partnerSplits field specifies how time is apportioned over partners. This
   will default to empty but if specified, the partner percents must sum to 100.
   By submission time, it must be specified.
@@ -4774,6 +4825,12 @@ input SubaruProposalTypeInput {
   The Subaru call for proposals type.  If not specified, NORMAL is assumed.
   """
   type: SubaruCallForProposalsType
+
+  """
+  The minimum percentage of time required to consider this proposal a success.
+  If not set, 100% is assumed.
+  """
+  minPercentTime: IntPercent
 
   """
   The partnerSplits field specifies how time is apportioned over partners. This
@@ -5226,6 +5283,12 @@ type SmartGcal implements StepConfig {
 Edit or create an observation's observing mode
 """
 input ObservingModeInput @oneOf {
+
+  """
+  An exchange instrument mode (Keck/Subaru). It cannot be unset with a null value.
+  """
+  exchange: ExchangeInput
+
   """
   The flamingos2Imaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
@@ -5262,14 +5325,19 @@ input ObservingModeInput @oneOf {
   gmosSouthLongSlit: GmosSouthLongSlitInput
 
   """
+  The gnirsImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gnirsImaging: GnirsImagingInput
+
+  """
+  The gnirsSpectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gnirsSpectroscopy: GnirsSpectroscopyInput
+
+  """
   The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   igrins2LongSlit: Igrins2LongSlitInput
-
-  """
-  The gnirsLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
-  """
-  gnirsLongSlit: GnirsLongSlitInput
 
   """
   A visiting instrument mode. It cannot be unset with a null value.
@@ -5316,6 +5384,42 @@ type Visitor {
   Optional total requested observing time.
   """
   totalRequestTime: TimeSpan
+}
+
+input ExchangeInput {
+  """
+  Keck instrument. Required (and only allowed) when mode is EXCHANGE_KECK.
+  """
+  keckInstrument: KeckInstrument
+
+  """
+  Subaru instrument. Required (and only allowed) when mode is EXCHANGE_SUBARU.
+  """
+  subaruInstrument: SubaruInstrument
+
+  """
+  Total requested observing time.
+  """
+  totalRequestTime: TimeSpanInput
+}
+
+type Exchange {
+  mode: ExchangeObservingModeType!
+
+  """
+  Keck instrument, present when mode is EXCHANGE_KECK.
+  """
+  keckInstrument: KeckInstrument
+
+  """
+  Subaru instrument, present when mode is EXCHANGE_SUBARU.
+  """
+  subaruInstrument: SubaruInstrument
+
+  """
+  Total requested observing time.
+  """
+  totalRequestTime: TimeSpan!
 }
 
 """
@@ -6139,6 +6243,15 @@ input TargetEnvironmentInput {
   """
   explicitBase: CoordinatesInput
   asterism: [TargetId!]
+
+  """
+  Explicitly selects which asterism target drives the signal-to-noise (ITC)
+  calculation, overriding the automatic choice. The target must be a member of
+  the observation's asterism (after applying any `asterism` edit in the same
+  input). Assign null to clear the selection and let a representative target be
+  chosen automatically.
+  """
+  explicitSignalToNoiseTargetId: TargetId
 
   """
   Whether blind offset is enabled for this observation
@@ -7364,6 +7477,18 @@ enum ObservingModeType {
   ALOPEKE_WIDE_FIELD
 
   """
+  ObservingModeType ExchangeKeck.  Refers to an observation executed at the
+  Keck observatory.
+  """
+  EXCHANGE_KECK
+
+  """
+  ObservingModeType ExchangeSubaru.  Refers to an observation executed at the
+  Subaru observatory.
+  """
+  EXCHANGE_SUBARU
+
+  """
   ObservingModeType Flamingos2Imaging
   """
   FLAMINGOS_2_IMAGING
@@ -7399,9 +7524,19 @@ enum ObservingModeType {
   GMOS_SOUTH_LONG_SLIT
 
   """
+  ObservingModeType GnirsImaging
+  """
+  GNIRS_IMAGING
+
+  """
   ObservingModeType GnirsLongSlit
   """
   GNIRS_LONG_SLIT
+
+  """
+  ObservingModeType GnirsIfu
+  """
+  GNIRS_IFU
 
   """
   ObservingModeType Igrins2LongSlit
@@ -7432,6 +7567,7 @@ enum ObservingModeType {
   ObservingModeType ZorroWideField
   """
   ZORRO_WIDE_FIELD
+
 }
 
 """
@@ -7445,6 +7581,14 @@ enum VisitorObservingModeType {
   VISITOR_SOUTH
   ZORRO_SPECKLE
   ZORRO_WIDE_FIELD
+}
+
+"""
+ExchangeObservingModeType
+"""
+enum ExchangeObservingModeType {
+  EXCHANGE_KECK
+  EXCHANGE_SUBARU
 }
 
 type ConstraintSet {
@@ -8119,6 +8263,14 @@ type Execution {
     LIMIT: NonNegInt
   ): VisitSelectResult!
 
+  """
+  The observation time estimate as it stood when the first 'observe' visit was
+  recorded, at which point the execution sequence was fixed and execution
+  began.  This is null until the first observe visit is recorded, and never
+  changes thereafter.
+  """
+  originalEstimate: ObservationTimeEstimate
+
   "Time accounting calculation for this observation."
   timeCharge: CategorizedTime!
 
@@ -8141,9 +8293,9 @@ Execution configuration.  All but one of the instruments will be `null`.
 type ExecutionConfig {
   """
   Instrument type.  This will indicate which of the instrument-specific fields
-  is defined.
+  is defined.  Null for exchange observations, which have no Gemini instrument.
   """
-  instrument: Instrument!
+  instrument: Instrument
 
   """
   Flamingos 2 execution config.  This will be null unless the `instrument` is
@@ -8169,16 +8321,17 @@ type ExecutionConfig {
   gmosSouth: GmosSouthExecutionConfig
 
   """
+  GNIRS execution config.  This will be null unless the `instrument` is
+  `GNIRS`.
+  """
+  gnirs: GnirsExecutionConfig
+
+  """
   IGRINS-2 execution config.  This will be null unless the `instrument` is
   `IGRINS2`.
   """
   igrins2: Igrins2ExecutionConfig
 
-  """
-  GNIRS execution config.  This will be null unless the `instrument` is
-  `GNIRS`.
-  """
-  gnirs: GnirsExecutionConfig
 }
 
 """
@@ -8246,11 +8399,14 @@ enum Existence {
 "Summarizes the execution setup time and sequences."
 type ExecutionDigest {
 
+  "Time estimate for executing the observation."
+  estimate: ObservationTimeEstimate!
+
   "Setup time calculations."
-  setup: SetupTime!
+  setup: SetupTime! @deprecated(reason: "Use `estimate.setup` instead.")
 
   "Estimated number of setups required to complete this observation."
-  setupCount: NonNegInt!
+  setupCount: NonNegInt! @deprecated(reason: "Use `estimate.setupCount` instead.")
 
   "Acquisition sequence summary."
   acquisition: SequenceDigest
@@ -8259,7 +8415,30 @@ type ExecutionDigest {
   science: SequenceDigest
 
   "Full time estimate: science time plus full setup time for every setup."
-  fullTimeEstimate: CategorizedTime!
+  fullTimeEstimate: CategorizedTime! @deprecated(reason: "Use `estimate.total` instead.")
+
+}
+
+"""
+Time estimate for executing an observation: the setup time(s) and the science
+sequence time.  In the execution digest this estimate is continually updated
+(and reduces) as the observation is executed; in `originalEstimate` it is
+fixed at the start of execution so that the estimate may be compared with the
+actual time required after the fact.
+"""
+type ObservationTimeEstimate {
+
+  "Setup time estimates."
+  setup: SetupTime!
+
+  "Expected number of setups."
+  setupCount: NonNegInt!
+
+  "Science sequence time estimate."
+  science: CategorizedTime!
+
+  "Total time estimate: science time plus full setup time for every setup."
+  total: CategorizedTime!
 
 }
 
@@ -8780,6 +8959,11 @@ type GnirsDynamic {
   a long-slit FPU.
   """
   fpuOther: GnirsFpuOther
+
+  """
+  IFU FPU value, when the FPU is an integral field unit.
+  """
+  fpuIfu: GnirsFpuIfu
 
   """
   Spectroscopy configuration carried when the acquisition mirror is "out" of
@@ -10186,7 +10370,136 @@ input Igrins2LongSlitInput {
 
 }
 
-type GnirsLongSlitAcquisition {
+type GnirsImagingFilter {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: GnirsFilter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Defines a GNIRS imaging filter to use along with its exposure time mode.
+"""
+input GnirsImagingFilterInput {
+
+  """
+  The filter to use for this imaging configuration.
+  """
+  filter: GnirsFilter!
+
+  """
+  Exposure time mode for this filter.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+GNIRS Imaging mode.  Keyhole imaging fixes the FPU (acquisition keyhole), the
+decker (acquisition) and the acquisition mirror (in), so none of them appears
+here.
+"""
+type GnirsImaging {
+
+  """
+  Details specific to the type of imaging being performed.
+  """
+  variant: ImagingVariant!
+
+  """
+  The filters (at least one is required) to be used for data collection.
+  """
+  filters: [GnirsImagingFilter!]!
+
+  """
+  Filters as initially selected when creating the imaging mode.
+  """
+  initialFilters: [GnirsImagingFilter!]!
+
+  """
+  The camera (determines the pixel scale).
+  """
+  camera: GnirsCamera!
+
+  """
+  Coadds per exposure.
+  """
+  coadds: PosInt!
+
+  """
+  Optional explicitly specified read mode.  If not set, the read mode is
+  derived from each filter's exposure time.
+  """
+  explicitReadMode: GnirsReadMode
+
+  """
+  The wellDepth field is either explicitly specified in explicitWellDepth or
+  else taken from defaultWellDepth.
+  """
+  wellDepth: GnirsWellDepth!
+
+  """
+  Optional explicitly specified well depth. If set it overrides the default.
+  """
+  explicitWellDepth: GnirsWellDepth
+
+  """
+  Default well depth (determined by the camera).
+  """
+  defaultWellDepth: GnirsWellDepth!
+
+}
+
+"""
+GNIRS Imaging creation and edit input parameters.
+"""
+input GnirsImagingInput {
+
+  """
+  Details specific to the type of imaging being performed.  On creation, if not
+  specified, defaults to a grouped variant with an increasing-wavelength,
+  10 arcsec spiral offset generator.
+  """
+  variant: ImagingVariantInput
+
+  """
+  The filters field must be specified with at least one filter. It cannot be
+  unset with a null value.
+  """
+  filters: [GnirsImagingFilterInput!]
+
+  """
+  The camera (determines the pixel scale).  Required on creation.
+  """
+  camera: GnirsCamera
+
+  """
+  Coadds per exposure.  On creation, if not specified, defaults to 1.
+  """
+  coadds: PosInt
+
+  """
+  The explicitReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadMode: GnirsReadMode
+
+  """
+  The explicitWellDepth field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWellDepth: GnirsWellDepth
+
+}
+
+type GnirsSpectroscopyAcquisition {
   exposureTimeMode: ExposureTimeMode!
 
   coadds: PosInt!
@@ -10200,9 +10513,9 @@ type GnirsLongSlitAcquisition {
 }
 
 """
-GNIRS Long Slit mode
+GNIRS Spectroscopy mode (long slit or IFU, distinguished by the FPU).
 """
-type GnirsLongSlit {
+type GnirsSpectroscopy {
 
   exposureTimeMode: ExposureTimeMode!
 
@@ -10220,8 +10533,17 @@ type GnirsLongSlit {
   camera: GnirsCamera!
   initialCamera: GnirsCamera!
 
-  fpu: GnirsFpuSlit!
-  initialFpu: GnirsFpuSlit!
+  """
+  Long-slit configuration (FPU + along-slit telescope configs), when this is a
+  long-slit observation. Exactly one of `slit` / `ifu` is present.
+  """
+  slit: GnirsSlit
+
+  """
+  IFU configuration (FPU + p/q telescope configs), when this is an integral field
+  unit observation. Exactly one of `slit` / `ifu` is present.
+  """
+  ifu: GnirsIfu
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
@@ -10240,11 +10562,7 @@ type GnirsLongSlit {
 
   explicitFocusMotorSteps: Int
 
-  telescopeConfigs: SlitTelescopeConfigs!
-  defaultTelescopeConfigs: SlitTelescopeConfigs!
-  explicitTelescopeConfigs: SlitTelescopeConfigs
-
-  acquisition: GnirsLongSlitAcquisition!
+  acquisition: GnirsSpectroscopyAcquisition!
 
   """
   Telluric type configuration for this observation.
@@ -10253,7 +10571,38 @@ type GnirsLongSlit {
 
 }
 
-input GnirsLongSlitAcquisitionInput {
+"""
+GNIRS long-slit-specific configuration: the slit FPU plus the telescope configs
+taken along the slit. Present on `GnirsSpectroscopy.slit` iff the observation is a
+long slit; null for IFU.
+"""
+type GnirsSlit {
+  fpu: GnirsFpuSlit!
+  initialFpu: GnirsFpuSlit!
+
+  "Effective telescope configs (explicit override coalesced with the default)."
+  telescopeConfigs: SlitTelescopeConfigs!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+  explicitTelescopeConfigs: SlitTelescopeConfigs
+}
+
+"""
+GNIRS IFU-specific configuration: the IFU FPU plus the telescope configs as full
+p/q offsets. Present on `GnirsSpectroscopy.ifu` iff the observation is an IFU; null
+for long slit.
+"""
+type GnirsIfu {
+  fpu: GnirsFpuIfu!
+  initialFpu: GnirsFpuIfu!
+
+  """
+  Telescope configs (full p/q offsets). Unlike the long slit these have no derived
+  default: they are seeded from the FPU at creation and then edited in place.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
+}
+
+input GnirsSpectroscopyAcquisitionInput {
   explicitFilter: GnirsFilter
   explicitAcquisitionType: GnirsAcquisitionType
   coadds: PosInt
@@ -10290,9 +10639,29 @@ input SlitTelescopeConfigsInput {
 }
 
 """
-Edit or create GNIRS Long Slit configuration
+GNIRS long-slit-specific configuration input. `fpu` is required on create.
 """
-input GnirsLongSlitInput {
+input GnirsSlitInput {
+  fpu: GnirsFpuSlit
+
+  "Long-slit telescope configs. Null clears an explicit override back to the default."
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
+}
+
+"""
+GNIRS IFU-specific configuration input. `fpu` is required on create. A missing
+`telescopeConfigs` is left unedited (and on create is seeded from the FPU).
+"""
+input GnirsIfuInput {
+  fpu: GnirsFpuIfu
+
+  telescopeConfigs: [TelescopeConfigInput!]
+}
+
+"""
+Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
+"""
+input GnirsSpectroscopyInput {
 
   exposureTimeMode: ExposureTimeModeInput
 
@@ -10300,7 +10669,11 @@ input GnirsLongSlitInput {
 
   filter: GnirsFilter
 
-  fpu: GnirsFpuSlit
+  "Long-slit configuration. On create, exactly one of `slit` / `ifu` is required."
+  slit: GnirsSlitInput
+
+  "IFU configuration. On create, exactly one of `slit` / `ifu` is required."
+  ifu: GnirsIfuInput
 
   camera: GnirsCamera
 
@@ -10322,9 +10695,7 @@ input GnirsLongSlitInput {
 
   explicitWellDepth: GnirsWellDepth
 
-  explicitTelescopeConfigs: SlitTelescopeConfigsInput
-
-  acquisition: GnirsLongSlitAcquisitionInput
+  acquisition: GnirsSpectroscopyAcquisitionInput
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
@@ -12552,7 +12923,19 @@ type SpectroscopyConfigOptionGmosSouth {
 type SpectroscopyConfigOptionGnirs {
   grating: GnirsGrating!
   filter: GnirsFilter!
-  fpu: GnirsFpuSlit!
+
+  """
+  Long-slit FPU, when this option is a single-slit configuration. Exactly one of
+  `fpuSlit` / `fpuIfu` is present.
+  """
+  fpuSlit: GnirsFpuSlit
+
+  """
+  IFU FPU, when this option is an integral field unit configuration. Exactly one
+  of `fpuSlit` / `fpuIfu` is present.
+  """
+  fpuIfu: GnirsFpuIfu
+
   prism: GnirsPrism!
   camera: GnirsCamera!
 }
@@ -12604,6 +12987,14 @@ enum GnirsFpuSlit {
 }
 
 """
+IFU FPU options for GNIRS (low- and high-resolution integral field units).
+"""
+enum GnirsFpuIfu {
+  LOW_RESOLUTION
+  HIGH_RESOLUTION
+}
+
+"""
 Non-slit FPU options for GNIRS (acquisition, pupil viewer, pinholes).
 """
 enum GnirsFpuOther {
@@ -12642,6 +13033,8 @@ enum GnirsDecker {
   LONG_CAM_LONG_SLIT
   SHORT_CAM_LONG_SLIT
   LONG_CAM_CROSS_DISPERSED
+  LOW_RESOLUTION_IFU
+  HIGH_RESOLUTION_IFU
 }
 
 """
@@ -12745,6 +13138,11 @@ type ImagingConfigOption {
   """
   flamingos2: ImagingConfigOptionFlamingos2
 
+  """
+  For GNIRS options, the GNIRS configuration.  Null for other instruments.
+  """
+  gnirs: ImagingConfigOptionGnirs
+
 }
 
 type ImagingConfigOptionGmosNorth {
@@ -12757,6 +13155,11 @@ type ImagingConfigOptionGmosSouth {
 
 type ImagingConfigOptionFlamingos2 {
   filter: Flamingos2Filter!
+}
+
+type ImagingConfigOptionGnirs {
+  filter: GnirsFilter!
+  camera: GnirsCamera!
 }
 
 """
@@ -12782,6 +13185,7 @@ enum ItcType {
   GHOST_IFU,
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING,
+  GNIRS_IMAGING,
   IGRINS_2_SPECTROSCOPY,
   GNIRS_SPECTROSCOPY,
   SPECTROSCOPY
@@ -12790,11 +13194,13 @@ enum ItcType {
 """
 Contains the result of calling the ITC for all targets, but a single instrument
 configuration.  Since the observation may contain multiple targets, there may
-be multiple results. The "result" field contains the selected, representative,
-result for all targets.  If there are multiple successful results, this will
-be the one that prescribes the longest observation. If there is a mix of
-failures and successes, the overall "result" will be a failure. The "all" field
-contains results for all targets regardless.
+be multiple results. The "selected" field contains the representative result
+for all targets.  If a signal-to-noise target has been chosen for the
+observation (see `TargetEnvironment.explicitSignalToNoiseTarget`), that target's result
+is used.  Otherwise the brightest target (the one requiring the shortest
+exposure time) is used.  If there is a mix of failures and successes, the
+overall "selected" result will be a failure. The "all" field contains results
+for all targets regardless.
 """
 type ItcResultSet {
   selected: ItcResult!
@@ -12826,6 +13232,15 @@ results for all targets but a single filter.
 """
 type ItcGmosSouthImagingResultSet {
   filter:  GmosSouthFilter!
+  results: ItcResultSet!
+}
+
+"""
+Combines a GNIRS filter with an `ItcResultSet`. In other words, ITC results
+for all targets but a single filter.
+"""
+type ItcGnirsImagingResultSet {
+  filter:  GnirsFilter!
   results: ItcResultSet!
 }
 
@@ -12874,6 +13289,14 @@ set.
 type ItcGmosSouthImaging implements Itc {
   itcType: ItcType!
   gmosSouthImagingScience: [ItcGmosSouthImagingResultSet!]!
+}
+
+"""
+GNIRS imaging ITC results.  Here each filter is paired with its result set.
+"""
+type ItcGnirsImaging implements Itc {
+  itcType: ItcType!
+  gnirsImagingScience: [ItcGnirsImagingResultSet!]!
 }
 
 """
@@ -13333,7 +13756,7 @@ type ConfigurationConditions {
 }
 
 type ConfigurationObservingMode {
-  instrument: Instrument!
+  instrument: Instrument
   mode: ObservingModeType!
   gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
   gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
@@ -13341,6 +13764,7 @@ type ConfigurationObservingMode {
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
   gnirsLongSlit: ConfigurationGnirsLongSlit
+  gnirsIfu: ConfigurationGnirsIfu
   igrins2LongSlit: ConfigurationIgrins2LongSlit
   visitor: ConfigurationVisitor
 }
@@ -13376,6 +13800,11 @@ type ConfigurationGnirsLongSlit {
   prism: GnirsPrism!
 }
 
+type ConfigurationGnirsIfu {
+  grating: GnirsGrating!
+  fpu: GnirsFpuIfu!
+}
+
 type ConfigurationIgrins2LongSlit {
   ignore: Ignore
 }
@@ -13394,6 +13823,22 @@ type ConfigurationRequest {
   program: Program!
   status: ConfigurationRequestStatus!
   justification: NonEmptyString
+
+  """
+  Staff feedback on the request.
+  """
+  feedback: NonEmptyString
+
+  """
+  Time at which the request was created.
+  """
+  createdAt: Timestamp!
+
+  """
+  Time at which the request was last updated.
+  """
+  updatedAt: Timestamp!
+
   configuration: Configuration!
   applicableObservations: [ObservationId!]!
 }
@@ -14584,14 +15029,19 @@ Base science mode
 """
 type ObservingMode {
   """
-  Instrument
+  Instrument, or null for exchange observations (which have no Gemini instrument).
   """
-  instrument: Instrument!
+  instrument: Instrument
 
   """
   Mode type
   """
   mode: ObservingModeType!
+
+  """
+  Observations executed at Keck or Subaru.
+  """
+  exchange: Exchange
 
   """
   Flamingos 2 Imaging mode
@@ -14629,14 +15079,19 @@ type ObservingMode {
   gmosSouthLongSlit: GmosSouthLongSlit
 
   """
-  IGRINS-2 Long Slit mode
+  GNIRS Imaging mode
   """
-  igrins2LongSlit: Igrins2LongSlit
+  gnirsImaging: GnirsImaging
 
   """
   GNIRS Long Slit mode
   """
-  gnirsLongSlit: GnirsLongSlit
+  gnirsSpectroscopy: GnirsSpectroscopy
+
+  """
+  IGRINS-2 Long Slit mode
+  """
+  igrins2LongSlit: Igrins2LongSlit
 
   visitor: Visitor
 
@@ -16645,6 +17100,17 @@ type TargetEnvironment {
   ): Target
 
   """
+  The asterism target explicitly selected to drive the signal-to-noise (ITC)
+  calculation, overriding the automatic choice. This is always one of the
+  observation's asterism targets. When null, no explicit selection has been
+  made and a representative target is chosen automatically; the target that will
+  actually be used in that case is available via the `itc` field's `selected`
+  result. It is set with `TargetEnvironmentInput.explicitSignalToNoiseTargetId`
+  and is cleared automatically if the target is removed from the asterism.
+  """
+  explicitSignalToNoiseTarget: Target
+
+  """
   The base position used by navigate to slew and track the target.
   Uses the observation's stored observation time.
   Returns a GraphQL error when the observation time is required
@@ -18227,6 +18693,11 @@ input WhereObservation {
   Matches on the observation workflow state.
   """
   workflow: WhereCalculatedObservationWorkflow
+
+  """
+  Matches the calibration role.
+  """
+  calibrationRole: WhereOptionEqCalibrationRole
 }
 
 """
@@ -18262,6 +18733,26 @@ input WhereConfigurationRequest {
   Matches the configuration request status.
   """
   status: WhereOrderConfigurationRequestStatus
+
+  """
+  Matches the justification.
+  """
+  justification: WhereOptionString
+
+  """
+  Matches the staff feedback.
+  """
+  feedback: WhereOptionString
+
+  """
+  Matches the creation time.
+  """
+  createdAt: WhereOrderTimestamp
+
+  """
+  Matches the last update time.
+  """
+  updatedAt: WhereOrderTimestamp
 }
 
 input WhereObservationReference {
@@ -20635,10 +21126,10 @@ input GnirsAcquisitionMirrorOutInput {
 """
 GNIRS dynamic step configuration input.
 
-Exactly one of `fpuSlit` / `fpuOther` must be provided.  `acquisitionMirrorOut`
-is provided when the acquisition mirror is "out" (spectroscopy mode); its
-absence indicates the mirror is "in".  `focusMotorSteps` is omitted when focus
-is "Best" (instrument-chosen).
+Exactly one of `fpuSlit` / `fpuOther` / `fpuIfu` must be provided.
+`acquisitionMirrorOut` is provided when the acquisition mirror is "out"
+(spectroscopy mode); its absence indicates the mirror is "in".  `focusMotorSteps`
+is omitted when focus is "Best" (instrument-chosen).
 """
 input GnirsDynamicInput {
   exposure: TimeSpanInput!
@@ -20647,6 +21138,7 @@ input GnirsDynamicInput {
   decker: GnirsDecker!
   fpuSlit: GnirsFpuSlit
   fpuOther: GnirsFpuOther
+  fpuIfu: GnirsFpuIfu
   acquisitionMirrorOut: GnirsAcquisitionMirrorOutInput
   camera: GnirsCamera!
   focusMotorSteps: Int

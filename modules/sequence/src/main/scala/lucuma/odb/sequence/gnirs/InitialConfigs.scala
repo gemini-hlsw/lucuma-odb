@@ -14,7 +14,7 @@ import lucuma.core.model.sequence.gnirs.GnirsFocus
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.util.TimeSpan
-import lucuma.odb.sequence.gnirs.longslit.Config as GnirsLongSlit
+import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopy
 
 object InitialConfigs:
 
@@ -28,12 +28,12 @@ object InitialConfigs:
       coadds            = PosInt.MinValue,
       filter            = GnirsFilter.Y,
       decker            = GnirsDecker.Acquisition,
-      fpu               = GnirsFpu.Slit(lucuma.core.enums.GnirsFpuSlit.LongSlit_0_10),
+      fpu               = GnirsFpu.Spectroscopy.Slit(lucuma.core.enums.GnirsFpuSlit.LongSlit_0_10),
       acquisitionMirror = GnirsAcquisitionMirrorMode.In,
       camera            = GnirsCamera.ShortBlue,
       focus             = GnirsFocus.Best,
       readMode          = GnirsReadMode.VeryBright
     )
 
-  def staticFrom(config: GnirsLongSlit): GnirsStaticConfig =
+  def staticFrom(config: GnirsSpectroscopy): GnirsStaticConfig =
     GnirsStaticConfig(config.wellDepth)

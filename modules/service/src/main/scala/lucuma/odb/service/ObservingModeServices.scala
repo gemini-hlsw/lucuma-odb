@@ -12,6 +12,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.ExposureTimeMode
@@ -79,8 +80,8 @@ object ObservingModeServices:
 
         which.groupMap(_._2)(_._1).toList.traverse {
 
-          case (v: VisitorObservingModeType, oids) =>
-            visitorService
+          case (e: ExchangeObservingModeType, oids) =>
+            exchangeService
               .select(oids)
               .map(_.widen[ObservingMode])
 
@@ -119,13 +120,23 @@ object ObservingModeServices:
               .selectSouth(oids)
               .map(_.widen[ObservingMode])
 
-          case (GnirsLongSlit, oids) =>
-            gnirsLongSlitService
+          case (GnirsImaging, oids) =>
+            gnirsImagingService
+              .select(oids)
+              .map(_.widen[ObservingMode])
+
+          case (GnirsLongSlit | GnirsIfu, oids) =>
+            gnirsSpectroscopyService
               .select(oids)
               .map(_.widen[ObservingMode])
 
           case (Igrins2LongSlit, oids) =>
             igrins2LongSlitService
+              .select(oids)
+              .map(_.widen[ObservingMode])
+
+          case (v: VisitorObservingModeType, oids) =>
+            visitorService
               .select(oids)
               .map(_.widen[ObservingMode])
 
@@ -153,6 +164,7 @@ object ObservingModeServices:
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
+          input.exchange.map(m =>           exchangeService.insert(m, which)),
           input.flamingos2Imaging.map(m =>  flamingos2ImagingService.insert(m, etm, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
           input.ghostIfu.map(m =>           ghostIfuService.insert(m, etm, which)),
@@ -161,7 +173,8 @@ object ObservingModeServices:
           input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
           input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which)),
           input.igrins2LongSlit.map(m =>    igrins2LongSlitService.insert(m, etm, which)),
-          input.gnirsLongSlit.map(m =>      gnirsLongSlitService.insert(m, etm, which)),
+          input.gnirsImaging.map(m =>       gnirsImagingService.insert(m, etm, which)),
+          input.gnirsSpectroscopy.map(m =>  gnirsSpectroscopyService.insert(m, etm, which)),
           input.visitor.map(m => visitorService.insert(m, which)),
         ).flattenOption match
           case List(r) => r
@@ -178,6 +191,7 @@ object ObservingModeServices:
 
         val deleteObservingMode: F[Unit] =
           mode match
+            case _: ExchangeObservingModeType         => exchangeService.delete(which)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.delete(which)
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
@@ -185,7 +199,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
-            case ObservingModeType.GnirsLongSlit      => gnirsLongSlitService.delete(which)
+            case ObservingModeType.GnirsImaging       => gnirsImagingService.delete(which)
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
             case _: VisitorObservingModeType          => visitorService.delete(which)
 
@@ -196,6 +211,7 @@ object ObservingModeServices:
         which: List[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[Result[Unit]] =
         List(
+          input.exchange.map(m => exchangeService.update(m, which).map(_.success)),
           input.flamingos2Imaging.map(m => flamingos2ImagingService.update(m, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which).map(_.success)),
           input.ghostIfu.map(m => ghostIfuService.update(m, which)),
@@ -204,7 +220,8 @@ object ObservingModeServices:
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
           input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
           input.igrins2LongSlit.map(m => igrins2LongSlitService.update(m, which).map(_.success)),
-          input.gnirsLongSlit.map(m => gnirsLongSlitService.update(m, which).map(_.success)),
+          input.gnirsImaging.map(m => gnirsImagingService.update(m, which)),
+          input.gnirsSpectroscopy.map(m => gnirsSpectroscopyService.update(m, which)),
           input.visitor.map(m => visitorService.update(m, which).map(_.success))
         ).flattenOption match
           case List(r) => r
@@ -226,6 +243,7 @@ object ObservingModeServices:
 
         def cloneObservingMode(etms: List[(ExposureTimeModeId, ExposureTimeModeId)]): F[Unit] =
           mode match
+            case _: ExchangeObservingModeType         => exchangeService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
@@ -233,7 +251,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
-            case ObservingModeType.GnirsLongSlit      => gnirsLongSlitService.clone(origOid, newOid)
+            case ObservingModeType.GnirsImaging       => gnirsImagingService.clone(origOid, newOid, etms)
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
             case _: VisitorObservingModeType          => visitorService.clone(origOid, newOid)
 

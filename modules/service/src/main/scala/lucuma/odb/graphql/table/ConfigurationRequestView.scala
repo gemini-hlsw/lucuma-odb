@@ -17,6 +17,9 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     val ProgramId = col("c_program_id", program_id)
     val Status = col("c_status", configuration_request_status)
     val Justification = col("c_justification", text_nonempty.opt)
+    val Feedback = col("c_feedback", text_nonempty.opt)
+    val CreatedAt = col("c_created_at", core_timestamp)
+    val UpdatedAt = col("c_updated_at", core_timestamp)
 
     object Conditions:
       val CloudExtinction = col("c_cloud_extinction", cloud_extinction_preset)
@@ -71,6 +74,12 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val Grating = col("c_gnirs_longslit_grating", gnirs_grating.embedded)
       val Camera  = col("c_gnirs_longslit_camera", gnirs_camera.embedded)
       val Prism   = col("c_gnirs_longslit_prism", gnirs_prism.embedded)
+
+    // GNIRS IFU is keyed by (grating, ifu); no camera/prism in the configuration.
+    object GnirsIfu:
+      val Id      = col("c_gnirs_ifu_id", configuration_request_id.embedded)
+      val Grating = col("c_gnirs_ifu_grating", gnirs_grating.embedded)
+      val Fpu     = col("c_gnirs_ifu_fpu", gnirs_fpu_ifu.embedded)
 
     object Igrins2LongSlit:
       val Id = col("c_igrins_2_longslit_id", configuration_request_id.embedded)

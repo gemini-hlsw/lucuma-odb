@@ -12,6 +12,8 @@ import lucuma.core.data.arb.ArbZipper
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
+import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -121,16 +123,29 @@ trait ArbItc:
     Cogen[List[(GmosSouthFilter, Zipper[Itc.Result])]].contramap: a =>
       a.science.toNel.toList
 
+  given Arbitrary[Itc.GnirsImaging] =
+    Arbitrary:
+      for
+        f0 <- arbitrary[GnirsFilter]
+        fs <- Gen.listOf(arbitrary[GnirsFilter]).map(fs => (f0 :: fs).distinct)
+        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[Itc.Result]])
+      yield Itc.GnirsImaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
+
+  given Cogen[Itc.GnirsImaging] =
+    Cogen[List[(GnirsFilter, Zipper[Itc.Result])]].contramap: a =>
+      a.science.toNel.toList
+
   given Arbitrary[Itc.Spectroscopy] =
     Arbitrary:
       for
         a <- arbitrary[Zipper[Itc.Result]]
         s <- arbitrary[Zipper[Itc.Result]]
-      yield Itc.Spectroscopy(a, s)
+        t <- arbitrary[Option[GnirsAcquisitionType]]
+      yield Itc.Spectroscopy(a, s, t)
 
   given Cogen[Itc.Spectroscopy] =
-    Cogen[(Zipper[Itc.Result], Zipper[Itc.Result])].contramap: a =>
-      (a.acquisition, a.science)
+    Cogen[(Zipper[Itc.Result], Zipper[Itc.Result], Option[GnirsAcquisitionType])].contramap: a =>
+      (a.acquisition, a.science, a.gnirsAcqType)
 
   given Arbitrary[Itc.Igrins2Spectroscopy] =
     Arbitrary:
@@ -146,19 +161,21 @@ trait ArbItc:
         arbitrary[Itc.GhostIfu],
         arbitrary[Itc.GmosNorthImaging],
         arbitrary[Itc.GmosSouthImaging],
+        arbitrary[Itc.GnirsImaging],
         arbitrary[Itc.Igrins2Spectroscopy],
         arbitrary[Itc.Spectroscopy]
       )
 
   given Cogen[Itc] =
     Cogen[
-      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.Igrins2Spectroscopy, Either[Itc.GhostIfu, Itc.Flamingos2Imaging]]]]]
+      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.GnirsImaging, Either[Itc.Igrins2Spectroscopy, Either[Itc.GhostIfu, Itc.Flamingos2Imaging]]]]]]
     ].contramap:
       case a: Itc.Spectroscopy        => Left(a)
       case a: Itc.GmosNorthImaging    => Right(Left(a))
       case a: Itc.GmosSouthImaging    => Right(Right(Left(a)))
-      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(Left(a))))
-      case a: Itc.GhostIfu            => Right(Right(Right(Right(Left(a)))))
-      case a: Itc.Flamingos2Imaging   => Right(Right(Right(Right(Right(a)))))
+      case a: Itc.GnirsImaging        => Right(Right(Right(Left(a))))
+      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(Right(Left(a)))))
+      case a: Itc.GhostIfu            => Right(Right(Right(Right(Right(Left(a))))))
+      case a: Itc.Flamingos2Imaging   => Right(Right(Right(Right(Right(Right(a))))))
 
 object ArbItc extends ArbItc

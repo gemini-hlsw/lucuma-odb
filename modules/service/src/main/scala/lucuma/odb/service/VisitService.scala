@@ -9,15 +9,18 @@ import cats.syntax.all.*
 import fs2.Stream
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
+import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.IdempotencyKey
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.ResultExtensions.*
 import lucuma.odb.graphql.input.RecordVisitInput
+import lucuma.odb.logic.GeneratorContext
 import lucuma.odb.sequence.data.VisitOrigin
 import lucuma.odb.sequence.data.VisitRecord
 import lucuma.odb.syntax.instrument.*
@@ -174,12 +177,27 @@ object VisitService:
           .value
           .map(Result.fromEitherOdbError)
 
+      // Records the observation's time estimate (as computed from the just
+      // materialized sequence) so that it may be compared with the actual
+      // execution time after the fact.  This happens at most once, when the
+      // first observe visit is recorded.  The WHERE IS NULL guard in the
+      // UPDATE keeps concurrent callers from overwriting an existing value.
+      private def recordOriginalTimeEstimate(
+        ctx: GeneratorContext
+      )(using Transaction[F]): EitherT[F, OdbError, Unit] =
+        EitherT(generator.calculateDigest(ctx)).semiflatMap: digest =>
+          session.execute(Statements.SetOriginalTimeEstimate)(digest, ctx.oid).void
+
       override def lookupOrInsertForObserve(
         input: RecordVisitInput
       )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
         generator
-          .materializeAndThen(input.observationId):
-            lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey).map(_.visitId).value
+          .materializeAndThen(input.observationId): ctx =>
+            (for
+              record <- EitherT.liftF(session.unique(Statements.ShouldRecordOriginalEstimate)(input.observationId))
+              visit  <- lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey)
+              _      <- recordOriginalTimeEstimate(ctx).whenA(record)
+            yield visit.visitId).value
           .map(Result.fromEitherOdbError)
 
   object Statements:
@@ -349,3 +367,44 @@ object VisitService:
         SET c_origin = $visit_origin
         WHERE c_visit_id = $visit_id
       """.command.contramap((id, origin) => (origin, id))
+
+    // The original time estimate should be recorded when (and only when) the
+    // first observe visit is recorded for the observation.  Observations that
+    // acquired observe visits before the estimate columns existed are skipped
+    // altogether, since an estimate taken mid-execution would not be original.
+    val ShouldRecordOriginalEstimate: Query[Observation.Id, Boolean] =
+      sql"""
+        SELECT o.c_orig_est_setup_count IS NULL
+           AND NOT EXISTS (
+                 SELECT 1
+                   FROM t_visit v
+                  WHERE v.c_observation_id = o.c_observation_id
+                    AND v.c_origin = 'observe' :: e_visit_origin
+               )
+          FROM t_observation o
+         WHERE o.c_observation_id = $observation_id
+      """.query(bool)
+
+    val SetOriginalTimeEstimate: Command[(ExecutionDigest, Observation.Id)] =
+      sql"""
+        UPDATE t_observation
+           SET c_orig_est_full_setup_time        = $time_span,
+               c_orig_est_reacq_setup_time       = $time_span,
+               c_orig_est_setup_count            = $int4_nonneg,
+               c_orig_est_sci_non_charged_time   = $time_span,
+               c_orig_est_sci_program_time       = $time_span,
+               c_orig_est_total_non_charged_time = $time_span,
+               c_orig_est_total_program_time     = $time_span
+         WHERE c_observation_id = $observation_id
+           AND c_orig_est_setup_count IS NULL
+      """.command.contramap: (digest, oid) =>
+        (
+          digest.setup.full,
+          digest.setup.reacquisition,
+          digest.setupCount,
+          digest.science.timeEstimate(ChargeClass.NonCharged),
+          digest.science.timeEstimate(ChargeClass.Program),
+          digest.fullTimeEstimate(ChargeClass.NonCharged),
+          digest.fullTimeEstimate(ChargeClass.Program),
+          oid
+        )

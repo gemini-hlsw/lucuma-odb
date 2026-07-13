@@ -11,6 +11,7 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
 
 object WhereConfigurationRequest {
@@ -19,6 +20,10 @@ object WhereConfigurationRequest {
     val WhereOrderConfigurationRequestId = WhereOrder.binding(path / "id", ConfigurationRequestIdBinding)
     val WhereStatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ConfigurationRequestStatus])
     val WhereProgramBinding = WhereProgram.binding(path / "program")
+    val WhereJustificationBinding = WhereOptionString.binding(path / "justification")
+    val WhereFeedbackBinding = WhereOptionString.binding(path / "feedback")
+    val WhereCreatedAtBinding = WhereOrder.binding[Timestamp](path / "createdAt", TimestampBinding)
+    val WhereUpdatedAtBinding = WhereOrder.binding[Timestamp](path / "updatedAt", TimestampBinding)
 
     lazy val WhereObservationBinding = binding(path) // lazy self-reference
     ObjectFieldsBinding.rmap {
@@ -29,9 +34,13 @@ object WhereConfigurationRequest {
         WhereOrderConfigurationRequestId.Option("id", rId),
         WhereProgramBinding.Option("program", rProgram),
         WhereStatusBinding.Option("status", rStatus),
+        WhereJustificationBinding.Option("justification", rJustification),
+        WhereFeedbackBinding.Option("feedback", rFeedback),
+        WhereCreatedAtBinding.Option("createdAt", rCreatedAt),
+        WhereUpdatedAtBinding.Option("updatedAt", rUpdatedAt),
       ) =>
-        (rAND, rOR, rNOT, rId, rStatus, rProgram).parMapN {
-          (AND, OR, NOT, id, status, program) =>
+        (rAND, rOR, rNOT, rId, rStatus, rProgram, rJustification, rFeedback, rCreatedAt, rUpdatedAt).parMapN {
+          (AND, OR, NOT, id, status, program, justification, feedback, createdAt, updatedAt) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -39,10 +48,13 @@ object WhereConfigurationRequest {
               id,
               status,
               program,
+              justification,
+              feedback,
+              createdAt,
+              updatedAt,
             ).flatten)
         }
     }
   }
 
 }
-

@@ -66,12 +66,33 @@ heroku git:remote -a lucuma-otel-collector --remote heroku-collector
 
 ## Running locally
 
+### With `run-local.sh` (forwards to real Grafana Cloud)
+
+`run-local.sh` builds the image (if needed), generates the htpasswd entry, and
+runs the collector forwarding traces to your Grafana Cloud Tempo. Set the Grafana
+credentials in your environment and run it:
+
+```bash
+export GRAFANA_OTLP_ENDPOINT=https://otlp-gateway-...grafana.net/otlp
+export GRAFANA_OTLP_TOKEN=<base64 instanceID:token>   # see below
+./run-local.sh
+```
+
+The script prints the ODB env vars to set. Defaults (`PORT=8888`, `OTLP_USER=otlp`,
+`OTLP_PASSWORD=banana`) can be overridden on the command line.
+
+```bash
+export GRAFANA_OTLP_TOKEN=$(echo -n "${GRAFANA_INSTANCE_ID}:${GRAFANA_TOKEN}" | base64)
+```
+
+### With dummy secrets (no real backend)
+
 Build and run the collector with dummy exporter secrets:
 
 ```bash
 docker build -t otel-collector-local .
 
-# Generate an htpasswd entry for user oltp and password banana
+# Generate an htpasswd entry for user otlp and password banana
 HTPASSWD=$(docker run --rm httpd:2.4-alpine htpasswd -nbB otlp banana)
 
 docker run --rm --name otel-local \
