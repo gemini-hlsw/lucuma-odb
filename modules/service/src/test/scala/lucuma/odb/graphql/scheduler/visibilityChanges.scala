@@ -108,10 +108,15 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
           )(pid).void
 
   private def hasObs(body: String, oid: Observation.Id): Boolean =
-    body.linesIterator.contains(Gid[Observation.Id].show(oid))
+    body.linesIterator.exists(_.startsWith(s"${Gid[Observation.Id].show(oid)}\t"))
 
   private def hasTarget(body: String, tid: Target.Id): Boolean =
-    body.linesIterator.contains(Gid[Target.Id].show(tid))
+    body.linesIterator.exists(_.startsWith(s"${Gid[Target.Id].show(tid)}\t"))
+
+  private def obsTimestamp(body: String, oid: Observation.Id): Option[Instant] =
+    body.linesIterator
+      .find(_.startsWith(s"${Gid[Observation.Id].show(oid)}\t"))
+      .map(line => Instant.parse(line.split("\t")(1)))
 
   test("non-service user is forbidden"):
     fetchVisibilityChanges(pi, Epoch).map: (status, _) =>
@@ -167,6 +172,8 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       assertEquals(st, Status.Ok)
       // Trigger updated the observation
       assert(hasObs(b, o))
+      // The response carries the same invalidation timestamp read directly from the DB.
+      assertEquals(obsTimestamp(b, o), Some(after))
 
   test("a target updated after a given 'since' appears in the response"):
     for

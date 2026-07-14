@@ -13,10 +13,10 @@ import skunk.implicits.*
 
 import Services.Syntax.*
 
-/** A single visibility-relevant change: either an observation or a target. */
+/** A single visibility-relevant change: either an observation or a target, with the time it was last invalidated. */
 enum VisibilityChange:
-  case ForObservation(id: Observation.Id)
-  case ForTarget(id: Target.Id)
+  case ForObservation(id: Observation.Id, invalidatedAt: Timestamp)
+  case ForTarget(id: Target.Id, invalidatedAt: Timestamp)
 
 /**
  * Exposes the observations and targets whose visibility-relevant inputs have changed.
@@ -43,25 +43,25 @@ object VisibilityService:
       override def selectVisibilityChanges(
         since: Timestamp
       )(using Transaction[F], Services.ServiceAccess): Stream[F, VisibilityChange] =
-        session.stream(Statements.SelectObservations)(since, 1024).map(VisibilityChange.ForObservation(_)) ++
-          session.stream(Statements.SelectTargets)(since, 1024).map(VisibilityChange.ForTarget(_))
+        session.stream(Statements.SelectObservations)(since, 1024).map((id, ts) => VisibilityChange.ForObservation(id, ts)) ++
+          session.stream(Statements.SelectTargets)(since, 1024).map((id, ts) => VisibilityChange.ForTarget(id, ts))
 
   object Statements:
 
-    val SelectObservations: Query[Timestamp, Observation.Id] =
+    val SelectObservations: Query[Timestamp, (Observation.Id, Timestamp)] =
       sql"""
-        SELECT ov.c_observation_id
+        SELECT ov.c_observation_id, ov.c_last_visibility_invalidation
         FROM t_observation_visibility ov
         JOIN t_observation o ON o.c_observation_id = ov.c_observation_id
         JOIN t_obscalc oc ON oc.c_observation_id = ov.c_observation_id
         WHERE oc.c_workflow_state IN ('ready', 'ongoing')
           AND o.c_existence = 'present'
           AND ov.c_last_visibility_invalidation >= $core_timestamp
-      """.query(observation_id)
+      """.query(observation_id *: core_timestamp)
 
-    val SelectTargets: Query[Timestamp, Target.Id] =
+    val SelectTargets: Query[Timestamp, (Target.Id, Timestamp)] =
       sql"""
-        SELECT DISTINCT tv.c_target_id
+        SELECT DISTINCT tv.c_target_id, tv.c_last_visibility_invalidation
         FROM t_target_visibility tv
         JOIN t_target t ON t.c_target_id = tv.c_target_id
         JOIN t_asterism_target a ON a.c_target_id = tv.c_target_id
@@ -71,4 +71,4 @@ object VisibilityService:
           AND t.c_existence = 'present'
           AND o.c_existence = 'present'
           AND tv.c_last_visibility_invalidation >= $core_timestamp
-      """.query(target_id)
+      """.query(target_id *: core_timestamp)
