@@ -52,8 +52,10 @@ object VisibilityService:
       sql"""
         SELECT ov.c_observation_id
         FROM t_observation_visibility ov
+        JOIN t_observation o ON o.c_observation_id = ov.c_observation_id
         JOIN t_obscalc oc ON oc.c_observation_id = ov.c_observation_id
         WHERE oc.c_workflow_state IN ('ready', 'ongoing')
+          AND o.c_existence = 'present'
           AND ov.c_last_visibility_invalidation >= $core_timestamp
       """.query(observation_id)
 
@@ -61,8 +63,12 @@ object VisibilityService:
       sql"""
         SELECT DISTINCT tv.c_target_id
         FROM t_target_visibility tv
+        JOIN t_target t ON t.c_target_id = tv.c_target_id
         JOIN t_asterism_target a ON a.c_target_id = tv.c_target_id
+        JOIN t_observation o ON o.c_observation_id = a.c_observation_id
         JOIN t_obscalc oc ON oc.c_observation_id = a.c_observation_id
         WHERE oc.c_workflow_state IN ('ready', 'ongoing')
+          AND t.c_existence = 'present'
+          AND o.c_existence = 'present'
           AND tv.c_last_visibility_invalidation >= $core_timestamp
       """.query(target_id)

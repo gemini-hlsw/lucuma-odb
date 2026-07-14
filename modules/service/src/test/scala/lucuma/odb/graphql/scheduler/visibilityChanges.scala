@@ -317,3 +317,27 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       assertEquals(st, Status.Ok)
       assert(!hasObs(b, o),    s"obs should not be listed for a future 'since': $b")
       assert(!hasTarget(b, t), s"target should not be listed for a future 'since': $b")
+
+  test("a deleted observation is not listed even though it remains ready/ongoing"):
+    for
+      p       <- createProgram
+      t       <- createTargetWithProfileAs(pi, p)
+      o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
+      _       <- deleteObservation(pi, o)
+      (st, b) <- fetchVisibilityChanges(serviceUser, Epoch)
+    yield
+      assertEquals(st, Status.Ok)
+      assert(!hasObs(b, o), s"deleted obs should not be listed: $b")
+
+  test("a deleted target is not listed even though its observation is tracked"):
+    for
+      p       <- createProgram
+      t       <- createTargetWithProfileAs(pi, p)
+      o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
+      _       <- deleteTargetAs(pi, t)
+      (st, b) <- fetchVisibilityChanges(serviceUser, Epoch)
+    yield
+      assertEquals(st, Status.Ok)
+      assert(!hasTarget(b, t), s"deleted target should not be listed: $b")
