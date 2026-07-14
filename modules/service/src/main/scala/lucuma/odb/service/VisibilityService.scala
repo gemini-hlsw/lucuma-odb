@@ -19,10 +19,8 @@ enum VisibilityChange:
   case ForTarget(id: Target.Id, invalidatedAt: Timestamp)
 
 /**
- * Exposes the observations and targets whose visibility-relevant inputs have changed.
- *
- * Only observations in workflow state `ready` or `ongoing`, and the targets they use,
- * are considered.
+ * Exposes the observations and targets whose visibility-relevant inputs have changed,
+ * regardless of workflow state. Only soft-deleted observations/targets are excluded.
  */
 trait VisibilityService[F[_]]:
 
@@ -53,9 +51,7 @@ object VisibilityService:
         SELECT ov.c_observation_id, ov.c_last_visibility_invalidation
         FROM t_observation_visibility ov
         JOIN t_observation o ON o.c_observation_id = ov.c_observation_id
-        JOIN t_obscalc oc ON oc.c_observation_id = ov.c_observation_id
-        WHERE oc.c_workflow_state IN ('ready', 'ongoing')
-          AND o.c_existence = 'present'
+        WHERE o.c_existence = 'present'
           AND ov.c_last_visibility_invalidation >= $core_timestamp
       """.query(observation_id *: core_timestamp)
 
@@ -66,9 +62,7 @@ object VisibilityService:
         JOIN t_target t ON t.c_target_id = tv.c_target_id
         JOIN t_asterism_target a ON a.c_target_id = tv.c_target_id
         JOIN t_observation o ON o.c_observation_id = a.c_observation_id
-        JOIN t_obscalc oc ON oc.c_observation_id = a.c_observation_id
-        WHERE oc.c_workflow_state IN ('ready', 'ongoing')
-          AND t.c_existence = 'present'
+        WHERE t.c_existence = 'present'
           AND o.c_existence = 'present'
           AND tv.c_last_visibility_invalidation >= $core_timestamp
       """.query(target_id *: core_timestamp)

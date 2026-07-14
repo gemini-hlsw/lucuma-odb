@@ -122,7 +122,7 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
     fetchVisibilityChanges(pi, Epoch).map: (status, _) =>
       assertEquals(status, Status.Forbidden)
 
-  test("an untracked observation and its target are not listed"):
+  test("a newly created observation and target are listed immediately (no workflow-state filter)"):
     for
       p       <- createProgram
       t       <- createTargetWithProfileAs(pi, p)
@@ -130,34 +130,14 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       (st, b) <- fetchVisibilityChanges(serviceUser, Epoch)
     yield
       assertEquals(st, Status.Ok)
-      assert(!hasObs(b, o))
-      assert(!hasTarget(b, t))
-
-  test("a ready observation"):
-    for
-      p         <- createProgram
-      t         <- createTargetWithProfileAs(pi, p)
-      o         <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _         <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
-      (st1, b1) <- fetchVisibilityChanges(serviceUser, Epoch)
-      _         <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ongoing)
-      (st2, b2) <- fetchVisibilityChanges(serviceUser, Epoch)
-    yield
-      // Ready obs
-      assertEquals(st1, Status.Ok)
-      assert(hasObs(b1, o))
-      assert(hasTarget(b1, t))
-      // Ongoing obs
-      assertEquals(st2, Status.Ok)
-      assert(hasObs(b2, o))
-      assert(hasTarget(b2, t))
+      assert(hasObs(b, o))
+      assert(hasTarget(b, t))
 
   test("an observation with visibility-relevant changes appears in the response"):
     for
       p        <- createProgram
       t        <- createTargetWithProfileAs(pi, p)
       o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _        <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       before   <- obsInvalidation(o)
       cursor    = before.plusMillis(1)
       (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
@@ -180,7 +160,6 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       p        <- createProgram
       t        <- createTargetWithProfileAs(pi, p)
       o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _        <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       before   <- targetInvalidation(t)
       cursor    = before.plusMillis(1)
       (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
@@ -199,7 +178,6 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       p        <- createProgram
       t        <- createTargetWithProfileAs(pi, p)
       o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _        <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       before   <- targetInvalidation(t)
       cursor    = before.plusMillis(1)
       (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
@@ -218,7 +196,6 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       p        <- createProgram
       t        <- createTargetWithProfileAs(pi, p)
       o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _        <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       before   <- targetInvalidation(t)
       cursor    = before.plusMillis(1)
       (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
@@ -237,7 +214,6 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       p         <- createProgram
       t         <- createTargetWithProfileAs(pi, p)
       o         <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _         <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       before    <- obsInvalidation(o)
       cursor     = before.plusMillis(1)
       (_,  b0)  <- fetchVisibilityChanges(serviceUser, cursor)
@@ -257,8 +233,6 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       t         <- createTargetWithProfileAs(pi, p)
       o1        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       o2        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _         <- setCalculatedWorkflowState(o1, ObservationWorkflowState.Ready)
-      _         <- setCalculatedWorkflowState(o2, ObservationWorkflowState.Ready)
       before1   <- obsInvalidation(o1)
       before2   <- obsInvalidation(o2)
       cursor     = (if before1.isAfter(before2) then before1 else before2).plusMillis(1)
@@ -277,72 +251,68 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       assert(hasObs(b, o1))
       assert(hasObs(b, o2))
 
-  test("an observation that was completed after a given 'since' is not listed"):
+  test("an observation remains listed across every workflow state, including completed"):
     for
       p       <- createProgram
       t       <- createTargetWithProfileAs(pi, p)
       o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
+      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ongoing)
       _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Completed)
       (st, b) <- fetchVisibilityChanges(serviceUser, Epoch)
     yield
       assertEquals(st, Status.Ok)
-      assert(!hasObs(b, o), s"completed obs should not be listed: $b")
+      assert(hasObs(b, o))
 
   test("a 'since' equal to the invalidation time is inclusive"):
     for
       p       <- createProgram
       t       <- createTargetWithProfileAs(pi, p)
       o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       ts      <- obsInvalidation(o)
       (st, b) <- fetchVisibilityChanges(serviceUser, ts)
     yield
       assertEquals(st, Status.Ok)
-      assert(hasObs(b, o), s"obs stamped exactly at 'since' should be listed: $b")
+      assert(hasObs(b, o))
 
   test("a gzip-encoded response can be decompressed"):
     for
       p       <- createProgram
       t       <- createTargetWithProfileAs(pi, p)
       o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       (st, b) <- fetchGzip(serviceUser, Epoch)
     yield
       assertEquals(st, Status.Ok)
-      assert(hasObs(b, o),    s"ready obs should be listed (gzip): $b")
-      assert(hasTarget(b, t), s"target of ready obs should be listed (gzip): $b")
+      assert(hasObs(b, o))
+      assert(hasTarget(b, t))
 
   test("a 'since' in the future excludes everything"):
     for
       p       <- createProgram
       t       <- createTargetWithProfileAs(pi, p)
       o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       (st, b) <- fetchVisibilityChanges(serviceUser, Future)
     yield
       assertEquals(st, Status.Ok)
-      assert(!hasObs(b, o),    s"obs should not be listed for a future 'since': $b")
-      assert(!hasTarget(b, t), s"target should not be listed for a future 'since': $b")
+      assert(!hasObs(b, o))
+      assert(!hasTarget(b, t))
 
-  test("a deleted observation is not listed even though it remains ready/ongoing"):
+  test("a deleted observation is not listed"):
     for
       p       <- createProgram
       t       <- createTargetWithProfileAs(pi, p)
       o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       _       <- deleteObservation(pi, o)
       (st, b) <- fetchVisibilityChanges(serviceUser, Epoch)
     yield
       assertEquals(st, Status.Ok)
       assert(!hasObs(b, o), s"deleted obs should not be listed: $b")
 
-  test("a deleted target is not listed even though its observation is tracked"):
+  test("a deleted target is not listed"):
     for
       p       <- createProgram
       t       <- createTargetWithProfileAs(pi, p)
       o       <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _       <- setCalculatedWorkflowState(o, ObservationWorkflowState.Ready)
       _       <- deleteTargetAs(pi, t)
       (st, b) <- fetchVisibilityChanges(serviceUser, Epoch)
     yield
