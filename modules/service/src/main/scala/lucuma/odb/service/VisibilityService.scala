@@ -50,21 +50,21 @@ object VisibilityService:
 
     val SelectObservations: Query[Timestamp, Observation.Id] =
       sql"""
-        SELECT o.c_observation_id
-        FROM t_observation o
-        JOIN t_obscalc oc ON oc.c_observation_id = o.c_observation_id
+        SELECT ov.c_observation_id
+        FROM t_observation_visibility ov
+        JOIN t_obscalc oc ON oc.c_observation_id = ov.c_observation_id
         WHERE oc.c_workflow_state IN ('ready', 'ongoing')
-          AND o.c_last_visibility_invalidation >= $core_timestamp
-        ORDER BY o.c_last_visibility_invalidation
+          AND ov.c_last_visibility_invalidation >= $core_timestamp
+        ORDER BY ov.c_last_visibility_invalidation
       """.query(observation_id)
 
     val SelectTargets: Query[Timestamp, Target.Id] =
       sql"""
-        SELECT DISTINCT t.c_target_id, t.c_last_visibility_invalidation
-        FROM t_target t
-        JOIN t_asterism_target a ON a.c_target_id = t.c_target_id
+        SELECT DISTINCT tv.c_target_id, tv.c_last_visibility_invalidation
+        FROM t_target_visibility tv
+        JOIN t_asterism_target a ON a.c_target_id = tv.c_target_id
         JOIN t_obscalc oc ON oc.c_observation_id = a.c_observation_id
         WHERE oc.c_workflow_state IN ('ready', 'ongoing')
-          AND t.c_last_visibility_invalidation >= $core_timestamp
-        ORDER BY t.c_last_visibility_invalidation
+          AND tv.c_last_visibility_invalidation >= $core_timestamp
+        ORDER BY tv.c_last_visibility_invalidation
       """.query(target_id *: core_timestamp).map(_._1)

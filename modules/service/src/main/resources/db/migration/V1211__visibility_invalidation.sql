@@ -2,39 +2,82 @@
 --
 -- External consumers (scheduler / visibility service) need to know which
 -- observations and targets may require a visibility recalculation.
+--
+-- Dedicated side tables (rather than columns on t_observation / t_target) so
+-- that stamping never touches the base tables directly:
 
--- triggers stamp a "last invalidation" timestamp on the observations and targets
--- whose visibility-relevant inputs changed
+CREATE TABLE t_observation_visibility (
+  c_observation_id d_observation_id NOT NULL PRIMARY KEY
+    REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
+  c_last_visibility_invalidation timestamp NOT NULL DEFAULT now()
+);
 
--- DEFAULT now() seeds every existing row at migration time.
-ALTER TABLE t_observation
-  ADD COLUMN c_last_visibility_invalidation timestamp NOT NULL DEFAULT now();
-ALTER TABLE t_target
-  ADD COLUMN c_last_visibility_invalidation timestamp NOT NULL DEFAULT now();
+CREATE TABLE t_target_visibility (
+  c_target_id d_target_id NOT NULL PRIMARY KEY
+    REFERENCES t_target(c_target_id) ON DELETE CASCADE,
+  c_last_visibility_invalidation timestamp NOT NULL DEFAULT now()
+);
+
+-- Seed a row for every existing observation / target.
+INSERT INTO t_observation_visibility (c_observation_id)
+  SELECT c_observation_id FROM t_observation;
+INSERT INTO t_target_visibility (c_target_id)
+  SELECT c_target_id FROM t_target;
 
 -- We index to speed up sorting by last invalidation time
-CREATE INDEX observation_last_visibility_index ON t_observation (c_last_visibility_invalidation);
-CREATE INDEX target_last_visibility_index      ON t_target      (c_last_visibility_invalidation);
+CREATE INDEX observation_visibility_last_invalidation_index ON t_observation_visibility (c_last_visibility_invalidation);
+CREATE INDEX target_visibility_last_invalidation_index      ON t_target_visibility      (c_last_visibility_invalidation);
 
 -------------------------------------------------------
--- OBSERVATION constraintsinvalidations.
+-- Seed a visibility row for every newly created observation / target.
 -------------------------------------------------------
 
--- A change to a visibility-relevant constraint field on an observation stamps the
--- observation.
--- BEFORE UPDATE so the stamp rides the same row write (no extra write)
--- the WHEN clause restricts firing to actual value changes.
+CREATE OR REPLACE FUNCTION visibility_observation_seed()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO t_observation_visibility (c_observation_id) VALUES (NEW.c_observation_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER visibility_observation_seed_trigger
+  AFTER INSERT ON t_observation
+  FOR EACH ROW
+  EXECUTE FUNCTION visibility_observation_seed();
+
+CREATE OR REPLACE FUNCTION visibility_target_seed()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO t_target_visibility (c_target_id) VALUES (NEW.c_target_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER visibility_target_seed_trigger
+  AFTER INSERT ON t_target
+  FOR EACH ROW
+  EXECUTE FUNCTION visibility_target_seed();
+
+-------------------------------------------------------
+-- OBSERVATION constraint invalidations.
+-------------------------------------------------------
+
+-- A change to a visibility-relevant constraint field on an observation stamps
+-- t_observation_visibility. AFTER UPDATE (not BEFORE, since the stamp lives on
+-- a different table); the WHEN clause restricts firing to actual value changes.
 CREATE OR REPLACE FUNCTION visibility_observation_stamp()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.c_last_visibility_invalidation := now();
+  UPDATE t_observation_visibility
+  SET c_last_visibility_invalidation = now()
+  WHERE c_observation_id = NEW.c_observation_id;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER visibility_observation_trigger
-  BEFORE UPDATE OF c_cloud_extinction, c_image_quality, c_sky_background, c_water_vapor,
-                   c_air_mass_min, c_air_mass_max, c_hour_angle_min, c_hour_angle_max
+  AFTER UPDATE OF c_cloud_extinction, c_image_quality, c_sky_background, c_water_vapor,
+                  c_air_mass_min, c_air_mass_max, c_hour_angle_min, c_hour_angle_max
   ON t_observation
   FOR EACH ROW
   WHEN (
@@ -57,7 +100,7 @@ CREATE TRIGGER visibility_observation_trigger
 CREATE OR REPLACE FUNCTION visibility_timing_window_stamp()
 RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE t_observation
+  UPDATE t_observation_visibility
   SET c_last_visibility_invalidation = now()
   WHERE c_observation_id = COALESCE(NEW.c_observation_id, OLD.c_observation_id);
   RETURN COALESCE(NEW, OLD);
@@ -70,15 +113,17 @@ CREATE TRIGGER visibility_timing_window_trigger
   EXECUTE FUNCTION visibility_timing_window_stamp();
 
 -------------------------------------------------------
--- PROGRAM active peridod visibility invalidations.
+-- PROGRAM active period visibility invalidations.
 -------------------------------------------------------
 -- A change to a program's active period stamps every observation of that program.
 CREATE OR REPLACE FUNCTION visibility_program_stamp()
 RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE t_observation
+  UPDATE t_observation_visibility
   SET c_last_visibility_invalidation = now()
-  WHERE c_program_id = NEW.c_program_id;
+  WHERE c_observation_id IN (
+    SELECT c_observation_id FROM t_observation WHERE c_program_id = NEW.c_program_id
+  );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -94,20 +139,21 @@ CREATE TRIGGER visibility_program_trigger
 -- TARGET visibility invalidations.
 ----------------------------------
 
--- A change to a visibility-relevant target field stamps the target.  BEFORE
--- UPDATE, same reasoning as above.
+-- A change to a visibility-relevant target field stamps t_target_visibility.
 CREATE OR REPLACE FUNCTION visibility_target_stamp()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.c_last_visibility_invalidation := now();
+  UPDATE t_target_visibility
+  SET c_last_visibility_invalidation = now()
+  WHERE c_target_id = NEW.c_target_id;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER visibility_target_trigger
-  BEFORE UPDATE OF c_sid_ra, c_sid_dec, c_sid_pm_ra, c_sid_pm_dec, c_sid_epoch,
-                   c_sid_rv, c_sid_parallax,
-                   c_nsid_des, c_nsid_key_type, c_nsid_key
+  AFTER UPDATE OF c_sid_ra, c_sid_dec, c_sid_pm_ra, c_sid_pm_dec, c_sid_epoch,
+                  c_sid_rv, c_sid_parallax,
+                  c_nsid_des, c_nsid_key_type, c_nsid_key
   ON t_target
   FOR EACH ROW
   WHEN (
@@ -123,4 +169,3 @@ CREATE TRIGGER visibility_target_trigger
     OR NEW.c_nsid_key      IS DISTINCT FROM OLD.c_nsid_key
   )
   EXECUTE FUNCTION visibility_target_stamp();
-

@@ -54,7 +54,7 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
   private def obsInvalidation(oid: Observation.Id): IO[Instant] =
     withSession: s =>
       s.unique(
-        sql"SELECT c_last_visibility_invalidation FROM t_observation WHERE c_observation_id = $observation_id"
+        sql"SELECT c_last_visibility_invalidation FROM t_observation_visibility WHERE c_observation_id = $observation_id"
           .query(core_timestamp)
       )(oid).map(_.toInstant)
 
@@ -76,7 +76,7 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
   private def targetInvalidation(tid: Target.Id): IO[Instant] =
     withSession: s =>
       s.unique(
-        sql"SELECT c_last_visibility_invalidation FROM t_target WHERE c_target_id = $target_id"
+        sql"SELECT c_last_visibility_invalidation FROM t_target_visibility WHERE c_target_id = $target_id"
           .query(core_timestamp)
       )(tid).map(_.toInstant)
 
