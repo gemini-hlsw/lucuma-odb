@@ -220,8 +220,15 @@ object AsterismService {
                 val missing = observationIds.toList.filterNot(present.toSet)
                 missing match
                   case Nil =>
-                    val af = Statements.setSignalToNoiseTarget(programId, observationIds, tid)
-                    session.prepareR(af.fragment.command).use(_.execute(af.argument)).as(Result.unit)
+                    // Clear existing SN targets first, then set the chosen one. A single
+                    // UPDATE that flips multiple rows can transiently violate the partial
+                    // unique index i_asterism_single_sn_target: 
+                    val clear = Statements.clearSignalToNoiseTargets(programId, observationIds)
+                    val set   = Statements.applySignalToNoiseFlags(programId, observationIds.map(_ -> tid))
+                    for
+                      _ <- session.prepareR(clear.fragment.command).use(_.execute(clear.argument))
+                      _ <- session.prepareR(set.fragment.command).use(_.execute(set.argument))
+                    yield Result.unit
                   case bad =>
                     OdbError.InvalidArgument(
                       s"Signal-to-noise target ${tid.show} is not in the asterism of observation(s): ${bad.map(_.show).mkString(", ")}.".some
@@ -394,18 +401,6 @@ object AsterismService {
         programIdEqual(programId)                                                   |+|
         void" AND " |+| observationIdIn(observationIds)                             |+|
         void" AND c_is_signal_to_noise_target"
-
-    // Sets the flag on the chosen target and clears it from all others for the
-    // given observations, in a single statement (safe w.r.t. the single-target
-    // partial unique index).
-    def setSignalToNoiseTarget(
-      programId:      Program.Id,
-      observationIds: NonEmptyList[Observation.Id],
-      targetId:       Target.Id
-    ): AppliedFragment =
-      sql"UPDATE t_asterism_target SET c_is_signal_to_noise_target = (c_target_id = $target_id) WHERE "(targetId) |+|
-        programIdEqual(programId)                                                                                 |+|
-        void" AND " |+| observationIdIn(observationIds)
 
     def observationsWithTarget(
       programId:      Program.Id,
