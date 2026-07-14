@@ -177,6 +177,38 @@ clean at a stale value — no lost update, regardless of commit order.
 (narrowed from `INSERT OR UPDATE OR DELETE` in V1210), so these `UPDATE`s do not
 re-invalidate obscalc.
 
+### Lock ordering (deadlock avoidance)
+
+Recording an execution event touches three rows via triggers: `t_observation`
+(`update_execution_information_for_step_event` takes it `FOR UPDATE`), `t_obscalc`
+(`invalidate_obscalc`), and `t_visit` (the invalidation marker). Every code path
+that touches these must acquire them in **one consistent order** or concurrent
+transactions deadlock. The order is:
+
+```
+t_observation  →  t_obscalc  →  t_visit
+```
+
+`invalidate_visit_time_accounting` enforces this **itself**, so it does not depend
+on trigger firing order:
+
+```sql
+PERFORM 1 FROM t_observation WHERE c_observation_id = observation_id FOR UPDATE; -- t_observation
+CALL invalidate_obscalc(observation_id);                                        -- t_obscalc
+UPDATE t_visit SET c_ta_invalidation = now() WHERE c_visit_id = visit_id;        -- t_visit
+```
+
+Because the procedure locks `t_observation` first regardless of when it runs, the
+order can't invert even if the trigger fires before `update_execution_information_*`
+(which also locks `t_observation` first) — and it survives renaming or adding
+triggers.
+
+This was a real production deadlock (V1210 named the trigger `event_…`, which
+Postgres fires in **name** order — *before* `update_execution_…` — so an event
+insert locked `t_obscalc` before `t_observation`, the reverse of `recordVisit`
+and observation edits). Fixed in V1211 with the explicit ordering above. **If you
+add another path that touches these tables, take the locks in this same order.**
+
 ## What a recompute actually computes
 
 `update(visitId)` rebuilds the visit's `TimeAccountingState` from **all** of its
