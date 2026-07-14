@@ -108,10 +108,10 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
           )(pid).void
 
   private def hasObs(body: String, oid: Observation.Id): Boolean =
-    body.linesIterator.contains(s"OBSERVATION\t${Gid[Observation.Id].show(oid)}")
+    body.linesIterator.contains(Gid[Observation.Id].show(oid))
 
   private def hasTarget(body: String, tid: Target.Id): Boolean =
-    body.linesIterator.contains(s"TARGET\t${Gid[Target.Id].show(tid)}")
+    body.linesIterator.contains(Gid[Target.Id].show(tid))
 
   test("non-service user is forbidden"):
     fetchVisibilityChanges(pi, Epoch).map: (status, _) =>

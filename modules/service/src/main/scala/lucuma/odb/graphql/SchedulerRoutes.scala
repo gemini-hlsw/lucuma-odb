@@ -103,10 +103,10 @@ object SchedulerRoutes:
       row._3.stepCount.value.toString
     ).intercalate("\t")
 
-  private def visibilityTsv(c: VisibilityChange): String =
+  private def visibilityId(c: VisibilityChange): String =
     c match
-      case VisibilityChange.ForObservation(id) => s"OBSERVATION\t${Gid[Observation.Id].show(id)}"
-      case VisibilityChange.ForTarget(id)      => s"TARGET\t${Gid[Target.Id].show(id)}"
+      case VisibilityChange.ForObservation(id) => Gid[Observation.Id].show(id)
+      case VisibilityChange.ForTarget(id)      => Gid[Target.Id].show(id)
 
   def apply[F[_]: Async](
     services:  [A] => User => (Services[F] => F[A]) => F[A],
@@ -172,7 +172,7 @@ object SchedulerRoutes:
                 Ok(
                   visibilityService
                     .selectVisibilityChanges(since)
-                    .map(visibilityTsv)
+                    .map(visibilityId)
                     .intersperse("\n")
                     .through(fs2.text.utf8.encode)
                 )
