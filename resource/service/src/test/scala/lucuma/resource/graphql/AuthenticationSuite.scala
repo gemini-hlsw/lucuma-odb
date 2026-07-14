@@ -13,12 +13,10 @@ import lucuma.resource.test.TestSso
 import org.http4s.*
 import org.http4s.headers.Authorization
 
-/**
- * Verifies that GraphQL endpoints are protected by authentication. The Resource service does not
- * authenticate users itself; it only validates JWTs and API keys. A request with valid SSO
- * credentials is served; one with missing or invalid credentials is rejected with 403 Forbidden.
- */
 class AuthenticationSuite extends ResourceGraphQLSuite:
+
+  private def requiresAuth(field: String): List[String] =
+    List(s"Field '$field' requires authentication.")
 
   private val timelineQuery =
     """query($site: Site!) {
@@ -45,20 +43,27 @@ class AuthenticationSuite extends ResourceGraphQLSuite:
       authorization = asUser(TestSso.standardUser(42, 420))
     )
 
-  test("A request with no credentials is forbidden"):
-    expectFailure(timelineQuery, variables)
-
-  test("A request with a malformed bearer token is forbidden"):
-    expectFailure(
+  test("A data query with no credentials is rejected"):
+    expect(
       timelineQuery,
+      Left(requiresAuth("telescopeNightTimeline")),
+      variables,
+      authorization = anonymous
+    )
+
+  test("A data query with a malformed bearer token is rejected"):
+    expect(
+      timelineQuery,
+      Left(requiresAuth("telescopeNightTimeline")),
       variables,
       authorization =
         rawAuthorization(Authorization(Credentials.Token(AuthScheme.Bearer, "not-a-real-jwt")))
     )
 
-  test("A request with an unsupported Authorization scheme is forbidden"):
-    expectFailure(
+  test("A data query with an unsupported Authorization scheme is rejected"):
+    expect(
       timelineQuery,
+      Left(requiresAuth("telescopeNightTimeline")),
       variables,
       authorization = rawAuthorization(Authorization(BasicCredentials("user", "password")))
     )

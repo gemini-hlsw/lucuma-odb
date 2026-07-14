@@ -9,6 +9,7 @@ import cats.effect.*
 import cats.syntax.all.*
 import grackle.*
 import grackle.skunk.SkunkMonitor
+import lucuma.common.middleware.IntrospectionMapping
 import lucuma.common.middleware.UserAttributes.given
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
@@ -36,16 +37,19 @@ class GraphQlRoutes[F[_]: {Async, Tracer}](
     schema:    Schema,
     ssoClient: SsoClient[F, User]
   ): HttpRoutes[F] =
+    val introspectionService = GraphQLService[F](IntrospectionMapping(schema)).some
     Routes.forService(
       authorization =>
         authorization
           .flatTraverse(ssoClient.get)
-          .map: userOpt =>
-            userOpt.map: user =>
+          .map:
+            case None =>
+              introspectionService // no auth: only schema introspection is allowed
+            case Some(user) =>
               GraphQLService[F](
                 ResourceMapping(pool, monitor)(schema),
                 Attributes.from(user).toList*
-              ),
+              ).some,
       wsb
     )
 }
