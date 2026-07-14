@@ -27,9 +27,9 @@ enum VisibilityChange:
 trait VisibilityService[F[_]]:
 
   /**
-   * The observation and target changes invalidated at or after `since`, each group
-   * ordered by invalidation time (all observations first, then all targets).  The
-   * consumer reconstructs (observation, target) pairs itself.
+   * The observation and target changes invalidated at or after `since` (all
+   * observations first, then all targets).
+   * The consumer reconstructs (observation, target) pairs itself.
    */
   def selectVisibilityChanges(
     since: Timestamp
@@ -55,16 +55,14 @@ object VisibilityService:
         JOIN t_obscalc oc ON oc.c_observation_id = ov.c_observation_id
         WHERE oc.c_workflow_state IN ('ready', 'ongoing')
           AND ov.c_last_visibility_invalidation >= $core_timestamp
-        ORDER BY ov.c_last_visibility_invalidation
       """.query(observation_id)
 
     val SelectTargets: Query[Timestamp, Target.Id] =
       sql"""
-        SELECT DISTINCT tv.c_target_id, tv.c_last_visibility_invalidation
+        SELECT DISTINCT tv.c_target_id
         FROM t_target_visibility tv
         JOIN t_asterism_target a ON a.c_target_id = tv.c_target_id
         JOIN t_obscalc oc ON oc.c_observation_id = a.c_observation_id
         WHERE oc.c_workflow_state IN ('ready', 'ongoing')
           AND tv.c_last_visibility_invalidation >= $core_timestamp
-        ORDER BY tv.c_last_visibility_invalidation
-      """.query(target_id *: core_timestamp).map(_._1)
+      """.query(target_id)
