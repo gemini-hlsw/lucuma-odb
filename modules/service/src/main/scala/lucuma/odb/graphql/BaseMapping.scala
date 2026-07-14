@@ -10,7 +10,7 @@ import lucuma.odb.graphql.util.SchemaSemigroup
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
-     with SchemaSemigroup[F]
+     with SchemaSemigroup
      with MappingExtras[F]
      with CirceMappingLike[F] {
 

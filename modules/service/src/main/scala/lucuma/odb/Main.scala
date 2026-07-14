@@ -19,6 +19,7 @@ import grackle.skunk.SkunkMonitor
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.common.middleware.IntrospectionMapping
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.horizons.HorizonsClient
@@ -253,7 +254,7 @@ object FMain extends MainParams {
       middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      introspecService   = GraphQLService(OdbMapping.forIntrospection(pool, SkunkMonitor.noopMonitor[F], enums))
+      introspecService   = GraphQLService(IntrospectionMapping(OdbMapping.introspectionSchema(enums)))
       graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, horizonsClient, emailConfig, introspecService)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource

@@ -740,6 +740,7 @@ lazy val common = project
       "org.http4s"    %% "http4s-core"                           % http4sVersion,
       "org.http4s"    %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sVersion,
       "org.http4s"    %% "http4s-server"                         % http4sVersion,
+      "org.typelevel" %% "grackle-core"                          % grackleVersion,
       "org.typelevel" %% "cats-core"                             % catsVersion,
       "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
       "org.typelevel" %% "log4cats-core"                         % log4catsVersion,
