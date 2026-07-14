@@ -65,6 +65,8 @@ CREATE TRIGGER visibility_target_seed_trigger
 -- A change to a visibility-relevant constraint field on an observation stamps
 -- t_observation_visibility. AFTER UPDATE (not BEFORE, since the stamp lives on
 -- a different table); the WHEN clause restricts firing to actual value changes.
+-- c_existence is tracked too: deletion is a no-op here but *restoring* a deleted
+-- observation must re-stamp it
 CREATE OR REPLACE FUNCTION visibility_observation_stamp()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -77,7 +79,8 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER visibility_observation_trigger
   AFTER UPDATE OF c_cloud_extinction, c_image_quality, c_sky_background, c_water_vapor,
-                  c_air_mass_min, c_air_mass_max, c_hour_angle_min, c_hour_angle_max
+                  c_air_mass_min, c_air_mass_max, c_hour_angle_min, c_hour_angle_max,
+                  c_existence
   ON t_observation
   FOR EACH ROW
   WHEN (
@@ -89,6 +92,7 @@ CREATE TRIGGER visibility_observation_trigger
     OR NEW.c_air_mass_max     IS DISTINCT FROM OLD.c_air_mass_max
     OR NEW.c_hour_angle_min   IS DISTINCT FROM OLD.c_hour_angle_min
     OR NEW.c_hour_angle_max   IS DISTINCT FROM OLD.c_hour_angle_max
+    OR NEW.c_existence        IS DISTINCT FROM OLD.c_existence
   )
   EXECUTE FUNCTION visibility_observation_stamp();
 
@@ -140,6 +144,8 @@ CREATE TRIGGER visibility_program_trigger
 ----------------------------------
 
 -- A change to a visibility-relevant target field stamps t_target_visibility.
+-- c_existence is tracked for the same reason as t_observation above: restoring
+-- a deleted target must re-stamp it so it can reappear past an advanced cursor.
 CREATE OR REPLACE FUNCTION visibility_target_stamp()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -153,7 +159,8 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER visibility_target_trigger
   AFTER UPDATE OF c_sid_ra, c_sid_dec, c_sid_pm_ra, c_sid_pm_dec, c_sid_epoch,
                   c_sid_rv, c_sid_parallax,
-                  c_nsid_des, c_nsid_key_type, c_nsid_key
+                  c_nsid_des, c_nsid_key_type, c_nsid_key,
+                  c_existence
   ON t_target
   FOR EACH ROW
   WHEN (
@@ -167,5 +174,6 @@ CREATE TRIGGER visibility_target_trigger
     OR NEW.c_nsid_des      IS DISTINCT FROM OLD.c_nsid_des
     OR NEW.c_nsid_key_type IS DISTINCT FROM OLD.c_nsid_key_type
     OR NEW.c_nsid_key      IS DISTINCT FROM OLD.c_nsid_key
+    OR NEW.c_existence     IS DISTINCT FROM OLD.c_existence
   )
   EXECUTE FUNCTION visibility_target_stamp();

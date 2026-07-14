@@ -318,3 +318,35 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
     yield
       assertEquals(st, Status.Ok)
       assert(!hasTarget(b, t), s"deleted target should not be listed: $b")
+
+  test("a restored observation reappears for a cursor past its last real stamp"):
+    for
+      p        <- createProgram
+      t        <- createTargetWithProfileAs(pi, p)
+      o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _        <- deleteObservation(pi, o)
+      before   <- obsInvalidation(o)
+      cursor    = before.plusMillis(1)
+      _        <- restoreObservation(pi, o)
+      after    <- obsInvalidation(o)
+      (st, b)  <- fetchVisibilityChanges(serviceUser, cursor)
+    yield
+      assertEquals(st, Status.Ok)
+      assert(after.isAfter(cursor), s"restore should re-stamp the observation: before=$before after=$after")
+      assert(hasObs(b, o), s"restored obs should reappear even for a cursor past its creation stamp: $b")
+
+  test("a restored target reappears for a cursor past its last real stamp"):
+    for
+      p        <- createProgram
+      t        <- createTargetWithProfileAs(pi, p)
+      o        <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _        <- deleteTargetAs(pi, t)
+      before   <- targetInvalidation(t)
+      cursor    = before.plusMillis(1)
+      _        <- undeleteTargetAs(pi, t)
+      after    <- targetInvalidation(t)
+      (st, b)  <- fetchVisibilityChanges(serviceUser, cursor)
+    yield
+      assertEquals(st, Status.Ok)
+      assert(after.isAfter(cursor), s"undelete should re-stamp the target: before=$before after=$after")
+      assert(hasTarget(b, t), s"restored target should reappear even for a cursor past its creation stamp: $b")
