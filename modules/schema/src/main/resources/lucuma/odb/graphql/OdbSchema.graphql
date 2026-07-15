@@ -5356,6 +5356,11 @@ input VisitorInput {
   agsDiameter: AngleInput
 
   """
+  Science field of view, understood as the diameter of a circular area.
+  """
+  scienceFovDiameter: AngleInput
+
+  """
   Optional descriptive name for this visitor mode selection.
   """
   name: NonEmptyString
@@ -5374,6 +5379,11 @@ type Visitor {
   AGS field of view, understood as the diameter of a circular area.
   """
   agsDiameter: Angle!
+
+  """
+  Science field of view, understood as the diameter of a circular area.
+  """
+  scienceFovDiameter: Angle!
 
   """
   Optional descriptive name for this visitor mode selection.

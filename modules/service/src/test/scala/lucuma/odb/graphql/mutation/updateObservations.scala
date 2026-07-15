@@ -4800,6 +4800,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           mode: VISITOR_NORTH
           centralWavelength: { nanometers: 2200 }
           agsDiameter: { degrees: 1 }
+          scienceFovDiameter: { degrees: 1 }
         }
       }
     """
@@ -4817,6 +4818,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           mode: VISITOR_NORTH
           centralWavelength: { nanometers: 2200 }
           agsDiameter: { degrees: 1 }
+          scienceFovDiameter: { degrees: 1 }
           name: "north run"
           totalRequestTime: { hours: 3 }
         }
@@ -4882,6 +4884,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           mode: VISITOR_NORTH
           centralWavelength: { nanometers: 2200 }
           agsDiameter: { arcseconds: 5 }
+          scienceFovDiameter: { arcseconds: 5 }
           name: "IQUEYE"
           totalRequestTime: { hours: 3 }
         }
@@ -4913,6 +4916,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           mode: VISITOR_SOUTH
           centralWavelength: { nanometers: 2200 }
           agsDiameter: { arcseconds: 5 }
+          scienceFovDiameter: { arcseconds: 5 }
           name: "IQUEYE"
           totalRequestTime: { hours: 3 }
         }

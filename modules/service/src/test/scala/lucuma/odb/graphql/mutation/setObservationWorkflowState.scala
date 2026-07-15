@@ -254,6 +254,9 @@ class setObservationWorkflowState
         agsDiameter: {
           arcminutes: 1.23
         }
+        scienceFovDiameter: {
+          arcminutes: 1.23
+        }
       }
     """
 

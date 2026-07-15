@@ -89,3 +89,4 @@ TASK_*.md
 .claude/
 
 *.bkp
+.pi/

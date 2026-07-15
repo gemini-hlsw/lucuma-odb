@@ -25,13 +25,14 @@ object VisitorInput:
     mode: Option[VisitorObservingModeType],
     centralWavelength: Option[Wavelength],
     agsDiameter: Option[Angle],
+    scienceFovDiameter: Option[Angle],
     name: Option[NonEmptyString],
     totalRequestTime: Option[TimeSpan]
   ):
     def toCreate: Result[Create] =
       Result.fromOption(
-        (mode, centralWavelength, agsDiameter).mapN((m, w, f) =>
-          Create(m, w, f, name, totalRequestTime)
+        (mode, centralWavelength, agsDiameter, scienceFovDiameter).mapN((m, w, a, s) =>
+          Create(m, w, a, s, name, totalRequestTime)
         ),
         "Cannot turn edit into create; all required fields must be defined."
       ).flatMap: c =>
@@ -43,10 +44,11 @@ object VisitorInput:
         VisitorObservingModeTypeBinding("mode", rMode),
         WavelengthInput.Binding("centralWavelength", rWavelength),
         AngleInput.Binding("agsDiameter", rAgsDiameter),
+        AngleInput.Binding("scienceFovDiameter", rScienceFovDiameter),
         NonEmptyStringBinding.Option("name", rName),
         TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rAgsDiameter, rName, rTotalRequestTime).mapN(Create.apply)
+        (rMode, rWavelength, rAgsDiameter, rScienceFovDiameter, rName, rTotalRequestTime).mapN(Create.apply)
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
@@ -54,7 +56,8 @@ object VisitorInput:
         VisitorObservingModeTypeBinding.Option("mode", rMode),
         WavelengthInput.Binding.Option("centralWavelength", rWavelength),
         AngleInput.Binding.Option("agsDiameter", rAgsDiameter),
+        AngleInput.Binding.Option("scienceFovDiameter", rScienceFovDiameter),
         NonEmptyStringBinding.Option("name", rName),
         TimeSpanInput.Binding.Option("totalRequestTime", rTotalRequestTime)
       ) =>
-        (rMode, rWavelength, rAgsDiameter, rName, rTotalRequestTime).mapN(Edit.apply)
+        (rMode, rWavelength, rAgsDiameter, rScienceFovDiameter, rName, rTotalRequestTime).mapN(Edit.apply)
