@@ -76,6 +76,7 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
       angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
       angleMappingAtPath(VisitorType / "agsDiameter", VisitorTable.AgsDiameter, VisitorTable.ObservationId),
+      angleMappingAtPath(VisitorType / "scienceFovDiameter", VisitorTable.ScienceFovDiameter, VisitorTable.ObservationId),
       angleMappingAtPath(ConfigurationRequestType / "configuration" / "observingMode" / "visitor" / "radius", ConfigurationRequestView.Visitor.Radius, ConfigurationRequestView.Visitor.Id),
       angleMappingAtPath(ObservationType / "configuration" / "observingMode" / "visitor" / "radius", VisitorTable.AgsDiameter, VisitorTable.ObservationId),
     )

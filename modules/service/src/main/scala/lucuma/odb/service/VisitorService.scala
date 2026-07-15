@@ -97,6 +97,7 @@ object VisitorService:
                 SET.centralWavelength.map(sql"c_central_wavelength = $wavelength_pm"),
                 SET.mode.map(sql"c_observing_mode_type = $visitor_observing_mode_type"),
                 SET.agsDiameter.map(sql"c_ags_diameter = $angle_µas"),
+                SET.scienceFovDiameter.map(sql"c_science_fov_diameter = $angle_µas"),
                 SET.name.map(sql"c_name = $text_nonempty"),
                 SET.totalRequestTime.map(sql"c_total_request_time = $time_span")
               ).flatten
@@ -151,15 +152,16 @@ object VisitorService:
           c_observing_mode_type,
           c_central_wavelength,
           c_ags_diameter,
+          c_science_fov_diameter,
           c_name,
           c_total_request_time
         FROM
           t_visitor
         WHERE
            c_observation_id IN (${observation_id.nel(a)})
-      """.query(observation_id *: visitor_observing_mode_type *: wavelength_pm *: angle_µas *: text_nonempty.opt *: time_span.opt)
+      """.query(observation_id *: visitor_observing_mode_type *: wavelength_pm *: angle_µas *: angle_µas *: text_nonempty.opt *: time_span.opt)
         .map:
-          case (oid, mode, wavelength, sep, name, trt) => (oid, Config(mode, wavelength, sep, name, trt))
+          case (oid, mode, wavelength, sep, sf, name, trt) => (oid, Config(mode, wavelength, sep, sf, name, trt))
 
     val Insert: Command[(Observation.Id, VisitorInput.Create)] =
       sql"""
@@ -168,6 +170,7 @@ object VisitorService:
           c_observing_mode_type,
           c_central_wavelength,
           c_ags_diameter,
+          c_science_fov_diameter,
           c_name,
           c_total_request_time
         ) VALUES (
@@ -175,13 +178,14 @@ object VisitorService:
           $visitor_observing_mode_type,
           $wavelength_pm,
           $angle_µas,
+          $angle_µas,
           ${text_nonempty.opt},
           ${time_span.opt}
         )
       """.command
         .contramap:
-          case (oid, VisitorInput.Create(mode, wavelength, angle, name, trt)) =>
-            (oid, mode, wavelength, angle, name, trt)
+          case (oid, VisitorInput.Create(mode, wavelength, angle, scienceFov, name, trt)) =>
+            (oid, mode, wavelength, angle, scienceFov, name, trt)
 
     def delete[A <: NonEmptyList[Observation.Id]](a: A): Command[a.type] =
       sql"""
