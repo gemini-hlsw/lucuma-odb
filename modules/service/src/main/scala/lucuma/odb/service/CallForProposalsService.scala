@@ -69,28 +69,20 @@ object CallForProposalsService:
     gemini:             Option[CfpProperties.Gemini]
   ):
     // Validate that a proposal of the given observatory/subtype is compatible
-    // with this call: the observatories must agree, a Gemini proposal's science
-    // subtype must match the Gemini call type, and a Subaru proposal's call type
-    // must match the Subaru call's.
+    // with this call: the observatories must agree and a Gemini proposal's
+    // science subtype must match the Gemini call type.  (The Subaru proposal
+    // type is a property of the call itself, so there is nothing to reconcile.)
     def validate(
       proposalObservatory: Observatory,
-      scienceSubtype:      Option[ScienceSubtype],
-      subaruProposalType:  Option[SubaruCallForProposalsType]
+      scienceSubtype:      Option[ScienceSubtype]
     ): Result[Unit] =
       if proposalObservatory =!= observatory then
         CfpProperties.mismatchedObservatory(cid, observatory, proposalObservatory).asFailure
       else
-        val subtypeCheck: Result[Unit] =
-          (gemini, scienceSubtype).tupled.fold(Result.unit): (gem, sub) =>
-            CfpProperties.mismatchedGeminiCfp(cid, gem.callType, sub)
-              .asFailure
-              .unlessA(sub.isCompatibleWith(gem.callType))
-        val subaruCheck: Result[Unit] =
-          (this.subaruProposalType, subaruProposalType).tupled.fold(Result.unit): (callType, propType) =>
-            CfpProperties.mismatchedSubaru(cid, callType, propType)
-              .asFailure
-              .unlessA(callType === propType)
-        (subtypeCheck, subaruCheck).tupled.void
+        (gemini, scienceSubtype).tupled.fold(Result.unit): (gem, sub) =>
+          CfpProperties.mismatchedGeminiCfp(cid, gem.callType, sub)
+            .asFailure
+            .unlessA(sub.isCompatibleWith(gem.callType))
 
   object CfpProperties:
 
@@ -115,15 +107,6 @@ object CallForProposalsService:
     OdbError =
       OdbError.InvalidArgument(
         s"The Call for Proposals $cid is a ${cfpType.title} call and cannot be used with a ${sub.title} proposal.".some
-      )
-
-    def mismatchedSubaru(
-      cid:      CallForProposals.Id,
-      cfpType:  SubaruCallForProposalsType,
-      propType: SubaruCallForProposalsType):
-    OdbError =
-      OdbError.InvalidArgument(
-        s"The Call for Proposals $cid is a Subaru $cfpType call and cannot be used with a Subaru $propType proposal.".some
       )
 
   def instantiate[F[_]: Concurrent](using Services[F]): CallForProposalsService[F] =

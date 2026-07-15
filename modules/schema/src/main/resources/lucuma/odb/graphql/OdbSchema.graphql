@@ -4529,9 +4529,6 @@ type KeckProposalType {
 Proposal properties for an exchange proposal requesting time at Subaru.
 """
 type SubaruProposalType {
-  "The Subaru call for proposals type (normal or intensive)."
-  type: SubaruCallForProposalsType!
-
   """
   Minimum percentage of observing time required to consider this proposal
   successful.
@@ -4821,11 +4818,6 @@ input KeckProposalTypeInput {
 Properties for an exchange proposal requesting time at Subaru.
 """
 input SubaruProposalTypeInput {
-  """
-  The Subaru call for proposals type.  If not specified, NORMAL is assumed.
-  """
-  type: SubaruCallForProposalsType
-
   """
   The minimum percentage of time required to consider this proposal a success.
   If not set, 100% is assumed.

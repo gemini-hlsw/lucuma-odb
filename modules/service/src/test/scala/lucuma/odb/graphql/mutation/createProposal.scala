@@ -1704,7 +1704,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                     percent
                   }
                 }
-                subaru { type }
+                subaru { minPercentTime }
               }
             }
           }
@@ -1763,7 +1763,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
-  test("✓ Subaru intensive exchange proposal"):
+  test("✓ Subaru exchange proposal"):
     createProgramAs(pi, "Subaru Proposal").flatMap: pid =>
       expect(
         user = pi,
@@ -1774,7 +1774,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   subaru: {
-                    type: INTENSIVE
                     minPercentTime: 30
                     partnerSplits: [{ partner: US, percent: 100 }]
                   }
@@ -1785,7 +1784,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini { scienceSubtype }
                 keck { partnerSplits { partner } }
                 subaru {
-                  type
                   minPercentTime
                   partnerSplits { partner percent }
                 }
@@ -1800,7 +1798,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "gemini": null,
                 "keck": null,
                 "subaru": {
-                  "type": "INTENSIVE",
                   "minPercentTime": 30,
                   "partnerSplits": [
                     { "partner": "US", "percent": 100 }
@@ -1812,8 +1809,8 @@ class createProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
-  test("✓ Subaru exchange proposal defaults to NORMAL"):
-    createProgramAs(pi, "Subaru Normal Proposal").flatMap: pid =>
+  test("✓ Subaru exchange proposal defaults minPercentTime to 100"):
+    createProgramAs(pi, "Subaru Default Proposal").flatMap: pid =>
       expect(
         user = pi,
         query = s"""
@@ -1829,7 +1826,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                subaru { type minPercentTime }
+                subaru { minPercentTime }
               }
             }
           }
@@ -1839,7 +1836,6 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal": {
               "proposal": {
                 "subaru": {
-                  "type": "NORMAL",
                   "minPercentTime": 100
                 }
               }
@@ -1859,7 +1855,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   gemini: { queue: { minPercentTime: 50 } }
-                  subaru: { type: NORMAL }
+                  subaru: { minPercentTime: 50 }
                 }
               }
             ) {
@@ -1942,7 +1938,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
       _   <- go(cid, pid)
     yield ()
 
-  test("⨯ Subaru proposal call type must match the call (intensive on normal)"):
+  test("✓ Subaru proposal on a Subaru call"):
     def go(cid: CallForProposals.Id, pid: Program.Id): IO[Unit] =
       expect(
         user = pi,
@@ -1951,35 +1947,12 @@ class createProposal extends OdbSuite with DatabaseOperations {
             createProposal(
               input: {
                 programId: "$pid"
-                SET: { callId: "$cid", subaru: { type: INTENSIVE } }
-              }
-            ) { proposal { category } }
-          }
-        """,
-        expected =
-          List(s"The Call for Proposals $cid is a Subaru Normal call and cannot be used with a Subaru Intensive proposal.").asLeft
-      )
-    for
-      cid <- createSubaruCallForProposalsAs(staff, subaruType = lucuma.core.enums.SubaruCallForProposalsType.Normal)
-      pid <- createProgramAs(pi, "Subaru type mismatch")
-      _   <- go(cid, pid)
-    yield ()
-
-  test("✓ Subaru proposal matching its call"):
-    def go(cid: CallForProposals.Id, pid: Program.Id): IO[Unit] =
-      expect(
-        user = pi,
-        query = s"""
-          mutation {
-            createProposal(
-              input: {
-                programId: "$pid"
-                SET: { callId: "$cid", subaru: { type: INTENSIVE, partnerSplits: [{ partner: US, percent: 100 }] } }
+                SET: { callId: "$cid", subaru: { partnerSplits: [{ partner: US, percent: 100 }] } }
               }
             ) {
               proposal {
                 call { id }
-                subaru { type }
+                subaru { minPercentTime }
               }
             }
           }
@@ -1989,7 +1962,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
             "createProposal": {
               "proposal": {
                 "call": { "id": $cid },
-                "subaru": { "type": "INTENSIVE" }
+                "subaru": { "minPercentTime": 100 }
               }
             }
           }

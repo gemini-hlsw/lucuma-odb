@@ -221,12 +221,17 @@ object ProposalService {
         cfp:               Option[CfpProperties],
         considerForBand3:  Option[ConsiderForBand3],
         exchangePartner:   Option[ExchangePartner],
-        observatory:       Option[Observatory],
-        subaruProposalType: Option[SubaruCallForProposalsType]
+        observatory:       Option[Observatory]
       ) {
         // Every stored proposal has an observatory; default to Gemini defensively.
         val obs: Observatory = observatory.getOrElse(Observatory.Gemini)
         val isExternal: Boolean = obs =!= Observatory.Gemini
+
+        // The Subaru proposal type is a property of the linked call, not of the
+        // proposal itself.  It is non-empty only for a Subaru proposal (whose
+        // call is a Subaru call); the t_program mirror is fed from here.
+        val subaruProposalType: Option[SubaruCallForProposalsType] =
+          cfp.flatMap(_.subaruProposalType)
 
         val isPastDeadline: Option[Boolean] =
           deadline.map(_ < currentTime)
@@ -325,19 +330,11 @@ object ProposalService {
           // set.observatory is None when the edit doesn't change the variant.
           val newObservatory = set.observatory.orElse(observatory)
 
-          // A Subaru proposal always has a call type (defaulting to Normal); any
-          // other observatory has none.
-          val newSubaru =
-            newObservatory match
-              case Some(Observatory.Subaru) =>
-                set.subaruCallType.orElse(subaruProposalType).orElse(SubaruCallForProposalsType.Normal.some)
-              case _                        => none
-
           (for
             c <- eCfp
             s <- eCfp.map(_.map(_.semester))
             p <- eCfp.map(_.flatMap(_.gemini).map(_.proprietary).getOrElse(proprietary))
-          yield copy(semester = s, scienceSubtype = newSubtype, observatory = newObservatory, subaruProposalType = newSubaru, splitsSum = eSum, proprietary = p, cfp = c)).value
+          yield copy(semester = s, scienceSubtype = newSubtype, observatory = newObservatory, splitsSum = eSum, proprietary = p, cfp = c)).value
 
         private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MMM-dd")
         private def formatDate(t: Timestamp): String = dateFormatter.format(t.toLocalDateTime)
@@ -435,7 +432,7 @@ object ProposalService {
           _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
 
         val codec: Decoder[ProposalContext] =
-          (proposal_status *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: observatory.opt *: subaru_proposal_type.opt).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: observatory.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -465,14 +462,14 @@ object ProposalService {
         // observatory must match, and (for Gemini/Subaru) the science subtype or
         // Subaru call type must agree with the call.
         def checkCfpCompatibility(o: Option[CfpProperties]): ResultT[F, Unit] =
-          ResultT.fromResult(o.fold(Result.unit)(_.validate(input.SET.observatory, input.SET.scienceSubtype, input.SET.subaruProposalType)))
+          ResultT.fromResult(o.fold(Result.unit)(_.validate(input.SET.observatory, input.SET.scienceSubtype)))
 
         // Update the program's science subtype and/or semester to match inputs.
         def updateProgram(
           p: ProposalContext,
           c: Option[CfpProperties]
         ): ResultT[F, Unit] =
-          ResultT.liftF(p.updateProgram(input.programId, input.SET.scienceSubtype, input.SET.observatory, input.SET.subaruProposalType, c.map(_.semester), c.flatMap(_.gemini).map(_.proprietary)))
+          ResultT.liftF(p.updateProgram(input.programId, input.SET.scienceSubtype, input.SET.observatory, c.flatMap(_.subaruProposalType), c.map(_.semester), c.flatMap(_.gemini).map(_.proprietary)))
 
         val insert: ResultT[F, Unit] =
           val af = Statements.insertProposal(input.programId, input.SET)
@@ -512,7 +509,7 @@ object ProposalService {
         // observatory must match, and (for Gemini/Subaru) the science subtype or
         // Subaru call type must agree with the call.
         def checkCfpCompatibility(p: ProposalContext): ResultT[F, Unit] =
-          ResultT.fromResult(p.cfp.fold(Result.unit)(_.validate(p.obs, p.scienceSubtype, p.subaruProposalType)))
+          ResultT.fromResult(p.cfp.fold(Result.unit)(_.validate(p.obs, p.scienceSubtype)))
 
         def checkUserAccess(pid: Program.Id, p: ProposalContext): ResultT[F, Unit] =
           ResultT.fromResult(
@@ -665,9 +662,8 @@ object ProposalService {
             else
               call.considerForBand3.map(sql"c_consider_for_band_3 = ${consider_for_band_3}")
 
-          // A Gemini proposal sits at Gemini and has no Subaru proposal type.
+          // A Gemini proposal sits at Gemini.
           sql"c_observatory = ${observatory}"(Observatory.Gemini) ::
-          sql"c_subaru_proposal_type = ${subaru_proposal_type.opt}"(none) ::
           sql"c_science_subtype = $science_subtype"(call.scienceSubtype) ::
           List(
             call.tooActivation.map(sql"c_too_activation = ${too_activation}"),
@@ -684,24 +680,20 @@ object ProposalService {
           ).flatten
         }
 
-      // An external (Keck/Subaru) proposal carries an observatory (and, for
-      // Subaru, a call type) and clears all Gemini-specific properties.  A Subaru
-      // edit that omits the call type leaves the existing one unchanged; a Keck
-      // proposal clears it.
+      // An external (Keck/Subaru) proposal carries an observatory and clears all
+      // Gemini-specific properties.  (The Subaru proposal type is a property of
+      // the call, not the proposal.)
       val externalUpdates: List[AppliedFragment] =
         if SET.keck.isEmpty && SET.subaru.isEmpty then Nil
         else {
-          val (obs, subaruType): (Observatory, Nullable[SubaruCallForProposalsType]) =
-            SET.subaru match
-              case Some(s) => (Observatory.Subaru, Nullable.orAbsent(s.callType))
-              case None    => (Observatory.Keck, Nullable.Null)
+          val obs: Observatory =
+            if SET.subaru.isDefined then Observatory.Subaru else Observatory.Keck
           // The minimum percent time comes from whichever exchange type is
           // present; when omitted the existing value is left unchanged.
           val minPercentTime: Option[IntPercent] =
             SET.keck.flatMap(_.minPercentTime).orElse(SET.subaru.flatMap(_.minPercentTime))
           List(
             sql"c_observatory = ${observatory}"(obs).some,
-            subaruType.foldPresent(sql"c_subaru_proposal_type = ${subaru_proposal_type.opt}"),
             sql"c_science_subtype = ${science_subtype.opt}"(none).some,
             sql"c_too_activation = ${too_activation}"(ToOActivation.None).some,
             minPercentTime.map(sql"c_min_percent = ${int_percent}"),
@@ -799,9 +791,9 @@ object ProposalService {
       )
 
     // An external (exchange) proposal has no science subtype; it carries an
-    // observatory and (for Subaru) a Subaru proposal type instead.  The
-    // Gemini-specific columns take their table defaults; c_min_percent has no
-    // default and is taken from the exchange proposal type (defaulting to 100%).
+    // observatory instead.  The Gemini-specific columns take their table
+    // defaults; c_min_percent has no default and is taken from the exchange
+    // proposal type (defaulting to 100%).
     private def insertExternalProposal(
       pid: Program.Id,
       c:   ProposalPropertiesInput.Create
@@ -816,21 +808,18 @@ object ProposalService {
           c_cfp_id,
           c_category,
           c_observatory,
-          c_subaru_proposal_type,
           c_min_percent
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
           ${tag.opt},
           ${observatory},
-          ${subaru_proposal_type.opt},
           ${int_percent}
       """.apply(
         pid,
         c.callId,
         c.category,
         c.observatory,
-        c.subaruProposalType,
         minPercentTime
       )
 
@@ -907,8 +896,7 @@ object ProposalService {
           cfp.c_gemini_proprietary,
           prop.c_consider_for_band_3,
           prop.c_exchange_partner,
-          prop.c_observatory,
-          prop.c_subaru_proposal_type
+          prop.c_observatory
         FROM t_program prog
         LEFT JOIN t_proposal prop
           ON prog.c_program_id = prop.c_program_id
