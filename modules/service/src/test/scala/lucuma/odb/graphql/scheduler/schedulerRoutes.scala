@@ -13,7 +13,6 @@ import lucuma.core.enums.GcalLampType
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepType
 import lucuma.core.model.Observation
-import lucuma.core.model.User
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
@@ -22,7 +21,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import org.http4s.*
-import org.http4s.implicits.*
 
 class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForGmos:
 
@@ -33,11 +31,6 @@ class schedulerRoutes extends SchedulerRoutesSuite with ExecutionTestSupportForG
       20.minTimeSpan,
       PosInt.unsafeFrom(10)
     )
-
-  def withRoutes[A](user: User, request: Request[IO]): IO[Response[IO]] =
-    withSession: s =>
-      servicesFor(user).use: srv =>
-        SchedulerRoutes(srv(s), ssoClient).orNotFound.run(request)
 
   test("not service user"):
     atomsRequest(pi).flatMap: request =>

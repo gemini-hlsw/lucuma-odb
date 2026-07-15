@@ -2193,6 +2193,7 @@ trait DatabaseOperations { this: OdbSuite =>
             WHERE: {
               id: { EQ: "$tid"}
             }
+            includeDeleted: true
           }) {
             targets {
               id

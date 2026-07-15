@@ -228,6 +228,9 @@ trait Services[F[_]]:
   /** The `TimingWindowService`. */
   def timingWindowService: TimingWindowService[F]
 
+  /** The `VisibilityService`. */
+  def visibilityService: VisibilityService[F]
+
   /** The `VisitService` */
   def visitService: VisitService[F]
 
@@ -380,6 +383,7 @@ object Services:
       lazy val timeAccountingService = TimeAccountingService.instantiate
       lazy val timeService = TimeService.instantiate
       lazy val timingWindowService = TimingWindowService.instantiate
+      lazy val visibilityService = VisibilityService.instantiate
       lazy val visitService = VisitService.instantiate
       lazy val obscalcService = ObscalcService.instantiate
       lazy val timeEstimateService = TimeEstimateService.instantiate
@@ -458,6 +462,7 @@ object Services:
     def timeAccountingService[F[_]](using Services[F]): TimeAccountingService[F] = summon[Services[F]].timeAccountingService
     def timeService[F[_]](using Services[F]): TimeService[F] = summon[Services[F]].timeService
     def timingWindowService[F[_]](using Services[F]): TimingWindowService[F] = summon[Services[F]].timingWindowService
+    def visibilityService[F[_]](using Services[F]): VisibilityService[F] = summon[Services[F]].visibilityService
     def visitService[F[_]](using Services[F]): VisitService[F] = summon[Services[F]].visitService
     def itcService[F[_]](using Services[F]): ItcService[F] = summon[Services[F]].itcService
     def generator[F[_]](using Services[F]): Generator[F] = summon[Services[F]].generator
