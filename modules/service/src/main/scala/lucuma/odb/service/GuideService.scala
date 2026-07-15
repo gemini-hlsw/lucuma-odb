@@ -33,7 +33,6 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.PortDisposition
 import lucuma.core.enums.Site
 import lucuma.core.enums.TrackType
-import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -320,7 +319,7 @@ object GuideService {
           (Site.GN, tpe, mode.filter.centralWavelength)
         case _: igrins2.longslit.Config                       =>
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
-        case visitor.Config(mode, wavelength, _, _, _)        =>
+        case visitor.Config(mode, wavelength, _, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
 
     // Extra static coordinates AGS should treat like science positions.
@@ -381,12 +380,10 @@ object GuideService {
             AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2) =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
-          case (c: visitor.Config, GuideProbe.PWFS2) if c.mode === VisitorObservingModeType.MaroonX         =>
-            AgsParams.MaroonX(PortDisposition.Bottom).withPWFS2.some
-          case (c: visitor.Config, GuideProbe.PWFS1) if c.mode === VisitorObservingModeType.MaroonX         =>
-            AgsParams.MaroonX(PortDisposition.Bottom).withPWFS1.some
           case (c: visitor.Config, GuideProbe.PWFS2)                                                        =>
-            AgsParams.Visitor(c.agsDiameter, PortDisposition.Bottom).withPWFS2.some
+            AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS2.some
+          case (c: visitor.Config, GuideProbe.PWFS1)                                                        =>
+            AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS1.some
           case _                                                                                            =>
             none
 

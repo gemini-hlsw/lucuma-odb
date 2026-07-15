@@ -1613,12 +1613,15 @@ trait DatabaseOperations { this: OdbSuite =>
             name: "test visitor"
             totalRequestTime: { hours: 1 }"""
           case _ => ""
+        val (agsDiameter, scienceFovDiameter) = v match
+          case VisitorObservingModeType.MaroonX => ("{ arcseconds: 60 }", "{ arcseconds: 0.77 }")
+          case _                                => ("{ arcseconds: 1 }",  "{ arcseconds: 1 }")
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            agsDiameter: { arcseconds: 1 }
-            scienceFovDiameter: { arcseconds: 1 }$extras
+            agsDiameter: $agsDiameter
+            scienceFovDiameter: $scienceFovDiameter$extras
           }
         }"""
       case _ => ???
