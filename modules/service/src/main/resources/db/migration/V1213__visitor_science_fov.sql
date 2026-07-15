@@ -26,6 +26,10 @@ UPDATE t_visitor
   SET c_science_fov_diameter = c_ags_diameter
   WHERE c_observing_mode_type IN ('visitor_north', 'visitor_south');
 
+-- Flush the deferred trigger events queued by the UPDATEs above so the
+-- following ALTER TABLE is not blocked
+SET CONSTRAINTS ALL IMMEDIATE;
+
 ALTER TABLE t_visitor ALTER COLUMN c_science_fov_diameter SET NOT NULL;
 
 COMMENT ON COLUMN t_visitor.c_science_fov_diameter IS
