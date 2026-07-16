@@ -504,7 +504,7 @@ object ObservationWorkflowService {
             case Inactive   => List(executionState.getOrElse(validationStatus))
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
-            case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (info.isAccepted || info.tpe =!= ProgramType.Science))(Ready)
+            case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
@@ -519,7 +519,7 @@ object ObservationWorkflowService {
         type Validator = ObservationValidationInfo => ObservationValidationMap
 
         val (cals, other)         = infos.partition(_._2.role.isDefined)
-        val (nonScience, science) = other.partition(_._2.tpe =!= ProgramType.Science)
+        val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
 
         // Here are our simple validators
 

@@ -300,8 +300,12 @@ object ProposalService {
           newSemester:    Option[Semester],
           newProprietary: Option[NonNegInt]
         ): F[Unit] =
+          val newProgramType: ProgramType = newObservatory match
+            case Observatory.Gemini => ProgramType.Science
+            case Observatory.Keck   => ProgramType.Keck
+            case Observatory.Subaru => ProgramType.Subaru
           session
-            .execute(Statements.UpdateProgram)(pid, newType, newObservatory, newSubaru, newSemester, newProprietary)
+            .execute(Statements.UpdateProgram)(pid, newType, newProgramType, newSubaru, newSemester, newProprietary)
             .whenA(
               scienceSubtype =!= newType ||
               !observatory.contains(newObservatory) ||
@@ -440,8 +444,8 @@ object ProposalService {
             af.fragment.query(program_type *: codec)
           ).use { ps =>
             ps.option(af.argument).map {
-              case Some((ProgramType.Science, pc)) => pc.success
-              case Some((t, pc))                   => invalidProgramType(pid, t).asFailure
+              case Some((t, pc)) if t.hasProposal => pc.success
+              case Some((t, pc))                  => invalidProgramType(pid, t).asFailure
               case _                               => OdbError.InvalidProgram(pid).asFailure
             }
           }
@@ -579,10 +583,11 @@ object ProposalService {
       )(using Transaction[F], Services.StaffAccess): F[Result[Boolean]] =
         session
           .execute(Statements.DeleteProposal)(input.programId)
-          .map {
-            case Delete(0) => false.success
-            case Delete(1) => true.success
-            case c         => OdbError.InvalidArgument(s"Could not delete proposal in ${input.programId}: $c".some).asFailure
+          .flatMap {
+            case Delete(0) => false.success.pure[F]
+            case Delete(1) =>
+              session.execute(Statements.ResetProgramTypeToScience)(input.programId).as(true.success)
+            case c         => OdbError.InvalidArgument(s"Could not delete proposal in ${input.programId}: $c".some).asFailure.pure[F]
           }
 
       override def setProposalStatus(
@@ -644,6 +649,17 @@ object ProposalService {
     val DeleteProposal: Command[Program.Id] =
       sql"""
         DELETE FROM t_proposal WHERE c_program_id = $program_id
+      """.command
+
+    // Removing a proposal reverts an exchange (keck/subaru) program back to a
+    // plain Gemini science program.
+    val ResetProgramTypeToScience: Command[Program.Id] =
+      sql"""
+        UPDATE t_program
+           SET c_program_type         = 'science',
+               c_subaru_proposal_type = NULL
+         WHERE c_program_id = $program_id
+           AND c_program_type IN ('keck', 'subaru')
       """.command
 
     def updates(SET: ProposalPropertiesInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
@@ -823,14 +839,15 @@ object ProposalService {
         minPercentTime
       )
 
-    // The science subtype, observatory and Subaru proposal type are mirrored
-    // directly from the proposal (so they may be cleared), while the semester and
+    // The science subtype, program type (which encodes the observatory:
+    // gemini->science, keck->keck, subaru->subaru) and Subaru proposal type are
+    // mirrored from the proposal (so they may be cleared), while the semester and
     // proprietary period (which come from the CfP) are left unchanged when absent.
-    val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], Observatory, Option[SubaruCallForProposalsType], Option[Semester], Option[NonNegInt])] =
+    val UpdateProgram: Command[(Program.Id, Option[ScienceSubtype], ProgramType, Option[SubaruCallForProposalsType], Option[Semester], Option[NonNegInt])] =
       sql"""
         UPDATE t_program
            SET c_science_subtype      = ${science_subtype.opt},
-               c_observatory          = ${observatory},
+               c_program_type         = ${program_type},
                c_subaru_proposal_type = ${subaru_proposal_type.opt},
                c_semester        = CASE
                                      WHEN ${semester.opt} IS NULL THEN c_semester

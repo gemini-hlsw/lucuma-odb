@@ -13,6 +13,7 @@ import io.circe.literal.*
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
@@ -324,6 +325,123 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
     } yield ()
   }
 
+  // Keck and Subaru time-exchange proposals: attaching one flips the program to
+  // the corresponding program type, and once accepted the program reference is
+  // G-{semester}-{index}-{K|U|I}, exposed via the Keck/Subaru reference types.
+  private def addExchangeProposal(pid: Program.Id, cid: CallForProposals.Id, set: String): IO[Unit] =
+    query(pi, s"""
+      mutation {
+        createProposal(input: {
+          programId: "$pid"
+          SET: {
+            category: GALACTIC_OTHER
+            callId: "$cid"
+            $set
+          }
+        }) { proposal { category } }
+      }
+    """).void
+
+  private val exchangeSplits =
+    """partnerSplits: [ { partner: US, percent: 70 }, { partner: CA, percent: 30 } ]"""
+
+  test("attaching a Subaru proposal flips the program type to SUBARU") {
+    for {
+      cid <- createSubaruCallForProposalsAs(staff, subaruType = SubaruCallForProposalsType.Intensive)
+      pid <- createProgramWithUsPi(pi)
+      _   <- addExchangeProposal(pid, cid, s"subaru: { $exchangeSplits }")
+      _   <- expect(pi, s"""
+          query { program(programId: "$pid") { type } }
+        """,
+        json"""{ "program": { "type": "SUBARU" } }""".asRight
+      )
+    } yield ()
+  }
+
+  test("accepted Keck program reference ends in -K") {
+    for {
+      cid  <- createKeckCallForProposalsAs(staff, semester = "2026A".semester)
+      pid  <- createProgramWithUsPi(pi)
+      _    <- addExchangeProposal(pid, cid, s"keck: { $exchangeSplits }")
+      _    <- addCoisAs(pi, pid)
+      refP <- submitProposal(pi, pid)
+      refG <- acceptProposal(staff, pid)
+      _    <- expect(pi, s"""
+          query {
+            program(programId: "$pid") {
+              type
+              reference {
+                label
+                type
+                ... on KeckProgramReference { semester semesterIndex }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "program": {
+              "type": "KECK",
+              "reference": {
+                "label": ${s"${refP.label}-K"},
+                "type": "KECK",
+                "semester": ${refP.semester.format},
+                "semesterIndex": ${refP.index.value}
+              }
+            }
+          }
+        """.asRight
+      )
+    } yield assertEquals(refG.map(_.label), s"${refP.label}-K".some)
+  }
+
+  test("accepted Subaru intensive program reference ends in -I") {
+    for {
+      cid  <- createSubaruCallForProposalsAs(staff, semester = "2026B".semester, subaruType = SubaruCallForProposalsType.Intensive)
+      pid  <- createProgramWithUsPi(pi)
+      _    <- addExchangeProposal(pid, cid, s"subaru: { $exchangeSplits }")
+      _    <- addCoisAs(pi, pid)
+      refP <- submitProposal(pi, pid)
+      refG <- acceptProposal(staff, pid)
+      _    <- expect(pi, s"""
+          query {
+            program(programId: "$pid") {
+              reference {
+                label
+                type
+                ... on SubaruProgramReference { semester semesterIndex subaruType }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "program": {
+              "reference": {
+                "label": ${s"${refP.label}-I"},
+                "type": "SUBARU",
+                "semester": ${refP.semester.format},
+                "semesterIndex": ${refP.index.value},
+                "subaruType": "INTENSIVE"
+              }
+            }
+          }
+        """.asRight
+      )
+    } yield assertEquals(refG.map(_.label), s"${refP.label}-I".some)
+  }
+
+  test("accepted Subaru normal program reference ends in -U") {
+    for {
+      cid  <- createSubaruCallForProposalsAs(staff, semester = "2027A".semester, subaruType = SubaruCallForProposalsType.Normal)
+      pid  <- createProgramWithUsPi(pi)
+      _    <- addExchangeProposal(pid, cid, s"subaru: { $exchangeSplits }")
+      _    <- addCoisAs(pi, pid)
+      refP <- submitProposal(pi, pid)
+      refG <- acceptProposal(staff, pid)
+    } yield assertEquals(refG.map(_.label), s"${refP.label}-U".some)
+  }
+
   test("change proposal class in accepted proposal") {
     def toClassical(pid: Program.Id, cid: CallForProposals.Id): IO[Json] =
       query(
@@ -514,6 +632,40 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid <- createProgramAs(pi)
       ref <- setProgramReference(staff, pid, """engineering: { semester: "2025B", instrument: GMOS_SOUTH }""")
     } yield assertEquals(ref, "G-2025B-ENG-GMOSS-02".programReference.some)
+  }
+
+  // The manual setProgramReference path supports the Keck/Subaru exchange types.
+  // Like science, their reference label only materializes once accepted, so on an
+  // unaccepted program the mutation flips the type but returns no reference.
+  test("setProgramReference KECK sets the type") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(staff, pid, """keck: { semester: "2025B" }""")
+      _   <- expect(pi, s"""query { program(programId: "$pid") { type reference { label } } }""",
+               json"""{ "program": { "type": "KECK", "reference": null } }""".asRight)
+    } yield assertEquals(ref, none)
+  }
+
+  test("setProgramReference SUBARU sets the type") {
+    for {
+      pid <- createProgramAs(pi)
+      ref <- setProgramReference(staff, pid, """subaru: { semester: "2025B", subaruType: INTENSIVE }""")
+      _   <- expect(pi, s"""query { program(programId: "$pid") { type reference { label } } }""",
+               json"""{ "program": { "type": "SUBARU", "reference": null } }""".asRight)
+    } yield assertEquals(ref, none)
+  }
+
+  // A program that has a proposal may only take a proposal-bearing reference type;
+  // previously only SCIENCE was allowed, now KECK/SUBARU are too.
+  test("setProgramReference KECK is allowed on a program with a proposal") {
+    for {
+      cid <- createGeminiCallForProposalsAs(staff, semester = sem2025B)
+      pid <- createProgramAs(pi)
+      _   <- addQueueProposal(pi, pid, cid)
+      ref <- setProgramReference(staff, pid, """keck: { semester: "2025B" }""")
+      _   <- expect(pi, s"""query { program(programId: "$pid") { type } }""",
+               json"""{ "program": { "type": "KECK" } }""".asRight)
+    } yield assertEquals(ref, none)
   }
 
   test("program reference ENG fields") {

@@ -48,9 +48,11 @@ trait ProgramReferenceMapping[F[_]]
           case PT.Commissioning => Result(CommissioningProgramReferenceType)
           case PT.Engineering   => Result(EngineeringProgramReferenceType)
           case PT.Example       => Result(ExampleProgramReferenceType)
+          case PT.Keck          => Result(KeckProgramReferenceType)
           case PT.Library       => Result(LibraryProgramReferenceType)
           case PT.Monitoring    => Result(MonitoringProgramReferenceType)
           case PT.Science       => Result(ScienceProgramReferenceType)
+          case PT.Subaru        => Result(SubaruProgramReferenceType)
           case PT.System        => Result(SystemProgramReferenceType)
 
       private def mkPredicate(tpe: PT): Result[Predicate] =
@@ -62,9 +64,11 @@ trait ProgramReferenceMapping[F[_]]
           case CommissioningProgramReferenceType => mkPredicate(PT.Commissioning)
           case EngineeringProgramReferenceType   => mkPredicate(PT.Engineering)
           case ExampleProgramReferenceType       => mkPredicate(PT.Example)
+          case KeckProgramReferenceType          => mkPredicate(PT.Keck)
           case LibraryProgramReferenceType       => mkPredicate(PT.Library)
           case MonitoringProgramReferenceType    => mkPredicate(PT.Monitoring)
           case ScienceProgramReferenceType       => mkPredicate(PT.Science)
+          case SubaruProgramReferenceType        => mkPredicate(PT.Subaru)
           case SystemProgramReferenceType        => mkPredicate(PT.System)
           case _                                 => Result.internalError(s"Invalid discriminator: $tpe")
     }
@@ -113,6 +117,21 @@ trait ProgramReferenceMapping[F[_]]
       SqlField("scienceSubtype", ProgramReferenceView.ScienceSubtype),
       SqlField("semester",       ProgramReferenceView.Semester),
       SqlField("semesterIndex",  ProgramReferenceView.SemesterIndex)
+    )
+
+  lazy val KeckProgramReferenceMapping: ObjectMapping =
+    ObjectMapping(KeckProgramReferenceType)(
+      SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
+      SqlField("semester",      ProgramReferenceView.Semester),
+      SqlField("semesterIndex", ProgramReferenceView.SemesterIndex)
+    )
+
+  lazy val SubaruProgramReferenceMapping: ObjectMapping =
+    ObjectMapping(SubaruProgramReferenceType)(
+      SqlField("id",            ProgramReferenceView.Id, key = true, hidden = true),
+      SqlField("semester",      ProgramReferenceView.Semester),
+      SqlField("semesterIndex", ProgramReferenceView.SemesterIndex),
+      SqlField("subaruType",    ProgramReferenceView.SubaruType)
     )
 
 }

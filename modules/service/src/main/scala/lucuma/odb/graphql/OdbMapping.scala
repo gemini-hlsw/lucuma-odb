@@ -526,6 +526,8 @@ object OdbMapping {
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 SchedulingConstraintsMapping,
+                KeckProgramReferenceMapping,
+                SubaruProgramReferenceMapping,
                 ScienceProgramReferenceMapping,
                 ScienceRequirementsMapping,
                 SequenceEventMapping,

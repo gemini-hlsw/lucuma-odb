@@ -5520,9 +5520,11 @@ input ProgramReferencePropertiesInput @oneOf {
   commissioning: ProgramReferencePropertiesCommissioningInput
   engineering: ProgramReferencePropertiesEngineeringInput
   example: ProgramReferencePropertiesExampleInput
+  keck: ProgramReferencePropertiesKeckInput
   library: ProgramReferencePropertiesLibraryInput
   monitoring: ProgramReferencePropertiesMonitoringInput
   science: ProgramReferencePropertiesScienceInput
+  subaru: ProgramReferencePropertiesSubaruInput
   system: ProgramReferencePropertiesSystemInput
 }
 
@@ -5594,11 +5596,26 @@ input ProgramReferencePropertiesMonitoringInput {
 }
 
 """
+Inputs required when updating or switching to a Keck time-exchange program.
+"""
+input ProgramReferencePropertiesKeckInput {
+  semester: Semester!
+}
+
+"""
 Inputs required when updating or switching to a science program.
 """
 input ProgramReferencePropertiesScienceInput {
   semester: Semester!
   scienceSubtype: ScienceSubtype!
+}
+
+"""
+Inputs required when updating or switching to a Subaru time-exchange program.
+"""
+input ProgramReferencePropertiesSubaruInput {
+  semester: Semester!
+  subaruType: SubaruCallForProposalsType!
 }
 
 """
@@ -14339,6 +14356,24 @@ type ScienceProgramReference implements ProgramReference {
   semesterIndex: PosInt!
 }
 
+"Reference for a Keck time-exchange program."
+type KeckProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+"Reference for a Subaru time-exchange program."
+type SubaruProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  semester: Semester!
+  semesterIndex: PosInt!
+  "The Subaru call type (normal or intensive) that determines the reference letter (U or I)."
+  subaruType: SubaruCallForProposalsType!
+}
+
 type SystemProgramReference implements ProgramReference {
   label: ProgramReferenceLabel!
   type: ProgramType!
@@ -14376,10 +14411,14 @@ type ProgramSelectResult {
 
 enum ProgramType {
   CALIBRATION
+  COMMISSIONING
   ENGINEERING
   EXAMPLE
+  KECK
   LIBRARY
+  MONITORING
   SCIENCE
+  SUBARU
   SYSTEM
 }
 

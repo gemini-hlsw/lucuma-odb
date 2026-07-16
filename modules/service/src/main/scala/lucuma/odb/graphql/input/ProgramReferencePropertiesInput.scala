@@ -10,6 +10,7 @@ import grackle.syntax.*
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ScienceSubtype
+import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
 import lucuma.odb.graphql.binding.Matcher
@@ -20,9 +21,11 @@ case class ProgramReferencePropertiesInput(
          ProgramReferencePropertiesCommissioningInput |
          ProgramReferencePropertiesEngineeringInput   |
          ProgramReferencePropertiesExampleInput       |
+         ProgramReferencePropertiesKeckInput          |
          ProgramReferencePropertiesLibraryInput       |
          ProgramReferencePropertiesMonitoringInput    |
          ProgramReferencePropertiesScienceInput       |
+         ProgramReferencePropertiesSubaruInput        |
          ProgramReferencePropertiesSystemInput
 ) {
 
@@ -32,9 +35,11 @@ case class ProgramReferencePropertiesInput(
       case ProgramReferencePropertiesCommissioningInput(_, _) => ProgramType.Commissioning
       case ProgramReferencePropertiesEngineeringInput(_, _)   => ProgramType.Engineering
       case ProgramReferencePropertiesExampleInput(_)          => ProgramType.Example
+      case ProgramReferencePropertiesKeckInput(_)             => ProgramType.Keck
       case ProgramReferencePropertiesLibraryInput(_, _)       => ProgramType.Library
       case ProgramReferencePropertiesMonitoringInput(_, _)    => ProgramType.Monitoring
       case ProgramReferencePropertiesScienceInput(_, _)       => ProgramType.Science
+      case ProgramReferencePropertiesSubaruInput(_, _)        => ProgramType.Subaru
       case ProgramReferencePropertiesSystemInput(_)           => ProgramType.System
     }
 
@@ -61,8 +66,10 @@ case class ProgramReferencePropertiesInput(
       case ProgramReferencePropertiesCalibrationInput(s, _)   => s.some
       case ProgramReferencePropertiesCommissioningInput(s, _) => s.some
       case ProgramReferencePropertiesEngineeringInput(s, _)   => s.some
+      case ProgramReferencePropertiesKeckInput(s)             => s.some
       case ProgramReferencePropertiesMonitoringInput(s, _)    => s.some
       case ProgramReferencePropertiesScienceInput(s, _)       => s.some
+      case ProgramReferencePropertiesSubaruInput(s, _)        => s.some
       case _                                                  => none
     }
 
@@ -70,6 +77,12 @@ case class ProgramReferencePropertiesInput(
     input match {
       case ProgramReferencePropertiesScienceInput(_, s) => s.some
       case _                                            => none
+    }
+
+  def subaruProposalType: Option[SubaruCallForProposalsType] =
+    input match {
+      case ProgramReferencePropertiesSubaruInput(_, t) => t.some
+      case _                                           => none
     }
 
 }
@@ -83,21 +96,25 @@ object ProgramReferencePropertiesInput {
         ProgramReferencePropertiesCommissioningInput.Binding.Option("commissioning", rCom),
         ProgramReferencePropertiesEngineeringInput.Binding.Option("engineering", rEng),
         ProgramReferencePropertiesExampleInput.Binding.Option("example", rXpl),
+        ProgramReferencePropertiesKeckInput.Binding.Option("keck", rKeck),
         ProgramReferencePropertiesLibraryInput.Binding.Option("library", rLib),
         ProgramReferencePropertiesMonitoringInput.Binding.Option("monitoring", rMon),
         ProgramReferencePropertiesScienceInput.Binding.Option("science", rSci),
+        ProgramReferencePropertiesSubaruInput.Binding.Option("subaru", rSubaru),
         ProgramReferencePropertiesSystemInput.Binding.Option("system", rSys)
-      ) => (rCal, rCom, rEng, rXpl, rLib, rMon, rSci, rSys).parTupled.flatMap {
-         case (Some(cal), None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(cal).success
-         case (None, Some(com), None, None, None, None, None, None) => ProgramReferencePropertiesInput(com).success
-         case (None, None, Some(eng), None, None, None, None, None) => ProgramReferencePropertiesInput(eng).success
-         case (None, None, None, Some(xpl), None, None, None, None) => ProgramReferencePropertiesInput(xpl).success
-         case (None, None, None, None, Some(lib), None, None, None) => ProgramReferencePropertiesInput(lib).success
-         case (None, None, None, None, None, Some(mon), None, None) => ProgramReferencePropertiesInput(mon).success
-         case (None, None, None, None, None, None, Some(sci), None) => ProgramReferencePropertiesInput(sci).success
-         case (None, None, None, None, None, None, None, Some(sys)) => ProgramReferencePropertiesInput(sys).success
+      ) => (rCal, rCom, rEng, rXpl, rKeck, rLib, rMon, rSci, rSubaru, rSys).parTupled.flatMap {
+         case (Some(cal), None, None, None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(cal).success
+         case (None, Some(com), None, None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(com).success
+         case (None, None, Some(eng), None, None, None, None, None, None, None) => ProgramReferencePropertiesInput(eng).success
+         case (None, None, None, Some(xpl), None, None, None, None, None, None) => ProgramReferencePropertiesInput(xpl).success
+         case (None, None, None, None, Some(keck), None, None, None, None, None) => ProgramReferencePropertiesInput(keck).success
+         case (None, None, None, None, None, Some(lib), None, None, None, None) => ProgramReferencePropertiesInput(lib).success
+         case (None, None, None, None, None, None, Some(mon), None, None, None) => ProgramReferencePropertiesInput(mon).success
+         case (None, None, None, None, None, None, None, Some(sci), None, None) => ProgramReferencePropertiesInput(sci).success
+         case (None, None, None, None, None, None, None, None, Some(subaru), None) => ProgramReferencePropertiesInput(subaru).success
+         case (None, None, None, None, None, None, None, None, None, Some(sys)) => ProgramReferencePropertiesInput(sys).success
          case _                                               =>
-           Result.failure("Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'library', 'monitoring', 'science' or 'system' expected.")
+           Result.failure("Exactly one of 'calibration', 'commissioning', 'engineering', 'example', 'keck', 'library', 'monitoring', 'science', 'subaru' or 'system' expected.")
       }
     }
 
