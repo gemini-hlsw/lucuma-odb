@@ -8,6 +8,8 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.ExchangeObservingModeType
+import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
@@ -374,6 +376,56 @@ class setObservationWorkflowState
       _   <- assertIO(queryObservationWorkflowState(oid), Ongoing)
       _   <- interceptOdbError(setObservationWorkflowState(pi, oid, Ready)):
               case OdbError.InvalidWorkflowTransition(Ongoing, Ready, _) => () // expected
+    yield ()
+
+  // Exchange observations run at Keck/Subaru, not Gemini, so there is no
+  // Ready/Ongoing execution lifecycle. They default to Defined and add Completed
+  // (a declared-complete state) to the normal transition set.
+  private def createExchangeKeckObs(accepted: Boolean): IO[(Program.Id, Observation.Id)] =
+    for
+      cid <- createKeckCallForProposalsAs(staff, instruments = List(KeckInstrument.Hires))
+      pid <- createProgramWithNonPartnerPi(pi, "Exchange")
+      _   <- query(pi, s"""
+               mutation {
+                 createProposal(input: {
+                   programId: "$pid"
+                   SET: { category: GALACTIC_OTHER, callId: "$cid", keck: { partnerSplits: [{ partner: US, percent: 100 }] } }
+                 }) { proposal { category } }
+               }
+             """)
+      _   <- addCoisAs(pi, pid).whenA(accepted)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED").whenA(accepted)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createExchangeModeObservationAs(pi, pid, ExchangeObservingModeType.ExchangeKeck, tid)
+      _   <- runObscalcUpdate(pid, oid)
+    yield (pid, oid)
+
+  test("[Exchange]     Defined    <-> Inactive, Completed (proposal not accepted)"):
+    for
+      po        <- createExchangeKeckObs(accepted = false)
+      (pid, oid) = po
+      _         <- assertIO(queryObservationWorkflowState(oid), Defined)
+      _         <- testTransitions(pid, oid, Defined, Inactive, Completed)
+    yield ()
+
+  test("[Exchange]     Defined    <-> Inactive, Ready, Completed (proposal accepted)"):
+    for
+      po        <- createExchangeKeckObs(accepted = true)
+      (pid, oid) = po
+      _         <- assertIO(queryObservationWorkflowState(oid), Defined)
+      _         <- testTransitions(pid, oid, Defined, Inactive, Ready, Completed)
+    yield ()
+
+  test("[Exchange]     Completed  <-> Defined (PI can declare complete and revert)"):
+    for
+      po        <- createExchangeKeckObs(accepted = false)
+      (pid, oid) = po
+      _         <- assertIO(queryObservationWorkflowState(oid), Defined)
+      _         <- setObservationWorkflowState(pi, oid, Completed)
+      _         <- runObscalcUpdate(pid, oid)
+      _         <- assertIO(queryObservationWorkflowState(oid), Completed)
+      // From Completed the only transition is back to Defined; everything else is illegal.
+      _         <- testTransitions(pid, oid, Completed, Defined)
     yield ()
 
 }
