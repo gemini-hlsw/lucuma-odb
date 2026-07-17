@@ -127,8 +127,10 @@ class observation_configurationRequests
       case ObservingModeType.GhostIfu           => Mutation.forGhostIfu(user, oid, GhostResolutionMode.Standard)
       case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B480_G5309)
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.CaT, GmosNorthFilter.DS920))
+      case ObservingModeType.GmosNorthMos       => IO.unit
       case ObservingModeType.GmosSouthLongSlit  => Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.B480_G5327)
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.CaT, GmosSouthFilter.GG455))
+      case ObservingModeType.GmosSouthMos       => IO.unit
       case ObservingModeType.GnirsImaging       => IO.unit
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodAlongSlit)
@@ -142,8 +144,10 @@ class observation_configurationRequests
       case ObservingModeType.GhostIfu           => IO.unit
       case ObservingModeType.GmosNorthLongSlit  => IO.unit // no changes are compatible
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.DS920)) // subset of original, ok
+      case ObservingModeType.GmosNorthMos       => IO.unit
       case ObservingModeType.GmosSouthLongSlit  => IO.unit // no changes are compatible
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455)) // subset of original, ok
+      case ObservingModeType.GmosSouthMos       => IO.unit
       case ObservingModeType.GnirsImaging       => IO.unit
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
@@ -157,8 +161,10 @@ class observation_configurationRequests
       case ObservingModeType.GhostIfu           => None
       case ObservingModeType.GmosNorthLongSlit  => Some(Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301))
       case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
+      case ObservingModeType.GmosNorthMos       => None
       case ObservingModeType.GmosSouthLongSlit  => Some(Mutation.forGmosSouthLongSlit(user, oid, GmosSouthGrating.R600_G5324))
       case ObservingModeType.GmosSouthImaging   => None // Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.GG455, GmosSouthFilter.GPrime_GG455))
+      case ObservingModeType.GmosSouthMos       => None
       case ObservingModeType.GnirsImaging       => None
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => Some(IO.unit) // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => None // Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodToSky)
@@ -239,8 +245,10 @@ class observation_configurationRequests
           case ObservingModeType.GhostIfu           => createGhostIfuObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)
+          case ObservingModeType.GmosNorthMos       => IO.raiseError(new RuntimeException("Gmos North MOS not supported yet"))
           case ObservingModeType.GmosSouthLongSlit  => createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosSouthImaging   => createGmosSouthImagingObservationAs(pi, pid, tid)
+          case ObservingModeType.GmosSouthMos       => IO.raiseError(new RuntimeException("Gmos South MOS not supported yet"))
           case ObservingModeType.GnirsImaging       => IO.raiseError(new RuntimeException("GNIRS imaging not supported yet"))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.raiseError(new RuntimeException("GNIRS not supported yet"))
           case ObservingModeType.Igrins2LongSlit    => createIgrins2LongSlitObservationAs(pi, pid, tid)

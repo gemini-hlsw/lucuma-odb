@@ -9,6 +9,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
+import cats.syntax.applicative.*
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
@@ -110,6 +111,9 @@ object ObservingModeServices:
               .selectNorth(oids)
               .map(_.widen[ObservingMode])
 
+          case (GmosNorthMos, oids) =>
+            Map.empty.pure[F] // N.B., GMOS North MOS is not yet supported.
+
           case (GmosSouthLongSlit, oids) =>
             gmosLongSlitService
               .selectSouth(oids)
@@ -124,6 +128,9 @@ object ObservingModeServices:
             gnirsImagingService
               .select(oids)
               .map(_.widen[ObservingMode])
+
+          case (GmosSouthMos, oids) =>
+            Map.empty.pure[F] // N.B., GMOS South MOS is not yet supported.
 
           case (GnirsLongSlit | GnirsIfu, oids) =>
             gnirsSpectroscopyService
@@ -197,8 +204,10 @@ object ObservingModeServices:
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
+            case ObservingModeType.GmosNorthMos       => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS North MOS is not yet supported."))
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
+            case ObservingModeType.GmosSouthMos       => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS South MOS is not yet supported."))
             case ObservingModeType.GnirsImaging       => gnirsImagingService.delete(which)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
@@ -249,8 +258,10 @@ object ObservingModeServices:
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
+            case ObservingModeType.GmosNorthMos       => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS North MOS is not yet supported."))
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
+            case ObservingModeType.GmosSouthMos       => MonadCancelThrow[F].raiseError(new RuntimeException("GMOS South MOS is not yet supported."))
             case ObservingModeType.GnirsImaging       => gnirsImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
