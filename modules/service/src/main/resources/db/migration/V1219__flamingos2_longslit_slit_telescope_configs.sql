@@ -38,6 +38,10 @@ SET c_slit_offset_mode = 'nod_to_sky',
   ']'
 WHERE c_offsets IS NOT NULL;
 
+-- Flush the deferred FK (c_observation_id) trigger events queued by the UPDATE so the
+-- following ALTER TABLE is not blocked by "pending trigger events" (55006).
+SET CONSTRAINTS ALL IMMEDIATE;
+
 -- Drop the view first (it depends on c_offsets), then the old CSV column and its check.
 DROP VIEW v_flamingos_2_long_slit;
 
