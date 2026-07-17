@@ -508,17 +508,13 @@ object ObservationWorkflowService {
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
             case Defined    =>
+              // Exchange observations run at Keck/Subaru, not Gemini; they have no
+              // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
               List(Inactive) ++
-                Option.when((!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready) ++
-                Option.when(info.isExchange)(Completed)
-            case Ready      =>
-              List(Inactive, validationStatus) ++
-                Option.when(canUpdateExecutionState)(Ongoing) ++
-                Option.when(info.isExchange)(Completed)
+                Option.when((!info.isExchange) && (!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
+            case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
-            case Completed  =>
-              if info.isExchange then List(Defined)            // exchange: allow revert (un-complete)
-              else if info.isDeclaredComplete then List(Ongoing) else Nil
+            case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
         (state, allowedTransitions)
 
@@ -786,21 +782,6 @@ object ObservationWorkflowService {
                     // Same for everyone
                     case (Ongoing, Completed) =>
                       updateDeclaredState(oid, Some(Completed))
-                        .as(Result(w.copy(state = state)))
-
-                    // Exchange observations: declare complete directly from Defined/Ready
-                    // (there is no Ready/Ongoing lifecycle at Gemini), and allow reverting.
-                    case (Defined, Completed) =>
-                      updateDeclaredState(oid, Some(Completed))
-                        .as(Result(w.copy(state = state)))
-
-                    case (Ready, Completed) =>
-                      updateUserState(oid, None) >>
-                      updateDeclaredState(oid, Some(Completed))
-                        .as(Result(w.copy(state = state)))
-
-                    case (Completed, Defined) =>
-                      updateDeclaredState(oid, None)
                         .as(Result(w.copy(state = state)))
 
                     // Same for everyone; note that this needs to be the last case

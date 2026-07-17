@@ -400,32 +400,22 @@ class setObservationWorkflowState
       _   <- runObscalcUpdate(pid, oid)
     yield (pid, oid)
 
-  test("[Exchange]     Defined    <-> Inactive, Completed (proposal not accepted)"):
+  test("[Exchange]     Defined    <-> Inactive (proposal not accepted)"):
     for
       po        <- createExchangeKeckObs(accepted = false)
       (pid, oid) = po
       _         <- assertIO(queryObservationWorkflowState(oid), Defined)
-      _         <- testTransitions(pid, oid, Defined, Inactive, Completed)
+      _         <- testTransitions(pid, oid, Defined, Inactive)
     yield ()
 
-  test("[Exchange]     Defined    <-> Inactive, Ready, Completed (proposal accepted)"):
+  // Exchange has no Ready/Completed lifecycle: even when the proposal is accepted,
+  // Ready must not be offered (a normal accepted observation would offer it).
+  test("[Exchange]     Defined    <-> Inactive (proposal accepted)"):
     for
       po        <- createExchangeKeckObs(accepted = true)
       (pid, oid) = po
       _         <- assertIO(queryObservationWorkflowState(oid), Defined)
-      _         <- testTransitions(pid, oid, Defined, Inactive, Ready, Completed)
-    yield ()
-
-  test("[Exchange]     Completed  <-> Defined (PI can declare complete and revert)"):
-    for
-      po        <- createExchangeKeckObs(accepted = false)
-      (pid, oid) = po
-      _         <- assertIO(queryObservationWorkflowState(oid), Defined)
-      _         <- setObservationWorkflowState(pi, oid, Completed)
-      _         <- runObscalcUpdate(pid, oid)
-      _         <- assertIO(queryObservationWorkflowState(oid), Completed)
-      // From Completed the only transition is back to Defined; everything else is illegal.
-      _         <- testTransitions(pid, oid, Completed, Defined)
+      _         <- testTransitions(pid, oid, Defined, Inactive)
     yield ()
 
 }
