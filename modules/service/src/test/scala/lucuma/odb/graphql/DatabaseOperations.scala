@@ -1322,6 +1322,8 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
+      case ObservingModeType.GmosNorthMos =>
+        """{}"""
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
@@ -1353,6 +1355,8 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+      case ObservingModeType.GmosSouthMos =>
+        """{}"""
       case ObservingModeType.GnirsImaging =>
         s"""{
           gnirsImaging: {
