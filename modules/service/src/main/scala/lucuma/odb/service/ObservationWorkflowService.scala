@@ -170,6 +170,9 @@ case class ObservationValidationInfo(
       case _: VisitorObservingModeType => true
       case _ => false
 
+  def isExchange: Boolean =
+    observingMode.exists(_.isExchange)
+
   lazy val cfpMidpoint: Option[Timestamp] =
     for
       s  <- site
@@ -504,7 +507,11 @@ object ObservationWorkflowService {
             case Inactive   => List(executionState.getOrElse(validationStatus))
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
-            case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
+            case Defined    =>
+              // Exchange observations run at Keck/Subaru, not Gemini; they have no
+              // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
+              List(Inactive) ++
+                Option.when((!info.isExchange) && (!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
@@ -524,7 +531,7 @@ object ObservationWorkflowService {
         // Here are our simple validators
 
         val generatorValidator: Validator = info =>
-          if info.isVisitor then ObservationValidationMap.empty
+          if info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else info.generatorParams.foldMap:
             case Left(error)                                          => ObservationValidationMap.singleton(error.toObsValidation)
             case Right(GeneratorParams(Left(m), _, _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
@@ -572,7 +579,7 @@ object ObservationWorkflowService {
             else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
 
         val itcValidator: Validator = info =>
-          if hasItc(info.oid) || info.isVisitor then ObservationValidationMap.empty
+          if hasItc(info.oid) || info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
         // V magnitudes are used by Observe to set the GHOST slit viewing
@@ -627,7 +634,7 @@ object ObservationWorkflowService {
 
         val toCheck: List[ObservationValidationInfo] =
           science.values.toList.filter: info =>
-            info.isAccepted && prelimV.get(info.oid).forall(_.isEmpty)
+            info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(_.isEmpty)
 
         val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
           NonEmptyList
@@ -709,7 +716,7 @@ object ObservationWorkflowService {
           errs  <- validateObsDefinition(infos, _ => itc.isDefined)
           exec = exec0.filter:
             case a: DeclaredExecutionState => true // always ok
-            case _ => !infos.get(oid).exists(_.isVisitor) // otherwise discard the state if it's a visitor
+            case _ => !infos.get(oid).exists(i => i.isVisitor || i.isExchange) // otherwise discard the state if it's a visitor or exchange
           wfExec = exec.flatMap[ExecutionState](ces => ces.workflowExecutionState)
           execs  = wfExec.fold[Map[Observation.Id, ExecutionState]](Map.empty)(es => Map(oid -> es))
           wfs    = computeWorkflows(infos, errs, execs)
