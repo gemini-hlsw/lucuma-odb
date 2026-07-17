@@ -4,12 +4,12 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
-import cats.syntax.applicative.*
 import cats.syntax.traverse.*
 import grackle.Result
 import grackle.syntax.*
