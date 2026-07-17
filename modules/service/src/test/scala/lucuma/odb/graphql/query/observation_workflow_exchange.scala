@@ -81,7 +81,7 @@ class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
   test("exchange observatory mismatch is reported as a workflow validation"):
     for
       cid <- createSubaruCallForProposalsAs(staff)
-      pid <- createProgramWithProposal(cid, """subaru: { type: NORMAL, partnerSplits: [{ partner: US, percent: 100 }] }""")
+      pid <- createProgramWithProposal(cid, """subaru: { partnerSplits: [{ partner: US, percent: 100 }] }""")
       // A Keck exchange observation on a Subaru proposal.
       oid <- createExchangeObservationAs(pid, "keckInstrument: HIRES, totalRequestTime: { hours: 1 }")
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)

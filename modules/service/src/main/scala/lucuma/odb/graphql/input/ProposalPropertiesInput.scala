@@ -8,7 +8,6 @@ import grackle.syntax.*
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
-import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.IntPercent
 import lucuma.odb.data.Nullable
@@ -39,9 +38,6 @@ object ProposalPropertiesInput {
       else if subaru.isDefined then Observatory.Subaru
       else Observatory.Gemini
 
-    def subaruProposalType: Option[SubaruCallForProposalsType] =
-      subaru.map(_.callType)
-
     def partnerSplits: Map[Partner, IntPercent] =
       gemini.map(_.partnerSplits)
         .orElse(keck.map(_.partnerSplits))
@@ -66,10 +62,6 @@ object ProposalPropertiesInput {
       else if keck.isDefined then Observatory.Keck.some
       else if subaru.isDefined then Observatory.Subaru.some
       else none
-
-    // The Subaru proposal type given by this edit, if any.
-    def subaruCallType: Option[SubaruCallForProposalsType] =
-      subaru.flatMap(_.callType)
 
     // The edited partner splits, drawn from whichever variant is present.
     def partnerSplits: Nullable[Map[Partner, IntPercent]] =

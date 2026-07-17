@@ -35,7 +35,7 @@ class updateObservations_Exchange extends OdbSuite with DatabaseOperations:
 
   private def subaruProgram: IO[Program.Id] =
     createSubaruCallForProposalsAs(staff).flatMap: cid =>
-      createProgramWithProposal(cid, """subaru: { type: NORMAL, partnerSplits: [{ partner: US, percent: 100 }] }""")
+      createProgramWithProposal(cid, """subaru: { partnerSplits: [{ partner: US, percent: 100 }] }""")
 
   private def keckProgram: IO[Program.Id] =
     createKeckCallForProposalsAs(staff).flatMap: cid =>
