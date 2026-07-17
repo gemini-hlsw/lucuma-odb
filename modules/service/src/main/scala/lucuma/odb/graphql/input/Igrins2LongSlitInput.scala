@@ -9,7 +9,7 @@ import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
@@ -30,7 +30,7 @@ object Igrins2LongSlitInput:
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],
-    explicitOffsetMode: Option[SlitOffsetMode] = None,
+    explicitOffsetMode: Option[Igrins2SlitOffsetPreset] = None,
     explicitSaveSVCImages: Option[Boolean] = None,
     explicitOffsets: Option[List[Offset]] = None,
     telluricType: TelluricType = TelluricType.Hot
@@ -56,7 +56,7 @@ object Igrins2LongSlitInput:
             case (etm, offsetMode, offsets, saveSVC, telluricType) =>
               val create = Create(etm, offsetMode, saveSVC, offsets, telluricType.getOrElse(TelluricType.Hot))
               offsets match
-                case Some(os) if offsetMode.forall(_ === SlitOffsetMode.NodAlongSlit) =>
+                case Some(os) if offsetMode.forall(_ === Igrins2SlitOffsetPreset.NodAlongSlit) =>
                   validateAllOnQ(os).as(create)
                 case _ =>
                   Result(create)
@@ -65,7 +65,7 @@ object Igrins2LongSlitInput:
 
   case class Edit(
     exposureTimeMode: Option[ExposureTimeMode],
-    explicitOffsetMode: Nullable[SlitOffsetMode],
+    explicitOffsetMode: Nullable[Igrins2SlitOffsetPreset],
     explicitSaveSVCImages: Nullable[Boolean],
     explicitOffsets: Nullable[List[Offset]],
     telluricType: Option[TelluricType]
@@ -100,7 +100,7 @@ object Igrins2LongSlitInput:
           (rETM, rOffsetMode, rOffsets, rSaveSVC, rTelluricType).parTupled.flatMap {
             case (etm, offsetMode, offsets, saveSVC, telluricType) =>
               val isNodAlongSlit = offsetMode match
-                case NonNull(SlitOffsetMode.NodAlongSlit) => true
+                case NonNull(Igrins2SlitOffsetPreset.NodAlongSlit) => true
                 case _                                       => false
 
               val edit = Edit(etm, offsetMode, saveSVC, offsets, telluricType)

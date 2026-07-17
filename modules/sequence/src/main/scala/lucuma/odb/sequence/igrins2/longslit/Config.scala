@@ -6,7 +6,7 @@ package lucuma.odb.sequence.igrins2.longslit
 import cats.Eq
 import cats.derived.*
 import cats.syntax.all.*
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
@@ -18,14 +18,16 @@ import java.io.DataOutputStream
 
 case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
-  offsetMode: SlitOffsetMode,
+  offsetMode: Igrins2SlitOffsetPreset,
   saveSVCImages: Boolean,
   explicitSpatialOffsets: Option[List[Offset]],
   telluricType: TelluricType
 ) derives Eq:
 
   def offsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(defaultOffsetsFor(offsetMode))
+    explicitSpatialOffsets.getOrElse(
+      defaultSlitTelescopeConfigs(offsetMode).telescopeConfigs.toList.map(_.offset)
+    )
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)

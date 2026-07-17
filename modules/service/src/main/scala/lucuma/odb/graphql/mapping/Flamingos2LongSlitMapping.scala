@@ -4,11 +4,11 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.syntax.all.*
 import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
-import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
@@ -16,13 +16,15 @@ import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadoutMode
+import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
-import lucuma.odb.sequence.flamingos2.longslit.Config
 
 trait Flamingos2LongSlitMapping[F[_]]
   extends Flamingos2LongSlitView[F]
@@ -30,11 +32,34 @@ trait Flamingos2LongSlitMapping[F[_]]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
-  private def decodeOffsets(s: String): Json =
-    OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
+  private def telescopeConfigJson(offset: Offset, guiding: StepGuideState): Json =
+    Json.obj(
+      "offset"  -> Json.obj("p" -> offset.p.asJson, "q" -> offset.q.asJson),
+      "guiding" -> guiding.asJson
+    )
 
-  private val defaultOffsetsJson: Json =
-    Config.DefaultSpatialOffsets.map(_.asJson).asJson
+  private def telescopeConfigAlongSlitJson(q: Offset.Q, guiding: StepGuideState): Json =
+    Json.obj(
+      "q"       -> q.asJson,
+      "guiding" -> guiding.asJson
+    )
+
+  // Encodes a SlitTelescopeConfigs as the GraphQL SlitTelescopeConfigs shape:
+  // { offsetMode, alongSlit, toSky } with exactly one of alongSlit / toSky populated.
+  private def slitTelescopeConfigsJson(mode: SlitOffsetMode, json: String): Json =
+    SlitTelescopeConfigsFormat.getOption((mode, json)).fold(Json.Null):
+      case SlitTelescopeConfigs.AlongSlit(nel) =>
+        Json.obj(
+          "offsetMode" -> mode.asJson,
+          "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
+          "toSky"      -> Json.Null
+        )
+      case SlitTelescopeConfigs.ToSky(nel) =>
+        Json.obj(
+          "offsetMode" -> mode.asJson,
+          "alongSlit"  -> Json.Null,
+          "toSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
+        )
 
   lazy val Flamingos2LongSlitAcquisitionMapping: ObjectMapping =
     ObjectMapping(Flamingos2LongSlitAcquisitionType)(
@@ -69,26 +94,38 @@ trait Flamingos2LongSlitMapping[F[_]]
       SqlField("defaultReadoutMode",  Flamingos2LongSlitView.ReadoutModeDefault),
       SqlField("explicitReadoutMode", Flamingos2LongSlitView.ReadoutMode),
 
-      SqlField("offsetsString", Flamingos2LongSlitView.Offsets, hidden = true),
+      // Raw columns (hidden) backing the telescope config cursor fields.
+      SqlField("slitOffsetModeEffRaw", Flamingos2LongSlitView.SlitOffsetModeEffective,  hidden = true),
+      SqlField("tcEffRaw",             Flamingos2LongSlitView.TelescopeConfigsEffective, hidden = true),
+      SqlField("slitOffsetModeDefRaw", Flamingos2LongSlitView.SlitOffsetModeDefault,     hidden = true),
+      SqlField("tcDefRaw",             Flamingos2LongSlitView.TelescopeConfigsDefault,   hidden = true),
+      SqlField("slitOffsetModeExpRaw", Flamingos2LongSlitView.SlitOffsetMode,            hidden = true),
+      SqlField("tcExpRaw",             Flamingos2LongSlitView.TelescopeConfigs,          hidden = true),
 
-      CursorFieldJson("offsets",
+      CursorFieldJson("telescopeConfigs",
         cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets)))
-            .map(_.getOrElse(defaultOffsetsJson)),
-        List("explicitOffsets", "defaultOffsets")
+          for
+            modeEff <- cursor.field("slitOffsetModeEffRaw", None).flatMap(_.as[SlitOffsetMode])
+            tcEff   <- cursor.field("tcEffRaw", None).flatMap(_.as[String])
+          yield slitTelescopeConfigsJson(modeEff, tcEff),
+        List("slitOffsetModeEffRaw", "tcEffRaw")
       ),
-
-      CursorFieldJson("explicitOffsets",
+      CursorFieldJson("defaultTelescopeConfigs",
         cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets).asJson)),
-        List("offsetsString")
+          for
+            modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[SlitOffsetMode])
+            tcDef   <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
+          yield slitTelescopeConfigsJson(modeDef, tcDef),
+        List("slitOffsetModeDefRaw", "tcDefRaw")
       ),
-
-      CursorFieldJson("defaultOffsets", _ => Result(defaultOffsetsJson), Nil),
+      CursorFieldJson("explicitTelescopeConfigs",
+        cursor =>
+          for
+            modeOpt <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
+            jsonOpt <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
+          yield (modeOpt, jsonOpt).mapN(slitTelescopeConfigsJson).getOrElse(Json.Null),
+        List("slitOffsetModeExpRaw", "tcExpRaw")
+      ),
 
       SqlJson("telluricType", Flamingos2LongSlitView.TelluricType),
 

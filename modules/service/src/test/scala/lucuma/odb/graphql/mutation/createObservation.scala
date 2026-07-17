@@ -1576,12 +1576,14 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                 disperser: R1200_HK
                 filter: Y
                 fpu: LONG_SLIT_2
-                explicitOffsets: [
-                  { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
-                  { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
-                  { p: { arcseconds: 0.0 }, q: { arcseconds:   5.5 } },
-                  { p: { arcseconds: 0.0 }, q: { arcseconds:  -2.5 } }
-                ]
+                explicitTelescopeConfigs: {
+                  toSky: [
+                    { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } }, guiding: ENABLED },
+                    { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } }, guiding: ENABLED },
+                    { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:   5.5 } }, guiding: ENABLED },
+                    { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  -2.5 } }, guiding: DISABLED }
+                  ]
+                }
               }
             }
           }
@@ -1592,35 +1594,20 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                 disperser
                 filter
                 fpu
-                offsets {
-                  p {
-                    microarcseconds
-                    arcseconds
-                  }
-                  q {
-                    microarcseconds
-                    arcseconds
-                  }
+                telescopeConfigs {
+                  offsetMode
+                  alongSlit { q { microarcseconds arcseconds } guiding }
+                  toSky { offset { p { microarcseconds arcseconds } q { microarcseconds arcseconds } } guiding }
                 }
-                explicitOffsets {
-                  p {
-                    microarcseconds
-                    arcseconds
-                  }
-                  q {
-                    microarcseconds
-                    arcseconds
-                  }
+                defaultTelescopeConfigs {
+                  offsetMode
+                  alongSlit { q { microarcseconds arcseconds } guiding }
+                  toSky { offset { p { microarcseconds arcseconds } q { microarcseconds arcseconds } } guiding }
                 }
-                defaultOffsets {
-                  p {
-                    microarcseconds
-                    arcseconds
-                  }
-                  q {
-                    microarcseconds
-                    arcseconds
-                  }
+                explicitTelescopeConfigs {
+                  offsetMode
+                  alongSlit { q { microarcseconds arcseconds } guiding }
+                  toSky { offset { p { microarcseconds arcseconds } q { microarcseconds arcseconds } } guiding }
                 }
               }
             }
@@ -1630,6 +1617,28 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
     """
 
   test("[general] specify f2 long slit spatial offsets at observation creation"):
+    val explicitToSky =
+      json"""{
+        "offsetMode": "NOD_TO_SKY",
+        "alongSlit": null,
+        "toSky": [
+          { "offset": { "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -10000000, "arcseconds": -10.0 } }, "guiding": "ENABLED" },
+          { "offset": { "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  10000000, "arcseconds":  10.0 } }, "guiding": "ENABLED" },
+          { "offset": { "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":   5500000, "arcseconds":   5.5 } }, "guiding": "ENABLED" },
+          { "offset": { "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  -2500000, "arcseconds":  -2.5 } }, "guiding": "DISABLED" }
+        ]
+      }"""
+    val telluricDefault =
+      json"""{
+        "offsetMode": "NOD_ALONG_SLIT",
+        "alongSlit": [
+          { "q": { "microarcseconds":  15000000, "arcseconds":  15.0 }, "guiding": "ENABLED" },
+          { "q": { "microarcseconds": -15000000, "arcseconds": -15.0 }, "guiding": "ENABLED" },
+          { "q": { "microarcseconds": -15000000, "arcseconds": -15.0 }, "guiding": "ENABLED" },
+          { "q": { "microarcseconds":  15000000, "arcseconds":  15.0 }, "guiding": "ENABLED" }
+        ],
+        "toSky": null
+      }"""
     createProgramAs(pi).flatMap { pid =>
       query(pi, createObsWithF2SpatialOffsets(pid)).flatMap { js =>
         val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "flamingos2LongSlit")
@@ -1638,31 +1647,16 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           (longSlit.downIO[Flamingos2Disperser]("disperser"),
            longSlit.downIO[Option[Flamingos2Filter]]("filter"),
            longSlit.downIO[Flamingos2Fpu]("fpu"),
-           longSlit.downIO[List[Json]]("offsets"),
-           longSlit.downIO[List[Json]]("explicitOffsets"),
-           longSlit.downIO[List[Json]]("defaultOffsets")
+           longSlit.downIO[Json]("telescopeConfigs"),
+           longSlit.downIO[Json]("explicitTelescopeConfigs"),
+           longSlit.downIO[Json]("defaultTelescopeConfigs")
           ).tupled,
           (Flamingos2Disperser.R1200HK,
            Some(Flamingos2Filter.Y),
            Flamingos2Fpu.LongSlit2,
-           List(
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -10000000, "arcseconds": -10.0 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  10000000, "arcseconds":  10.0 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":   5500000, "arcseconds":   5.5 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  -2500000, "arcseconds":  -2.5 } }"""
-           ),
-           List(
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -10000000, "arcseconds": -10.0 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  10000000, "arcseconds":  10.0 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":   5500000, "arcseconds":   5.5 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  -2500000, "arcseconds":  -2.5 } }"""
-           ),
-           List(
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": 15000000, "arcseconds": 15.0 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -15000000, "arcseconds": -15.0 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": -15000000, "arcseconds": -15.0 } }""",
-             json"""{ "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds": 15000000, "arcseconds": 15.0 } }"""
-           )
+           explicitToSky,
+           explicitToSky,
+           telluricDefault
           )
         )
       }
@@ -1670,7 +1664,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   test("createObservation: rejects 3 spatial offsets"):
     createProgramAs(pi).flatMap { pid =>
-      interceptGraphQL("Argument 'input.SET.observingMode.flamingos2LongSlit' is invalid: Flamingos2 must have exactly 0 or 4 offsets, but 3 were provided.") {
+      interceptGraphQL("Argument 'input.SET.observingMode.flamingos2LongSlit' is invalid: Flamingos2 must have exactly 4 offsets, but 3 were provided.") {
         query(pi, s"""
           mutation {
             createObservation(input: {
@@ -1681,11 +1675,13 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                     disperser: R1200_HK
                     filter: Y
                     fpu: LONG_SLIT_2
-                    explicitOffsets: [
-                      { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
-                      { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
-                      { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } }
-                    ]
+                    explicitTelescopeConfigs: {
+                      toSky: [
+                        { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } }, guiding: ENABLED },
+                        { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } }, guiding: ENABLED },
+                        { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } }, guiding: ENABLED }
+                      ]
+                    }
                   }
                 }
               }
@@ -2397,17 +2393,20 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             observation {
               observingMode {
                 flamingos2LongSlit {
-                  offsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  telescopeConfigs {
+                    offsetMode
+                    alongSlit { q { arcseconds } guiding }
+                    toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                   }
-                  explicitOffsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  explicitTelescopeConfigs {
+                    offsetMode
+                    alongSlit { q { arcseconds } guiding }
+                    toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                   }
-                  defaultOffsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  defaultTelescopeConfigs {
+                    offsetMode
+                    alongSlit { q { arcseconds } guiding }
+                    toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                   }
                 }
               }
@@ -2420,19 +2419,27 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             "observation": {
               "observingMode": {
                 "flamingos2LongSlit": {
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
-                  ],
-                  "explicitOffsets": null,
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
-                  ]
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": null,
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  }
                 }
               }
             }

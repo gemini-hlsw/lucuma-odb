@@ -11,12 +11,12 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
-import lucuma.core.math.Offset
-import lucuma.core.math.arb.ArbOffset.given
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.arb.ArbExposureTimeMode.given
 import lucuma.core.model.arb.ArbTelluricType.given
+import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
@@ -43,10 +43,10 @@ trait ArbFlamingos2LongSlitInput:
         s  <- arbitrary[Option[Flamingos2Reads]]
         d  <- arbitrary[Option[Flamingos2Decker]]
         o  <- arbitrary[Option[Flamingos2ReadoutMode]]
-        so <- arbitrary[Option[List[Offset]]]
+        tc <- arbitrary[Option[SlitTelescopeConfigs]]
         tt <- arbitrary[TelluricType]
         a  <- arbitrary[Option[Flamingos2LongSlitInput.Acquisition]]
-      yield Flamingos2LongSlitInput.Create(g, f, u, e, r, s, d, o, so, tt, a)
+      yield Flamingos2LongSlitInput.Create(g, f, u, e, r, s, d, o, tc, tt, a)
 
   given Arbitrary[Flamingos2LongSlitInput.Edit] =
     Arbitrary:
@@ -59,9 +59,9 @@ trait ArbFlamingos2LongSlitInput:
         s  <- arbitrary[Nullable[Flamingos2Reads]]
         d  <- arbitrary[Nullable[Flamingos2Decker]]
         o  <- arbitrary[Nullable[Flamingos2ReadoutMode]]
-        so <- arbitrary[Nullable[List[Offset]]]
+        tc <- arbitrary[Nullable[SlitTelescopeConfigs]]
         tt <- arbitrary[Option[TelluricType]]
         a  <- arbitrary[Option[Flamingos2LongSlitInput.Acquisition]]
-      yield Flamingos2LongSlitInput.Edit(g, f, u, e, r, s, d, o, so, tt, a)
+      yield Flamingos2LongSlitInput.Edit(g, f, u, e, r, s, d, o, tc, tt, a)
 
 object ArbFlamingos2LongSlitInput extends ArbFlamingos2LongSlitInput

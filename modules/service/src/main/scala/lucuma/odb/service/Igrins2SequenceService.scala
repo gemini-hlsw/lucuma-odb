@@ -8,7 +8,7 @@ import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
@@ -61,7 +61,7 @@ object Igrins2SequenceService:
         for
           s0 <- selectStatic(observationId)
           s1 <- s0.fold(session.option(Statements.SelectStaticByMode)(observationId))(_.some.pure[F])
-        yield s1.getOrElse(Igrins2StaticConfig(Igrins2SVCImages.DontSave, SlitOffsetMode.NodAlongSlit)).some
+        yield s1.getOrElse(Igrins2StaticConfig(Igrins2SVCImages.DontSave, Igrins2SlitOffsetPreset.NodAlongSlit)).some
 
   object Statements:
 

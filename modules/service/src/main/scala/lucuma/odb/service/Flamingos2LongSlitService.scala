@@ -14,7 +14,7 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config
@@ -72,14 +72,16 @@ object Flamingos2LongSlitService:
          flamingos_2_reads.opt        *:
          flamingos_2_decker.opt       *:
          flamingos_2_readout_mode.opt *:
-         text.opt                     *:
+         slit_offset_mode             *: // c_slit_offset_mode_effective
+         text                         *: // c_telescope_configs_effective
          telluric_type
-        ).emap { case (disperser, filter, fpu, sci, acq, readMode, reads, decker, readoutMode, offsetsText, telluricType) =>
-          offsetsText.traverse: so =>
-            OffsetsFormat.getOption(so).toRight(s"Could not parse '$so' as an offsets list.")
-          .map { offsets =>
-            Config(disperser, filter, fpu, sci, acq, readMode, reads, decker, readoutMode, offsets, telluricType)
-          }
+        ).emap { case (disperser, filter, fpu, sci, acq, readMode, reads, decker, readoutMode, offsetMode, tcJson, telluricType) =>
+          SlitTelescopeConfigsFormat.getOption((offsetMode, tcJson))
+            .map(_.telescopeConfigs)
+            .toRight(s"Could not parse '$tcJson' as telescope configs.")
+            .map { telescopeConfigs =>
+              Config(disperser, filter, fpu, sci, acq, telescopeConfigs, readMode, reads, decker, readoutMode, telluricType)
+            }
         }
 
       override def select(
@@ -175,7 +177,8 @@ object Flamingos2LongSlitService:
           ls.c_reads,
           ls.c_decker,
           ls.c_readout_mode,
-          ls.c_offsets,
+          ls.c_slit_offset_mode_effective,
+          ls.c_telescope_configs_effective,
           ls.c_telluric_type
         FROM
           v_flamingos_2_long_slit ls
@@ -205,7 +208,8 @@ object Flamingos2LongSlitService:
           C_reads,
           c_decker,
           c_readout_mode,
-          c_offsets,
+          c_slit_offset_mode,
+          c_telescope_configs,
           c_telluric_type,
           c_initial_disperser,
           c_initial_filter,
@@ -222,6 +226,7 @@ object Flamingos2LongSlitService:
           ${flamingos_2_reads.opt},
           ${flamingos_2_decker.opt},
           ${flamingos_2_readout_mode.opt},
+          ${slit_offset_mode.opt},
           ${text.opt},
           $telluric_type,
           $flamingos_2_disperser,
@@ -239,7 +244,8 @@ object Flamingos2LongSlitService:
           in.explicitReads,
           in.explicitDecker,
           in.explicitReadoutMode,
-          in.formattedOffsets,
+          in.explicitSlitOffsetMode,
+          in.formattedTelescopeConfigs,
           in.telluricType,
           in.disperser,
           in.filter,
@@ -264,7 +270,8 @@ object Flamingos2LongSlitService:
       val upReads          = sql"c_reads              = ${flamingos_2_reads.opt}"
       val upDecker         = sql"c_decker             = ${flamingos_2_decker.opt}"
       val upReadoutMode    = sql"c_readout_mode       = ${flamingos_2_readout_mode.opt}"
-      val upOffsets        = sql"c_offsets            = ${text.opt}"
+      val upSlitMode       = sql"c_slit_offset_mode   = ${slit_offset_mode.opt}"
+      val upTelescopeCfgs  = sql"c_telescope_configs  = ${text.opt}"
       val upTelluricType   = sql"c_telluric_type      = ${telluric_type.opt}"
 
       val ups: List[AppliedFragment] =
@@ -277,7 +284,8 @@ object Flamingos2LongSlitService:
           input.explicitReads.toOptionOption.map(upReads),
           input.explicitDecker.toOptionOption.map(upDecker),
           input.explicitReadoutMode.toOptionOption.map(upReadoutMode),
-          input.formattedOffsets.toOptionOption.map(upOffsets),
+          input.explicitSlitOffsetMode.toOptionOption.map(upSlitMode),
+          input.formattedTelescopeConfigs.toOptionOption.map(upTelescopeCfgs),
           input.telluricType.map(tt => upTelluricType(Some(tt)))
         ).flatten
 
@@ -312,7 +320,8 @@ object Flamingos2LongSlitService:
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
-        c_offsets,
+        c_slit_offset_mode,
+        c_telescope_configs,
         c_telluric_type,
         c_initial_disperser,
         c_initial_filter,
@@ -332,7 +341,8 @@ object Flamingos2LongSlitService:
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
-        c_offsets,
+        c_slit_offset_mode,
+        c_telescope_configs,
         c_telluric_type,
         c_initial_disperser,
         c_initial_filter,
@@ -341,14 +351,13 @@ object Flamingos2LongSlitService:
       WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)
 
-    // Tellurics need a fixed set of offsets
+    // Tellurics use the default telescope configs (the Telluric nod-along-slit
+    // pattern); clear any explicit override to revert to it.
     def applyF2TelluricDefaults(oid: Observation.Id): AppliedFragment =
       sql"""
         UPDATE t_flamingos_2_long_slit
-        SET c_offsets = $text
+        SET c_slit_offset_mode  = NULL,
+            c_telescope_configs = NULL
         WHERE c_observation_id = $observation_id
-      """.apply(
-        OffsetsFormat.reverseGet(Config.DefaultSpatialOffsets),
-        oid
-      )
+      """.apply(oid)
   }

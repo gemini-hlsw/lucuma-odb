@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.flamingos2.longslit
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.all.*
 import lucuma.core.enums.Flamingos2Decker
@@ -13,10 +14,9 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
-import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
-import lucuma.core.syntax.all.*
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -38,7 +38,7 @@ case class Config private[longslit](
   explicitDecker: Option[Flamingos2Decker],
   defaultReadoutMode: Flamingos2ReadoutMode,
   explicitReadoutMode: Option[Flamingos2ReadoutMode],
-  explicitSpatialOffsets: Option[List[Offset]],
+  telescopeConfigs: NonEmptyList[TelescopeConfig],
   telluricType: TelluricType
 ) derives Eq:
 
@@ -47,9 +47,6 @@ case class Config private[longslit](
 
   def readoutMode: Flamingos2ReadoutMode =
     explicitReadoutMode.getOrElse(defaultReadoutMode)
-
-  def offsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(Config.DefaultSpatialOffsets)
 
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
@@ -65,8 +62,8 @@ case class Config private[longslit](
     out.writeChars(decker.tag)
     out.writeChars(readoutMode.tag)
 
-    out.write:
-      explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
+    telescopeConfigs.toList.foreach: tc =>
+      out.write(tc.hashBytes)
 
     out.write(telluricType.hashBytes)
 
@@ -76,25 +73,17 @@ case class Config private[longslit](
 
 object Config:
 
-  val DefaultSpatialOffsets: List[Offset] =
-    List(
-      Offset.Zero.copy(q =  15.arcseconds.q),
-      Offset.Zero.copy(q = -15.arcseconds.q),
-      Offset.Zero.copy(q = -15.arcseconds.q),
-      Offset.Zero.copy(q =  15.arcseconds.q)
-    )
-
   def apply(
     disperser: Flamingos2Disperser,
     filter: Flamingos2Filter,
     fpu: Flamingos2Fpu,
     exposureTimeMode: ExposureTimeMode,
     acquisition: AcquisitionConfig,
+    telescopeConfigs: NonEmptyList[TelescopeConfig],
     explicitReadMode: Option[Flamingos2ReadMode] = None,
     explicitReads: Option[Flamingos2Reads] = None,
     explicitDecker: Option[Flamingos2Decker] = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    explicitSpatialOffsets: Option[List[Offset]] = None,
     telluricType: TelluricType = TelluricType.Hot
   ): Config =
     new Config(
@@ -109,6 +98,6 @@ object Config:
       explicitDecker,
       DefaultFlamingos2ReadoutMode,
       explicitReadoutMode,
-      explicitSpatialOffsets,
+      telescopeConfigs,
       telluricType
     )

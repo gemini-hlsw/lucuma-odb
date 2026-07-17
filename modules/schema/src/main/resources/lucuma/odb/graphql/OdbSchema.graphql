@@ -9600,21 +9600,20 @@ type Flamingos2LongSlit {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  Offsets, either explicitly specified in explicitOffsets
-  or else taken from defaultOffsets
+  Effective telescope configs (explicit override coalesced with the default).
   """
-  offsets: [Offset!]!
+  telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default offsets.
+  Default telescope configs (the Telluric nod-along-slit pattern).
   """
-  defaultOffsets: [Offset!]!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Optional explicitly specified offsets. If set it overrides the
-  the default.
+  Optional explicitly specified telescope configs. If set they override the
+  preset default.
   """
-  explicitOffsets: [Offset!]
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Telluric type configuration for this observation.
@@ -9715,9 +9714,10 @@ input Flamingos2LongSlitInput {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  Explicit telescope configs. May be unset by assigning null (clears the
+  override back to the default), or ignored by skipping.
   """
-  explicitOffsets: [OffsetInput!]
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.

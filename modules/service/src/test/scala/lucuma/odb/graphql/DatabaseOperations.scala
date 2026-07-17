@@ -1511,7 +1511,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
-        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", explicitTelescopeConfigs: { toSky: $offsets }")
         s"""{
           flamingos2LongSlit: {
             disperser: R1200_HK

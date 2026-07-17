@@ -8,11 +8,11 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
-import lucuma.core.model.sequence.igrins2.NodAlongSlitDefaultOffsets
+import lucuma.core.model.sequence.igrins2.defaultSlitTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
@@ -58,7 +58,7 @@ object Igrins2LongSlitService:
 
       val igrins2LS: Decoder[Config] =
         (exposure_time_mode   *:
-         slit_offset_mode.opt *:
+         igrins2_slit_offset_preset.opt *:
          bool.opt             *:
          text.opt             *:
          telluric_type
@@ -68,7 +68,7 @@ object Igrins2LongSlitService:
           .map: offsets =>
             Config(
               sci,
-              offsetMode.getOrElse(SlitOffsetMode.NodAlongSlit),
+              offsetMode.getOrElse(Igrins2SlitOffsetPreset.NodAlongSlit),
               saveSVC.getOrElse(false),
               offsets,
               telluricType
@@ -161,7 +161,7 @@ object Igrins2LongSlitService:
 
     val InsertIgrins2LongSlit: Fragment[(
       Observation.Id,
-      Option[SlitOffsetMode],
+      Option[Igrins2SlitOffsetPreset],
       Option[Boolean],
       Option[String],
       TelluricType
@@ -178,7 +178,7 @@ object Igrins2LongSlitService:
         SELECT
           $observation_id        ,
           c_program_id           ,
-          ${slit_offset_mode.opt},
+          ${igrins2_slit_offset_preset.opt},
           ${bool.opt}            ,
           ${text.opt}            ,
           $telluric_type
@@ -206,7 +206,7 @@ object Igrins2LongSlitService:
 
     private def igrins2Updates(input: Igrins2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upOffsetMode    = sql"c_offset_mode     = ${slit_offset_mode.opt}"
+      val upOffsetMode    = sql"c_offset_mode     = ${igrins2_slit_offset_preset.opt}"
       val upSaveSVCImages = sql"c_save_svc_images = ${bool.opt}"
       val upOffsets       = sql"c_spatial_offsets = ${text.opt}"
       val upTelluricType  = sql"c_telluric_type   = ${telluric_type.opt}"
@@ -248,12 +248,15 @@ object Igrins2LongSlitService:
       sql"""
         UPDATE t_igrins_2_long_slit
         SET
-          c_offset_mode     = $slit_offset_mode,
+          c_offset_mode     = $igrins2_slit_offset_preset,
           c_spatial_offsets = $text
         WHERE c_observation_id = $observation_id
       """.apply(
-        SlitOffsetMode.NodAlongSlit,
-        OffsetsFormat.reverseGet(NodAlongSlitDefaultOffsets),
+        Igrins2SlitOffsetPreset.NodAlongSlit,
+        OffsetsFormat.reverseGet(
+          defaultSlitTelescopeConfigs(Igrins2SlitOffsetPreset.NodAlongSlit)
+            .telescopeConfigs.toList.map(_.offset)
+        ),
         oid
       )
 
