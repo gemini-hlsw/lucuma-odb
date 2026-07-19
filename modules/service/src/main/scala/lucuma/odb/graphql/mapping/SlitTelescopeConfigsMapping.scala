@@ -17,9 +17,14 @@ import lucuma.odb.json.offset.query.given
 
 /**
  * Shared encoding of the GraphQL `SlitTelescopeConfigs` output type from the two DB columns
- * used to persist it — a discriminant tag (`c_slit_offset_mode`) and a JSON blob
- * (`c_telescope_configs`). Mixed into every long-slit mapping that exposes telescope configs
+ * used to persist it:
+ * - a discriminant tag (`c_slit_offset_mode`) 
+ * - and a JSON blob (`c_telescope_configs`). 
+ *
+ * Mixed into every long-slit mapping that exposes telescope configs
  * (GNIRS, Flamingos2) so the JSON shaping and cursor-field wiring live in one place.
+ *
+ * IGRINS2 and GMOS are pending.
  */
 trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
 
@@ -38,9 +43,9 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
   /**
    * Encodes a `SlitTelescopeConfigs` as the GraphQL `SlitTelescopeConfigs` type:
    * `{ offsetMode, alongSlit, toSky }` with exactly one of `alongSlit` / `toSky` non-null,
-   * depending on the discriminant. Fails (rather than silently emitting `null`) when the
-   * persisted blob does not parse, so corruption surfaces as a real error instead of a
-   * non-null-field violation downstream.
+   * depending on the discriminant. 
+   *
+   * Fails (rather than silently emitting `null`) when the persisted blob does not parse.
    */
   protected def slitTelescopeConfigsJson(mode: SlitOffsetMode, json: String): Result[Json] =
     SlitTelescopeConfigsFormat.getOption((mode, json)) match

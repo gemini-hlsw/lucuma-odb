@@ -1,6 +1,6 @@
--- Flamingos2 long slit adopts the SlitTelescopeConfigs model (lucuma-core 0.218),
--- mirroring the GNIRS long slit storage: a fixed default set of telescope configs
--- (the Telluric nod-along-slit pattern) with an optional explicit
+-- Flamingos2 long slit adopts the SlitTelescopeConfigs model mirroring the GNIRS 
+-- long slit storage:
+-- a fixed default set of telescope configs with an optional explicit
 -- (slit_offset_mode, telescope_configs) override.
 
 -- New columns: explicit SlitTelescopeConfigs (discriminant + JSON blob).
@@ -42,7 +42,6 @@ WHERE c_offsets IS NOT NULL;
 -- following ALTER TABLE is not blocked by "pending trigger events" (55006).
 SET CONSTRAINTS ALL IMMEDIATE;
 
--- Drop the view first (it depends on c_offsets), then the old CSV column and its check.
 DROP VIEW v_flamingos_2_long_slit;
 
 ALTER TABLE t_flamingos_2_long_slit
@@ -55,8 +54,7 @@ ALTER TABLE t_flamingos_2_long_slit
   ADD CONSTRAINT flamingos2_explicit_configs_check
     CHECK ((c_telescope_configs IS NULL) = (c_slit_offset_mode IS NULL));
 
--- Rebuild the view with a fixed default (the Telluric nod-along-slit pattern) and
--- effective = COALESCE(explicit, default).
+-- Rebuild the view with a fixed default and effective = COALESCE(explicit, default).
 CREATE VIEW v_flamingos_2_long_slit AS
   SELECT
     m.*,

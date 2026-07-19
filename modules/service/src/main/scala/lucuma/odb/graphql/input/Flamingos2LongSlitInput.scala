@@ -70,13 +70,13 @@ object Flamingos2LongSlitInput:
     filter: Flamingos2Filter,
     fpu: Flamingos2Fpu,
     exposureTimeMode: Option[ExposureTimeMode],
-    explicitReadMode: Option[Flamingos2ReadMode]       = None,
-    explicitReads: Option[Flamingos2Reads]             = None,
-    explicitDecker: Option[Flamingos2Decker]           = None,
-    explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    explicitTelescopeConfigs: Option[SlitTelescopeConfigs]   = None,
-    telluricType: TelluricType                         = TelluricType.Hot,
-    acquisition: Option[Acquisition]                   = None
+    explicitReadMode: Option[Flamingos2ReadMode]           = None,
+    explicitReads: Option[Flamingos2Reads]                 = None,
+    explicitDecker: Option[Flamingos2Decker]               = None,
+    explicitReadoutMode: Option[Flamingos2ReadoutMode]     = None,
+    explicitTelescopeConfigs: Option[SlitTelescopeConfigs] = None,
+    telluricType: TelluricType                             = TelluricType.Hot,
+    acquisition: Option[Acquisition]                       = None
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit

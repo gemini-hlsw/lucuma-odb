@@ -351,8 +351,7 @@ object Flamingos2LongSlitService:
       WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)
 
-    // Tellurics use the default telescope configs (the Telluric nod-along-slit
-    // pattern); clear any explicit override to revert to it.
+    // Tellurics use the default telescope configs
     def applyF2TelluricDefaults(oid: Observation.Id): AppliedFragment =
       sql"""
         UPDATE t_flamingos_2_long_slit

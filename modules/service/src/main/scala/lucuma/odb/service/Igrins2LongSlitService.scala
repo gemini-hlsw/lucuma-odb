@@ -56,10 +56,10 @@ object Igrins2LongSlitService:
     new Igrins2LongSlitService[F] {
 
       val igrins2LS: Decoder[Config] =
-        (exposure_time_mode   *:
+        (exposure_time_mode             *:
          igrins2_slit_offset_preset.opt *:
-         bool.opt             *:
-         text.opt             *:
+         bool.opt                       *:
+         text.opt                       *:
          telluric_type
         ).emap { case (sci, offsetMode, saveSVC, offsetsText, telluricType) =>
           offsetsText.traverse: so =>
@@ -175,11 +175,11 @@ object Igrins2LongSlitService:
           c_telluric_type
         )
         SELECT
-          $observation_id        ,
-          c_program_id           ,
+          $observation_id                  ,
+          c_program_id                     ,
           ${igrins2_slit_offset_preset.opt},
-          ${bool.opt}            ,
-          ${text.opt}            ,
+          ${bool.opt}                      ,
+          ${text.opt}                      ,
           $telluric_type
         FROM t_observation
         WHERE c_observation_id = $observation_id
