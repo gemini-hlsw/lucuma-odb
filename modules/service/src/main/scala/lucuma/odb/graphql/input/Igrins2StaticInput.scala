@@ -15,7 +15,7 @@ object Igrins2StaticInput:
     ObjectFieldsBinding.rmap:
       case List(
         BooleanBinding.Option("saveSVCImages", rSVC),
-        SlitOffsetModeBinding.Option("offsetMode", rOffsetMode)
+        Igrins2OffsetModeBinding.Option("offsetMode", rOffsetMode)
       ) =>
         (rSVC, rOffsetMode)
           .parMapN: (svc, offsetMode) =>

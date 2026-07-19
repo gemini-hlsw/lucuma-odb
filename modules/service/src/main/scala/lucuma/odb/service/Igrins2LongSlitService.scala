@@ -12,7 +12,6 @@ import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
-import lucuma.core.model.sequence.igrins2.defaultSlitTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.spatialOffsets.*
@@ -253,10 +252,7 @@ object Igrins2LongSlitService:
         WHERE c_observation_id = $observation_id
       """.apply(
         Igrins2SlitOffsetPreset.NodAlongSlit,
-        OffsetsFormat.reverseGet(
-          defaultSlitTelescopeConfigs(Igrins2SlitOffsetPreset.NodAlongSlit)
-            .telescopeConfigs.toList.map(_.offset)
-        ),
+        OffsetsFormat.reverseGet(Config.NodAlongSlitDefaultOffsets),
         oid
       )
 

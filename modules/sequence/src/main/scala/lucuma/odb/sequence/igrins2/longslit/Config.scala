@@ -25,9 +25,7 @@ case class Config(
 ) derives Eq:
 
   def offsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(
-      defaultSlitTelescopeConfigs(offsetMode).telescopeConfigs.toList.map(_.offset)
-    )
+    explicitSpatialOffsets.getOrElse(Config.defaultOffsetsFor(offsetMode))
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)
@@ -42,3 +40,13 @@ case class Config(
 
     out.close()
     bao.toByteArray
+
+object Config:
+
+  /** Default spatial offsets for the given IGRINS-2 preset. */
+  def defaultOffsetsFor(preset: Igrins2SlitOffsetPreset): List[Offset] =
+    defaultSlitTelescopeConfigs(preset).telescopeConfigs.toList.map(_.offset)
+
+  /** Offsets for the NodAlongSlit preset — the set used when reverting to defaults. */
+  val NodAlongSlitDefaultOffsets: List[Offset] =
+    defaultOffsetsFor(Igrins2SlitOffsetPreset.NodAlongSlit)

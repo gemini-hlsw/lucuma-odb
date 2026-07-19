@@ -49,8 +49,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gnirs.GnirsFpu
-import lucuma.core.enums.Igrins2SlitOffsetPreset
-import lucuma.core.model.sequence.igrins2.defaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -65,6 +63,7 @@ import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.offset.decoder.given
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
+import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
@@ -2010,7 +2009,7 @@ class perScienceObservationCalibrations
       assertEquals(sciSet._2, customScience)
       // Telluric gets the default to NodAlongSlit offsets.
       assertEquals(telSet._1, "NOD_ALONG_SLIT")
-      assertEquals(telSet._2, defaultSlitTelescopeConfigs(Igrins2SlitOffsetPreset.NodAlongSlit).telescopeConfigs.toList.map(_.offset))
+      assertEquals(telSet._2, Igrins2Config.NodAlongSlitDefaultOffsets)
     }
 
   private def updateIgrins2ScienceOffsets(oid: Observation.Id): IO[Unit] =
@@ -2054,7 +2053,7 @@ class perScienceObservationCalibrations
       tel2    <- queryIgrins2OffsetSettings(toid)
     } yield {
       assertEquals(tel2._1, "NOD_ALONG_SLIT")
-      assertEquals(tel2._2, defaultSlitTelescopeConfigs(Igrins2SlitOffsetPreset.NodAlongSlit).telescopeConfigs.toList.map(_.offset))
+      assertEquals(tel2._2, Igrins2Config.NodAlongSlitDefaultOffsets)
     }
 
   // (has explicit override?, effective alongSlit q offsets in arcseconds) for a

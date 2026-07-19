@@ -47,7 +47,7 @@ object Igrins2LongSlitInput:
       ObjectFieldsBinding.rmap {
         case List(
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
-          SlitOffsetModeBinding.Option("explicitOffsetMode", rOffsetMode),
+          Igrins2OffsetModeBinding.Option("explicitOffsetMode", rOffsetMode),
           BooleanBinding.Option("explicitSaveSVCImages", rSaveSVC),
           OffsetInput.Binding.List.Option("explicitOffsets", rOffsets),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
@@ -92,7 +92,7 @@ object Igrins2LongSlitInput:
       ObjectFieldsBinding.rmap {
         case List(
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rETM),
-          SlitOffsetModeBinding.Nullable("explicitOffsetMode", rOffsetMode),
+          Igrins2OffsetModeBinding.Nullable("explicitOffsetMode", rOffsetMode),
           BooleanBinding.Nullable("explicitSaveSVCImages", rSaveSVC),
           OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
