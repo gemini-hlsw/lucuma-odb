@@ -9605,7 +9605,7 @@ type Flamingos2LongSlit {
   telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default telescope configs (the Telluric nod-along-slit pattern).
+  Default telescope configs.
   """
   defaultTelescopeConfigs: SlitTelescopeConfigs!
 

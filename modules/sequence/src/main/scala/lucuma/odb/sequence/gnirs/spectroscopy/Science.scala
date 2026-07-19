@@ -40,6 +40,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID
@@ -85,13 +86,13 @@ object Science:
     /**
      * Cycle count: round up so that we always deliver at least the requested
      * number of on-source exposures. Sky steps don't contribute to the S/N, so
-     * cycles with sky offsets require extra repeats. On-source means guided: the
-     * dither positions are guided, the large sky offsets unguided. Keyed on the
-     * per-offset guide state (as Flamingos2 does), so the configured guiding
+     * cycles with sky offsets require extra repeats.
+     * On-source means guided, the dither positions are guided, the large sky offsets unguided.
+     * Keyed on the per-offset guide state, so the configured guiding
      * drives the cycle count for both slit and IFU.
      */
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[GnirsDynamicConfig](s => isGuided(s.telescopeConfig.guiding), scienceSteps.toList, t)
+      calculateCycleCount[GnirsDynamicConfig](s => s.telescopeConfig.guiding.isGuided, scienceSteps.toList, t)
 
   object StepDefinition:
 

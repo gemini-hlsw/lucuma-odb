@@ -40,7 +40,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.*
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.isGuided
+import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID
@@ -101,7 +101,7 @@ object Science:
       NonEmptyList.of(a0, b0, b1, a1)
 
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[F2](s => isGuided(s.telescopeConfig.guiding), abbaCycle.toList, t)
+      calculateCycleCount[F2](s => s.telescopeConfig.guiding.isGuided, abbaCycle.toList, t)
 
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
