@@ -911,24 +911,15 @@ class perProgramPerConfigCalibrations
       """,
     ).void
 
-  // The 'requirement'-role wavelength (top-level scienceRequirements.exposureTimeMode).
-  def requirementWvOf(ob: List[CalibObs]): Option[Wavelength] =
+  def wvAtRequirement(ob: List[CalibObs]): Option[Wavelength] =
     ob.collectFirst:
-      case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
+      case CalibObs(calibrationRole = Some(CalibrationRole.SpectroPhotometric), scienceRequirements = ScienceRequirements(ExposureTimeMode(SignalToNoise(wv)))) => wv
 
-  // The 'science'-role wavelength (observingMode.gmosNorthLongSlit.exposureTimeMode) --
-  // this is what GeneratorParamsService/ITC actually reads.
-  def scienceWvOf(ob: List[CalibObs]): Option[Wavelength] =
+  def wvAtForScience(ob: List[CalibObs]): Option[Wavelength] =
     ob.collectFirst:
-      case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, _, Some(ObservingMode(Some(GmosNorthLongSlit(_, ExposureTimeMode(SignalToNoise(wv)))), _))) => wv
+      case CalibObs(calibrationRole = Some(CalibrationRole.SpectroPhotometric), observingMode = Some(ObservingMode(Some(GmosNorthLongSlit(_, ExposureTimeMode(SignalToNoise(wv)))), _))) => wv
 
-  test("spec photo signal to noise at updates when science S/N wavelength changes, even with non-default ROI"):
-    // Regression test: the specphot calibration is created with its ROI
-    // normalized to CENTRAL_SPECTRUM regardless of the science observation's
-    // actual ROI.
-    // Recalculating after a S/N wavelength edit must still find and update it,
-    // both on the top-level scienceRequirements ('requirement' role) and on
-    // the observing mode's own science ETM ('science' role, used by ITC).
+  test("spec photo signal to noise at updates when science S/N wavelength changes"):
     for {
       pid      <- createProgramAs(pi)
       tid      <- createTargetAs(pi, pid, "One")
@@ -944,10 +935,11 @@ class perProgramPerConfigCalibrations
       _        <- recalculateCalibrations(pid, when, oid)
       obAfter  <- queryObservations(pid)
     } yield {
-      assertEquals(requirementWvOf(obBefore), Wavelength.fromIntNanometers(500))
-      assertEquals(scienceWvOf(obBefore), Wavelength.fromIntNanometers(500))
-      assertEquals(requirementWvOf(obAfter), Wavelength.fromIntNanometers(650))
-      assertEquals(scienceWvOf(obAfter), Wavelength.fromIntNanometers(650))
+      // requirement and science ETM should match
+      assertEquals(wvAtRequirement(obBefore), Wavelength.fromIntNanometers(500))
+      assertEquals(wvAtForScience(obBefore), Wavelength.fromIntNanometers(500))
+      assertEquals(wvAtRequirement(obAfter), Wavelength.fromIntNanometers(650))
+      assertEquals(wvAtForScience(obAfter), Wavelength.fromIntNanometers(650))
     }
 
   test("spec photo signal to noise at is not touched once the calibration has started executing"):
@@ -969,17 +961,14 @@ class perProgramPerConfigCalibrations
       _        <- recordVisit(setupEvent, service, calibId)
       _        <- runObscalcUpdate(pid, calibId)
       _        <- setCalculatedWorkflowState(calibId, ObservationWorkflowState.Ongoing)
-      // Edit the science observation's S/N wavelength -- the config still
-      // matches this calibration, so it stays "needed" (not removed), only
-      // its wavelength would otherwise be updated.
+      // Edit the science observation's S/N wavelength it should not affect the calibration
       _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
       obAfter  <- queryObservations(pid)
     } yield {
-      // The Ongoing calibration's wavelengths must remain untouched.
-      assertEquals(requirementWvOf(obAfter), Wavelength.fromIntNanometers(500))
-      assertEquals(scienceWvOf(obAfter), Wavelength.fromIntNanometers(500))
+      assertEquals(wvAtRequirement(obAfter), Wavelength.fromIntNanometers(500))
+      assertEquals(wvAtForScience(obAfter), Wavelength.fromIntNanometers(500))
     }
 
   test("Don't add calibrations if science is inactive"):

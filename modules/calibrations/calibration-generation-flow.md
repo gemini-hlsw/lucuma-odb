@@ -184,13 +184,6 @@ flowchart TD
     S --> T[Delete empty calibration groups]
 ```
 
-`calObsProps` keys props by each science observation's **role-normalized** config (see Configuration Matching below), producing a
-`Map[CalibrationConfigSubset, CalObsProps]` per role. Both creation and the existing-calibration update look up by the calibration's own role,
-but by different means: creation uses `configsMatch` (a tolerant normalized comparison), while the update does an exact lookup by the
-calibration's own stored config. The latter only hits because that stored config is itself created in normalized form — so keying the map by
-the raw config instead would silently miss any calibration whose normalized fields differ (e.g. a specphot calibration's ROI is `CentralSpectrum`,
-so a `FullFrame` science obs would never match it), leaving its S/N λ stale.
-
 ### Configuration Matching
 
 The matching logic differs by calibration role:
@@ -209,6 +202,10 @@ flowchart TD
     H --> I["Compare: config1 === config2"]
     I --> J["All config details must match exactly"]
 ```
+
+The same normalization keys `calObsProps`'s per-role props map, and since each calibration is created from a normalized config, the
+wavelength/band update finds it by an exact lookup on the calibration's stored config. Keying by the raw config instead would miss any
+calibration whose normalized fields differ (e.g. a `FullFrame` science obs vs its `CentralSpectrum` specphot calibration), leaving the S/N λ stale.
 
 ### Calibration Observation Creation
 

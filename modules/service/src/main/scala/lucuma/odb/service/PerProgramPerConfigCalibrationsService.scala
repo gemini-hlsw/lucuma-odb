@@ -176,11 +176,11 @@ object PerProgramPerConfigCalibrationsService:
             none
 
       private def generateGMOSLSCalibrations(
-        pid:           Program.Id,
-        propsByRole:   Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]],
+        pid:            Program.Id,
+        propsByRole:    Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]],
         configsPerRole: Map[CalibrationRole, List[CalibrationConfigSubset]],
-        gnTgt:         CalibrationIdealTargets,
-        gsTgt:         CalibrationIdealTargets
+        gnTgt:          CalibrationIdealTargets,
+        gsTgt:          CalibrationIdealTargets
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val allConfigs = configsPerRole.values.flatten.toList
         for {
@@ -246,17 +246,9 @@ object PerProgramPerConfigCalibrationsService:
             .filterNot { o => removedOids.contains(o.id) }
             .map { o => (o.id, o.role.flatMap(role => propsByRole.get(role).flatMap(_.get(o.data)))) }
             .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
-        // Defensive re-check: `calibrations` is already filtered to exclude
-        // Ongoing/Completed calibrations by the caller (CalibrationsService),
-        // but updatePropsAt now rewrites the mode's own science-role ETM (not
-        // just the cosmetic scienceRequirements one), so this must never touch
-        // a calibration that has started or finished executing -- mirrors the
-        // same check removeUnnecessaryCalibrations applies before deleting.
         excludeOngoingAndCompleted(candidates, _._1)
 
-      // A partial GMOS Long Slit mode edit that touches only the science-role
-      // exposure time mode, leaving every other field (grating, filter, fpu,
-      // binning, roi, etc.) untouched.
+      // A partial GMOS Long Slit mode edit that touches only the science ETM
       private def gmosLongSlitScienceEtmEdit(modeType: ObservingModeType, etm: ExposureTimeMode): ObservingModeInput.Edit =
         val common = GmosLongSlitInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
         val (gn, gs) = modeType match
@@ -309,8 +301,7 @@ object PerProgramPerConfigCalibrationsService:
               void""" WHERE """ |+| oidInClause |+|
               void""" AND o.c_calibration_role IS NOT NULL AND (""" |+| needsUpdate |+| void")" |+| extraFilter
 
-            // Keeps the top-level "requirement" ETM (scienceRequirements.exposureTimeMode)
-            // in sync, mirroring the value used at calibration creation time.
+            // Sync the requirements ETM
             val requirementUpdate =
               services.observationService.updateObservations(
                 Services.asSuperUser:
@@ -330,11 +321,7 @@ object PerProgramPerConfigCalibrationsService:
                   )
               ).void
 
-            // Also update the mode's own science-role ETM, which is what
-            // GeneratorParamsService/ITC actually reads. scienceRequirements
-            // above only touches the separate 'requirement'-role row and does
-            // NOT propagate into the mode -- see ObservationService.updateObservations,
-            // which only syncs the mode when an explicit observingMode edit is given.
+            // Also update the calibrations science-role ETM
             def modeUpdate(modeType: ObservingModeType): F[Unit] =
               props.wavelengthAt.traverse_ : w =>
                 val etm = ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(100.0), w)
@@ -375,8 +362,7 @@ object PerProgramPerConfigCalibrationsService:
           activeGmosSci   <- onlyDefinedAndReady(allSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
-          // Extract props from all science observations, normalized per calibration
-          // type so the grouping key matches the calibration's own stored config
+          // Extract props from all science observations, normalized per calibration type.
           propsByRole     = PerProgramPerConfigCalibrationTypes
                               .map(role => role -> calObsProps(toConfigForCalibration(allSci), role)).toMap
           // Create ideal targets for each site
