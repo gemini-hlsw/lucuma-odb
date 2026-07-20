@@ -122,8 +122,8 @@ class perProgramPerConfigCalibrations
   case class ExposureTimeMode(signalToNoise: SignalToNoise) derives Decoder
   case class ScienceRequirements(exposureTimeMode: ExposureTimeMode) derives Decoder
   case class SignalToNoise(at: Wavelength) derives Decoder
-  case class GmosNorthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
-  case class GmosSouthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
+  case class GmosNorthLongSlit(explicitRoi: Option[GmosRoi], exposureTimeMode: ExposureTimeMode) derives Decoder
+  case class GmosSouthLongSlit(explicitRoi: Option[GmosRoi], exposureTimeMode: ExposureTimeMode) derives Decoder
   case class ObservingMode(gmosNorthLongSlit: Option[GmosNorthLongSlit], gmosSouthLongSlit: Option[GmosSouthLongSlit]) derives Decoder
   case class CalibObs(
     id: Observation.Id,
@@ -204,9 +204,19 @@ class perProgramPerConfigCalibrations
                   observingMode {
                     gmosNorthLongSlit {
                       explicitRoi
+                      exposureTimeMode {
+                        signalToNoise {
+                          at { nanometers }
+                        }
+                      }
                     }
                     gmosSouthLongSlit {
                       explicitRoi
+                      exposureTimeMode {
+                        signalToNoise {
+                          at { nanometers }
+                        }
+                      }
                     }
                   }
                   targetEnvironment {
@@ -901,11 +911,24 @@ class perProgramPerConfigCalibrations
       """,
     ).void
 
+  // The 'requirement'-role wavelength (top-level scienceRequirements.exposureTimeMode).
+  def requirementWvOf(ob: List[CalibObs]): Option[Wavelength] =
+    ob.collectFirst:
+      case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
+
+  // The 'science'-role wavelength (observingMode.gmosNorthLongSlit.exposureTimeMode) --
+  // this is what GeneratorParamsService/ITC actually reads.
+  def scienceWvOf(ob: List[CalibObs]): Option[Wavelength] =
+    ob.collectFirst:
+      case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, _, Some(ObservingMode(Some(GmosNorthLongSlit(_, ExposureTimeMode(SignalToNoise(wv)))), _))) => wv
+
   test("spec photo signal to noise at updates when science S/N wavelength changes, even with non-default ROI"):
     // Regression test: the specphot calibration is created with its ROI
     // normalized to CENTRAL_SPECTRUM regardless of the science observation's
     // actual ROI.
     // Recalculating after a S/N wavelength edit must still find and update it,
+    // both on the top-level scienceRequirements ('requirement' role) and on
+    // the observing mode's own science ETM ('science' role, used by ITC).
     for {
       pid      <- createProgramAs(pi)
       tid      <- createTargetAs(pi, pid, "One")
@@ -915,18 +938,48 @@ class perProgramPerConfigCalibrations
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
       obBefore <- queryObservations(pid)
-      wvBefore = obBefore.collectFirst:
-                   case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
       // Edit the science observation's S/N wavelength
       _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
       _        <- runObscalcUpdate(pid, oid)
       _        <- recalculateCalibrations(pid, when, oid)
       obAfter  <- queryObservations(pid)
-      wvAfter  = obAfter.collectFirst:
-                   case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
     } yield {
-      assertEquals(wvBefore, Wavelength.fromIntNanometers(500))
-      assertEquals(wvAfter, Wavelength.fromIntNanometers(650))
+      assertEquals(requirementWvOf(obBefore), Wavelength.fromIntNanometers(500))
+      assertEquals(scienceWvOf(obBefore), Wavelength.fromIntNanometers(500))
+      assertEquals(requirementWvOf(obAfter), Wavelength.fromIntNanometers(650))
+      assertEquals(scienceWvOf(obAfter), Wavelength.fromIntNanometers(650))
+    }
+
+  test("spec photo signal to noise at is not touched once the calibration has started executing"):
+    val setupEvent =
+      ExecutionQuerySetupOperations
+        .Setup(offset = 200, atomCount = 1, stepCount = 1, datasetCount = 1)
+
+    for {
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetAs(pi, pid, "One")
+      oid      <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _        <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(500).get)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      ob1      <- queryObservations(pid)
+      calibId  = ob1.callibrationIds.head
+      // Start executing the specphot calibration
+      _        <- recordVisit(setupEvent, service, calibId)
+      _        <- runObscalcUpdate(pid, calibId)
+      _        <- setCalculatedWorkflowState(calibId, ObservationWorkflowState.Ongoing)
+      // Edit the science observation's S/N wavelength -- the config still
+      // matches this calibration, so it stays "needed" (not removed), only
+      // its wavelength would otherwise be updated.
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      obAfter  <- queryObservations(pid)
+    } yield {
+      // The Ongoing calibration's wavelengths must remain untouched.
+      assertEquals(requirementWvOf(obAfter), Wavelength.fromIntNanometers(500))
+      assertEquals(scienceWvOf(obAfter), Wavelength.fromIntNanometers(500))
     }
 
   test("Don't add calibrations if science is inactive"):
