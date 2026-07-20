@@ -8,8 +8,8 @@ import cats.syntax.eq.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import grackle.Result
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Igrins2SlitOffsetPreset
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
