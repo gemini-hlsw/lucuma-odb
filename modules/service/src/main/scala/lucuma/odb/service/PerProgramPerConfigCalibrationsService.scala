@@ -66,9 +66,10 @@ object PerProgramPerConfigCalibrationsService:
       given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
 
       private def calObsProps(
-        calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
+        calibConfigs: List[ObsExtract[CalibrationConfigSubset]],
+        calibType:    CalibrationRole
       ): Map[CalibrationConfigSubset, CalObsProps] =
-        calibConfigs.groupBy(_.data).map { case (k, v) =>
+        calibConfigs.groupBy(ex => CalibrationConfigMatcher.matcherFor(ex.data, calibType).normalize(ex.data)).map: (k, v) =>
           val w = v.map(ex => ex.itc.flatMap(ItcInput.spectroscopy.getOption).map(_.science.mode.exposureTimeMode.at)).flattenOption match
             case Nil =>
                none[Wavelength]
@@ -76,7 +77,6 @@ object PerProgramPerConfigCalibrationsService:
               val pm = ws.map(_.toPicometers.value.value).combineAll / ws.size
               PosInt.from(pm).map(Wavelength(_)).toOption
           k -> CalObsProps(w, v.map(_.band).min)
-        }
 
       private def uniqueConfiguration(
         all: List[ObsExtract[ObservingMode]]
@@ -174,7 +174,7 @@ object PerProgramPerConfigCalibrationsService:
 
       private def generateGMOSLSCalibrations(
         pid:           Program.Id,
-        props:         Map[CalibrationConfigSubset, CalObsProps],
+        propsByRole:   Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]],
         configsPerRole: Map[CalibrationRole, List[CalibrationConfigSubset]],
         gnTgt:         CalibrationIdealTargets,
         gsTgt:         CalibrationIdealTargets
@@ -183,9 +183,8 @@ object PerProgramPerConfigCalibrationsService:
         for {
           cg   <- calibrationsGroup(pid, allConfigs.size)
           oids <- cg.map(g =>
-                    configsPerRole.toList.flatTraverse { case (calibType, configs) =>
-                      generateCalibrationsForType(pid, g, props, configs, calibType, gnTgt, gsTgt)
-                    }
+                    configsPerRole.toList.flatTraverse: (calibType, configs) =>
+                      generateCalibrationsForType(pid, g, propsByRole.getOrElse(calibType, Map.empty), configs, calibType, gnTgt, gsTgt)
                   ).getOrElse(List.empty.pure[F])
         } yield oids
       }
@@ -237,11 +236,11 @@ object PerProgramPerConfigCalibrationsService:
       private def prepareCalibrationUpdates(
         calibrations: List[ObsExtract[CalibrationConfigSubset]],
         removedOids:  List[Observation.Id],
-        props:        Map[CalibrationConfigSubset, CalObsProps]
+        propsByRole:  Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]]
       ): List[(Observation.Id, CalObsProps)] =
         calibrations
           .filterNot { o => removedOids.contains(o.id) }
-          .map { o => (o.id, props.get(o.data)) }
+          .map { o => (o.id, o.role.flatMap(role => propsByRole.get(role).flatMap(_.get(o.data)))) }
           .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
 
       private def updatePropsAt(
@@ -312,8 +311,10 @@ object PerProgramPerConfigCalibrationsService:
           activeGmosSci   <- onlyDefinedAndReady(allSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
-          // Extract props from all science observations
-          props           = calObsProps(toConfigForCalibration(allSci))
+          // Extract props from all science observations, normalized per calibration
+          // type so the grouping key matches the calibration's own stored config
+          propsByRole     = PerProgramPerConfigCalibrationTypes
+                              .map(role => role -> calObsProps(toConfigForCalibration(allSci), role)).toMap
           // Create ideal targets for each site
           gnTgt           = CalibrationIdealTargets(Site.GN, when, calibTargets)
           gsTgt           = CalibrationIdealTargets(Site.GS, when, calibTargets)
@@ -324,9 +325,9 @@ object PerProgramPerConfigCalibrationsService:
           removedOids    <- removeUnnecessaryCalibrations(uniqueSci, gmosCalibs)
           _              <- (info"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
           // Generate new calibrations for each unique configuration
-          addedOids      <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
+          addedOids      <- generateGMOSLSCalibrations(pid, propsByRole, configsPerRole, gnTgt, gsTgt)
           _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
-          calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, props)
+          calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, propsByRole)
           _              <- updatePropsAt(calibUpdates)
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)

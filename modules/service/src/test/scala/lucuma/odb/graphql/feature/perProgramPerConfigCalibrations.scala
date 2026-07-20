@@ -874,6 +874,61 @@ class perProgramPerConfigCalibrations
     }
   }
 
+  def updateScienceExposureTimeMode(oid: Observation.Id, snAt: Wavelength, roi: Option[GmosRoi] = None): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            WHERE: { id: { EQ: "$oid" } }
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  ${roi.foldMap(r => s"explicitRoi: ${r.tag.toScreamingSnakeCase}")}
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.000
+                      at: { nanometers: ${snAt.toNanometers} }
+                    }
+                  }
+                }
+              }
+            }
+          }) {
+            observations { id }
+          }
+        }
+      """,
+    ).void
+
+  test("spec photo signal to noise at updates when science S/N wavelength changes, even with non-default ROI"):
+    // Regression test: the specphot calibration is created with its ROI
+    // normalized to CENTRAL_SPECTRUM regardless of the science observation's
+    // actual ROI.
+    // Recalculating after a S/N wavelength edit must still find and update it,
+    for {
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetAs(pi, pid, "One")
+      oid      <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _        <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(500).get, GmosRoi.FullFrame.some)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      obBefore <- queryObservations(pid)
+      wvBefore = obBefore.collectFirst:
+                   case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
+      // Edit the science observation's S/N wavelength
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      obAfter  <- queryObservations(pid)
+      wvAfter  = obAfter.collectFirst:
+                   case CalibObs(_, _, Some(CalibrationRole.SpectroPhotometric), _, _, ScienceRequirements(ExposureTimeMode(SignalToNoise(wv))), _) => wv
+    } yield {
+      assertEquals(wvBefore, Wavelength.fromIntNanometers(500))
+      assertEquals(wvAfter, Wavelength.fromIntNanometers(650))
+    }
+
   test("Don't add calibrations if science is inactive"):
     for {
       pid  <- createProgramAs(pi)
