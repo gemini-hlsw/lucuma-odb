@@ -11,6 +11,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.math.Coordinates
@@ -26,8 +27,10 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.input.CreateGroupInput
+import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GroupPropertiesInput
 import lucuma.odb.graphql.input.ObservationPropertiesInput
+import lucuma.odb.graphql.input.ObservingModeInput
 import lucuma.odb.graphql.input.ScienceRequirementsInput
 import lucuma.odb.graphql.input.SpectroscopyScienceRequirementsInput
 import lucuma.odb.graphql.mapping.AccessControl
@@ -66,9 +69,10 @@ object PerProgramPerConfigCalibrationsService:
       given Logger[F] = LF.getLoggerFromName("per-program-calibrations")
 
       private def calObsProps(
-        calibConfigs: List[ObsExtract[CalibrationConfigSubset]]
+        calibConfigs: List[ObsExtract[CalibrationConfigSubset]],
+        calibType:    CalibrationRole
       ): Map[CalibrationConfigSubset, CalObsProps] =
-        calibConfigs.groupBy(_.data).map { case (k, v) =>
+        calibConfigs.groupBy(ex => CalibrationConfigMatcher.matcherFor(ex.data, calibType).normalize(ex.data)).map: (k, v) =>
           val w = v.map(ex => ex.itc.flatMap(ItcInput.spectroscopy.getOption).map(_.science.mode.exposureTimeMode.at)).flattenOption match
             case Nil =>
                none[Wavelength]
@@ -76,7 +80,6 @@ object PerProgramPerConfigCalibrationsService:
               val pm = ws.map(_.toPicometers.value.value).combineAll / ws.size
               PosInt.from(pm).map(Wavelength(_)).toOption
           k -> CalObsProps(w, v.map(_.band).min)
-        }
 
       private def uniqueConfiguration(
         all: List[ObsExtract[ObservingMode]]
@@ -173,19 +176,18 @@ object PerProgramPerConfigCalibrationsService:
             none
 
       private def generateGMOSLSCalibrations(
-        pid:           Program.Id,
-        props:         Map[CalibrationConfigSubset, CalObsProps],
+        pid:            Program.Id,
+        propsByRole:    Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]],
         configsPerRole: Map[CalibrationRole, List[CalibrationConfigSubset]],
-        gnTgt:         CalibrationIdealTargets,
-        gsTgt:         CalibrationIdealTargets
+        gnTgt:          CalibrationIdealTargets,
+        gsTgt:          CalibrationIdealTargets
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val allConfigs = configsPerRole.values.flatten.toList
         for {
           cg   <- calibrationsGroup(pid, allConfigs.size)
           oids <- cg.map(g =>
-                    configsPerRole.toList.flatTraverse { case (calibType, configs) =>
-                      generateCalibrationsForType(pid, g, props, configs, calibType, gnTgt, gsTgt)
-                    }
+                    configsPerRole.toList.flatTraverse: (calibType, configs) =>
+                      generateCalibrationsForType(pid, g, propsByRole.getOrElse(calibType, Map.empty), configs, calibType, gnTgt, gsTgt)
                   ).getOrElse(List.empty.pure[F])
         } yield oids
       }
@@ -237,12 +239,39 @@ object PerProgramPerConfigCalibrationsService:
       private def prepareCalibrationUpdates(
         calibrations: List[ObsExtract[CalibrationConfigSubset]],
         removedOids:  List[Observation.Id],
-        props:        Map[CalibrationConfigSubset, CalObsProps]
-      ): List[(Observation.Id, CalObsProps)] =
-        calibrations
-          .filterNot { o => removedOids.contains(o.id) }
-          .map { o => (o.id, props.get(o.data)) }
-          .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
+        propsByRole:  Map[CalibrationRole, Map[CalibrationConfigSubset, CalObsProps]]
+      ): F[List[(Observation.Id, CalObsProps)]] =
+        val candidates =
+          calibrations
+            .filterNot { o => removedOids.contains(o.id) }
+            .map { o => (o.id, o.role.flatMap(role => propsByRole.get(role).flatMap(_.get(o.data)))) }
+            .collect { case (oid, Some(props)) if props.band.isDefined || props.wavelengthAt.isDefined => (oid, props) }
+        excludeOngoingAndCompleted(candidates, _._1)
+
+      // A partial GMOS Long Slit mode edit that touches only the science ETM
+      private def gmosLongSlitScienceEtmEdit(modeType: ObservingModeType, etm: ExposureTimeMode): ObservingModeInput.Edit =
+        val common = GmosLongSlitInput.Edit.Common.AllUndefined.copy(exposureTimeMode = etm.some)
+        val (gn, gs) = modeType match
+          case ObservingModeType.GmosNorthLongSlit =>
+            (GmosLongSlitInput.Edit.North(none, Nullable.Absent, none, common, none).some, none)
+          case ObservingModeType.GmosSouthLongSlit =>
+            (none, GmosLongSlitInput.Edit.South(none, Nullable.Absent, none, common, none).some)
+          case other =>
+            sys.error(s"gmosLongSlitScienceEtmEdit: unexpected observing mode type $other")
+        ObservingModeInput.Edit(
+          exchange           = none,
+          flamingos2Imaging  = none,
+          flamingos2LongSlit = none,
+          ghostIfu           = none,
+          gmosNorthImaging   = none,
+          gmosNorthLongSlit  = gn,
+          gmosSouthImaging   = none,
+          gmosSouthLongSlit  = gs,
+          gnirsImaging       = none,
+          gnirsSpectroscopy  = none,
+          igrins2LongSlit    = none,
+          visitor            = none
+        )
 
       private def updatePropsAt(
         calibrationUpdates: List[(Observation.Id, CalObsProps)]
@@ -264,28 +293,49 @@ object PerProgramPerConfigCalibrationsService:
             val oidInClause =
               void"o.c_observation_id IN (" |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
 
-            services.observationService.updateObservations(
-              Services.asSuperUser:
-                AccessControl.unchecked(
-                  ObservationPropertiesInput.Edit.Empty.copy(
-                    scienceBand         = Nullable.orAbsent(props.band),
-                    scienceRequirements = props.wavelengthAt.map: w =>
-                      ScienceRequirementsInput(
-                        exposureTimeMode = Nullable.NonNull(
-                          ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(100.0), w)
-                        ),
-                        spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
-                        imaging      = None
-                      )
-                  ),
-                  void"""
-                    SELECT DISTINCT c_observation_id
-                      FROM t_observation o
-                  """               |+| etmJoin     |+|
-                  void""" WHERE """ |+| oidInClause |+|
-                  void""" AND o.c_calibration_role IS NOT NULL AND (""" |+| needsUpdate |+| void")"
-                )
-            )
+            def selection(extraFilter: AppliedFragment): AppliedFragment =
+              void"""
+                SELECT DISTINCT c_observation_id
+                  FROM t_observation o
+              """               |+| etmJoin     |+|
+              void""" WHERE """ |+| oidInClause |+|
+              void""" AND o.c_calibration_role IS NOT NULL AND (""" |+| needsUpdate |+| void")" |+| extraFilter
+
+            // Sync the requirements ETM
+            val requirementUpdate =
+              services.observationService.updateObservations(
+                Services.asSuperUser:
+                  AccessControl.unchecked(
+                    ObservationPropertiesInput.Edit.Empty.copy(
+                      scienceBand         = Nullable.orAbsent(props.band),
+                      scienceRequirements = props.wavelengthAt.map: w =>
+                        ScienceRequirementsInput(
+                          exposureTimeMode = Nullable.NonNull(
+                            ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(100.0), w)
+                          ),
+                          spectroscopy = SpectroscopyScienceRequirementsInput.Default.some,
+                          imaging      = None
+                        )
+                    ),
+                    selection(void"")
+                  )
+              ).void
+
+            // Also update the calibrations science-role ETM
+            def modeUpdate(modeType: ObservingModeType): F[Unit] =
+              props.wavelengthAt.traverse_ : w =>
+                val etm = ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(100.0), w)
+                services.observationService.updateObservations(
+                  Services.asSuperUser:
+                    AccessControl.unchecked(
+                      ObservationPropertiesInput.Edit.Empty.copy(
+                        observingMode = Nullable.NonNull(gmosLongSlitScienceEtmEdit(modeType, etm))
+                      ),
+                      selection(sql" AND o.c_observing_mode_type = $observing_mode_type".apply(modeType))
+                    )
+                ).void
+
+            requirementUpdate *> modeUpdate(ObservingModeType.GmosNorthLongSlit) *> modeUpdate(ObservingModeType.GmosSouthLongSlit)
 
       private def deleteEmptyCalibrationGroup(pid: Program.Id)(using Transaction[F], ServiceAccess): F[Unit] =
         groupService.selectGroups(pid).flatMap:
@@ -312,8 +362,9 @@ object PerProgramPerConfigCalibrationsService:
           activeGmosSci   <- onlyDefinedAndReady(allSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
-          // Extract props from all science observations
-          props           = calObsProps(toConfigForCalibration(allSci))
+          // Extract props from all science observations, normalized per calibration type.
+          propsByRole     = PerProgramPerConfigCalibrationTypes
+                              .map(role => role -> calObsProps(toConfigForCalibration(allSci), role)).toMap
           // Create ideal targets for each site
           gnTgt           = CalibrationIdealTargets(Site.GN, when, calibTargets)
           gsTgt           = CalibrationIdealTargets(Site.GS, when, calibTargets)
@@ -324,9 +375,9 @@ object PerProgramPerConfigCalibrationsService:
           removedOids    <- removeUnnecessaryCalibrations(uniqueSci, gmosCalibs)
           _              <- (info"Program $pid will remove unnecessary calibrations $removedOids").whenA(removedOids.nonEmpty)
           // Generate new calibrations for each unique configuration
-          addedOids      <- generateGMOSLSCalibrations(pid, props, configsPerRole, gnTgt, gsTgt)
+          addedOids      <- generateGMOSLSCalibrations(pid, propsByRole, configsPerRole, gnTgt, gsTgt)
           _              <- (info"Program $pid added calibrations $addedOids").whenA(addedOids.nonEmpty)
-          calibUpdates    = prepareCalibrationUpdates(gmosCalibs, removedOids, props)
+          calibUpdates   <- prepareCalibrationUpdates(gmosCalibs, removedOids, propsByRole)
           _              <- updatePropsAt(calibUpdates)
           // Delete the calibration group if empty
           _              <- deleteEmptyCalibrationGroup(pid)

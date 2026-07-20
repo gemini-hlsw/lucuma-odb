@@ -122,8 +122,8 @@ class perProgramPerConfigCalibrations
   case class ExposureTimeMode(signalToNoise: SignalToNoise) derives Decoder
   case class ScienceRequirements(exposureTimeMode: ExposureTimeMode) derives Decoder
   case class SignalToNoise(at: Wavelength) derives Decoder
-  case class GmosNorthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
-  case class GmosSouthLongSlit(explicitRoi: Option[GmosRoi]) derives Decoder
+  case class GmosNorthLongSlit(explicitRoi: Option[GmosRoi], exposureTimeMode: ExposureTimeMode) derives Decoder
+  case class GmosSouthLongSlit(explicitRoi: Option[GmosRoi], exposureTimeMode: ExposureTimeMode) derives Decoder
   case class ObservingMode(gmosNorthLongSlit: Option[GmosNorthLongSlit], gmosSouthLongSlit: Option[GmosSouthLongSlit]) derives Decoder
   case class CalibObs(
     id: Observation.Id,
@@ -204,9 +204,19 @@ class perProgramPerConfigCalibrations
                   observingMode {
                     gmosNorthLongSlit {
                       explicitRoi
+                      exposureTimeMode {
+                        signalToNoise {
+                          at { nanometers }
+                        }
+                      }
                     }
                     gmosSouthLongSlit {
                       explicitRoi
+                      exposureTimeMode {
+                        signalToNoise {
+                          at { nanometers }
+                        }
+                      }
                     }
                   }
                   targetEnvironment {
@@ -873,6 +883,93 @@ class perProgramPerConfigCalibrations
       assertEquals(Wavelength.fromIntNanometers(510), wv.headOption)
     }
   }
+
+  def updateScienceExposureTimeMode(oid: Observation.Id, snAt: Wavelength, roi: Option[GmosRoi] = None): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            WHERE: { id: { EQ: "$oid" } }
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  ${roi.foldMap(r => s"explicitRoi: ${r.tag.toScreamingSnakeCase}")}
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 75.000
+                      at: { nanometers: ${snAt.toNanometers} }
+                    }
+                  }
+                }
+              }
+            }
+          }) {
+            observations { id }
+          }
+        }
+      """,
+    ).void
+
+  def wvAtRequirement(ob: List[CalibObs]): Option[Wavelength] =
+    ob.collectFirst:
+      case CalibObs(calibrationRole = Some(CalibrationRole.SpectroPhotometric), scienceRequirements = ScienceRequirements(ExposureTimeMode(SignalToNoise(wv)))) => wv
+
+  def wvAtForScience(ob: List[CalibObs]): Option[Wavelength] =
+    ob.collectFirst:
+      case CalibObs(calibrationRole = Some(CalibrationRole.SpectroPhotometric), observingMode = Some(ObservingMode(Some(GmosNorthLongSlit(_, ExposureTimeMode(SignalToNoise(wv)))), _))) => wv
+
+  test("spec photo signal to noise at updates when science S/N wavelength changes"):
+    for {
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetAs(pi, pid, "One")
+      oid      <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _        <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(500).get, GmosRoi.FullFrame.some)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      obBefore <- queryObservations(pid)
+      // Edit the science observation's S/N wavelength
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      obAfter  <- queryObservations(pid)
+    } yield {
+      // requirement and science ETM should match
+      assertEquals(wvAtRequirement(obBefore), Wavelength.fromIntNanometers(500))
+      assertEquals(wvAtForScience(obBefore), Wavelength.fromIntNanometers(500))
+      assertEquals(wvAtRequirement(obAfter), Wavelength.fromIntNanometers(650))
+      assertEquals(wvAtForScience(obAfter), Wavelength.fromIntNanometers(650))
+    }
+
+  test("spec photo signal to noise at is not touched once the calibration has started executing"):
+    val setupEvent =
+      ExecutionQuerySetupOperations
+        .Setup(offset = 200, atomCount = 1, stepCount = 1, datasetCount = 1)
+
+    for {
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetAs(pi, pid, "One")
+      oid      <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _        <- updateTargetPropertiesAs(pi, tid, Coordinates.Zero)
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(500).get)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      ob1      <- queryObservations(pid)
+      calibId  = ob1.callibrationIds.head
+      // Start executing the specphot calibration
+      _        <- recordVisit(setupEvent, service, calibId)
+      _        <- runObscalcUpdate(pid, calibId)
+      _        <- setCalculatedWorkflowState(calibId, ObservationWorkflowState.Ongoing)
+      // Edit the science observation's S/N wavelength it should not affect the calibration
+      _        <- updateScienceExposureTimeMode(oid, Wavelength.fromIntNanometers(650).get)
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      obAfter  <- queryObservations(pid)
+    } yield {
+      assertEquals(wvAtRequirement(obAfter), Wavelength.fromIntNanometers(500))
+      assertEquals(wvAtForScience(obAfter), Wavelength.fromIntNanometers(500))
+    }
 
   test("Don't add calibrations if science is inactive"):
     for {
