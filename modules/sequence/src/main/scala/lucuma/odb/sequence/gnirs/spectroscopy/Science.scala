@@ -116,8 +116,10 @@ object Science:
         cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
           for
             fs <- EitherT(expander.expandStep(static, flat))
-            rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
+            // The flat is required, but the arc is optional
+            ar <- EitherT.liftF(expander.expandStep(static, arc))
+            arcSteps = ar.toOption.toList.flatMap(_.toList).map(adjustReadMode)
+          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ++ arcSteps).some)
 
     object PreDef:
 
