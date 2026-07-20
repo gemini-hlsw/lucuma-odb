@@ -4,12 +4,14 @@
 package lucuma.odb.sequence.igrins2.longslit
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
-import cats.syntax.all.*
 import lucuma.core.enums.Igrins2SlitOffsetPreset
-import lucuma.core.math.Offset
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.*
 import lucuma.odb.sequence.syntax.all.*
 
@@ -18,24 +20,33 @@ import java.io.DataOutputStream
 
 case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
-  offsetMode: Igrins2SlitOffsetPreset,
   saveSVCImages: Boolean,
-  explicitSpatialOffsets: Option[List[Offset]],
+  telescopeConfigs: SlitTelescopeConfigs,
   telluricType: TelluricType
 ) derives Eq:
 
-  def offsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(Config.defaultOffsetsFor(offsetMode))
+  /** The telescope configs flattened for step generation. */
+  def steps: NonEmptyList[TelescopeConfig] =
+    telescopeConfigs.telescopeConfigs
+
+  /**
+   * The offset preset recorded in the instrument static config, derived from the shape of
+   * the telescope configs.
+   */
+  def offsetPreset: Igrins2SlitOffsetPreset =
+    telescopeConfigs.offsetsType match
+      case SlitOffsetMode.NodAlongSlit => Igrins2SlitOffsetPreset.NodAlongSlit
+      case SlitOffsetMode.NodToSky     => Igrins2SlitOffsetPreset.NodToSky
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)
     val out = new DataOutputStream(bao)
 
     out.write(scienceExposureTimeMode.hashBytes)
-    out.writeChars(offsetMode.tag)
     out.writeBoolean(saveSVCImages)
-    val off = explicitSpatialOffsets.foldMap(_.map(_.hashBytes)).flatten.toArray
-    out.write(off, 0, off.length)
+    out.writeChars(telescopeConfigs.offsetsType.tag)
+    steps.toList.foreach: tc =>
+      out.write(tc.hashBytes)
     out.write(telluricType.hashBytes)
 
     out.close()
@@ -43,10 +54,6 @@ case class Config(
 
 object Config:
 
-  /** Default spatial offsets for the given IGRINS-2 preset. */
-  def defaultOffsetsFor(preset: Igrins2SlitOffsetPreset): List[Offset] =
-    defaultSlitTelescopeConfigs(preset).telescopeConfigs.toList.map(_.offset)
-
-  /** Offsets for the NodAlongSlit preset — the set used when reverting to defaults. */
-  val NodAlongSlitDefaultOffsets: List[Offset] =
-    defaultOffsetsFor(Igrins2SlitOffsetPreset.NodAlongSlit)
+  /** The default telescope configs — the nod-along-slit ABBA pattern. */
+  val DefaultTelescopeConfigs: SlitTelescopeConfigs =
+    defaultSlitTelescopeConfigs(Igrins2SlitOffsetPreset.NodAlongSlit)

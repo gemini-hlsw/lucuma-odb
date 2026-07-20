@@ -260,9 +260,11 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           }
         }
         igrins2LongSlit {
-          offsetMode
-          explicitOffsetMode
-          defaultOffsetMode
+          telescopeConfigs {
+            offsetMode
+            alongSlit { q { arcseconds } guiding }
+            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+          }
           saveSVCImages
           explicitSaveSVCImages
           defaultSaveSVCImages
@@ -1931,10 +1933,10 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
       oid <- createIgrins2LongSlitObservationAs(pi, pid, Some("""[
-                { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } },
-                { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
-                { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
-                { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } }
+                { q: { arcseconds: -1.5 }, guiding: ENABLED },
+                { q: { arcseconds:  1.5 }, guiding: ENABLED },
+                { q: { arcseconds:  1.5 }, guiding: ENABLED },
+                { q: { arcseconds: -1.5 }, guiding: ENABLED }
               ]"""), tid)
       oid2 <- cloneObservationAs(pi, oid)
       graph =
@@ -1942,9 +1944,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         {
           observingMode {
             igrins2LongSlit {
-              offsets {
-                p { arcseconds }
-                q { arcseconds }
+              telescopeConfigs {
+                offsetMode
+                alongSlit { q { arcseconds } guiding }
               }
             }
           }
@@ -1964,24 +1966,30 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "offsets": [
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
-                          ]
+                          "telescopeConfigs": {
+                            "offsetMode": "NOD_ALONG_SLIT",
+                            "alongSlit": [
+                              { "q": { "arcseconds": -1.500000 }, "guiding": "ENABLED" },
+                              { "q": { "arcseconds":  1.500000 }, "guiding": "ENABLED" },
+                              { "q": { "arcseconds":  1.500000 }, "guiding": "ENABLED" },
+                              { "q": { "arcseconds": -1.500000 }, "guiding": "ENABLED" }
+                            ]
+                          }
                         }
                       }
                     },
                     "newObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "offsets": [
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                            { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }
-                          ]
+                          "telescopeConfigs": {
+                            "offsetMode": "NOD_ALONG_SLIT",
+                            "alongSlit": [
+                              { "q": { "arcseconds": -1.500000 }, "guiding": "ENABLED" },
+                              { "q": { "arcseconds":  1.500000 }, "guiding": "ENABLED" },
+                              { "q": { "arcseconds":  1.500000 }, "guiding": "ENABLED" },
+                              { "q": { "arcseconds": -1.500000 }, "guiding": "ENABLED" }
+                            ]
+                          }
                         }
                       }
                     }
@@ -2382,8 +2390,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         {
           observingMode {
             igrins2LongSlit {
-              offsetMode
-              explicitOffsetMode
               saveSVCImages
               explicitSaveSVCImages
             }
@@ -2404,8 +2410,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "offsetMode": "NOD_ALONG_SLIT",
-                          "explicitOffsetMode": null,
                           "saveSVCImages": false,
                           "explicitSaveSVCImages": null
                         }
@@ -2414,8 +2418,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "newObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "offsetMode": "NOD_ALONG_SLIT",
-                          "explicitOffsetMode": null,
                           "saveSVCImages": false,
                           "explicitSaveSVCImages": null
                         }
@@ -2440,7 +2442,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                       SET: {
                         observingMode: {
                           igrins2LongSlit: {
-                            explicitOffsetMode: NOD_TO_SKY
                             explicitSaveSVCImages: true
                           }
                         }
@@ -2459,8 +2460,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         {
           observingMode {
             igrins2LongSlit {
-              offsetMode
-              explicitOffsetMode
               saveSVCImages
               explicitSaveSVCImages
             }
@@ -2481,8 +2480,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "offsetMode": "NOD_TO_SKY",
-                          "explicitOffsetMode": "NOD_TO_SKY",
                           "saveSVCImages": true,
                           "explicitSaveSVCImages": true
                         }
@@ -2491,8 +2488,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "newObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "offsetMode": "NOD_TO_SKY",
-                          "explicitOffsetMode": "NOD_TO_SKY",
                           "saveSVCImages": true,
                           "explicitSaveSVCImages": true
                         }

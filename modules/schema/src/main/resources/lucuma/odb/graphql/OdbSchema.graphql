@@ -10295,22 +10295,6 @@ type Igrins2LongSlit {
   exposureTimeMode: ExposureTimeMode!
 
   """
-  The offset mode is either explicitly specified in explicitOffsetMode or else
-  taken from defaultOffsetMode
-  """
-  offsetMode: SlitOffsetMode!
-
-  """
-  Default offset mode
-  """
-  defaultOffsetMode: SlitOffsetMode!
-
-  """
-  Optional explicitly specified offset mode. If set it overrides the default.
-  """
-  explicitOffsetMode: SlitOffsetMode
-
-  """
   Whether to save SVC images, either explicitly specified in
   explicitSaveSVCImages or else taken from defaultSaveSVCImages
   """
@@ -10328,22 +10312,21 @@ type Igrins2LongSlit {
   explicitSaveSVCImages: Boolean
 
   """
-  Spatial offsets, either explicitly specified in explicitOffsets or else
-  taken from defaultOffsets
+  Effective telescope configs (explicit override coalesced with the default).
   """
-  offsets: [Offset!]!
+  telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default spatial offsets
-  (ABBA pattern, q = -1.25, +1.25, +1.25, -1.25 arcsec) for NodAlongSlit, or
-  (p = 0, q = 0), (p = 10, q = 10), (p = 0, q = 0) for NodToSky.
+  Default telescope configs: the nod-along-slit ABBA pattern,
+  q = -1.25, +1.25, +1.25, -1.25 arcsec, all guided.
   """
-  defaultOffsets: [Offset!]!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Optional explicitly specified spatial offsets. If set, overrides the default.
+  Optional explicitly specified telescope configs. If set they override the
+  default.
   """
-  explicitOffsets: [Offset!]
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Telluric type configuration for this observation.
@@ -10364,22 +10347,16 @@ input Igrins2LongSlitInput {
   exposureTimeMode: ExposureTimeModeInput
 
   """
-  The offset mode field may be unset by assigning a null value, or ignored by
-  skipping it altogether
-  """
-  explicitOffsetMode: SlitOffsetMode
-
-  """
   The save SVC images field may be unset by assigning a null value, or ignored
   by skipping it altogether
   """
   explicitSaveSVCImages: Boolean
 
   """
-  Spatial offsets. May be unset by assigning null, or ignored by skipping.
-  For NodAlongSlit mode, all offsets must have P = 0.
+  Explicit telescope configs. May be unset by assigning null (clears the
+  override back to the default), or ignored by skipping.
   """
-  explicitOffsets: [OffsetInput!]
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.

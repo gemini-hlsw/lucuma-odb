@@ -20,7 +20,7 @@ import java.util.UUID
 object LongSlit:
 
   def staticFrom(config: Config): Igrins2StaticConfig =
-    Igrins2StaticConfig(Igrins2SVCImages(config.saveSVCImages), config.offsetMode)
+    Igrins2StaticConfig(Igrins2SVCImages(config.saveSVCImages), config.offsetPreset)
 
   def instantiate(
     observationId: Observation.Id,

@@ -3,16 +3,9 @@
 
 package lucuma.odb.sequence
 
-import cats.syntax.eq.*
 import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.math.Angle
-import lucuma.core.math.Offset
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.data.ProtoStep
-
-def isOnSlit(slitLength: Angle, o: Offset): Boolean =
-  (o.p.toAngle.toMicroarcseconds === 0L) &&
-  (Angle.signedDecimalArcseconds.get(o.q.toAngle).abs <= (Angle.signedDecimalArcseconds.get(slitLength) / 2))
 
 def calculateCycleCount[D](
   isOnSource: ProtoStep[D] => Boolean,

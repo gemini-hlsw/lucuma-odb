@@ -4203,9 +4203,21 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         instrument
         observingMode {
           igrins2LongSlit {
-            offsetMode
-            defaultOffsetMode
-            explicitOffsetMode
+            telescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
+            defaultTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
+            explicitTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
             saveSVCImages
             defaultSaveSVCImages
             explicitSaveSVCImages
@@ -4229,9 +4241,27 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               "instrument": "IGRINS2",
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsetMode": "NOD_ALONG_SLIT",
-                  "defaultOffsetMode": "NOD_ALONG_SLIT",
-                  "explicitOffsetMode": null,
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": null,
                   "saveSVCImages": false,
                   "defaultSaveSVCImages": false,
                   "explicitSaveSVCImages": null,
@@ -4253,7 +4283,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
 
     oneUpdateTest(pi, update, query, expected)
 
-  test("observing mode: update igrins2 long slit offset mode"):
+  test("observing mode: update igrins2 long slit telescope configs"):
 
     val update0 = """
       observingMode: {
@@ -4268,10 +4298,17 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """
 
+    // A nod-to-sky override: the shape of the explicit configs carries the mode.
     val update1 = """
       observingMode: {
         igrins2LongSlit: {
-          explicitOffsetMode: NOD_TO_SKY
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 10.0 }, q: { arcseconds: 10.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
+            ]
+          }
           explicitSaveSVCImages: true
         }
       }
@@ -4281,9 +4318,21 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observations {
         observingMode {
           igrins2LongSlit {
-            offsetMode
-            defaultOffsetMode
-            explicitOffsetMode
+            telescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
+            defaultTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
+            explicitTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
             saveSVCImages
             defaultSaveSVCImages
             explicitSaveSVCImages
@@ -4300,9 +4349,27 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             {
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsetMode": "NOD_ALONG_SLIT",
-                  "defaultOffsetMode": "NOD_ALONG_SLIT",
-                  "explicitOffsetMode": null,
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": null,
                   "saveSVCImages": false,
                   "defaultSaveSVCImages": false,
                   "explicitSaveSVCImages": null
@@ -4322,9 +4389,34 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             {
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsetMode": "NOD_TO_SKY",
-                  "defaultOffsetMode": "NOD_ALONG_SLIT",
-                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } }, "guiding": "DISABLED" },
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } }, "guiding": "DISABLED" },
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
                   "saveSVCImages": true,
                   "defaultSaveSVCImages": false,
                   "explicitSaveSVCImages": true
@@ -4354,7 +4446,13 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               at: { nanometers: 2200 }
             }
           }
-          explicitOffsetMode: NOD_TO_SKY
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 10.0 }, q: { arcseconds: 10.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
+            ]
+          }
           explicitSaveSVCImages: true
         }
       }
@@ -4363,7 +4461,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     val update1 = """
       observingMode: {
         igrins2LongSlit: {
-          explicitOffsetMode: null
+          explicitTelescopeConfigs: null
           explicitSaveSVCImages: null
         }
       }
@@ -4373,8 +4471,16 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observations {
         observingMode {
           igrins2LongSlit {
-            offsetMode
-            explicitOffsetMode
+            telescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
+            explicitTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
             saveSVCImages
             explicitSaveSVCImages
           }
@@ -4390,8 +4496,24 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             {
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsetMode": "NOD_TO_SKY",
-                  "explicitOffsetMode": "NOD_TO_SKY",
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } }, "guiding": "DISABLED" },
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } }, "guiding": "DISABLED" },
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
                   "saveSVCImages": true,
                   "explicitSaveSVCImages": true
                 }
@@ -4402,6 +4524,8 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """.asRight
 
+    // Clearing the override reverts to the single fixed default, which is nod-along-slit:
+    // there is no way to keep sky nodding without explicit configs.
     val expected1 =
       json"""
       {
@@ -4410,8 +4534,17 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             {
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsetMode": "NOD_ALONG_SLIT",
-                  "explicitOffsetMode": null,
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": null,
                   "saveSVCImages": false,
                   "explicitSaveSVCImages": null
                 }
@@ -4429,7 +4562,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       )
     )
 
-  test("observing mode: update igrins2 spatial offsets"):
+  test("observing mode: update igrins2 telescope configs"):
 
     val update0 = """
       observingMode: {
@@ -4440,12 +4573,14 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               at: { nanometers: 2200 }
             }
           }
-          explicitOffsets: [
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
-          ]
+          explicitTelescopeConfigs: {
+            alongSlit: [
+              { q: { arcseconds: -5.0 }, guiding: ENABLED },
+              { q: { arcseconds:  5.0 }, guiding: DISABLED },
+              { q: { arcseconds:  3.5 }, guiding: ENABLED },
+              { q: { arcseconds: -2.5 }, guiding: ENABLED }
+            ]
+          }
         }
       }
     """
@@ -4453,7 +4588,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     val update1 = """
       observingMode: {
         igrins2LongSlit: {
-          explicitOffsets: null
+          explicitTelescopeConfigs: null
         }
       }
     """
@@ -4461,11 +4596,12 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     val update2 = """
       observingMode: {
         igrins2LongSlit: {
-          explicitOffsetMode: NOD_TO_SKY
-          explicitOffsets: [
-            { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } },
-            { p: { arcseconds: 2.0 }, q: { arcseconds:  5.0 } }
-          ]
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds: 1.0 }, q: { arcseconds: -5.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 2.0 }, q: { arcseconds:  5.0 } }, guiding: DISABLED }
+            ]
+          }
         }
       }
     """
@@ -4473,7 +4609,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     val update3 = """
       observingMode: {
         igrins2LongSlit: {
-          explicitOffsets: null
+          explicitTelescopeConfigs: null
         }
       }
     """
@@ -4482,17 +4618,20 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observations {
         observingMode {
           igrins2LongSlit {
-            offsets {
-              p { arcseconds }
-              q { arcseconds }
+            telescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
-            explicitOffsets {
-              p { arcseconds }
-              q { arcseconds }
+            explicitTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
-            defaultOffsets {
-              p { arcseconds }
-              q { arcseconds }
+            defaultTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
           }
         }
@@ -4506,24 +4645,36 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             {
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ],
-                  "explicitOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ],
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
-                  ]
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -5.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  5.000000 }, "guiding": "DISABLED" },
+                      { "q": { "arcseconds":  3.500000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -2.500000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -5.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  5.000000 }, "guiding": "DISABLED" },
+                      { "q": { "arcseconds":  3.500000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -2.500000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  }
                 }
               }
             }
@@ -4539,19 +4690,27 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             {
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
-                  ],
-                  "explicitOffsets": null,
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.250000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.250000 } }
-                  ]
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": null,
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  }
                 }
               }
             }
@@ -4567,19 +4726,32 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             {
               "observingMode": {
                 "igrins2LongSlit": {
-                  "offsets": [
-                    { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }
-                  ],
-                  "explicitOffsets": [
-                    { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }
-                  ],
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
-                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
-                  ]
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }, "guiding": "DISABLED" }
+                    ]
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -5.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds":  5.000000 } }, "guiding": "DISABLED" }
+                    ]
+                  },
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds":  1.250000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -1.250000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  }
                 }
               }
             }
@@ -4588,148 +4760,18 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       }
     """.asRight
 
-    val expected3 = json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "observingMode": {
-                "igrins2LongSlit": {
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
-                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
-                  ],
-                  "explicitOffsets": null,
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
-                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
+    // Clearing always reverts to the one fixed default. There is no nod-to-sky default to
+    // fall back to any more — sky nodding only exists as an explicit override.
+    val expected3 = expected1
 
     multiUpdateTest(pi,
       List(
-        (update0, query, expected0), // create with explicit offsets
-        (update1, query, expected1), // clear explicit offsets, revert to default
-        (update2, query, expected2), // switch mode with new explicit offsets
-        (update3, query, expected3)  // clear explicit offsets again, revert to default offsets
+        (update0, query, expected0), // create with explicit along-slit configs
+        (update1, query, expected1), // clear the override, revert to the default
+        (update2, query, expected2), // replace with explicit to-sky configs
+        (update3, query, expected3)  // clear again, back to the along-slit default
       )
     )
-
-  test("observing mode: changing igrins2 offset mode clears explicit offsets"):
-
-    val update0 = """
-      observingMode: {
-        igrins2LongSlit: {
-          exposureTimeMode: {
-            signalToNoise: {
-              value: 50.0
-              at: { nanometers: 2200 }
-            }
-          }
-          explicitOffsets: [
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
-          ]
-        }
-      }
-    """
-
-    val update1 = """
-      observingMode: {
-        igrins2LongSlit: {
-          explicitOffsetMode: NOD_TO_SKY
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        observingMode {
-          igrins2LongSlit {
-            offsetMode
-            explicitOffsetMode
-            offsets {
-              p { arcseconds }
-              q { arcseconds }
-            }
-            explicitOffsets {
-              p { arcseconds }
-              q { arcseconds }
-            }
-          }
-        }
-      }
-    """
-
-    val expected0 = json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "observingMode": {
-                "igrins2LongSlit": {
-                  "offsetMode": "NOD_ALONG_SLIT",
-                  "explicitOffsetMode": null,
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ],
-                  "explicitOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    val expected1 = json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "observingMode": {
-                "igrins2LongSlit": {
-                  "offsetMode": "NOD_TO_SKY",
-                  "explicitOffsetMode": "NOD_TO_SKY",
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } },
-                    { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }
-                  ],
-                  "explicitOffsets": null
-                }
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    multiUpdateTest(pi,
-      List(
-        (update0, query, expected0), // create with explicit offsets
-        (update1, query, expected1)  // change mode, clear explicit offsets
-      )
-    )
-
   test("observing mode: switch from gmos to igrins2"):
 
     val update0 = """
@@ -4760,7 +4802,13 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               at: { nanometers: 2200 }
             }
           }
-          explicitOffsetMode: NOD_TO_SKY
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 10.0 }, q: { arcseconds: 10.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
+            ]
+          }
         }
       }
     """
@@ -4773,8 +4821,11 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             grating
           }
           igrins2LongSlit {
-            offsetMode
-            explicitOffsetMode
+            telescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+            }
           }
         }
       }
@@ -4809,8 +4860,15 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               "observingMode": {
                 "gmosNorthLongSlit": null,
                 "igrins2LongSlit": {
-                  "offsetMode": "NOD_TO_SKY",
-                  "explicitOffsetMode": "NOD_TO_SKY"
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 10.000000 }, "q": { "arcseconds": 10.000000 } }, "guiding": "DISABLED" },
+                      { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" }
+                    ]
+                  }
                 }
               }
             }

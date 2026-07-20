@@ -14,12 +14,14 @@ trait Igrins2LongSlitView[F[_]] extends BaseMapping[F]:
 
     val ObservationId: ColumnRef         = col("c_observation_id", observation_id)
 
-    val OffsetMode: ColumnRef            = col("c_offset_mode", slit_offset_mode.opt)
-
     val SaveSVCImages: ColumnRef         = col("c_save_svc_images", bool.opt)
 
-    val Offsets: ColumnRef               = col("c_spatial_offsets", text.opt)
+    val SlitOffsetMode: ColumnRef          = col("c_slit_offset_mode", slit_offset_mode.opt)
+    val SlitOffsetModeDefault: ColumnRef   = col("c_slit_offset_mode_default", slit_offset_mode.opt)
+    val SlitOffsetModeEffective: ColumnRef = col("c_slit_offset_mode_effective", slit_offset_mode.opt)
 
-    val DefaultOffsets: ColumnRef        = col("c_default_spatial_offsets", text)
+    val TelescopeConfigs: ColumnRef          = col("c_telescope_configs", text.opt)
+    val TelescopeConfigsDefault: ColumnRef   = col("c_telescope_configs_default", text)
+    val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
 
     val TelluricType: ColumnRef          = col("c_telluric_type", jsonb)
