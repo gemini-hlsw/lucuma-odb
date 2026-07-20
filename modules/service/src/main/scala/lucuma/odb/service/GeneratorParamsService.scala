@@ -501,16 +501,14 @@ object GeneratorParamsService {
                 coadds            = gn.coadds
               )
 
-              // Two-pass acquisition ITC only when the mode and filter are both auto and
-              // we're in S/N mode: only then does the resolved filter depend on the
-              // ITC-derived exposure time (Very Bright → H2), creating the circularity.
+              // Two-pass acquisition ITC whenever the acquisition mode and filter are
+              // both auto: only then does the resolved filter depend on the ITC-derived
+              // brightness classification (Very Bright → H2), creating the circularity.
+              // This holds for both S/N and time-and-count acquisition ETMs — the
+              // classification must not depend on the user's acquisition ETM.
               val acqAutoClassify: Boolean =
                 gn.acquisition.explicitAcqMode.isEmpty &&
-                gn.acquisition.explicitFilter.isEmpty && {
-                  gn.acquisition.exposureTimeMode match
-                    case ExposureTimeMode.SignalToNoiseMode(_, _)   => true
-                    case ExposureTimeMode.TimeAndCountMode(_, _, _) => false
-                }
+                gn.acquisition.explicitFilter.isEmpty
 
               spectroscopyGeneratorParams(
                 obsMode = gn,
