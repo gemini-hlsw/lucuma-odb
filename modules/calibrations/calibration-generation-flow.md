@@ -160,6 +160,7 @@ flowchart TD
 
     C --> D[Extract unique GMOS configurations from science obs]
     D --> E[Prepare ideal targets for GN and GS sites]
+    D --> D2["calObsProps: per role, group all science obs by normalized config -> avg wavelength + band"]
 
     E --> F[calculateConfigurationsPerRole]
     F --> G["For each role (SpectroPhoto, Twilight):"]
@@ -178,10 +179,16 @@ flowchart TD
     P -->|No| Q[Delete if not Ongoing/Completed]
     P -->|Yes| R[Keep]
 
-    L --> S[Update band and wavelength on existing calibrations]
+    L --> S["Update band and wavelength on existing calibrations (lookup by the calibration's own role-normalized config)"]
     M --> S
     S --> T[Delete empty calibration groups]
 ```
+
+`calObsProps` keys props by each science observation's **role-normalized** config — the same normalization applied to a calibration's stored config
+at creation (see Configuration Matching below) — producing a `Map[CalibrationConfigSubset, CalObsProps]` per role. Both creation and the
+existing-calibration update look up by the calibration's own role, so the key always matches. Keying by the raw config instead would silently
+miss any calibration whose normalized fields differ — e.g. a specphot calibration's ROI is normalized to `CentralSpectrum`, so a `FullFrame`
+science obs would never match it, leaving its S/N λ stale.
 
 ### Configuration Matching
 
