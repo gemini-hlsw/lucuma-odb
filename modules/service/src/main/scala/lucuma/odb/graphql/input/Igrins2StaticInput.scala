@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
 import lucuma.odb.graphql.binding.*
@@ -15,11 +15,11 @@ object Igrins2StaticInput:
     ObjectFieldsBinding.rmap:
       case List(
         BooleanBinding.Option("saveSVCImages", rSVC),
-        SlitOffsetModeBinding.Option("offsetMode", rOffsetMode)
+        Igrins2OffsetModeBinding.Option("offsetMode", rOffsetMode)
       ) =>
         (rSVC, rOffsetMode)
           .parMapN: (svc, offsetMode) =>
             Igrins2StaticConfig(
               Igrins2SVCImages(svc.getOrElse(false)),
-              offsetMode.getOrElse(SlitOffsetMode.NodAlongSlit)
+              offsetMode.getOrElse(Igrins2SlitOffsetPreset.NodAlongSlit)
             )

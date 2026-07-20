@@ -31,7 +31,13 @@ trait Flamingos2LongSlitView[F[_]] extends BaseMapping[F]:
     val ReadoutMode: ColumnRef        = col("c_readout_mode", flamingos_2_readout_mode.opt)
     val ReadoutModeDefault: ColumnRef = col("c_readout_mode_default", flamingos_2_readout_mode)
 
-    val Offsets: ColumnRef            = col("c_offsets", text.opt)
+    val SlitOffsetMode: ColumnRef          = col("c_slit_offset_mode", slit_offset_mode.opt)
+    val SlitOffsetModeDefault: ColumnRef   = col("c_slit_offset_mode_default", slit_offset_mode.opt)
+    val SlitOffsetModeEffective: ColumnRef = col("c_slit_offset_mode_effective", slit_offset_mode.opt)
+
+    val TelescopeConfigs: ColumnRef          = col("c_telescope_configs", text.opt)
+    val TelescopeConfigsDefault: ColumnRef   = col("c_telescope_configs_default", text)
+    val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
 
     val ImageQuality: ColumnRef       = col("c_image_quality", image_quality_preset)
     val SourceProfile: ColumnRef      = col("c_source_profile", jsonb.opt)

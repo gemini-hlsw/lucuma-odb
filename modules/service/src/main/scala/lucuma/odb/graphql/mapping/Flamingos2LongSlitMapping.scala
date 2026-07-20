@@ -8,33 +8,21 @@ import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
-import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadoutMode
-import lucuma.core.math.Offset
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
-import lucuma.odb.sequence.flamingos2.longslit.Config
 
 trait Flamingos2LongSlitMapping[F[_]]
   extends Flamingos2LongSlitView[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
+     with SlitTelescopeConfigsMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
-
-  private def decodeOffsets(s: String): Json =
-    OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
-
-  private val defaultOffsetsJson: Json =
-    Config.DefaultSpatialOffsets.map(_.asJson).asJson
 
   lazy val Flamingos2LongSlitAcquisitionMapping: ObjectMapping =
     ObjectMapping(Flamingos2LongSlitAcquisitionType)(
@@ -69,26 +57,17 @@ trait Flamingos2LongSlitMapping[F[_]]
       SqlField("defaultReadoutMode",  Flamingos2LongSlitView.ReadoutModeDefault),
       SqlField("explicitReadoutMode", Flamingos2LongSlitView.ReadoutMode),
 
-      SqlField("offsetsString", Flamingos2LongSlitView.Offsets, hidden = true),
+      // Raw columns (hidden) backing the telescope config cursor fields.
+      SqlField("slitOffsetModeEffRaw", Flamingos2LongSlitView.SlitOffsetModeEffective,  hidden = true),
+      SqlField("tcEffRaw",             Flamingos2LongSlitView.TelescopeConfigsEffective, hidden = true),
+      SqlField("slitOffsetModeDefRaw", Flamingos2LongSlitView.SlitOffsetModeDefault,     hidden = true),
+      SqlField("tcDefRaw",             Flamingos2LongSlitView.TelescopeConfigsDefault,   hidden = true),
+      SqlField("slitOffsetModeExpRaw", Flamingos2LongSlitView.SlitOffsetMode,            hidden = true),
+      SqlField("tcExpRaw",             Flamingos2LongSlitView.TelescopeConfigs,          hidden = true),
 
-      CursorFieldJson("offsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets)))
-            .map(_.getOrElse(defaultOffsetsJson)),
-        List("explicitOffsets", "defaultOffsets")
-      ),
-
-      CursorFieldJson("explicitOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeOffsets).asJson)),
-        List("offsetsString")
-      ),
-
-      CursorFieldJson("defaultOffsets", _ => Result(defaultOffsetsJson), Nil),
+      slitTelescopeConfigsField("telescopeConfigs",        "slitOffsetModeEffRaw", "tcEffRaw"),
+      slitTelescopeConfigsField("defaultTelescopeConfigs", "slitOffsetModeDefRaw", "tcDefRaw"),
+      explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "tcExpRaw"),
 
       SqlJson("telluricType", Flamingos2LongSlitView.TelluricType),
 

@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package input
 
 import cats.data.NonEmptyList
-import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
@@ -25,7 +24,6 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Access
@@ -33,7 +31,6 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
@@ -115,34 +112,6 @@ object GnirsSpectroscopyInput:
                 Matcher.validationFailure("'telescopeConfigs' must not be empty")
               )(Result(_))
             .map(Value(fpu, _))
-
-  object TelescopeConfigAlongSlitInput:
-    val Binding: Matcher[TelescopeConfigAlongSlit] =
-      ObjectFieldsBinding.rmap:
-        case List(
-          OffsetComponentInput.BindingQ("q", rQ),
-          StepGuideStateBinding("guiding", rGuiding)
-        ) =>
-          (rQ, rGuiding).parMapN(TelescopeConfigAlongSlit.apply)
-
-  object SlitTelescopeConfigsInput:
-    val Binding: Matcher[SlitTelescopeConfigs] =
-      ObjectFieldsBinding.rmap:
-        case List(
-          TelescopeConfigAlongSlitInput.Binding.List.Option("alongSlit", rAlongSlit),
-          TelescopeConfigInput.Binding.List.Option("toSky", rOnSky)
-        ) =>
-          (rAlongSlit, rOnSky).tupled.flatMap:
-            case (Some(cs), None) =>
-              NonEmptyList.fromList(cs).fold(
-                Matcher.validationFailure("alongSlit must not be empty")
-              )(nel => Result(SlitTelescopeConfigs.AlongSlit(nel)))
-            case (None, Some(cs)) =>
-              NonEmptyList.fromList(cs).fold(
-                Matcher.validationFailure("toSky must not be empty")
-              )(nel => Result(SlitTelescopeConfigs.ToSky(nel)))
-            case _ =>
-              Matcher.validationFailure("Exactly one of alongSlit or toSky must be provided")
 
   case class AcquisitionInput(
     explicitFilter:   Nullable[GnirsFilter], // Nullable to allow clearing to the computed default

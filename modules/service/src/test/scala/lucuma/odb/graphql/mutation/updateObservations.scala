@@ -2083,12 +2083,14 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           disperser: R1200_JH
           filter: Y
           fpu: LONG_SLIT_2
-          explicitOffsets: [
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }
-          ]
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  3.5 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }, guiding: ENABLED }
+            ]
+          }
         }
       }
     """
@@ -2101,29 +2103,20 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             disperser
             filter
             fpu
-            offsets {
-              p {
-                arcseconds
-              }
-              q {
-                arcseconds
-              }
+            telescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
-            explicitOffsets {
-              p {
-                arcseconds
-              }
-              q {
-                arcseconds
-              }
+            explicitTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
-            defaultOffsets {
-              p {
-                arcseconds
-              }
-              q {
-                arcseconds
-              }
+            defaultTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
+              toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
           }
         }
@@ -2141,24 +2134,36 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ],
-                  "explicitOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }
-                  ],
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
-                  ]
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -5.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  5.000000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  3.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  }
                 }
               }
             }
@@ -2170,12 +2175,14 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     val update1 = """
       observingMode: {
         flamingos2LongSlit: {
-          explicitOffsets: [
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } },
-            { p: { arcseconds: 0.0 }, q: { arcseconds:  2.5 } }
-          ]
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -1.5 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  1.5 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -2.5 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  2.5 } }, guiding: ENABLED }
+            ]
+          }
         }
       }
     """
@@ -2191,24 +2198,36 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
-                  ],
-                  "explicitOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }
-                  ],
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
-                  ]
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_TO_SKY",
+                    "alongSlit": null,
+                    "toSky": [
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -1.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  1.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -2.500000 } }, "guiding": "ENABLED" },
+                      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  2.500000 } }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  }
                 }
               }
             }
@@ -2220,7 +2239,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     val update2 = """
       observingMode: {
         flamingos2LongSlit: {
-          explicitOffsets: null
+          explicitTelescopeConfigs: null
         }
       }
     """
@@ -2236,19 +2255,27 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "disperser": "R1200_JH",
                   "filter": "Y",
                   "fpu": "LONG_SLIT_2",
-                  "offsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
-                  ],
-                  "explicitOffsets": null,
-                  "defaultOffsets": [
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                    { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
-                  ]
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  },
+                  "explicitTelescopeConfigs": null,
+                  "defaultTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                    ],
+                    "toSky": null
+                  }
                 }
               }
             }
@@ -3617,7 +3644,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     for {
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid)
-      _   <- interceptGraphQL("Argument 'input.SET.observingMode.flamingos2LongSlit' is invalid: Flamingos2 must have exactly 0 or 4 offsets, but 2 were provided.") {
+      _   <- interceptGraphQL("Argument 'input.SET.observingMode.flamingos2LongSlit' is invalid: Flamingos2 must have exactly 4 offsets, but 2 were provided.") {
         query(pi, s"""
           mutation {
             updateObservations(input: {
@@ -3627,10 +3654,12 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     disperser: R1200_HK
                     filter: Y
                     fpu: LONG_SLIT_2
-                    explicitOffsets: [
-                      { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } },
-                      { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }
-                    ]
+                    explicitTelescopeConfigs: {
+                      toSky: [
+                        { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -5.0 } }, guiding: ENABLED },
+                        { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  5.0 } }, guiding: ENABLED }
+                      ]
+                    }
                   }
                 }
               }
@@ -3641,10 +3670,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               observations {
                 observingMode {
                   flamingos2LongSlit {
-                    offsets {
-                      p { arcseconds }
-                      q { arcseconds }
-                    }
+                    disperser
                   }
                 }
               }
@@ -3674,12 +3700,14 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                       at: { nanometers: 345.67 }
                     }
                   }
-                  explicitOffsets: [
-                    { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } },
-                    { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } },
-                    { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } },
-                    { p: { arcseconds: 0.0 }, q: { arcseconds:  -5.0 } }
-                  ]
+                  explicitTelescopeConfigs: {
+                    toSky: [
+                      { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: -10.0 } }, guiding: ENABLED },
+                      { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  10.0 } }, guiding: ENABLED },
+                      { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:   5.0 } }, guiding: ENABLED },
+                      { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  -5.0 } }, guiding: ENABLED }
+                    ]
+                  }
                 }
               }
             }
@@ -3697,7 +3725,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             SET: {
               observingMode: {
                 flamingos2LongSlit: {
-                  explicitOffsets: null
+                  explicitTelescopeConfigs: null
                 }
               }
             }
@@ -3708,9 +3736,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             observations {
               observingMode {
                 flamingos2LongSlit {
-                  offsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  telescopeConfigs {
+                    offsetMode
+                    alongSlit { q { arcseconds } guiding }
+                    toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                   }
                 }
               }
@@ -3739,12 +3768,14 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                       at: { nanometers: 345.67 }
                     }
                   }
-                  explicitOffsets: [
-                    { p: { arcseconds: 1.0 }, q: { arcseconds: -3.0 } },
-                    { p: { arcseconds: 2.0 }, q: { arcseconds:  4.0 } },
-                    { p: { arcseconds: -1.5 }, q: { arcseconds: 2.5 } },
-                    { p: { arcseconds: 0.5 }, q: { arcseconds: -1.0 } }
-                  ]
+                  explicitTelescopeConfigs: {
+                    toSky: [
+                      { offset: { p: { arcseconds: 1.0 }, q: { arcseconds: -3.0 } }, guiding: ENABLED },
+                      { offset: { p: { arcseconds: 2.0 }, q: { arcseconds:  4.0 } }, guiding: ENABLED },
+                      { offset: { p: { arcseconds: -1.5 }, q: { arcseconds: 2.5 } }, guiding: DISABLED },
+                      { offset: { p: { arcseconds: 0.5 }, q: { arcseconds: -1.0 } }, guiding: DISABLED }
+                    ]
+                  }
                 }
               }
             }
@@ -3756,17 +3787,20 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               observingMode {
                 flamingos2LongSlit {
                   disperser
-                  offsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  telescopeConfigs {
+                    offsetMode
+                    alongSlit { q { arcseconds } guiding }
+                    toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                   }
-                  explicitOffsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  explicitTelescopeConfigs {
+                    offsetMode
+                    alongSlit { q { arcseconds } guiding }
+                    toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                   }
-                  defaultOffsets {
-                    p { arcseconds }
-                    q { arcseconds }
+                  defaultTelescopeConfigs {
+                    offsetMode
+                    alongSlit { q { arcseconds } guiding }
+                    toSky { offset { p { arcseconds } q { arcseconds } } guiding }
                   }
                 }
               }
@@ -3781,24 +3815,36 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                 "observingMode": {
                   "flamingos2LongSlit": {
                     "disperser": "R1200_HK",
-                    "offsets": [
-                      { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
-                      { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
-                      { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
-                      { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
-                    ],
-                    "explicitOffsets": [
-                      { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } },
-                      { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } },
-                      { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } },
-                      { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }
-                    ],
-                    "defaultOffsets": [
-                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } },
-                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": -15.000000 } },
-                      { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 15.000000 } }
-                    ]
+                    "telescopeConfigs": {
+                      "offsetMode": "NOD_TO_SKY",
+                      "alongSlit": null,
+                      "toSky": [
+                        { "offset": { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } }, "guiding": "ENABLED" },
+                        { "offset": { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } }, "guiding": "ENABLED" },
+                        { "offset": { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } }, "guiding": "DISABLED" },
+                        { "offset": { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }, "guiding": "DISABLED" }
+                      ]
+                    },
+                    "explicitTelescopeConfigs": {
+                      "offsetMode": "NOD_TO_SKY",
+                      "alongSlit": null,
+                      "toSky": [
+                        { "offset": { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": -3.000000 } }, "guiding": "ENABLED" },
+                        { "offset": { "p": { "arcseconds": 2.000000 }, "q": { "arcseconds": 4.000000 } }, "guiding": "ENABLED" },
+                        { "offset": { "p": { "arcseconds": -1.500000 }, "q": { "arcseconds": 2.500000 } }, "guiding": "DISABLED" },
+                        { "offset": { "p": { "arcseconds": 0.500000 }, "q": { "arcseconds": -1.000000 } }, "guiding": "DISABLED" }
+                      ]
+                    },
+                    "defaultTelescopeConfigs": {
+                      "offsetMode": "NOD_ALONG_SLIT",
+                      "alongSlit": [
+                        { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                      ],
+                      "toSky": null
+                    }
                   }
                 }
               }

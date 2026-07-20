@@ -38,24 +38,24 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitOffsets: [
+                explicitTelescopeConfigs: { toSky: [
                   {
-                    p: { arcseconds: 60 }
-                    q: { arcseconds:  0 }
+                    offset: { p: { arcseconds: 60 }, q: { arcseconds:  0 } }
+                    guiding: DISABLED
                   },
                   {
-                    p: { arcseconds:  0 }
-                    q: { arcseconds:  0 }
+                    offset: { p: { arcseconds:  0 }, q: { arcseconds:  0 } }
+                    guiding: ENABLED
                   },
                   {
-                    p: { arcseconds:  0 }
-                    q: { arcseconds:  0 }
+                    offset: { p: { arcseconds:  0 }, q: { arcseconds:  0 } }
+                    guiding: ENABLED
                   },
                   {
-                    p: { arcseconds: 60 }
-                    q: { arcseconds:  0 }
+                    offset: { p: { arcseconds: 60 }, q: { arcseconds:  0 } }
+                    guiding: DISABLED
                   }
-                ]
+                ] }
               }
             """
           )
@@ -99,24 +99,24 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitOffsets: [
+                explicitTelescopeConfigs: { toSky: [
                   {
-                    p: { arcseconds: 300 }
-                    q: { arcseconds:  55 }
+                    offset: { p: { arcseconds: 300 }, q: { arcseconds:  55 } }
+                    guiding: DISABLED
                   },
                   {
-                    p: { arcseconds:   0 }
-                    q: { arcseconds:  -5 }
+                    offset: { p: { arcseconds:   0 }, q: { arcseconds:  -5 } }
+                    guiding: ENABLED
                   },
                   {
-                    p: { arcseconds:   0 }
-                    q: { arcseconds:   5 }
+                    offset: { p: { arcseconds:   0 }, q: { arcseconds:   5 } }
+                    guiding: ENABLED
                   },
                   {
-                    p: { arcseconds: 300 }
-                    q: { arcseconds:  65 }
+                    offset: { p: { arcseconds: 300 }, q: { arcseconds:  65 } }
+                    guiding: DISABLED
                   }
-                ]
+                ] }
               }
             """
           )

@@ -4,7 +4,7 @@
 package lucuma.odb.graphql.input
 package arb
 
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.math.Offset
 import lucuma.core.math.arb.ArbOffset.given
 import lucuma.core.model.ExposureTimeMode
@@ -23,7 +23,7 @@ trait ArbIgrins2LongSlitInput:
     Arbitrary:
       for
         e  <- arbitrary[Option[ExposureTimeMode]]
-        om <- arbitrary[Option[SlitOffsetMode]]
+        om <- arbitrary[Option[Igrins2SlitOffsetPreset]]
         sv <- arbitrary[Option[Boolean]]
         so <- arbitrary[Option[List[Offset]]]
         tt <- arbitrary[TelluricType]
@@ -33,7 +33,7 @@ trait ArbIgrins2LongSlitInput:
     Arbitrary:
       for
         e  <- arbitrary[Option[ExposureTimeMode]]
-        om <- arbitrary[Nullable[SlitOffsetMode]]
+        om <- arbitrary[Nullable[Igrins2SlitOffsetPreset]]
         sv <- arbitrary[Nullable[Boolean]]
         so <- arbitrary[Nullable[List[Offset]]]
         tt <- arbitrary[Option[TelluricType]]

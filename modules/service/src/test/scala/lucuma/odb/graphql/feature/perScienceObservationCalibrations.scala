@@ -49,7 +49,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gnirs.GnirsFpu
-import lucuma.core.model.sequence.igrins2.NodAlongSlitDefaultOffsets
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -64,7 +63,7 @@ import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.offset.decoder.given
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
-import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
+import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2Config
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
@@ -2010,7 +2009,7 @@ class perScienceObservationCalibrations
       assertEquals(sciSet._2, customScience)
       // Telluric gets the default to NodAlongSlit offsets.
       assertEquals(telSet._1, "NOD_ALONG_SLIT")
-      assertEquals(telSet._2, NodAlongSlitDefaultOffsets)
+      assertEquals(telSet._2, Igrins2Config.NodAlongSlitDefaultOffsets)
     }
 
   private def updateIgrins2ScienceOffsets(oid: Observation.Id): IO[Unit] =
@@ -2054,41 +2053,50 @@ class perScienceObservationCalibrations
       tel2    <- queryIgrins2OffsetSettings(toid)
     } yield {
       assertEquals(tel2._1, "NOD_ALONG_SLIT")
-      assertEquals(tel2._2, NodAlongSlitDefaultOffsets)
+      assertEquals(tel2._2, Igrins2Config.NodAlongSlitDefaultOffsets)
     }
 
-  private def queryF2ExplicitOffsets(oid: Observation.Id): IO[List[Offset]] =
+  // (has explicit override?, effective alongSlit q offsets in arcseconds) for a
+  // Flamingos2 long slit observation.
+  private def queryF2TelescopeConfigs(oid: Observation.Id): IO[(Boolean, List[Double])] =
     query(
       serviceUser,
       s"""query {
             observation(observationId: "$oid") {
               observingMode {
                 flamingos2LongSlit {
-                  explicitOffsets { p { microarcseconds } q { microarcseconds } }
+                  explicitTelescopeConfigs { offsetMode }
+                  telescopeConfigs {
+                    alongSlit { q { arcseconds } }
+                  }
                 }
               }
             }
           }"""
     ).map: c =>
-      c.hcursor.downField("observation").downField("observingMode").downField("flamingos2LongSlit")
-        .downField("explicitOffsets").as[Option[List[Offset]]].toOption.flatten.orEmpty
+      val ls = c.hcursor.downField("observation").downField("observingMode").downField("flamingos2LongSlit")
+      val hasExplicit = ls.downField("explicitTelescopeConfigs").focus.exists(j => !j.isNull)
+      val qs = ls.downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.getOrElse(Nil)
+        .flatMap(_.hcursor.downField("q").downField("arcseconds").as[Double].toOption)
+      (hasExplicit, qs)
 
-  test("f2 telluric is created with explicit default offsets"):
+  test("f2 telluric resolves to the Telluric offsets"):
     for {
       pid     <- createProgramAs(pi)
       tid     <- createTargetWithProfileAs(pi, pid)
       oid     <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
-      sciOffs <- queryF2ExplicitOffsets(oid)
+      sci     <- queryF2TelescopeConfigs(oid)
       toidOpt <- selectTelluricObservationFor(oid)
       toid    = toidOpt.get
-      telOffs <- queryF2ExplicitOffsets(toid)
+      tel     <- queryF2TelescopeConfigs(toid)
     } yield {
-      // Science has no explicit offsets
-      assertEquals(sciOffs, List.empty)
-      // Telluric has explicit defaults
-      assertEquals(telOffs, F2Config.DefaultSpatialOffsets)
+      val telluricQs = List(15.0, -15.0, -15.0, 15.0)
+      // Science has no explicit override, resolving to the default Telluric pattern.
+      assertEquals(sci, (false, telluricQs))
+      // The telluric calibration also resolves to the Telluric pattern (override cleared).
+      assertEquals(tel, (false, telluricQs))
     }
 
   // GNIRS along-slit q offsets (arcseconds) for the effective telescope configs.

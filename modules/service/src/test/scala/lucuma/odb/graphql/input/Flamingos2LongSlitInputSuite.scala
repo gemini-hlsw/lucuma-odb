@@ -3,13 +3,18 @@
 
 package lucuma.odb.graphql.input
 
+import cats.data.NonEmptyList
 import io.circe.testing.ArbitraryInstances
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.syntax.all.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.graphql.input.arb.ArbFlamingos2LongSlitInput.given
@@ -47,29 +52,30 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       val noBoth = edit.copy(disperser = None, fpu = None)
       assert(noBoth.toCreate.isFailure, "Should fail when both grating and fpu are missing")
 
-  test("OffsetsFormat formattedOffsets works in Create"):
-    val offsets = List(
-      Offset.Zero.copy(q = 5.arcseconds.q),
-      Offset.Zero.copy(q = 10.arcseconds.q)
+  private val configs = SlitTelescopeConfigs.ToSky(
+    NonEmptyList.of(
+      TelescopeConfig(Offset.Zero.copy(q =  5.arcseconds.q), StepGuideState.Enabled),
+      TelescopeConfig(Offset.Zero.copy(q = 10.arcseconds.q), StepGuideState.Disabled)
     )
+  )
 
+  private val configsJson =
+    """[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":5000000}},"guiding":"ENABLED"},{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":10000000}},"guiding":"DISABLED"}]"""
+
+  test("formattedTelescopeConfigs works in Create"):
     val create = Flamingos2LongSlitInput.Create(
       disperser = Flamingos2Disperser.R1200JH,
       filter = Flamingos2Filter.JH,
       fpu = Flamingos2Fpu.LongSlit2,
       exposureTimeMode = None,
-      explicitOffsets = Some(offsets),
+      explicitTelescopeConfigs = Some(configs),
       acquisition = None
     )
 
-    assertEquals(create.formattedOffsets, Some("0.000000,5.000000,0.000000,10.000000"))
+    assertEquals(create.formattedTelescopeConfigs, Some(configsJson))
+    assertEquals(create.explicitSlitOffsetMode, Some(SlitOffsetMode.NodToSky))
 
-  test("OffsetsFormat formattedOffsets works in Edit"):
-    val offsets = List(
-      Offset.Zero.copy(q = 5.arcseconds.q),
-      Offset.Zero.copy(q = 10.arcseconds.q)
-    )
-
+  test("formattedTelescopeConfigs works in Edit"):
     val edit = Flamingos2LongSlitInput.Edit(
       disperser = None,
       filter = None,
@@ -79,9 +85,10 @@ class Flamingos2LongSlitInputSuite extends DisciplineSuite with ArbitraryInstanc
       explicitReads = lucuma.odb.data.Nullable.Null,
       explicitDecker = lucuma.odb.data.Nullable.Null,
       explicitReadoutMode = lucuma.odb.data.Nullable.Null,
-      explicitOffsets = lucuma.odb.data.Nullable.NonNull(offsets),
+      explicitTelescopeConfigs = lucuma.odb.data.Nullable.NonNull(configs),
       telluricType = Some(TelluricType.Hot),
       acquisition = None
     )
 
-    assertEquals(edit.formattedOffsets, lucuma.odb.data.Nullable.NonNull("0.000000,5.000000,0.000000,10.000000"))
+    assertEquals(edit.formattedTelescopeConfigs, lucuma.odb.data.Nullable.NonNull(configsJson))
+    assertEquals(edit.explicitSlitOffsetMode, lucuma.odb.data.Nullable.NonNull(SlitOffsetMode.NodToSky))
