@@ -19,6 +19,9 @@ import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PosIntBinding
 import lucuma.odb.graphql.binding.ScienceSubtypeBinding
 import lucuma.odb.graphql.binding.SemesterBinding
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereString
 
 object WhereProgramReference {
 

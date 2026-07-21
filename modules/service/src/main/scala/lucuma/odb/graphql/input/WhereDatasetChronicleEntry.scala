@@ -11,6 +11,9 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereBoolean
 
 object WhereDatasetChronicleEntry:
 

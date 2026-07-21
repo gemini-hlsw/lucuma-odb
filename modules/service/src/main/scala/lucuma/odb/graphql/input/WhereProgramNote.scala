@@ -9,6 +9,10 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.model.ProgramNote
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereOptionString
+import lucuma.odb.graphql.binding.WhereString
+import lucuma.odb.graphql.binding.WhereBoolean
 
 object WhereProgramNote {
 

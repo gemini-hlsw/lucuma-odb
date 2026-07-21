@@ -12,6 +12,10 @@ import grackle.Predicate.*
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereOptionString
+import lucuma.odb.graphql.binding.WhereString
 
 object WhereAttachment {
 

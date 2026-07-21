@@ -19,7 +19,9 @@ trait SsoTables[F[_]] extends Codecs:
 
   object User extends TableDef("lucuma_user"):
     val Id      = col("user_id", user_id)
-    val OrcidId = col("orcid_id", orcid_id)
+    val OrcidId = col("orcid_id", orcid_id.opt)
+    val Type    = col("user_type", user_type)
+    val Enabled = col("user_enabled", bool)
 
     object Profile:
       val GivenName  = col("orcid_given_name", varchar.opt)

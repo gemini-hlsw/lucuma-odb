@@ -779,6 +779,7 @@ lazy val binding = project
       "co.fs2"        %% "fs2-io"             % fs2Version,
       "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
       "org.typelevel" %% "grackle-core"       % grackleVersion,
+      "org.typelevel" %% "grackle-sql-core"   % grackleVersion,
       "org.typelevel" %% "log4cats-core"      % log4catsVersion,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
       "org.typelevel" %% "munit-cats-effect"  % munitCatsEffectVersion % Test

@@ -15,6 +15,10 @@ import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Program
 import lucuma.odb.graphql.binding.*
 import org.typelevel.cats.time.given
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereOptionEq
+import lucuma.odb.graphql.binding.WhereOptionString
 
 object WhereProgram {
 

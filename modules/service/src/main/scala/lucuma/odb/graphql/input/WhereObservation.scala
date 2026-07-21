@@ -17,6 +17,10 @@ import lucuma.core.model.Observation
 import lucuma.core.util.Enumerated
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.syntax.instrument.*
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereOptionEq
+import lucuma.odb.graphql.binding.WhereOptionOrder
+import lucuma.odb.graphql.binding.WhereOptionString
 
 object WhereObservation {
 

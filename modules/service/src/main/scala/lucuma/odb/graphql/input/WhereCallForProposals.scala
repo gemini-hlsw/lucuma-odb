@@ -9,6 +9,9 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.odb.graphql.binding.*
 import org.typelevel.cats.time.given
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereBoolean
 
 object WhereCallForProposals:
 
