@@ -11,14 +11,14 @@ import skunk.codec.boolean.bool
 
 trait Igrins2Codecs:
 
-  import Codecs.slit_offset_mode
+  import Codecs.igrins2_slit_offset_preset
   import Codecs.time_span
 
   val igrins_2_dynamic: Codec[Igrins2DynamicConfig] =
     time_span.imap(Igrins2DynamicConfig(_))(_.exposure)
 
   val igrins_2_static: Codec[Igrins2StaticConfig] =
-    (bool *: slit_offset_mode).imap { case (svc, off) =>
+    (bool *: igrins2_slit_offset_preset).imap { case (svc, off) =>
       Igrins2StaticConfig(Igrins2SVCImages(svc), off)
     } { cfg => (cfg.saveSVCImages.value, cfg.offsetMode) }
 

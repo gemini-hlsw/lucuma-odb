@@ -146,24 +146,24 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
                 disperser: R1200_JH
                 filter: JH
                 fpu: LONG_SLIT_1
-                explicitOffsets: [
+                explicitTelescopeConfigs: { toSky: [
                   {
-                    p: { arcseconds:  60 }
-                    q: { arcseconds:   0 }
+                    offset: { p: { arcseconds:  60 }, q: { arcseconds:   0 } }
+                    guiding: DISABLED
                   },
                   {
-                    p: { arcseconds:   0 }
-                    q: { arcseconds: 100 }
+                    offset: { p: { arcseconds:   0 }, q: { arcseconds: 100 } }
+                    guiding: DISABLED
                   },
                   {
-                    p: { arcseconds:   0 }
-                    q: { arcseconds: 100 }
+                    offset: { p: { arcseconds:   0 }, q: { arcseconds: 100 } }
+                    guiding: DISABLED
                   },
                   {
-                    p: { arcseconds: 60 }
-                    q: { arcseconds:  0 }
+                    offset: { p: { arcseconds: 60 }, q: { arcseconds:  0 } }
+                    guiding: DISABLED
                   }
-                ]
+                ] }
               }
             """
           )

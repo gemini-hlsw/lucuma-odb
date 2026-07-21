@@ -24,9 +24,6 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState.Disabled
-import lucuma.core.enums.StepGuideState.Enabled
-import lucuma.core.math.Angle
-import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.TelescopeConfig
@@ -43,7 +40,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.*
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.isOnSlit
+import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID
@@ -76,12 +73,6 @@ object Science:
   val MaxSciencePeriod: TimeSpan =
     90.minuteTimeSpan
 
-  /**
-   * Slit length.  Offsets larger than +/- 54 arcsec are off slit and unguided.
-   */
-  val SlitLength: Angle =
-    Angle.fromBigDecimalArcseconds(108.0)
-
   private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
 
   extension (start: Timestamp)
@@ -110,13 +101,12 @@ object Science:
       NonEmptyList.of(a0, b0, b1, a1)
 
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      calculateCycleCount[F2](s => isOnSlit(SlitLength, s.telescopeConfig.offset), abbaCycle.toList, t)
+      calculateCycleCount[F2](s => s.telescopeConfig.guiding.isGuided, abbaCycle.toList, t)
 
   object StepDefinition extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
 
-    def f2ScienceStep(o: Offset, obsClass: ObserveClass): State[F2, ProtoStep[F2]] =
-      val guideState = if isOnSlit(SlitLength, o) then Enabled else Disabled
-      scienceStep(TelescopeConfig(o, guideState), obsClass)
+    def f2ScienceStep(tc: TelescopeConfig, obsClass: ObserveClass): State[F2, ProtoStep[F2]] =
+      scienceStep(tc, obsClass)
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
@@ -147,10 +137,10 @@ object Science:
       def apply(
          config:  Config,
          time:    IntegrationTime,
-         a0Off:   Offset,
-         b0Off:   Offset,
-         b1Off:   Offset,
-         a1Off:   Offset,
+         a0Off:   TelescopeConfig,
+         b0Off:   TelescopeConfig,
+         b1Off:   TelescopeConfig,
+         a1Off:   TelescopeConfig,
          calRole: Option[CalibrationRole]
       ): PreDef =
 
@@ -190,11 +180,11 @@ object Science:
     ): EitherT[F, String, StepDefinition] =
       for
         p <- EitherT.fromEither:
-               config.offsets match
-                 case List(a0, b0, b1, a1) => PreDef(config, time, a0, b0, b1, a1, calRole).asRight
+               config.telescopeConfigs match
+                 case NonEmptyList(a0, b0 :: b1 :: a1 :: Nil) => PreDef(config, time, a0, b0, b1, a1, calRole).asRight
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
-                 case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.offsets.size} provided).".asLeft
+                 case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.telescopeConfigs.size} provided).".asLeft
         d <- p.expand(static, expander)
       yield d
 

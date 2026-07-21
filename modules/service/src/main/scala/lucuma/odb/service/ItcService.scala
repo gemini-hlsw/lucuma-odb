@@ -340,21 +340,24 @@ object ItcService {
             val min: TimeSpan = gnirs.MinAcquisitionExposureTime
             val max: TimeSpan = gnirs.MaxAcquisitionExposureTime
             etm match
-              case ExposureTimeMode.SignalToNoiseMode(userSN, at) if autoClassify =>
+              case _ if autoClassify =>
                 // Two-pass. The acquisition mode (Very Bright / Bright / Faint) is a
                 // function of exposure time, but the exposure time depends on the filter
                 // (Very Bright images in H2) which depends on the mode — and, in S/N mode,
                 // a low requested S/N would shorten the exposure and misclassify a Bright
                 // target as Very Bright. So classify from a fixed brightness measurement
                 // (broadband filter, classification S/N) first, then compute the real
-                // exposure at the user's S/N in the mode-appropriate filter.
+                // exposure at the user's ETM in the mode-appropriate filter. The
+                // classification must not depend on the user's acquisition ETM, so it
+                // always runs at the classification S/N — the user ETM's own wavelength
+                // (`etm.at`, present on both S/N and time-and-count modes) locates it.
                 def gnirsInput(f: GnirsFilter, e: ExposureTimeMode): ImagingInput =
                   ImagingInput.parameters
                     .andThen(ImagingParameters.mode)
                     .replace(InstrumentMode.GnirsImaging(e, f, camera, readMode, wellDepth, coadds, port))(input)
 
                 val classifySN:  SignalToNoise    = gnirs.AcquisitionClassificationSignalToNoise
-                val classifyEtm: ExposureTimeMode = ExposureTimeMode.SignalToNoiseMode(classifySN, at)
+                val classifyEtm: ExposureTimeMode = ExposureTimeMode.SignalToNoiseMode(classifySN, etm.at)
                 for
                   z1                                <- go(gnirsInput(filter, classifyEtm), min, max)
                   t1:      IntegrationTime           = z1.focus.value
@@ -362,9 +365,14 @@ object ItcService {
                   // Very Bright images through the acquisition filter in H2; the other
                   // classifications keep the broadband filter (already `filter`).
                   f2:      GnirsFilter               = if acqType === GnirsAcquisitionType.VeryBright then GnirsFilter.H2 else filter
-                  // Skip the second call when it would be identical to the first (same
-                  // filter and the user already asked for the classification S/N).
-                  z2                                <- if f2 === filter && userSN === classifySN then EitherT.pure[F, OdbError](z1)
+                  // Skip the second call only when it would be identical to the first:
+                  // same filter and the user's ETM is itself the classification S/N
+                  // request. Time-and-count always needs the second call (the first ran
+                  // at the classification S/N, not the user's time/count).
+                  skip:    Boolean                   = f2 === filter && (etm match
+                                                         case ExposureTimeMode.SignalToNoiseMode(sn, _) => sn === classifySN
+                                                         case _                                         => false)
+                  z2                                <- if skip then EitherT.pure[F, OdbError](z1)
                                                        else go(gnirsInput(f2, etm), min, max)
                 yield (z2, acqType.some)
               case _ =>

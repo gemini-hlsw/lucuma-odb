@@ -606,6 +606,9 @@ trait Codecs {
   val slit_offset_mode: Codec[SlitOffsetMode] =
     enumerated[SlitOffsetMode](Type.varchar)
 
+  val igrins2_slit_offset_preset: Codec[Igrins2SlitOffsetPreset] =
+    enumerated[Igrins2SlitOffsetPreset](Type.varchar)
+
   val slew_stage: Codec[SlewStage] =
     enumerated(Type("e_slew_stage"))
 

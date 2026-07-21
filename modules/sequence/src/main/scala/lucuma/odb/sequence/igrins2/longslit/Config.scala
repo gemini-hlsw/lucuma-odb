@@ -6,7 +6,7 @@ package lucuma.odb.sequence.igrins2.longslit
 import cats.Eq
 import cats.derived.*
 import cats.syntax.all.*
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
@@ -18,14 +18,14 @@ import java.io.DataOutputStream
 
 case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
-  offsetMode: SlitOffsetMode,
+  offsetMode: Igrins2SlitOffsetPreset,
   saveSVCImages: Boolean,
   explicitSpatialOffsets: Option[List[Offset]],
   telluricType: TelluricType
 ) derives Eq:
 
   def offsets: List[Offset] =
-    explicitSpatialOffsets.getOrElse(defaultOffsetsFor(offsetMode))
+    explicitSpatialOffsets.getOrElse(Config.defaultOffsetsFor(offsetMode))
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(256)
@@ -40,3 +40,13 @@ case class Config(
 
     out.close()
     bao.toByteArray
+
+object Config:
+
+  /** Default spatial offsets for the given IGRINS-2 preset. */
+  def defaultOffsetsFor(preset: Igrins2SlitOffsetPreset): List[Offset] =
+    defaultSlitTelescopeConfigs(preset).telescopeConfigs.toList.map(_.offset)
+
+  /** Offsets for the NodAlongSlit preset — the set used when reverting to defaults. */
+  val NodAlongSlitDefaultOffsets: List[Offset] =
+    defaultOffsetsFor(Igrins2SlitOffsetPreset.NodAlongSlit)

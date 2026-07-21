@@ -5,3 +5,4 @@ package lucuma.odb.sequence.syntax
 
 object all extends ToDatasetQaStateOps
               with ToHashBytesOps
+              with ToStepGuideStateOps
