@@ -6,12 +6,9 @@ package graphql
 package predicate
 
 import grackle.Path
-import grackle.Predicate
-import lucuma.odb.data.UserType
-import lucuma.core.model.Program
-import lucuma.core.model.User
-import lucuma.core.model.User
 import lucuma.core.model.OrcidId
+import lucuma.core.model.User
+import lucuma.odb.data.UserType
 
 class UserPredicates(path: Path) {
 

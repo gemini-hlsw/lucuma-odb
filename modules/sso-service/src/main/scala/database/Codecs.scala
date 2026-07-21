@@ -7,12 +7,12 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.*
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
+import lucuma.odb.data.UserType
 import lucuma.sso.client.ApiKey
 import lucuma.sso.service.SessionToken
 import skunk.*
 import skunk.codec.all.*
 import skunk.data.Type
-import lucuma.odb.data.UserType
 
 // Codecs for some atomic types.
 trait Codecs {

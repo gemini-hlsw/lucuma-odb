@@ -29,17 +29,17 @@ import lucuma.core.model.OrcidId
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
+import lucuma.odb.graphql.binding.BooleanBinding
+import lucuma.odb.graphql.binding.NonNegIntBinding
+import lucuma.odb.graphql.binding.UserIdBinding
 import lucuma.odb.graphql.schema.SchemaStitcher
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.database.RoleType
-import natchez.Trace
-import org.typelevel.log4cats.Logger
-import lucuma.odb.graphql.binding.UserIdBinding
-import lucuma.odb.graphql.binding.NonNegIntBinding
-import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.sso.service.graphql.input.WhereUser
 import lucuma.sso.service.graphql.predicate.Predicates
+import natchez.Trace
+import org.typelevel.log4cats.Logger
 
 object SsoMapping {
 

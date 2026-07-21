@@ -12,10 +12,9 @@ import grackle.Path
 import grackle.Query
 import grackle.Query.*
 import grackle.Result
+import grackle.skunk.SkunkMapping
 import io.circe.Encoder
 import skunk.codec.numeric.int8
-import grackle.sql.SqlMapping
-import grackle.skunk.SkunkMapping
 
 object ResultMapping {
 
