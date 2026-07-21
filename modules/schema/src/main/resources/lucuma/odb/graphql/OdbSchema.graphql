@@ -3528,6 +3528,21 @@ type Mutation {
   ): ReplaceGnirsSequenceResult!
 
   """
+  Re-runs the Archive Duplication Search for an observation, replacing its
+  stored result with what the Gemini Observatory Archive holds now.
+
+  The search is advisory, so an archive that is unreachable or answers badly is
+  reported as an ERROR state on the result rather than as a failed mutation, and
+  leaves any previously found matches readable.
+
+  Rejected once the observation's proposal has been submitted, so that the count
+  the TAC and the proposal PDF see is the one the PI last saw.
+  """
+  refreshGoaDuplication(
+    input: RefreshGoaDuplicationInput!
+  ): RefreshGoaDuplicationResult!
+
+  """
   Resets the acquisition sequence to start from the initial step regardless of
   which acquisition steps may have been executed.  Requires staff (or better)
   access.
@@ -5207,6 +5222,26 @@ type RecordGmosSouthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
+}
+
+"""
+Input parameters for re-running the Archive Duplication Search.  Select one of
+`observationId` or `observationReference`.
+"""
+input RefreshGoaDuplicationInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+}
+
+"""
+The result of re-running the Archive Duplication Search.
+"""
+type RefreshGoaDuplicationResult {
+  "The search result as it now stands."
+  goaDuplication: GoaDuplication!
+
+  "The observation that was searched."
+  observation: Observation!
 }
 
 """

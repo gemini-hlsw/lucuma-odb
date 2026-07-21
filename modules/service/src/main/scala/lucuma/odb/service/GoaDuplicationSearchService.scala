@@ -16,6 +16,7 @@ import lucuma.catalog.goa.GoaParams
 import lucuma.catalog.goa.GoaQueryError
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
@@ -46,6 +47,15 @@ trait GoaDuplicationSearchService[F[_]]:
   def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[GoaDuplication.Snapshot]]
 
 object GoaDuplicationSearchService:
+
+  /**
+   * Submission freezes the snapshot, so that the count the TAC and the proposal
+   * PDF see is the one the PI last saw.  Every status at or past `Submitted`
+   * counts as submitted; nothing unfreezes but withdrawing the proposal.
+   */
+  extension (ps: ProposalStatus)
+    private def isFrozen: Boolean =
+      ps >= ProposalStatus.Submitted
 
   def instantiate[F[_]: Concurrent: Parallel: Clock](
     goaClient: GoaClient[F]
@@ -79,9 +89,11 @@ object GoaDuplicationSearchService:
       private def loadContext(observationId: Observation.Id)(using NoTransaction[F]): F[Result[Context]] =
         services.transactionally:
           session.option(Statements.SelectObservation)(observationId).flatMap:
-            case None                            =>
+            case None                                   =>
               OdbError.InvalidObservation(observationId).asFailureF[F, Context]
-            case Some((omt, ra, dec, refTime)) =>
+            case Some((_, _, _, _, ps)) if ps.isFrozen  =>
+              OdbError.InvalidObservation(observationId, frozen).asFailureF[F, Context]
+            case Some((omt, ra, dec, refTime, _))       =>
               val explicitBase = (ra, dec).mapN(Coordinates.apply)
               for
                 mode     <- Services.asSuperUser(omt.traverse: t =>
@@ -194,19 +206,28 @@ object GoaDuplicationSearchService:
       private val now: F[Timestamp] =
         Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
 
+      private val frozen: Option[String] =
+        "The Archive Duplication Search cannot be re-run because the proposal has been submitted.".some
+
   object Statements:
 
-    /** Observing mode, explicit base and reference time, as the policy needs them. */
+    /**
+     * Observing mode, explicit base and reference time, as the policy needs
+     * them, plus the proposal status, which decides whether the snapshot is
+     * still ours to replace.
+     */
     type ObservationRow =
-      (Option[ObservingModeType], Option[RightAscension], Option[Declination], Option[Timestamp])
+      (Option[ObservingModeType], Option[RightAscension], Option[Declination], Option[Timestamp], ProposalStatus)
 
     val SelectObservation: Query[Observation.Id, ObservationRow] =
       sql"""
         SELECT
-          c_observing_mode_type,
-          c_explicit_ra,
-          c_explicit_dec,
-          COALESCE(c_observation_time, c_reference_time)
-        FROM v_observation
-        WHERE c_observation_id = $observation_id
-      """.query(observing_mode_type.opt *: right_ascension.opt *: declination.opt *: core_timestamp.opt)
+          o.c_observing_mode_type,
+          o.c_explicit_ra,
+          o.c_explicit_dec,
+          COALESCE(o.c_observation_time, o.c_reference_time),
+          p.c_proposal_status
+        FROM v_observation o
+        JOIN t_program p ON p.c_program_id = o.c_program_id
+        WHERE o.c_observation_id = $observation_id
+      """.query(observing_mode_type.opt *: right_ascension.opt *: declination.opt *: core_timestamp.opt *: proposal_status)
