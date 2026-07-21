@@ -59,6 +59,32 @@ class goaDuplication extends OdbSuite:
   private val SparseRecord: String =
     """[{ "name": "a.fits", "instrument": "GMOS-N", "observation_type": "OBJECT" }]"""
 
+  /**
+   * The archive is an OCS-era system whose vocabularies are open: timestamps
+   * carry fractional seconds and sometimes an offset, and classes and types
+   * appear that lucuma-core has no case for.  None of it should be lost.
+   */
+  private val AwkwardRecord: String =
+    """
+      [
+        {
+          "name": "S20240101S0002.fits",
+          "instrument": "GMOS-S",
+          "observation_type": "TELLURIC_STANDARD",
+          "observation_class": "science_verification",
+          "qa_state": "Undefined",
+          "ut_datetime": "2024-01-01 03:04:05.678",
+          "release": "2025-07-01"
+        },
+        {
+          "name": "S20240101S0003.fits",
+          "instrument": "GMOS-S",
+          "observation_type": "OBJECT",
+          "ut_datetime": "2024-01-01 03:04:05-05:00"
+        }
+      ]
+    """
+
   private def siderealObservation: IO[Observation.Id] =
     for
       pid <- createProgramAs(pi)
@@ -176,6 +202,36 @@ class goaDuplication extends OdbSuite:
               "airmass": 1.234,
               "azimuth": { "degrees": 12.5 },
               "elevation": { "degrees": 67.5 }
+            }
+          ]
+        }
+      """
+    )
+
+  test("vocabularies GOA knows and lucuma-core does not survive the round trip"):
+    for
+      oid <- siderealObservation
+      _   <- refresh(GoaClientMock.fromJson[IO](AwkwardRecord))(oid)
+      js  <- goaDuplication(oid, "matchCount matches { name observationType observationClass qaState utDateTime }")
+    yield assertEquals(
+      js,
+      json"""
+        {
+          "matchCount": 2,
+          "matches": [
+            {
+              "name": "S20240101S0002.fits",
+              "observationType": "TELLURIC_STANDARD",
+              "observationClass": "science_verification",
+              "qaState": "Undefined",
+              "utDateTime": "2024-01-01T03:04:05.678Z"
+            },
+            {
+              "name": "S20240101S0003.fits",
+              "observationType": "OBJECT",
+              "observationClass": null,
+              "qaState": null,
+              "utDateTime": "2024-01-01T08:04:05Z"
             }
           ]
         }
