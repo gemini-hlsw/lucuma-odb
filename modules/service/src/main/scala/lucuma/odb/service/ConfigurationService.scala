@@ -242,11 +242,40 @@ object ConfigurationService {
       if rids.isEmpty then
         ResultT.pure(List.empty)
       else
+        // Fetch the requests (each with its program id), then fetch each distinct
+        // program's observations exactly once, rather than re-fetching the entire
+        // observation list once per request in the same program. The old single
+        // nested query returned O(requests × observations) rows, which for a program
+        // with many requests could also blow the Postgres parameter limit when the
+        // asterism lookups for `configuration.target` were batched.
+        for
+          requests <- queryRequests(rids)
+          obsByPid <- queryProgramObservations(requests.map(_._2).distinct)
+        yield requests.map: (req, pid) =>
+          (req, obsByPid.getOrElse(pid, Nil))
+
+    private def queryRequests(
+      rids: List[ConfigurationRequest.Id]
+    ): ResultT[F, List[(ConfigurationRequest, Program.Id)]] =
+      ResultT:
+        services.runGraphQLQuery(Queries.SelectRequests(rids)).map: r =>
+          r.flatMap: json =>
+            import Queries.SelectRequests.given
+            json.hcursor.as[Queries.SelectRequests.Response] match
+              case Right(r)    => Result(r)
+              case Left(other) => Result.internalError(other.getMessage)
+
+    private def queryProgramObservations(
+      pids: List[Program.Id]
+    ): ResultT[F, Map[Program.Id, List[(Observation.Id, Configuration)]]] =
+      if pids.isEmpty then
+        ResultT.pure(Map.empty)
+      else
         ResultT:
-          services.runGraphQLQuery(Queries.SelectRequestsAndObservations(rids)).map: r =>
+          services.runGraphQLQuery(Queries.SelectProgramObservations(pids)).map: r =>
             r.flatMap: json =>
-              import Queries.SelectRequestsAndObservations.given
-              json.hcursor.as[Queries.SelectRequestsAndObservations.Response] match
+              import Queries.SelectProgramObservations.given
+              json.hcursor.as[Queries.SelectProgramObservations.Response] match
                 case Right(r)    => Result(r)
                 case Left(other) => Result.internalError(other.getMessage)
 
@@ -636,27 +665,21 @@ object ConfigurationService {
         }
       """
 
-    object SelectRequestsAndObservations:
-      type Response = List[(ConfigurationRequest, List[(Observation.Id, Configuration)])]
+    // Fetches the requests identified by `rids`, each paired with its program id.
+    // Observations are fetched separately, per distinct program, by
+    // `SelectProgramObservations` — see `queryRequestsAndObservations`.
+    object SelectRequests:
+      type Response = List[(ConfigurationRequest, Program.Id)]
 
-      private given dc: Decoder[Option[Configuration]] =
-        summon[Decoder[Configuration]].attempt.map(_.toOption)
-
-      private given da: Decoder[Option[(Observation.Id, Configuration)]] = hc =>
-        for
-          id  <- hc.downField("id").as[Observation.Id]
-          cfg <- hc.downField("configuration").as(using dc)
-        yield cfg.tupleLeft(id)
-
-      private given db: Decoder[(ConfigurationRequest, List[(Observation.Id, Configuration)])] = hc =>
+      private given dr: Decoder[(ConfigurationRequest, Program.Id)] = hc =>
         for
           req <- hc.as[ConfigurationRequest]
-          obs <- hc.downFields("program", "observations", "matches").as(using Decoder.decodeList(using da))
-        yield (req, obs.flatten)
+          pid <- hc.downFields("program", "id").as[Program.Id]
+        yield (req, pid)
 
       given Decoder[Response] = hc =>
         hc.downFields("configurationRequests", "matches")
-          .as(using Decoder.decodeList(using db))
+          .as(using Decoder.decodeList(using dr))
 
       def apply(rids: List[ConfigurationRequest.Id]) =
         s"""
@@ -736,58 +759,102 @@ object ConfigurationService {
                   }
                 }
                 program {
-                  observations {
-                    matches {
-                      id
-                      configuration {
-                        conditions {
-                          imageQuality
-                          cloudExtinction
-                          skyBackground
-                          waterVapor
-                        }
-                        target {
-                          coordinates {
-                            ra {
-                              hms
-                            }
-                            dec {
-                              dms
-                            }
+                  id
+                }
+              }
+            }
+          }
+        """
+
+    // Fetches, for each of the given programs, the program's observations paired
+    // with their configurations. Queried once per distinct program (rather than
+    // once per request) to avoid re-fetching the same observation list repeatedly.
+    object SelectProgramObservations:
+      type Response = Map[Program.Id, List[(Observation.Id, Configuration)]]
+
+      private given dc: Decoder[Option[Configuration]] =
+        summon[Decoder[Configuration]].attempt.map(_.toOption)
+
+      private given da: Decoder[Option[(Observation.Id, Configuration)]] = hc =>
+        for
+          id  <- hc.downField("id").as[Observation.Id]
+          cfg <- hc.downField("configuration").as(using dc)
+        yield cfg.tupleLeft(id)
+
+      private given dp: Decoder[(Program.Id, List[(Observation.Id, Configuration)])] = hc =>
+        for
+          pid <- hc.downField("id").as[Program.Id]
+          obs <- hc.downFields("observations", "matches").as(using Decoder.decodeList(using da))
+        yield (pid, obs.flatten)
+
+      given Decoder[Response] = hc =>
+        hc.downFields("programs", "matches")
+          .as(using Decoder.decodeList(using dp))
+          .map(_.toMap)
+
+      def apply(pids: List[Program.Id]) =
+        s"""
+          query {
+            programs(
+              WHERE: {
+                id: {
+                  IN: ${pids.asJson}
+                }
+              }
+            ) {
+              matches {
+                id
+                observations {
+                  matches {
+                    id
+                    configuration {
+                      conditions {
+                        imageQuality
+                        cloudExtinction
+                        skyBackground
+                        waterVapor
+                      }
+                      target {
+                        coordinates {
+                          ra {
+                            hms
+                          }
+                          dec {
+                            dms
                           }
                         }
-                        observingMode {
-                          instrument
+                      }
+                      observingMode {
+                        instrument
+                        mode
+                        gmosNorthLongSlit {
+                          grating
+                        }
+                        gmosSouthLongSlit {
+                          grating
+                        }
+                        gmosNorthImaging {
+                          filters
+                        }
+                        gmosSouthImaging {
+                          filters
+                        }
+                        flamingos2LongSlit {
+                          disperser
+                        }
+                        gnirsLongSlit {
+                          grating
+                          camera
+                          prism
+                        }
+                        gnirsIfu {
+                          grating
+                          fpu
+                        }
+                        visitor {
                           mode
-                          gmosNorthLongSlit {
-                            grating
-                          }
-                          gmosSouthLongSlit {
-                            grating
-                          }
-                          gmosNorthImaging {
-                            filters
-                          }
-                          gmosSouthImaging {
-                            filters
-                          }
-                          flamingos2LongSlit {
-                            disperser
-                          }
-                          gnirsLongSlit {
-                            grating
-                            camera
-                            prism
-                          }
-                          gnirsIfu {
-                            grating
-                            fpu
-                          }
-                          visitor {
-                            mode
-                            radius {
-                              microarcseconds
-                            }
+                          radius {
+                            microarcseconds
                           }
                         }
                       }
