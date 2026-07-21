@@ -8,6 +8,7 @@ package predicate
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.odb.graphql.predicate.LeafPredicates
 
 class EnabledPredicates(path: Path) extends LeafPredicates[Boolean](path) {
 

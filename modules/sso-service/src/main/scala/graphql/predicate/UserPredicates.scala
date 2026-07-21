@@ -9,12 +9,10 @@ import grackle.Path
 import lucuma.core.model.OrcidId
 import lucuma.core.model.User
 import lucuma.odb.data.UserType
+import lucuma.odb.graphql.predicate.LeafPredicates
 
-class UserPredicates(path: Path) {
-
-  lazy val id            = LeafPredicates[User.Id](path / "id")
-  lazy val orcidId       = LeafPredicates[OrcidId](path / "orcidId")
-  lazy val tpe           = LeafPredicates[UserType](path / "type")
-  lazy val enabled       = EnabledPredicates(path / "enabled")
-
-}
+class UserPredicates(path: Path):
+  lazy val id       = LeafPredicates[User.Id](path / "id")
+  lazy val orcidId  = LeafPredicates[OrcidId](path / "orcidId")
+  lazy val tpe      = LeafPredicates[UserType](path / "type")
+  lazy val enabled  = EnabledPredicates(path / "enabled")
