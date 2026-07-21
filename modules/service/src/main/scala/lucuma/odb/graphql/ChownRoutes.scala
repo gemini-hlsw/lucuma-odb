@@ -17,6 +17,7 @@ import grackle.Result.Warning
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -111,7 +112,8 @@ object ChownRoutes:
                     gaiaClient,
                     s3,
                     horizonsClient,
-                    TelluricTargetsClient.noop[F]
+                    TelluricTargetsClient.noop[F],
+                    GoaClient.noop[F]
                   )).useGiven:
 
                       // This request is coming from SSO so it's possible (although unlikely) that one or 

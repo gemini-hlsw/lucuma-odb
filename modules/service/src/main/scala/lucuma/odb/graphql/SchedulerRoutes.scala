@@ -12,6 +12,7 @@ import cats.implicits.*
 import fs2.compression.Compression
 import fs2.compression.DeflateParams
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.AccessControlException
@@ -75,7 +76,8 @@ object SchedulerRoutes:
           gaiaClient,
           S3FileService.noop[F],
           horizonsClient,
-          TelluricTargetsClient.noop[F]
+          TelluricTargetsClient.noop[F],
+          GoaClient.noop[F]
         )).use(fa),
       ssoClient
     )

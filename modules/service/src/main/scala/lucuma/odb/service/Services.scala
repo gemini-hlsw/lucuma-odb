@@ -18,6 +18,7 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.data.Metadata
 import lucuma.core.model.Access
@@ -295,6 +296,7 @@ object Services:
     s3FileService0: S3FileService[F],
     horizonsClient: HorizonsClient[F],
     telluricClient0: TelluricTargetsClient[F],
+    goaClient0: GoaClient[F],
     hminCache0: HminBrightnessCache = HminBrightnessCache.Empty,
   )(s: Session[F]): Services[F[_]] =
     new Services[F]:

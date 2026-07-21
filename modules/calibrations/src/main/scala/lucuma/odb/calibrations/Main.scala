@@ -18,6 +18,7 @@ import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Result
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
@@ -237,6 +238,7 @@ object CMain extends MainParams {
           S3FileService.noop[F],
           horizonsClient,
           telClient,
+          GoaClient.noop[F],
           hminCache
         )(pool).pure
       case Some(u) =>
