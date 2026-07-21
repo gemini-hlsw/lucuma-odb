@@ -17,10 +17,12 @@ import lucuma.catalog.goa.GoaParams
 import lucuma.catalog.goa.GoaQueryError
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.odb.data.GoaDuplication
 import lucuma.odb.data.OdbError
 import lucuma.odb.util.Codecs.program_id
 import skunk.syntax.all.*
@@ -122,6 +124,61 @@ class refreshGoaDuplication extends OdbSuite:
           "saturated": false,
           "error": null,
           "matches": [{ "name": "a.fits" }, { "name": "b.fits" }]
+        }
+      """
+    )
+
+  test("a search that finds nothing is reported as checked, not as an error"):
+    for
+      oid <- observation()
+      _   <- archive.set(Archive.Holding("[]"))
+      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount saturated error matches { name }")
+    yield assertEquals(
+      js,
+      json"""
+        {
+          "state": "CHECKED",
+          "matchCount": 0,
+          "saturated": false,
+          "error": null,
+          "matches": []
+        }
+      """
+    )
+
+  test("a search filled to GOA's cap is reported as saturated"):
+    // The count is reported as it stands; rendering it as "500+" is Explore's job.
+    val names = (1 to GoaDuplication.QueryLimit).toList.map(i => s"f$i.fits")
+    for
+      oid <- observation()
+      _   <- archive.set(Archive.Holding(records(names*)))
+      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount saturated")
+    yield assertEquals(
+      js,
+      json"""
+        {
+          "state": "CHECKED",
+          "matchCount": ${GoaDuplication.QueryLimit},
+          "saturated": true
+        }
+      """
+    )
+
+  test("an instrument GOA does not know is reported as not checked"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.MaroonX, tid)
+      _   <- archive.set(Archive.Holding(records("a.fits")))
+      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount error matches { name }")
+    yield assertEquals(
+      js,
+      json"""
+        {
+          "state": "NOT_CHECKED",
+          "matchCount": 0,
+          "error": null,
+          "matches": []
         }
       """
     )
