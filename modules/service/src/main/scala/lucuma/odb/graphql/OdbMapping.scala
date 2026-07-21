@@ -268,6 +268,7 @@ object OdbMapping {
           with RecordDatasetResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
+          with RefreshGoaDuplicationResultMapping[F]
           with RegionMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -524,6 +525,7 @@ object OdbMapping {
                 RecordIgrins2VisitResultMapping,
                 RecordVisitResultMapping,
                 RedeemUserInvitationResultMapping,
+                RefreshGoaDuplicationResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 SchedulingConstraintsMapping,
