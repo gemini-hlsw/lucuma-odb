@@ -4,9 +4,11 @@
 package lucuma.odb.sequence
 
 import cats.Applicative
+import cats.Functor
 import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType
 import lucuma.core.model.sequence.StepConfig
@@ -40,6 +42,16 @@ trait SmartGcalExpander[F[_], S, D]:
     static: S,
     atom:   ProtoAtom[ProtoStep[D]]
   ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
+
+  /**
+   * Expands a single step, best-effort.  Like `expandStep`, but a missing
+   * SmartGcal mapping yields no steps instead of an error.
+   */
+  def expandStepBestEffort(
+    static: S,
+    step:   ProtoStep[D]
+  )(using Functor[F]): F[List[ProtoStep[D]]] =
+    expandStep(static, step).map(_.fold(_ => List.empty, _.toList))
 
 
 object SmartGcalExpander:

@@ -114,12 +114,11 @@ object Science:
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
         cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
+          // The flat is required, but the arc is best-effort
           for
             fs <- EitherT(expander.expandStep(static, flat))
-            // The flat is required, but the arc is optional
-            ar <- EitherT.liftF(expander.expandStep(static, arc))
-            arcSteps = ar.toOption.toList.flatMap(_.toList).map(adjustReadMode)
-          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ++ arcSteps).some)
+            as <- EitherT.liftF(expander.expandStepBestEffort(static, arc))
+          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ++ as.map(adjustReadMode)).some)
 
     object PreDef:
 

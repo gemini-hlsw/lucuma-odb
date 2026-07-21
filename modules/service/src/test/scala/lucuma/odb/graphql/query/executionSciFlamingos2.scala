@@ -179,6 +179,36 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
           ).asLeft
       )
 
+  test("[f2] R=3000 + Y filter yields flat-only calibrations, no arc"):
+    // R=3000 + Y filter has a flat but no arc in the smart gcal tables (the arc
+    // lamps don't reach the Y-band edge).
+    // The sequence must still generate — with a flat and no arc.
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(
+               pi,
+               p,
+               List(t),
+               """
+                 flamingos2LongSlit: {
+                   disperser: R3000
+                   filter: Y
+                   fpu: LONG_SLIT_1
+                 }
+               """
+             )
+      yield o
+
+    setup.flatMap: oid =>
+      query(pi, flamingos2ScienceQuery(oid)).map: js =>
+        val arcs     = js.findAllByKey("arcs")
+        val continua = js.findAllByKey("continuum")
+        assert(arcs.nonEmpty) // no arc
+        assert(arcs.forall(_.asArray.exists(_.isEmpty)))
+        assert(continua.exists(!_.isNull)) // flat present
+
   test("simple generation - unsplittable"):
     val setup: IO[Observation.Id] =
       for
