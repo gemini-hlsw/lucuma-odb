@@ -16,7 +16,7 @@ import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.OrcidConfig
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
-import lucuma.sso.service.graphql.SsoMapping
+import lucuma.sso.service.graphql.mapping.SsoMapping
 import lucuma.sso.service.orcid.OrcidService
 import natchez.Trace.Implicits.noop
 import org.http4s.HttpRoutes

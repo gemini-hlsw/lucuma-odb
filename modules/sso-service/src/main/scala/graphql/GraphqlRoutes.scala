@@ -13,6 +13,7 @@ import lucuma.core.model.StandardUser
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.sso.client.SsoClient
+import lucuma.sso.service.graphql.mapping.SsoMapping
 import natchez.Trace
 import org.http4s.*
 import org.http4s.server.websocket.WebSocketBuilder2

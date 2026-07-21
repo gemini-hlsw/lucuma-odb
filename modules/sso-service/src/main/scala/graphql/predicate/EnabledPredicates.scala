@@ -10,9 +10,6 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.odb.graphql.predicate.LeafPredicates
 
-class EnabledPredicates(path: Path) extends LeafPredicates[Boolean](path) {
-
+class EnabledPredicates(path: Path) extends LeafPredicates[Boolean](path):
   def includeDisabled(b: Boolean): Predicate =
     if (b) True else Eql(path, Const(true))
-
-}

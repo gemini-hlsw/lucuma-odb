@@ -6,15 +6,73 @@ package graphql
 package query
 
 import io.circe.literal.*
+import lucuma.core.model.StandardUser
+import lucuma.sso.service.database.RoleRequest
 
 object users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
-  test("Query all users."):
+  test("Standard user can only see self (and can see full record)."):
     flaky():
-      As(Bob).expectQuery(
-        query = """
+      var bob: StandardUser = null // sorry
+      As(Bob).expectQueryWithUser(
+        query = b =>
+          bob = b
+          """
+            query {
+              users() {
+                matches {
+                  id
+                  orcidId
+                  type
+                  enabled
+                  roles {
+                    type              
+                  }
+                  profile {
+                    givenName
+                    familyName
+                    creditName
+                    email
+                  }
+                }
+              }
+            }
+          """,  
+        expected = json"""
+        {
+          "data" : {
+            "users" : {
+              "matches" : [
+                {
+                  "id" : ${bob.id},
+                  "orcidId" : ${bob.profile.orcidId},
+                  "type" : "STANDARD",
+                  "enabled" : true,
+                  "roles" : [
+                    {
+                      "type" : "PI"
+                    }
+                  ],
+                  "profile" : {
+                    "givenName" : "Bob",
+                    "familyName" : "Dobbs",
+                    "creditName" : null,
+                    "email" : "bob@dobbs.com"
+                  }
+                }
+              ]
+            }
+          }
+        }
+        """
+      )
+
+  test("Staff can see many users."):
+    flaky():
+      As(Bob, withRole = Some(RoleRequest.Staff)).query(
+        """
           query {
-            users(LIMIT: 3) {
+            users() {
               matches {
                 id
                 orcidId
@@ -23,11 +81,17 @@ object users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
                 roles {
                   type              
                 }
+                profile {
+                  givenName
+                  familyName
+                  creditName
+                  email
+                }
               }
             }
           }
-        """,
-        expected = json"""42"""
-      )
-
+        """
+      ).flatMap: json =>  
+        // a bunch of users here
+        assert(false)
 

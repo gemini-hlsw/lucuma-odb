@@ -6,6 +6,7 @@ package graphql
 package predicate
 
 import grackle.Path
+import lucuma.sso.service.graphql.mapping.BaseMapping
 
 trait Predicates[F[_]] extends BaseMapping[F]:
   object Predicates:
