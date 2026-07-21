@@ -18,7 +18,7 @@ case class GmosSpectroscopyRow[G, L, U](
   spec:      SpectroscopyRow,
   disperser: G,
   filter:    Option[L],
-  fpu:       U
+  fpu:       Option[U]
 )
 
 object GmosSpectroscopyRow {
@@ -33,9 +33,9 @@ object GmosSpectroscopyRow {
     u:    U => String
   ): Parser[List[GmosSpectroscopyRow[G, L, U]]] =
     // NOTE: If any of the Enumerated instances for Grating (Disperser), Filter or Fpu are changed, the
-    // file probably needs to be reimported (See `R__Phase0.importForcingVersion`), or the 
+    // file probably needs to be reimported (See `R__Phase0.importForcingVersion`), or the
     // import file needs to modified. In particular, if a Grating or Filter is obsoleted and replaced by
-    // a new one with the same `shortName`, the file needs to be re-imported (via importForcingVersion). 
+    // a new one with the same `shortName`, the file needs to be re-imported (via importForcingVersion).
     // If one is obsoleted and not replaced, the relevant rows need to be removed from the import file (which
     // will automatically trigger a re-import).
     SpectroscopyRow.rows.flatMap { rs =>
@@ -44,7 +44,9 @@ object GmosSpectroscopyRow {
           _ <- Either.raiseWhen(r.instrument =!= inst)(s"Cannot parse a ${r.instrument.tag} as ${inst.tag}")
           g <- Enumerated[G].all.find(a => g(a) === r.disperser).toRight(s"Cannot find disperser: ${r.disperser}. Does a value exist in the Enumerated?")
           l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f).toRight(s"Cannot find filter: $f. Does a value exist in the Enumerated?") }
-          u <- Enumerated[U].all.find(a => u(a) === r.fpu).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?")
+          // For MOS rows there is no builtin FPU then we return none
+          u <- (if (r.fpuOption === FpuOption.Multislit) none[U].asRight[String]
+                else Enumerated[U].all.find(a => u(a) === r.fpu).map(_.some).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?"))
         } yield GmosSpectroscopyRow(r, g, l, u)
         gn.fold(Parser.failWith, Parser.pure)
       }

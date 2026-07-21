@@ -20,7 +20,7 @@ class R__Phase0 extends RepeatableMigration("Phase 0 Instrument Options") {
 
   val imagingFileName: String = "Phase0_Instrument_Matrix - Imaging.tsv"
 
-  override val importForcingVersion: Int = 10
+  override val importForcingVersion: Int = 11
 
   lazy val definitionFiles: NonEmptyList[(String, IO[InputStream])] =
     filesFromClasspath("phase0", NonEmptyList.of(spectroscopyFileName, imagingFileName))
