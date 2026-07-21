@@ -19,11 +19,6 @@ import lucuma.core.util.TimeSpan
 
 trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
 
-  /**
-   * Sets the explicit telescope configs. `configs` is the GraphQL list literal for the
-   * shape selected by `mode`: `TelescopeConfigAlongSlitInput` for `NodAlongSlit`,
-   * `TelescopeConfigInput` for `NodToSky`.
-   */
   def setOffsets(oid: Observation.Id, mode: SlitOffsetMode, configs: String): IO[Unit] =
     val shape = mode match
       case SlitOffsetMode.NodAlongSlit => "alongSlit"

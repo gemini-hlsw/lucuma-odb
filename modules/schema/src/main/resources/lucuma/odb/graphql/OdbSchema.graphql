@@ -10353,8 +10353,7 @@ input Igrins2LongSlitInput {
   explicitSaveSVCImages: Boolean
 
   """
-  Explicit telescope configs. May be unset by assigning null (clears the
-  override back to the default), or ignored by skipping.
+  Explicit telescope configs. May be unset by assigning a null value, or ignored by skipping.
   """
   explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
