@@ -14,6 +14,7 @@ import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.GnirsDynamicView
 import lucuma.odb.graphql.table.GnirsSpectroscopyView
+import lucuma.odb.graphql.table.GoaMatchView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.table.VisitorTable
@@ -26,6 +27,7 @@ trait WavelengthMapping[F[_]]
      with GmosDynamicTables[F]
      with GnirsDynamicView[F]
      with GnirsSpectroscopyView[F]
+     with GoaMatchView[F]
      with ObservationView[F]
      with SpectroscopyConfigOptionTable[F]
      with VisitorTable[F]:
@@ -63,6 +65,7 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(GmosNorthLongSlitType / "initialCentralWavelength", GmosNorthLongSlitView.Common.InitialCentralWavelength, GmosNorthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "centralWavelength", GmosSouthLongSlitView.Common.CentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "initialCentralWavelength", GmosSouthLongSlitView.Common.InitialCentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
+      wavelengthMappingAtPath(GoaMatchType / "wavelength", GoaMatchView.Wavelength.Value, GoaMatchView.Wavelength.SyntheticId),
       wavelengthMappingAtPath(SignalToNoiseExposureTimeModeType / "at", ExposureTimeModeView.SignalToNoise.At, ExposureTimeModeView.SignalToNoise.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMin", SpectroscopyConfigOptionTable.WavelengthMin, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMax", SpectroscopyConfigOptionTable.WavelengthMax, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),

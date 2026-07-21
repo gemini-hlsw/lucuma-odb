@@ -13714,6 +13714,135 @@ type Observation {
   """
   workflow: CalculatedObservationWorkflow
 
+  """
+  Result of the Archive Duplication Search: what the Gemini Observatory Archive
+  held around this observation's pointing, taken with an equivalent instrument,
+  when the search was last run.  Advisory only -- it never blocks creating,
+  editing or submitting an observation.
+  """
+  goaDuplication: GoaDuplication!
+
+}
+
+"The outcome of the most recent Archive Duplication Search attempt."
+enum GoaDuplicationState {
+
+  """
+  No search result.  Either the search has never been run, or it ran against an
+  observation the archive cannot be asked about: an instrument it does not know,
+  or no resolvable pointing and no usable target name.
+  """
+  NOT_CHECKED
+
+  "The search ran and the reported matches are its result."
+  CHECKED
+
+  """
+  The most recent attempt failed.  Any previously found matches are still
+  reported, so a GOA outage leaves the last good snapshot readable.
+  """
+  ERROR
+
+}
+
+"One archived file matched by an Archive Duplication Search."
+type GoaMatch {
+
+  "Archive file name.  Unique within a search result."
+  name: String!
+
+  dataLabel: String
+
+  ra: RightAscension
+
+  dec: Declination
+
+  "Archive instrument name, e.g. GMOS-N."
+  instrument: String!
+
+  "OCS observation type, e.g. OBJECT."
+  observationType: String!
+
+  "OCS observation class, e.g. science."
+  observationClass: String
+
+  qaState: String
+
+  utDateTime: Timestamp
+
+  releaseDate: Date
+
+  "OCS program id, e.g. GN-2019A-Q-101.  Not a lucuma ProgramId."
+  programId: String
+
+  "OCS observation id, e.g. GN-2019A-Q-101-11.  Not a lucuma ObservationId."
+  observationId: String
+
+  objectName: String
+
+  exposure: TimeSpan
+
+  disperser: String
+
+  filter: String
+
+  wavelength: Wavelength
+
+  airmass: BigDecimal
+
+  azimuth: Angle
+
+  elevation: Angle
+
+  """
+  Angular separation in arcseconds between this file's pointing and the search
+  center, telling a match on the target apart from one merely nearby in the
+  field.  Null when the search ran by target name rather than coordinates, or
+  when the file itself has no pointing.
+  """
+  distanceArcsec: BigDecimal
+
+}
+
+"""
+Archive Duplication Search result for an observation, as of the last time the
+search was run.
+"""
+type GoaDuplication {
+
+  state: GoaDuplicationState!
+
+  """
+  Number of matching archive files.  Counted per file rather than per archived
+  observation, to stay consistent with the PIT.  A floor rather than an exact
+  figure when `saturated`.
+  """
+  matchCount: NonNegInt!
+
+  """
+  Whether a constituent query came back filled to the archive's hard cap of 500
+  records.  When true `matchCount` is a floor and should be rendered as "500+".
+  """
+  saturated: Boolean!
+
+  "When the reported matches were gathered.  Null until a search has run."
+  lastCheckedAt: Timestamp
+
+  "Why the most recent attempt failed.  Set when `state` is ERROR."
+  error: String
+
+  "Coordinates searched around, for a sidereal pointing."
+  searchCoordinates: Coordinates
+
+  "Target name searched for, for a non-sidereal pointing."
+  searchTargetName: NonEmptyString
+
+  "Radius searched around the search center, half the observation's field of view."
+  searchRadius: Angle
+
+  "The matched archive files, ordered by file name."
+  matches: [GoaMatch!]!
+
 }
 
 enum ExecutionState {
