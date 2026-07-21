@@ -10,7 +10,10 @@ trait ConfigurationRequestSelectResultMapping[F[_]]
      with ProgramView[F]
      with ResultMapping[F] {
 
-  lazy val ConfigurationRequestSelectResultMapping =
-    nestedSelectResultMappingAtPath(ProgramType / "configurationRequests", ProgramView.Id, Join(ProgramView.Id, ConfigurationRequestView.ProgramId))
+  lazy val ConfigurationRequestSelectResultMappings: List[TypeMapping] =
+    List(
+      topLevelSelectResultMappingAtPath(QueryType / "configurationRequests"),
+      nestedSelectResultMappingAtPath(ProgramType / "configurationRequests", ProgramView.Id, Join(ProgramView.Id, ConfigurationRequestView.ProgramId)),
+    )
 
 }
