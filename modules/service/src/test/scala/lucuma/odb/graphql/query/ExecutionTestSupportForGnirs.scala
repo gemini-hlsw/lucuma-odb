@@ -60,6 +60,24 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       GnirsWellDepth.Shallow
     )
 
+  // a thermal-IR (L/M-band) long-camera GNIRS spectroscopy setup
+  // 0.05"/pix, D10, MIRROR, 2.8-4.2 µm, 0.20" slit, DEEP.
+  //
+  // It has a flat but no arc, mirroring the real tables where arcs stop at ~2.5 µm.
+  // Used to verify the sequence still generates without arcs.
+  private val gnirsThermalIrKey: Gnirs.TableKey =
+    Gnirs.TableKey(
+      GnirsPixelScale.PixelScale_0_05,
+      GnirsGrating.D10,
+      GnirsPrism.Mirror,
+      BoundedInterval.unsafeOpenUpper(
+        Wavelength.fromIntNanometers(2800).get,
+        Wavelength.fromIntNanometers(4200).get
+      ),
+      GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_20),
+      GnirsWellDepth.Deep
+    )
+
   val gnirsSmartFlat: SmartGcalValue.Legacy =
     SmartGcalValue(
       Gcal(
@@ -116,6 +134,9 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartFlat),
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
         )
+      ::: List(
+        Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrKey, gnirsSmartFlat)
+      )
 
     prior >>
       servicesFor(pi /* doesn't matter */).map(_(s)).use: services =>
@@ -191,6 +212,32 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                       at:    { nanometers: $atNm }
                     }
                   }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+
+  def configureGnirsThermalIr(oid: Observation.Id): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  camera: LONG_BLUE
+                  explicitGrating: D10
+                  slit: { fpu: LONG_SLIT_0_20 }
+                  centralWavelength: { nanometers: 3300 }
+                  explicitWellDepth: DEEP
                 }
               }
             }
