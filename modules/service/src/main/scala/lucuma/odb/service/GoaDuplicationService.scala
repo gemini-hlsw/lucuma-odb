@@ -1,0 +1,281 @@
+// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
+
+package lucuma.odb.service
+
+import cats.data.NonEmptyList
+import cats.effect.Concurrent
+import cats.syntax.all.*
+import lucuma.catalog.goa.GoaObservationClass
+import lucuma.catalog.goa.GoaObservationType
+import lucuma.catalog.goa.GoaSummaryRecord
+import lucuma.core.math.Coordinates
+import lucuma.core.model.Observation
+import lucuma.odb.data.GoaDuplication
+import lucuma.odb.data.GoaSearchCenter
+import lucuma.odb.util.Codecs.*
+import skunk.*
+import skunk.codec.boolean.bool
+import skunk.codec.numeric.float8
+import skunk.codec.temporal.date
+import skunk.codec.temporal.timestamp
+import skunk.codec.text.text
+import skunk.implicits.*
+
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+
+/**
+ * Storage for Archive Duplication Search snapshots.  Running the search itself
+ * is the caller's job; this service only reads and replaces what was found.
+ */
+trait GoaDuplicationService[F[_]]:
+
+  /** The stored snapshot, or `Snapshot.NeverChecked` if there is none. */
+  def select(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Snapshot]
+
+  /** The stored headline values, without the matches. */
+  def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Header]
+
+  /**
+   * Replaces any existing snapshot with this one.  There is no history: the
+   * previous matches are discarded.
+   */
+  def store(
+    observationId: Observation.Id,
+    header:        GoaDuplication.Header,
+    matches:       List[GoaSummaryRecord]
+  )(using Transaction[F]): F[Unit]
+
+  /**
+   * Records that the most recent attempt failed, leaving any previously stored
+   * matches and headline values in place so a GOA outage cannot destroy a good
+   * snapshot.
+   */
+  def storeError(observationId: Observation.Id, message: String)(using Transaction[F]): F[Unit]
+
+object GoaDuplicationService:
+
+  def instantiate[F[_]: Concurrent](using Services[F]): GoaDuplicationService[F] =
+    new GoaDuplicationService[F]:
+
+      import Services.Syntax.*
+
+      override def select(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Snapshot] =
+        (selectHeader(observationId), session.execute(Statements.SelectMatches)(observationId))
+          .mapN(GoaDuplication.Snapshot.apply)
+
+      override def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Header] =
+        session
+          .option(Statements.SelectHeader)(observationId)
+          .map(_.getOrElse(GoaDuplication.Header.NeverChecked))
+
+      override def store(
+        observationId: Observation.Id,
+        header:        GoaDuplication.Header,
+        matches:       List[GoaSummaryRecord]
+      )(using Transaction[F]): F[Unit] =
+        for
+          _ <- session.execute(Statements.UpsertHeader)(observationId, header)
+          _ <- session.execute(Statements.DeleteMatches)(observationId)
+          _ <- NonEmptyList.fromList(matches).traverse_ : nel =>
+                 session.execute(Statements.insertMatches(nel))(observationId, nel)
+        yield ()
+
+      override def storeError(observationId: Observation.Id, message: String)(using Transaction[F]): F[Unit] =
+        session.execute(Statements.UpsertError)(observationId, message).void
+
+  object Statements:
+
+    /** GOA reports UT datetimes as instants; the column is a plain UTC timestamp. */
+    private val ut_datetime: Codec[Instant] =
+      timestamp.imap(_.toInstant(ZoneOffset.UTC))(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
+
+    private val goa_observation_type: Codec[GoaObservationType] =
+      text.imap(GoaObservationType.fromTag)(_.tag)
+
+    private val goa_observation_class: Codec[GoaObservationClass] =
+      text.imap(GoaObservationClass.fromTag)(_.tag)
+
+    /** Columns of `t_goa_match`, in `GoaSummaryRecord` field order. */
+    private val goa_match: Codec[GoaSummaryRecord] =
+      (text                     *:  // c_file_name
+       text.opt                 *:  // c_data_label
+       right_ascension.opt      *:  // c_ra
+       declination.opt          *:  // c_dec
+       text                     *:  // c_instrument
+       goa_observation_type     *:  // c_observation_type
+       goa_observation_class.opt*:  // c_observation_class
+       text.opt                 *:  // c_qa_state
+       ut_datetime.opt          *:  // c_ut_datetime
+       date.opt                 *:  // c_release_date
+       text.opt                 *:  // c_goa_program_id
+       text.opt                 *:  // c_goa_observation_id
+       text.opt                 *:  // c_object_name
+       time_span.opt            *:  // c_exposure
+       text.opt                 *:  // c_disperser
+       text.opt                 *:  // c_filter
+       wavelength_pm.opt        *:  // c_wavelength
+       float8.opt               *:  // c_airmass
+       angle_µas.opt            *:  // c_azimuth
+       angle_µas.opt                // c_elevation
+      ).to[GoaSummaryRecord]
+
+    /**
+     * Header columns, in the order the header is selected and written.  The
+     * search center is sidereal (coordinates) or non-sidereal (a target name),
+     * never both.
+     */
+    private val goa_duplication_header: Codec[GoaDuplication.Header] =
+      (goa_duplication_state *:
+       int4_nonneg           *:
+       bool                  *:
+       core_timestamp.opt    *:
+       text.opt              *:
+       right_ascension.opt   *:
+       declination.opt       *:
+       text_nonempty.opt     *:
+       angle_µas.opt
+      ).imap { (state, count, saturated, checkedAt, error, ra, dec, targetName, radius) =>
+        val center = (ra, dec)
+          .mapN((r, d) => GoaSearchCenter.Sidereal(Coordinates(r, d)))
+          .orElse(targetName.map(GoaSearchCenter.NonSidereal(_)))
+        GoaDuplication.Header(
+          state,
+          count,
+          saturated,
+          checkedAt,
+          error,
+          GoaDuplication.Provenance(center, radius)
+        )
+      } { h =>
+        val (ra, dec, targetName) = h.provenance.center match
+          case Some(GoaSearchCenter.Sidereal(c))    => (c.ra.some, c.dec.some, none)
+          case Some(GoaSearchCenter.NonSidereal(n)) => (none, none, n.some)
+          case None                                 => (none, none, none)
+        (h.state, h.matchCount, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.provenance.radius)
+      }
+
+    val SelectHeader: Query[Observation.Id, GoaDuplication.Header] =
+      sql"""
+        SELECT
+          c_state,
+          c_match_count,
+          c_saturated,
+          c_last_checked_at,
+          c_error,
+          c_search_ra,
+          c_search_dec,
+          c_search_target,
+          c_search_radius
+        FROM v_goa_duplication
+        WHERE c_observation_id = $observation_id
+      """.query(goa_duplication_header)
+
+    val SelectMatches: Query[Observation.Id, GoaSummaryRecord] =
+      sql"""
+        SELECT
+          c_file_name,
+          c_data_label,
+          c_ra,
+          c_dec,
+          c_instrument,
+          c_observation_type,
+          c_observation_class,
+          c_qa_state,
+          c_ut_datetime,
+          c_release_date,
+          c_goa_program_id,
+          c_goa_observation_id,
+          c_object_name,
+          c_exposure,
+          c_disperser,
+          c_filter,
+          c_wavelength,
+          c_airmass,
+          c_azimuth,
+          c_elevation
+        FROM t_goa_match
+        WHERE c_observation_id = $observation_id
+        ORDER BY c_file_name
+      """.query(goa_match)
+
+    val UpsertHeader: Command[(Observation.Id, GoaDuplication.Header)] =
+      sql"""
+        INSERT INTO t_goa_duplication (
+          c_observation_id,
+          c_state,
+          c_match_count,
+          c_saturated,
+          c_last_checked_at,
+          c_error,
+          c_search_ra,
+          c_search_dec,
+          c_search_target,
+          c_search_radius
+        ) VALUES ($observation_id, $goa_duplication_header)
+        ON CONFLICT (c_observation_id) DO UPDATE SET
+          c_state           = EXCLUDED.c_state,
+          c_match_count     = EXCLUDED.c_match_count,
+          c_saturated       = EXCLUDED.c_saturated,
+          c_last_checked_at = EXCLUDED.c_last_checked_at,
+          c_error           = EXCLUDED.c_error,
+          c_search_ra       = EXCLUDED.c_search_ra,
+          c_search_dec      = EXCLUDED.c_search_dec,
+          c_search_target   = EXCLUDED.c_search_target,
+          c_search_radius   = EXCLUDED.c_search_radius
+      """.command
+
+    /**
+     * Flags a failed attempt.  Only the state and message are touched, so a
+     * previously good snapshot survives a GOA outage intact.
+     */
+    val UpsertError: Command[(Observation.Id, String)] =
+      sql"""
+        INSERT INTO t_goa_duplication (
+          c_observation_id,
+          c_state,
+          c_error
+        ) VALUES ($observation_id, 'error', $text)
+        ON CONFLICT (c_observation_id) DO UPDATE SET
+          c_state = 'error',
+          c_error = EXCLUDED.c_error
+      """.command
+
+    val DeleteMatches: Command[Observation.Id] =
+      sql"""
+        DELETE FROM t_goa_match
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    def insertMatches(
+      matches: NonEmptyList[GoaSummaryRecord]
+    ): Command[(Observation.Id, matches.type)] =
+      sql"""
+        INSERT INTO t_goa_match (
+          c_observation_id,
+          c_file_name,
+          c_data_label,
+          c_ra,
+          c_dec,
+          c_instrument,
+          c_observation_type,
+          c_observation_class,
+          c_qa_state,
+          c_ut_datetime,
+          c_release_date,
+          c_goa_program_id,
+          c_goa_observation_id,
+          c_object_name,
+          c_exposure,
+          c_disperser,
+          c_filter,
+          c_wavelength,
+          c_airmass,
+          c_azimuth,
+          c_elevation
+        ) VALUES ${(observation_id *: goa_match).values.list(matches.size)}
+      """.command
+         .contramap: (oid, ms) =>
+           ms.toList.map((oid, _))

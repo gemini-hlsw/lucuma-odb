@@ -22,6 +22,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.odb.data.GoaSearchCenter
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.exchange.Config as Exchange
