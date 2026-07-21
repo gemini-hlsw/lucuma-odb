@@ -21,7 +21,6 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
@@ -81,14 +80,11 @@ object Flamingos2LongSlitInput:
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    private val formattedConfigs: Option[(SlitOffsetMode, String)] =
-      explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
+    private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
-    val explicitSlitOffsetMode: Option[SlitOffsetMode] =
-      formattedConfigs.map(_._1)
+    val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
 
-    val formattedTelescopeConfigs: Option[String] =
-      formattedConfigs.map(_._2)
+    val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
   object Create:
 
@@ -162,14 +158,11 @@ object Flamingos2LongSlitInput:
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    private val formattedConfigs: Nullable[(SlitOffsetMode, String)] =
-      explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
+    private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
-    val explicitSlitOffsetMode: Nullable[SlitOffsetMode] =
-      formattedConfigs.map(_._1)
+    val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
 
-    val formattedTelescopeConfigs: Nullable[String] =
-      formattedConfigs.map(_._2)
+    val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
     private def required[A](oa: Option[A], itemName: String): Result[A] =
       Result.fromOption(

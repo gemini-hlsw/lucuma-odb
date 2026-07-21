@@ -19,7 +19,10 @@ import lucuma.core.util.TimeSpan
 
 trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
 
-  def setOffsets(oid: Observation.Id, mode: SlitOffsetMode, offsets: String): IO[Unit] =
+  def setOffsets(oid: Observation.Id, mode: SlitOffsetMode, configs: String): IO[Unit] =
+    val shape = mode match
+      case SlitOffsetMode.NodAlongSlit => "alongSlit"
+      case SlitOffsetMode.NodToSky     => "toSky"
     query(
       pi,
       s"""
@@ -28,8 +31,7 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
             SET: {
               observingMode: {
                 igrins2LongSlit: {
-                  explicitOffsetMode: ${mode.tag.toScreamingSnakeCase}
-                  explicitOffsets: $offsets
+                  explicitTelescopeConfigs: { $shape: $configs }
                 }
               }
             }

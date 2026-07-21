@@ -11,26 +11,16 @@ import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
-import io.circe.Json
-import io.circe.syntax.*
-import lucuma.core.enums.SlitOffsetMode
-import lucuma.core.math.Offset
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.format.spatialOffsets.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
 
 trait Igrins2LongSlitMapping[F[_]]
   extends Igrins2LongSlitView[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
+     with SlitTelescopeConfigsMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
-
-  private def decodeIgrins2Offsets(s: String): Json =
-    OffsetsFormat.getOption(s).map(_.asJson).getOrElse(List.empty[Offset].asJson)
-
-  val defaultOffsetMode: FieldMapping = CursorField[SlitOffsetMode]("defaultOffsetMode", _ => Result(SlitOffsetMode.NodAlongSlit))
 
   val defaultSaveSVCImages: FieldMapping = CursorField[Boolean]("defaultSaveSVCImages", _ => Result(false))
 
@@ -41,44 +31,21 @@ trait Igrins2LongSlitMapping[F[_]]
 
       SqlObject("exposureTimeMode", Join(Igrins2LongSlitView.ObservationId, ExposureTimeModeView.ObservationId)),
 
-      explicitOrElseDefault[SlitOffsetMode]("offsetMode", "explicitOffsetMode", "defaultOffsetMode"),
-      SqlField("explicitOffsetMode", Igrins2LongSlitView.OffsetMode),
-      defaultOffsetMode,
-
       explicitOrElseDefault[Boolean]("saveSVCImages", "explicitSaveSVCImages", "defaultSaveSVCImages"),
 
       SqlField("explicitSaveSVCImages", Igrins2LongSlitView.SaveSVCImages),
       defaultSaveSVCImages,
 
-      SqlField("offsetsString", Igrins2LongSlitView.Offsets, hidden = true),
-      SqlField("defaultOffsetsString", Igrins2LongSlitView.DefaultOffsets, hidden = true),
+      SqlField("slitOffsetModeEffRaw", Igrins2LongSlitView.SlitOffsetModeEffective,  hidden = true),
+      SqlField("tcEffRaw",             Igrins2LongSlitView.TelescopeConfigsEffective, hidden = true),
+      SqlField("slitOffsetModeDefRaw", Igrins2LongSlitView.SlitOffsetModeDefault,     hidden = true),
+      SqlField("tcDefRaw",             Igrins2LongSlitView.TelescopeConfigsDefault,   hidden = true),
+      SqlField("slitOffsetModeExpRaw", Igrins2LongSlitView.SlitOffsetMode,            hidden = true),
+      SqlField("tcExpRaw",             Igrins2LongSlitView.TelescopeConfigs,          hidden = true),
 
-      CursorFieldJson("offsets",
-        cursor =>
-          for
-            s <- cursor.field("offsetsString", None).flatMap(_.as[Option[String]])
-            d <- cursor.field("defaultOffsetsString", None).flatMap(_.as[String])
-          yield s.map(decodeIgrins2Offsets)
-            .getOrElse(decodeIgrins2Offsets(d)),
-        List("offsetsString", "defaultOffsetsString")
-      ),
-
-      CursorFieldJson("explicitOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeIgrins2Offsets).asJson)),
-        List("offsetsString")
-      ),
-
-      CursorFieldJson("defaultOffsets",
-        cursor =>
-          cursor
-            .field("defaultOffsetsString", None)
-            .flatMap(_.as[String])
-            .map(decodeIgrins2Offsets),
-        List("defaultOffsetsString")
-      ),
+      slitTelescopeConfigsField("telescopeConfigs",        "slitOffsetModeEffRaw", "tcEffRaw"),
+      slitTelescopeConfigsField("defaultTelescopeConfigs", "slitOffsetModeDefRaw", "tcDefRaw"),
+      explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "tcExpRaw"),
 
       SqlJson("telluricType", Igrins2LongSlitView.TelluricType)
 

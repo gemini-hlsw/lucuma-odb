@@ -4,14 +4,12 @@
 package lucuma.odb.graphql.input
 package arb
 
-import lucuma.core.enums.Igrins2SlitOffsetPreset
-import lucuma.core.math.Offset
-import lucuma.core.math.arb.ArbOffset.given
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.arb.ArbExposureTimeMode.given
 import lucuma.core.model.arb.ArbTelluricType.given
-import lucuma.core.util.arb.ArbEnumerated.given
+import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable.given
 import org.scalacheck.*
@@ -23,20 +21,18 @@ trait ArbIgrins2LongSlitInput:
     Arbitrary:
       for
         e  <- arbitrary[Option[ExposureTimeMode]]
-        om <- arbitrary[Option[Igrins2SlitOffsetPreset]]
         sv <- arbitrary[Option[Boolean]]
-        so <- arbitrary[Option[List[Offset]]]
+        tc <- arbitrary[Option[SlitTelescopeConfigs]]
         tt <- arbitrary[TelluricType]
-      yield Igrins2LongSlitInput.Create(e, om, sv, so, tt)
+      yield Igrins2LongSlitInput.Create(e, sv, tc, tt)
 
   given Arbitrary[Igrins2LongSlitInput.Edit] =
     Arbitrary:
       for
         e  <- arbitrary[Option[ExposureTimeMode]]
-        om <- arbitrary[Nullable[Igrins2SlitOffsetPreset]]
         sv <- arbitrary[Nullable[Boolean]]
-        so <- arbitrary[Nullable[List[Offset]]]
+        tc <- arbitrary[Nullable[SlitTelescopeConfigs]]
         tt <- arbitrary[Option[TelluricType]]
-      yield Igrins2LongSlitInput.Edit(e, om, sv, so, tt)
+      yield Igrins2LongSlitInput.Edit(e, sv, tc, tt)
 
 object ArbIgrins2LongSlitInput extends ArbIgrins2LongSlitInput

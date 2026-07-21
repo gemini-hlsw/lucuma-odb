@@ -1521,7 +1521,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Igrins2LongSlit =>
-        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", explicitTelescopeConfigs: { alongSlit: $offsets }")
         s"""{
           igrins2LongSlit: {
             exposureTimeMode: {

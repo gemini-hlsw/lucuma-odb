@@ -108,11 +108,16 @@ class observation_configurationRequests
         """
 
     def forIgrins2LongSlit(user: User, oid: Observation.Id, offsetMode: SlitOffsetMode): IO[Unit] =
+      val configs = offsetMode match
+        case SlitOffsetMode.NodAlongSlit =>
+          "alongSlit: [ { q: { arcseconds: -1.5 }, guiding: ENABLED } ]"
+        case SlitOffsetMode.NodToSky     =>
+          "toSky: [ { offset: { p: { arcseconds: 10 }, q: { arcseconds: 10 } }, guiding: DISABLED } ]"
       updateObservationAs(user, oid):
         s"""
           observingMode: {
             igrins2LongSlit: {
-              explicitOffsetMode: ${offsetMode.tag.toScreamingSnakeCase}
+              explicitTelescopeConfigs: { $configs }
             }
           }
         """

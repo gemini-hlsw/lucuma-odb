@@ -100,11 +100,12 @@ object Igrins2SequenceService:
         WHERE c_observation_id = $observation_id
       """.query(igrins_2_static)
 
+    // The offset mode preset follows the shape of the effective telescope configs.
     val SelectStaticByMode: Query[Observation.Id, Igrins2StaticConfig] =
       sql"""
         SELECT
           COALESCE(c_save_svc_images, false),
-          COALESCE(c_offset_mode, 'nod_along_slit')
-        FROM t_igrins_2_long_slit
+          c_slit_offset_mode_effective
+        FROM v_igrins_2_long_slit
         WHERE c_observation_id = $observation_id
       """.query(igrins_2_static)
