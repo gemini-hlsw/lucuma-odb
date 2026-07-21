@@ -13,9 +13,15 @@ import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.core.optics.Format
 
 /**
- * Serialization layer between `SlitTelescopeConfigs` (the lucuma-core domain type) and the two
- * columns used to persist it in the DB: a discriminant tag (e.g. `c_slit_offset_mode`) and a
- * JSON blob (column name varies by instrument, e.g. `c_telescope_configs` for GNIRS).
+ * The two columns a `SlitTelescopeConfigs` persists
+ */
+final case class StoredSlitTelescopeConfigs(slitOffsetMode: SlitOffsetMode, telescopeConfigs: String)
+
+/**
+ * Serialization layer between `SlitTelescopeConfigs` and the two columns every long-slit table
+ * persists it as:
+ * - the discriminant tag (`c_slit_offset_mode`) and
+ * - the JSON blob (`c_telescope_configs`).
  */
 trait TelescopeConfigsFormat:
   import lucuma.odb.json.offset.transport.given
@@ -46,5 +52,11 @@ trait TelescopeConfigsFormat:
         case SlitTelescopeConfigs.ToSky(cs)     => (SlitOffsetMode.NodToSky,     ToSkyFormat.reverseGet(cs))
       }
     )
+
+  /** Splits a `SlitTelescopeConfigs` into its two persisted columns. */
+  val storedSlitTelescopeConfigs: SlitTelescopeConfigs => StoredSlitTelescopeConfigs =
+    stc =>
+      val (slitOffsetMode, telescopeConfigs) = SlitTelescopeConfigsFormat.reverseGet(stc)
+      StoredSlitTelescopeConfigs(slitOffsetMode, telescopeConfigs)
 
 object telescopeConfigs extends TelescopeConfigsFormat

@@ -7,7 +7,6 @@ package input
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
@@ -26,14 +25,11 @@ object Igrins2LongSlitInput:
     def observingModeType: ObservingModeType =
       ObservingModeType.Igrins2LongSlit
 
-    private val formattedConfigs: Option[(SlitOffsetMode, String)] =
-      explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
+    private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
-    val explicitSlitOffsetMode: Option[SlitOffsetMode] =
-      formattedConfigs.map(_._1)
+    val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
 
-    val formattedTelescopeConfigs: Option[String] =
-      formattedConfigs.map(_._2)
+    val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
   object Create:
 
@@ -60,14 +56,11 @@ object Igrins2LongSlitInput:
     val observingModeType: ObservingModeType =
       ObservingModeType.Igrins2LongSlit
 
-    private val formattedConfigs: Nullable[(SlitOffsetMode, String)] =
-      explicitTelescopeConfigs.map(SlitTelescopeConfigsFormat.reverseGet)
+    private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
-    val explicitSlitOffsetMode: Nullable[SlitOffsetMode] =
-      formattedConfigs.map(_._1)
+    val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
 
-    val formattedTelescopeConfigs: Nullable[String] =
-      formattedConfigs.map(_._2)
+    val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
     val toCreate: Result[Create] =
       Result(Create(

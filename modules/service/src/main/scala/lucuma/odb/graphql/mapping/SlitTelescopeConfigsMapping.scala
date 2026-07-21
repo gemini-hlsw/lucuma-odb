@@ -21,10 +21,8 @@ import lucuma.odb.json.offset.query.given
  * - a discriminant tag (`c_slit_offset_mode`) 
  * - and a JSON blob (`c_telescope_configs`). 
  *
- * Mixed into every long-slit mapping that exposes telescope configs
- * (GNIRS, Flamingos2) so the JSON shaping and cursor-field wiring live in one place.
- *
- * IGRINS2 and GMOS are pending.
+ * Mixed into every long-slit mapping that exposes telescope configs (GNIRS, Flamingos2,
+ * IGRINS-2) so the JSON shaping and cursor-field wiring live in one place. GMOS is pending.
  */
 trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
 

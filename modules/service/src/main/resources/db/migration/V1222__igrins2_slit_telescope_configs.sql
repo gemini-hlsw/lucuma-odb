@@ -1,10 +1,4 @@
--- IGRINS-2 long slit adopts the SlitTelescopeConfigs model mirroring the Flamingos2
--- and GNIRS long slit storage: a fixed default set of telescope configs with an
--- optional explicit (slit_offset_mode, telescope_configs) override.
---
--- The per-observation offset mode preset (c_offset_mode) goes away: the shape of an
--- explicit override now carries the mode. The static config keeps its own
--- c_offset_mode, seeded from the effective mode in the view.
+-- IGRINS-2 long slit now uses the SlitTelescopeConfigs model
 
 -- New columns: explicit SlitTelescopeConfigs (discriminant + JSON blob).
 ALTER TABLE t_igrins_2_long_slit
@@ -54,8 +48,7 @@ FROM parsed p
 WHERE m.c_observation_id = p.c_observation_id;
 
 -- Rows that relied on the nod-to-sky preset for their defaults have no explicit offsets to
--- migrate, but the preset is going away — materialize those defaults as an explicit override
--- so they don't silently fall back to the nod-along-slit default.
+-- migrate, but the preset is going away
 -- ATTENTION: duplicated from lucuma-core igrins2.NodToSkyDefaultTelescopeConfigs. Keep in sync.
 UPDATE t_igrins_2_long_slit
 SET c_slit_offset_mode  = 'nod_to_sky',
@@ -70,14 +63,12 @@ WHERE c_offset_mode = 'nod_to_sky'
 -- following ALTER TABLE is not blocked by "pending trigger events" (55006).
 SET CONSTRAINTS ALL IMMEDIATE;
 
+-- Drop dependencies on the old columns
 DROP VIEW v_igrins_2_long_slit;
 
--- The p = 0 rule for nod-along-slit is now structural: AlongSlit configs carry only q.
 DROP TRIGGER IF EXISTS check_igrins2_nod_along_slit_offsets_trigger ON t_igrins_2_long_slit;
 DROP FUNCTION IF EXISTS check_igrins2_nod_along_slit_offsets();
 
--- The observation-edit event trigger is column-scoped, so it must be re-pointed at the new
--- columns rather than dropped with them (V1111).
 DROP TRIGGER ch_observation_edit_igrins2_offsets_trigger ON t_igrins_2_long_slit;
 
 -- The generated c_mode_key column keys on c_offset_mode, and v_all_modes /
@@ -88,6 +79,7 @@ DROP VIEW v_all_modes;
 DROP TRIGGER observing_mode_key_trigger ON t_igrins_2_long_slit;
 ALTER TABLE t_igrins_2_long_slit DROP COLUMN c_mode_key;
 
+-- Finally drop the old columns
 ALTER TABLE t_igrins_2_long_slit
   DROP CONSTRAINT IF EXISTS check_igrins2_offsets_format;
 ALTER TABLE t_igrins_2_long_slit
@@ -100,10 +92,7 @@ AFTER UPDATE OF c_slit_offset_mode, c_telescope_configs ON t_igrins_2_long_slit
 FOR EACH ROW
 EXECUTE FUNCTION ch_observation_edit_associated_table_update();
 
--- Regenerate the mode key off the explicit slit offset mode. The grouping function already
--- coalesces a NULL mode to 'nod_along_slit', which is exactly the new default, so every row
--- keeps the key it had before this migration (the backfill above materialized nod_to_sky).
--- The explicit configs themselves stay out of the key, as the offsets did before.
+-- Regenerate the mode key off the explicit slit offset mode. 
 ALTER TABLE t_igrins_2_long_slit
   ADD COLUMN c_mode_key text NOT NULL GENERATED ALWAYS AS (
     format_igrins_2_long_slit_mode_group(
