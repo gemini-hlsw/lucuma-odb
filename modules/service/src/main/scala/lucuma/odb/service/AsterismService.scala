@@ -270,7 +270,12 @@ object AsterismService {
       override def getAsterisms(
         oids: List[Observation.Id]
       )(using SuperUserAccess): F[Map[Observation.Id, List[(Target.Id, Target)]]] =
-        NonEmptyList.fromList(oids) match
+        // Dedup the ids before building the `IN (...)` list. Callers (e.g. the
+        // configurationRequests/applicableObservations effect batching) may pass the
+        // same observation many times; without dedup the bind-parameter count can
+        // exceed Postgres's 32767 limit. The result Map is keyed by observation id,
+        // so deduping is behavior-preserving. Mirrors `getSiteAndExplicitBaseCoordinates`.
+        NonEmptyList.fromList(oids.distinct) match
           case None      => Map.empty.pure[F]
           case Some(nel) =>
             val enc = observation_id.nel(nel)
