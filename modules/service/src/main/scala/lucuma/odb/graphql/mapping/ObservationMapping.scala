@@ -36,6 +36,7 @@ import lucuma.odb.service.Services
 import skunk.Transaction
 
 import table.AttachmentTable
+import table.GoaDuplicationView
 import table.ObsAttachmentAssignmentTable
 import table.ObscalcTable
 import table.ObservationReferenceView
@@ -48,6 +49,7 @@ trait ObservationMapping[F[_]]
      with TimingWindowView[F]
      with AttachmentTable[F]
      with ObsAttachmentAssignmentTable[F]
+     with GoaDuplicationView[F]
      with ObscalcTable[F]
      with ObservationReferenceView[F] {
 
@@ -88,7 +90,8 @@ trait ObservationMapping[F[_]]
       SqlField("observerNotes", ObservationView.ObserverNotes),
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
-      SqlObject("workflow", Join(ObservationView.Id, ObscalcTable.ObservationId))
+      SqlObject("workflow", Join(ObservationView.Id, ObscalcTable.ObservationId)),
+      SqlObject("goaDuplication", Join(ObservationView.Id, GoaDuplicationView.ObservationId))
     )
 
   lazy val ObservationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
