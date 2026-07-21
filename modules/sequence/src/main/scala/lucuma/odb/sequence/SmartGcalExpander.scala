@@ -47,7 +47,7 @@ trait SmartGcalExpander[F[_], S, D]:
    * Expands a single step, best-effort.  Like `expandStep`, but a missing
    * SmartGcal mapping yields no steps instead of an error.
    */
-  def expandStepBestEffort(
+  def expandStepOptional(
     static: S,
     step:   ProtoStep[D]
   )(using Functor[F]): F[List[ProtoStep[D]]] =

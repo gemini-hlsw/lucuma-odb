@@ -89,8 +89,8 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
-  // thermal-IR (L/M-band) long-camera config — 0.05"/pix (LONG_BLUE), D10, MIRROR, 0.20" slit,
-  // 3.3 µm.
+  // thermal-IR (L/M-band) long-camera config 
+  // 0.05"/pix (LONG_BLUE), D10, MIRROR, 0.20" slit, 3.3 µm.
   // This config has a flat but no arc in the smart gcal tables.
   val ThermalIrSnapshot: GnirsDynamicSnapshot =
     GnirsDynamicSnapshot(
@@ -111,10 +111,8 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
     )
 
   test("[gnirs] thermal-IR config yields flat-only calibrations, no arc"):
-    // Thermal-IR (L/M-band) configs have a flat but no arc in the smart gcal
-    // tables.
-    // The sequence must still generate: the arc is best-effort and is
-    // omitted when there's no arc mapping.
+    // Thermal-IR (L/M-band) configs have a flat but no arc in the smart gcal tables.
+    // The sequence must still generate, the arc is optional
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs

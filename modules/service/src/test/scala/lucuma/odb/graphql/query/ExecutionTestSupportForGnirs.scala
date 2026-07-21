@@ -60,8 +60,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       GnirsWellDepth.Shallow
     )
 
-  // a thermal-IR (L/M-band) long-camera GNIRS spectroscopy setup — 0.05"/pix, D10,
-  // MIRROR, 2.8-4.2 µm, 0.20" slit, DEEP.
+  // a thermal-IR (L/M-band) long-camera GNIRS spectroscopy setup
+  // 0.05"/pix, D10, MIRROR, 2.8-4.2 µm, 0.20" slit, DEEP.
   //
   // It has a flat but no arc, mirroring the real tables where arcs stop at ~2.5 µm.
   // Used to verify the sequence still generates without arcs.
@@ -135,7 +135,6 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
         )
       ::: List(
-        // o-57a1: flat only, no arc.
         Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrKey, gnirsSmartFlat)
       )
 
@@ -225,10 +224,6 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
     ).void
 
 
-  /**
-   * configure gnirs with thermal-IR (L/M-band) long-camera setup — 0.05"/pix (LONG_BLUE), D10,
-   * MIRROR, 0.20" slit, 3.3 µm.
-   */
   def configureGnirsThermalIr(oid: Observation.Id): IO[Unit] =
     query(
       pi,

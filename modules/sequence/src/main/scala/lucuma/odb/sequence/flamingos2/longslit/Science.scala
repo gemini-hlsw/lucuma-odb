@@ -130,7 +130,7 @@ object Science:
         // The flat is required, but the arc is best-effort
         for
           fs <- EitherT(expander.expandStep(static, flat))
-          rs <- EitherT.liftF(expander.expandStepBestEffort(static, arc))
+          rs <- EitherT.liftF(expander.expandStepOptional(static, arc))
         yield StepDefinition(a0, b0, b1, a1, fs.map(adjustReadMode) ++ rs.map(adjustReadMode))
 
     object PreDef:

@@ -182,7 +182,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
   test("[f2] R=3000 + Y filter yields flat-only calibrations, no arc"):
     // R=3000 + Y filter has a flat but no arc in the smart gcal tables (the arc
     // lamps don't reach the Y-band edge).
-    // The sequence must still generate — with a flat and no arc.
+    // The sequence must still generate with a flat and no arc.
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
