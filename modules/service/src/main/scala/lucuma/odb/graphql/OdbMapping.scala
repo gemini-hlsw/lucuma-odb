@@ -18,6 +18,7 @@ import grackle.QueryCompiler.SelectElaborator
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
@@ -114,6 +115,7 @@ object OdbMapping {
     tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient0:   Client[F],
     horizonsClient0: HorizonsClient[F],
+    goaClient0:    GoaClient[F],
     emailConfig0:  Config.Email,
     allowSub:      Boolean = true,        // Are submappings (recursive calls) allowed?
     schema0:       Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
@@ -362,6 +364,7 @@ object OdbMapping {
                     tec,
                     httpClient0,
                     horizonsClient0,
+                    goaClient0,
                     emailConfig0,
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
                     Some(schema),           // don't re-parse the schema
@@ -375,7 +378,8 @@ object OdbMapping {
                 gaiaClient0,
                 S3FileService.noop[F],
                 horizonsClient0,
-                TelluricTargetsClient.noop[F]
+                TelluricTargetsClient.noop[F],
+                goaClient0
               )(session)
 
           def mkTypeMappings(ms: List[TypeMapping]): TypeMappings =
@@ -808,6 +812,7 @@ object OdbMapping {
     tec:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:  Client[F],
     horizonsClient: HorizonsClient[F],
+    goaClient:   GoaClient[F],
     emailConfig: Config.Email,
     schema:      Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
   ): Mapping[F] =
@@ -825,6 +830,7 @@ object OdbMapping {
       tec,
       httpClient,
       horizonsClient,
+      goaClient,
       emailConfig,
       allowSub = false,
       schema,

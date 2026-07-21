@@ -10,6 +10,7 @@ import cats.effect.std.UUIDGen
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
@@ -71,7 +72,8 @@ object AttachmentRoutes {
             gaiaClient,
             s3,
             horizonsClient,
-            TelluricTargetsClient.noop[F]
+            TelluricTargetsClient.noop[F],
+            GoaClient.noop[F]
           )).map(_.attachmentFileService).use(fa),
       ssoClient,
       maxUploadMb
