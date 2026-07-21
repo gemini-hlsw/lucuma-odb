@@ -10,6 +10,8 @@ import lucuma.core.math.Angle
 import lucuma.core.math.HourAngle
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.table.GoaDuplicationView
+import lucuma.odb.graphql.table.GoaMatchView
 import lucuma.odb.graphql.table.ImagingConfigOptionTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
@@ -24,6 +26,8 @@ trait AngleMapping[F[_]] extends ObservationView[F]
                             with SpectroscopyConfigOptionTable[F]
                             with VisitorTable[F]
                             with ConfigurationRequestView[F]
+                            with GoaDuplicationView[F]
+                            with GoaMatchView[F]
                             with MappingExtras[F] {
 
   private val µPerMilli: Long = 1000L
@@ -72,6 +76,9 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitWidth", SpectroscopyConfigOptionTable.SlitWidth, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitLength", SpectroscopyConfigOptionTable.SlitLength, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       angleMappingAtPath(ImagingConfigOptionType / "fov", ImagingConfigOptionTable.Fov, ImagingConfigOptionTable.Instrument, ImagingConfigOptionTable.Index),
+      angleMappingAtPath(GoaDuplicationType / "searchRadius", GoaDuplicationView.SearchRadius.Value, GoaDuplicationView.SearchRadius.SyntheticId),
+      angleMappingAtPath(GoaMatchType / "azimuth", GoaMatchView.Azimuth.Value, GoaMatchView.Azimuth.SyntheticId),
+      angleMappingAtPath(GoaMatchType / "elevation", GoaMatchView.Elevation.Value, GoaMatchView.Elevation.SyntheticId),
       angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId),
       angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
       angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),

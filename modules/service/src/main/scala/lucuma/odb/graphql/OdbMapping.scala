@@ -202,6 +202,7 @@ object OdbMapping {
           with Igrins2LongSlitMapping[F]
           with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
+          with GoaDuplicationMapping[F]
           with GnirsDynamicMapping[F]
           with GnirsAcquisitionMirrorOutMapping[F]
           with GnirsStaticMapping[F]
@@ -461,6 +462,8 @@ object OdbMapping {
                 GoaPropertiesMapping,
                 GroupMapping,
                 GroupEditMapping,
+                GoaDuplicationMapping,
+                GoaMatchMapping,
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 Igrins2StaticMapping,
@@ -670,6 +673,7 @@ object OdbMapping {
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
                 GmosSouthLongSlitElaborator,
+                GoaDuplicationElaborator,
                 GroupElaborator,
                 MutationElaborator,
                 ObservationElaborator,
