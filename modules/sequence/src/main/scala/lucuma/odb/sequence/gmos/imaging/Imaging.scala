@@ -12,8 +12,8 @@ import lucuma.core.enums.ImagingVariantType.PreImaging
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
-import lucuma.odb.data.Itc.GmosNorthImaging
-import lucuma.odb.data.Itc.GmosSouthImaging
+import lucuma.odb.data.ItcScience.GmosNorthImaging
+import lucuma.odb.data.ItcScience.GmosSouthImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 

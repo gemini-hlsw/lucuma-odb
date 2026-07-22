@@ -5,7 +5,9 @@ package lucuma.odb.json
 
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
-import lucuma.odb.data.Itc
+import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcResult
+import lucuma.odb.data.ItcScience
 import lucuma.odb.data.arb.ArbItc
 import munit.DisciplineSuite
 
@@ -15,4 +17,9 @@ class ItcSuite extends DisciplineSuite with ArbitraryInstances:
   import time.query.given
   import wavelength.query.given
 
-  checkAll("ItcCodec", CodecTests[Itc].codec)
+  // The composite `Itc` has no JSON codec (it is assembled from separate
+  // columns); its two parts are stored and cached independently, so we exercise
+  // their codecs directly.
+  checkAll("ItcResultCodec", CodecTests[ItcResult].codec)
+  checkAll("ItcScienceCodec", CodecTests[ItcScience].codec)
+  checkAll("ItcAcquisitionAvailableCodec", CodecTests[ItcAcquisition.Available].codec)

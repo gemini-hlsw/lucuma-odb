@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package data
 package arb
 
-import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
@@ -45,7 +44,7 @@ trait ArbGeneratorParams:
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
-    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, sc, sp)
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, dc, es, sc, sp)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
@@ -58,7 +57,7 @@ trait ArbGeneratorParams:
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
-    yield GeneratorParams(Either.right(itc), bnd, cfg, rol, dc, es, sc, sp)
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, dc, es, sc, sp)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:

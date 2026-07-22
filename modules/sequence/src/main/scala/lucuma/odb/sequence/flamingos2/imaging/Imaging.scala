@@ -10,7 +10,7 @@ import cats.effect.Sync
 import fs2.Pure
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
-import lucuma.odb.data.Itc.Flamingos2Imaging
+import lucuma.odb.data.ItcScience.Flamingos2Imaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 

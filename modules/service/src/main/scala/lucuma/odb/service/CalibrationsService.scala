@@ -111,7 +111,7 @@ object CalibrationsService extends CalibrationObservations {
         requiresItcInputs: Boolean
       ): PartialFunction[(Observation.Id, Either[GeneratorParamsService.Error, GeneratorParams]), ObsExtract[ObservingMode]] =
         {
-          case (oid, Right(GeneratorParams(itc, band, mode, calibRole, _, _, _, _))) if itc.isRight || !requiresItcInputs =>
+          case (oid, Right(GeneratorParams(itc, band, mode, calibRole, _, _, _, _))) if itc.isReady || !requiresItcInputs =>
             ObsExtract(oid, itc.toOption, band, calibRole, mode)
         }
 

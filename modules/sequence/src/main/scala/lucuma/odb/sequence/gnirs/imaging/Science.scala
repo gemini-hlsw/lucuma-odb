@@ -30,8 +30,8 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.Itc.GnirsImaging
-import lucuma.odb.data.Itc.Result
+import lucuma.odb.data.ItcResult as Result
+import lucuma.odb.data.ItcScience.GnirsImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep

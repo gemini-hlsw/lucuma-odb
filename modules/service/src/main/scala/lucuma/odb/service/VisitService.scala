@@ -188,6 +188,20 @@ object VisitService:
         EitherT(generator.calculateDigest(ctx)).semiflatMap: digest =>
           session.execute(Statements.SetOriginalTimeEstimate)(digest, ctx.oid).void
 
+      // Freezes the ITC result that fed sequence generation, so that once
+      // execution has begun the observation no longer depends on the live ITC
+      // service or the disposable cache.  The ITC used here is the very one that
+      // materialized the sequence (from the same generator context), so the two
+      // are frozen consistently.  Idempotent (the first frozen value wins), so it
+      // is safe to run on every observe visit.  A missing/failed ITC leaves
+      // things alone -- there is nothing authoritative to freeze.
+      private def freezeItcResult(
+        ctx: GeneratorContext
+      )(using Transaction[F]): F[Unit] =
+        (ctx.params.itcInput.toOption, ctx.itcRes.toOption)
+          .mapN((input, itc) => itcService.freeze(ctx.oid, input, itc))
+          .getOrElse(().pure[F])
+
       override def lookupOrInsertForObserve(
         input: RecordVisitInput
       )(using NoTransaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
@@ -197,6 +211,7 @@ object VisitService:
               record <- EitherT.liftF(session.unique(Statements.ShouldRecordOriginalEstimate)(input.observationId))
               visit  <- lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey)
               _      <- recordOriginalTimeEstimate(ctx).whenA(record)
+              _      <- EitherT.liftF(freezeItcResult(ctx))
             yield visit.visitId).value
           .map(Result.fromEitherOdbError)
 
