@@ -10,11 +10,11 @@ import lucuma.catalog.goa.GoaClientMock
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.data.GoaDuplication
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 
-class GoaDuplicationSearchServiceSuite extends OdbSuite:
+class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   val pi: User = TestUsers.Standard.pi(1, 30)
 
@@ -52,15 +52,15 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.MaroonX, tid)
     yield oid
 
-  private def refresh(client: GoaClient[IO])(oid: Observation.Id): IO[GoaDuplication.Snapshot] =
+  private def refresh(client: GoaClient[IO])(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
     withServices(pi): services =>
       given Services[IO] = services
-      GoaDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get)
+      ArchiveDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get)
 
   /** What is actually in the database, as opposed to what `refresh` returned. */
-  private def stored(oid: Observation.Id): IO[GoaDuplication.Snapshot] =
+  private def stored(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
     withServices(pi): services =>
-      services.transactionally(services.goaDuplicationService.select(oid))
+      services.transactionally(services.archiveDuplicationService.select(oid))
 
   test("matches are counted per file and persisted"):
     for
@@ -68,7 +68,7 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(mockOf("a.fits", "b.fits", "c.fits"))(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.header.state, GoaDuplication.State.Checked)
+      assertEquals(s.header.state, ArchiveDuplication.State.Checked)
       assertEquals(s.header.matchCount.value, 3)
       assertEquals(db.matches.map(_.name), List("a.fits", "b.fits", "c.fits"))
 
@@ -97,27 +97,27 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       oid <- gmosObservation
       s   <- refresh(GoaClientMock.empty[IO])(oid)
     yield
-      assertEquals(s.header.state, GoaDuplication.State.Checked)
+      assertEquals(s.header.state, ArchiveDuplication.State.Checked)
       assertEquals(s.header.matchCount.value, 0)
       assertEquals(s.header.error, none)
       assertEquals(s.matches, Nil)
 
   test("a query filled to GOA's cap is saturated"):
-    val names = (1 to GoaDuplication.QueryLimit).toList.map(i => s"f$i.fits")
+    val names = (1 to ArchiveDuplication.QueryLimit).toList.map(i => s"f$i.fits")
     for
       oid <- gmosObservation
       s   <- refresh(mockOf(names*))(oid)
     yield
-      assertEquals(s.header.matchCount.value, GoaDuplication.QueryLimit)
+      assertEquals(s.header.matchCount.value, ArchiveDuplication.QueryLimit)
       assert(s.header.saturated)
 
   test("a query short of the cap is not saturated"):
-    val names = (1 until GoaDuplication.QueryLimit).toList.map(i => s"f$i.fits")
+    val names = (1 until ArchiveDuplication.QueryLimit).toList.map(i => s"f$i.fits")
     for
       oid <- gmosObservation
       s   <- refresh(mockOf(names*))(oid)
     yield
-      assertEquals(s.header.matchCount.value, GoaDuplication.QueryLimit - 1)
+      assertEquals(s.header.matchCount.value, ArchiveDuplication.QueryLimit - 1)
       assert(!s.header.saturated)
 
   test("refreshing replaces the previous snapshot"):
@@ -137,7 +137,7 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(brokenMock)(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.header.state, GoaDuplication.State.Error)
+      assertEquals(s.header.state, ArchiveDuplication.State.Error)
       assert(s.header.error.isDefined)
       assertEquals(db.header.matchCount.value, 2)
       assertEquals(db.matches.map(_.name), List("a.fits", "b.fits"))
@@ -147,7 +147,7 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       oid <- gmosObservation
       s   <- refresh(brokenMock)(oid)
     yield
-      assertEquals(s.header.state, GoaDuplication.State.Error)
+      assertEquals(s.header.state, ArchiveDuplication.State.Error)
       assertEquals(s.header.matchCount.value, 0)
       assertEquals(s.matches, Nil)
 
@@ -157,10 +157,10 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(mockOf("a.fits"))(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.header.state, GoaDuplication.State.NotChecked)
+      assertEquals(s.header.state, ArchiveDuplication.State.NotChecked)
       assertEquals(s.header.error, none)
       assertEquals(s.matches, Nil)
-      assertEquals(db.header.state, GoaDuplication.State.NotChecked)
+      assertEquals(db.header.state, ArchiveDuplication.State.NotChecked)
       assert(db.header.lastCheckedAt.isDefined)
 
   test("an observation with no pointing is reported as not checked"):
@@ -169,6 +169,6 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       oid <- createGmosNorthImagingObservationAs(pi, pid)
       s   <- refresh(mockOf("a.fits"))(oid)
     yield
-      assertEquals(s.header.state, GoaDuplication.State.NotChecked)
+      assertEquals(s.header.state, ArchiveDuplication.State.NotChecked)
       assertEquals(s.header.searchArea.center, none)
       assertEquals(s.matches, Nil)

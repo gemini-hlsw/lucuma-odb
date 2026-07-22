@@ -202,7 +202,7 @@ object OdbMapping {
           with Igrins2LongSlitMapping[F]
           with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
-          with GoaDuplicationMapping[F]
+          with ArchiveDuplicationMapping[F]
           with GnirsDynamicMapping[F]
           with GnirsAcquisitionMirrorOutMapping[F]
           with GnirsStaticMapping[F]
@@ -268,7 +268,7 @@ object OdbMapping {
           with RecordDatasetResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
-          with RefreshGoaDuplicationResultMapping[F]
+          with RefreshArchiveDuplicationResultMapping[F]
           with RegionMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -463,8 +463,8 @@ object OdbMapping {
                 GoaPropertiesMapping,
                 GroupMapping,
                 GroupEditMapping,
-                GoaDuplicationMapping,
-                GoaMatchMapping,
+                ArchiveDuplicationMapping,
+                ArchiveMatchMapping,
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 Igrins2StaticMapping,
@@ -525,7 +525,7 @@ object OdbMapping {
                 RecordIgrins2VisitResultMapping,
                 RecordVisitResultMapping,
                 RedeemUserInvitationResultMapping,
-                RefreshGoaDuplicationResultMapping,
+                RefreshArchiveDuplicationResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 SchedulingConstraintsMapping,
@@ -675,7 +675,7 @@ object OdbMapping {
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
                 GmosSouthLongSlitElaborator,
-                GoaDuplicationElaborator,
+                ArchiveDuplicationElaborator,
                 GroupElaborator,
                 MutationElaborator,
                 ObservationElaborator,

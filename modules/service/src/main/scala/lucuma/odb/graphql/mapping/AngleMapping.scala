@@ -16,8 +16,8 @@ import lucuma.core.math.HourAngle
 import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.GoaDuplicationView
-import lucuma.odb.graphql.table.GoaMatchView
+import lucuma.odb.graphql.table.ArchiveDuplicationView
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ImagingConfigOptionTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
@@ -33,8 +33,8 @@ trait AngleMapping[F[_]] extends ObservationView[F]
                             with SpectroscopyConfigOptionTable[F]
                             with VisitorTable[F]
                             with ConfigurationRequestView[F]
-                            with GoaDuplicationView[F]
-                            with GoaMatchView[F]
+                            with ArchiveDuplicationView[F]
+                            with ArchiveMatchView[F]
                             with MappingExtras[F] {
 
   private val µPerMilli: Long = 1000L
@@ -90,14 +90,14 @@ trait AngleMapping[F[_]] extends ObservationView[F]
    * the one definition of the geometry.  The object is absent unless both
    * pointings are known, so the separation is always computable when asked for.
    */
-  private lazy val GoaMatchDistanceMapping: ObjectMapping =
+  private lazy val ArchiveMatchDistanceMapping: ObjectMapping =
     computedAngleMappingAtPath(
-      GoaMatchType / "distance",
+      ArchiveMatchType / "distance",
       List(
-        SqlField("matchRa",   GoaMatchView.Distance.Ra,        hidden = true),
-        SqlField("matchDec",  GoaMatchView.Distance.Dec,       hidden = true),
-        SqlField("searchRa",  GoaMatchView.Distance.SearchRa,  hidden = true),
-        SqlField("searchDec", GoaMatchView.Distance.SearchDec, hidden = true),
+        SqlField("matchRa",   ArchiveMatchView.Distance.Ra,        hidden = true),
+        SqlField("matchDec",  ArchiveMatchView.Distance.Dec,       hidden = true),
+        SqlField("searchRa",  ArchiveMatchView.Distance.SearchRa,  hidden = true),
+        SqlField("searchDec", ArchiveMatchView.Distance.SearchDec, hidden = true),
         CursorField[Angle](
           "value",
           goaMatchSeparation,
@@ -105,7 +105,7 @@ trait AngleMapping[F[_]] extends ObservationView[F]
           hidden = true
         )
       ),
-      GoaMatchView.Distance.SyntheticId
+      ArchiveMatchView.Distance.SyntheticId
     )
 
   private def goaMatchSeparation(c: Cursor): Result[Angle] =
@@ -134,10 +134,10 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitWidth", SpectroscopyConfigOptionTable.SlitWidth, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       angleMappingAtPath(SpectroscopyConfigOptionType / "slitLength", SpectroscopyConfigOptionTable.SlitLength, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       angleMappingAtPath(ImagingConfigOptionType / "fov", ImagingConfigOptionTable.Fov, ImagingConfigOptionTable.Instrument, ImagingConfigOptionTable.Index),
-      angleMappingAtPath(GoaDuplicationType / "searchRadius", GoaDuplicationView.SearchRadius.Value, GoaDuplicationView.SearchRadius.SyntheticId),
-      angleMappingAtPath(GoaMatchType / "azimuth", GoaMatchView.Azimuth.Value, GoaMatchView.Azimuth.SyntheticId),
-      angleMappingAtPath(GoaMatchType / "elevation", GoaMatchView.Elevation.Value, GoaMatchView.Elevation.SyntheticId),
-      GoaMatchDistanceMapping,
+      angleMappingAtPath(ArchiveDuplicationType / "searchRadius", ArchiveDuplicationView.SearchRadius.Value, ArchiveDuplicationView.SearchRadius.SyntheticId),
+      angleMappingAtPath(ArchiveMatchType / "azimuth", ArchiveMatchView.Azimuth.Value, ArchiveMatchView.Azimuth.SyntheticId),
+      angleMappingAtPath(ArchiveMatchType / "elevation", ArchiveMatchView.Elevation.Value, ArchiveMatchView.Elevation.SyntheticId),
+      ArchiveMatchDistanceMapping,
       angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId),
       angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
       angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),

@@ -11,17 +11,17 @@ import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.ObservationIdBinding
 import lucuma.odb.graphql.binding.ObservationReferenceBinding
 
-final case class RefreshGoaDuplicationInput(
+final case class RefreshArchiveDuplicationInput(
   observationId:  Option[Observation.Id],
   observationRef: Option[ObservationReference]
 )
 
-object RefreshGoaDuplicationInput:
+object RefreshArchiveDuplicationInput:
 
-  val Binding: Matcher[RefreshGoaDuplicationInput] =
+  val Binding: Matcher[RefreshArchiveDuplicationInput] =
     ObjectFieldsBinding.rmap:
       case List(
         ObservationIdBinding.Option("observationId", rObservationId),
         ObservationReferenceBinding.Option("observationReference", rObservationRef)
       ) =>
-        (rObservationId, rObservationRef).mapN(RefreshGoaDuplicationInput.apply)
+        (rObservationId, rObservationRef).mapN(RefreshArchiveDuplicationInput.apply)

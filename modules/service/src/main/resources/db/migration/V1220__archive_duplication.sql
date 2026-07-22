@@ -9,7 +9,7 @@
 --
 -- The headline values (count, saturation, last checked) are denormalized here
 -- so the proposal PDF and GraphQL can read them without aggregating over
--- t_goa_match.
+-- t_archive_match.
 
 -- The outcome of the most recent search attempt.
 --
@@ -21,18 +21,18 @@
 --                Any previously stored matches are left untouched, so
 --                c_match_count / c_last_checked_at still describe the last
 --                good snapshot.
-CREATE TYPE e_goa_duplication_state AS ENUM (
+CREATE TYPE e_archive_duplication_state AS ENUM (
   'not_checked',
   'checked',
   'error'
 );
 
-CREATE TABLE t_goa_duplication (
+CREATE TABLE t_archive_duplication (
 
   c_observation_id  d_observation_id        PRIMARY KEY
     REFERENCES t_observation(c_observation_id) ON DELETE CASCADE,
 
-  c_state           e_goa_duplication_state NOT NULL,
+  c_state           e_archive_duplication_state NOT NULL,
 
   -- File-level match count, matching the PIT.  Saturated when a constituent
   -- query came back with GOA's hard cap of 500 records, in which case the
@@ -60,7 +60,7 @@ CREATE TABLE t_goa_duplication (
   CONSTRAINT goa_duplication_search_key    CHECK (num_nonnulls(c_search_ra, c_search_target) <= 1)
 );
 
-COMMENT ON TABLE t_goa_duplication IS
+COMMENT ON TABLE t_archive_duplication IS
   'Archive Duplication Search snapshot header, one row per observation that has been searched.';
 
 -- One row per matched archive file.  Rows hang off the snapshot header, so
@@ -71,10 +71,10 @@ COMMENT ON TABLE t_goa_duplication IS
 -- instrument name, disperser, filter, QA state, observation type and class, and
 -- the program and observation ids are all kept as text.  The archive holds both
 -- OCS- and GPP-era data, so those last four carry values from either era.
-CREATE TABLE t_goa_match (
+CREATE TABLE t_archive_match (
 
   c_observation_id     d_observation_id NOT NULL
-    REFERENCES t_goa_duplication(c_observation_id) ON DELETE CASCADE,
+    REFERENCES t_archive_duplication(c_observation_id) ON DELETE CASCADE,
 
   -- The archive file name, unique within a snapshot: matches are deduped by it.
   c_file_name          text             NOT NULL,
@@ -104,20 +104,20 @@ CREATE TABLE t_goa_match (
   CONSTRAINT goa_match_coords CHECK (num_nulls(c_ra, c_dec) <> 1)
 );
 
-COMMENT ON TABLE t_goa_match IS
+COMMENT ON TABLE t_archive_match IS
   'One archived file matched by an Archive Duplication Search.';
-COMMENT ON COLUMN t_goa_match.c_goa_program_id IS
+COMMENT ON COLUMN t_archive_match.c_goa_program_id IS
   'Program id as reported by GOA: a GPP program id, or an OCS one such as GN-2019A-Q-101.';
-COMMENT ON COLUMN t_goa_match.c_goa_observation_id IS
+COMMENT ON COLUMN t_archive_match.c_goa_observation_id IS
   'Observation id as reported by GOA: a GPP observation id, or an OCS one such as GN-2019A-Q-101-11.';
 
 -- Every observation has a duplication result, whether or not it has been
 -- searched: an observation with no header row reads as never checked, with no
 -- matches.
-CREATE VIEW v_goa_duplication AS
+CREATE VIEW v_archive_duplication AS
   SELECT
     o.c_observation_id,
-    COALESCE(d.c_state, 'not_checked'::e_goa_duplication_state) AS c_state,
+    COALESCE(d.c_state, 'not_checked'::e_archive_duplication_state) AS c_state,
     COALESCE(d.c_match_count, 0)                                AS c_match_count,
     COALESCE(d.c_saturated, FALSE)                              AS c_saturated,
     d.c_last_checked_at,
@@ -128,4 +128,4 @@ CREATE VIEW v_goa_duplication AS
     d.c_search_radius,
     CASE WHEN d.c_search_ra IS NOT NULL THEN o.c_observation_id END AS c_search_center_id
   FROM t_observation o
-  LEFT JOIN t_goa_duplication d ON d.c_observation_id = o.c_observation_id;
+  LEFT JOIN t_archive_duplication d ON d.c_observation_id = o.c_observation_id;

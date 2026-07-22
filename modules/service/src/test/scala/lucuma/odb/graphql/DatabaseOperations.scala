@@ -4670,9 +4670,9 @@ trait DatabaseOperations { this: OdbSuite =>
 
   /**
    * Re-runs the Archive Duplication Search, returning the resulting
-   * `goaDuplication` payload with the requested fields selected.
+   * `archiveDuplication` payload with the requested fields selected.
    */
-  def refreshGoaDuplicationAs(
+  def refreshArchiveDuplicationAs(
     user:   User,
     oid:    Observation.Id,
     fields: String = "state matchCount saturated error"
@@ -4681,12 +4681,12 @@ trait DatabaseOperations { this: OdbSuite =>
       user  = user,
       query = s"""
         mutation {
-          refreshGoaDuplication(input: { observationId: ${oid.asJson} }) {
-            goaDuplication { $fields }
+          refreshArchiveDuplication(input: { observationId: ${oid.asJson} }) {
+            archiveDuplication { $fields }
           }
         }
       """
-    ).map(_.hcursor.downFields("refreshGoaDuplication", "goaDuplication").focus.get)
+    ).map(_.hcursor.downFields("refreshArchiveDuplication", "archiveDuplication").focus.get)
 
   def setIsSplittableAs(
     user:         User,

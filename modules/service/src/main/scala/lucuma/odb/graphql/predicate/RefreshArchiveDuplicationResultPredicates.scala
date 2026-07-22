@@ -5,5 +5,5 @@ package lucuma.odb.graphql.predicate
 
 import grackle.Path
 
-class RefreshGoaDuplicationResultPredicates(path: Path):
+class RefreshArchiveDuplicationResultPredicates(path: Path):
   val observation = ObservationPredicates(path / "observation")

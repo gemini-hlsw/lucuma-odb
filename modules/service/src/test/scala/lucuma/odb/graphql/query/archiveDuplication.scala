@@ -16,11 +16,11 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.data.GoaSearchCenter
-import lucuma.odb.service.GoaDuplicationSearchService
+import lucuma.odb.data.ArchiveSearchCenter
+import lucuma.odb.service.ArchiveDuplicationSearchService
 import lucuma.odb.service.Services
 
-class goaDuplication extends OdbSuite:
+class archiveDuplication extends OdbSuite:
 
   val pi: User = TestUsers.Standard.pi(1, 30)
 
@@ -102,30 +102,30 @@ class goaDuplication extends OdbSuite:
   private def refresh(client: GoaClient[IO])(oid: Observation.Id): IO[Unit] =
     withServices(pi): services =>
       given Services[IO] = services
-      GoaDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get).void
+      ArchiveDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get).void
 
   private def searchCenterOf(oid: Observation.Id): IO[Option[Coordinates]] =
     withServices(pi): services =>
       services
-        .transactionally(services.goaDuplicationService.selectHeader(oid))
-        .map(_.searchArea.center.collect { case GoaSearchCenter.Sidereal(c) => c })
+        .transactionally(services.archiveDuplicationService.selectHeader(oid))
+        .map(_.searchArea.center.collect { case ArchiveSearchCenter.Sidereal(c) => c })
 
-  private def goaDuplication(oid: Observation.Id, fields: String): IO[Json] =
+  private def archiveDuplication(oid: Observation.Id, fields: String): IO[Json] =
     query(
       user  = pi,
       query = s"""
         query {
           observation(observationId: ${oid.asJson}) {
-            goaDuplication { $fields }
+            archiveDuplication { $fields }
           }
         }
       """
-    ).map(_.hcursor.downField("observation").downField("goaDuplication").focus.get)
+    ).map(_.hcursor.downField("observation").downField("archiveDuplication").focus.get)
 
   test("an observation that has never been searched reads as not checked"):
     for
       oid <- siderealObservation
-      js  <- goaDuplication(oid, "state matchCount saturated lastCheckedAt error matches { name }")
+      js  <- archiveDuplication(oid, "state matchCount saturated lastCheckedAt error matches { name }")
     yield assertEquals(
       js,
       json"""
@@ -144,7 +144,7 @@ class goaDuplication extends OdbSuite:
     for
       oid <- siderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](FullRecord))(oid)
-      js  <- goaDuplication(oid, """
+      js  <- archiveDuplication(oid, """
                state
                matchCount
                saturated
@@ -210,7 +210,7 @@ class goaDuplication extends OdbSuite:
     for
       oid <- siderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](AwkwardRecord))(oid)
-      js  <- goaDuplication(oid, "matchCount matches { name observationType observationClass qaState utDateTime }")
+      js  <- archiveDuplication(oid, "matchCount matches { name observationType observationClass qaState utDateTime }")
     yield assertEquals(
       js,
       json"""
@@ -241,7 +241,7 @@ class goaDuplication extends OdbSuite:
       oid    <- siderealObservation
       _      <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
       center <- searchCenterOf(oid)
-      js     <- goaDuplication(oid, """
+      js     <- archiveDuplication(oid, """
                   lastCheckedAt
                   searchTargetName
                   searchCoordinates { ra { microseconds } dec { microarcseconds } }
@@ -267,7 +267,7 @@ class goaDuplication extends OdbSuite:
       oid    <- siderealObservation
       _      <- refresh(GoaClientMock.fromJson[IO](FullRecord))(oid)
       center <- searchCenterOf(oid)
-      js     <- goaDuplication(oid, "matches { coordinates { ra { degrees } dec { degrees } } distance { microarcseconds } }")
+      js     <- archiveDuplication(oid, "matches { coordinates { ra { degrees } dec { degrees } } distance { microarcseconds } }")
     yield
       val m        = js.hcursor.downField("matches").downN(0)
       val coords   = m.downField("coordinates")
@@ -284,7 +284,7 @@ class goaDuplication extends OdbSuite:
     for
       oid <- siderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
-      js  <- goaDuplication(oid, "matches { name coordinates { ra { degrees } } distance { microarcseconds } }")
+      js  <- archiveDuplication(oid, "matches { name coordinates { ra { degrees } } distance { microarcseconds } }")
     yield assertEquals(
       js,
       json"""
@@ -300,7 +300,7 @@ class goaDuplication extends OdbSuite:
     for
       oid <- nonsiderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](FullRecord))(oid)
-      js  <- goaDuplication(oid, """
+      js  <- archiveDuplication(oid, """
                searchTargetName
                searchCoordinates { ra { degrees } }
                matches { name distance { microarcseconds } }
@@ -323,7 +323,7 @@ class goaDuplication extends OdbSuite:
       oid <- siderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](FullRecord))(oid)
       _   <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
-      js  <- goaDuplication(oid, "matchCount matches { name }")
+      js  <- archiveDuplication(oid, "matchCount matches { name }")
     yield assertEquals(
       js,
       json"""{ "matchCount": 1, "matches": [ { "name": "a.fits" } ] }"""

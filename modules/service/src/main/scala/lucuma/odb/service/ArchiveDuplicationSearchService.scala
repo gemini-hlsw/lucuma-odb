@@ -24,7 +24,7 @@ import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.GoaDuplication
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.GoaQueryPolicy
@@ -44,11 +44,11 @@ import skunk.syntax.all.*
  * matches untouched; only a missing observation or a database problem yields a
  * failed `Result`.
  */
-trait GoaDuplicationSearchService[F[_]]:
+trait ArchiveDuplicationSearchService[F[_]]:
 
-  def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[GoaDuplication.Snapshot]]
+  def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[ArchiveDuplication.Snapshot]]
 
-object GoaDuplicationSearchService:
+object ArchiveDuplicationSearchService:
 
   /**
    * Submission freezes the snapshot, so that the count the TAC and the proposal
@@ -61,13 +61,13 @@ object GoaDuplicationSearchService:
 
   def instantiate[F[_]: Concurrent: Parallel: Clock](
     goaClient: GoaClient[F]
-  )(using Services[F]): GoaDuplicationSearchService[F] =
+  )(using Services[F]): ArchiveDuplicationSearchService[F] =
     fromRunner(GoaQueryRunner.fromClient(goaClient))
 
   def fromRunner[F[_]: Concurrent: Clock](
     runner: GoaQueryRunner[F]
-  )(using Services[F]): GoaDuplicationSearchService[F] =
-    new GoaDuplicationSearchService[F]:
+  )(using Services[F]): ArchiveDuplicationSearchService[F] =
+    new ArchiveDuplicationSearchService[F]:
 
       import Services.Syntax.*
 
@@ -81,7 +81,7 @@ object GoaDuplicationSearchService:
         lazy val pointings: List[GoaQueryPolicy.TargetPointing] =
           asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
 
-      override def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[GoaDuplication.Snapshot]] =
+      override def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[ArchiveDuplication.Snapshot]] =
         (for
           ctx    <- ResultT(loadContext(observationId))
           center <- ResultT.liftF(resolveCenter(observationId, ctx))
@@ -128,9 +128,9 @@ object GoaDuplicationSearchService:
         observationId: Observation.Id,
         ctx:           Context,
         center:        Option[Coordinates]
-      )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
+      )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         val searchArea =
-          GoaDuplication.SearchArea(
+          ArchiveDuplication.SearchArea(
             GoaQueryPolicy.searchCenter(ctx.explicitBase, center, ctx.pointings),
             ctx.mode.flatMap(GoaQueryPolicy.searchRadius)
           )
@@ -148,17 +148,17 @@ object GoaDuplicationSearchService:
        */
       private def storeNotChecked(
         observationId: Observation.Id,
-        searchArea:    GoaDuplication.SearchArea
-      )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
+        searchArea:    ArchiveDuplication.SearchArea
+      )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         now.flatMap: t =>
-          val header = GoaDuplication.Header.notChecked(t, searchArea)
-          store(observationId, header, Nil).as(GoaDuplication.Snapshot(header, Nil))
+          val header = ArchiveDuplication.Header.notChecked(t, searchArea)
+          store(observationId, header, Nil).as(ArchiveDuplication.Snapshot(header, Nil))
 
       private def runQueries(
         observationId: Observation.Id,
-        searchArea:    GoaDuplication.SearchArea,
+        searchArea:    ArchiveDuplication.SearchArea,
         params:        List[GoaParams]
-      )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
+      )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         runner.run(params).flatMap:
           case Left(errors)  => storeError(observationId, errors)
           case Right(byQuery) => storeMatches(observationId, searchArea, byQuery)
@@ -170,43 +170,43 @@ object GoaDuplicationSearchService:
       private def storeError(
         observationId: Observation.Id,
         errors:        NonEmptyChain[GoaQueryError]
-      )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
+      )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         val message: NonEmptyString =
           NonEmptyString
             .from(errors.toList.map(_.message).mkString("; "))
             .getOrElse("The Archive Duplication Search failed for an unreported reason.".refined)
         services.transactionally:
-          goaDuplicationService.storeError(observationId, message) >>
-          goaDuplicationService.select(observationId)
+          archiveDuplicationService.storeError(observationId, message) >>
+          archiveDuplicationService.select(observationId)
 
       private def storeMatches(
         observationId: Observation.Id,
-        searchArea:    GoaDuplication.SearchArea,
+        searchArea:    ArchiveDuplication.SearchArea,
         byQuery:       List[List[GoaSummaryRecord]]
-      )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
+      )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         // A file returned by more than one query in the group is one duplicate,
         // not several, so the count is of distinct files.
         val matches = byQuery.flatten.distinctBy(_.name)
         now.flatMap: t =>
           val header =
-            GoaDuplication.Header(
-              GoaDuplication.State.Checked,
+            ArchiveDuplication.Header(
+              ArchiveDuplication.State.Checked,
               NonNegInt.unsafeFrom(matches.size),
               // Any query that came back full was truncated, so the count is a floor.
-              saturated     = byQuery.exists(_.sizeIs == GoaDuplication.QueryLimit),
+              saturated     = byQuery.exists(_.sizeIs == ArchiveDuplication.QueryLimit),
               lastCheckedAt = t.some,
               error         = none,
               searchArea    = searchArea
             )
-          store(observationId, header, matches).as(GoaDuplication.Snapshot(header, matches))
+          store(observationId, header, matches).as(ArchiveDuplication.Snapshot(header, matches))
 
       private def store(
         observationId: Observation.Id,
-        header:        GoaDuplication.Header,
+        header:        ArchiveDuplication.Header,
         matches:       List[GoaSummaryRecord]
       )(using NoTransaction[F]): F[Unit] =
         services.transactionally:
-          goaDuplicationService.store(observationId, header, matches)
+          archiveDuplicationService.store(observationId, header, matches)
 
       private val now: F[Timestamp] =
         Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)

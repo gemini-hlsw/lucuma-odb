@@ -17,8 +17,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.GoaDuplication
-import lucuma.odb.data.GoaSearchCenter
+import lucuma.odb.data.ArchiveDuplication
+import lucuma.odb.data.ArchiveSearchCenter
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.refined.*
@@ -27,7 +27,7 @@ import skunk.Transaction
 import java.time.Instant
 import java.time.LocalDate
 
-class GoaDuplicationServiceSuite extends OdbSuite:
+class ArchiveDuplicationServiceSuite extends OdbSuite:
 
   val pi: User = TestUsers.Standard.pi(1, 30)
 
@@ -89,33 +89,33 @@ class GoaDuplicationServiceSuite extends OdbSuite:
       elevation        = none
     )
 
-  private def header(count: Int, center: Option[GoaSearchCenter]): GoaDuplication.Header =
-    GoaDuplication.Header(
-      GoaDuplication.State.Checked,
+  private def header(count: Int, center: Option[ArchiveSearchCenter]): ArchiveDuplication.Header =
+    ArchiveDuplication.Header(
+      ArchiveDuplication.State.Checked,
       NonNegInt.unsafeFrom(count),
       saturated     = false,
       lastCheckedAt = checkedAt.some,
       error         = none,
-      searchArea    = GoaDuplication.SearchArea(center, Angle.fromDoubleArcseconds(180.0).some)
+      searchArea    = ArchiveDuplication.SearchArea(center, Angle.fromDoubleArcseconds(180.0).some)
     )
 
-  private def sidereal(count: Int): GoaDuplication.Header =
-    header(count, GoaSearchCenter.Sidereal(searchCenter).some)
+  private def sidereal(count: Int): ArchiveDuplication.Header =
+    header(count, ArchiveSearchCenter.Sidereal(searchCenter).some)
 
   private def newObservation: IO[Observation.Id] =
     createProgramAs(pi).flatMap(createObservationAs(pi, _))
 
-  private def run[A](f: Transaction[IO] ?=> GoaDuplicationService[IO] => IO[A]): IO[A] =
+  private def run[A](f: Transaction[IO] ?=> ArchiveDuplicationService[IO] => IO[A]): IO[A] =
     withServices(pi): services =>
       services.transactionally:
-        f(services.goaDuplicationService)
+        f(services.archiveDuplicationService)
 
   test("an observation that has never been searched reads as not checked"):
     for
       oid <- newObservation
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header, GoaDuplication.Header.NeverChecked)
+      assertEquals(s.header, ArchiveDuplication.Header.NeverChecked)
       assertEquals(s.matches, Nil)
 
   test("a stored snapshot round-trips with every column"):
@@ -131,12 +131,12 @@ class GoaDuplicationServiceSuite extends OdbSuite:
 
   test("a non-sidereal search center round-trips as a target name"):
     val name = NonEmptyString.unsafeFrom("Ceres")
-    val h    = header(0, GoaSearchCenter.NonSidereal(name).some)
+    val h    = header(0, ArchiveSearchCenter.NonSidereal(name).some)
     for
       oid <- newObservation
       _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
-    yield assertEquals(s.header.searchArea.center, GoaSearchCenter.NonSidereal(name).some)
+    yield assertEquals(s.header.searchArea.center, ArchiveSearchCenter.NonSidereal(name).some)
 
   test("storing replaces the previous snapshot rather than appending to it"):
     for
@@ -155,7 +155,7 @@ class GoaDuplicationServiceSuite extends OdbSuite:
       _   <- run(_.storeError(oid, "GOA is down".refined))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header.state, GoaDuplication.State.Error)
+      assertEquals(s.header.state, ArchiveDuplication.State.Error)
       assertEquals(s.header.error, NonEmptyString.unsafeFrom("GOA is down").some)
       assertEquals(s.header.matchCount.value, 1)
       assertEquals(s.header.lastCheckedAt, checkedAt.some)
@@ -167,18 +167,18 @@ class GoaDuplicationServiceSuite extends OdbSuite:
       _   <- run(_.storeError(oid, "GOA is down".refined))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header.state, GoaDuplication.State.Error)
+      assertEquals(s.header.state, ArchiveDuplication.State.Error)
       assertEquals(s.header.lastCheckedAt, none)
       assertEquals(s.header.matchCount.value, 0)
       assertEquals(s.matches, Nil)
 
   test("a not-checked snapshot records that the search ran but could not be performed"):
-    val h = GoaDuplication.Header.notChecked(checkedAt, GoaDuplication.SearchArea.Empty)
+    val h = ArchiveDuplication.Header.notChecked(checkedAt, ArchiveDuplication.SearchArea.Empty)
     for
       oid <- newObservation
       _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header.state, GoaDuplication.State.NotChecked)
+      assertEquals(s.header.state, ArchiveDuplication.State.NotChecked)
       assertEquals(s.header.lastCheckedAt, checkedAt.some)
       assertEquals(s.matches, Nil)

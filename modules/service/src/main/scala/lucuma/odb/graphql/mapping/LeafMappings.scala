@@ -53,7 +53,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.GoaDuplication
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
@@ -165,7 +165,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GnirsCamera](GnirsCameraType),
       LeafMapping[GnirsReadMode](GnirsReadModeType),
       LeafMapping[GnirsWellDepth](GnirsWellDepthType),
-      LeafMapping[GoaDuplication.State](GoaDuplicationStateType),
+      LeafMapping[ArchiveDuplication.State](ArchiveDuplicationStateType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),

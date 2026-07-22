@@ -57,7 +57,7 @@ trait Predicates[F[_]] extends BaseMapping[F] {
     val programUser                   = ProgramUserPredicates(Path.from(ProgramUserType))
     val proposal                      = ProposalPredicates(Path.from(ProposalType))
     val recordDatasetResult           = RecordDatasetResultPredicates(Path.from(RecordDatasetResultType))
-    val refreshGoaDuplicationResult   = RefreshGoaDuplicationResultPredicates(Path.from(RefreshGoaDuplicationResultType))
+    val refreshArchiveDuplicationResult   = RefreshArchiveDuplicationResultPredicates(Path.from(RefreshArchiveDuplicationResultType))
     val resetAcquisitionResult        = ResetAcquisitionResultPredicates(Path.from(ResetAcquisitionResultType))
     val sequenceEvent                 = ExecutionEventPredicates(Path.from(SequenceEventType))
     val setGuideTargetNameResult      = SetGuideTargetNameResultPredicates(Path.from(SetGuideTargetNameResultType))
