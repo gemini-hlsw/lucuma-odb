@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.catalog.goa.GoaObservationClass
 import lucuma.catalog.goa.GoaObservationType
 import lucuma.catalog.goa.GoaSummaryRecord
@@ -53,7 +54,7 @@ trait GoaDuplicationService[F[_]]:
    * matches and headline values in place so a GOA outage cannot destroy a good
    * snapshot.
    */
-  def storeError(observationId: Observation.Id, message: String)(using Transaction[F]): F[Unit]
+  def storeError(observationId: Observation.Id, message: NonEmptyString)(using Transaction[F]): F[Unit]
 
 object GoaDuplicationService:
 
@@ -83,7 +84,7 @@ object GoaDuplicationService:
                  session.execute(Statements.insertMatches(nel))(observationId, nel)
         yield ()
 
-      override def storeError(observationId: Observation.Id, message: String)(using Transaction[F]): F[Unit] =
+      override def storeError(observationId: Observation.Id, message: NonEmptyString)(using Transaction[F]): F[Unit] =
         session.execute(Statements.UpsertError)(observationId, message).void
 
   object Statements:
@@ -132,7 +133,7 @@ object GoaDuplicationService:
        int4_nonneg           *:
        bool                  *:
        core_timestamp.opt    *:
-       text.opt              *:
+       text_nonempty.opt     *:
        right_ascension.opt   *:
        declination.opt       *:
        text_nonempty.opt     *:
@@ -231,13 +232,13 @@ object GoaDuplicationService:
      * Flags a failed attempt.  Only the state and message are touched, so a
      * previously good snapshot survives a GOA outage intact.
      */
-    val UpsertError: Command[(Observation.Id, String)] =
+    val UpsertError: Command[(Observation.Id, NonEmptyString)] =
       sql"""
         INSERT INTO t_goa_duplication (
           c_observation_id,
           c_state,
           c_error
-        ) VALUES ($observation_id, 'error', $text)
+        ) VALUES ($observation_id, 'error', $text_nonempty)
         ON CONFLICT (c_observation_id) DO UPDATE SET
           c_state = 'error',
           c_error = EXCLUDED.c_error

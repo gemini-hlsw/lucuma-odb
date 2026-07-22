@@ -55,11 +55,10 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
       declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
       declinationMappingAtPath(GhostIfuType / "skyPosition" / "dec", GhostIfuView.Sky.Id, GhostIfuView.Sky.Dec),
       declinationMappingAtPath(GoaDuplicationType / "searchCoordinates" / "dec", GoaDuplicationView.SearchCoordinates.SyntheticId, GoaDuplicationView.SearchCoordinates.Dec),
-      declinationMappingAtPath(GoaMatchType / "dec", GoaMatchView.Coordinates.SyntheticId, GoaMatchView.Coordinates.Dec),
+      declinationMappingAtPath(GoaMatchType / "coordinates" / "dec", GoaMatchView.Coordinates.SyntheticId, GoaMatchView.Coordinates.Dec),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "start", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.Start),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "end", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.End),
       declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
     )
 
 }
-

@@ -3531,12 +3531,7 @@ type Mutation {
   Re-runs the Archive Duplication Search for an observation, replacing its
   stored result with what the Gemini Observatory Archive holds now.
 
-  The search is advisory, so an archive that is unreachable or answers badly is
-  reported as an ERROR state on the result rather than as a failed mutation, and
-  leaves any previously found matches readable.
-
-  Rejected once the observation's proposal has been submitted, so that the count
-  the TAC and the proposal PDF see is the one the PI last saw.
+  Rejected once the observation's proposal has been submitted.
   """
   refreshGoaDuplication(
     input: RefreshGoaDuplicationInput!
@@ -13747,9 +13742,7 @@ type Observation {
 
   """
   Result of the Archive Duplication Search: what the Gemini Observatory Archive
-  held around this observation's pointing, taken with an equivalent instrument,
-  when the search was last run.  Advisory only -- it never blocks creating,
-  editing or submitting an observation.
+  held around this observation's pointing.
   """
   goaDuplication: GoaDuplication!
 
@@ -13776,68 +13769,126 @@ enum GoaDuplicationState {
 
 }
 
-"One archived file matched by an Archive Duplication Search."
+"""
+One archived file matched by an Archive Duplication Search.
+
+The fields are the archive's own record of the file, assembled from its FITS
+headers, so which of them are populated varies by instrument and by era.
+Every nullable field here is null when the archive does not report a value for that
+file; where absence means something more specific than that, the field says so.
+fields are typed where possible.
+"""
 type GoaMatch {
 
-  "Archive file name.  Unique within a search result."
+  """
+  Archive file name, e.g. S20240101S0001.fits.  Always present, and unique.
+  """
   name: String!
 
+  "Dataset label the file was recorded under, e.g. GN-2019A-Q-101-11-001."
   dataLabel: String
 
-  ra: RightAscension
+  """
+  Coordinates the file was taken at.  Null when the archive records no pointing
+  for the file.
+  """
+  coordinates: Coordinates
 
-  dec: Declination
-
-  "Archive instrument name, e.g. GMOS-N."
+  """
+  Archive instrument name, e.g. GMOS-N.  Always present, and always one of the
+  instruments the search queried.
+  """
   instrument: String!
 
-  "OCS observation type, e.g. OBJECT."
+  """
+  Observation type as the archive reports it.  Always present, and in practice
+  always OBJECT: the search asks the archive for object frames only.
+  """
   observationType: String!
 
-  "OCS observation class, e.g. science."
+  """
+  Observation class as the archive reports it, e.g. science.
+  """
   observationClass: String
 
+  """
+  Quality assessment the file was given, e.g. Pass or Usable.  Never a failing
+  assessment: the search excludes files that failed QA.
+  """
   qaState: String
 
+  "UT date and time the file was taken."
   utDateTime: Timestamp
 
+  """
+  Date the file's proprietary period ends and it becomes publicly available.
+  May be in the future.
+  """
   releaseDate: Date
 
-  "OCS program id, e.g. GN-2019A-Q-101.  Not a lucuma ProgramId."
+  """
+  Program id as the archive reports it.  The archive holds both OCS- and
+  GPP-era data, so this may be a GPP program id or an OCS one, e.g.
+  GN-2019A-Q-101.
+  """
   programId: String
 
-  "OCS observation id, e.g. GN-2019A-Q-101-11.  Not a lucuma ObservationId."
+  """
+  Observation id as the archive reports it.  A GPP observation id or an OCS
+  one, e.g. GN-2019A-Q-101-11, for the same reason as `programId`.
+  """
   observationId: String
 
+  """
+  Target name recorded for the file.  Free text as the observer entered it.
+  """
   objectName: String
 
+  "Exposure time of the file."
   exposure: TimeSpan
 
+  """
+  Name of the dispersing element in the beam, e.g. B600.  Null for an imaging
+  frame, which has none.
+  """
   disperser: String
 
+  "Name of the filter in the beam, e.g. g_G0301.  Null when there was none."
   filter: String
 
+  """
+  Central wavelength the file was taken at.  Null for a frame with no
+  dispersing element.
+  """
   wavelength: Wavelength
 
+  "Airmass the file was taken at, a dimensionless ratio starting at 1 at zenith."
   airmass: BigDecimal
 
+  "Telescope azimuth the file was taken at."
   azimuth: Angle
 
+  "Telescope elevation above the horizon the file was taken at."
   elevation: Angle
 
   """
-  Angular separation in arcseconds between this file's pointing and the search
-  center, telling a match on the target apart from one merely nearby in the
-  field.  Null when the search ran by target name rather than coordinates, or
-  when the file itself has no pointing.
+  Angular separation between this file's pointing and the search center,
+  telling a match on the target apart from one merely nearby in the field.
+  Null when the search ran by target name rather than coordinates, or when the
+  file itself has no pointing.
   """
-  distanceArcsec: BigDecimal
+  distance: Angle
 
 }
 
 """
 Archive Duplication Search result for an observation, as of the last time the
 search was run.
+
+When `state` is ERROR only `error` describes the failed attempt.  A failure
+leaves the previously found results in place rather than discarding them, so
+`matchCount`, `matches`, `lastCheckedAt` and the search provenance still
+describe the last search that succeeded, and `lastCheckedAt` says when that was.
 """
 type GoaDuplication {
 
@@ -13846,7 +13897,8 @@ type GoaDuplication {
   """
   Number of matching archive files.  Counted per file rather than per archived
   observation, to stay consistent with the PIT.  A floor rather than an exact
-  figure when `saturated`.
+  figure when `saturated`, and the count from the last successful search rather
+  than from the most recent attempt when `state` is ERROR.
   """
   matchCount: NonNegInt!
 
@@ -13860,7 +13912,7 @@ type GoaDuplication {
   lastCheckedAt: Timestamp
 
   "Why the most recent attempt failed.  Set when `state` is ERROR."
-  error: String
+  error: NonEmptyString
 
   "Coordinates searched around, for a sidereal pointing."
   searchCoordinates: Coordinates

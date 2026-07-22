@@ -4,10 +4,16 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.syntax.all.*
+import grackle.Cursor
 import grackle.Path
+import grackle.Result
 import grackle.skunk.SkunkMapping
 import lucuma.core.math.Angle
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
 import lucuma.core.math.HourAngle
+import lucuma.core.math.RightAscension
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.GoaDuplicationView
@@ -18,6 +24,7 @@ import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.table.TelescopeConfigGeneratorView
 import lucuma.odb.graphql.table.VisitorTable
 import lucuma.odb.graphql.util.MappingExtras
+import lucuma.odb.json.angle.query.given
 
 trait AngleMapping[F[_]] extends ObservationView[F]
                             with ChronConditionsEntryView[F]
@@ -43,25 +50,76 @@ trait AngleMapping[F[_]] extends ObservationView[F]
     valueColumn: ColumnRef,
     idColumns: ColumnRef*
   ): ObjectMapping =
+    computedAngleMappingAtPath(path, List(SqlField("value", valueColumn, hidden = true)), idColumns*)
+
+  /**
+   * An angle whose `value` is derived rather than read straight from a column.
+   * `valueFields` supplies the hidden `value` field along with whatever it is
+   * computed from.
+   */
+  private def computedAngleMappingAtPath(
+    path: Path,
+    valueFields: List[FieldMapping],
+    idColumns: ColumnRef*
+  ): ObjectMapping =
     ObjectMapping(path)(
       (idColumns.toList.zipWithIndex.map { (ref, idx) =>
         SqlField(s"synthetic_id$idx", ref, key = true, hidden = true)
-      }) ++ List(
-        SqlField("value", valueColumn, hidden = true),
-        FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
-        FieldRef[Angle]("value").as("microseconds", angleToTime(1L)),
-        FieldRef[Angle]("value").as("milliarcseconds", angleToArc(µPerMilli)),
-        FieldRef[Angle]("value").as("milliseconds", angleToTime(µPerMilli)),
-        FieldRef[Angle]("value").as("arcseconds", angleToArc(µPerSec)),
-        FieldRef[Angle]("value").as("seconds", angleToTime(µPerSec)),
-        FieldRef[Angle]("value").as("arcminutes", angleToArc(µPerMin)),
-        FieldRef[Angle]("value").as("minutes", angleToTime(µPerMin)),
-        FieldRef[Angle]("value").as("degrees", angleToArc(µPerUnit)),
-        FieldRef[Angle]("value").as("hours", angleToTime(µPerUnit)),
-        FieldRef[Angle]("value").as("dms", c => Angle.dms.get(c).format),
-        FieldRef[Angle]("value").as("hms", c => HourAngle.fromStringHMS.reverseGet(Angle.hourAngle.get(c)))
-      )*
+      }) ++ valueFields ++ angleUnitFields*
     )
+
+  private lazy val angleUnitFields: List[FieldMapping] =
+    List(
+      FieldRef[Angle]("value").as("microarcseconds", _.toMicroarcseconds),
+      FieldRef[Angle]("value").as("microseconds", angleToTime(1L)),
+      FieldRef[Angle]("value").as("milliarcseconds", angleToArc(µPerMilli)),
+      FieldRef[Angle]("value").as("milliseconds", angleToTime(µPerMilli)),
+      FieldRef[Angle]("value").as("arcseconds", angleToArc(µPerSec)),
+      FieldRef[Angle]("value").as("seconds", angleToTime(µPerSec)),
+      FieldRef[Angle]("value").as("arcminutes", angleToArc(µPerMin)),
+      FieldRef[Angle]("value").as("minutes", angleToTime(µPerMin)),
+      FieldRef[Angle]("value").as("degrees", angleToArc(µPerUnit)),
+      FieldRef[Angle]("value").as("hours", angleToTime(µPerUnit)),
+      FieldRef[Angle]("value").as("dms", c => Angle.dms.get(c).format),
+      FieldRef[Angle]("value").as("hms", c => HourAngle.fromStringHMS.reverseGet(Angle.hourAngle.get(c)))
+    )
+
+  /**
+   * Angular separation between a GOA match and the center the search that found
+   * it ran around.  Derived here rather than in the view so lucuma-core remains
+   * the one definition of the geometry.  The object is absent unless both
+   * pointings are known, so the separation is always computable when asked for.
+   */
+  private lazy val GoaMatchDistanceMapping: ObjectMapping =
+    computedAngleMappingAtPath(
+      GoaMatchType / "distance",
+      List(
+        SqlField("matchRa",   GoaMatchView.Distance.Ra,        hidden = true),
+        SqlField("matchDec",  GoaMatchView.Distance.Dec,       hidden = true),
+        SqlField("searchRa",  GoaMatchView.Distance.SearchRa,  hidden = true),
+        SqlField("searchDec", GoaMatchView.Distance.SearchDec, hidden = true),
+        CursorField[Angle](
+          "value",
+          goaMatchSeparation,
+          List("matchRa", "matchDec", "searchRa", "searchDec"),
+          hidden = true
+        )
+      ),
+      GoaMatchView.Distance.SyntheticId
+    )
+
+  private def goaMatchSeparation(c: Cursor): Result[Angle] =
+    for
+      ra        <- c.fieldAs[Option[RightAscension]]("matchRa")
+      dec       <- c.fieldAs[Option[Declination]]("matchDec")
+      searchRa  <- c.fieldAs[Option[RightAscension]]("searchRa")
+      searchDec <- c.fieldAs[Option[Declination]]("searchDec")
+      sep       <- Result.fromOption(
+                     (ra, dec, searchRa, searchDec).mapN: (r, d, sr, sd) =>
+                       Coordinates(sr, sd).angularDistance(Coordinates(r, d)),
+                     "A GOA match distance needs a pointing for both the match and the search center."
+                   )
+    yield sep
 
   import ObservationView.ScienceRequirements.Spectroscopy
   import ObservationView.ScienceRequirements.Imaging
@@ -79,6 +137,7 @@ trait AngleMapping[F[_]] extends ObservationView[F]
       angleMappingAtPath(GoaDuplicationType / "searchRadius", GoaDuplicationView.SearchRadius.Value, GoaDuplicationView.SearchRadius.SyntheticId),
       angleMappingAtPath(GoaMatchType / "azimuth", GoaMatchView.Azimuth.Value, GoaMatchView.Azimuth.SyntheticId),
       angleMappingAtPath(GoaMatchType / "elevation", GoaMatchView.Elevation.Value, GoaMatchView.Elevation.SyntheticId),
+      GoaMatchDistanceMapping,
       angleMappingAtPath(ImagingScienceRequirementsType / "minimumFov", Imaging.MinimumFovAngle.Value, Imaging.MinimumFovAngle.SyntheticId),
       angleMappingAtPath(RandomTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
       angleMappingAtPath(SpiralTelescopeConfigGeneratorType / "size", TelescopeConfigGeneratorView.Size, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),

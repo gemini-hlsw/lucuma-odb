@@ -56,6 +56,10 @@ CREATE VIEW v_goa_match AS
     m.c_elevation,
 
     CASE WHEN m.c_ra         IS NOT NULL THEN m.c_observation_id || ':' || m.c_file_name END AS c_coordinates_id,
+    -- The separation is measurable only when both the match and the search it
+    -- came from have a pointing, so the distance reads as absent otherwise.
+    CASE WHEN m.c_ra IS NOT NULL AND d.c_search_ra IS NOT NULL
+         THEN m.c_observation_id || ':' || m.c_file_name END AS c_distance_id,
     CASE WHEN m.c_exposure   IS NOT NULL THEN m.c_observation_id || ':' || m.c_file_name END AS c_exposure_id,
     CASE WHEN m.c_wavelength IS NOT NULL THEN m.c_observation_id || ':' || m.c_file_name END AS c_wavelength_id,
     CASE WHEN m.c_azimuth    IS NOT NULL THEN m.c_observation_id || ':' || m.c_file_name END AS c_azimuth_id,

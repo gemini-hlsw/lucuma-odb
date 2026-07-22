@@ -11,9 +11,10 @@ import skunk.codec.text.text
 
 trait GoaMatchView[F[_]] extends BaseMapping[F]:
 
-  // The GOA record fields come from OCS and do not all map onto lucuma types;
-  // the archive instrument name, disperser, filter, QA state and the OCS
-  // program and observation ids are text.
+  // The GOA record fields do not all map onto lucuma types; the archive
+  // instrument name, disperser, filter, QA state, observation type and class,
+  // and the program and observation ids are text.  The archive holds both OCS-
+  // and GPP-era data, so those last four carry values from either era.
   object GoaMatchView extends TableDef("v_goa_match"):
     val Id: ColumnRef               = col("c_match_id",            text)
     val ObservationId: ColumnRef    = col("c_observation_id",      observation_id)
@@ -54,8 +55,9 @@ trait GoaMatchView[F[_]] extends BaseMapping[F]:
       val Value: ColumnRef          = col("c_elevation",           angle_µas.embedded)
 
     // The match's own coordinates and those of the search it came from, read as
-    // plain optional values so the distance can be derived from both.
+    // plain optional values so the separation can be derived from both.
     object Distance:
+      val SyntheticId: ColumnRef    = col("c_distance_id",         text.embedded)
       val Ra: ColumnRef             = col("c_distance_ra",         right_ascension.opt)
       val Dec: ColumnRef            = col("c_distance_dec",        declination.opt)
       val SearchRa: ColumnRef       = col("c_search_ra",           right_ascension.opt)
