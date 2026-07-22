@@ -129,8 +129,8 @@ object GoaDuplicationSearchService:
         ctx:           Context,
         center:        Option[Coordinates]
       )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
-        val provenance =
-          GoaDuplication.Provenance(
+        val searchArea =
+          GoaDuplication.SearchArea(
             GoaQueryPolicy.searchCenter(ctx.explicitBase, center, ctx.pointings),
             ctx.mode.flatMap(GoaQueryPolicy.searchRadius)
           )
@@ -139,8 +139,8 @@ object GoaDuplicationSearchService:
           ctx.mode.toList.flatMap(GoaQueryPolicy.queries(_, ctx.explicitBase, center, ctx.pointings))
 
         params match
-          case Nil => storeNotChecked(observationId, provenance)
-          case ps  => runQueries(observationId, provenance, ps)
+          case Nil => storeNotChecked(observationId, searchArea)
+          case ps  => runQueries(observationId, searchArea, ps)
 
       /**
        * The observation is one GOA cannot be asked about: an instrument it does
@@ -148,20 +148,20 @@ object GoaDuplicationSearchService:
        */
       private def storeNotChecked(
         observationId: Observation.Id,
-        provenance:    GoaDuplication.Provenance
+        searchArea:    GoaDuplication.SearchArea
       )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
         now.flatMap: t =>
-          val header = GoaDuplication.Header.notChecked(t, provenance)
+          val header = GoaDuplication.Header.notChecked(t, searchArea)
           store(observationId, header, Nil).as(GoaDuplication.Snapshot(header, Nil))
 
       private def runQueries(
         observationId: Observation.Id,
-        provenance:    GoaDuplication.Provenance,
+        searchArea:    GoaDuplication.SearchArea,
         params:        List[GoaParams]
       )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
         runner.run(params).flatMap:
           case Left(errors)  => storeError(observationId, errors)
-          case Right(byQuery) => storeMatches(observationId, provenance, byQuery)
+          case Right(byQuery) => storeMatches(observationId, searchArea, byQuery)
 
       /**
        * Records the failure without disturbing the stored matches, so a GOA
@@ -181,7 +181,7 @@ object GoaDuplicationSearchService:
 
       private def storeMatches(
         observationId: Observation.Id,
-        provenance:    GoaDuplication.Provenance,
+        searchArea:    GoaDuplication.SearchArea,
         byQuery:       List[List[GoaSummaryRecord]]
       )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
         // A file returned by more than one query in the group is one duplicate,
@@ -196,7 +196,7 @@ object GoaDuplicationSearchService:
               saturated     = byQuery.exists(_.sizeIs == GoaDuplication.QueryLimit),
               lastCheckedAt = t.some,
               error         = none,
-              provenance    = provenance
+              searchArea    = searchArea
             )
           store(observationId, header, matches).as(GoaDuplication.Snapshot(header, matches))
 

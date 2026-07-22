@@ -13891,7 +13891,7 @@ search was run.
 
 When `state` is ERROR only `error` describes the failed attempt.  A failure
 leaves the previously found results in place rather than discarding them, so
-`matchCount`, `matches`, `lastCheckedAt` and the search provenance still
+`matchCount`, `matches`, `lastCheckedAt` and the search area still
 describe the last search that succeeded, and `lastCheckedAt` says when that was.
 """
 type GoaDuplication {

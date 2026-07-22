@@ -88,8 +88,8 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       oid <- gmosObservation
       s   <- refresh(mockOf("a.fits"))(oid)
     yield
-      assert(s.header.provenance.center.isDefined)
-      assert(s.header.provenance.radius.isDefined)
+      assert(s.header.searchArea.center.isDefined)
+      assert(s.header.searchArea.radius.isDefined)
       assert(s.header.lastCheckedAt.isDefined)
 
   test("no matches is a successful search, not an error"):
@@ -170,5 +170,5 @@ class GoaDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(mockOf("a.fits"))(oid)
     yield
       assertEquals(s.header.state, GoaDuplication.State.NotChecked)
-      assertEquals(s.header.provenance.center, none)
+      assertEquals(s.header.searchArea.center, none)
       assertEquals(s.matches, Nil)
