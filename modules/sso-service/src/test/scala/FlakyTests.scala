@@ -7,5 +7,5 @@ import cats.effect.IO
 
 trait FlakyTests:
 
-  def flaky(attempts: Int = 3)(x: IO[Unit]): IO[Unit] =
+  def flaky()(x: IO[Unit]): IO[Unit] =
     x // TODO
