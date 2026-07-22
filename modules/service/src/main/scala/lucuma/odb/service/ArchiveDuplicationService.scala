@@ -124,9 +124,7 @@ object ArchiveDuplicationService:
       ).to[GoaSummaryRecord]
 
     /**
-     * Summary columns, in the order the summary is selected and written.  The
-     * search center is sidereal (coordinates) or non-sidereal (a target name),
-     * never both.
+     * Summary columns, in the order the summary is selected and written.
      */
     private val archive_duplication_summary: Codec[ArchiveDuplication.Summary] =
       (archive_duplication_state *:

@@ -64,17 +64,11 @@ object GoaQueryPolicy:
         case _: Target.Opportunity => Unresolvable
 
   /**
-   * The Duplication-Equivalence Group: every instrument an observation taken
-   * with `instrument` is searched against, itself included.
+   * every instrument an observation taken with `instrument` is searched against, itself included.
    *
    * GOA offers a single `GMOS` umbrella covering both sites, but `GoaParams`
    * carries an `Instrument` and the client derives the archive name from
-   * `goaName`, so the umbrella is expressed here as one query per site.  The
-   * union of the two is the same record set; the consequence is that GOA's
-   * 500-record cap applies to each site separately rather than to the pair.
-   *
-   * Instruments GOA does not know about (MAROON-X) yield no queries at all, so
-   * the observation is reported as not checked.
+   * `goaName`, so the umbrella is expressed here as one query per site.
    */
   def equivalenceGroup(instrument: Instrument): List[Instrument] =
     val group = instrument match
@@ -91,8 +85,9 @@ object GoaQueryPolicy:
   /**
    * Where to search.  An explicit base wins; otherwise a wholly non-sidereal
    * asterism is searched by target name and anything else by the asterism
-   * center evaluated at the observation's reference time.  `None` means the
-   * observation has no resolvable pointing and no usable name.
+   * center evaluated at the observation's reference time.
+   *
+   * `None` means the observation has no resolvable pointing and no usable name.
    */
   def searchPointing(
     explicitBase:   Option[Coordinates],
@@ -109,42 +104,6 @@ object GoaQueryPolicy:
     explicitBase.map(ArchiveSearchPointing.Sidereal(_))
       .orElse(movingTargetName.map(ArchiveSearchPointing.NonSidereal(_)))
       .orElse(asterismCenter.map(ArchiveSearchPointing.Sidereal(_)))
-
-  /**
-   * How wide to search: half the observation's field of view, taken as the
-   * angular distance from the science area's origin to its most distant vertex.
-   * There is deliberately no minimum, so small-aperture modes search narrowly.
-   *
-   * `None` when the mode has no Gemini science area to measure (exchange
-   * observations, GNIRS acquisition and pupil-viewer apertures).
-   */
-  def searchRadius(mode: ObservingMode): Option[Angle] =
-    scienceAreas(mode)
-      .map(_.eval.radius)
-      .maximumOption(using Angle.AngleOrder)
-      .filter(_.toMicroarcseconds > 0L)
-
-  /**
-   * The queries to run for an observation, empty when it cannot be checked at
-   * all.  `dateRange` is left unset in v1: we persist a snapshot of the results
-   * rather than pinning the query to the submission deadline.
-   */
-  def queries(
-    mode:           ObservingMode,
-    explicitBase:   Option[Coordinates],
-    asterismCenter: Option[Coordinates],
-    asterism:       List[TargetPointing]
-  ): List[GoaParams] =
-    val params =
-      for
-        instrument <- mode.instrument
-        center     <- searchPointing(explicitBase, asterismCenter, asterism)
-        radius     <- searchRadius(mode)
-      yield equivalenceGroup(instrument).map: i =>
-        center match
-          case ArchiveSearchPointing.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
-          case ArchiveSearchPointing.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
-    params.orEmpty
 
   private def scienceAreas(mode: ObservingMode): List[ShapeExpression] =
     val pa  = Angle.Angle0
@@ -174,3 +133,38 @@ object GoaQueryPolicy:
         List(igrins2ScienceArea.scienceSlitFOV)
       case c: Visitor            =>
         List(visitorScienceArea.fov(c.scienceFovDiameter))
+
+  /**
+   * How wide to search: half the observation's field of view, taken as the
+   * angular distance from the science area's origin to its most distant vertex.
+   * There is deliberately no minimum, so small-aperture modes search narrowly.
+   *
+   * `None` when the mode has no Gemini science area to measure.
+   */
+  def searchRadius(mode: ObservingMode): Option[Angle] =
+    scienceAreas(mode)
+      .map(_.eval.radius)
+      .maximumOption(using Angle.AngleOrder)
+      .filter(_.toMicroarcseconds > 0L)
+
+  /**
+   * The queries to run for an observation, empty when it cannot be checked at
+   * all.
+   */
+  def queries(
+    mode:           ObservingMode,
+    explicitBase:   Option[Coordinates],
+    asterismCenter: Option[Coordinates],
+    asterism:       List[TargetPointing]
+  ): List[GoaParams] =
+    val params =
+      for
+        instrument <- mode.instrument
+        center     <- searchPointing(explicitBase, asterismCenter, asterism)
+        radius     <- searchRadius(mode)
+      yield equivalenceGroup(instrument).map: i =>
+        center match
+          case ArchiveSearchPointing.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
+          case ArchiveSearchPointing.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
+    params.orEmpty
+
