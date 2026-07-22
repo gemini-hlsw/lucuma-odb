@@ -13,8 +13,10 @@ trait ArchiveMatchView[F[_]] extends BaseMapping[F]:
 
   // The GOA record fields do not all map onto lucuma types; the archive
   // instrument name, disperser, filter, QA state, observation type and class,
-  // and the program and observation ids are text.  The archive holds both OCS-
-  // and GPP-era data, so those last four carry values from either era.
+  // and the program and observation ids are text.
+  //
+  // The archive holds both OCS- and GPP-era data, so those last four carry
+  // values from either era.
   object ArchiveMatchView extends TableDef("v_archive_match"):
     val Id: ColumnRef               = col("c_match_id",            text)
     val ObservationId: ColumnRef    = col("c_observation_id",      observation_id)

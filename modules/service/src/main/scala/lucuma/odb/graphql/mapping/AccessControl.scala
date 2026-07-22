@@ -362,7 +362,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           SET.existence.isDefined           ||
           SET.observerNotes.isDefined
         then ObservationWorkflowState.preExecutionSet // ok prior to execution
-        else if 
+        else if
           // staff can edit blind offsets for ongoing observations and some acquisition info
           SET.targetEnvironment.isDefined ||
             SET.observingMode.isDefined
@@ -540,12 +540,6 @@ trait AccessControl[F[_]] extends Predicates[F] {
 
   }
 
-  /**
-   * The Archive Duplication Search is advisory and changes nothing about the
-   * observation itself, so writing the program is the whole requirement; no
-   * workflow state forbids re-running it.  The submission freeze is a separate
-   * concern, enforced by `ArchiveDuplicationSearchService`.
-   */
   def selectForUpdate(
     input: RefreshArchiveDuplicationInput,
   )(using Services[F], NoTransaction[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
@@ -749,10 +743,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
     Services.asSuperUser:
       observationWorkflowService.getWorkflowsAndModes(List(input.observationId))
         .map: res =>
-          res.map(_(input.observationId)).flatMap: 
+          res.map(_(input.observationId)).flatMap:
             case (w, om) =>
               if w.state === input.state || w.validTransitions.contains(input.state)
-              then 
+              then
                 Result(AccessControl.unchecked((om, w, input.state), input.observationId, observation_id))
               else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
 

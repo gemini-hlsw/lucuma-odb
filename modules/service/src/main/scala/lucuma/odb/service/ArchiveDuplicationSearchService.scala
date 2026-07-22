@@ -38,22 +38,24 @@ import skunk.syntax.all.*
  * Runs an Archive Duplication Search: turns an observation into GOA queries,
  * executes them and replaces the observation's stored snapshot with what came
  * back.
- *
- * The search is advisory, so a GOA failure is not a failed call.  It is
- * reported as a snapshot whose state is `Error`, carrying the previously stored
- * matches untouched; only a missing observation or a database problem yields a
- * failed `Result`.
  */
 trait ArchiveDuplicationSearchService[F[_]]:
 
+  /**
+   * Re-run the Archive Duplication Search, replacing the observation's stored
+   * snapshot with what GOA holds now.
+   *
+   * `NoTransaction` rather than `Transaction`: the search makes a multi-second
+   * outbound call to GOA (and possibly an ephemeris resolution), and running
+   * that inside a caller-supplied transaction would pin a connection.
+   */
   def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[ArchiveDuplication.Snapshot]]
 
 object ArchiveDuplicationSearchService:
 
   /**
    * Submission freezes the snapshot, so that the count the TAC and the proposal
-   * PDF see is the one the PI last saw.  Every status at or past `Submitted`
-   * counts as submitted; nothing unfreezes but withdrawing the proposal.
+   * PDF see is the one the PI last saw.
    */
   extension (ps: ProposalStatus)
     private def isFrozen: Boolean =
@@ -62,12 +64,8 @@ object ArchiveDuplicationSearchService:
   def instantiate[F[_]: Concurrent: Parallel: Clock](
     goaClient: GoaClient[F]
   )(using Services[F]): ArchiveDuplicationSearchService[F] =
-    fromRunner(GoaQueryRunner.fromClient(goaClient))
-
-  private def fromRunner[F[_]: Concurrent: Clock](
-    runner: GoaQueryRunner[F]
-  )(using Services[F]): ArchiveDuplicationSearchService[F] =
     new ArchiveDuplicationSearchService[F]:
+      val runner = GoaQueryRunner.fromClient(goaClient)
 
       import Services.Syntax.*
 
@@ -109,15 +107,9 @@ object ArchiveDuplicationSearchService:
        * it.  An explicit base or a wholly non-sidereal asterism answers the
        * question on its own, and resolving anyway would mean an ephemeris
        * lookup we do not need.
-       *
-       * An observation with no scheduled time and no call for proposals has no
-       * reference time; it is searched as of now rather than not at all, which
-       * for a search this wide only matters to a fast-moving target.  A failed
-       * resolution is not an error either — the observation simply reports as
-       * not checked.
        */
       private def resolveCenter(observationId: Observation.Id, ctx: Context): F[Option[Coordinates]] =
-        if GoaQueryPolicy.searchPointing(ctx.explicitBase, none, ctx.pointings).isDefined then none.pure[F]
+        if GoaQueryPolicy.searchPointing(ctx.explicitBase, none, ctx.pointings).isDefined then none.pure
         else
           ctx.referenceTime.fold(now)(_.pure[F]).flatMap: t =>
             trackingService
@@ -142,10 +134,6 @@ object ArchiveDuplicationSearchService:
           case Nil => storeNotChecked(observationId, searchArea)
           case ps  => runQueries(observationId, searchArea, ps)
 
-      /**
-       * The observation is one GOA cannot be asked about: an instrument it does
-       * not know, or no resolvable pointing.  That is advisory, not a failure.
-       */
       private def storeNotChecked(
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea
