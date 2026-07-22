@@ -64,7 +64,7 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.GoaDuplication
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
@@ -357,8 +357,8 @@ trait Codecs {
   val gender: Codec[Gender] =
     enumerated(Type("e_gender"))
 
-  val goa_duplication_state: Codec[GoaDuplication.State] =
-    enumerated(Type("e_goa_duplication_state"))
+  val archive_duplication_state: Codec[ArchiveDuplication.State] =
+    enumerated(Type("e_archive_duplication_state"))
 
   val guide_state: Codec[StepGuideState] =
     enumerated(Type("e_guide_state"))

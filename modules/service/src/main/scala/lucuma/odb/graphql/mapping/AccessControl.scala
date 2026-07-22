@@ -48,7 +48,7 @@ import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
-import lucuma.odb.graphql.input.RefreshGoaDuplicationInput
+import lucuma.odb.graphql.input.RefreshArchiveDuplicationInput
 import lucuma.odb.graphql.input.ReplaceSequenceInput
 import lucuma.odb.graphql.input.ResetAcquisitionInput
 import lucuma.odb.graphql.input.SetAllocationsInput
@@ -544,10 +544,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
    * The Archive Duplication Search is advisory and changes nothing about the
    * observation itself, so writing the program is the whole requirement; no
    * workflow state forbids re-running it.  The submission freeze is a separate
-   * concern, enforced by `GoaDuplicationSearchService`.
+   * concern, enforced by `ArchiveDuplicationSearchService`.
    */
   def selectForUpdate(
-    input: RefreshGoaDuplicationInput,
+    input: RefreshArchiveDuplicationInput,
   )(using Services[F], NoTransaction[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
     Services.asSuperUser:
       observationService

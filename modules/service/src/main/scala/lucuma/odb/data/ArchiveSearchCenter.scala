@@ -13,6 +13,6 @@ import lucuma.core.math.Coordinates
  * The single point an Archive Duplication Search is run around.  GOA locates
  * sidereal pointings by coordinates and moving targets by object name.
  */
-enum GoaSearchCenter derives Eq:
+enum ArchiveSearchCenter derives Eq:
   case Sidereal(coordinates: Coordinates)
   case NonSidereal(targetName: NonEmptyString)

@@ -3,16 +3,16 @@
 
 package lucuma.odb.graphql.mapping
 
-import lucuma.odb.graphql.table.GoaDuplicationView
+import lucuma.odb.graphql.table.ArchiveDuplicationView
 import lucuma.odb.graphql.table.ObservationView
 
-trait RefreshGoaDuplicationResultMapping[F[_]]
+trait RefreshArchiveDuplicationResultMapping[F[_]]
   extends ObservationView[F]
-     with GoaDuplicationView[F]:
+     with ArchiveDuplicationView[F]:
 
-  lazy val RefreshGoaDuplicationResultMapping: ObjectMapping =
-    ObjectMapping(RefreshGoaDuplicationResultType)(
+  lazy val RefreshArchiveDuplicationResultMapping: ObjectMapping =
+    ObjectMapping(RefreshArchiveDuplicationResultType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
-      SqlObject("goaDuplication", Join(ObservationView.Id, GoaDuplicationView.ObservationId)),
+      SqlObject("archiveDuplication", Join(ObservationView.Id, ArchiveDuplicationView.ObservationId)),
       SqlObject("observation")
     )

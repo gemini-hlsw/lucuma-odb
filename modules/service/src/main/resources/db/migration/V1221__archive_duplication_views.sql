@@ -7,10 +7,10 @@
 
 -- Adds c_search_radius_id: the radius is optional, and an observation that was
 -- never searched (or whose mode has no science area) has none.
-CREATE OR REPLACE VIEW v_goa_duplication AS
+CREATE OR REPLACE VIEW v_archive_duplication AS
   SELECT
     o.c_observation_id,
-    COALESCE(d.c_state, 'not_checked'::e_goa_duplication_state) AS c_state,
+    COALESCE(d.c_state, 'not_checked'::e_archive_duplication_state) AS c_state,
     COALESCE(d.c_match_count, 0)                                AS c_match_count,
     COALESCE(d.c_saturated, FALSE)                              AS c_saturated,
     d.c_last_checked_at,
@@ -22,15 +22,15 @@ CREATE OR REPLACE VIEW v_goa_duplication AS
     CASE WHEN d.c_search_ra     IS NOT NULL THEN o.c_observation_id END AS c_search_center_id,
     CASE WHEN d.c_search_radius IS NOT NULL THEN o.c_observation_id END AS c_search_radius_id
   FROM t_observation o
-  LEFT JOIN t_goa_duplication d ON d.c_observation_id = o.c_observation_id;
+  LEFT JOIN t_archive_duplication d ON d.c_observation_id = o.c_observation_id;
 
--- t_goa_match is keyed by observation and file name together, so the view
+-- t_archive_match is keyed by observation and file name together, so the view
 -- supplies c_match_id to identify a match with a single column.
 --
 -- The search center is carried on every row because the per-match angular
 -- distance is derived from it, and a match cannot reach its snapshot header on
 -- its own.
-CREATE VIEW v_goa_match AS
+CREATE VIEW v_archive_match AS
   SELECT
     m.c_observation_id,
     m.c_file_name,
@@ -71,5 +71,5 @@ CREATE VIEW v_goa_match AS
     m.c_dec     AS c_distance_dec,
     d.c_search_ra,
     d.c_search_dec
-  FROM t_goa_match m
-  JOIN t_goa_duplication d ON d.c_observation_id = m.c_observation_id;
+  FROM t_archive_match m
+  JOIN t_archive_duplication d ON d.c_observation_id = m.c_observation_id;

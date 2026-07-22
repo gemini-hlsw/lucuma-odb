@@ -175,11 +175,11 @@ trait Services[F[_]]:
   /** The `GnirsSpectroscopyService`. */
   def gnirsSpectroscopyService: GnirsSpectroscopyService[F]
 
-  /** The `GoaDuplicationService`. */
-  def goaDuplicationService: GoaDuplicationService[F]
+  /** The `ArchiveDuplicationService`. */
+  def archiveDuplicationService: ArchiveDuplicationService[F]
 
-  /** Construct a `GoaDuplicationSearchService`, given a `GoaClient`. */
-  def goaDuplicationSearchService: GoaDuplicationSearchService[F]
+  /** Construct a `ArchiveDuplicationSearchService`, given a `GoaClient`. */
+  def archiveDuplicationSearchService: ArchiveDuplicationSearchService[F]
 
   /** The `GroupService`. */
   def groupService: GroupService[F]
@@ -377,7 +377,7 @@ object Services:
       lazy val gnirsImagingService = GnirsImagingService.instantiate
       lazy val gnirsSequenceService = GnirsSequenceService.instantiate
       lazy val gnirsSpectroscopyService = GnirsSpectroscopyService.instantiate
-      lazy val goaDuplicationService = GoaDuplicationService.instantiate
+      lazy val archiveDuplicationService = ArchiveDuplicationService.instantiate
       lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
       lazy val igrins2SequenceService = Igrins2SequenceService.instantiate
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
@@ -408,7 +408,7 @@ object Services:
       lazy val attachmentFileService = AttachmentFileService.instantiate(s3FileService)
       lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
       lazy val generator = Generator.instantiate(commitHash, tc)
-      lazy val goaDuplicationSearchService = GoaDuplicationSearchService.instantiate(goaClient0)
+      lazy val archiveDuplicationSearchService = ArchiveDuplicationSearchService.instantiate(goaClient0)
       lazy val guideService = GuideService.instantiate(gaiaClient)
       lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
@@ -452,8 +452,8 @@ object Services:
     def gnirsImagingService[F[_]](using Services[F]): GnirsImagingService[F] = summon[Services[F]].gnirsImagingService
     def gnirsSequenceService[F[_]](using Services[F]): GnirsSequenceService[F] = summon[Services[F]].gnirsSequenceService
     def gnirsSpectroscopyService[F[_]](using Services[F]): GnirsSpectroscopyService[F] = summon[Services[F]].gnirsSpectroscopyService
-    def goaDuplicationService[F[_]](using Services[F]): GoaDuplicationService[F] = summon[Services[F]].goaDuplicationService
-    def goaDuplicationSearchService[F[_]](using Services[F]): GoaDuplicationSearchService[F] = summon[Services[F]].goaDuplicationSearchService
+    def archiveDuplicationService[F[_]](using Services[F]): ArchiveDuplicationService[F] = summon[Services[F]].archiveDuplicationService
+    def archiveDuplicationSearchService[F[_]](using Services[F]): ArchiveDuplicationSearchService[F] = summon[Services[F]].archiveDuplicationSearchService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
     def igrins2SequenceService[F[_]](using Services[F]): Igrins2SequenceService[F] = summon[Services[F]].igrins2SequenceService

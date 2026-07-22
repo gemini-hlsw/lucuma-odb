@@ -22,7 +22,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
-import lucuma.odb.data.GoaSearchCenter
+import lucuma.odb.data.ArchiveSearchCenter
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.exchange.Config as Exchange
@@ -98,7 +98,7 @@ object GoaQueryPolicy:
     explicitBase:   Option[Coordinates],
     asterismCenter: Option[Coordinates],
     asterism:       List[TargetPointing]
-  ): Option[GoaSearchCenter] =
+  ): Option[ArchiveSearchCenter] =
     val movingTargetName =
       asterism.toNel.flatMap:
         _.traverse:
@@ -106,9 +106,9 @@ object GoaQueryPolicy:
           case _                             => none
         .map(_.head)
 
-    explicitBase.map(GoaSearchCenter.Sidereal(_))
-      .orElse(movingTargetName.map(GoaSearchCenter.NonSidereal(_)))
-      .orElse(asterismCenter.map(GoaSearchCenter.Sidereal(_)))
+    explicitBase.map(ArchiveSearchCenter.Sidereal(_))
+      .orElse(movingTargetName.map(ArchiveSearchCenter.NonSidereal(_)))
+      .orElse(asterismCenter.map(ArchiveSearchCenter.Sidereal(_)))
 
   /**
    * How wide to search: half the observation's field of view, taken as the
@@ -142,8 +142,8 @@ object GoaQueryPolicy:
         radius     <- searchRadius(mode)
       yield equivalenceGroup(instrument).map: i =>
         center match
-          case GoaSearchCenter.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
-          case GoaSearchCenter.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
+          case ArchiveSearchCenter.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
+          case ArchiveSearchCenter.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
     params.orEmpty
 
   private def scienceAreas(mode: ObservingMode): List[ShapeExpression] =

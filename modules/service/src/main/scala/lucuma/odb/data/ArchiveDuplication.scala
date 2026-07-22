@@ -17,7 +17,7 @@ import lucuma.core.util.Timestamp
 /**
  * The stored result of an Archive Duplication Search.
  */
-object GoaDuplication:
+object ArchiveDuplication:
 
   /** Archive per-query record cap. */
   val QueryLimit: Int = 500
@@ -33,10 +33,10 @@ object GoaDuplication:
   /**
    * The circle on the sky a search ran over: where it looked and how wide.
    * Stored alongside the results so a match is read against the search that
-   * found it rather than the observation as it stands now.
+   * found it
    */
   final case class SearchArea(
-    center: Option[GoaSearchCenter],
+    center: Option[ArchiveSearchCenter],
     radius: Option[Angle]
   ) derives Eq
 
@@ -44,9 +44,9 @@ object GoaDuplication:
     val Empty: SearchArea = SearchArea(none, none)
 
   /**
-   * One row of `t_goa_duplication`: a snapshot's headline values, without the
+   * One row of `t_archive_duplication`: a snapshot's headline values, without the
    * matches they summarize.  This is the storage side only — GraphQL serves the
-   * same values independently, straight from `v_goa_duplication`.
+   * same values independently, straight from `v_archive_duplication`.
    */
   final case class Header(
     state:         State,
