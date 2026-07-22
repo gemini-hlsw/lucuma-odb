@@ -53,22 +53,34 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
       Flamingos2ReadMode.Faint.readCount
     )
 
-  private def sciAtom(filter: Flamingos2Filter, exposureTime: TimeSpan, p: Int = 0, q: Int = 0): Json =
+  private def sciStep(
+    filter:       Flamingos2Filter,
+    exposureTime: TimeSpan,
+    p:            Int            = 0,
+    q:            Int            = 0,
+    guiding:      StepGuideState = StepGuideState.Enabled
+  ): Json =
+    json"""
+      {
+        "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(imagingDynamic(filter, exposureTime))},
+        "stepConfig": { "stepType": "SCIENCE" },
+        "telescopeConfig": ${expectedTelescopeConfig(p, q, guiding)},
+        "observeClass": "SCIENCE",
+        "breakpoint": "DISABLED"
+      }
+    """
+
+  private def sciAtomOf(steps: Json*): Json =
     json"""
       {
         "description": null,
         "observeClass": "SCIENCE",
-        "steps": [
-          {
-            "instrumentConfig": ${flamingos2ExpectedInstrumentConfig(imagingDynamic(filter, exposureTime))},
-            "stepConfig": { "stepType": "SCIENCE" },
-            "telescopeConfig": ${expectedTelescopeConfig(p, q, StepGuideState.Enabled)},
-            "observeClass": "SCIENCE",
-            "breakpoint": "DISABLED"
-          }
-        ]
+        "steps": ${steps.toList.asJson}
       }
     """
+
+  private def sciAtom(filter: Flamingos2Filter, exposureTime: TimeSpan, p: Int = 0, q: Int = 0): Json =
+    sciAtomOf(sciStep(filter, exposureTime, p, q))
 
   private def expectedScience(atoms: List[Json]): Json =
     json"""
@@ -157,6 +169,91 @@ class executionSciFlamingos2Imaging extends ExecutionTestSupportForFlamingos2:
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan),
         sciAtom(Flamingos2Filter.Y, 10.secondTimeSpan),
         sciAtom(Flamingos2Filter.J, 20.secondTimeSpan)
+      )
+
+    setup.flatMap: oid =>
+      expect(pi, flamingos2ScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
+
+  // Two guide-disabled sky positions, shared across filters.  Sky steps must be
+  // observeClass SCIENCE (not NIGHT_CAL) even though guiding is disabled.
+  private val skyOffsetsInput: String =
+    s"""
+      skyOffsets: {
+        enumerated: {
+          values: [
+            { offset: { p: { arcseconds: 10 }, q: { arcseconds: 10 } }, guiding: DISABLED },
+            { offset: { p: { arcseconds: 20 }, q: { arcseconds: 20 } }, guiding: DISABLED }
+          ]
+        }
+      }
+    """
+
+  private def skyPair(filter: Flamingos2Filter, t: TimeSpan): List[Json] =
+    List(
+      sciStep(filter, t, 10, 10, StepGuideState.Disabled),
+      sciStep(filter, t, 20, 20, StepGuideState.Disabled)
+    )
+
+  test("grouped, no offsets, sky"):
+    val mode =
+      s"""
+        flamingos2Imaging: {
+          variant: { grouped: { skyCount: 2, $skyOffsetsInput } }
+          filters: [ { filter: Y }, { filter: J } ]
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), mode)
+      yield o
+
+    // One atom per filter: sky, sky, object exposures, sky, sky.
+    def mkAtom(filter: Flamingos2Filter, t: TimeSpan, count: Int): Json =
+      sciAtomOf((skyPair(filter, t) ++ List.fill(count)(sciStep(filter, t)) ++ skyPair(filter, t))*)
+
+    val atoms =
+      List(
+        mkAtom(Flamingos2Filter.Y, 10.secondTimeSpan, 2),
+        mkAtom(Flamingos2Filter.J, 20.secondTimeSpan, 3)
+      )
+
+    setup.flatMap: oid =>
+      expect(pi, flamingos2ScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
+
+  test("interleaved, no offsets, sky"):
+    val mode =
+      s"""
+        flamingos2Imaging: {
+          variant: { interleaved: { skyCount: 2, $skyOffsetsInput } }
+          filters: [ { filter: Y }, { filter: J } ]
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), mode)
+      yield o
+
+    val Y = Flamingos2Filter.Y
+    val J = Flamingos2Filter.J
+    val ty = 10.secondTimeSpan
+    val tj = 20.secondTimeSpan
+
+    // Each atom is bracketed by the same guide-disabled sky steps (forward at
+    // the head, reversed at the tail), with the interleaved object exposures in
+    // between.  groupCount = min(2, 3) = 2, so there are two atoms.
+    val skyHead = skyPair(Y, ty) ++ skyPair(J, tj)
+    val skyTail = skyPair(J, tj).reverse ++ skyPair(Y, ty).reverse
+
+    val atoms =
+      List(
+        sciAtomOf((skyHead ++ List(sciStep(Y, ty), sciStep(J, tj), sciStep(J, tj)) ++ skyTail)*),
+        sciAtomOf((skyHead ++ List(sciStep(Y, ty), sciStep(J, tj)) ++ skyTail)*)
       )
 
     setup.flatMap: oid =>
