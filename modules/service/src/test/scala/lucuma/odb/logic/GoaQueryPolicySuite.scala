@@ -36,7 +36,7 @@ import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.Target
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
-import lucuma.odb.data.ArchiveSearchCenter
+import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.logic.GoaQueryPolicy.TargetPointing
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.gmos.imaging.Config as GmosImaging
@@ -171,44 +171,44 @@ class GoaQueryPolicySuite extends FunSuite:
 
   test("an explicit base wins over the asterism center"):
     assertEquals(
-      GoaQueryPolicy.searchCenter(base.some, center.some, List(TargetPointing.Sidereal)),
-      ArchiveSearchCenter.Sidereal(base).some
+      GoaQueryPolicy.searchPointing(base.some, center.some, List(TargetPointing.Sidereal)),
+      ArchiveSearchPointing.Sidereal(base).some
     )
 
   test("the asterism center is used when there is no explicit base"):
     assertEquals(
-      GoaQueryPolicy.searchCenter(none, center.some, List(TargetPointing.Sidereal)),
-      ArchiveSearchCenter.Sidereal(center).some
+      GoaQueryPolicy.searchPointing(none, center.some, List(TargetPointing.Sidereal)),
+      ArchiveSearchPointing.Sidereal(center).some
     )
 
   test("a wholly non-sidereal asterism is searched by name, not by a resolved center"):
     // The center a moving target resolves to is a moment in time; the name is
     // what the archive indexes it under, so the name is preferred.
     assertEquals(
-      GoaQueryPolicy.searchCenter(none, center.some, List(TargetPointing.NonSidereal(name("Halley")))),
-      ArchiveSearchCenter.NonSidereal(name("Halley")).some
+      GoaQueryPolicy.searchPointing(none, center.some, List(TargetPointing.NonSidereal(name("Halley")))),
+      ArchiveSearchPointing.NonSidereal(name("Halley")).some
     )
 
   test("an explicit base still wins over a non-sidereal asterism"):
     assertEquals(
-      GoaQueryPolicy.searchCenter(base.some, none, List(TargetPointing.NonSidereal(name("Halley")))),
-      ArchiveSearchCenter.Sidereal(base).some
+      GoaQueryPolicy.searchPointing(base.some, none, List(TargetPointing.NonSidereal(name("Halley")))),
+      ArchiveSearchPointing.Sidereal(base).some
     )
 
   test("an asterism only partly non-sidereal falls back to the center"):
     assertEquals(
-      GoaQueryPolicy.searchCenter(
+      GoaQueryPolicy.searchPointing(
         none,
         center.some,
         List(TargetPointing.NonSidereal(name("Halley")), TargetPointing.Sidereal)
       ),
-      ArchiveSearchCenter.Sidereal(center).some
+      ArchiveSearchPointing.Sidereal(center).some
     )
 
   test("no pointing and no usable name is not a search center"):
-    assertEquals(GoaQueryPolicy.searchCenter(none, none, Nil), none)
-    assertEquals(GoaQueryPolicy.searchCenter(none, none, List(TargetPointing.Sidereal)), none)
-    assertEquals(GoaQueryPolicy.searchCenter(none, none, List(TargetPointing.Unresolvable)), none)
+    assertEquals(GoaQueryPolicy.searchPointing(none, none, Nil), none)
+    assertEquals(GoaQueryPolicy.searchPointing(none, none, List(TargetPointing.Sidereal)), none)
+    assertEquals(GoaQueryPolicy.searchPointing(none, none, List(TargetPointing.Unresolvable)), none)
 
   test("targets are classified by how they can be pointed at"):
     val sidereal    = Target.Sidereal(name("Star"), SiderealTracking.const(base), sourceProfile, none)

@@ -36,7 +36,7 @@ object ArchiveDuplication:
    * found it
    */
   final case class SearchArea(
-    center: Option[ArchiveSearchCenter],
+    center: Option[ArchiveSearchPointing],
     radius: Option[Angle]
   ) derives Eq
 
@@ -48,7 +48,7 @@ object ArchiveDuplication:
    * matches they summarize.  This is the storage side only — GraphQL serves the
    * same values independently, straight from `v_archive_duplication`.
    */
-  final case class Header(
+  final case class Summary(
     state:         State,
     matchCount:    NonNegInt,
     saturated:     Boolean,
@@ -57,17 +57,17 @@ object ArchiveDuplication:
     searchArea:    SearchArea
   ) derives Eq
 
-  object Header:
+  object Summary:
 
-    /** The header of an observation that has never been searched. */
-    val NeverChecked: Header =
-      Header(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, SearchArea.Empty)
+    /** The summary of an observation that has never been searched. */
+    val NeverChecked: Summary =
+      Summary(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, SearchArea.Empty)
 
-    def notChecked(at: Timestamp, searchArea: SearchArea): Header =
-      Header(State.NotChecked, NonNegInt.unsafeFrom(0), false, at.some, none, searchArea)
+    def notChecked(at: Timestamp, searchArea: SearchArea): Summary =
+      Summary(State.NotChecked, NonNegInt.unsafeFrom(0), false, at.some, none, searchArea)
 
-  /** A header together with the matched files it summarizes. */
+  /** The summary, together with the matched files it describes. */
   final case class Snapshot(
-    header:  Header,
+    summary:  Summary,
     matches: List[GoaSummaryRecord]
   )

@@ -16,7 +16,7 @@ import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
 import lucuma.core.model.User
-import lucuma.odb.data.ArchiveSearchCenter
+import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.service.ArchiveDuplicationSearchService
 import lucuma.odb.service.Services
 
@@ -104,11 +104,11 @@ class archiveDuplication extends OdbSuite:
       given Services[IO] = services
       ArchiveDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get).void
 
-  private def searchCenterOf(oid: Observation.Id): IO[Option[Coordinates]] =
+  private def searchPointingOf(oid: Observation.Id): IO[Option[Coordinates]] =
     withServices(pi): services =>
       services
-        .transactionally(services.archiveDuplicationService.selectHeader(oid))
-        .map(_.searchArea.center.collect { case ArchiveSearchCenter.Sidereal(c) => c })
+        .transactionally(services.archiveDuplicationService.selectSummary(oid))
+        .map(_.searchArea.center.collect { case ArchiveSearchPointing.Sidereal(c) => c })
 
   private def archiveDuplication(oid: Observation.Id, fields: String): IO[Json] =
     query(
@@ -240,7 +240,7 @@ class archiveDuplication extends OdbSuite:
     for
       oid    <- siderealObservation
       _      <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
-      center <- searchCenterOf(oid)
+      center <- searchPointingOf(oid)
       js     <- archiveDuplication(oid, """
                   lastCheckedAt
                   searchTargetName
@@ -266,7 +266,7 @@ class archiveDuplication extends OdbSuite:
     for
       oid    <- siderealObservation
       _      <- refresh(GoaClientMock.fromJson[IO](FullRecord))(oid)
-      center <- searchCenterOf(oid)
+      center <- searchPointingOf(oid)
       js     <- archiveDuplication(oid, "matches { coordinates { ra { degrees } dec { degrees } } distance { microarcseconds } }")
     yield
       val m        = js.hcursor.downField("matches").downN(0)

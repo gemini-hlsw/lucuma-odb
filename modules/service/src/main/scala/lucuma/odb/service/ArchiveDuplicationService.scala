@@ -13,7 +13,7 @@ import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
 import lucuma.odb.data.ArchiveDuplication
-import lucuma.odb.data.ArchiveSearchCenter
+import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -37,7 +37,7 @@ trait ArchiveDuplicationService[F[_]]:
   def select(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Snapshot]
 
   /** The stored headline values, without the matches. */
-  def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Header]
+  def selectSummary(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Summary]
 
   /**
    * Replaces any existing snapshot with this one.  There is no history: the
@@ -45,7 +45,7 @@ trait ArchiveDuplicationService[F[_]]:
    */
   def store(
     observationId: Observation.Id,
-    header:        ArchiveDuplication.Header,
+    summary:        ArchiveDuplication.Summary,
     matches:       List[GoaSummaryRecord]
   )(using Transaction[F]): F[Unit]
 
@@ -64,21 +64,21 @@ object ArchiveDuplicationService:
       import Services.Syntax.*
 
       override def select(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Snapshot] =
-        (selectHeader(observationId), session.execute(Statements.SelectMatches)(observationId))
+        (selectSummary(observationId), session.execute(Statements.SelectMatches)(observationId))
           .mapN(ArchiveDuplication.Snapshot.apply)
 
-      override def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Header] =
+      override def selectSummary(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Summary] =
         session
-          .option(Statements.SelectHeader)(observationId)
-          .map(_.getOrElse(ArchiveDuplication.Header.NeverChecked))
+          .option(Statements.SelectSummary)(observationId)
+          .map(_.getOrElse(ArchiveDuplication.Summary.NeverChecked))
 
       override def store(
         observationId: Observation.Id,
-        header:        ArchiveDuplication.Header,
+        summary:        ArchiveDuplication.Summary,
         matches:       List[GoaSummaryRecord]
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- session.execute(Statements.UpsertHeader)(observationId, header)
+          _ <- session.execute(Statements.UpsertSummary)(observationId, summary)
           _ <- session.execute(Statements.DeleteMatches)(observationId)
           _ <- NonEmptyList.fromList(matches).traverse_ : nel =>
                  session.execute(Statements.insertMatches(nel))(observationId, nel)
@@ -124,11 +124,11 @@ object ArchiveDuplicationService:
       ).to[GoaSummaryRecord]
 
     /**
-     * Header columns, in the order the header is selected and written.  The
+     * Summary columns, in the order the summary is selected and written.  The
      * search center is sidereal (coordinates) or non-sidereal (a target name),
      * never both.
      */
-    private val goa_duplication_header: Codec[ArchiveDuplication.Header] =
+    private val archive_duplication_summary: Codec[ArchiveDuplication.Summary] =
       (archive_duplication_state *:
        int4_nonneg           *:
        bool                  *:
@@ -140,9 +140,9 @@ object ArchiveDuplicationService:
        angle_µas.opt
       ).imap { (state, count, saturated, checkedAt, error, ra, dec, targetName, radius) =>
         val center = (ra, dec)
-          .mapN((r, d) => ArchiveSearchCenter.Sidereal(Coordinates(r, d)))
-          .orElse(targetName.map(ArchiveSearchCenter.NonSidereal(_)))
-        ArchiveDuplication.Header(
+          .mapN((r, d) => ArchiveSearchPointing.Sidereal(Coordinates(r, d)))
+          .orElse(targetName.map(ArchiveSearchPointing.NonSidereal(_)))
+        ArchiveDuplication.Summary(
           state,
           count,
           saturated,
@@ -152,13 +152,13 @@ object ArchiveDuplicationService:
         )
       } { h =>
         val (ra, dec, targetName) = h.searchArea.center match
-          case Some(ArchiveSearchCenter.Sidereal(c))    => (c.ra.some, c.dec.some, none)
-          case Some(ArchiveSearchCenter.NonSidereal(n)) => (none, none, n.some)
+          case Some(ArchiveSearchPointing.Sidereal(c))    => (c.ra.some, c.dec.some, none)
+          case Some(ArchiveSearchPointing.NonSidereal(n)) => (none, none, n.some)
           case None                                 => (none, none, none)
         (h.state, h.matchCount, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.searchArea.radius)
       }
 
-    val SelectHeader: Query[Observation.Id, ArchiveDuplication.Header] =
+    val SelectSummary: Query[Observation.Id, ArchiveDuplication.Summary] =
       sql"""
         SELECT
           c_state,
@@ -172,7 +172,7 @@ object ArchiveDuplicationService:
           c_search_radius
         FROM v_archive_duplication
         WHERE c_observation_id = $observation_id
-      """.query(goa_duplication_header)
+      """.query(archive_duplication_summary)
 
     val SelectMatches: Query[Observation.Id, GoaSummaryRecord] =
       sql"""
@@ -202,7 +202,7 @@ object ArchiveDuplicationService:
         ORDER BY c_file_name
       """.query(goa_match)
 
-    val UpsertHeader: Command[(Observation.Id, ArchiveDuplication.Header)] =
+    val UpsertSummary: Command[(Observation.Id, ArchiveDuplication.Summary)] =
       sql"""
         INSERT INTO t_archive_duplication (
           c_observation_id,
@@ -215,7 +215,7 @@ object ArchiveDuplicationService:
           c_search_dec,
           c_search_target,
           c_search_radius
-        ) VALUES ($observation_id, $goa_duplication_header)
+        ) VALUES ($observation_id, $archive_duplication_summary)
         ON CONFLICT (c_observation_id) DO UPDATE SET
           c_state           = EXCLUDED.c_state,
           c_match_count     = EXCLUDED.c_match_count,

@@ -68,8 +68,8 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(mockOf("a.fits", "b.fits", "c.fits"))(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.Checked)
-      assertEquals(s.header.matchCount.value, 3)
+      assertEquals(s.summary.state, ArchiveDuplication.State.Checked)
+      assertEquals(s.summary.matchCount.value, 3)
       assertEquals(db.matches.map(_.name), List("a.fits", "b.fits", "c.fits"))
 
   test("a file returned by both queries in the group is counted once"):
@@ -80,7 +80,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(mockOf("a.fits", "b.fits"))(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.header.matchCount.value, 2)
+      assertEquals(s.summary.matchCount.value, 2)
       assertEquals(db.matches.map(_.name), List("a.fits", "b.fits"))
 
   test("a search records where and how wide it looked"):
@@ -88,18 +88,18 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       oid <- gmosObservation
       s   <- refresh(mockOf("a.fits"))(oid)
     yield
-      assert(s.header.searchArea.center.isDefined)
-      assert(s.header.searchArea.radius.isDefined)
-      assert(s.header.lastCheckedAt.isDefined)
+      assert(s.summary.searchArea.center.isDefined)
+      assert(s.summary.searchArea.radius.isDefined)
+      assert(s.summary.lastCheckedAt.isDefined)
 
   test("no matches is a successful search, not an error"):
     for
       oid <- gmosObservation
       s   <- refresh(GoaClientMock.empty[IO])(oid)
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.Checked)
-      assertEquals(s.header.matchCount.value, 0)
-      assertEquals(s.header.error, none)
+      assertEquals(s.summary.state, ArchiveDuplication.State.Checked)
+      assertEquals(s.summary.matchCount.value, 0)
+      assertEquals(s.summary.error, none)
       assertEquals(s.matches, Nil)
 
   test("a query filled to GOA's cap is saturated"):
@@ -108,8 +108,8 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       oid <- gmosObservation
       s   <- refresh(mockOf(names*))(oid)
     yield
-      assertEquals(s.header.matchCount.value, ArchiveDuplication.QueryLimit)
-      assert(s.header.saturated)
+      assertEquals(s.summary.matchCount.value, ArchiveDuplication.QueryLimit)
+      assert(s.summary.saturated)
 
   test("a query short of the cap is not saturated"):
     val names = (1 until ArchiveDuplication.QueryLimit).toList.map(i => s"f$i.fits")
@@ -117,8 +117,8 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       oid <- gmosObservation
       s   <- refresh(mockOf(names*))(oid)
     yield
-      assertEquals(s.header.matchCount.value, ArchiveDuplication.QueryLimit - 1)
-      assert(!s.header.saturated)
+      assertEquals(s.summary.matchCount.value, ArchiveDuplication.QueryLimit - 1)
+      assert(!s.summary.saturated)
 
   test("refreshing replaces the previous snapshot"):
     for
@@ -127,7 +127,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       _   <- refresh(mockOf("d.fits"))(oid)
       db  <- stored(oid)
     yield
-      assertEquals(db.header.matchCount.value, 1)
+      assertEquals(db.summary.matchCount.value, 1)
       assertEquals(db.matches.map(_.name), List("d.fits"))
 
   test("a GOA failure is reported without destroying the last good snapshot"):
@@ -137,9 +137,9 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(brokenMock)(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.Error)
-      assert(s.header.error.isDefined)
-      assertEquals(db.header.matchCount.value, 2)
+      assertEquals(s.summary.state, ArchiveDuplication.State.Error)
+      assert(s.summary.error.isDefined)
+      assertEquals(db.summary.matchCount.value, 2)
       assertEquals(db.matches.map(_.name), List("a.fits", "b.fits"))
 
   test("a GOA failure with no previous snapshot is still not a failed call"):
@@ -147,8 +147,8 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       oid <- gmosObservation
       s   <- refresh(brokenMock)(oid)
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.Error)
-      assertEquals(s.header.matchCount.value, 0)
+      assertEquals(s.summary.state, ArchiveDuplication.State.Error)
+      assertEquals(s.summary.matchCount.value, 0)
       assertEquals(s.matches, Nil)
 
   test("an instrument GOA does not know is reported as not checked"):
@@ -157,11 +157,11 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       s   <- refresh(mockOf("a.fits"))(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.NotChecked)
-      assertEquals(s.header.error, none)
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotChecked)
+      assertEquals(s.summary.error, none)
       assertEquals(s.matches, Nil)
-      assertEquals(db.header.state, ArchiveDuplication.State.NotChecked)
-      assert(db.header.lastCheckedAt.isDefined)
+      assertEquals(db.summary.state, ArchiveDuplication.State.NotChecked)
+      assert(db.summary.lastCheckedAt.isDefined)
 
   test("an observation with no pointing is reported as not checked"):
     for
@@ -169,6 +169,6 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       oid <- createGmosNorthImagingObservationAs(pi, pid)
       s   <- refresh(mockOf("a.fits"))(oid)
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.NotChecked)
-      assertEquals(s.header.searchArea.center, none)
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotChecked)
+      assertEquals(s.summary.searchArea.center, none)
       assertEquals(s.matches, Nil)

@@ -22,7 +22,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
-import lucuma.odb.data.ArchiveSearchCenter
+import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.exchange.Config as Exchange
@@ -94,11 +94,11 @@ object GoaQueryPolicy:
    * center evaluated at the observation's reference time.  `None` means the
    * observation has no resolvable pointing and no usable name.
    */
-  def searchCenter(
+  def searchPointing(
     explicitBase:   Option[Coordinates],
     asterismCenter: Option[Coordinates],
     asterism:       List[TargetPointing]
-  ): Option[ArchiveSearchCenter] =
+  ): Option[ArchiveSearchPointing] =
     val movingTargetName =
       asterism.toNel.flatMap:
         _.traverse:
@@ -106,9 +106,9 @@ object GoaQueryPolicy:
           case _                             => none
         .map(_.head)
 
-    explicitBase.map(ArchiveSearchCenter.Sidereal(_))
-      .orElse(movingTargetName.map(ArchiveSearchCenter.NonSidereal(_)))
-      .orElse(asterismCenter.map(ArchiveSearchCenter.Sidereal(_)))
+    explicitBase.map(ArchiveSearchPointing.Sidereal(_))
+      .orElse(movingTargetName.map(ArchiveSearchPointing.NonSidereal(_)))
+      .orElse(asterismCenter.map(ArchiveSearchPointing.Sidereal(_)))
 
   /**
    * How wide to search: half the observation's field of view, taken as the
@@ -138,12 +138,12 @@ object GoaQueryPolicy:
     val params =
       for
         instrument <- mode.instrument
-        center     <- searchCenter(explicitBase, asterismCenter, asterism)
+        center     <- searchPointing(explicitBase, asterismCenter, asterism)
         radius     <- searchRadius(mode)
       yield equivalenceGroup(instrument).map: i =>
         center match
-          case ArchiveSearchCenter.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
-          case ArchiveSearchCenter.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
+          case ArchiveSearchPointing.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
+          case ArchiveSearchPointing.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
     params.orEmpty
 
   private def scienceAreas(mode: ObservingMode): List[ShapeExpression] =
