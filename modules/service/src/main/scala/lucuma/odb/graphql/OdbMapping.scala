@@ -103,23 +103,23 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory as LF, SecureRandom}](
-    database:      Resource[F, Session[F]],
-    monitor0:      SkunkMonitor[F],
-    user0:         User,
-    topics0:       Topics[F],
-    gaiaClient0:   GaiaClient[F],
-    itcClient0:    ItcClient[F],
-    commitHash0:   CommitHash,
-    goaUsers0:     Set[User.Id],
-    enums:         Enums,
-    tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient0:   Client[F],
+    database:        Resource[F, Session[F]],
+    monitor0:        SkunkMonitor[F],
+    user0:           User,
+    topics0:         Topics[F],
+    gaiaClient0:     GaiaClient[F],
+    itcClient0:      ItcClient[F],
+    commitHash0:     CommitHash,
+    goaUsers0:       Set[User.Id],
+    enums:           Enums,
+    tec:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient0:     Client[F],
     horizonsClient0: HorizonsClient[F],
-    goaClient0:    GoaClient[F],
-    emailConfig0:  Config.Email,
-    allowSub:      Boolean = true,        // Are submappings (recursive calls) allowed?
-    schema0:       Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
-    shouldValidate:Boolean = true,        // should we validatate the TypeMappings?
+    goaClient0:      GoaClient[F],
+    emailConfig0:    Config.Email,
+    allowSub:        Boolean = true,        // Are submappings (recursive calls) allowed?
+    schema0:         Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
+    shouldValidate:  Boolean = true,        // should we validatate the TypeMappings?
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
@@ -807,20 +807,20 @@ object OdbMapping {
    * subscriptions.
    */
   def forObscalc[F[_]: Async: Parallel: Tracer: Logger: LoggerFactory: SecureRandom](
-    database:    Resource[F, Session[F]],
-    monitor:     SkunkMonitor[F],
-    user:        User,
-    goaUsers:    Set[User.Id],
-    gaiaClient:  GaiaClient[F],
-    itcClient:   ItcClient[F],
-    commitHash:  CommitHash,
-    enums:       Enums,
-    tec:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient:  Client[F],
+    database:       Resource[F, Session[F]],
+    monitor:        SkunkMonitor[F],
+    user:           User,
+    goaUsers:       Set[User.Id],
+    gaiaClient:     GaiaClient[F],
+    itcClient:      ItcClient[F],
+    commitHash:     CommitHash,
+    enums:          Enums,
+    tec:            TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:     Client[F],
     horizonsClient: HorizonsClient[F],
-    goaClient:   GoaClient[F],
-    emailConfig: Config.Email,
-    schema:      Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+    goaClient:      GoaClient[F],
+    emailConfig:    Config.Email,
+    schema:         Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
   ): Mapping[F] =
 
     apply(

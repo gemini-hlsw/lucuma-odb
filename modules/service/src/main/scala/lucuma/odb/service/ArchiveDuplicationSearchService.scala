@@ -64,7 +64,7 @@ object ArchiveDuplicationSearchService:
   )(using Services[F]): ArchiveDuplicationSearchService[F] =
     fromRunner(GoaQueryRunner.fromClient(goaClient))
 
-  def fromRunner[F[_]: Concurrent: Clock](
+  private def fromRunner[F[_]: Concurrent: Clock](
     runner: GoaQueryRunner[F]
   )(using Services[F]): ArchiveDuplicationSearchService[F] =
     new ArchiveDuplicationSearchService[F]:
@@ -117,7 +117,7 @@ object ArchiveDuplicationSearchService:
        * not checked.
        */
       private def resolveCenter(observationId: Observation.Id, ctx: Context): F[Option[Coordinates]] =
-        if GoaQueryPolicy.searchCenter(ctx.explicitBase, none, ctx.pointings).isDefined then none.pure[F]
+        if GoaQueryPolicy.searchPointing(ctx.explicitBase, none, ctx.pointings).isDefined then none.pure[F]
         else
           ctx.referenceTime.fold(now)(_.pure[F]).flatMap: t =>
             trackingService
@@ -131,7 +131,7 @@ object ArchiveDuplicationSearchService:
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         val searchArea =
           ArchiveDuplication.SearchArea(
-            GoaQueryPolicy.searchCenter(ctx.explicitBase, center, ctx.pointings),
+            GoaQueryPolicy.searchPointing(ctx.explicitBase, center, ctx.pointings),
             ctx.mode.flatMap(GoaQueryPolicy.searchRadius)
           )
 
@@ -151,8 +151,8 @@ object ArchiveDuplicationSearchService:
         searchArea:    ArchiveDuplication.SearchArea
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         now.flatMap: t =>
-          val header = ArchiveDuplication.Header.notChecked(t, searchArea)
-          store(observationId, header, Nil).as(ArchiveDuplication.Snapshot(header, Nil))
+          val summary = ArchiveDuplication.Summary.notChecked(t, searchArea)
+          store(observationId, summary, Nil).as(ArchiveDuplication.Snapshot(summary, Nil))
 
       private def runQueries(
         observationId: Observation.Id,
@@ -188,8 +188,8 @@ object ArchiveDuplicationSearchService:
         // not several, so the count is of distinct files.
         val matches = byQuery.flatten.distinctBy(_.name)
         now.flatMap: t =>
-          val header =
-            ArchiveDuplication.Header(
+          val summary =
+            ArchiveDuplication.Summary(
               ArchiveDuplication.State.Checked,
               NonNegInt.unsafeFrom(matches.size),
               // Any query that came back full was truncated, so the count is a floor.
@@ -198,15 +198,15 @@ object ArchiveDuplicationSearchService:
               error         = none,
               searchArea    = searchArea
             )
-          store(observationId, header, matches).as(ArchiveDuplication.Snapshot(header, matches))
+          store(observationId, summary, matches).as(ArchiveDuplication.Snapshot(summary, matches))
 
       private def store(
         observationId: Observation.Id,
-        header:        ArchiveDuplication.Header,
+        summary:        ArchiveDuplication.Summary,
         matches:       List[GoaSummaryRecord]
       )(using NoTransaction[F]): F[Unit] =
         services.transactionally:
-          archiveDuplicationService.store(observationId, header, matches)
+          archiveDuplicationService.store(observationId, summary, matches)
 
       private val now: F[Timestamp] =
         Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
