@@ -3533,9 +3533,9 @@ type Mutation {
 
   Rejected once the observation's proposal has been submitted.
   """
-  refreshGoaDuplication(
-    input: RefreshGoaDuplicationInput!
-  ): RefreshGoaDuplicationResult!
+  refreshArchiveDuplication(
+    input: RefreshArchiveDuplicationInput!
+  ): RefreshArchiveDuplicationResult!
 
   """
   Resets the acquisition sequence to start from the initial step regardless of
@@ -5223,7 +5223,7 @@ type RecordGmosSouthVisitResult {
 Input parameters for re-running the Archive Duplication Search.  Select one of
 `observationId` or `observationReference`.
 """
-input RefreshGoaDuplicationInput {
+input RefreshArchiveDuplicationInput {
   observationId: ObservationId
   observationReference: ObservationReferenceLabel
 }
@@ -5231,9 +5231,9 @@ input RefreshGoaDuplicationInput {
 """
 The result of re-running the Archive Duplication Search.
 """
-type RefreshGoaDuplicationResult {
+type RefreshArchiveDuplicationResult {
   "The search result as it now stands."
-  goaDuplication: GoaDuplication!
+  archiveDuplication: ArchiveDuplication!
 
   "The observation that was searched."
   observation: Observation!
@@ -13744,12 +13744,12 @@ type Observation {
   Result of the Archive Duplication Search: what the Gemini Observatory Archive
   held around this observation's pointing.
   """
-  goaDuplication: GoaDuplication!
+  archiveDuplication: ArchiveDuplication!
 
 }
 
 "The outcome of the most recent Archive Duplication Search attempt."
-enum GoaDuplicationState {
+enum ArchiveDuplicationState {
 
   """
   No search result.  Either the search has never been run, or it ran against an
@@ -13778,7 +13778,7 @@ Every nullable field here is null when the archive does not report a value for t
 file; where absence means something more specific than that, the field says so.
 fields are typed where possible.
 """
-type GoaMatch {
+type ArchiveMatch {
 
   """
   Archive file name, e.g. S20240101S0001.fits.  Always present, and unique.
@@ -13890,9 +13890,9 @@ leaves the previously found results in place rather than discarding them, so
 `matchCount`, `matches`, `lastCheckedAt` and the search area still
 describe the last search that succeeded, and `lastCheckedAt` says when that was.
 """
-type GoaDuplication {
+type ArchiveDuplication {
 
-  state: GoaDuplicationState!
+  state: ArchiveDuplicationState!
 
   """
   Number of matching archive files.  Counted per file rather than per archived
@@ -13924,7 +13924,7 @@ type GoaDuplication {
   searchRadius: Angle
 
   "The matched archive files, ordered by file name."
-  matches: [GoaMatch!]!
+  matches: [ArchiveMatch!]!
 
 }
 

@@ -8,24 +8,24 @@ package mapping
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.GhostIfuView
-import lucuma.odb.graphql.table.GoaDuplicationView
-import lucuma.odb.graphql.table.GoaMatchView
+import lucuma.odb.graphql.table.ArchiveDuplicationView
+import lucuma.odb.graphql.table.ArchiveMatchView
 
 import table.ObservationView
 
 trait CoordinatesMapping[F[_]] extends ObservationView[F]
                                   with ConfigurationRequestView[F]
                                   with GhostIfuView[F]
-                                  with GoaDuplicationView[F]
-                                  with GoaMatchView[F]:
+                                  with ArchiveDuplicationView[F]
+                                  with ArchiveMatchView[F]:
 
   lazy val CoordinatesMappings =
     List(
       CoordinatesMapping,
       ConfigurationRequestReferenceCoordinatesMapping,
       GhostIfuSkyPositionMapping,
-      GoaDuplicationSearchCoordinatesMapping,
-      GoaMatchCoordinatesMapping
+      ArchiveDuplicationSearchCoordinatesMapping,
+      ArchiveMatchCoordinatesMapping
     )
 
   private lazy val CoordinatesMapping =
@@ -42,16 +42,16 @@ trait CoordinatesMapping[F[_]] extends ObservationView[F]
       SqlObject("dec")
     )
 
-  private lazy val GoaDuplicationSearchCoordinatesMapping =
-    ObjectMapping(GoaDuplicationType / "searchCoordinates")(
-      SqlField("synthetic-id", GoaDuplicationView.SearchCoordinates.SyntheticId, key = true, hidden = true),
+  private lazy val ArchiveDuplicationSearchCoordinatesMapping =
+    ObjectMapping(ArchiveDuplicationType / "searchCoordinates")(
+      SqlField("synthetic-id", ArchiveDuplicationView.SearchCoordinates.SyntheticId, key = true, hidden = true),
       SqlObject("ra"),
       SqlObject("dec")
     )
 
-  private lazy val GoaMatchCoordinatesMapping =
-    ObjectMapping(GoaMatchType / "coordinates")(
-      SqlField("synthetic-id", GoaMatchView.Coordinates.SyntheticId, key = true, hidden = true),
+  private lazy val ArchiveMatchCoordinatesMapping =
+    ObjectMapping(ArchiveMatchType / "coordinates")(
+      SqlField("synthetic-id", ArchiveMatchView.Coordinates.SyntheticId, key = true, hidden = true),
       SqlObject("ra"),
       SqlObject("dec")
     )

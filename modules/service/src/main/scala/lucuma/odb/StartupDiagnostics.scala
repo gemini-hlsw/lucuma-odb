@@ -85,7 +85,7 @@ object StartupDiagnostics:
           checkPostgresEnum(imaging_variant),
           checkPostgresEnum(gmos_long_slit_acquisition_roi),
           checkPostgresEnum(gender),
-          checkPostgresEnum(goa_duplication_state),
+          checkPostgresEnum(archive_duplication_state),
           checkPostgresEnum(guide_state),
           checkPostgresEnum(keck_instrument),
           checkPostgresEnum(multiple_filters_mode),

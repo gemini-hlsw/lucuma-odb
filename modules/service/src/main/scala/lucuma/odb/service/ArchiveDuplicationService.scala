@@ -12,8 +12,8 @@ import lucuma.catalog.goa.GoaObservationType
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
-import lucuma.odb.data.GoaDuplication
-import lucuma.odb.data.GoaSearchCenter
+import lucuma.odb.data.ArchiveDuplication
+import lucuma.odb.data.ArchiveSearchCenter
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -31,13 +31,13 @@ import java.time.ZoneOffset
  * Storage for Archive Duplication Search snapshots.  Running the search itself
  * is the caller's job; this service only reads and replaces what was found.
  */
-trait GoaDuplicationService[F[_]]:
+trait ArchiveDuplicationService[F[_]]:
 
   /** The stored snapshot, or an empty never-checked one if there is none. */
-  def select(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Snapshot]
+  def select(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Snapshot]
 
   /** The stored headline values, without the matches. */
-  def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Header]
+  def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Header]
 
   /**
    * Replaces any existing snapshot with this one.  There is no history: the
@@ -45,7 +45,7 @@ trait GoaDuplicationService[F[_]]:
    */
   def store(
     observationId: Observation.Id,
-    header:        GoaDuplication.Header,
+    header:        ArchiveDuplication.Header,
     matches:       List[GoaSummaryRecord]
   )(using Transaction[F]): F[Unit]
 
@@ -56,25 +56,25 @@ trait GoaDuplicationService[F[_]]:
    */
   def storeError(observationId: Observation.Id, message: NonEmptyString)(using Transaction[F]): F[Unit]
 
-object GoaDuplicationService:
+object ArchiveDuplicationService:
 
-  def instantiate[F[_]: Concurrent](using Services[F]): GoaDuplicationService[F] =
-    new GoaDuplicationService[F]:
+  def instantiate[F[_]: Concurrent](using Services[F]): ArchiveDuplicationService[F] =
+    new ArchiveDuplicationService[F]:
 
       import Services.Syntax.*
 
-      override def select(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Snapshot] =
+      override def select(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Snapshot] =
         (selectHeader(observationId), session.execute(Statements.SelectMatches)(observationId))
-          .mapN(GoaDuplication.Snapshot.apply)
+          .mapN(ArchiveDuplication.Snapshot.apply)
 
-      override def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Header] =
+      override def selectHeader(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Header] =
         session
           .option(Statements.SelectHeader)(observationId)
-          .map(_.getOrElse(GoaDuplication.Header.NeverChecked))
+          .map(_.getOrElse(ArchiveDuplication.Header.NeverChecked))
 
       override def store(
         observationId: Observation.Id,
-        header:        GoaDuplication.Header,
+        header:        ArchiveDuplication.Header,
         matches:       List[GoaSummaryRecord]
       )(using Transaction[F]): F[Unit] =
         for
@@ -99,7 +99,7 @@ object GoaDuplicationService:
     private val goa_observation_class: Codec[GoaObservationClass] =
       text.imap(GoaObservationClass.fromTag)(_.tag)
 
-    /** Columns of `t_goa_match`, in `GoaSummaryRecord` field order. */
+    /** Columns of `t_archive_match`, in `GoaSummaryRecord` field order. */
     private val goa_match: Codec[GoaSummaryRecord] =
       (text                     *:  // c_file_name
        text.opt                 *:  // c_data_label
@@ -128,8 +128,8 @@ object GoaDuplicationService:
      * search center is sidereal (coordinates) or non-sidereal (a target name),
      * never both.
      */
-    private val goa_duplication_header: Codec[GoaDuplication.Header] =
-      (goa_duplication_state *:
+    private val goa_duplication_header: Codec[ArchiveDuplication.Header] =
+      (archive_duplication_state *:
        int4_nonneg           *:
        bool                  *:
        core_timestamp.opt    *:
@@ -140,25 +140,25 @@ object GoaDuplicationService:
        angle_µas.opt
       ).imap { (state, count, saturated, checkedAt, error, ra, dec, targetName, radius) =>
         val center = (ra, dec)
-          .mapN((r, d) => GoaSearchCenter.Sidereal(Coordinates(r, d)))
-          .orElse(targetName.map(GoaSearchCenter.NonSidereal(_)))
-        GoaDuplication.Header(
+          .mapN((r, d) => ArchiveSearchCenter.Sidereal(Coordinates(r, d)))
+          .orElse(targetName.map(ArchiveSearchCenter.NonSidereal(_)))
+        ArchiveDuplication.Header(
           state,
           count,
           saturated,
           checkedAt,
           error,
-          GoaDuplication.SearchArea(center, radius)
+          ArchiveDuplication.SearchArea(center, radius)
         )
       } { h =>
         val (ra, dec, targetName) = h.searchArea.center match
-          case Some(GoaSearchCenter.Sidereal(c))    => (c.ra.some, c.dec.some, none)
-          case Some(GoaSearchCenter.NonSidereal(n)) => (none, none, n.some)
+          case Some(ArchiveSearchCenter.Sidereal(c))    => (c.ra.some, c.dec.some, none)
+          case Some(ArchiveSearchCenter.NonSidereal(n)) => (none, none, n.some)
           case None                                 => (none, none, none)
         (h.state, h.matchCount, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.searchArea.radius)
       }
 
-    val SelectHeader: Query[Observation.Id, GoaDuplication.Header] =
+    val SelectHeader: Query[Observation.Id, ArchiveDuplication.Header] =
       sql"""
         SELECT
           c_state,
@@ -170,7 +170,7 @@ object GoaDuplicationService:
           c_search_dec,
           c_search_target,
           c_search_radius
-        FROM v_goa_duplication
+        FROM v_archive_duplication
         WHERE c_observation_id = $observation_id
       """.query(goa_duplication_header)
 
@@ -197,14 +197,14 @@ object GoaDuplicationService:
           c_airmass,
           c_azimuth,
           c_elevation
-        FROM t_goa_match
+        FROM t_archive_match
         WHERE c_observation_id = $observation_id
         ORDER BY c_file_name
       """.query(goa_match)
 
-    val UpsertHeader: Command[(Observation.Id, GoaDuplication.Header)] =
+    val UpsertHeader: Command[(Observation.Id, ArchiveDuplication.Header)] =
       sql"""
-        INSERT INTO t_goa_duplication (
+        INSERT INTO t_archive_duplication (
           c_observation_id,
           c_state,
           c_match_count,
@@ -234,7 +234,7 @@ object GoaDuplicationService:
      */
     val UpsertError: Command[(Observation.Id, NonEmptyString)] =
       sql"""
-        INSERT INTO t_goa_duplication (
+        INSERT INTO t_archive_duplication (
           c_observation_id,
           c_state,
           c_error
@@ -246,7 +246,7 @@ object GoaDuplicationService:
 
     val DeleteMatches: Command[Observation.Id] =
       sql"""
-        DELETE FROM t_goa_match
+        DELETE FROM t_archive_match
         WHERE c_observation_id = $observation_id
       """.command
 
@@ -254,7 +254,7 @@ object GoaDuplicationService:
       matches: NonEmptyList[GoaSummaryRecord]
     ): Command[(Observation.Id, matches.type)] =
       sql"""
-        INSERT INTO t_goa_match (
+        INSERT INTO t_archive_match (
           c_observation_id,
           c_file_name,
           c_data_label,

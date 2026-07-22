@@ -22,12 +22,12 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
-import lucuma.odb.data.GoaDuplication
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.OdbError
 import lucuma.odb.util.Codecs.program_id
 import skunk.syntax.all.*
 
-class refreshGoaDuplication extends OdbSuite:
+class refreshArchiveDuplication extends OdbSuite:
 
   val pi: User    = TestUsers.Standard.pi(nextId, nextId)
   val pi2: User   = TestUsers.Standard.pi(nextId, nextId)
@@ -104,17 +104,17 @@ class refreshGoaDuplication extends OdbSuite:
       query = s"""
         query {
           observation(observationId: ${oid.asJson}) {
-            goaDuplication { $fields }
+            archiveDuplication { $fields }
           }
         }
       """
-    ).map(_.hcursor.downFields("observation", "goaDuplication").focus.get)
+    ).map(_.hcursor.downFields("observation", "archiveDuplication").focus.get)
 
   test("refresh stores the search result and returns it"):
     for
       oid <- observation()
       _   <- archive.set(Archive.Holding(records("a.fits", "b.fits")))
-      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount saturated error matches { name }")
+      js  <- refreshArchiveDuplicationAs(pi, oid, "state matchCount saturated error matches { name }")
     yield assertEquals(
       js,
       json"""
@@ -132,7 +132,7 @@ class refreshGoaDuplication extends OdbSuite:
     for
       oid <- observation()
       _   <- archive.set(Archive.Holding("[]"))
-      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount saturated error matches { name }")
+      js  <- refreshArchiveDuplicationAs(pi, oid, "state matchCount saturated error matches { name }")
     yield assertEquals(
       js,
       json"""
@@ -148,17 +148,17 @@ class refreshGoaDuplication extends OdbSuite:
 
   test("a search filled to GOA's cap is reported as saturated"):
     // The count is reported as it stands; rendering it as "500+" is Explore's job.
-    val names = (1 to GoaDuplication.QueryLimit).toList.map(i => s"f$i.fits")
+    val names = (1 to ArchiveDuplication.QueryLimit).toList.map(i => s"f$i.fits")
     for
       oid <- observation()
       _   <- archive.set(Archive.Holding(records(names*)))
-      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount saturated")
+      js  <- refreshArchiveDuplicationAs(pi, oid, "state matchCount saturated")
     yield assertEquals(
       js,
       json"""
         {
           "state": "CHECKED",
-          "matchCount": ${GoaDuplication.QueryLimit},
+          "matchCount": ${ArchiveDuplication.QueryLimit},
           "saturated": true
         }
       """
@@ -170,7 +170,7 @@ class refreshGoaDuplication extends OdbSuite:
       tid <- createTargetAs(pi, pid)
       oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.MaroonX, tid)
       _   <- archive.set(Archive.Holding(records("a.fits")))
-      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount error matches { name }")
+      js  <- refreshArchiveDuplicationAs(pi, oid, "state matchCount error matches { name }")
     yield assertEquals(
       js,
       json"""
@@ -187,9 +187,9 @@ class refreshGoaDuplication extends OdbSuite:
     for
       oid <- observation()
       _   <- archive.set(Archive.Holding(records("a.fits", "b.fits")))
-      _   <- refreshGoaDuplicationAs(pi, oid)
+      _   <- refreshArchiveDuplicationAs(pi, oid)
       _   <- archive.set(Archive.Holding(records("c.fits")))
-      js  <- refreshGoaDuplicationAs(pi, oid, "matchCount matches { name }")
+      js  <- refreshArchiveDuplicationAs(pi, oid, "matchCount matches { name }")
       db  <- storedDuplication(oid, "matchCount matches { name }")
     yield
       assertEquals(js, json"""{ "matchCount": 1, "matches": [{ "name": "c.fits" }] }""")
@@ -199,7 +199,7 @@ class refreshGoaDuplication extends OdbSuite:
     for
       oid <- observationUnderSubmittedProposal
       _   <- archive.set(Archive.Holding(records("a.fits")))
-      _   <- interceptOdbError(refreshGoaDuplicationAs(pi, oid)):
+      _   <- interceptOdbError(refreshArchiveDuplicationAs(pi, oid)):
                case OdbError.InvalidObservation(_, Some(msg)) =>
                  assert(msg.contains("submitted"), msg)
       db  <- storedDuplication(oid, "state matchCount matches { name }")
@@ -214,11 +214,11 @@ class refreshGoaDuplication extends OdbSuite:
       tid    <- createTargetAs(pi, pid)
       oid    <- createGmosNorthImagingObservationAs(pi, pid, tid)
       _      <- archive.set(Archive.Holding(records("a.fits")))
-      _      <- refreshGoaDuplicationAs(pi, oid)
+      _      <- refreshArchiveDuplicationAs(pi, oid)
       before <- storedDuplication(oid, "state matchCount matches { name }")
       _      <- markSubmitted(pid)
       _      <- archive.set(Archive.Holding(records("x.fits", "y.fits")))
-      _      <- interceptOdbError(refreshGoaDuplicationAs(pi, oid)):
+      _      <- interceptOdbError(refreshArchiveDuplicationAs(pi, oid)):
                   case OdbError.InvalidObservation(_, Some(msg)) =>
                     assert(msg.contains("submitted"), msg)
       after  <- storedDuplication(oid, "state matchCount matches { name }")
@@ -230,7 +230,7 @@ class refreshGoaDuplication extends OdbSuite:
     for
       oid <- observation()
       _   <- archive.set(Archive.Down)
-      js  <- refreshGoaDuplicationAs(pi, oid, "state matchCount error")
+      js  <- refreshArchiveDuplicationAs(pi, oid, "state matchCount error")
     yield
       assertEquals(js.hcursor.downField("state").as[String], Right("ERROR"))
       assert(js.hcursor.downField("error").as[String].exists(_.contains("Network error")))
@@ -239,9 +239,9 @@ class refreshGoaDuplication extends OdbSuite:
     for
       oid <- observation()
       _   <- archive.set(Archive.Holding(records("a.fits", "b.fits")))
-      _   <- refreshGoaDuplicationAs(pi, oid)
+      _   <- refreshArchiveDuplicationAs(pi, oid)
       _   <- archive.set(Archive.Down)
-      _   <- refreshGoaDuplicationAs(pi, oid)
+      _   <- refreshArchiveDuplicationAs(pi, oid)
       db  <- storedDuplication(oid, "state matchCount matches { name }")
     yield assertEquals(
       db,
@@ -275,7 +275,7 @@ class refreshGoaDuplication extends OdbSuite:
     for
       oid <- observation()
       _   <- archive.set(Archive.Holding(records("a.fits")))
-      _   <- interceptOdbError(refreshGoaDuplicationAs(pi2, oid)):
+      _   <- interceptOdbError(refreshArchiveDuplicationAs(pi2, oid)):
                case OdbError.NotAuthorized(_, _) => ()
       db  <- storedDuplication(oid, "state")
     yield assertEquals(db, json"""{ "state": "NOT_CHECKED" }""")

@@ -36,7 +36,7 @@ import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.Target
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
-import lucuma.odb.data.GoaSearchCenter
+import lucuma.odb.data.ArchiveSearchCenter
 import lucuma.odb.logic.GoaQueryPolicy.TargetPointing
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.gmos.imaging.Config as GmosImaging
@@ -172,13 +172,13 @@ class GoaQueryPolicySuite extends FunSuite:
   test("an explicit base wins over the asterism center"):
     assertEquals(
       GoaQueryPolicy.searchCenter(base.some, center.some, List(TargetPointing.Sidereal)),
-      GoaSearchCenter.Sidereal(base).some
+      ArchiveSearchCenter.Sidereal(base).some
     )
 
   test("the asterism center is used when there is no explicit base"):
     assertEquals(
       GoaQueryPolicy.searchCenter(none, center.some, List(TargetPointing.Sidereal)),
-      GoaSearchCenter.Sidereal(center).some
+      ArchiveSearchCenter.Sidereal(center).some
     )
 
   test("a wholly non-sidereal asterism is searched by name, not by a resolved center"):
@@ -186,13 +186,13 @@ class GoaQueryPolicySuite extends FunSuite:
     // what the archive indexes it under, so the name is preferred.
     assertEquals(
       GoaQueryPolicy.searchCenter(none, center.some, List(TargetPointing.NonSidereal(name("Halley")))),
-      GoaSearchCenter.NonSidereal(name("Halley")).some
+      ArchiveSearchCenter.NonSidereal(name("Halley")).some
     )
 
   test("an explicit base still wins over a non-sidereal asterism"):
     assertEquals(
       GoaQueryPolicy.searchCenter(base.some, none, List(TargetPointing.NonSidereal(name("Halley")))),
-      GoaSearchCenter.Sidereal(base).some
+      ArchiveSearchCenter.Sidereal(base).some
     )
 
   test("an asterism only partly non-sidereal falls back to the center"):
@@ -202,7 +202,7 @@ class GoaQueryPolicySuite extends FunSuite:
         center.some,
         List(TargetPointing.NonSidereal(name("Halley")), TargetPointing.Sidereal)
       ),
-      GoaSearchCenter.Sidereal(center).some
+      ArchiveSearchCenter.Sidereal(center).some
     )
 
   test("no pointing and no usable name is not a search center"):

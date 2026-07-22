@@ -7,11 +7,11 @@ package table
 import lucuma.odb.util.Codecs.*
 import skunk.codec.boolean.bool
 
-trait GoaDuplicationView[F[_]] extends BaseMapping[F]:
+trait ArchiveDuplicationView[F[_]] extends BaseMapping[F]:
 
-  object GoaDuplicationView extends TableDef("v_goa_duplication"):
+  object ArchiveDuplicationView extends TableDef("v_archive_duplication"):
     val ObservationId: ColumnRef  = col("c_observation_id",   observation_id)
-    val State: ColumnRef          = col("c_state",            goa_duplication_state)
+    val State: ColumnRef          = col("c_state",            archive_duplication_state)
     val MatchCount: ColumnRef     = col("c_match_count",      int4_nonneg)
     val Saturated: ColumnRef      = col("c_saturated",        bool)
     val LastCheckedAt: ColumnRef  = col("c_last_checked_at",  core_timestamp.opt)
