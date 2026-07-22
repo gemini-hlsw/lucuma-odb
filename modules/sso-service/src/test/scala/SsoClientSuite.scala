@@ -12,7 +12,6 @@ import lucuma.core.refined.auto.*
 import lucuma.sso.client.ApiKey
 import lucuma.sso.client.SsoClient
 import lucuma.sso.client.SsoClient.UserInfo
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.*
 import org.http4s.client.Client
 import org.http4s.dsl.io.*

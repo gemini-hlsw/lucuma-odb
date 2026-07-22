@@ -19,7 +19,6 @@ import lucuma.sso.client.SsoJwtReader
 import lucuma.sso.client.util.JwtDecoder
 import lucuma.sso.service.config.Config
 import lucuma.sso.service.orcid.OrcidIdGenerator
-import lucuma.sso.service.simulator.SsoSimulator
 import lucuma.sso.service.util.JwtEncoder
 import monocle.Prism
 import org.http4s.*

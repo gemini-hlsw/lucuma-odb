@@ -6,7 +6,6 @@ package lucuma.sso.service
 import cats.effect.*
 import cats.implicits.*
 import lucuma.core.model.Access
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.*
 import org.http4s.headers.Location
 

@@ -9,7 +9,6 @@ import lucuma.core.model.GuestRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
 import lucuma.sso.client.SsoJwtClaim
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.*
 import org.http4s.headers.Location
 

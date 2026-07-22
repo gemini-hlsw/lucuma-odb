@@ -13,7 +13,6 @@ import lucuma.core.refined.auto.*
 import lucuma.core.util.Gid
 import lucuma.sso.client.ApiKey
 import lucuma.sso.client.SsoJwtClaim
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.Credentials
 import org.http4s.Headers
 import org.http4s.Method

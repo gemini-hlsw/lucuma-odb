@@ -4,7 +4,6 @@
 package lucuma.sso.service
 
 import cats.effect.*
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.*
 import org.http4s.headers.Cookie
 

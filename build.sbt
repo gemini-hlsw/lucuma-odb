@@ -433,11 +433,13 @@ lazy val ssoService = project
       "org.tpolecat"        %% "natchez-http4s"             % natchezHttp4sVersion,
       "org.tpolecat"        %% "natchez-log"                % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes"      % lucumaGraphQLRoutesVersion,
-      "io.circe"            %% "circe-literal"              % circeVersion          % Test,
-      // "com.dimafeng"                     %% "testcontainers-scala-munit"                 % testcontainersScalaVersion   % Test,
-      // "com.dimafeng"                     %% "testcontainers-scala-postgresql"            % testcontainersScalaVersion   % Test,
-      "org.scalameta"       %% "munit"                      % munitVersion           % Test,
-      "org.typelevel"       %% "munit-cats-effect"          % munitCatsEffectVersion % Test,
+
+      "io.circe"            %% "circe-literal"                   % circeVersion               % Test,
+      "org.scalameta"       %% "munit"                           % munitVersion               % Test,
+      "org.typelevel"       %% "munit-cats-effect"               % munitCatsEffectVersion     % Test,
+      "com.dimafeng"        %% "testcontainers-scala-munit"      % testcontainersScalaVersion % Test,
+      "com.dimafeng"        %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
+
     ),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs       += "serve",

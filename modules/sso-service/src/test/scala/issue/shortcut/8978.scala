@@ -12,7 +12,6 @@ import lucuma.core.model.StandardUser
 import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.orcid.OrcidIdGenerator
 import lucuma.sso.service.orcid.OrcidPerson
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.*
 import org.http4s.headers.Location
 class Shortcut_8978 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:

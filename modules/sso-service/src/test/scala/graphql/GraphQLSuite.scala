@@ -14,7 +14,6 @@ import lucuma.core.util.Gid
 import lucuma.sso.client.ApiKey
 import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.orcid.OrcidPerson
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.Credentials
 import org.http4s.Headers
 import org.http4s.Method

@@ -5,6 +5,7 @@ package lucuma.sso.service
 package graphql
 package query
 
+import cats.effect.IO
 import io.circe.literal.*
 import lucuma.core.model.StandardUser
 import lucuma.sso.service.database.RoleRequest
@@ -67,7 +68,7 @@ class users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
         """
       )
 
-  test("Staff can see many users.".ignore):
+  test("Staff can see many users."):
     flaky():
       As(Bob, withRole = Some(RoleRequest.Staff)).query(
         """
@@ -91,6 +92,7 @@ class users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
             }
           }
         """
-      ).map: _ =>  
-        fail("not implemented")
+      ).flatMap: j =>
+        IO.println(j.spaces2)
+
 

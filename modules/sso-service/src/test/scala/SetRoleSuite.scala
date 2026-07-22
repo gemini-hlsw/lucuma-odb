@@ -7,7 +7,6 @@ import cats.effect.*
 import cats.syntax.all.*
 import lucuma.core.model.*
 import lucuma.sso.service.database.RoleRequest
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.headers.Location
 
 class SetRoleSuite extends SsoSuite with Fixture with FlakyTests {

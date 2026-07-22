@@ -6,7 +6,6 @@ package lucuma.sso.service
 import cats.effect.*
 import cats.implicits.*
 import lucuma.core.model.*
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.headers.Location
 
 class ExistingUserSuite extends SsoSuite with Fixture with FlakyTests {

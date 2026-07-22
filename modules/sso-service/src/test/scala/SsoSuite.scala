@@ -10,7 +10,9 @@ import munit.CatsEffectSuite
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-trait SsoSuite extends CatsEffectSuite {
+import simulator.SsoSimulator
+
+trait SsoSuite extends CatsEffectSuite with SsoSimulator {
 
   implicit val logger: Logger[IO] =
     Slf4jLogger.getLogger
