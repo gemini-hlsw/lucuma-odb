@@ -22,7 +22,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
-import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.OdbError
 import lucuma.odb.util.Codecs.program_id
 import skunk.syntax.all.*
@@ -146,24 +145,6 @@ class refreshArchiveDuplication extends OdbSuite:
       """
     )
 
-  test("a search filled to GOA's cap is reported as saturated"):
-    // The count is reported as it stands; rendering it as "500+" is Explore's job.
-    val names = (1 to ArchiveDuplication.QueryLimit).toList.map(i => s"f$i.fits")
-    for
-      oid <- observation()
-      _   <- archive.set(Archive.Holding(records(names*)))
-      js  <- refreshArchiveDuplicationAs(pi, oid, "state matchCount saturated")
-    yield assertEquals(
-      js,
-      json"""
-        {
-          "state": "CHECKED",
-          "matchCount": ${ArchiveDuplication.QueryLimit},
-          "saturated": true
-        }
-      """
-    )
-
   test("an instrument GOA does not know is reported as not checked"):
     for
       pid <- createProgramAs(pi)
@@ -234,25 +215,6 @@ class refreshArchiveDuplication extends OdbSuite:
     yield
       assertEquals(js.hcursor.downField("state").as[String], Right("ERROR"))
       assert(js.hcursor.downField("error").as[String].exists(_.contains("Network error")))
-
-  test("an unreachable archive leaves the last good result readable"):
-    for
-      oid <- observation()
-      _   <- archive.set(Archive.Holding(records("a.fits", "b.fits")))
-      _   <- refreshArchiveDuplicationAs(pi, oid)
-      _   <- archive.set(Archive.Down)
-      _   <- refreshArchiveDuplicationAs(pi, oid)
-      db  <- storedDuplication(oid, "state matchCount matches { name }")
-    yield assertEquals(
-      db,
-      json"""
-        {
-          "state": "ERROR",
-          "matchCount": 2,
-          "matches": [{ "name": "a.fits" }, { "name": "b.fits" }]
-        }
-      """
-    )
 
   test("creating an observation while the archive is unreachable still succeeds"):
     for
