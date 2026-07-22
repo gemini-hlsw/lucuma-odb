@@ -152,8 +152,7 @@ class goaDuplication extends OdbSuite:
                matches {
                  name
                  dataLabel
-                 ra { degrees }
-                 dec { degrees }
+                 coordinates { ra { degrees } dec { degrees } }
                  instrument
                  observationType
                  observationClass
@@ -184,8 +183,7 @@ class goaDuplication extends OdbSuite:
             {
               "name": "S20240101S0001.fits",
               "dataLabel": "GS-2024A-Q-1-1-001",
-              "ra": { "degrees": 0.0 },
-              "dec": { "degrees": 0.01 },
+              "coordinates": { "ra": { "degrees": 0.0 }, "dec": { "degrees": 0.01 } },
               "instrument": "GMOS-S",
               "observationType": "OBJECT",
               "observationClass": "science",
@@ -264,35 +262,35 @@ class goaDuplication extends OdbSuite:
       assert(js.hcursor.downField("lastCheckedAt").focus.exists(!_.isNull))
       assert(js.hcursor.downField("searchRadius").downField("microarcseconds").focus.exists(!_.isNull))
 
-  test("distanceArcsec is the separation from the stored search center"):
+  test("distance is the separation from the stored search center"):
     for
       oid    <- siderealObservation
       _      <- refresh(GoaClientMock.fromJson[IO](FullRecord))(oid)
       center <- searchCenterOf(oid)
-      js     <- goaDuplication(oid, "matches { ra { degrees } dec { degrees } distanceArcsec }")
+      js     <- goaDuplication(oid, "matches { coordinates { ra { degrees } dec { degrees } } distance { microarcseconds } }")
     yield
       val m        = js.hcursor.downField("matches").downN(0)
-      val ra       = m.downField("ra").downField("degrees").as[BigDecimal].toOption.get
-      val dec      = m.downField("dec").downField("degrees").as[BigDecimal].toOption.get
-      val actual   = m.downField("distanceArcsec").as[BigDecimal].toOption.get
+      val coords   = m.downField("coordinates")
+      val ra       = coords.downField("ra").downField("degrees").as[BigDecimal].toOption.get
+      val dec      = coords.downField("dec").downField("degrees").as[BigDecimal].toOption.get
+      val actual   = m.downField("distance").downField("microarcseconds").as[Long].toOption.get
       val matchAt  = Coordinates(
                        RightAscension.fromDoubleDegrees(ra.toDouble),
                        Declination.fromDoubleDegrees(dec.toDouble).get
                      )
-      val expected = BigDecimal(center.get.angularDistance(matchAt).toMicroarcseconds) / 1_000_000
-      assertEquals(actual, expected)
+      assertEquals(actual, center.get.angularDistance(matchAt).toMicroarcseconds)
 
-  test("distanceArcsec is null for a match with no pointing"):
+  test("distance is null for a match with no pointing"):
     for
       oid <- siderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
-      js  <- goaDuplication(oid, "matches { name ra { degrees } dec { degrees } distanceArcsec }")
+      js  <- goaDuplication(oid, "matches { name coordinates { ra { degrees } } distance { microarcseconds } }")
     yield assertEquals(
       js,
       json"""
         {
           "matches": [
-            { "name": "a.fits", "ra": null, "dec": null, "distanceArcsec": null }
+            { "name": "a.fits", "coordinates": null, "distance": null }
           ]
         }
       """
@@ -305,7 +303,7 @@ class goaDuplication extends OdbSuite:
       js  <- goaDuplication(oid, """
                searchTargetName
                searchCoordinates { ra { degrees } }
-               matches { name distanceArcsec }
+               matches { name distance { microarcseconds } }
              """)
     yield assertEquals(
       js,
@@ -314,7 +312,7 @@ class goaDuplication extends OdbSuite:
           "searchTargetName": "Halley",
           "searchCoordinates": null,
           "matches": [
-            { "name": "S20240101S0001.fits", "distanceArcsec": null }
+            { "name": "S20240101S0001.fits", "distance": null }
           ]
         }
       """

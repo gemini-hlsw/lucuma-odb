@@ -5,18 +5,12 @@ package lucuma.odb.graphql
 
 package mapping
 
-import cats.syntax.all.*
-import grackle.Cursor
 import grackle.Query.Binding
 import grackle.Query.OrderBy
 import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
-import grackle.Result
 import grackle.TypeRef
-import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 
 import table.GoaDuplicationView
 import table.GoaMatchView
@@ -46,8 +40,7 @@ trait GoaDuplicationMapping[F[_]]
       SqlField("id", GoaMatchView.Id, key = true, hidden = true),
       SqlField("name", GoaMatchView.Name),
       SqlField("dataLabel", GoaMatchView.DataLabel),
-      SqlObject("ra"),
-      SqlObject("dec"),
+      SqlObject("coordinates"),
       SqlField("instrument", GoaMatchView.Instrument),
       SqlField("observationType", GoaMatchView.ObservationType),
       SqlField("observationClass", GoaMatchView.ObservationClass),
@@ -64,31 +57,8 @@ trait GoaDuplicationMapping[F[_]]
       SqlField("airmass", GoaMatchView.Airmass),
       SqlObject("azimuth"),
       SqlObject("elevation"),
-      SqlField("distanceRa", GoaMatchView.Distance.Ra, hidden = true),
-      SqlField("distanceDec", GoaMatchView.Distance.Dec, hidden = true),
-      SqlField("searchRa", GoaMatchView.Distance.SearchRa, hidden = true),
-      SqlField("searchDec", GoaMatchView.Distance.SearchDec, hidden = true),
-      CursorField[Option[BigDecimal]](
-        "distanceArcsec",
-        distanceArcsec,
-        List("distanceRa", "distanceDec", "searchRa", "searchDec")
-      )
+      SqlObject("distance")
     )
-
-  /**
-   * Angular separation between a match and the center it was found around.
-   * Absent when the search ran by target name, so there is no center to measure
-   * from, or when the archived file records no pointing.
-   */
-  private def distanceArcsec(c: Cursor): Result[Option[BigDecimal]] =
-    for
-      ra        <- c.fieldAs[Option[RightAscension]]("distanceRa")
-      dec       <- c.fieldAs[Option[Declination]]("distanceDec")
-      searchRa  <- c.fieldAs[Option[RightAscension]]("searchRa")
-      searchDec <- c.fieldAs[Option[Declination]]("searchDec")
-    yield (ra, dec, searchRa, searchDec).mapN: (r, d, sr, sd) =>
-      val separation = Coordinates(sr, sd).angularDistance(Coordinates(r, d))
-      BigDecimal(separation.toMicroarcseconds) / 1_000_000
 
   lazy val GoaDuplicationElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     case (GoaDuplicationType, "matches", Nil) =>

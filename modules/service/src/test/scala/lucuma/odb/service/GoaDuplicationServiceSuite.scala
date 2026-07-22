@@ -21,6 +21,7 @@ import lucuma.odb.data.GoaDuplication
 import lucuma.odb.data.GoaSearchCenter
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
+import lucuma.refined.*
 import skunk.Transaction
 
 import java.time.Instant
@@ -151,11 +152,11 @@ class GoaDuplicationServiceSuite extends OdbSuite:
     for
       oid <- newObservation
       _   <- run(_.store(oid, sidereal(1), List(fullRecord)))
-      _   <- run(_.storeError(oid, "GOA is down"))
+      _   <- run(_.storeError(oid, "GOA is down".refined))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.header.state, GoaDuplication.State.Error)
-      assertEquals(s.header.error, "GOA is down".some)
+      assertEquals(s.header.error, NonEmptyString.unsafeFrom("GOA is down").some)
       assertEquals(s.header.matchCount.value, 1)
       assertEquals(s.header.lastCheckedAt, checkedAt.some)
       assertEquals(s.matches, List(fullRecord))
@@ -163,7 +164,7 @@ class GoaDuplicationServiceSuite extends OdbSuite:
   test("an error with no previous snapshot reports the error and no matches"):
     for
       oid <- newObservation
-      _   <- run(_.storeError(oid, "GOA is down"))
+      _   <- run(_.storeError(oid, "GOA is down".refined))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.header.state, GoaDuplication.State.Error)

@@ -8,6 +8,7 @@ import cats.derived.*
 import cats.syntax.option.*
 import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.math.Angle
 import lucuma.core.util.Enumerated
@@ -52,7 +53,7 @@ object GoaDuplication:
     matchCount:    NonNegInt,
     saturated:     Boolean,
     lastCheckedAt: Option[Timestamp],
-    error:         Option[String],
+    error:         Option[NonEmptyString],
     provenance:    Provenance
   ) derives Eq
 
