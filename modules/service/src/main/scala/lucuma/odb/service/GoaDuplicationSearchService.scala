@@ -9,6 +9,7 @@ import cats.effect.Clock
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import lucuma.catalog.goa.GoaClient
@@ -29,6 +30,7 @@ import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.GoaQueryPolicy
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.util.Codecs.*
+import lucuma.refined.*
 import skunk.Query
 import skunk.syntax.all.*
 
@@ -169,7 +171,10 @@ object GoaDuplicationSearchService:
         observationId: Observation.Id,
         errors:        NonEmptyChain[GoaQueryError]
       )(using NoTransaction[F]): F[GoaDuplication.Snapshot] =
-        val message = errors.toList.map(_.message).mkString("; ")
+        val message: NonEmptyString =
+          NonEmptyString
+            .from(errors.toList.map(_.message).mkString("; "))
+            .getOrElse("The Archive Duplication Search failed for an unreported reason.".refined)
         services.transactionally:
           goaDuplicationService.storeError(observationId, message) >>
           goaDuplicationService.select(observationId)

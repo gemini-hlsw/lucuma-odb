@@ -43,7 +43,7 @@ CREATE TABLE t_goa_duplication (
   -- When the stored matches were gathered.  Null until a search has succeeded.
   c_last_checked_at timestamp               NULL,
 
-  c_error           text                    NULL,
+  c_error           text                    NULL CHECK (c_error <> ''),
 
   -- Search provenance.  Kept so the per-match angular distance can be derived
   -- from what was actually searched rather than from the observation as it
@@ -67,9 +67,10 @@ COMMENT ON TABLE t_goa_duplication IS
 -- replacing a snapshot is a delete of these plus an upsert of the header, and
 -- there can be no matches without a header.
 --
--- The GOA record fields come from OCS and do not all map onto lucuma types:
--- the archive instrument name, disperser, filter, QA state and the OCS program
--- and observation ids are kept as text.
+-- The GOA record fields do not all map onto lucuma types, so the archive
+-- instrument name, disperser, filter, QA state, observation type and class, and
+-- the program and observation ids are all kept as text.  The archive holds both
+-- OCS- and GPP-era data, so those last four carry values from either era.
 CREATE TABLE t_goa_match (
 
   c_observation_id     d_observation_id NOT NULL
@@ -106,9 +107,9 @@ CREATE TABLE t_goa_match (
 COMMENT ON TABLE t_goa_match IS
   'One archived file matched by an Archive Duplication Search.';
 COMMENT ON COLUMN t_goa_match.c_goa_program_id IS
-  'OCS program id as reported by GOA, e.g. GN-2019A-Q-101.  Not a lucuma program id.';
+  'Program id as reported by GOA: a GPP program id, or an OCS one such as GN-2019A-Q-101.';
 COMMENT ON COLUMN t_goa_match.c_goa_observation_id IS
-  'OCS observation id as reported by GOA.  Not a lucuma observation id.';
+  'Observation id as reported by GOA: a GPP observation id, or an OCS one such as GN-2019A-Q-101-11.';
 
 -- Every observation has a duplication result, whether or not it has been
 -- searched: an observation with no header row reads as never checked, with no

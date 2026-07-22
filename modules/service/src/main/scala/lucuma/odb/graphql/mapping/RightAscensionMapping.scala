@@ -54,11 +54,10 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
       rightAscensionMappingAtPath(GhostIfuType / "skyPosition" / "ra", GhostIfuView.Sky.Id, GhostIfuView.Sky.Ra),
       rightAscensionMappingAtPath(GoaDuplicationType / "searchCoordinates" / "ra", GoaDuplicationView.SearchCoordinates.SyntheticId, GoaDuplicationView.SearchCoordinates.Ra),
-      rightAscensionMappingAtPath(GoaMatchType / "ra", GoaMatchView.Coordinates.SyntheticId, GoaMatchView.Coordinates.Ra),
+      rightAscensionMappingAtPath(GoaMatchType / "coordinates" / "ra", GoaMatchView.Coordinates.SyntheticId, GoaMatchView.Coordinates.Ra),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "start", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.Start),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "end", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.End),
       rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
     )
 
 }
-

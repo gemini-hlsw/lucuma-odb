@@ -6,7 +6,6 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import skunk.codec.boolean.bool
-import skunk.codec.text.text
 
 trait GoaDuplicationView[F[_]] extends BaseMapping[F]:
 
@@ -16,7 +15,7 @@ trait GoaDuplicationView[F[_]] extends BaseMapping[F]:
     val MatchCount: ColumnRef     = col("c_match_count",      int4_nonneg)
     val Saturated: ColumnRef      = col("c_saturated",        bool)
     val LastCheckedAt: ColumnRef  = col("c_last_checked_at",  core_timestamp.opt)
-    val Error: ColumnRef          = col("c_error",            text.opt)
+    val Error: ColumnRef          = col("c_error",            text_nonempty.opt)
     val SearchTargetName: ColumnRef = col("c_search_target",  text_nonempty.opt)
 
     object SearchCoordinates:
