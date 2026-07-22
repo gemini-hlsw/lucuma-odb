@@ -18,7 +18,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.ArchiveDuplication
-import lucuma.odb.data.ArchiveSearchCenter
+import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.refined.*
@@ -33,7 +33,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
 
   override val validUsers: List[User] = List(pi)
 
-  private val searchCenter: Coordinates =
+  private val searchPointing: Coordinates =
     Coordinates.fromHmsDms.unsafeGet("17 57 48.49803 +04 41 36.2072")
 
   private val checkedAt: Timestamp =
@@ -44,8 +44,8 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     GoaSummaryRecord(
       name             = "N20190101S0123.fits",
       dataLabel        = "GN-2019A-Q-101-1-001".some,
-      ra               = searchCenter.ra.some,
-      dec              = searchCenter.dec.some,
+      ra               = searchPointing.ra.some,
+      dec              = searchPointing.dec.some,
       instrument       = "GMOS-N",
       observationType  = GoaObservationType.Object,
       observationClass = GoaObservationClass.Science.some,
@@ -89,8 +89,8 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       elevation        = none
     )
 
-  private def header(count: Int, center: Option[ArchiveSearchCenter]): ArchiveDuplication.Header =
-    ArchiveDuplication.Header(
+  private def summary(count: Int, center: Option[ArchiveSearchPointing]): ArchiveDuplication.Summary =
+    ArchiveDuplication.Summary(
       ArchiveDuplication.State.Checked,
       NonNegInt.unsafeFrom(count),
       saturated     = false,
@@ -99,8 +99,8 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       searchArea    = ArchiveDuplication.SearchArea(center, Angle.fromDoubleArcseconds(180.0).some)
     )
 
-  private def sidereal(count: Int): ArchiveDuplication.Header =
-    header(count, ArchiveSearchCenter.Sidereal(searchCenter).some)
+  private def sidereal(count: Int): ArchiveDuplication.Summary =
+    summary(count, ArchiveSearchPointing.Sidereal(searchPointing).some)
 
   private def newObservation: IO[Observation.Id] =
     createProgramAs(pi).flatMap(createObservationAs(pi, _))
@@ -115,7 +115,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       oid <- newObservation
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header, ArchiveDuplication.Header.NeverChecked)
+      assertEquals(s.summary, ArchiveDuplication.Summary.NeverChecked)
       assertEquals(s.matches, Nil)
 
   test("a stored snapshot round-trips with every column"):
@@ -126,17 +126,17 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       _   <- run(_.store(oid, h, ms))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header, h)
+      assertEquals(s.summary, h)
       assertEquals(s.matches.sortBy(_.name), ms.sortBy(_.name))
 
   test("a non-sidereal search center round-trips as a target name"):
     val name = NonEmptyString.unsafeFrom("Ceres")
-    val h    = header(0, ArchiveSearchCenter.NonSidereal(name).some)
+    val h    = summary(0, ArchiveSearchPointing.NonSidereal(name).some)
     for
       oid <- newObservation
       _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
-    yield assertEquals(s.header.searchArea.center, ArchiveSearchCenter.NonSidereal(name).some)
+    yield assertEquals(s.summary.searchArea.center, ArchiveSearchPointing.NonSidereal(name).some)
 
   test("storing replaces the previous snapshot rather than appending to it"):
     for
@@ -145,7 +145,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       _   <- run(_.store(oid, sidereal(1), List(sparseRecord)))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header.matchCount.value, 1)
+      assertEquals(s.summary.matchCount.value, 1)
       assertEquals(s.matches, List(sparseRecord))
 
   test("an error leaves the previous matches and last checked time intact"):
@@ -155,10 +155,10 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       _   <- run(_.storeError(oid, "GOA is down".refined))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.Error)
-      assertEquals(s.header.error, NonEmptyString.unsafeFrom("GOA is down").some)
-      assertEquals(s.header.matchCount.value, 1)
-      assertEquals(s.header.lastCheckedAt, checkedAt.some)
+      assertEquals(s.summary.state, ArchiveDuplication.State.Error)
+      assertEquals(s.summary.error, NonEmptyString.unsafeFrom("GOA is down").some)
+      assertEquals(s.summary.matchCount.value, 1)
+      assertEquals(s.summary.lastCheckedAt, checkedAt.some)
       assertEquals(s.matches, List(fullRecord))
 
   test("an error with no previous snapshot reports the error and no matches"):
@@ -167,18 +167,18 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       _   <- run(_.storeError(oid, "GOA is down".refined))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.Error)
-      assertEquals(s.header.lastCheckedAt, none)
-      assertEquals(s.header.matchCount.value, 0)
+      assertEquals(s.summary.state, ArchiveDuplication.State.Error)
+      assertEquals(s.summary.lastCheckedAt, none)
+      assertEquals(s.summary.matchCount.value, 0)
       assertEquals(s.matches, Nil)
 
   test("a not-checked snapshot records that the search ran but could not be performed"):
-    val h = ArchiveDuplication.Header.notChecked(checkedAt, ArchiveDuplication.SearchArea.Empty)
+    val h = ArchiveDuplication.Summary.notChecked(checkedAt, ArchiveDuplication.SearchArea.Empty)
     for
       oid <- newObservation
       _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.header.state, ArchiveDuplication.State.NotChecked)
-      assertEquals(s.header.lastCheckedAt, checkedAt.some)
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotChecked)
+      assertEquals(s.summary.lastCheckedAt, checkedAt.some)
       assertEquals(s.matches, Nil)
