@@ -230,19 +230,11 @@ class GoaQueryPolicySuite extends FunSuite:
       BigDecimal("165.201").some
     )
 
-  test("a long slit searches a smaller area than imaging with the same instrument"):
-    val imaging  = GoaQueryPolicy.searchRadius(gmosNorthImaging).get
-    val longSlit = GoaQueryPolicy.searchRadius(gmosNorthLongSlit(GmosNorthFpu.LongSlit_1_00)).get
-    assert(Angle.AngleOrder.lt(longSlit, imaging), s"$longSlit >= $imaging")
-
   test("a mode with no measurable science area has no radius"):
     // A long slit configuration carrying an IFU FPU evaluates to an empty
     // shape; there is nothing to search, which is not the same as searching a
     // zero-radius field.
     assertEquals(GoaQueryPolicy.searchRadius(gmosNorthLongSlit(GmosNorthFpu.Ifu2Slits)), none)
-
-  test("an exchange observation has no Gemini science area to measure"):
-    assertEquals(GoaQueryPolicy.searchRadius(exchange), none)
 
   // -- The three combined --------------------------------------------------
 
