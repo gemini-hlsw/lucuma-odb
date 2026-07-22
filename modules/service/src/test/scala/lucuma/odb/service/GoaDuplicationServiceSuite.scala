@@ -96,7 +96,7 @@ class GoaDuplicationServiceSuite extends OdbSuite:
       saturated     = false,
       lastCheckedAt = checkedAt.some,
       error         = none,
-      provenance    = GoaDuplication.Provenance(center, Angle.fromDoubleArcseconds(180.0).some)
+      searchArea    = GoaDuplication.SearchArea(center, Angle.fromDoubleArcseconds(180.0).some)
     )
 
   private def sidereal(count: Int): GoaDuplication.Header =
@@ -136,7 +136,7 @@ class GoaDuplicationServiceSuite extends OdbSuite:
       oid <- newObservation
       _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
-    yield assertEquals(s.header.provenance.center, GoaSearchCenter.NonSidereal(name).some)
+    yield assertEquals(s.header.searchArea.center, GoaSearchCenter.NonSidereal(name).some)
 
   test("storing replaces the previous snapshot rather than appending to it"):
     for
@@ -173,7 +173,7 @@ class GoaDuplicationServiceSuite extends OdbSuite:
       assertEquals(s.matches, Nil)
 
   test("a not-checked snapshot records that the search ran but could not be performed"):
-    val h = GoaDuplication.Header.notChecked(checkedAt, GoaDuplication.Provenance.Empty)
+    val h = GoaDuplication.Header.notChecked(checkedAt, GoaDuplication.SearchArea.Empty)
     for
       oid <- newObservation
       _   <- run(_.store(oid, h, Nil))

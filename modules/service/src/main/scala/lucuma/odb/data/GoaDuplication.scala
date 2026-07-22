@@ -19,12 +19,11 @@ import lucuma.core.util.Timestamp
  */
 object GoaDuplication:
 
-  /** GOA's hard per-query record cap.  A query that returns this many is a floor. */
+  /** Archive per-query record cap. */
   val QueryLimit: Int = 500
 
   /**
-   * The outcome of the most recent search attempt.  `NotChecked` is advisory
-   * rather than a failure: the observation is one GOA cannot be asked about.
+   * The outcome of the most recent search attempt.
    */
   enum State(val tag: String) derives Enumerated:
     case NotChecked extends State("not_checked")
@@ -32,21 +31,22 @@ object GoaDuplication:
     case Error      extends State("error")
 
   /**
-   * What a search was run against.  Kept so the per-match angular distance is
-   * derived from the search that produced the matches, not from the
-   * observation as it stands now.
+   * The circle on the sky a search ran over: where it looked and how wide.
+   * Stored alongside the results so a match is read against the search that
+   * found it rather than the observation as it stands now.
    */
-  final case class Provenance(
+  final case class SearchArea(
     center: Option[GoaSearchCenter],
     radius: Option[Angle]
   ) derives Eq
 
-  object Provenance:
-    val Empty: Provenance = Provenance(none, none)
+  object SearchArea:
+    val Empty: SearchArea = SearchArea(none, none)
 
   /**
-   * A snapshot as stored, without the matches.  This is what the proposal PDF
-   * and the observation's GraphQL field read.
+   * One row of `t_goa_duplication`: a snapshot's headline values, without the
+   * matches they summarize.  This is the storage side only — GraphQL serves the
+   * same values independently, straight from `v_goa_duplication`.
    */
   final case class Header(
     state:         State,
@@ -54,25 +54,20 @@ object GoaDuplication:
     saturated:     Boolean,
     lastCheckedAt: Option[Timestamp],
     error:         Option[NonEmptyString],
-    provenance:    Provenance
+    searchArea:    SearchArea
   ) derives Eq
 
   object Header:
 
     /** The header of an observation that has never been searched. */
     val NeverChecked: Header =
-      Header(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, Provenance.Empty)
+      Header(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, SearchArea.Empty)
 
-    def notChecked(at: Timestamp, provenance: Provenance): Header =
-      Header(State.NotChecked, NonNegInt.unsafeFrom(0), false, at.some, none, provenance)
+    def notChecked(at: Timestamp, searchArea: SearchArea): Header =
+      Header(State.NotChecked, NonNegInt.unsafeFrom(0), false, at.some, none, searchArea)
 
   /** A header together with the matched files it summarizes. */
   final case class Snapshot(
     header:  Header,
     matches: List[GoaSummaryRecord]
   )
-
-  object Snapshot:
-
-    val NeverChecked: Snapshot =
-      Snapshot(Header.NeverChecked, Nil)

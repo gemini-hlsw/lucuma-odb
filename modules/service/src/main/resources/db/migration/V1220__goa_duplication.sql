@@ -45,7 +45,7 @@ CREATE TABLE t_goa_duplication (
 
   c_error           text                    NULL CHECK (c_error <> ''),
 
-  -- Search provenance.  Kept so the per-match angular distance can be derived
+  -- The area searched.  Kept so the per-match angular distance can be derived
   -- from what was actually searched rather than from the observation as it
   -- stands now.  A sidereal search stores coordinates, a non-sidereal one the
   -- target name it was run against.
