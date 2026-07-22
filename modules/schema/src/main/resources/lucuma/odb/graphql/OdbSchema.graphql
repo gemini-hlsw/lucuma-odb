@@ -12904,13 +12904,21 @@ type SpectroscopyConfigOptionGhost {
 }
 
 type SpectroscopyConfigOptionGmosNorth {
-  fpu: GmosNorthBuiltinFpu!
+  """
+  The builtin FPU, present for single-slit configurations. Null for multislit
+  (MOS) configurations, where the focal-plane unit is a custom mask.
+  """
+  fpu: GmosNorthBuiltinFpu
   grating: GmosNorthGrating!
   filter: GmosNorthFilter
 }
 
 type SpectroscopyConfigOptionGmosSouth {
-  fpu: GmosSouthBuiltinFpu!
+  """
+  The builtin FPU, present for single-slit configurations. Null for multislit
+  (MOS) configurations, where the focal-plane unit is a custom mask.
+  """
+  fpu: GmosSouthBuiltinFpu
   grating: GmosSouthGrating!
   filter: GmosSouthFilter
 }

@@ -3,6 +3,7 @@
 
 import cats.effect.IO
 import lucuma.odb.phase0.FileReader
+import lucuma.odb.phase0.FpuOption
 import munit.CatsEffectSuite
 
 class Phase0LoaderSuite extends CatsEffectSuite:
@@ -24,7 +25,9 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .compile
       .toList
       .map: rows =>
-        assertEquals(rows.length, 161)
+        assertEquals(rows.length, 322)
+        assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Multislit), 161)
+        assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Singleslit), 161)
 
   test("loadAll gmosSouth spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
@@ -41,7 +44,8 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .compile
       .toList
       .map: rows =>
-        assertEquals(rows.length, 182)
+        assertEquals(rows.length, 364)
+        assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Multislit), 182)
 
   test("loadAll flamingos2 spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
