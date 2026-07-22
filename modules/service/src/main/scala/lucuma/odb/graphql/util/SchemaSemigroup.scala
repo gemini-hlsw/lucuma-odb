@@ -7,7 +7,6 @@ import cats.Semigroup
 import cats.syntax.all.*
 import grackle.DirectiveDef
 import grackle.EnumType
-import grackle.Mapping
 import grackle.NamedType
 import grackle.ObjectType
 import grackle.Schema
@@ -15,9 +14,9 @@ import grackle.Type
 import org.tpolecat.sourcepos.SourcePos
 
 /** A mixin that provides Semigroup[Schema]. */
-trait SchemaSemigroup[F[_]] extends Mapping[F] {
+trait SchemaSemigroup {
 
-  private implicit val SemigroupDirectiveDef: Semigroup[DirectiveDef] = (a, b) =>
+  private given SemigroupDirectiveDef: Semigroup[DirectiveDef] = (a, b) =>
     if (a.name != b.name) a
     else DirectiveDef(
       a.name,
@@ -27,7 +26,7 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
       (a.locations ++ b.locations).distinct,
     )
 
-  private implicit val SemigroupNamedType: Semigroup[NamedType] = {
+  private given SemigroupNamedType: Semigroup[NamedType] = {
     case ((a: ObjectType), (b: ObjectType)) if sameName(a, b) =>
       ObjectType(
         a.name,
@@ -38,16 +37,16 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
       )
     case ((a: EnumType, b: EnumType)) if sameName(a, b) =>
       EnumType(
-        a.name, 
-        a.description, 
-        (a.enumValues ++ b.enumValues).distinctBy(_.name).filterNot(_.name == "DUMMY"), 
+        a.name,
+        a.description,
+        (a.enumValues ++ b.enumValues).distinctBy(_.name).filterNot(_.name == "DUMMY"),
         (a.directives ++ b.directives).distinctBy(_.name)
       )
     // todo: other named types
     case (a, _) => a
   }
 
-  implicit val SemigroupSchema: Semigroup[Schema] = (a, b) =>
+  given SemigroupSchema: Semigroup[Schema] = (a, b) =>
     Remapper.remap {
       new Schema {
         val pos: SourcePos = a.pos
@@ -77,5 +76,4 @@ trait SchemaSemigroup[F[_]] extends Mapping[F] {
 
 }
 
-
-
+object SchemaSemigroup extends SchemaSemigroup

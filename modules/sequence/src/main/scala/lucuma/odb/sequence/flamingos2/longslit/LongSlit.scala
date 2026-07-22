@@ -12,7 +12,7 @@ import lucuma.core.enums.MosPreImaging
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as F2Static
-import lucuma.odb.data.Itc.Spectroscopy
+import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 
@@ -32,10 +32,11 @@ object LongSlit:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, F2Static, F2Dynamic],
     config:         Config,
-    itc:            Either[OdbError, Spectroscopy],
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
     (for
-       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, itc.map(_.acquisition.focus.value)))
-       s <- EitherT(Science.instantiate(observationId, estimator, Static, namespace, expander, config, itc.map(_.science.focus.value), calRole))
+       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, acquisitionItc))
+       s <- EitherT(Science.instantiate(observationId, estimator, Static, namespace, expander, config, scienceItc, calRole))
     yield StreamingExecutionConfig(Static, a.generate, s.generate)).value

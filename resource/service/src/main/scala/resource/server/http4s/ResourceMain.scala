@@ -15,10 +15,14 @@ import fs2.io.file.Files
 import fs2.io.net.*
 import grackle.Schema
 import grackle.skunk.SkunkMonitor
+import lucuma.core.model.User
 import lucuma.otel.OtelSetup
+import lucuma.sso.client.SsoClient
 import natchez.Trace
 import org.flywaydb.core.Flyway
 import org.http4s.*
+import org.http4s.client.Client
+import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
@@ -54,17 +58,37 @@ object ResourceMain extends IOApp.Simple {
       given Meter[F]          = otel.meter
       given TracerProvider[F] = otel.tracerProvider
       given MeterProvider[F]  = otel.meterProvider
-      r                      <- routesResource[F](conf.database, conf.corsOverHttps, conf.domain)
+      ssoClient              <- ssoClientResource[F](conf.sso)
+      r                      <- routesResource[F](conf.database, conf.corsOverHttps, conf.domain, ssoClient)
       s                      <- server(conf, r)
     yield s
 
+  def ssoClientResource[F[_]: {Async, Network, Logger}](
+    config: SsoConfiguration
+  ): Resource[F, SsoClient[F, User]] =
+    EmberClientBuilder.default[F].build.evalMap(ssoClient[F](config, _))
+
+  def ssoClient[F[_]: {Async, Logger}](
+    config:     SsoConfiguration,
+    httpClient: Client[F]
+  ): F[SsoClient[F, User]] =
+    SsoClient
+      .initial(
+        serviceJwt = config.serviceJwt,
+        ssoRoot = config.root,
+        jwtReader = config.jwtReader[F],
+        httpClient = httpClient
+      )
+      .map(_.map(_.user))
+
   def routes[F[_]: {Async, Files, Tracer}](
-    pool:            Resource[F, Session[F]],
-    monitor:         SkunkMonitor[F],
-    schema:          Schema
+    pool:              Resource[F, Session[F]],
+    monitor:           SkunkMonitor[F],
+    schema:            Schema,
+    ssoClient:         SsoClient[F, User]
   )(wsb: WebSocketBuilder2[F]): HttpRoutes[F] = Router[F](
     "/"         -> new StaticRoutes().service,
-    "/resource" -> new GraphQlRoutes().service(wsb, pool, monitor, schema)
+    "/resource" -> new GraphQlRoutes().service(wsb, pool, monitor, schema, ssoClient)
   )
 
   def routesResource[
@@ -73,13 +97,14 @@ object ResourceMain extends IOApp.Simple {
   ](
     databaseConfig: DatabaseConfiguration,
     corsOverHttps:  Boolean,
-    domain:         Seq[String]
+    domain:         Seq[String],
+    ssoClient:      SsoClient[F, User]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for
       pool       <- databasePool(databaseConfig)
       schema     <- GraphQlRoutes.loadSchema[F].toResource
-      r           = routes(pool, SkunkMonitor.noopMonitor[F], schema)
-      middleware <- ServerMiddleware(corsOverHttps, domain).toResource
+      r           = routes(pool, SkunkMonitor.noopMonitor[F], schema, ssoClient)
+      middleware <- ServerMiddleware(corsOverHttps, domain, ssoClient).toResource
     yield wsb => middleware(r(wsb))
 
   def server[F[_]: {Async, Network}](

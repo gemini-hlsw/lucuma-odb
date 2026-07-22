@@ -66,7 +66,7 @@ def routesForWsb(
 
   for
     cache  <- RedisEffectfulCache[IO](new NoOpRedis[IO, Array[Byte], Array[Byte]]())
-    itcMap <- ItcMapping[IO](ExecutionEnvironment.Local, cache, itc, testConfig)
+    itcMap <- ItcMapping[IO](cache, itc, testConfig)
   yield (wsb: WebSocketBuilder2[IO]) =>
     Routes.forService(_ => IO.pure(GraphQLService(itcMap).some), wsb)
 

@@ -210,17 +210,20 @@ object FMain extends AnsiColor {
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
   def routesResource[F[_]: Async: Trace: Tracer: Meter: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
-      pool     <- databasePoolResource[F](config.database)
-      schema <- SsoMapping.loadSchema[F].toResource
-      channels <- SsoMapping.Channels(pool)
-      orcid    <- orcidServiceResource(config.orcid, config.environment)
+      pool        <- databasePoolResource[F](config.database)
+      schema      <- SsoMapping.loadSchema[F].toResource
+      channels    <- SsoMapping.Channels(pool)
+      orcid       <- orcidServiceResource(config.orcid, config.environment)
+      httpClient  <- EmberClientBuilder.default[F].build
+      dbPool       = pool.map(Database.fromSession(_))
+      serviceUser <- Resource.eval(dbPool.use(_.getSsoServiceUser))
     } yield wsb => ServerMiddleware[F](config).apply {
-      val dbPool = pool.map(Database.fromSession(_))
-      val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect:
-        case su: StandardUser => su
+      val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su }
+      val odb = OdbClient[F](httpClient, config.ssoJwtWriter, config.odbRootUri, serviceUser)
       Routes[F](
         dbPool    = dbPool,
         orcid     = orcid,
+        odb       = odb,
         jwtReader = config.ssoJwtReader,
         jwtWriter = config.ssoJwtWriter,
         publicUri = config.publicUri,

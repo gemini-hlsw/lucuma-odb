@@ -17,6 +17,8 @@ final case class Config(
   centralWavelength: Wavelength,
   // AGS field of view, understood as the diameter of a circular area.
   agsDiameter: Angle,
+  // Science field of view, understood as the diameter of a circular area.
+  scienceFovDiameter: Angle,
   name: Option[NonEmptyString],
   totalRequestTime: Option[TimeSpan]
 ):
@@ -38,6 +40,7 @@ object Config:
         HashBytes[VisitorObservingModeType].hashBytes(c.mode),
         HashBytes[Wavelength].hashBytes(c.centralWavelength),
         HashBytes[Angle].hashBytes(c.agsDiameter),
+        HashBytes[Angle].hashBytes(c.scienceFovDiameter),
         c.name.fold(Array.emptyByteArray)(n => HashBytes[String].hashBytes(n.value)),
         c.totalRequestTime.fold(Array.emptyByteArray)(HashBytes[TimeSpan].hashBytes)
       )

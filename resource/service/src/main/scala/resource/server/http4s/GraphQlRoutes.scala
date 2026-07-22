@@ -5,22 +5,23 @@ package resource.server.http4s
 
 import _root_.skunk.Session
 import cats.ApplicativeThrow
-import cats.Show
 import cats.effect.*
 import cats.syntax.all.*
 import grackle.*
-import grackle.Result.Failure
-import grackle.Result.Success
-import grackle.Result.Warning
 import grackle.skunk.SkunkMonitor
+import lucuma.common.middleware.IntrospectionMapping
+import lucuma.common.middleware.UserAttributes.given
+import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes
 import lucuma.odb.graphql.schema.SchemaStitcher
+import lucuma.sso.client.SsoClient
 import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.Tracer
 import resource.server.graphql.ResourceMapping
 
@@ -30,19 +31,25 @@ class GraphQlRoutes[F[_]: {Async, Tracer}](
   private given Logger[F] = Slf4jLogger.getLogger[F]
 
   def service(
-    wsb:     WebSocketBuilder2[F],
-    pool:    Resource[F, Session[F]],
-    monitor: SkunkMonitor[F],
-    schema:  Schema
+    wsb:       WebSocketBuilder2[F],
+    pool:      Resource[F, Session[F]],
+    monitor:   SkunkMonitor[F],
+    schema:    Schema,
+    ssoClient: SsoClient[F, User]
   ): HttpRoutes[F] =
+    val introspectionService = GraphQLService[F](IntrospectionMapping(schema)).some
     Routes.forService(
-      _ =>
-        GraphQLService[F](
-          ResourceMapping(
-            pool,
-            monitor
-          )(schema)
-        ).some.pure[F],
+      authorization =>
+        authorization
+          .flatTraverse(ssoClient.get)
+          .map:
+            case None =>
+              introspectionService // no auth: only schema introspection is allowed
+            case Some(user) =>
+              GraphQLService[F](
+                ResourceMapping(pool, monitor)(schema),
+                Attributes.from(user).toList*
+              ).some,
       wsb
     )
 }

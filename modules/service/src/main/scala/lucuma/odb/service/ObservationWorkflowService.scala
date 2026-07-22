@@ -45,11 +45,13 @@ import lucuma.core.syntax.string.*
 import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Itc
+import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import lucuma.odb.service.ObservationWorkflowService.UserState
@@ -169,6 +171,9 @@ case class ObservationValidationInfo(
     observingMode.exists:
       case _: VisitorObservingModeType => true
       case _ => false
+
+  def isExchange: Boolean =
+    observingMode.exists(_.isExchange)
 
   lazy val cfpMidpoint: Option[Timestamp] =
     for
@@ -504,7 +509,11 @@ object ObservationWorkflowService {
             case Inactive   => List(executionState.getOrElse(validationStatus))
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
-            case Defined    => List(Inactive) ++ Option.when((!info.isOpportunity) && (info.isAccepted || info.tpe =!= ProgramType.Science))(Ready)
+            case Defined    =>
+              // Exchange observations run at Keck/Subaru, not Gemini; they have no
+              // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
+              List(Inactive) ++
+                Option.when((!info.isExchange) && (!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
@@ -513,22 +522,22 @@ object ObservationWorkflowService {
 
       private def validateObsDefinition(
         infos:  Map[Observation.Id, ObservationValidationInfo],
-        hasItc: Observation.Id => Boolean
+        itcFor: Observation.Id => Option[Itc]
       )(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
 
         type Validator = ObservationValidationInfo => ObservationValidationMap
 
         val (cals, other)         = infos.partition(_._2.role.isDefined)
-        val (nonScience, science) = other.partition(_._2.tpe =!= ProgramType.Science)
+        val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
 
         // Here are our simple validators
 
         val generatorValidator: Validator = info =>
-          if info.isVisitor then ObservationValidationMap.empty
+          if info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else info.generatorParams.foldMap:
-            case Left(error)                                          => ObservationValidationMap.singleton(error.toObsValidation)
-            case Right(GeneratorParams(Left(m), _, _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
-            case Right(ps)                                            => ObservationValidationMap.empty
+            case Left(error)                                                                   => ObservationValidationMap.singleton(error.toObsValidation)
+            case Right(GeneratorParams(ItcInputDerivation.Incomplete(m), _, _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
+            case Right(ps)                                                                     => ObservationValidationMap.empty
 
         val cfpInstrumentValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>
@@ -572,8 +581,20 @@ object ObservationWorkflowService {
             else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
 
         val itcValidator: Validator = info =>
-          if hasItc(info.oid) || info.isVisitor then ObservationValidationMap.empty
+          if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
+
+        // An acquisition-capable mode whose acquisition ITC could not be produced
+        // (a cached deterministic failure) carries an ItcError.  Pre-execution this
+        // maps to Undefined and blocks Ready; during execution the frozen snapshot
+        // is present and execution-state dominance keeps the observation Ongoing,
+        // so it is a non-blocking standing error there.
+        val acquisitionValidator: Validator = info =>
+          if info.isVisitor then ObservationValidationMap.empty
+          else itcFor(info.oid).foldMap:
+            _.acquisition match
+              case ItcAcquisition.Failed(msg) => ObservationValidationMap.singleton(ObservationValidation.itc(msg))
+              case _                          => ObservationValidationMap.empty
 
         // V magnitudes are used by Observe to set the GHOST slit viewing
         // camera exposure time, so every target in a GHOST observation needs one.
@@ -602,7 +623,7 @@ object ObservationWorkflowService {
           otherConfigErrors
 
         val scienceValidator2: Validator =
-          itcValidator
+          itcValidator |+| acquisitionValidator
 
         // And our validation results
 
@@ -627,7 +648,7 @@ object ObservationWorkflowService {
 
         val toCheck: List[ObservationValidationInfo] =
           science.values.toList.filter: info =>
-            info.isAccepted && prelimV.get(info.oid).forall(_.isEmpty)
+            info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(_.isEmpty)
 
         val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
           NonEmptyList
@@ -675,7 +696,7 @@ object ObservationWorkflowService {
               for
                 infos  <- ResultT.liftF(lookupObsDefinitions(oids))         // Map[Observation.Id, ObsDefinition]
                 itcRes <- ResultT.liftF(lookupCachedItcResults(infos))      // Map[Observation.Id, ItcService.AsterismResults]
-                errs   <- validateObsDefinition(infos, itcRes.keySet.apply) // Map[Observation.Id, ObservationValidationMap]
+                errs   <- validateObsDefinition(infos, itcRes.get)          // Map[Observation.Id, ObservationValidationMap]
               yield (infos, errs, itcRes)
             ).value
 
@@ -706,10 +727,10 @@ object ObservationWorkflowService {
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
         (for
           infos <- ResultT.liftF(lookupObsDefinitions(List(oid)))
-          errs  <- validateObsDefinition(infos, _ => itc.isDefined)
+          errs  <- validateObsDefinition(infos, _ => itc)
           exec = exec0.filter:
             case a: DeclaredExecutionState => true // always ok
-            case _ => !infos.get(oid).exists(_.isVisitor) // otherwise discard the state if it's a visitor
+            case _ => !infos.get(oid).exists(i => i.isVisitor || i.isExchange) // otherwise discard the state if it's a visitor or exchange
           wfExec = exec.flatMap[ExecutionState](ces => ces.workflowExecutionState)
           execs  = wfExec.fold[Map[Observation.Id, ExecutionState]](Map.empty)(es => Map(oid -> es))
           wfs    = computeWorkflows(infos, errs, execs)

@@ -86,6 +86,9 @@ class observation_workflow_visitors extends OdbSuite with ObservingModeSetupOper
         agsDiameter: {
           arcminutes: 1.23
         }
+        scienceFovDiameter: {
+          arcminutes: 1.23
+        }
       }
     """
 

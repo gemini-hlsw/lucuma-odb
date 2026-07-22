@@ -33,6 +33,19 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
     if gzip then headers.map(_.put(`Accept-Encoding`(ContentCoding.gzip)))
     else headers
 
+  protected def withRoutes(user: User, request: Request[IO]): IO[Response[IO]] =
+    withSession: s =>
+      servicesFor(user).use: srv =>
+        SchedulerRoutes(srv(s), ssoClient).orNotFound.run(request)
+
+  protected def decompress(resp: Response[IO]): IO[String] =
+    resp.body
+      .through(Compression.forSync[IO].gunzip(8192))
+      .flatMap(_.content)
+      .through(fs2.text.utf8.decode)
+      .compile
+      .string
+
   protected def gzipAtomsRequest(user: User, gzip: Boolean, oids: String*): IO[Request[IO]] =
     headers(user, gzip).map: hs =>
       Request[IO](
@@ -95,13 +108,6 @@ abstract class SchedulerRoutesSuite extends OdbSuite:
 
     def assertCompressedAtoms(expectedStatus: Status, expectedDigests: List[(Observation.Id, List[AtomDigest])]): IO[Unit] =
       for
-        actual     <- resp
-        compressed <- actual.body.compile.to(Array)
-        body       <- Stream.emits(compressed)
-          .covary[IO]
-          .through(Compression.forSync[IO].gunzip(8192))
-          .flatMap(_.content)
-          .through(fs2.text.utf8.decode)
-          .compile
-          .string
+        actual <- resp
+        body   <- decompress(actual)
       yield assertAtoms(actual, body, expectedStatus, expectedDigests)

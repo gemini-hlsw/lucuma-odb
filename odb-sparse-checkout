@@ -22,5 +22,6 @@
 /modules/sso-backend-client/
 /modules/sso-frontend-client/
 /modules/otel/
+/modules/common-middleware/
 /project/
 /test-cert/

@@ -38,7 +38,11 @@ class spectroscopyConfigOptions extends OdbSuite {
         s.execute(sql"insert into t_spectroscopy_config_option_ghost values('Ghost', 1, 'one_by_one', 'standard')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_f2 values('Flamingos2', 1, 'LongSlit_8', 'R3000', 'H')".command) *>
         s.execute(sql"insert into t_spectroscopy_config_option_gnirs (c_instrument, c_index, c_grating, c_filter, c_fpu_slit, c_prism, c_camera) values('Gnirs', 1, 'D32', 'Order6', 'LongSlit_0_30', 'Mirror', 'ShortBlue')".command) *>
-        s.execute(sql"insert into t_spectroscopy_config_option_gnirs (c_instrument, c_index, c_grating, c_filter, c_fpu_ifu, c_prism, c_camera) values('Gnirs', 2, 'D32', 'Order6', 'LowResolution', 'Mirror', 'ShortBlue')".command)
+        s.execute(sql"insert into t_spectroscopy_config_option_gnirs (c_instrument, c_index, c_grating, c_filter, c_fpu_ifu, c_prism, c_camera) values('Gnirs', 2, 'D32', 'Order6', 'LowResolution', 'Mirror', 'ShortBlue')".command) *>
+        s.execute(sql"""insert into t_spectroscopy_config_option (c_instrument, c_index, c_name, c_focal_plane, c_fpu_label, c_slit_width, c_slit_length, c_disperser_label, c_filter_label, c_wavelength_min, c_wavelength_max, c_wavelength_optimal, c_wavelength_coverage, c_resolution, c_ao, c_capability, c_site) values('GmosNorth', 9001, 'R150 1.5"', 'multiple_slit', '1.5"', 1500000, 330000000, 'R150', NULL, 360000, 1030000, 717000, 1219000, 210, false, NULL, 'gn')""".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option_gmos_north (c_instrument, c_index, c_fpu, c_grating, c_filter) values('GmosNorth', 9001, NULL, 'R150_G5308', NULL)".command) *>
+        s.execute(sql"""insert into t_spectroscopy_config_option (c_instrument, c_index, c_name, c_focal_plane, c_fpu_label, c_slit_width, c_slit_length, c_disperser_label, c_filter_label, c_wavelength_min, c_wavelength_max, c_wavelength_optimal, c_wavelength_coverage, c_resolution, c_ao, c_capability, c_site) values('GmosSouth', 9002, 'R150 1.5"', 'multiple_slit', '1.5"', 1500000, 330000000, 'R150', NULL, 360000, 1030000, 717000, 1219000, 210, false, NULL, 'gs')""".command) *>
+        s.execute(sql"insert into t_spectroscopy_config_option_gmos_south (c_instrument, c_index, c_fpu, c_grating, c_filter) values('GmosSouth', 9002, NULL, 'R150_G5326', NULL)".command)
       ).void
     )
 
@@ -607,6 +611,98 @@ class spectroscopyConfigOptions extends OdbSuite {
               "name" : "R150 1.5\"",
               "gmosSouth": {
                 "fpu": "LONG_SLIT_1_50",
+                "grating": "R150_G5326"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("GmosNorth multislit") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              focalPlane: { EQ: MULTIPLE_SLIT }
+              instrument: { EQ: GMOS_NORTH }
+              resolution: { LT: 500 }
+              slitWidth: {
+                AND: [
+                  { arcseconds: { GT: 1.0 } },
+                  { arcseconds: { LT: 2.0 } }
+                ]
+              }
+            }
+          ) {
+            name
+            focalPlane
+            fpuLabel
+            gmosNorth {
+              fpu
+              grating
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name" : "R150 1.5\"",
+              "focalPlane" : "MULTIPLE_SLIT",
+              "fpuLabel" : "1.5\"",
+              "gmosNorth": {
+                "fpu": null,
+                "grating": "R150_G5308"
+              }
+            }
+          ]
+        }
+      """.asRight
+    )
+  }
+
+  test("GmosSouth multislit") {
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          spectroscopyConfigOptions(
+            WHERE: {
+              focalPlane: { EQ: MULTIPLE_SLIT }
+              instrument: { EQ: GMOS_SOUTH }
+              resolution: { LT: 500 }
+              slitWidth: {
+                AND: [
+                  { arcseconds: { GT: 1.0 } },
+                  { arcseconds: { LT: 2.0 } }
+                ]
+              }
+            }
+          ) {
+            name
+            focalPlane
+            fpuLabel
+            gmosSouth {
+              fpu
+              grating
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "spectroscopyConfigOptions": [
+            {
+              "name" : "R150 1.5\"",
+              "focalPlane" : "MULTIPLE_SLIT",
+              "fpuLabel" : "1.5\"",
+              "gmosSouth": {
+                "fpu": null,
                 "grating": "R150_G5326"
               }
             }

@@ -7,7 +7,6 @@ package input
 import cats.Eq
 import cats.derived.*
 import cats.syntax.foldable.*
-import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.partialOrder.*
@@ -22,25 +21,24 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.math.Offset
 import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.Nullable.NonNull
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.binding.*
 
 object Flamingos2LongSlitInput:
 
-  private def validateOffsets[A](offsets: List[Offset]): Result[List[Offset]] =
-    if (offsets.nonEmpty && offsets.length != 4)
-      Result.failure(s"Flamingos2 must have exactly 0 or 4 offsets, but ${offsets.length} were provided.")
-    else
-      Result(offsets)
+  // Flamingos2's ABBA science pattern requires exactly 4 telescope configs.
+  private def validateConfigs(tc: SlitTelescopeConfigs): Result[SlitTelescopeConfigs] =
+    val n = tc.telescopeConfigs.size
+    if n === 4 then Result(tc)
+    else Result.failure(s"Flamingos2 must have exactly 4 offsets, but $n were provided.")
 
   case class Acquisition(
     filter:           Nullable[Flamingos2Filter],
@@ -71,35 +69,26 @@ object Flamingos2LongSlitInput:
     filter: Flamingos2Filter,
     fpu: Flamingos2Fpu,
     exposureTimeMode: Option[ExposureTimeMode],
-    explicitReadMode: Option[Flamingos2ReadMode]       = None,
-    explicitReads: Option[Flamingos2Reads]             = None,
-    explicitDecker: Option[Flamingos2Decker]           = None,
-    explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    explicitOffsets: Option[List[Offset]]              = None,
-    telluricType: TelluricType                         = TelluricType.Hot,
-    acquisition: Option[Acquisition]                   = None
+    explicitReadMode: Option[Flamingos2ReadMode]           = None,
+    explicitReads: Option[Flamingos2Reads]                 = None,
+    explicitDecker: Option[Flamingos2Decker]               = None,
+    explicitReadoutMode: Option[Flamingos2ReadoutMode]     = None,
+    explicitTelescopeConfigs: Option[SlitTelescopeConfigs] = None,
+    telluricType: TelluricType                             = TelluricType.Hot,
+    acquisition: Option[Acquisition]                       = None
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    val formattedOffsets: Option[String] =
-      explicitOffsets.map(OffsetsFormat.reverseGet)
+    private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
+
+    val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
+
+    val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
   object Create:
 
-    private val Flamingos2Data: Matcher[(
-      Flamingos2Disperser,
-      Flamingos2Filter,
-      Flamingos2Fpu,
-      Option[ExposureTimeMode],
-      Option[Flamingos2ReadMode],
-      Option[Flamingos2Reads],
-      Option[Flamingos2Decker],
-      Option[Flamingos2ReadoutMode],
-      Option[List[Offset]],
-      Option[TelluricType],
-      Option[Acquisition]
-    )] =
+    val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap {
         case List(
           Flamingos2DisperserBinding("disperser", rDisperser),
@@ -110,7 +99,7 @@ object Flamingos2LongSlitInput:
           Flamingos2ReadsBinding.Option("explicitReads", rReads),
           Flamingos2DeckerBinding.Option("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Option("explicitReadoutMode", rReadoutMode),
-          OffsetInput.Binding.List.Option("explicitOffsets", rOffsets),
+          SlitTelescopeConfigsInput.Binding.Option("explicitTelescopeConfigs", rTelescopeConfigs),
           TelluricTypeBinding.Option("telluricType", rTelluricType),
           Acquisition.Binding.Option("acquisition", rAcquisition)
         ) => (
@@ -122,45 +111,27 @@ object Flamingos2LongSlitInput:
           rReads,
           rDecker,
           rReadoutMode,
-          rOffsets,
+          rTelescopeConfigs,
           rTelluricType,
           rAcquisition
-        ).parTupled
-      }
-
-    val Binding: Matcher[Create] =
-      Flamingos2Data.rmap:
-        case (
-          disperser,
-          filter,
-          fpu,
-          exposureTimeMode,
-          explicitReadMode,
-          explicitReads,
-          explicitDecker,
-          explicitReadoutMode,
-          explicitOffsets,
-          telluricType,
-          acquisition
-        ) =>
-          val create =
+        ).parTupled.flatMap { case (disperser, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
+          telescopeConfigs.traverse(validateConfigs).map { validated =>
             Create(
               disperser,
               filter,
               fpu,
               exposureTimeMode,
-              explicitReadMode,
-              explicitReads,
-              explicitDecker,
-              explicitReadoutMode,
-              explicitOffsets,
+              readMode,
+              reads,
+              decker,
+              readoutMode,
+              validated,
               telluricType.getOrElse(TelluricType.Hot),
               acquisition
             )
-
-          explicitOffsets match
-            case Some(offsets) => validateOffsets(offsets).as(create)
-            case None          => create.success
+          }
+        }
+      }
 
   case class Edit(
     disperser: Option[Flamingos2Disperser],
@@ -171,7 +142,7 @@ object Flamingos2LongSlitInput:
     explicitReads: Nullable[Flamingos2Reads],
     explicitDecker: Nullable[Flamingos2Decker],
     explicitReadoutMode: Nullable[Flamingos2ReadoutMode],
-    explicitOffsets: Nullable[List[Offset]],
+    explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs],
     telluricType: Option[TelluricType],
     acquisition: Option[Acquisition]
   ) derives Eq:
@@ -181,14 +152,17 @@ object Flamingos2LongSlitInput:
 
     def limitToPreExecution(access: Access): Boolean =
       // Staff can edit the acquisition info for ongoing observations
-      access <= Access.Pi || 
+      access <= Access.Pi ||
         copy(acquisition = None) =!= Edit.AllUndefined
 
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2LongSlit
 
-    val formattedOffsets: Nullable[String] =
-      explicitOffsets.map(OffsetsFormat.reverseGet)
+    private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
+
+    val explicitSlitOffsetMode = stored.map(_.slitOffsetMode)
+
+    val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
     private def required[A](oa: Option[A], itemName: String): Result[A] =
       Result.fromOption(
@@ -210,26 +184,14 @@ object Flamingos2LongSlitInput:
         explicitReads.toOption,
         explicitDecker.toOption,
         explicitReadoutMode.toOption,
-        explicitOffsets.toOption,
+        explicitTelescopeConfigs.toOption,
         telluricType.getOrElse(TelluricType.Hot),
         acquisition
       )
 
   object Edit:
 
-    private val Flamingos2EditData: Matcher[(
-      Option[Flamingos2Disperser],
-      Option[Flamingos2Filter],
-      Option[Flamingos2Fpu],
-      Option[ExposureTimeMode],
-      Nullable[Flamingos2ReadMode],
-      Nullable[Flamingos2Reads],
-      Nullable[Flamingos2Decker],
-      Nullable[Flamingos2ReadoutMode],
-      Nullable[List[Offset]],
-      Option[TelluricType],
-      Option[Acquisition]
-    )] =
+    val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap {
         case List(
           Flamingos2DisperserBinding.Option("disperser", rDisperser),
@@ -240,7 +202,7 @@ object Flamingos2LongSlitInput:
           Flamingos2ReadsBinding.Nullable("explicitReads", rReads),
           Flamingos2DeckerBinding.Nullable("explicitDecker", rDecker),
           Flamingos2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode),
-          OffsetInput.Binding.List.Nullable("explicitOffsets", rOffsets),
+          SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
           TelluricTypeBinding.Option("telluricType", rTelluricType),
           Acquisition.Binding.Option("acquisition", rAcquisition)
         ) => (
@@ -252,45 +214,27 @@ object Flamingos2LongSlitInput:
           rReads,
           rDecker,
           rReadoutMode,
-          rOffsets,
+          rTelescopeConfigs,
           rTelluricType,
           rAcquisition
-        ).parTupled
-      }
-
-    val Binding: Matcher[Edit] =
-      Flamingos2EditData.rmap:
-        case (
-          grating,
-          filter,
-          fpu,
-          exposureTimeMode,
-          explicitReadMode,
-          explicitReads,
-          explicitDecker,
-          explicitReadoutMode,
-          explicitOffsets,
-          telluricType,
-          acquisition
-        ) =>
-          val edit =
+        ).parTupled.flatMap { case (grating, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
+          telescopeConfigs.traverse(validateConfigs).map { validated =>
             Edit(
               grating,
               filter,
               fpu,
               exposureTimeMode,
-              explicitReadMode,
-              explicitReads,
-              explicitDecker,
-              explicitReadoutMode,
-              explicitOffsets,
+              readMode,
+              reads,
+              decker,
+              readoutMode,
+              validated,
               telluricType,
               acquisition
             )
+          }
+        }
+      }
 
-          explicitOffsets match
-            case NonNull(offsets) => validateOffsets(offsets).as(edit)
-            case _                => edit.success
-
-    private val AllUndefined: Edit = 
+    private val AllUndefined: Edit =
       Edit(None, None, None, None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None, None)

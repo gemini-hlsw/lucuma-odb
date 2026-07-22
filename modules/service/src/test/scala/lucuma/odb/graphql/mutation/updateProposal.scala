@@ -208,7 +208,6 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 programId: "$pid"
                 SET: {
                   subaru: {
-                    type: INTENSIVE
                     minPercentTime: 25
                     partnerSplits: [{ partner: US, percent: 100 }]
                   }
@@ -216,7 +215,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               }
             ) {
               proposal {
-                subaru { type minPercentTime }
+                subaru { minPercentTime }
               }
             }
           }
@@ -225,7 +224,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           {
             "updateProposal": {
               "proposal": {
-                "subaru": { "type": "INTENSIVE", "minPercentTime": 25 }
+                "subaru": { "minPercentTime": 25 }
               }
             }
           }

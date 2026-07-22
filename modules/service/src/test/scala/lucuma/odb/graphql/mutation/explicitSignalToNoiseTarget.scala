@@ -461,3 +461,16 @@ class explicitSignalToNoiseTarget extends OdbSuite:
       obs   <- observationsWhere(pi, s"""program: { id: { EQ: "${pid.show}" } }""")
       _     <- IO(assertEquals(obs, List(oid)))
     yield ()
+
+  // Reproduction for the unique-violation on i_asterism_single_sn_target.
+  test("switching the SN target from the later target to the earlier one does not raise 23505"):
+    for
+      pid <- createProgramAs(pi)
+      t0  <- createTargetAs(pi, pid, "Larry")
+      t1  <- createTargetAs(pi, pid, "Curly")
+      oid <- createObservationAs(pi, pid, t0, t1)
+      _   <- setSnTarget(oid, t1.some) // flag the later target
+      _   <- assertSnTarget(oid, t1.some)
+      _   <- setSnTarget(oid, t0.some) // switch to the earlier target: 23505 today
+      _   <- assertSnTarget(oid, t0.some)
+    yield ()

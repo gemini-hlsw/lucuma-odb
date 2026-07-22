@@ -89,3 +89,7 @@ TASK_*.md
 .claude/
 
 *.bkp
+.pi/
+.scratch/
+CONTEXT-MAP.md
+CONTEXT.md

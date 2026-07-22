@@ -402,12 +402,12 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
     def mkAtom(f: GmosNorthFilter, t: IntegrationTime): Json =
       gnAtom(
         (
-          Step(f, t).withOffset(0, 0).withClass(ObserveClass.NightCal) ::
-          Step(f, t).withOffset(1, 1).withClass(ObserveClass.NightCal) ::
+          Step(f, t).withOffset(0, 0).withClass(ObserveClass.Science) ::
+          Step(f, t).withOffset(1, 1).withClass(ObserveClass.Science) ::
           List.fill(t.exposureCount.value)(Step(f, t)).appendedAll:
             List(
-              Step(f, t).withOffset(0, 0).withClass(ObserveClass.NightCal),
-              Step(f, t).withOffset(1, 1).withClass(ObserveClass.NightCal)
+              Step(f, t).withOffset(0, 0).withClass(ObserveClass.Science),
+              Step(f, t).withOffset(1, 1).withClass(ObserveClass.Science)
             )
         )*
       )
@@ -541,17 +541,17 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
 
     val oneGroup: Json =
       gnAtom(
-        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(100, 100).withClass(ObserveClass.NightCal),
-        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(200, 200).withClass(ObserveClass.NightCal),
-        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(100, 100).withClass(ObserveClass.NightCal),
-        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(200, 200).withClass(ObserveClass.NightCal),
+        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(100, 100).withClass(ObserveClass.Science),
+        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(200, 200).withClass(ObserveClass.Science),
+        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(100, 100).withClass(ObserveClass.Science),
+        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(200, 200).withClass(ObserveClass.Science),
         Step(GmosNorthFilter.GPrime, Time120x06),
         Step(GmosNorthFilter.IPrime, Time060x12),
         Step(GmosNorthFilter.IPrime, Time060x12),
-        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(200, 200).withClass(ObserveClass.NightCal),
-        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(100, 100).withClass(ObserveClass.NightCal),
-        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(200, 200).withClass(ObserveClass.NightCal),
-        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(100, 100).withClass(ObserveClass.NightCal),
+        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(200, 200).withClass(ObserveClass.Science),
+        Step(GmosNorthFilter.IPrime, Time060x12).withOffset(100, 100).withClass(ObserveClass.Science),
+        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(200, 200).withClass(ObserveClass.Science),
+        Step(GmosNorthFilter.GPrime, Time120x06).withOffset(100, 100).withClass(ObserveClass.Science),
       )
 
     val json: List[Json] = List.fill(6)(oneGroup)

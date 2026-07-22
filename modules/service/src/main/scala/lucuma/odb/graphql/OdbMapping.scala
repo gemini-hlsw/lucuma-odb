@@ -34,6 +34,7 @@ import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util.*
+import lucuma.odb.graphql.util.SchemaSemigroup.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
@@ -80,6 +81,14 @@ object OdbMapping {
         dst <- Resource.eval(DatasetTopic(ses, 1024, sup))
       } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst)
   }
+
+  val dumpDir: Option[String] = sys.env.get("ODB_FETCH_DUMP_DIR")
+  val slowQueryThreshold: FiniteDuration =
+    sys.env
+      .get("ODB_SLOW_QUERY_THRESHOLD_MS")
+      .flatMap(_.toIntOption)
+      .map(_.millis)
+      .getOrElse(5.seconds)
 
   // Loads a GraphQL file from the classpath, relative to this Class.
   def unsafeLoadSchema(fileName: String): Schema = {
@@ -407,7 +416,6 @@ object OdbMapping {
                 ConditionsMeasurementMapping,
                 ConfigurationRequestMapping,
                 ConfigurationRequestEditMapping,
-                ConfigurationRequestSelectResultMapping,
                 ConstraintSetGroupMapping,
                 ConstraintSetGroupSelectResultMapping,
                 ConstraintSetMapping,
@@ -517,6 +525,8 @@ object OdbMapping {
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 SchedulingConstraintsMapping,
+                KeckProgramReferenceMapping,
+                SubaruProgramReferenceMapping,
                 ScienceProgramReferenceMapping,
                 ScienceRequirementsMapping,
                 SequenceEventMapping,
@@ -590,6 +600,7 @@ object OdbMapping {
                 CategorizedTimeMappings,
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
+                ConfigurationRequestSelectResultMappings,
                 ConfigurationFlamingos2LongSlitMappings,
                 ConfigurationGnirsLongSlitMappings,
                 ConfigurationIgrins2LongSlitMappings,
@@ -686,26 +697,21 @@ object OdbMapping {
             L.debug("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
             super.defaultRootCursor(query, tpe, parentCursor)
 
+          // Slow/large query instrumentation. Allocated once per mapping instance rather than
+          // on every `fetch` call.
+          private val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
+          private val MaxSqlLength               = 1024
+          private val DumpThreshold              = 50000
+
+          private def truncateSql(s: String): String =
+            if s.length <= MaxSqlLength then s
+            else s"${s.take(MaxSqlLength)}... (${s.length - MaxSqlLength} more chars)"
+
           // Override `fetch` to log the SQL query. This is optional.
           override def fetch(fragment: AppliedFragment, codecs: List[(Boolean, Codec)]): F[Vector[Array[Any]]] = {
-            val SlowQueryLogger: Logger[F] = LF.getLoggerFromName("lucuma-odb-slow-query")
-
-            // Maybe it should be an env variable
-            val SlowQueryThreshold = 5.second
-            val MaxSqlLength       = 1024
-
             val sql = fragment.fragment.sql
 
-            def truncateSql(s: String): String =
-              if s.length <= MaxSqlLength then s
-              else s"${s.take(MaxSqlLength)}... (${s.length - MaxSqlLength} more chars)"
-
-            // When `ODB_FETCH_DUMP_DIR` is set, large statements are written raw to a file on that
-            // dir and a reference added to the trace via `db.statement_file`
-            val dumpDir = sys.env.get("ODB_FETCH_DUMP_DIR")
-
-            val DumpThreshold = 50000
-            val big           = sql.length > DumpThreshold
+            val big = sql.length > DumpThreshold
 
             // Write raw SQL to a file iff dumping is enabled and the statement is large.
             val dumpSqlToFile: F[Option[String]] =
@@ -734,7 +740,7 @@ object OdbMapping {
             logQuery.flatMap: dumpPath =>
               T.span("grackle.fetch").use: span =>
                 Temporal[F].timed(super.fetch(fragment, codecs)).flatMap: (elapsed, result) =>
-                  val slowQuery = elapsed > SlowQueryThreshold
+                  val slowQuery = elapsed > slowQueryThreshold
 
                   val columnCount = codecs.size
 
@@ -778,41 +784,11 @@ object OdbMapping {
         }
 
   /**
-    * A minimal read-only mapping that only knows how to return introspection metadata. Other queries will
-    * fail with errors.
+    * The full ODB schema, including the dynamically-loaded enums. This is the schema exposed for
+    * introspection (see `IntrospectionMapping`).
     */
-  def forIntrospection[F[_]: Async](
-    database: Resource[F, Session[F]],
-    monitor:  SkunkMonitor[F],
-    enums:    Enums,
-  ): Mapping[F] =
-    new SkunkMapping[F](database, monitor)
-      with LeafMappings[F]
-      with QueryMapping[F]
-    {
-
-      // These are unused for introspection metadata queries.
-      def user = sys.error("OdbMapping.forIntrospection: no user available")
-      def services = sys.error("OdbMapping.forIntrospection: no services available")
-      def itcClient = sys.error("OdbMapping.forIntrospection: no itcClient available")
-      def goaUsers = sys.error("OdbMapping.forIntrospection: no goaUsers available")
-
-      // Our schema
-      val schema: Schema =
-        unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
-
-      // Our combined type mappings
-      override val typeMappings: TypeMappings =
-        TypeMappings.unchecked(
-          List(
-            QueryMapping,
-          ) ++ LeafMappings
-        )
-
-      override val selectElaborator: SelectElaborator =
-        SelectElaborator(QueryElaborator)
-
-    }
+  def introspectionSchema(enums: Enums): Schema =
+    unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
 
   /**
    * A reduced mapping for use with the Obscalc service.  Obscalc computes the

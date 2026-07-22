@@ -38,9 +38,9 @@ import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.Itc.GmosNorthImaging
-import lucuma.odb.data.Itc.GmosSouthImaging
-import lucuma.odb.data.Itc.Result
+import lucuma.odb.data.ItcResult as Result
+import lucuma.odb.data.ItcScience.GmosNorthImaging
+import lucuma.odb.data.ItcScience.GmosSouthImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
@@ -87,7 +87,7 @@ object Science:
           _   <- setFilter(filter, integrationTime.exposureTime)
           sky <- skyOffsets
                    .traverse: offset =>
-                     scienceStep(offset, ObserveClass.NightCal)
+                     scienceStep(offset, ObserveClass.Science)
           obj <- offsets.take(integrationTime.exposureCount.value)
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
@@ -124,7 +124,7 @@ object Science:
         skyList.traverse: (filter, offset) =>
           for
             _ <- setFilter(filter, filterTimes(filter).exposureTime)
-            s <- scienceStep(offset, ObserveClass.NightCal)
+            s <- scienceStep(offset, ObserveClass.Science)
           yield s
 
       // number of groups of interleaved filters

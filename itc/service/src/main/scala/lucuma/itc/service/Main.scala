@@ -29,7 +29,6 @@ import lucuma.itc.legacy.FLocalItc
 import lucuma.itc.legacy.ItcImpl
 import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.config.*
-import lucuma.itc.service.config.ExecutionEnvironment.*
 import lucuma.otel.OtelSetup
 import natchez.Trace
 import org.http4s.*
@@ -172,7 +171,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       _                          <- Resource.eval(checkVersionToPurge[F](cache))
       customSedResolver          <- CustomSedOdbAttachmentResolver[F](cfg.odbBaseUrl, cfg.odbServiceToken)
       given CustomSed.Resolver[F] = CustomSedCachedResolver(customSedResolver, cache, CustomSedTTL)
-      mapping                    <- Resource.eval(ItcMapping[F](cfg.environment, cache, itc, cfg))
+      mapping                    <- Resource.eval(ItcMapping[F](cache, itc, cfg))
       otelMiddleware             <- Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build)
       metricsOps                 <- Resource.eval(OtelMetrics.serverMetricsOps[F]())
     yield wsb =>
@@ -219,7 +218,7 @@ object Main extends IOApp with ItcCacheOrRemote {
   def server(cfg: Config)(using Logger[IO]): Resource[IO, ExitCode] =
     for
       _                       <- Resource.eval(banner[IO](cfg))
-      otel                    <- OtelSetup.resource(ServiceName, version(Local).value, cfg.otel)
+      otel                    <- OtelSetup.resource(ServiceName, version.value, cfg.otel)
       given Trace[IO]          = otel.trace
       given Tracer[IO]         = otel.tracer
       given Meter[IO]          = otel.meter

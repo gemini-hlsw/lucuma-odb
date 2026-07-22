@@ -10,7 +10,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.ghost.GhostStaticConfig
-import lucuma.odb.data.Itc.GhostIfu
+import lucuma.odb.data.ItcScience.GhostIfu
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 

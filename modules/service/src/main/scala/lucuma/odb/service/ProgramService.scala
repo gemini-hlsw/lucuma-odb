@@ -182,7 +182,7 @@ object ProgramService {
               OdbError
                 .InvalidProgram(pid, s"Cannot set the program reference for $pid to ${props.programType.abbreviation} until its proposal is removed.".some)
                 .asFailure
-                .whenA(hasProposal && props.programType != ProgramType.Science)
+                .whenA(hasProposal && !props.programType.hasProposal)
             }
           (for {
             _ <- ResultT(validateProposal(pid))
@@ -326,11 +326,12 @@ object ProgramService {
         UPDATE
           t_program
         SET
-          c_program_type    = $program_type,
-          c_library_desc    = ${text.opt},
-          c_instrument      = ${instrument.opt},
-          c_semester        = ${semester.opt},
-          c_science_subtype = ${science_subtype.opt}
+          c_program_type         = $program_type,
+          c_library_desc         = ${text.opt},
+          c_instrument           = ${instrument.opt},
+          c_semester             = ${semester.opt},
+          c_science_subtype      = ${science_subtype.opt},
+          c_subaru_proposal_type = ${subaru_proposal_type.opt}
         WHERE
           c_program_id = $program_id
         RETURNING
@@ -342,6 +343,7 @@ object ProgramService {
            prpi.instrument,
            prpi.semester,
            prpi.scienceSubtype,
+           prpi.subaruProposalType,
            id
          )}
 

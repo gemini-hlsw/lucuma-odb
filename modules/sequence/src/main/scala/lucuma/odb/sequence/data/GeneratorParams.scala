@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package data
 
 import cats.Eq
-import cats.syntax.either.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
@@ -17,7 +16,7 @@ import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
 case class GeneratorParams(
-  itcInput:         Either[MissingParamSet, ItcInput],
+  itcInput:         ItcInputDerivation,
   scienceBand:      Option[ScienceBand],
   observingMode:    ObservingMode,
   calibrationRole:  Option[CalibrationRole],
@@ -45,7 +44,7 @@ object GeneratorParams:
   given HashBytes[GeneratorParams] with
     def hashBytes(a: GeneratorParams): Array[Byte] =
       Array.concat(
-        a.itcInput.bimap(_.hashBytes, _.hashBytes).merge,
+        a.itcInput.hashBytes,
         a.scienceBand.hashBytes,
         a.observingMode.hashBytes,
         a.calibrationRole.hashBytes,

@@ -80,6 +80,9 @@ trait Database[F[_]] {
    */
   def deleteApiKey(keyId: PosLong, userId: Option[User.Id]): F[Boolean]
 
+  /** Return the SSO service user itself. Requests to other services should be done on behalf of this user. */
+  def getSsoServiceUser: F[ServiceUser]
+
   def deleteAllSessionTokensForUser(uid: User.Id): F[Unit]
   def deleteAllSessionTokensForRole(id: StandardRole.Id): F[Unit]
   def deleteRole(id: StandardRole.Id): F[Unit]
@@ -87,12 +90,19 @@ trait Database[F[_]] {
 
 object Database extends Codecs {
 
+  val SsoServiceUserName = "Lucuma SSO"
+
   def fromSession[F[_]: Concurrent: Trace](s: Session[F]): Database[F] =
     new Database[F] {
 
       def canonicalizeServiceUser(serviceName: String): F[ServiceUser] =
         Trace[F].span("canonicalizeServiceUser") {
           s.prepareR(CanonicalizeServiceUser).use(_.unique(serviceName))
+        }
+
+      def getSsoServiceUser: F[ServiceUser] =
+        Trace[F].span("getSsoServiceUser") {
+          canonicalizeServiceUser(SsoServiceUserName)
         }
 
       def createApiKey(roleId: StandardRole.Id): F[ApiKey] =

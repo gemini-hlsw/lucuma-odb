@@ -49,6 +49,7 @@ import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.MissingParam
 import lucuma.odb.sequence.data.MissingParamSet
 import lucuma.odb.sequence.exchange
@@ -289,14 +290,14 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(itcInput, obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
 
         observingMode(obsParams.targets, config, obsParams.calibrationRole).flatMap:
 
           // Exchange Modes (no ITC, like visitors)
           case exc: exchange.Config =>
             GeneratorParams(
-              MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("(exchange mode)"))).asLeft,
+              ItcInputDerivation.NotApplicable,
               obsParams.scienceBand,
               exc,
               obsParams.calibrationRole,
@@ -341,7 +342,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gnm @ gnirs.imaging.Config(filters = fs) =>
             // An input per filter. In S/N mode the read mode is derived per step from
@@ -370,7 +371,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
@@ -396,7 +397,7 @@ object GeneratorParamsService {
                   .leftMap(MissingParamSet.fromParams)
                   .toEither
 
-              GeneratorParams(itcInput, obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
+              GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable)
 
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
@@ -454,7 +455,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -472,7 +473,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gn: gnirs.spectroscopy.Config =>
             for
@@ -501,16 +502,14 @@ object GeneratorParamsService {
                 coadds            = gn.coadds
               )
 
-              // Two-pass acquisition ITC only when the mode and filter are both auto and
-              // we're in S/N mode: only then does the resolved filter depend on the
-              // ITC-derived exposure time (Very Bright → H2), creating the circularity.
+              // Two-pass acquisition ITC whenever the acquisition mode and filter are
+              // both auto: only then does the resolved filter depend on the ITC-derived
+              // brightness classification (Very Bright → H2), creating the circularity.
+              // This holds for both S/N and time-and-count acquisition ETMs — the
+              // classification must not depend on the user's acquisition ETM.
               val acqAutoClassify: Boolean =
                 gn.acquisition.explicitAcqMode.isEmpty &&
-                gn.acquisition.explicitFilter.isEmpty && {
-                  gn.acquisition.exposureTimeMode match
-                    case ExposureTimeMode.SignalToNoiseMode(_, _)   => true
-                    case ExposureTimeMode.TimeAndCountMode(_, _, _) => false
-                }
+                gn.acquisition.explicitFilter.isEmpty
 
               spectroscopyGeneratorParams(
                 obsMode = gn,
@@ -538,12 +537,12 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(itcInput, obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           // Visitor Modes
           case vis: visitor.Config =>
             GeneratorParams(
-              MissingParamSet.fromParams(NonEmptyList.one(MissingParam.forObservation("(visitor mode)"))).asLeft,
+              ItcInputDerivation.NotApplicable,
               obsParams.scienceBand,
               vis,
               obsParams.calibrationRole,

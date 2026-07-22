@@ -14,6 +14,8 @@ val UnImplementedModes: Set[ObservingModeType] =
     ObservingModeType.ExchangeKeck,
     ObservingModeType.ExchangeSubaru,
     ObservingModeType.Flamingos2Imaging,
+    ObservingModeType.GmosNorthMos,
+    ObservingModeType.GmosSouthMos,
     ObservingModeType.GnirsImaging,
     ObservingModeType.GnirsLongSlit,
     ObservingModeType.GnirsIfu

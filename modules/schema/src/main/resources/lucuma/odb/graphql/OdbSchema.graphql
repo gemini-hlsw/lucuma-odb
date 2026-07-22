@@ -4529,9 +4529,6 @@ type KeckProposalType {
 Proposal properties for an exchange proposal requesting time at Subaru.
 """
 type SubaruProposalType {
-  "The Subaru call for proposals type (normal or intensive)."
-  type: SubaruCallForProposalsType!
-
   """
   Minimum percentage of observing time required to consider this proposal
   successful.
@@ -4821,11 +4818,6 @@ input KeckProposalTypeInput {
 Properties for an exchange proposal requesting time at Subaru.
 """
 input SubaruProposalTypeInput {
-  """
-  The Subaru call for proposals type.  If not specified, NORMAL is assumed.
-  """
-  type: SubaruCallForProposalsType
-
   """
   The minimum percentage of time required to consider this proposal a success.
   If not set, 100% is assumed.
@@ -5356,6 +5348,11 @@ input VisitorInput {
   agsDiameter: AngleInput
 
   """
+  Science field of view, understood as the diameter of a circular area.
+  """
+  scienceFovDiameter: AngleInput
+
+  """
   Optional descriptive name for this visitor mode selection.
   """
   name: NonEmptyString
@@ -5374,6 +5371,11 @@ type Visitor {
   AGS field of view, understood as the diameter of a circular area.
   """
   agsDiameter: Angle!
+
+  """
+  Science field of view, understood as the diameter of a circular area.
+  """
+  scienceFovDiameter: Angle!
 
   """
   Optional descriptive name for this visitor mode selection.
@@ -5518,9 +5520,11 @@ input ProgramReferencePropertiesInput @oneOf {
   commissioning: ProgramReferencePropertiesCommissioningInput
   engineering: ProgramReferencePropertiesEngineeringInput
   example: ProgramReferencePropertiesExampleInput
+  keck: ProgramReferencePropertiesKeckInput
   library: ProgramReferencePropertiesLibraryInput
   monitoring: ProgramReferencePropertiesMonitoringInput
   science: ProgramReferencePropertiesScienceInput
+  subaru: ProgramReferencePropertiesSubaruInput
   system: ProgramReferencePropertiesSystemInput
 }
 
@@ -5592,11 +5596,26 @@ input ProgramReferencePropertiesMonitoringInput {
 }
 
 """
+Inputs required when updating or switching to a Keck time-exchange program.
+"""
+input ProgramReferencePropertiesKeckInput {
+  semester: Semester!
+}
+
+"""
 Inputs required when updating or switching to a science program.
 """
 input ProgramReferencePropertiesScienceInput {
   semester: Semester!
   scienceSubtype: ScienceSubtype!
+}
+
+"""
+Inputs required when updating or switching to a Subaru time-exchange program.
+"""
+input ProgramReferencePropertiesSubaruInput {
+  semester: Semester!
+  subaruType: SubaruCallForProposalsType!
 }
 
 """
@@ -9581,21 +9600,20 @@ type Flamingos2LongSlit {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  Offsets, either explicitly specified in explicitOffsets
-  or else taken from defaultOffsets
+  Effective telescope configs (explicit override coalesced with the default).
   """
-  offsets: [Offset!]!
+  telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default offsets.
+  Default telescope configs.
   """
-  defaultOffsets: [Offset!]!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Optional explicitly specified offsets. If set it overrides the
-  the default.
+  Optional explicitly specified telescope configs. If set they override the
+  preset default.
   """
-  explicitOffsets: [Offset!]
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Telluric type configuration for this observation.
@@ -9696,9 +9714,10 @@ input Flamingos2LongSlitInput {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  Explicit telescope configs. May be unset by assigning null (clears the
+  override back to the default), or ignored by skipping.
   """
-  explicitOffsets: [OffsetInput!]
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
@@ -10276,22 +10295,6 @@ type Igrins2LongSlit {
   exposureTimeMode: ExposureTimeMode!
 
   """
-  The offset mode is either explicitly specified in explicitOffsetMode or else
-  taken from defaultOffsetMode
-  """
-  offsetMode: SlitOffsetMode!
-
-  """
-  Default offset mode
-  """
-  defaultOffsetMode: SlitOffsetMode!
-
-  """
-  Optional explicitly specified offset mode. If set it overrides the default.
-  """
-  explicitOffsetMode: SlitOffsetMode
-
-  """
   Whether to save SVC images, either explicitly specified in
   explicitSaveSVCImages or else taken from defaultSaveSVCImages
   """
@@ -10309,22 +10312,21 @@ type Igrins2LongSlit {
   explicitSaveSVCImages: Boolean
 
   """
-  Spatial offsets, either explicitly specified in explicitOffsets or else
-  taken from defaultOffsets
+  Effective telescope configs (explicit override coalesced with the default).
   """
-  offsets: [Offset!]!
+  telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default spatial offsets
-  (ABBA pattern, q = -1.25, +1.25, +1.25, -1.25 arcsec) for NodAlongSlit, or
-  (p = 0, q = 0), (p = 10, q = 10), (p = 0, q = 0) for NodToSky.
+  Default telescope configs: the nod-along-slit ABBA pattern,
+  q = -1.25, +1.25, +1.25, -1.25 arcsec, all guided.
   """
-  defaultOffsets: [Offset!]!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Optional explicitly specified spatial offsets. If set, overrides the default.
+  Optional explicitly specified telescope configs. If set they override the
+  default.
   """
-  explicitOffsets: [Offset!]
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Telluric type configuration for this observation.
@@ -10345,22 +10347,15 @@ input Igrins2LongSlitInput {
   exposureTimeMode: ExposureTimeModeInput
 
   """
-  The offset mode field may be unset by assigning a null value, or ignored by
-  skipping it altogether
-  """
-  explicitOffsetMode: SlitOffsetMode
-
-  """
   The save SVC images field may be unset by assigning a null value, or ignored
   by skipping it altogether
   """
   explicitSaveSVCImages: Boolean
 
   """
-  Spatial offsets. May be unset by assigning null, or ignored by skipping.
-  For NodAlongSlit mode, all offsets must have P = 0.
+  Explicit telescope configs. May be unset by assigning a null value, or ignored by skipping.
   """
-  explicitOffsets: [OffsetInput!]
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   """
   The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
@@ -12909,13 +12904,21 @@ type SpectroscopyConfigOptionGhost {
 }
 
 type SpectroscopyConfigOptionGmosNorth {
-  fpu: GmosNorthBuiltinFpu!
+  """
+  The builtin FPU, present for single-slit configurations. Null for multislit
+  (MOS) configurations, where the focal-plane unit is a custom mask.
+  """
+  fpu: GmosNorthBuiltinFpu
   grating: GmosNorthGrating!
   filter: GmosNorthFilter
 }
 
 type SpectroscopyConfigOptionGmosSouth {
-  fpu: GmosSouthBuiltinFpu!
+  """
+  The builtin FPU, present for single-slit configurations. Null for multislit
+  (MOS) configurations, where the focal-plane unit is a custom mask.
+  """
+  fpu: GmosSouthBuiltinFpu
   grating: GmosSouthGrating!
   filter: GmosSouthFilter
 }
@@ -14337,6 +14340,24 @@ type ScienceProgramReference implements ProgramReference {
   semesterIndex: PosInt!
 }
 
+"Reference for a Keck time-exchange program."
+type KeckProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  semester: Semester!
+  semesterIndex: PosInt!
+}
+
+"Reference for a Subaru time-exchange program."
+type SubaruProgramReference implements ProgramReference {
+  label: ProgramReferenceLabel!
+  type: ProgramType!
+  semester: Semester!
+  semesterIndex: PosInt!
+  "The Subaru call type (normal or intensive) that determines the reference letter (U or I)."
+  subaruType: SubaruCallForProposalsType!
+}
+
 type SystemProgramReference implements ProgramReference {
   label: ProgramReferenceLabel!
   type: ProgramType!
@@ -14374,10 +14395,14 @@ type ProgramSelectResult {
 
 enum ProgramType {
   CALIBRATION
+  COMMISSIONING
   ENGINEERING
   EXAMPLE
+  KECK
   LIBRARY
+  MONITORING
   SCIENCE
+  SUBARU
   SYSTEM
 }
 
@@ -18693,6 +18718,11 @@ input WhereObservation {
   Matches on the observation workflow state.
   """
   workflow: WhereCalculatedObservationWorkflow
+
+  """
+  Matches the calibration role.
+  """
+  calibrationRole: WhereOptionEqCalibrationRole
 }
 
 """

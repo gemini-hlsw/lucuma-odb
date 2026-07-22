@@ -58,6 +58,14 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       Flamingos2Fpu.LongSlit2.some
     )
 
+  // R=3000 grism + Y filter has a flat but no arc in smart gcal tables
+  val f2_key_R3K_Y: Flamingos2.TableKey =
+    Flamingos2.TableKey(
+      Flamingos2Disperser.R3000.some,
+      Flamingos2Filter.Y,
+      Flamingos2Fpu.LongSlit1.some
+    )
+
   val f2_flat_JH1 =
     SmartGcalValue(
       Gcal(
@@ -94,7 +102,8 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_flat_JH1),
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH1, f2_arc_JH1),
         Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_flat_JH1),
-        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_arc_JH1)
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_JH2, f2_arc_JH1),
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), f2_key_R3K_Y, f2_flat_JH1)
       )
 
     servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>
@@ -332,4 +341,3 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       _ <- addEndStepEvent(s, v)
       _ <- runObscalcUpdate(p, o)
     yield o
-

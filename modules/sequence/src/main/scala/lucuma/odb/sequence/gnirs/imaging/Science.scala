@@ -30,8 +30,8 @@ import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.Itc.GnirsImaging
-import lucuma.odb.data.Itc.Result
+import lucuma.odb.data.ItcResult as Result
+import lucuma.odb.data.ItcScience.GnirsImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
@@ -79,7 +79,7 @@ object Science:
           _   <- setFilter(config, filter, integrationTime.exposureTime)
           sky <- skyOffsets
                    .traverse: offset =>
-                     scienceStep(offset, ObserveClass.NightCal)
+                     scienceStep(offset, ObserveClass.Science)
           obj <- offsets.take(integrationTime.exposureCount.value)
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
@@ -116,7 +116,7 @@ object Science:
         skyList.traverse: (filter, offset) =>
           for
             _ <- setFilter(config, filter, filterTimes(filter).exposureTime)
-            s <- scienceStep(offset, ObserveClass.NightCal)
+            s <- scienceStep(offset, ObserveClass.Science)
           yield s
 
       // number of groups of interleaved filters

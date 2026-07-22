@@ -72,6 +72,4 @@ trait ProposalView[F[_]] extends BaseMapping[F]:
       val Id = col("c_program_id_keck", program_id.embedded)
 
     object Subaru:
-      val Id       = col("c_program_id_subaru", program_id.embedded)
-      // Non-null placeholder column; only rendered when the Subaru object is present.
-      val CallType = col("c_subaru_proposal_type_d", subaru_proposal_type)
+      val Id = col("c_program_id_subaru", program_id.embedded)

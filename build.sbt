@@ -5,7 +5,7 @@ ThisBuild / resolvers += Resolver.sonatypeCentralSnapshots
 // Please keep in alphabetical order
 val awsJavaSdkVersion            = "1.12.797"
 val boopickleVersion             = "1.5.0"
-val bouncycastleVersion          = "1.70"
+val bouncycastleVersion          = "1.85"
 val catsEffectVersion            = "3.7.0"
 val catsParseVersion             = "1.1.0"
 val catsScalacheckVersion        = "0.3.2"
@@ -16,7 +16,7 @@ val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.0"
 val clueVersion                  = "0.55.0"
 val declineVersion               = "2.6.2"
-val flywayVersion                = "12.10.0"
+val flywayVersion                = "13.0.0"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
 val grackleVersion               = "0.29.0"
@@ -30,18 +30,18 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.5.38"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.217.0"
+val lucumaCoreVersion            = "0.222.0"
 val lucumaGraphQLRoutesVersion   = "0.13.8"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
-val munitVersion                 = "1.3.3"
+val munitVersion                 = "1.3.4"
 val munitCatsEffectVersion       = "2.2.0"   // check test output if you attempt to update this
 val munitDisciplineVersion       = "2.0.0"   // check test output if you attempt to update this
 val munitScalacheckVersion       = "1.3.0"   // check test output if you attempt to update this
 val scalacheckEffectMunitVersion = "2.1.0"
 val natchezHttp4sVersion         = "0.6.2"
 val natchezVersion               = "0.3.10"
-val openTelemetryVersion         = "1.63.0"
+val openTelemetryVersion         = "1.64.0"
 val openTelemetryInstrVersion    = "2.26.1-alpha"
 val otel4sVersion                = "1.0.1"
 val paigesVersion                = "0.4.4"
@@ -55,7 +55,7 @@ val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.90"
+ThisBuild / tlBaseVersion      := "0.89"
 ThisBuild / scalaVersion       := "3.8.4"
 ThisBuild / crossScalaVersions := Seq("3.8.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -395,8 +395,8 @@ lazy val ssoBackendClient = project
     name := "lucuma-sso-backend-client",
     libraryDependencies ++= Seq(
       "com.github.jwt-scala" %% "jwt-circe"          % jwtVersion,
-      "org.bouncycastle"      % "bcpkix-jdk15on"     % bouncycastleVersion,
-      "org.bouncycastle"      % "bcpg-jdk15on"       % bouncycastleVersion,
+      "org.bouncycastle"      % "bcpkix-jdk18on"     % bouncycastleVersion,
+      "org.bouncycastle"      % "bcpg-jdk18on"       % bouncycastleVersion,
       "org.http4s"           %% "http4s-core"        % http4sVersion,
       "org.http4s"           %% "http4s-client"      % http4sVersion,
       "org.http4s"           %% "http4s-dsl"         % http4sVersion,
@@ -492,6 +492,17 @@ lazy val itcModel = crossProject(JVMPlatform, JSPlatform)
       "org.typelevel" %%% "kittens"       % kittensVersion
     )
   )
+
+lazy val itcSourceHash = taskKey[String]("hash of itc service and model scala sources")
+ThisBuild / itcSourceHash / fileInputs +=
+  (itcService / baseDirectory).value.toGlob / "src" / "main" / "scala" / ** / "*.scala"
+ThisBuild / itcSourceHash / fileInputs +=
+  (LocalRootProject / baseDirectory).value.toGlob / "itc" / "model" / "src" / "main" / "scala" / ** / "*.scala"
+ThisBuild / itcSourceHash := {
+  val files  = itcSourceHash.inputFiles.filter(_.toString.endsWith(".scala")).sorted.map(_.toFile)
+  val hashes = files.map(Hash(_))
+  Hash.toHex(Hash(hashes.toArray.flatten))
+}
 
 lazy val ocslibHash = taskKey[String]("hash of ocslib and graphql schema")
 ThisBuild / ocslibHash / fileInputs += (itcService / baseDirectory).value.toGlob / "ocslib" / "*.jar"
@@ -594,6 +605,7 @@ lazy val itcService = project
       sbtVersion,
       git.gitHeadCommit,
       "buildDateTime" -> System.currentTimeMillis(),
+      itcSourceHash,
       ocslibHash,
       ocsGitHash,
       ocsGitBranch,
@@ -721,16 +733,21 @@ lazy val itcLegacyTests = project
 
 lazy val common = project
   .in(file("modules/common-middleware"))
-  .enablePlugins(NoPublishPlugin)
+  .dependsOn(ssoBackendClient)
   .settings(
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
-      "org.http4s"    %% "http4s-client"  % http4sVersion,
-      "org.http4s"    %% "http4s-core"    % http4sVersion,
-      "org.http4s"    %% "http4s-server"  % http4sVersion,
-      "org.typelevel" %% "cats-core"      % catsVersion,
-      "org.typelevel" %% "cats-effect"    % catsEffectVersion,
-      "org.scalameta" %% "munit"          % munitVersion % Test
+      "edu.gemini"    %% "lucuma-core"                           % lucumaCoreVersion,
+      "org.http4s"    %% "http4s-client"                         % http4sVersion,
+      "org.http4s"    %% "http4s-core"                           % http4sVersion,
+      "org.http4s"    %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sVersion,
+      "org.http4s"    %% "http4s-server"                         % http4sVersion,
+      "org.typelevel" %% "grackle-core"                          % grackleVersion,
+      "org.typelevel" %% "cats-core"                             % catsVersion,
+      "org.typelevel" %% "cats-effect"                           % catsEffectVersion,
+      "org.typelevel" %% "log4cats-core"                         % log4catsVersion,
+      "org.typelevel" %% "otel4s-core"                           % otel4sVersion,
+      "org.scalameta" %% "munit"                                 % munitVersion % Test
     )
   )
 
@@ -943,7 +960,7 @@ lazy val resourceModel =
   project
     .in(file("resource/model"))
     .enablePlugins(NoPublishPlugin)
-    .dependsOn(schema.jvm, otel)
+    .dependsOn(schema.jvm, otel, ssoBackendClient)
     .settings(resourceCommonSettings)
     .settings(
       name := "lucuma-resource-model",
@@ -976,6 +993,7 @@ lazy val resourceService = project
       "org.flywaydb"   % "flyway-database-postgresql"            % flywayVersion,
       "org.http4s"    %% "http4s-circe"                          % http4sVersion,
       "org.http4s"    %% "http4s-dsl"                            % http4sVersion,
+      "org.http4s"    %% "http4s-ember-client"                   % http4sVersion,
       "org.http4s"    %% "http4s-ember-server"                   % http4sVersion,
       "org.http4s"    %% "http4s-otel4s-middleware-metrics"      % http4sOtel4sVersion,
       "org.http4s"    %% "http4s-otel4s-middleware-trace-server" % http4sOtel4sVersion,
@@ -999,7 +1017,7 @@ lazy val resourceService = project
     executableScriptName        := "resource-service",
     dockerExposedPorts ++= Seq(8484),
     // Load resources during compile so they are available for GraphQL schema macros
-    (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
+    (Compile / compile)         := (Compile / compile).dependsOn(Compile / copyResources).value
   )
 
 lazy val resourceCommonSettings = lucumaGlobalSettings ++ Seq(

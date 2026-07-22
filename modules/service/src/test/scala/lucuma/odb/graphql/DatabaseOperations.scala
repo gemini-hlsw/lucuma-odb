@@ -116,6 +116,9 @@ trait DatabaseOperations { this: OdbSuite =>
               .map(_.map(_.meta.lastInvalidation).getOrElse(Timestamp.Min))
 
         when.flatMap: t =>
+          // Mirror the obscalc daemon: recompute time accounting first (clearing
+          // its dirty marker) so the calculation can settle to 'ready'.
+          services.transactionally(timeAccountingService.updateAll(oid)) *>
           srv.calculateAndUpdate(Obscalc.PendingCalc(pid, oid, t))
     .void
 
@@ -900,7 +903,13 @@ trait DatabaseOperations { this: OdbSuite =>
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.Flamingos2Imaging, ImageQuality.Preset.PointEight, None, tids*)
 
   def createGnirsImagingObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
-    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsImaging, ImageQuality.Preset.PointEight, None, tids*)
+    createGnirsImagingObservationAs(user, pid, None, tids*)
+
+  // The spiral dither generator's seed is always pinned so the generated science
+  // offsets — and hence AGS guide-star/pos-angle selection — are deterministic. An
+  // explicit `seed` overrides the DefaultImagingDitherSeed; `None` uses the default.
+  def createGnirsImagingObservationAs(user: User, pid: Program.Id, seed: Option[Long], tids: Target.Id*): IO[Observation.Id] =
+    createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsImaging, ImageQuality.Preset.PointEight, seed.map(_.toString), tids*)
 
   def createGnirsLongSlitObservationAs(user: User, pid: Program.Id, tids: Target.Id*): IO[Observation.Id] =
     createObservationWithSpatialOffsets(user, pid, ObservingModeType.GnirsLongSlit, ImageQuality.Preset.PointEight, None, tids*)
@@ -1250,6 +1259,27 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
 
 
+  // Test-support default seed for imaging spatial-dither offset generators. Some
+  // imaging modes (GNIRS, Flamingos-2) default to a *randomly*-seeded spiral when
+  // no variant is specified, which makes the generated science offsets — and hence
+  // AGS pos-angle selection — non-deterministic across runs. We pin the seed here
+  // so every imaging observation these helpers create is reproducible.
+  val DefaultImagingDitherSeed: Long = 0L
+
+  // A grouped variant with a fixed-seed spiral offset generator of the given size,
+  // reproducing each imaging mode's default variant but with a deterministic seed.
+  private def pinnedSpiralVariant(sizeArcsec: Int, seed: String = DefaultImagingDitherSeed.toString): String =
+    s"""variant: {
+              grouped: {
+                offsets: {
+                  spiral: {
+                    size: { arcseconds: $sizeArcsec }
+                    seed: $seed
+                  }
+                }
+              }
+            }"""
+
   private def observingModeObject(observingMode: ObservingModeType): String =
     observingMode match
       case e: ExchangeObservingModeType =>
@@ -1262,12 +1292,13 @@ trait DatabaseOperations { this: OdbSuite =>
         }"""
 
       case ObservingModeType.Flamingos2Imaging =>
-        """{
+        s"""{
           flamingos2Imaging: {
             filters: [
               { filter: Y },
               { filter: J }
             ]
+            ${pinnedSpiralVariant(30)}
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
@@ -1291,6 +1322,8 @@ trait DatabaseOperations { this: OdbSuite =>
             }
           }
         }"""
+      case ObservingModeType.GmosNorthMos =>
+        """{}"""
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
@@ -1322,14 +1355,17 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+      case ObservingModeType.GmosSouthMos =>
+        """{}"""
       case ObservingModeType.GnirsImaging =>
-        """{
+        s"""{
           gnirsImaging: {
             camera: SHORT_BLUE
             filters: [
               { filter: J },
               { filter: ORDER4 }
             ]
+            ${pinnedSpiralVariant(10)}
           }
         }"""
       case ObservingModeType.GnirsLongSlit =>
@@ -1415,7 +1451,8 @@ trait DatabaseOperations { this: OdbSuite =>
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            agsDiameter: { arcseconds: 1 }$extras
+            agsDiameter: { arcseconds: 1 }
+            scienceFovDiameter: { arcseconds: 1 }$extras
           }
         }"""
 
@@ -1474,7 +1511,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Flamingos2LongSlit =>
-        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", explicitTelescopeConfigs: { toSky: $offsets }")
         s"""{
           flamingos2LongSlit: {
             disperser: R1200_HK
@@ -1484,7 +1521,7 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Igrins2LongSlit =>
-        val offsetsField = offsets.fold("")(offsets => s", explicitOffsets: $offsets")
+        val offsetsField = offsets.fold("")(offsets => s", explicitTelescopeConfigs: { alongSlit: $offsets }")
         s"""{
           igrins2LongSlit: {
             exposureTimeMode: {
@@ -1522,13 +1559,19 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GnirsImaging =>
-        """{
+        // For imaging, `offsets` (when present) carries an explicit spiral dither
+        // seed; otherwise we fall back to the pinned default. Either way the seed is
+        // fixed so the generated science offsets — and hence AGS pos-angle selection
+        // — are deterministic (the server-side default seed is random).
+        val seed = offsets.getOrElse(DefaultImagingDitherSeed.toString)
+        s"""{
           gnirsImaging: {
             camera: SHORT_BLUE
             filters: [
               { filter: J },
               { filter: ORDER4 }
             ]
+            ${pinnedSpiralVariant(10, seed)}
           }
         }"""
       case ObservingModeType.GnirsLongSlit =>
@@ -1574,11 +1617,15 @@ trait DatabaseOperations { this: OdbSuite =>
             name: "test visitor"
             totalRequestTime: { hours: 1 }"""
           case _ => ""
+        val (agsDiameter, scienceFovDiameter) = v match
+          case VisitorObservingModeType.MaroonX => ("{ arcseconds: 60 }", "{ arcseconds: 0.77 }")
+          case _                                => ("{ arcseconds: 1 }",  "{ arcseconds: 1 }")
         s"""{
           visitor: {
             mode: ${v.tag.toScreamingSnakeCase}
             centralWavelength: { nanometers: 2200 }
-            agsDiameter: { arcseconds: 1 }$extras
+            agsDiameter: $agsDiameter
+            scienceFovDiameter: $scienceFovDiameter$extras
           }
         }"""
       case _ => ???
@@ -2155,6 +2202,7 @@ trait DatabaseOperations { this: OdbSuite =>
             WHERE: {
               id: { EQ: "$tid"}
             }
+            includeDeleted: true
           }) {
             targets {
               id

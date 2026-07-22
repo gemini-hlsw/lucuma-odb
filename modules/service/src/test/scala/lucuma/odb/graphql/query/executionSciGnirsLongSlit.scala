@@ -89,6 +89,60 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
+  // thermal-IR (L/M-band) long-camera config 
+  // 0.05"/pix (LONG_BLUE), D10, MIRROR, 0.20" slit, 3.3 µm.
+  // This config has a flat but no arc in the smart gcal tables.
+  val ThermalIrSnapshot: GnirsDynamicSnapshot =
+    GnirsDynamicSnapshot(
+      exposureTime        = ExposureTime,
+      coadds              = 1,
+      centralWavelengthNm = BigDecimal("3300.000"),
+      filter              = "ORDER3",
+      decker              = "LONG_CAM_LONG_SLIT",
+      fpuSlit             = Some("LONG_SLIT_0_20"),
+      fpuOther            = None,
+      fpuIfu              = None,
+      prism               = Some("MIRROR"),
+      grating             = Some("D10"),
+      mirrorWavelengthNm  = Some(BigDecimal("3300.000")),
+      camera              = "LONG_BLUE",
+      focus               = None,
+      readMode            = "FAINT"
+    )
+
+  test("[gnirs] thermal-IR config yields flat-only calibrations, no arc"):
+    // Thermal-IR (L/M-band) configs have a flat but no arc in the smart gcal tables.
+    // The sequence must still generate, the arc is optional
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- configureGnirsThermalIr(oid)
+      yield oid
+
+    // The flat, with no trailing arc, taken at the last (long-camera) offset.
+    val flatOnlyCalAtom: Json =
+      gnirsExpectedCalAtom(ThermalIrSnapshot, 0, -1, 20.secondTimeSpan, 2, 1, 10.secondTimeSpan, 3, 0)
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom" -> gnirsExpectedScienceAtom(ThermalIrSnapshot,
+                    (0, -1, Enabled), (0, 5, Enabled), (0, 5, Enabled), (0, -1, Enabled)
+                  ),
+                  "possibleFuture" -> List(flatOnlyCalAtom).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
+
   test("[gnirs] short camera default offsets, exposureCount=3 -> 1 cycle of 4, unsplittable"):
     for
       o <- gnirsObs

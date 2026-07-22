@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package mapping
 
-import cats.syntax.all.*
 import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.Unique
@@ -13,13 +12,9 @@ import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import io.circe.Json
 import io.circe.syntax.*
-import lucuma.core.enums.SlitOffsetMode
-import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
-import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
@@ -28,42 +23,8 @@ trait GnirsSpectroscopyMapping[F[_]]
   extends GnirsSpectroscopyView[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
+     with SlitTelescopeConfigsMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
-
-  private def telescopeConfigJson(offset: Offset, guiding: StepGuideState): Json =
-    Json.obj(
-      "offset"  -> Json.obj("p" -> offset.p.asJson, "q" -> offset.q.asJson),
-      "guiding" -> guiding.asJson
-    )
-
-  private def telescopeConfigAlongSlitJson(q: Offset.Q, guiding: StepGuideState): Json =
-    Json.obj(
-      "q"       -> q.asJson,
-      "guiding" -> guiding.asJson
-    )
-
-  // Encodes a SlitTelescopeConfigs as the JSON shape expected for the GraphQL
-  // SlitTelescopeConfigs type: { offsetMode, alongSlit, toSky } where exactly
-  // one of alongSlit / toSky is non-null depending on the discriminant.
-  private def slitTelescopeConfigsJson(mode: SlitOffsetMode, json: String): Json =
-    SlitTelescopeConfigsFormat.getOption((mode, json)).fold(Json.Null):
-      case SlitTelescopeConfigs.AlongSlit(nel) =>
-        Json.obj(
-          "offsetMode" -> mode.asJson,
-          "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
-          "toSky"      -> Json.Null
-        )
-      case SlitTelescopeConfigs.ToSky(nel) =>
-        Json.obj(
-          "offsetMode" -> mode.asJson,
-          "alongSlit"  -> Json.Null,
-          "toSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
-        )
-
-  // IFU configs: a plain [TelescopeConfig] (no slit offset mode).
-  private def ifuTelescopeConfigsJson(json: String): Json =
-    ToSkyFormat.getOption(json).fold(Json.Null):
-      _.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
 
   lazy val GnirsSpectroscopyAcquisitionMapping: ObjectMapping =
     ObjectMapping(GnirsSpectroscopyAcquisitionType)(
@@ -173,31 +134,10 @@ trait GnirsSpectroscopyMapping[F[_]]
 
       // effective (explicit coalesce default) and default: the offset mode is always
       // present for a long slit row, so these never resolve to null here.
-      CursorFieldJson("telescopeConfigs",
-        cursor =>
-          for
-            modeEff <- cursor.field("slitOffsetModeEffRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            tcEff   <- cursor.field("tcEffRaw", None).flatMap(_.as[String])
-          yield modeEff.fold(Json.Null)(slitTelescopeConfigsJson(_, tcEff)),
-        List("slitOffsetModeEffRaw", "tcEffRaw")
-      ),
-      CursorFieldJson("defaultTelescopeConfigs",
-        cursor =>
-          for
-            modeDef <- cursor.field("slitOffsetModeDefRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            tcDef   <- cursor.field("tcDefRaw", None).flatMap(_.as[String])
-          yield modeDef.fold(Json.Null)(slitTelescopeConfigsJson(_, tcDef)),
-        List("slitOffsetModeDefRaw", "tcDefRaw")
-      ),
+      slitTelescopeConfigsField("telescopeConfigs",        "slitOffsetModeEffRaw", "tcEffRaw"),
+      slitTelescopeConfigsField("defaultTelescopeConfigs", "slitOffsetModeDefRaw", "tcDefRaw"),
       // explicit (nullable): present only when an explicit override is set.
-      CursorFieldJson("explicitTelescopeConfigs",
-        cursor =>
-          for
-            modeOpt <- cursor.field("slitOffsetModeExpRaw", None).flatMap(_.as[Option[SlitOffsetMode]])
-            jsonOpt <- cursor.field("tcExpRaw", None).flatMap(_.as[Option[String]])
-          yield (modeOpt, jsonOpt).mapN(slitTelescopeConfigsJson).getOrElse(Json.Null),
-        List("slitOffsetModeExpRaw", "tcExpRaw")
-      ),
+      explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "tcExpRaw"),
     )
 
   // IFU variant. Keyed on c_fpu_ifu (embedded): null for long slit rows, so the
@@ -214,7 +154,7 @@ trait GnirsSpectroscopyMapping[F[_]]
       // [TelescopeConfig] with no slit offset mode — no default / explicit split.
       SqlField("tcRaw", GnirsSpectroscopyView.TelescopeConfigsEffective, hidden = true),
       CursorFieldJson("telescopeConfigs",
-        cursor => cursor.field("tcRaw", None).flatMap(_.as[String]).map(ifuTelescopeConfigsJson),
+        cursor => cursor.field("tcRaw", None).flatMap(_.as[String]).flatMap(ifuTelescopeConfigsJson),
         List("tcRaw")
       ),
     )

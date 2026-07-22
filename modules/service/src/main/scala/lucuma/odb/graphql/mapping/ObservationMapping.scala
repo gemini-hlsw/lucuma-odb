@@ -24,6 +24,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Itc
+import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.table.TimingWindowView
@@ -117,6 +119,9 @@ trait ObservationMapping[F[_]]
   }
 
   def itcQueryHandler: EffectHandler[F] = {
+    // The Encoder[Itc] reassembles the pre-split GraphQL union JSON; see
+    // lucuma.odb.json.itc.  A `Failed` acquisition is not representable there, so
+    // it is surfaced as a field error below (as before the split).
     import lucuma.odb.json.itc.given
     import lucuma.odb.json.time.query.given
     import lucuma.odb.json.wavelength.query.given
@@ -128,7 +133,15 @@ trait ObservationMapping[F[_]]
         services.use { implicit s =>
           itcService
             .lookup(pid, oid)
-            .map(_.bimap(_.asFailure, _.success).merge)
+            .map:
+              case Left(e)  => e.asFailure
+              case Right(i) =>
+                // A deterministic acquisition failure is surfaced as a field
+                // error, as before the split; the science part is unaffected
+                // for sequence generation and workflow validation.
+                i.acquisition match
+                  case ItcAcquisition.Failed(msg) => OdbError.ItcError(msg.some).asFailure
+                  case _                          => i.success
         }
 
     effectHandler(readEnv, calculate)

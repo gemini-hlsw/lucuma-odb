@@ -17,7 +17,8 @@ final case class ResourceConfiguration(
   port:          Port,
   corsOverHttps: Boolean,     // Whether to require CORS over HTTPS
   domain:        Seq[String], // Domains, for CORS headers
-  otel:          Option[OtelConfig]
+  otel:          Option[OtelConfig],
+  sso:           SsoConfiguration
 ) derives Eq
 
 object ResourceConfiguration:
@@ -28,7 +29,8 @@ object ResourceConfiguration:
     port,
     corsOverHttps,
     domain,
-    otelConfig
+    otelConfig,
+    SsoConfiguration.fromCiris
   ).parMapN(ResourceConfiguration.apply)
 
   private lazy val environment =

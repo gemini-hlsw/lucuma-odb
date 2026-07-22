@@ -88,10 +88,10 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         t <- createTargetWithProfileAs(pi, p)
         o <- createIgrins2LongSlitObservationAs(pi, p,
                Some("""[
-                 { p: { arcseconds: 0 }, q: { arcseconds: 10 } },
-                 { p: { arcseconds: 0 }, q: { arcseconds: 10 } },
-                 { p: { arcseconds: 0 }, q: { arcseconds: 10 } },
-                 { p: { arcseconds: 0 }, q: { arcseconds: 10 } }
+                 { q: { arcseconds: 10 }, guiding: DISABLED },
+                 { q: { arcseconds: 10 }, guiding: DISABLED },
+                 { q: { arcseconds: 10 }, guiding: DISABLED },
+                 { q: { arcseconds: 10 }, guiding: DISABLED }
                ]"""),
                t
              )
@@ -115,9 +115,9 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
         _ <- setOffsets(o, SlitOffsetMode.NodToSky,
                """[
-                 { p: { arcseconds:  0 }, q: { arcseconds:  0 } },
-                 { p: { arcseconds: 10 }, q: { arcseconds: 10 } },
-                 { p: { arcseconds:  0 }, q: { arcseconds:  0 } }
+                 { offset: { p: { arcseconds:  0 }, q: { arcseconds:  0 } }, guiding: ENABLED  },
+                 { offset: { p: { arcseconds: 10 }, q: { arcseconds: 10 } }, guiding: DISABLED },
+                 { offset: { p: { arcseconds:  0 }, q: { arcseconds:  0 } }, guiding: ENABLED  }
                ]"""
              )
       } yield o
@@ -154,9 +154,9 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
         _ <- setOffsets(o, SlitOffsetMode.NodToSky,
                """[
-                 { p: { arcseconds: 10 }, q: { arcseconds: 0 } },
-                 { p: { arcseconds: 20 }, q: { arcseconds: 0 } },
-                 { p: { arcseconds: 10 }, q: { arcseconds: 0 } }
+                 { offset: { p: { arcseconds: 10 }, q: { arcseconds: 0 } }, guiding: DISABLED },
+                 { offset: { p: { arcseconds: 20 }, q: { arcseconds: 0 } }, guiding: DISABLED },
+                 { offset: { p: { arcseconds: 10 }, q: { arcseconds: 0 } }, guiding: DISABLED }
                ]"""
              )
       } yield o
@@ -185,8 +185,8 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         o <- createIgrins2LongSlitObservationAs(pi, p, t)
         _ <- setOffsets(o, SlitOffsetMode.NodToSky,
                """[
-                 { p: { arcseconds: 0 }, q: { arcseconds: 0   } },
-                 { p: { arcseconds: 0 }, q: { arcseconds: 2.6 } }
+                 { offset: { p: { arcseconds: 0 }, q: { arcseconds: 0   } }, guiding: ENABLED  },
+                 { offset: { p: { arcseconds: 0 }, q: { arcseconds: 2.6 } }, guiding: DISABLED }
                ]"""
              )
       } yield o
@@ -220,10 +220,10 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
         t <- createTargetWithProfileAs(pi, p)
         o <- createIgrins2LongSlitObservationAs(pi, p,
                Some("""[
-                 { p: { arcseconds: 0 }, q: { arcseconds: -1 } },
-                 { p: { arcseconds: 0 }, q: { arcseconds:  1 } },
-                 { p: { arcseconds: 0 }, q: { arcseconds: 10 } },
-                 { p: { arcseconds: 0 }, q: { arcseconds: -1 } }
+                 { q: { arcseconds: -1 }, guiding: ENABLED  },
+                 { q: { arcseconds:  1 }, guiding: ENABLED  },
+                 { q: { arcseconds: 10 }, guiding: DISABLED },
+                 { q: { arcseconds: -1 }, guiding: ENABLED  }
                ]"""),
                t
              )

@@ -24,8 +24,6 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
-import lucuma.core.geom.gnirs.all as GnirsGeometry
-import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -42,6 +40,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID
@@ -81,32 +80,25 @@ object Science:
 
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    fpu:          GnirsFpu.Spectroscopy,
-    slitLength:   Angle,
     // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
      * Cycle count: round up so that we always deliver at least the requested
      * number of on-source exposures. Sky steps don't contribute to the S/N, so
-     * cycles with sky offsets require extra repeats. On-source means on the slit
-     * (both p and q) for a slit FPU; for an IFU (no slit) it means the guided
-     * dither positions, the large unguided offsets being sky.
+     * cycles with sky offsets require extra repeats.
+     * On-source means guided, the dither positions are guided, the large sky offsets unguided.
+     * Keyed on the per-offset guide state, so the configured guiding
+     * drives the cycle count for both slit and IFU.
      */
     def cycleCount(t: IntegrationTime): Either[String, NonNegInt] =
-      val onSource: ProtoStep[GnirsDynamicConfig] => Boolean =
-        fpu match
-          case GnirsFpu.Spectroscopy.Slit(_) => s => isOnSlit(slitLength, s.telescopeConfig.offset)
-          case GnirsFpu.Spectroscopy.Ifu(_)  => s => isGuided(s.telescopeConfig.guiding)
-      calculateCycleCount(onSource, scienceSteps.toList, t)
+      calculateCycleCount[GnirsDynamicConfig](s => s.telescopeConfig.guiding.isGuided, scienceSteps.toList, t)
 
   object StepDefinition:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-      fpu:          GnirsFpu.Spectroscopy,
-      slitLength:   Angle,
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
     ):
@@ -121,11 +113,12 @@ object Science:
         def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
-        cals.fold(EitherT.pure(StepDefinition(scienceSteps, fpu, slitLength, none))): (flat, arc) =>
+        cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
+          // The flat is required, but the arc is best-effort
           for
             fs <- EitherT(expander.expandStep(static, flat))
-            rs <- EitherT(expander.expandStep(static, arc))
-          yield StepDefinition(scienceSteps, fpu, slitLength, (fs.map(adjustReadMode) ::: rs.map(adjustReadMode)).some)
+            as <- EitherT.liftF(expander.expandStepOptional(static, arc))
+          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ++ as.map(adjustReadMode)).some)
 
     object PreDef:
 
@@ -174,8 +167,6 @@ object Science:
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
           yield PreDef(
             ss,
-            config.fpu,
-            GnirsGeometry.slitLength(config.camera, config.prism),
             Option.when(includeCals)((f, r))
           )
 

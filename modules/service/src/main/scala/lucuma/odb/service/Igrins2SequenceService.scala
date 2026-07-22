@@ -8,7 +8,7 @@ import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
-import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.enums.Igrins2SlitOffsetPreset
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
@@ -61,7 +61,7 @@ object Igrins2SequenceService:
         for
           s0 <- selectStatic(observationId)
           s1 <- s0.fold(session.option(Statements.SelectStaticByMode)(observationId))(_.some.pure[F])
-        yield s1.getOrElse(Igrins2StaticConfig(Igrins2SVCImages.DontSave, SlitOffsetMode.NodAlongSlit)).some
+        yield s1.getOrElse(Igrins2StaticConfig(Igrins2SVCImages.DontSave, Igrins2SlitOffsetPreset.NodAlongSlit)).some
 
   object Statements:
 
@@ -100,11 +100,12 @@ object Igrins2SequenceService:
         WHERE c_observation_id = $observation_id
       """.query(igrins_2_static)
 
+    // The offset mode preset follows the shape of the effective telescope configs.
     val SelectStaticByMode: Query[Observation.Id, Igrins2StaticConfig] =
       sql"""
         SELECT
           COALESCE(c_save_svc_images, false),
-          COALESCE(c_offset_mode, 'nod_along_slit')
-        FROM t_igrins_2_long_slit
+          c_slit_offset_mode_effective
+        FROM v_igrins_2_long_slit
         WHERE c_observation_id = $observation_id
       """.query(igrins_2_static)

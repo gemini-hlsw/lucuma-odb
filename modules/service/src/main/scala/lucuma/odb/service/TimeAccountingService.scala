@@ -50,6 +50,15 @@ trait TimeAccountingService[F[_]] {
   )(using Transaction[F], Services.ServiceAccess): F[Unit]
 
   /**
+   * Updates the time accounting data for every visit of the given observation.
+   * A no-op for observations that have no visits (i.e., that haven't begun
+   * executing).
+   */
+  def updateAll(
+    observationId: Observation.Id
+  )(using Transaction[F], Services.ServiceAccess): F[Unit]
+
+  /**
    * Adds a manual time charge correction.
    */
   def addCorrection(
@@ -139,6 +148,23 @@ object TimeAccountingService {
         visitId: Visit.Id
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         Update(visitId).run
+
+      override def updateAll(
+        observationId: Observation.Id
+      )(using Transaction[F], Services.ServiceAccess): F[Unit] =
+        // Recompute only the visits that were actually invalidated (received an
+        // execution event or a dataset QA-state change) since their last update.
+        // Visits with no relevant change -- including closed, already-corrected
+        // visits of the same observation -- are left untouched, so an unrelated
+        // obscalc invalidation (or an event in a different visit) never reprices
+        // them.  We record the invalidation timestamp we observed (not `now()`)
+        // so that an invalidation arriving during the recompute leaves the visit
+        // dirty for the next pass.
+        session.execute(SelectDirtyVisits)(observationId).flatMap:
+          _.traverse_ { (visitId, invalidation) =>
+            update(visitId) *>
+            session.execute(MarkVisitTimeAccountingUpdated)(invalidation, visitId).void
+          }
 
       case class Update(visitId: Visit.Id)(using Transaction[F]) {
         lazy val run: F[Unit] =
@@ -350,6 +376,27 @@ object TimeAccountingService {
            f.programTime,
            v
          )}
+
+    // The observation's visits that are "dirty" (invalidated since their last
+    // update), each with the invalidation timestamp to record once recomputed.
+    val SelectDirtyVisits: Query[Observation.Id, (Visit.Id, Timestamp)] =
+      sql"""
+        SELECT
+          c_visit_id,
+          c_ta_invalidation
+        FROM
+          t_visit
+        WHERE
+          c_observation_id  = $observation_id AND
+          c_ta_invalidation > c_ta_update
+      """.query(visit_id *: core_timestamp)
+
+    val MarkVisitTimeAccountingUpdated: Command[(Timestamp, Visit.Id)] =
+      sql"""
+        UPDATE t_visit
+           SET c_ta_update = $core_timestamp
+         WHERE c_visit_id = $visit_id
+      """.command
 
     val SelectObservationId: Query[Visit.Id, Observation.Id] =
       sql"""

@@ -4,11 +4,11 @@
 package lucuma.sso.service
 package graphql
 
-import cats.data.OptionT
 import cats.effect.*
 import cats.implicits.*
 import grackle.Schema
 import grackle.skunk.SkunkMonitor
+import lucuma.common.middleware.IntrospectionMapping
 import lucuma.core.model.StandardUser
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
@@ -31,14 +31,15 @@ object GraphQLRoutes {
     wsb:      WebSocketBuilder2[F],
     schema: Schema,
   ): HttpRoutes[F] =
+    val introspectionService = new GraphQLService(IntrospectionMapping[F](schema)).some
     LucumaGraphQLRoutes.forService[F](
-      oa => {
-        for {
-          auth <- OptionT.fromOption[F](oa)
-          user <- OptionT(client.get(auth))
-          map  = SsoMapping(channels, pool, monitor, schema)(user)
-        } yield new GraphQLService(map)
-      } .widen.value,
+      oa =>
+        oa.flatTraverse(client.get)
+          .map:
+            case None       =>
+              introspectionService // no auth: only schema introspection is allowed
+            case Some(user) =>
+              new GraphQLService(SsoMapping(channels, pool, monitor, schema)(user)).some,
       wsb
     )
 

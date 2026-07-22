@@ -136,7 +136,7 @@ object Phase0Table {
         instrument *:
         g          *:
         l.opt      *:
-        u
+        u.opt
       ).contramap[R] { row => (
         row.spec.instrument,
         row.disperser,
