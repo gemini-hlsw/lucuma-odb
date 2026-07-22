@@ -13,7 +13,7 @@ import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.*
 import org.http4s.headers.Location
 
-object GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
+class GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
 
   test("Guest Login.") {
     flaky()(
@@ -32,10 +32,11 @@ object GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
               user  <- jwt.getUser.liftTo[IO]                 // get the user
               tok   <- CookieReader[IO].getSessionToken(res)  // get the new session token
               userʹ <- db.getGuestUserFromToken(tok)          // redeem it to get the same user
-            } yield
-              expect.same(Status.Created, res.status) &&
-              expect.same(GuestRole, user.role) &&
-              expect.same(`userʹ`.id, user.id)
+            } yield {
+              assertEq(Status.Created, res.status)
+              assertEq(GuestRole, user.role)
+              assertEq(`userʹ`.id, user.id)
+            }
           }
         }
     )
@@ -75,9 +76,9 @@ object GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
           loginAsGuest.flatMap { case (guestId, guestToken) =>
             loginAsBob.flatMap { case (bobId, bobToken) =>
               db.findUserFromToken(guestToken).map { op =>
-                expect(op.isEmpty)             && // old token should no longer work
-                expect.same(guestId, bobId)       && // bob and guest have the same id
-                expect(guestToken != bobToken)    // and different tokens
+                assert(op.isEmpty)             // old token should no longer work
+                assertEq(guestId, bobId)   // bob and guest have the same id
+                assert(guestToken != bobToken) // and different tokens
               }
             }
           }
@@ -114,8 +115,10 @@ object GuestUserSuite extends SsoSuite with Fixture with FlakyTests {
           // Ensure the guest token doesn't work anymore
           op     <- db.use(_.findUserFromToken(gtok))
 
-        } yield expect.same(user1, user2) && // same user
-                expect(op.isEmpty)        // guest user session is invalid
+        } yield {
+          assertEq(user1, user2) // same user
+          assert(op.isEmpty)        // guest user session is invalid
+        }
       }
     )
   }

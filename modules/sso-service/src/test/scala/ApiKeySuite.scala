@@ -24,7 +24,7 @@ import org.http4s.headers.Authorization
 import org.http4s.headers.Location
 import org.typelevel.ci.CIString
 
-object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
+class ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
   inline given Predicate[Long, Positive] with
     transparent inline def isValid(inline t: Long): Boolean = t > 0
 
@@ -65,7 +65,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
           // Redeem it (TODO: use API but we need a service user to do it)
           user  <- db.use(_.findStandardUserFromApiKey(apiKey))
 
-        } yield expect(user.exists(_.displayName == "Bob Dobbs"))
+        } yield assert(user.exists(_.displayName == "Bob Dobbs"))
       } .onError(e => IO(println(e)))
     )
   }
@@ -91,7 +91,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
           // Try to redeem it, should fail
           user2  <- db.use(_.findStandardUserFromApiKey(apiKey))
 
-        } yield expect(user2.isEmpty)
+        } yield assert(user2.isEmpty)
       } .onError(e => IO(println(e)))
     )
   }
@@ -124,7 +124,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
             )
           )
 
-        } yield expect.same(Status.Forbidden, status)
+        } yield assertEq(Status.Forbidden, status)
       } .onError(e => IO(println(e)))
     )
   }
@@ -158,7 +158,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
                   )
                 )
 
-        } yield expect.same(Right(user), jwt.getUser)
+        } yield assertEquals(Right(user), jwt.getUser)
       } .onError(e => IO(println(e)))
     )
   }
@@ -186,7 +186,7 @@ object ApiKeySuite extends SsoSuite with Fixture with FlakyTests {
                     )
 
 
-        } yield expect.same(Status.Forbidden, status)
+        } yield assertEq(Status.Forbidden, status)
       } .onError(e => IO(println(e)))
     )
   }

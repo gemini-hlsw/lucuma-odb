@@ -9,7 +9,7 @@ import io.circe.literal.*
 import lucuma.core.model.StandardUser
 import lucuma.sso.service.database.RoleRequest
 
-object users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
+class users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
   test("Standard user can only see self (and can see full record)."):
     flaky():
@@ -67,7 +67,7 @@ object users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
         """
       )
 
-  test("Staff can see many users."):
+  test("Staff can see many users.".ignore):
     flaky():
       As(Bob, withRole = Some(RoleRequest.Staff)).query(
         """
@@ -91,7 +91,6 @@ object users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
             }
           }
         """
-      ).flatMap: json =>  
-        // a bunch of users here
-        assert(false)
+      ).map: _ =>  
+        fail("not implemented")
 

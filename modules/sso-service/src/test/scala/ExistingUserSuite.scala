@@ -9,7 +9,7 @@ import lucuma.core.model.*
 import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.headers.Location
 
-object ExistingUserSuite extends SsoSuite with Fixture with FlakyTests {
+class ExistingUserSuite extends SsoSuite with Fixture with FlakyTests {
 
   test("Log in as existing user.") {
     flaky()(
@@ -29,8 +29,10 @@ object ExistingUserSuite extends SsoSuite with Fixture with FlakyTests {
           tok2   <- sso.get(stage2)(CookieReader[IO].getSessionToken)
           user2  <- db.use(_.getStandardUserFromToken(tok2))
 
-        } yield expect(tok != tok2)    && // different tokens
-                expect.same(user2, user1)    // for the same user
+        } yield {
+          assertNotEquals(tok,tok2)  // different tokens
+          assertEq(user2, user1) // for the same user
+        }
       }
     )
   }

@@ -24,11 +24,10 @@ import lucuma.sso.service.util.JwtEncoder
 import monocle.Prism
 import org.http4s.*
 import org.http4s.headers.Location
-import weaver.SimpleIOSuite
 
 import scala.concurrent.duration.*
 
-object Shortcut_3485 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
+class Shortcut_3485 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
 
   extension [S,A](p: Prism[S,A]) def unsafeGet(s: S): A =
     p.getOption(s).get
@@ -37,8 +36,8 @@ object Shortcut_3485 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
   test("generate and then decode a JWT, ensuring that email is preserved"):
 
     val config     = Config.local(null, null)  
-    val jwtEncoder = JwtEncoder.withPrivateKey(config.privateKey)
-    val jwtDecoder = JwtDecoder.withPublicKey(config.publicKey)
+    val jwtEncoder = JwtEncoder.withPrivateKey[IO](config.privateKey)
+    val jwtDecoder = JwtDecoder.withPublicKey[IO](config.publicKey)
     val jwtWriter  = SsoJwtWriter(jwtEncoder, 1.minute)
     val jwtReader  = SsoJwtReader(jwtDecoder)
 
@@ -66,7 +65,7 @@ object Shortcut_3485 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
       orcidId <- randomOrcidId
       jwt     <- jwtWriter.newJwt(user(orcidId))
       decoded <- jwtReader.decodeStandardUser(jwt)
-    yield expect.same(Some(email), decoded.profile.email)
+    yield assertEq(Some(email), decoded.profile.email)
 
 
   test("ensure generated JWT for existing user includes email."):
@@ -85,10 +84,10 @@ object Shortcut_3485 extends SsoSuite with Fixture with OrcidIdGenerator[IO]:
 
         for
           res    <- sso.get(stage1)(_.pure[IO])
-          _      <- expect.same(Status.Found, res.status).failFast
+          _      <- IO(res.status === Status.Found).assert
           loc     = res.headers.get[Location].map(_.uri)
-          _      <- expect(loc.isDefined).failFast
+          _      <- IO(loc.isDefined).assert
           stage2 <- sim.authenticate(loc.get, Bob, None)
           _      <- sso.get(stage2)(CookieReader[IO].getSessionToken)
           bob    <- sso.fetchAs[StandardUser](Request[IO](Method.POST, SsoRoot / "api" / "v1" / "refresh-token"))
-        yield expect.eql(Bob.primaryEmail.get.email, bob.profile.email.get)
+        yield assertEq(Bob.primaryEmail.get.email, bob.profile.email.get)

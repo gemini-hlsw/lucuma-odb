@@ -10,7 +10,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.StandardRole
 import lucuma.sso.service.database.RoleRequest
 
-object addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
+class addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
   List(RoleRequest.Staff, RoleRequest.Ngo(Partner.AR)).foreach: role =>
     test(s"$role should not be able to give Bob a role"):
@@ -61,7 +61,7 @@ object addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
                 }
               """
             .map: json =>
-              expect:
+              assert:
                 json
                   .hcursor
                   .downFields("data", "addRole")
@@ -85,7 +85,7 @@ object addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
                 }
               """
             .map: json =>
-              expect:
+              assert:
                 json
                   .hcursor
                   .downFields("data", "addRole")
@@ -123,7 +123,7 @@ object addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
                         }
                       """
                     .map: json =>
-                      expect:
+                      assert:
                         json
                           .hcursor
                           .downFields("data", "addRole")

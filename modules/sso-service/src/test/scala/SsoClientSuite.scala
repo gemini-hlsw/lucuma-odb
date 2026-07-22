@@ -22,7 +22,7 @@ import org.typelevel.ci.CIString
 
 import scala.concurrent.duration.*
 
-object SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
+class SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
   inline given Predicate[Long, Positive] with
     transparent inline def isValid(inline t: Long): Boolean = t > 0
 
@@ -69,7 +69,7 @@ object SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
                       )
                     )
 
-        } yield expect.same("Bob Dobbs", name)
+        } yield assertEq("Bob Dobbs", name)
       }
     )
   }
@@ -107,7 +107,7 @@ object SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
                       )
                     )
 
-        } yield expect.same("Bob Dobbs", name)
+        } yield assertEq("Bob Dobbs", name)
       }
     )
   }
@@ -142,7 +142,7 @@ object SsoClientSuite extends SsoSuite with Fixture with FlakyTests {
                       )
                     )
 
-        } yield expect.same(Status.Forbidden, status)
+        } yield assertEq(Status.Forbidden, status)
       }
     )
   }

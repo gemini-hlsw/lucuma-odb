@@ -14,7 +14,7 @@ import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.database.RoleType
 import lucuma.sso.service.orcid.OrcidIdGenerator
 
-object deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests with OrcidIdGenerator[IO]:
+class deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests with OrcidIdGenerator[IO]:
 
   extension (as: As)      
     def queryRoleTypes: IO[Set[RoleType]] =
@@ -50,7 +50,7 @@ object deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTest
         As(Bob, withOrcidId = Some(oid))
           .queryRoleTypes
           .map: tpes =>
-            expect.same(tpes, Set(RoleType.Pi, RoleType.Admin))
+            assertEq(tpes, Set(RoleType.Pi, RoleType.Admin))
 
   test(s"Admin *can* call deleteRole"):
     flaky():
@@ -70,6 +70,6 @@ object deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTest
         As(Bob, withOrcidId = Some(oid))
           .queryRoleTypes
           .map: tpes =>
-            expect.same(tpes, Set(RoleType.Pi, RoleType.Staff))
+            assertEq(tpes, Set(RoleType.Pi, RoleType.Staff))
 
 
