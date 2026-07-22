@@ -108,7 +108,7 @@ class goaDuplication extends OdbSuite:
     withServices(pi): services =>
       services
         .transactionally(services.goaDuplicationService.selectHeader(oid))
-        .map(_.provenance.center.collect { case GoaSearchCenter.Sidereal(c) => c })
+        .map(_.searchArea.center.collect { case GoaSearchCenter.Sidereal(c) => c })
 
   private def goaDuplication(oid: Observation.Id, fields: String): IO[Json] =
     query(
@@ -236,7 +236,7 @@ class goaDuplication extends OdbSuite:
       """
     )
 
-  test("the search provenance is reported alongside the matches"):
+  test("the search area is reported alongside the matches"):
     for
       oid    <- siderealObservation
       _      <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)

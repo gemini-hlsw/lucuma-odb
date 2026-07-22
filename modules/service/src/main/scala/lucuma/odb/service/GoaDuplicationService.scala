@@ -33,7 +33,7 @@ import java.time.ZoneOffset
  */
 trait GoaDuplicationService[F[_]]:
 
-  /** The stored snapshot, or `Snapshot.NeverChecked` if there is none. */
+  /** The stored snapshot, or an empty never-checked one if there is none. */
   def select(observationId: Observation.Id)(using Transaction[F]): F[GoaDuplication.Snapshot]
 
   /** The stored headline values, without the matches. */
@@ -148,14 +148,14 @@ object GoaDuplicationService:
           saturated,
           checkedAt,
           error,
-          GoaDuplication.Provenance(center, radius)
+          GoaDuplication.SearchArea(center, radius)
         )
       } { h =>
-        val (ra, dec, targetName) = h.provenance.center match
+        val (ra, dec, targetName) = h.searchArea.center match
           case Some(GoaSearchCenter.Sidereal(c))    => (c.ra.some, c.dec.some, none)
           case Some(GoaSearchCenter.NonSidereal(n)) => (none, none, n.some)
           case None                                 => (none, none, none)
-        (h.state, h.matchCount, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.provenance.radius)
+        (h.state, h.matchCount, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.searchArea.radius)
       }
 
     val SelectHeader: Query[Observation.Id, GoaDuplication.Header] =
