@@ -10,10 +10,11 @@ import cats.syntax.applicative.*
 import cats.syntax.either.*
 import fs2.Pure
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
-import lucuma.odb.data.Itc
+import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.gnirs.InitialConfigs
@@ -30,9 +31,11 @@ object Spectroscopy:
     estimator:     StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
-    config:        Config,
-    itc:           Either[OdbError, Itc.Spectroscopy],
-    calRole:       Option[CalibrationRole]
+    config:         Config,
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    gnirsAcqType:   Option[GnirsAcquisitionType],
+    scienceItc:     Either[OdbError, IntegrationTime],
+    calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
     val static = staticFrom(config)
     // Daytime pinhole flats have no acquisition sequence.
@@ -42,13 +45,13 @@ object Spectroscopy:
         SequenceGenerator.empty[GnirsDynamicConfig].asRight.pure[F]
       else Acquisition.instantiate(
              observationId, estimator, static, namespace, expander, config,
-             itc.map(_.acquisition.focus.value),
-             itc.toOption.flatMap(_.gnirsAcqType)
+             acquisitionItc,
+             gnirsAcqType
            )
     (for
       a <- EitherT(acquisition)
       s <- EitherT(Science.instantiate(
              observationId, estimator, static, namespace, expander, config,
-             itc.map(_.science.focus.value), calRole
+             scienceItc, calRole
            ))
     yield StreamingExecutionConfig(static, a.generate, s.generate)).value

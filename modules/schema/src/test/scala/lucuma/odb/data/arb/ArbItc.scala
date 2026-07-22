@@ -64,118 +64,140 @@ trait ArbItc:
     Cogen[(Wavelength, SignalToNoise, SignalToNoise)].contramap: a =>
       (a.wavelength, a.single.value, a.total.value)
 
-  given Arbitrary[Itc.Result] =
+  given Arbitrary[ItcResult] =
     Arbitrary:
       for
         t <- arbitrary[Target.Id]
         v <- arbitrary[IntegrationTime]
         s <- arbitrary[Option[SignalToNoiseAt]]
-      yield Itc.Result(t, v, s)
+      yield ItcResult(t, v, s)
 
-  given Cogen[Itc.Result] =
+  given Cogen[ItcResult] =
     Cogen[(Target.Id, IntegrationTime, Option[SignalToNoiseAt])].contramap: a =>
       (a.targetId, a.value, a.signalToNoise)
 
-  given Arbitrary[Itc.Flamingos2Imaging] =
+  given Arbitrary[ItcScience.Flamingos2Imaging] =
     Arbitrary:
       for
         f0 <- arbitrary[Flamingos2Filter]
         fs <- Gen.listOf(arbitrary[Flamingos2Filter]).map(fs => (f0 :: fs).distinct)
-        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[Itc.Result]])
-      yield Itc.Flamingos2Imaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
+        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[ItcResult]])
+      yield ItcScience.Flamingos2Imaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
 
-  given Cogen[Itc.Flamingos2Imaging] =
-    Cogen[List[(Flamingos2Filter, Zipper[Itc.Result])]].contramap: a =>
+  given Cogen[ItcScience.Flamingos2Imaging] =
+    Cogen[List[(Flamingos2Filter, Zipper[ItcResult])]].contramap: a =>
       a.science.toNel.toList
 
-  given Arbitrary[Itc.GhostIfu] =
+  given Arbitrary[ItcScience.GhostIfu] =
     Arbitrary:
       for
-        red  <- arbitrary[Zipper[Itc.Result]]
-        blue <- arbitrary[Zipper[Itc.Result]]
-      yield Itc.GhostIfu(red, blue)
+        red  <- arbitrary[Zipper[ItcResult]]
+        blue <- arbitrary[Zipper[ItcResult]]
+      yield ItcScience.GhostIfu(red, blue)
 
-  given Cogen[Itc.GhostIfu] =
-    Cogen[(Zipper[Itc.Result], Zipper[Itc.Result])].contramap: a =>
+  given Cogen[ItcScience.GhostIfu] =
+    Cogen[(Zipper[ItcResult], Zipper[ItcResult])].contramap: a =>
       (a.red, a.blue)
 
-  given Arbitrary[Itc.GmosNorthImaging] =
+  given Arbitrary[ItcScience.GmosNorthImaging] =
     Arbitrary:
       for
         f0 <- arbitrary[GmosNorthFilter]
         fs <- Gen.listOf(arbitrary[GmosNorthFilter]).map(fs => (f0 :: fs).distinct)
-        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[Itc.Result]])
-      yield Itc.GmosNorthImaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
+        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[ItcResult]])
+      yield ItcScience.GmosNorthImaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
 
-  given Cogen[Itc.GmosNorthImaging] =
-    Cogen[List[(GmosNorthFilter, Zipper[Itc.Result])]].contramap: a =>
+  given Cogen[ItcScience.GmosNorthImaging] =
+    Cogen[List[(GmosNorthFilter, Zipper[ItcResult])]].contramap: a =>
       a.science.toNel.toList
 
-  given Arbitrary[Itc.GmosSouthImaging] =
+  given Arbitrary[ItcScience.GmosSouthImaging] =
     Arbitrary:
       for
         f0 <- arbitrary[GmosSouthFilter]
         fs <- Gen.listOf(arbitrary[GmosSouthFilter]).map(fs => (f0 :: fs).distinct)
-        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[Itc.Result]])
-      yield Itc.GmosSouthImaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
+        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[ItcResult]])
+      yield ItcScience.GmosSouthImaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
 
-  given Cogen[Itc.GmosSouthImaging] =
-    Cogen[List[(GmosSouthFilter, Zipper[Itc.Result])]].contramap: a =>
+  given Cogen[ItcScience.GmosSouthImaging] =
+    Cogen[List[(GmosSouthFilter, Zipper[ItcResult])]].contramap: a =>
       a.science.toNel.toList
 
-  given Arbitrary[Itc.GnirsImaging] =
+  given Arbitrary[ItcScience.GnirsImaging] =
     Arbitrary:
       for
         f0 <- arbitrary[GnirsFilter]
         fs <- Gen.listOf(arbitrary[GnirsFilter]).map(fs => (f0 :: fs).distinct)
-        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[Itc.Result]])
-      yield Itc.GnirsImaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
+        zs <- Gen.listOfN(fs.size, arbitrary[Zipper[ItcResult]])
+      yield ItcScience.GnirsImaging(NonEmptyList.fromListUnsafe(fs.zip(zs)).toNem)
 
-  given Cogen[Itc.GnirsImaging] =
-    Cogen[List[(GnirsFilter, Zipper[Itc.Result])]].contramap: a =>
+  given Cogen[ItcScience.GnirsImaging] =
+    Cogen[List[(GnirsFilter, Zipper[ItcResult])]].contramap: a =>
       a.science.toNel.toList
 
-  given Arbitrary[Itc.Spectroscopy] =
+  given Arbitrary[ItcScience.Spectroscopy] =
+    Arbitrary:
+      arbitrary[Zipper[ItcResult]].map(ItcScience.Spectroscopy.apply)
+
+  given Cogen[ItcScience.Spectroscopy] =
+    Cogen[Zipper[ItcResult]].contramap(_.science)
+
+  given Arbitrary[ItcScience] =
+    Arbitrary:
+      Gen.oneOf(
+        arbitrary[ItcScience.Flamingos2Imaging],
+        arbitrary[ItcScience.GhostIfu],
+        arbitrary[ItcScience.GmosNorthImaging],
+        arbitrary[ItcScience.GmosSouthImaging],
+        arbitrary[ItcScience.GnirsImaging],
+        arbitrary[ItcScience.Spectroscopy]
+      )
+
+  given Cogen[ItcScience] =
+    Cogen[
+      Either[ItcScience.Spectroscopy, Either[ItcScience.GmosNorthImaging, Either[ItcScience.GmosSouthImaging, Either[ItcScience.GnirsImaging, Either[ItcScience.GhostIfu, ItcScience.Flamingos2Imaging]]]]]
+    ].contramap:
+      case a: ItcScience.Spectroscopy      => Left(a)
+      case a: ItcScience.GmosNorthImaging  => Right(Left(a))
+      case a: ItcScience.GmosSouthImaging  => Right(Right(Left(a)))
+      case a: ItcScience.GnirsImaging      => Right(Right(Right(Left(a))))
+      case a: ItcScience.GhostIfu          => Right(Right(Right(Right(Left(a)))))
+      case a: ItcScience.Flamingos2Imaging => Right(Right(Right(Right(Right(a)))))
+
+  given Arbitrary[ItcAcquisition.Available] =
     Arbitrary:
       for
-        a <- arbitrary[Zipper[Itc.Result]]
-        s <- arbitrary[Zipper[Itc.Result]]
+        z <- arbitrary[Zipper[ItcResult]]
         t <- arbitrary[Option[GnirsAcquisitionType]]
-      yield Itc.Spectroscopy(a, s, t)
+      yield ItcAcquisition.Available(z, t)
 
-  given Cogen[Itc.Spectroscopy] =
-    Cogen[(Zipper[Itc.Result], Zipper[Itc.Result], Option[GnirsAcquisitionType])].contramap: a =>
-      (a.acquisition, a.science, a.gnirsAcqType)
+  given Cogen[ItcAcquisition.Available] =
+    Cogen[(Zipper[ItcResult], Option[GnirsAcquisitionType])].contramap: a =>
+      (a.times, a.gnirsAcqType)
 
-  given Arbitrary[Itc.Igrins2Spectroscopy] =
+  given Arbitrary[ItcAcquisition] =
     Arbitrary:
-      arbitrary[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
+      Gen.oneOf(
+        Gen.const(ItcAcquisition.NotApplicable),
+        arbitrary[String].map(ItcAcquisition.Failed.apply),
+        arbitrary[ItcAcquisition.Available]
+      )
 
-  given Cogen[Itc.Igrins2Spectroscopy] =
-    Cogen[Zipper[Itc.Result]].contramap(_.science)
+  given Cogen[ItcAcquisition] =
+    Cogen[Either[Unit, Either[String, ItcAcquisition.Available]]].contramap:
+      case ItcAcquisition.NotApplicable       => Left(())
+      case ItcAcquisition.Failed(msg)         => Right(Left(msg))
+      case a: ItcAcquisition.Available        => Right(Right(a))
 
   given Arbitrary[Itc] =
     Arbitrary:
-      Gen.oneOf(
-        arbitrary[Itc.Flamingos2Imaging],
-        arbitrary[Itc.GhostIfu],
-        arbitrary[Itc.GmosNorthImaging],
-        arbitrary[Itc.GmosSouthImaging],
-        arbitrary[Itc.GnirsImaging],
-        arbitrary[Itc.Igrins2Spectroscopy],
-        arbitrary[Itc.Spectroscopy]
-      )
+      for
+        a <- arbitrary[ItcAcquisition]
+        s <- arbitrary[ItcScience]
+      yield Itc(a, s)
 
   given Cogen[Itc] =
-    Cogen[
-      Either[Itc.Spectroscopy, Either[Itc.GmosNorthImaging, Either[Itc.GmosSouthImaging, Either[Itc.GnirsImaging, Either[Itc.Igrins2Spectroscopy, Either[Itc.GhostIfu, Itc.Flamingos2Imaging]]]]]]
-    ].contramap:
-      case a: Itc.Spectroscopy        => Left(a)
-      case a: Itc.GmosNorthImaging    => Right(Left(a))
-      case a: Itc.GmosSouthImaging    => Right(Right(Left(a)))
-      case a: Itc.GnirsImaging        => Right(Right(Right(Left(a))))
-      case a: Itc.Igrins2Spectroscopy => Right(Right(Right(Right(Left(a)))))
-      case a: Itc.GhostIfu            => Right(Right(Right(Right(Right(Left(a))))))
-      case a: Itc.Flamingos2Imaging   => Right(Right(Right(Right(Right(Right(a))))))
+    Cogen[(ItcAcquisition, ItcScience)].contramap: a =>
+      (a.acquisition, a.science)
 
 object ArbItc extends ArbItc

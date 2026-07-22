@@ -30,6 +30,9 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
+import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcResult
+import lucuma.odb.data.ItcScience
 
 trait ItcCodec:
 
@@ -47,16 +50,16 @@ trait ItcCodec:
   // N.B. lucuma.itc.SignalToNoiseAt defines its own encoder consistent with
   // this decoder.  Perhaps we should move the decoder there as well.
 
-  given Decoder[Itc.Result] =
+  given Decoder[ItcResult] =
     Decoder.instance: c =>
       for
         targetId        <- c.downField("targetId").as[Target.Id]
         exposureTime    <- c.downField("exposureTime").as[TimeSpan]
         exposureCount   <- c.downField("exposureCount").as[PosInt]
         signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
-      yield Itc.Result(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
+      yield ItcResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Result] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcResult] =
     Encoder.instance: a =>
       Json.obj(
         "targetId"        -> a.targetId.asJson,
@@ -65,9 +68,35 @@ trait ItcCodec:
         "signalToNoiseAt" -> a.signalToNoise.asJson
       )
 
+  // GnirsAcquisitionType is a plain Enumerated; encode by tag.  Round-trips
+  // within this codec only (the value is stored in the acquisition jsonb blob).
+  private given Encoder[GnirsAcquisitionType] =
+    Encoder[String].contramap(Enumerated[GnirsAcquisitionType].tag)
+
+  private given Decoder[GnirsAcquisitionType] =
+    Decoder[String].emap: s =>
+      Enumerated[GnirsAcquisitionType].fromTag(s).toRight(s"Invalid GnirsAcquisitionType: $s")
+
+  // Only the Available case is stored as JSON (in c_acquisition_results); the
+  // NotApplicable and Failed cases are represented by the c_acquisition_* columns
+  // directly (both null / c_acquisition_error), so the codec is for the payload.
+  given Decoder[ItcAcquisition.Available] =
+    Decoder.instance: c =>
+      for
+        times   <- c.downField("times").as[Zipper[ItcResult]]
+        acqType <- c.downField("gnirsAcqType").as[Option[GnirsAcquisitionType]]
+      yield ItcAcquisition.Available(times, acqType)
+
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcAcquisition.Available] =
+    Encoder.instance: a =>
+      Json.obj(
+        "times" -> a.times.asJson
+      // Emitted only when set (only GNIRS pins an acquisition type).
+      ).deepMerge(a.gnirsAcqType.fold(Json.obj())(t => Json.obj("gnirsAcqType" -> t.asJson)))
+
   private def imagingScienceNemDecoder[A: Decoder: Order](
     fieldName: String
-  ): Decoder[NonEmptyMap[A, Zipper[Itc.Result]]] =
+  ): Decoder[NonEmptyMap[A, Zipper[ItcResult]]] =
     Decoder.instance: c =>
       c.downField(fieldName)
        .values
@@ -78,53 +107,36 @@ trait ItcCodec:
            val c = json.hcursor
            for
              filter  <- c.downField("filter").as[A]
-             results <- c.downField("results").as[Zipper[Itc.Result]]
+             results <- c.downField("results").as[Zipper[ItcResult]]
            yield filter -> results
          res.map(_.toNem)
 
-  given Decoder[Itc.GhostIfu] =
+  given Decoder[ItcScience.GhostIfu] =
     Decoder.instance: c =>
       for
-        red  <- c.downField("red").as[Zipper[Itc.Result]]
-        blue <- c.downField("blue").as[Zipper[Itc.Result]]
-      yield Itc.GhostIfu(red, blue)
+        red  <- c.downField("red").as[Zipper[ItcResult]]
+        blue <- c.downField("blue").as[Zipper[ItcResult]]
+      yield ItcScience.GhostIfu(red, blue)
 
-  given Decoder[Itc.Flamingos2Imaging] =
-    imagingScienceNemDecoder[Flamingos2Filter]("flamingos2ImagingScience").map(Itc.Flamingos2Imaging.apply)
+  given Decoder[ItcScience.Flamingos2Imaging] =
+    imagingScienceNemDecoder[Flamingos2Filter]("flamingos2ImagingScience").map(ItcScience.Flamingos2Imaging.apply)
 
-  given Decoder[Itc.GmosNorthImaging] =
-    imagingScienceNemDecoder[GmosNorthFilter]("gmosNorthImagingScience").map(Itc.GmosNorthImaging.apply)
+  given Decoder[ItcScience.GmosNorthImaging] =
+    imagingScienceNemDecoder[GmosNorthFilter]("gmosNorthImagingScience").map(ItcScience.GmosNorthImaging.apply)
 
-  given Decoder[Itc.GmosSouthImaging] =
-    imagingScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(Itc.GmosSouthImaging.apply)
+  given Decoder[ItcScience.GmosSouthImaging] =
+    imagingScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(ItcScience.GmosSouthImaging.apply)
 
-  given Decoder[Itc.GnirsImaging] =
-    imagingScienceNemDecoder[GnirsFilter]("gnirsImagingScience").map(Itc.GnirsImaging.apply)
+  given Decoder[ItcScience.GnirsImaging] =
+    imagingScienceNemDecoder[GnirsFilter]("gnirsImagingScience").map(ItcScience.GnirsImaging.apply)
 
-  given Decoder[Itc.Igrins2Spectroscopy] =
+  given Decoder[ItcScience.Spectroscopy] =
     Decoder.instance:
-      _.downField("spectroscopyScience").as[Zipper[Itc.Result]].map(Itc.Igrins2Spectroscopy.apply)
-
-  // GnirsAcquisitionType is a plain Enumerated; encode by tag.  Round-trips within
-  // this codec only (the value is stored in the Itc jsonb blob).
-  private given Encoder[GnirsAcquisitionType] =
-    Encoder[String].contramap(Enumerated[GnirsAcquisitionType].tag)
-
-  private given Decoder[GnirsAcquisitionType] =
-    Decoder[String].emap: s =>
-      Enumerated[GnirsAcquisitionType].fromTag(s).toRight(s"Invalid GnirsAcquisitionType: $s")
-
-  given Decoder[Itc.Spectroscopy] =
-    Decoder.instance: c =>
-      for
-        acquisition <- c.downField("acquisition").as[Zipper[Itc.Result]]
-        science     <- c.downField("spectroscopyScience").as[Zipper[Itc.Result]]
-        acqType     <- c.downField("gnirsAcqType").as[Option[GnirsAcquisitionType]]
-      yield Itc.Spectroscopy(acquisition, science, acqType)
+      _.downField("spectroscopyScience").as[Zipper[ItcResult]].map(ItcScience.Spectroscopy.apply)
 
   private def imagingScienceNemEncoder[A: Encoder](
     using Encoder[TimeSpan], Encoder[Wavelength]
-  ): Encoder[NonEmptyMap[A, Zipper[Itc.Result]]] =
+  ): Encoder[NonEmptyMap[A, Zipper[ItcResult]]] =
     Encoder.instance: a =>
       Json.fromValues:
         a.toNel.toList.map: (filter, results) =>
@@ -133,79 +145,92 @@ trait ItcCodec:
             "results" -> results.asJson
           )
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GhostIfu] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GhostIfu] =
     Encoder.instance: a =>
       Json.obj(
-        "itcType" -> Itc.Type.GhostIfu.asJson,
+        "itcType" -> ItcScience.Type.GhostIfu.asJson,
         "red"     -> a.red.asJson,
         "blue"    -> a.blue.asJson
       )
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Flamingos2Imaging] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.Flamingos2Imaging] =
     Encoder.instance: a =>
       Json.obj(
-        "itcType"                  -> Itc.Type.Flamingos2Imaging.asJson,
+        "itcType"                  -> ItcScience.Type.Flamingos2Imaging.asJson,
         "flamingos2ImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[Flamingos2Filter])
       )
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GmosNorthImaging] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GmosNorthImaging] =
     Encoder.instance: a =>
       Json.obj(
-        "itcType"                 -> Itc.Type.GmosNorthImaging.asJson,
+        "itcType"                 -> ItcScience.Type.GmosNorthImaging.asJson,
         "gmosNorthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosNorthFilter])
       )
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GmosSouthImaging] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GmosSouthImaging] =
     Encoder.instance: a =>
       Json.obj(
-        "itcType"                 -> Itc.Type.GmosSouthImaging.asJson,
+        "itcType"                 -> ItcScience.Type.GmosSouthImaging.asJson,
         "gmosSouthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosSouthFilter])
       )
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.GnirsImaging] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GnirsImaging] =
     Encoder.instance: a =>
       Json.obj(
-        "itcType"             -> Itc.Type.GnirsImaging.asJson,
+        "itcType"             -> ItcScience.Type.GnirsImaging.asJson,
         "gnirsImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GnirsFilter])
       )
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Igrins2Spectroscopy] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.Spectroscopy] =
     Encoder.instance: a =>
       Json.obj(
-        "itcType"             -> Itc.Type.Igrins2Spectroscopy.asJson,
+        "itcType"             -> ItcScience.Type.Spectroscopy.asJson,
         "spectroscopyScience" -> a.science.asJson
       )
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc.Spectroscopy] =
-    Encoder.instance: a =>
-      Json.obj(
-        "itcType"             -> Itc.Type.Spectroscopy.asJson,
-        "acquisition"         -> a.acquisition.asJson,
-        "spectroscopyScience" -> a.science.asJson
-      // Emitted only when set, so pre-existing rows' JSON is unaffected.
-      ).deepMerge(a.gnirsAcqType.fold(Json.obj())(t => Json.obj("gnirsAcqType" -> t.asJson)))
-
-  given Decoder[Itc] =
+  given Decoder[ItcScience] =
     Decoder.instance: c =>
       c.downField("itcType")
-       .as[Itc.Type]
+       .as[ItcScience.Type]
        .flatMap:
-         case Itc.Type.Flamingos2Imaging   => Decoder[Itc.Flamingos2Imaging].apply(c)
-         case Itc.Type.GhostIfu            => Decoder[Itc.GhostIfu].apply(c)
-         case Itc.Type.GmosNorthImaging    => Decoder[Itc.GmosNorthImaging].apply(c)
-         case Itc.Type.GmosSouthImaging    => Decoder[Itc.GmosSouthImaging].apply(c)
-         case Itc.Type.GnirsImaging        => Decoder[Itc.GnirsImaging].apply(c)
-         case Itc.Type.Igrins2Spectroscopy => Decoder[Itc.Igrins2Spectroscopy].apply(c)
-         case Itc.Type.Spectroscopy        => Decoder[Itc.Spectroscopy].apply(c)
+         case ItcScience.Type.Flamingos2Imaging   => Decoder[ItcScience.Flamingos2Imaging].apply(c)
+         case ItcScience.Type.GhostIfu            => Decoder[ItcScience.GhostIfu].apply(c)
+         case ItcScience.Type.GmosNorthImaging    => Decoder[ItcScience.GmosNorthImaging].apply(c)
+         case ItcScience.Type.GmosSouthImaging    => Decoder[ItcScience.GmosSouthImaging].apply(c)
+         case ItcScience.Type.GnirsImaging        => Decoder[ItcScience.GnirsImaging].apply(c)
+         case ItcScience.Type.Spectroscopy        => Decoder[ItcScience.Spectroscopy].apply(c)
 
-  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc] =
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience] =
     Encoder.instance:
-      case a @ Itc.Flamingos2Imaging(_)   => Encoder[Itc.Flamingos2Imaging].apply(a)
-      case a @ Itc.GhostIfu(_, _)         => Encoder[Itc.GhostIfu].apply(a)
-      case a @ Itc.GmosNorthImaging(_)    => Encoder[Itc.GmosNorthImaging].apply(a)
-      case a @ Itc.GmosSouthImaging(_)    => Encoder[Itc.GmosSouthImaging].apply(a)
-      case a @ Itc.GnirsImaging(_)        => Encoder[Itc.GnirsImaging].apply(a)
-      case a @ Itc.Igrins2Spectroscopy(_) => Encoder[Itc.Igrins2Spectroscopy].apply(a)
-      case a @ Itc.Spectroscopy(_, _, _)  => Encoder[Itc.Spectroscopy].apply(a)
+      case a @ ItcScience.Flamingos2Imaging(_)   => Encoder[ItcScience.Flamingos2Imaging].apply(a)
+      case a @ ItcScience.GhostIfu(_, _)         => Encoder[ItcScience.GhostIfu].apply(a)
+      case a @ ItcScience.GmosNorthImaging(_)    => Encoder[ItcScience.GmosNorthImaging].apply(a)
+      case a @ ItcScience.GmosSouthImaging(_)    => Encoder[ItcScience.GmosSouthImaging].apply(a)
+      case a @ ItcScience.GnirsImaging(_)        => Encoder[ItcScience.GnirsImaging].apply(a)
+      case a @ ItcScience.Spectroscopy(_)        => Encoder[ItcScience.Spectroscopy].apply(a)
+
+  // The GraphQL `Itc` union predates the acquisition/science split, so its output
+  // JSON reassembles the two parts into the original fused shape.  There is no
+  // corresponding Decoder: the composite is assembled from separate storage
+  // columns (see ItcService), never decoded from a single blob.  Imaging and
+  // GHOST encode straight from their science result (they have no acquisition).
+  // A spectroscopy science with an acquisition result is an `ItcSpectroscopy`
+  // (acquisition merged in); one without is an `ItcIgrins2Spectroscopy` (distinct
+  // `itcType`).  A `Failed` acquisition is not represented here — the caller
+  // surfaces it as an error, as before the split an acquisition ITC failure
+  // failed the whole lookup.  `gnirsAcqType` is an internal detail with no
+  // GraphQL field, so it is omitted.
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[Itc] =
+    Encoder.instance: itc =>
+      val science = itc.science.asJson
+      itc.science match
+        case _: ItcScience.Spectroscopy =>
+          itc.acquisition match
+            case ItcAcquisition.Available(times, _) =>
+              science.deepMerge(Json.obj("acquisition" -> times.asJson))
+            case _                                  =>
+              science.deepMerge(Json.obj("itcType" -> "igrins_2_spectroscopy".asJson))
+        case _                          =>
+          science
 
 object itc extends ItcCodec

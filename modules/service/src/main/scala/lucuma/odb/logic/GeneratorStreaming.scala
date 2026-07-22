@@ -12,6 +12,7 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import fs2.Pure
 import fs2.Stream
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -27,7 +28,10 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig as GnirsDynamic
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig as GnirsStatic
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig as Igrins2Dynamic
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig as Igrins2Static
+import lucuma.itc.IntegrationTime
 import lucuma.odb.data.Itc
+import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcScience
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Syntax.*
@@ -138,36 +142,55 @@ object GeneratorStreaming:
   def requireGhostItc(
     oid: Observation.Id,
     itc: Either[OdbError, Itc]
-  ): Either[OdbError, Itc.GhostIfu] =
+  ): Either[OdbError, ItcScience.GhostIfu] =
     itc.flatMap: i =>
-      Itc.ghostIfu.getOption(i).toRight:
+      ItcScience.ghostIfu.getOption(i.science).toRight:
         OdbError.InvalidObservation(oid, s"Expecting a GHOST IFU result for this observation".some)
-
-  def requireIgrins2SpectroscopyItc(
-    oid: Observation.Id,
-    itc: Either[OdbError, Itc]
-  ): Either[OdbError, Itc.Igrins2Spectroscopy] =
-    itc.flatMap: i =>
-      Itc.igrins2Spectroscopy.getOption(i).toRight:
-        OdbError.InvalidObservation(oid, s"Expecting an IGRINS-2 spectroscopy ITC result for this observation".some)
 
   def requireImagingItc[A](
     name: String,
     oid:  Observation.Id,
     itc:  Either[OdbError, Itc],
-    img:  Itc => Option[A]
+    img:  ItcScience => Option[A]
   ): Either[OdbError, A] =
     itc.flatMap: i =>
-      img(i).toRight:
+      img(i.science).toRight:
         OdbError.InvalidObservation(oid, s"Expecting $name ITC results for this observation".some)
 
-  def requireSpectroscopyItc(
+  // Science integration time for a spectroscopy observation.  The whole ITC
+  // result must be present and its science part must be spectroscopy.
+  def spectroscopyScienceTime(
     oid: Observation.Id,
     itc: Either[OdbError, Itc]
-  ): Either[OdbError, Itc.Spectroscopy] =
+  ): Either[OdbError, IntegrationTime] =
     itc.flatMap: i =>
-      Itc.spectroscopy.getOption(i).toRight:
-        OdbError.InvalidObservation(oid, s"Expecting a spectroscopy ITC result for this observation".some)
+      ItcScience.spectroscopy.getOption(i.science)
+        .toRight(OdbError.InvalidObservation(oid, s"Expecting a spectroscopy ITC result for this observation".some))
+        .map(_.science.focus.value)
+
+  // Acquisition integration time for a mode that has an acquisition sequence.  A
+  // Failed acquisition (a cached deterministic ITC failure) or a NotApplicable
+  // one (no acquisition sequence) is surfaced as a Left, confining the failure
+  // to the acquisition sub-sequence.
+  def acquisitionTime(
+    oid: Observation.Id,
+    itc: Either[OdbError, Itc]
+  ): Either[OdbError, IntegrationTime] =
+    itc.flatMap:
+      _.acquisition match
+        case ItcAcquisition.Available(times, _) => times.focus.value.asRight
+        case ItcAcquisition.Failed(msg)         => OdbError.ItcError(msg.some).asLeft
+        case ItcAcquisition.NotApplicable       =>
+          OdbError.InvalidObservation(oid, s"Expecting an acquisition ITC result for this observation".some).asLeft
+
+  // The pinned GNIRS acquisition type, when the acquisition result carries one.
+  def gnirsAcqType(
+    itc: Either[OdbError, Itc]
+  ): Option[GnirsAcquisitionType] =
+    itc.toOption.flatMap:
+      _.acquisition match
+        case ItcAcquisition.Available(_, t) => t
+        case _                              => none
 
   def instantiate[F[_]: Async: Services](
     commitHash: CommitHash,
@@ -235,9 +258,10 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.flamingos2.longslit.LongSlit
         (for
           cfg <- extractMode(ObservingMode.Flamingos2LongSlitName, context)(_.asFlamingos2LongSlit)
-          itc  = requireSpectroscopyItc(context.oid, context.itcRes)
+          acq  = acquisitionTime(context.oid, context.itcRes)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, itc, rol))
+          gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, acq, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 
@@ -259,7 +283,7 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.flamingos2.imaging.Imaging
         (for
           cfg <- extractMode(ObservingMode.Flamingos2ImagingName, context)(_.asFlamingos2Imaging)
-          itc  = requireImagingItc(ObservingMode.Flamingos2ImagingName, context.oid, context.itcRes, Itc.flamingos2Imaging.getOption)
+          itc  = requireImagingItc(ObservingMode.Flamingos2ImagingName, context.oid, context.itcRes, ItcScience.flamingos2Imaging.getOption)
           gen <- EitherT(Imaging.flamingos2(calculator.flamingos2Step, context.namespace, cfg, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
@@ -309,9 +333,9 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.igrins2.longslit.LongSlit
         (for
           cfg <- extractMode(ObservingMode.Igrins2LongSlitName, context)(_.asIgrins2LongSlit)
-          itc  = requireIgrins2SpectroscopyItc(context.oid, context.itcRes)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2Step, context.namespace, cfg, itc, rol))
+          gen <- EitherT.fromEither(LongSlit.instantiate(context.oid, calculator.igrins2Step, context.namespace, cfg, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 
@@ -334,9 +358,11 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gnirs.spectroscopy.Spectroscopy
         (for
           cfg <- extractMode(ObservingMode.GnirsSpectroscopyName, context)(_.asGnirsSpectroscopy)
-          itc  = requireSpectroscopyItc(context.oid, context.itcRes)
+          acq  = acquisitionTime(context.oid, context.itcRes)
+          typ  = gnirsAcqType(context.itcRes)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(Spectroscopy.instantiate(context.oid, calculator.gnirsStep, context.namespace, exp.gnirs, cfg, itc, rol))
+          gen <- EitherT(Spectroscopy.instantiate(context.oid, calculator.gnirsStep, context.namespace, exp.gnirs, cfg, acq, typ, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 
@@ -358,7 +384,7 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gnirs.imaging.Imaging
         (for
           cfg <- extractMode(ObservingMode.GnirsImagingName, context)(_.asGnirsImaging)
-          itc  = requireImagingItc(ObservingMode.GnirsImagingName, context.oid, context.itcRes, Itc.gnirsImaging.getOption)
+          itc  = requireImagingItc(ObservingMode.GnirsImagingName, context.oid, context.itcRes, ItcScience.gnirsImaging.getOption)
           gen <- EitherT(Imaging.gnirs(calculator.gnirsStep, context.namespace, cfg, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
@@ -381,7 +407,7 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gmos.imaging.Imaging
         (for
           cfg <- extractMode(ObservingMode.GmosNorthImagingName, context)(_.asGmosNorthImaging)
-          itc  = requireImagingItc(ObservingMode.GmosNorthImagingName, context.oid, context.itcRes, Itc.gmosNorthImaging.getOption)
+          itc  = requireImagingItc(ObservingMode.GmosNorthImagingName, context.oid, context.itcRes, ItcScience.gmosNorthImaging.getOption)
           gen <- EitherT(Imaging.gmosNorth(calculator.gmosNorthStep, context.namespace, cfg, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
@@ -401,9 +427,10 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gmos.longslit.LongSlit
         (for
           cfg <- extractMode(ObservingMode.GmosNorthLongSlitName, context)(_.asGmosNorthLongSlit)
-          itc  = requireSpectroscopyItc(context.oid, context.itcRes)
+          acq  = acquisitionTime(context.oid, context.itcRes)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorthStep, context.namespace, exp.gmosNorth, cfg, itc, rol))
+          gen <- EitherT(LongSlit.gmosNorth(context.oid, calculator.gmosNorthStep, context.namespace, exp.gmosNorth, cfg, acq, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 
@@ -426,7 +453,7 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gmos.imaging.Imaging
         (for
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
-          itc  = requireImagingItc(ObservingMode.GmosSouthImagingName, context.oid, context.itcRes, Itc.gmosSouthImaging.getOption)
+          itc  = requireImagingItc(ObservingMode.GmosSouthImagingName, context.oid, context.itcRes, ItcScience.gmosSouthImaging.getOption)
           gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouthStep, context.namespace, cfg, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
@@ -447,8 +474,9 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gmos.longslit.LongSlit
         (for
           cfg <- extractMode(ObservingMode.GmosSouthLongSlitName, context)(_.asGmosSouthLongSlit)
-          itc  = requireSpectroscopyItc(context.oid, context.itcRes)
+          acq  = acquisitionTime(context.oid, context.itcRes)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, exp.gmosSouth, cfg, itc, rol))
+          gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, exp.gmosSouth, cfg, acq, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value

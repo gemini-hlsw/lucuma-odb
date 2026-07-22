@@ -11,7 +11,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.core.model.sequence.igrins2.Igrins2SVCImages
 import lucuma.core.model.sequence.igrins2.Igrins2StaticConfig
-import lucuma.odb.data.Itc.Igrins2Spectroscopy
+import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 
@@ -27,7 +27,7 @@ object LongSlit:
     estimator:     StepTimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
     namespace:     UUID,
     config:        Config,
-    itc:           Either[OdbError, Igrins2Spectroscopy],
+    scienceItc:    Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): Either[OdbError, StreamingExecutionConfig[Pure, Igrins2StaticConfig, Igrins2DynamicConfig]] =
     val static = staticFrom(config)
@@ -37,6 +37,6 @@ object LongSlit:
       static,
       namespace,
       config,
-      itc.map(_.science.focus.value),
+      scienceItc,
       calRole
     ).map(s => StreamingExecutionConfig(static, Stream.empty, s.generate))

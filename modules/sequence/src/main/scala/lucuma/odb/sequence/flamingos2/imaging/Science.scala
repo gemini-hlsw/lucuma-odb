@@ -27,8 +27,8 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.Itc.Flamingos2Imaging
-import lucuma.odb.data.Itc.Result
+import lucuma.odb.data.ItcResult as Result
+import lucuma.odb.data.ItcScience.Flamingos2Imaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep

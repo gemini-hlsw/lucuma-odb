@@ -13,9 +13,13 @@ import lucuma.core.data.Zipper
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.data.Itc
+import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcResult
+import lucuma.odb.data.ItcScience
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
@@ -38,33 +42,35 @@ case class GeneratorContext(
     // Generator Params
     md5.update(params.hashBytes)
 
-    def addResultSet(z: Zipper[Itc.Result]): Unit =
+    def addResultSet(z: Zipper[ItcResult]): Unit =
       md5.update(z.focus.value.exposureTime.hashBytes)
       md5.update(z.focus.value.exposureCount.hashBytes)
 
-    def addImagingResultSet[A: HashBytes](kv: (A, Zipper[Itc.Result])): Unit =
+    def addImagingResultSet[A: HashBytes](kv: (A, Zipper[ItcResult])): Unit =
       md5.update(kv._1.hashBytes)
       addResultSet(kv._2)
 
     // ITC
     itcRes.foreach: itc =>
-      itc match
-        case Itc.Flamingos2Imaging(m)      =>
+      itc.science match
+        case ItcScience.Flamingos2Imaging(m) =>
           m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.GhostIfu(r, b)            =>
+        case ItcScience.GhostIfu(r, b)       =>
           addResultSet(r)
           addResultSet(b)
-        case Itc.GmosNorthImaging(m)       =>
+        case ItcScience.GmosNorthImaging(m)  =>
           m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.GmosSouthImaging(m)       =>
+        case ItcScience.GmosSouthImaging(m)  =>
           m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.GnirsImaging(m)           =>
+        case ItcScience.GnirsImaging(m)      =>
           m.toNel.toList.foreach(addImagingResultSet)
-        case Itc.Igrins2Spectroscopy(sci)  =>
+        case ItcScience.Spectroscopy(sci)    =>
           addResultSet(sci)
-        case Itc.Spectroscopy(acq, sci, _) =>
-          addResultSet(acq)
-          addResultSet(sci)
+
+      itc.acquisition match
+        case ItcAcquisition.Available(times, _) => addResultSet(times)
+        case ItcAcquisition.Failed(_)           => ()
+        case ItcAcquisition.NotApplicable       => ()
 
     // Commit Hash
     md5.update(commitHash.hashBytes)
@@ -119,8 +125,13 @@ object GeneratorContext:
       // we use EitherT for short-circuiting control flow, but the payload is
       // also an Either value which may be a Left (for example when the target
       // is missing a SED).
-      as <- params.itcInput.fold(
-        m => EitherT.pure(sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft),
-        _ => cachedItcResults.fold(callItc(pid, params).map(_.asRight))(EitherT.pure(_))
-      )
+      as <- params.itcInput match
+        case ItcInputDerivation.Ready(_)      =>
+          cachedItcResults.fold(callItc(pid, params).map(_.asRight))(EitherT.pure(_))
+        case ItcInputDerivation.Incomplete(m) =>
+          EitherT.pure(sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft[Itc])
+        case ItcInputDerivation.NotApplicable =>
+          // Exchange / visitor modes have no ITC; this result is never consumed
+          // for them, but a Left keeps the payload type honest.
+          EitherT.pure(sequenceUnavailable(oid, "ITC is not applicable for this observing mode").asLeft[Itc])
     yield GeneratorContext(oid, as, params, commitHash)).value

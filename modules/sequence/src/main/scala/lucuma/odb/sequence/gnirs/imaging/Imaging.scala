@@ -10,7 +10,7 @@ import cats.effect.Sync
 import fs2.Pure
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
-import lucuma.odb.data.Itc.GnirsImaging
+import lucuma.odb.data.ItcScience.GnirsImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 

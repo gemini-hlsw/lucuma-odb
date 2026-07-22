@@ -38,9 +38,9 @@ import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
-import lucuma.odb.data.Itc.GmosNorthImaging
-import lucuma.odb.data.Itc.GmosSouthImaging
-import lucuma.odb.data.Itc.Result
+import lucuma.odb.data.ItcResult as Result
+import lucuma.odb.data.ItcScience.GmosNorthImaging
+import lucuma.odb.data.ItcScience.GmosSouthImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoAtom
 import lucuma.odb.sequence.data.ProtoStep

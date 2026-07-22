@@ -35,7 +35,7 @@ class ShortCut_7265 extends ExecutionTestSupportForGmos:
                 .selectOne(p, o)
                 .flatMap: e =>
                   e.leftMap(error => new RuntimeException(s"unexpected error: $error")).liftTo[IO]
-      i <- r.itcInput.leftMap(error => new RuntimeException(s"unexpected error: $error")).liftTo[IO]
+      i <- r.itcInput.toOption.toRight(new RuntimeException(s"expected an ITC input: ${r.itcInput}")).liftTo[IO]
       s <- ItcInput.spectroscopy.getOption(i).toRight(new RuntimeException(s"expected spectroscopy input: $i")).liftTo[IO]
       g <- InstrumentMode.gmosNorthImaging.getOption(s.acquisition.mode).toRight(new RuntimeException(s"expected GMOS North Imaging: $s")).liftTo[IO]
     yield g
