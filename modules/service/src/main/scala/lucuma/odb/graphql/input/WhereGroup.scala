@@ -11,8 +11,8 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.model.Group
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.binding.WhereOrder
 import lucuma.odb.graphql.binding.WhereOptionString
+import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereGroup {
 

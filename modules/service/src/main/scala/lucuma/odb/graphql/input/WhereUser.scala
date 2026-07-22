@@ -12,9 +12,9 @@ import grackle.Predicate.*
 import lucuma.core.model.User
 import lucuma.odb.data.UserType
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.binding.WhereOrder
 import lucuma.odb.graphql.binding.WhereEq
 import lucuma.odb.graphql.binding.WhereOptionString
+import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereUser:
 

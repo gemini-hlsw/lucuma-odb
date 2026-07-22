@@ -13,9 +13,9 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Target
 import lucuma.odb.graphql.binding.*
-import lucuma.odb.graphql.binding.WhereOrder
 import lucuma.odb.graphql.binding.WhereEq
 import lucuma.odb.graphql.binding.WhereOptionEq
+import lucuma.odb.graphql.binding.WhereOrder
 import lucuma.odb.graphql.binding.WhereString
 
 object WhereTarget {
