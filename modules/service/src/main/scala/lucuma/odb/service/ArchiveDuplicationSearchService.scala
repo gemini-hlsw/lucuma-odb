@@ -32,6 +32,7 @@ import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
 import skunk.Query
+import skunk.Transaction
 import skunk.syntax.all.*
 
 /**
@@ -140,7 +141,9 @@ object ArchiveDuplicationSearchService:
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         now.flatMap: t =>
           val summary = ArchiveDuplication.Summary.notChecked(t, searchArea)
-          store(observationId, summary, Nil).as(ArchiveDuplication.Snapshot(summary, Nil))
+          storeUnlessFrozen(observationId):
+            archiveDuplicationService.store(observationId, summary, Nil)
+              .as(ArchiveDuplication.Snapshot(summary, Nil))
 
       private def runQueries(
         observationId: Observation.Id,
@@ -163,7 +166,7 @@ object ArchiveDuplicationSearchService:
           NonEmptyString
             .from(errors.toList.map(_.message).mkString("; "))
             .getOrElse("The Archive Duplication Search failed for an unreported reason.".refined)
-        services.transactionally:
+        storeUnlessFrozen(observationId):
           archiveDuplicationService.storeError(observationId, message) >>
           archiveDuplicationService.select(observationId)
 
@@ -186,15 +189,28 @@ object ArchiveDuplicationSearchService:
               error         = none,
               searchArea    = searchArea
             )
-          store(observationId, summary, matches).as(ArchiveDuplication.Snapshot(summary, matches))
+          storeUnlessFrozen(observationId):
+            archiveDuplicationService.store(observationId, summary, matches)
+              .as(ArchiveDuplication.Snapshot(summary, matches))
 
-      private def store(
-        observationId: Observation.Id,
-        summary:        ArchiveDuplication.Summary,
-        matches:       List[GoaSummaryRecord]
-      )(using NoTransaction[F]): F[Unit] =
+      /**
+       * Applies a snapshot write, but only while the proposal is still ours to
+       * replace.  `loadContext` already rejects a frozen proposal, but the
+       * multi-second GOA call runs between that check and this write, so a
+       * proposal submitted in the meantime would otherwise overwrite the frozen
+       * snapshot the TAC is meant to see.  Re-reading the status here — inside
+       * the writing transaction and behind a `FOR UPDATE` lock on the program
+       * row, which serialises against the submission `UPDATE` — makes the freeze
+       * hold at the one place that writes the snapshot, as the ADR requires.  A
+       * refused write returns whatever is currently stored.
+       */
+      private def storeUnlessFrozen(
+        observationId: Observation.Id
+      )(write: Transaction[F] ?=> F[ArchiveDuplication.Snapshot])(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         services.transactionally:
-          archiveDuplicationService.store(observationId, summary, matches)
+          session.option(Statements.LockProposalStatus)(observationId).flatMap:
+            case Some(ps) if !ps.isFrozen => write
+            case _                        => archiveDuplicationService.select(observationId)
 
       private val now: F[Timestamp] =
         Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
@@ -224,3 +240,17 @@ object ArchiveDuplicationSearchService:
         JOIN t_program p ON p.c_program_id = o.c_program_id
         WHERE o.c_observation_id = $observation_id
       """.query(observing_mode_type.opt *: right_ascension.opt *: declination.opt *: core_timestamp.opt *: proposal_status)
+
+    /**
+     * The observation's proposal status, taking a row lock on the program so a
+     * submission that lands during the GOA call cannot slip in between this read
+     * and the snapshot write that follows it in the same transaction.
+     */
+    val LockProposalStatus: Query[Observation.Id, ProposalStatus] =
+      sql"""
+        SELECT p.c_proposal_status
+        FROM t_observation o
+        JOIN t_program p ON p.c_program_id = o.c_program_id
+        WHERE o.c_observation_id = $observation_id
+        FOR UPDATE OF p
+      """.query(proposal_status)

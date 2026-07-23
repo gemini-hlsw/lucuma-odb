@@ -7,18 +7,25 @@ import cats.effect.IO
 import cats.syntax.all.*
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.goa.GoaClientMock
+import lucuma.catalog.goa.GoaParams
+import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
+import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
+import lucuma.odb.util.Codecs.program_id
+import skunk.syntax.all.*
 
 class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
-  val pi: User = TestUsers.Standard.pi(1, 30)
+  val pi: User    = TestUsers.Standard.pi(1, 30)
+  val staff: User = TestUsers.Standard.staff(2, 31)
 
-  override val validUsers: List[User] = List(pi)
+  override val validUsers: List[User] = List(pi, staff)
 
   /**
    * GOA's summary records carry only `name`, `instrument` and
@@ -51,6 +58,35 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       tid <- createTargetAs(pi, pid)
       oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.MaroonX, tid)
     yield oid
+
+  /** A program carrying a proposal with a semester, so it can be submitted. */
+  private def proposedProgram: IO[Program.Id] =
+    for
+      pid <- createProgramWithUsPi(pi)
+      cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
+      _   <- addDemoScienceProposal(pi, pid, cid)
+    yield pid
+
+  /**
+   * Freezes the snapshot the way submission does, without the API's submit
+   * rules.  Runs on a fresh session -- independent of the one the search under
+   * test holds -- so it stands in for a concurrent submission and cannot nest.
+   */
+  private def markSubmitted(pid: Program.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_program set c_proposal_status = 'submitted' where c_program_id = $program_id".command
+      )(pid).void
+
+  /**
+   * A client that submits the proposal as a side effect of being queried,
+   * standing in for a submission that lands during the multi-second GOA call —
+   * after the search read the observation but before it writes the snapshot.
+   */
+  private def submittingDuring(pid: Program.Id, underlying: GoaClient[IO]): GoaClient[IO] =
+    new GoaClient[IO]:
+      def query(params: GoaParams) =
+        markSubmitted(pid) >> underlying.query(params)
 
   private def refresh(client: GoaClient[IO])(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
     withServices(pi): services =>
@@ -129,6 +165,23 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
     yield
       assertEquals(db.summary.matchCount.value, 1)
       assertEquals(db.matches.map(_.name), List("d.fits"))
+
+  test("a submission that lands during the GOA call does not overwrite the frozen snapshot"):
+    // The freeze is re-checked at the write, not only at load: this refresh reads
+    // the observation while still unsubmitted, but the proposal is submitted during
+    // the (mocked) GOA call, so the write it would make is refused and the snapshot
+    // the PI last saw survives.
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- refresh(mockOf("a.fits"))(oid)
+      s   <- refresh(submittingDuring(pid, mockOf("b.fits")))(oid)
+      db  <- stored(oid)
+    yield
+      assertEquals(s.matches.map(_.name), List("a.fits"))
+      assertEquals(db.summary.matchCount.value, 1)
+      assertEquals(db.matches.map(_.name), List("a.fits"))
 
   test("a GOA failure is reported without destroying the last good snapshot"):
     for
