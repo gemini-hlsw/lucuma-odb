@@ -6,10 +6,10 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
-import lucuma.odb.graphql.table.ConfigurationRequestView
-import lucuma.odb.graphql.table.GhostIfuView
 import lucuma.odb.graphql.table.ArchiveDuplicationView
 import lucuma.odb.graphql.table.ArchiveMatchView
+import lucuma.odb.graphql.table.ConfigurationRequestView
+import lucuma.odb.graphql.table.GhostIfuView
 
 import table.ObservationView
 

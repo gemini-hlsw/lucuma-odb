@@ -7,6 +7,7 @@ package mapping
 import grackle.Path
 import grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
@@ -14,7 +15,6 @@ import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
 import lucuma.odb.graphql.table.GnirsDynamicView
 import lucuma.odb.graphql.table.GnirsSpectroscopyView
-import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable
 import lucuma.odb.graphql.table.VisitorTable

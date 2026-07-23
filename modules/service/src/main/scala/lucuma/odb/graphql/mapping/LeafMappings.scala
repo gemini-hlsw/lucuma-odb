@@ -46,6 +46,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.CalculationState
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -53,7 +54,6 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
