@@ -18,6 +18,7 @@ import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.util.Codecs.program_id
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.syntax.all.*
 
 class ArchiveDuplicationSearchServiceSuite extends OdbSuite:

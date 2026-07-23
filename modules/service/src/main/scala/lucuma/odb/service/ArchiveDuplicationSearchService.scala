@@ -28,9 +28,17 @@ import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.logic.GoaQueryPolicy
+import lucuma.odb.otel.ObservationIdKey
+import lucuma.odb.otel.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.syntax.*
+import org.typelevel.otel4s.Attribute
+import org.typelevel.otel4s.trace.Span
+import org.typelevel.otel4s.trace.Tracer
 import skunk.Query
 import skunk.Transaction
 import skunk.syntax.all.*
@@ -62,11 +70,13 @@ object ArchiveDuplicationSearchService:
     private def isFrozen: Boolean =
       ps >= ProposalStatus.Submitted
 
-  def instantiate[F[_]: Concurrent: Parallel: Clock](
+  def instantiate[F[_]: {Concurrent, Parallel, Clock, Tracer as T, LoggerFactory as LF}](
     goaClient: GoaClient[F]
   )(using Services[F]): ArchiveDuplicationSearchService[F] =
     new ArchiveDuplicationSearchService[F]:
       val runner = GoaQueryRunner.fromClient(goaClient)
+
+      given Logger[F] = LF.getLoggerFromName("archive-duplication-search")
 
       import Services.Syntax.*
 
@@ -81,11 +91,26 @@ object ArchiveDuplicationSearchService:
           asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
 
       override def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[ArchiveDuplication.Snapshot]] =
-        (for
-          ctx    <- ResultT(loadContext(observationId))
-          center <- ResultT.liftF(resolveCenter(observationId, ctx))
-          snap   <- ResultT.liftF(search(observationId, ctx, center))
-        yield snap).value
+        T.span("archiveDuplicationSearch.refresh", Attribute.from(ObservationIdKey, observationId)).use: span =>
+          (for
+            ctx    <- ResultT(loadContext(observationId))
+            center <- ResultT.liftF(resolveCenter(observationId, ctx))
+            snap   <- ResultT.liftF(search(observationId, ctx, center))
+          yield snap).value
+            .flatTap(recordOutcome(span))
+            .onError { case e => span.recordException(e) }
+
+      /** Annotate the span with what the refresh produced, or that it was rejected. */
+      private def recordOutcome(span: Span[F])(result: Result[ArchiveDuplication.Snapshot]): F[Unit] =
+        result.toOption.fold(
+          span.addAttribute(Attribute("archiveDuplication.outcome", "rejected"))
+        ): snap =>
+          span.addAttributes(
+            Attribute("archiveDuplication.outcome", "stored"),
+            Attribute("archiveDuplication.state", snap.summary.state.tag),
+            Attribute("archiveDuplication.matchCount", snap.summary.matchCount.value.toLong),
+            Attribute("archiveDuplication.saturated", snap.summary.saturated)
+          )
 
       private def loadContext(observationId: Observation.Id)(using NoTransaction[F]): F[Result[Context]] =
         services.transactionally:
@@ -150,9 +175,14 @@ object ArchiveDuplicationSearchService:
         searchArea:    ArchiveDuplication.SearchArea,
         params:        List[GoaParams]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
-        runner.run(params).flatMap:
-          case Left(errors)  => storeError(observationId, errors)
-          case Right(byQuery) => storeMatches(observationId, searchArea, byQuery)
+        info"$observationId: Archive Duplication Search querying GOA: ${params.mkString(" | ")}" *>
+          runner.run(params).flatMap:
+            case Left(errors)   =>
+              info"$observationId: Archive Duplication Search failed: ${errors.toList.map(_.message).mkString("; ")}" *>
+                storeError(observationId, errors)
+            case Right(byQuery) =>
+              info"$observationId: Archive Duplication Search returned ${byQuery.map(_.size).mkString(" + ")} record(s)" *>
+                storeMatches(observationId, searchArea, byQuery)
 
       /**
        * Records the failure without disturbing the stored matches, so a GOA

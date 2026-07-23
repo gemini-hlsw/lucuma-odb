@@ -19,6 +19,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.service.ArchiveDuplicationSearchService
 import lucuma.odb.service.Services
+import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 
 class archiveDuplication extends OdbSuite:
 
