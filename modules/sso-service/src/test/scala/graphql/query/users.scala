@@ -6,23 +6,26 @@ package graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.all.*
 import io.circe.literal.*
-import lucuma.core.model.StandardUser
 import lucuma.sso.service.database.RoleRequest
+import lucuma.sso.service.orcid.OrcidIdGenerator
 
-class users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
+class users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests with OrcidIdGenerator[IO]:
+
+  // Do this to ensure that Alice and Bob have sequential userids
+  lazy val setup: IO[Unit] =
+    List(AsAlice, AsBob).traverse(_.canonicalizeUser).void
 
   test("Standard user can only see self (and can see full record)."):
     flaky():
-      var bob: StandardUser = null // sorry
-      As(Bob).expectQueryWithUser(
-        query = b =>
-          bob = b
+      setup >>
+      AsBob.expectQuery(
+        query =
           """
             query {
               users() {
                 matches {
-                  id
                   orcidId
                   type
                   enabled
@@ -45,8 +48,7 @@ class users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
             "users" : {
               "matches" : [
                 {
-                  "id" : ${bob.id},
-                  "orcidId" : ${bob.profile.orcidId},
+                  "orcidId" : $BobOrcidId,
                   "type" : "STANDARD",
                   "enabled" : true,
                   "roles" : [
@@ -70,29 +72,88 @@ class users extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
   test("Staff can see many users."):
     flaky():
-      As(Bob, withRole = Some(RoleRequest.Staff)).query(
-        """
-          query {
-            users() {
-              matches {
-                id
-                orcidId
-                type
-                enabled
-                roles {
-                  type              
-                }
-                profile {
-                  givenName
-                  familyName
-                  creditName
-                  email
+      setup >>
+      AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+        query = 
+          """
+            query {
+              users() {
+                matches {
+                  id
+                  type
+                  orcidId
                 }
               }
             }
-          }
-        """
-      ).flatMap: j =>
-        IO.println(j.spaces2)
+          """,
+          expected = json"""
+            {
+              "data" : {
+                "users" : {
+                  "matches" : [
+                    {
+                      "id" : "u-100",
+                      "type" : "SERVICE",
+                      "orcidId" : null
+                    },
+                    {
+                      "id" : "u-101",
+                      "type" : "STANDARD",
+                      "orcidId" : ${AliceOrcidId}
+                    },
+                    {
+                      "id" : "u-103",
+                      "type" : "STANDARD",
+                      "orcidId" : ${BobOrcidId}
+                    }
+                  ]
+                }
+              }
+            }
+          """
+      )
 
+  test("Staff can see many users (filter for type)."):
+    flaky():
+      setup >>
+      AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+        query = 
+          """
+            query {
+              users(
+                WHERE: {
+                  type: {
+                    EQ: STANDARD
+                  }
+                }
+              ) {
+                matches {
+                  id
+                  type
+                  orcidId
+                }
+              }
+            }
+          """,
+          expected = json"""
+            {
+              "data" : {
+                "users" : {
+                  "matches" : [
+                    {
+                      "id" : "u-101",
+                      "type" : "STANDARD",
+                      "orcidId" : ${AliceOrcidId}
+                    },
+                    {
+                      "id" : "u-103",
+                      "type" : "STANDARD",
+                      "orcidId" : ${BobOrcidId}
+                    }
+                  ]
+                }
+              }
+            }
+          """
+      )
 

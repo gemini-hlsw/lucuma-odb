@@ -6,6 +6,7 @@ package lucuma.sso.service
 import cats.Eq
 import cats.effect.*
 import cats.syntax.all.*
+import lucuma.sso.service.database.Database
 import munit.CatsEffectSuite
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -22,5 +23,8 @@ trait SsoSuite extends CatsEffectSuite with SsoSimulator {
 
   def assertEqIO[A: Eq](obtained: A, expected: A): IO[Unit] =
     IO(obtained === expected).assert
+
+  def db: Resource[IO, Database[IO]] =
+    SsoSimulator[IO].flatMap(_._1)
 
 }

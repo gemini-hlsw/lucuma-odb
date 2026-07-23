@@ -21,14 +21,12 @@ class deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests
       as.query("query { user { roles { type } } }").map: json =>
         json.hcursor.downFields("data", "user", "roles").require[Set[Json]].map: j =>
           j.hcursor.downField("type").require[RoleType]
-    def run: IO[Unit] =
-      as.query("user { id }").void
 
   List(None, Some(RoleRequest.Staff), Some(RoleRequest.Ngo(Partner.CA))).foreach: rr =>
     test(s"${rr.getOrElse(RoleRequest.Pi).tpe} can't call deleteRole"):
       flaky():
         var bob: StandardUser = null // i'm sorry
-        As(Bob, withRole = rr)
+        rr.foldLeft(As(Bob))(_.withRoleRequest(_))
           .expectQueryWithUser(
             u => { bob = u; s"""mutation { deleteRole(roleId: "${bob.role.id}") }""" },
             json"""
@@ -45,31 +43,29 @@ class deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests
   
   test("Double-check that created roles hang around."):
     flaky():
-      randomOrcidId.flatMap: oid =>
-        As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Admin)).run >>
-        As(Bob, withOrcidId = Some(oid))
-          .queryRoleTypes
-          .map: tpes =>
-            assertEq(tpes, Set(RoleType.Pi, RoleType.Admin))
+      AsBob.withRoleRequest(RoleRequest.Admin).canonicalizeUser >>
+      AsBob
+        .queryRoleTypes
+        .map: tpes =>
+          assertEq(tpes, Set(RoleType.Pi, RoleType.Admin))
 
   test(s"Admin *can* call deleteRole"):
     flaky():
-      randomOrcidId.flatMap: oid =>
-        As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Staff)).run >>
-        As(Bob, withOrcidId = Some(oid), withRole = Some(RoleRequest.Admin))
-          .expectQueryWithUser(
-            bob => s"""mutation { deleteRole(roleId: "${bob.role.id}") }""",
-            json"""
-              {
-                "data" : {
-                  "deleteRole" : true
-                }
+      AsBob.withRoleRequest(RoleRequest.Staff).canonicalizeUser >>
+      AsBob.withRoleRequest(RoleRequest.Admin)
+        .expectQueryWithUser(
+          bob => s"""mutation { deleteRole(roleId: "${bob.role.id}") }""",
+          json"""
+            {
+              "data" : {
+                "deleteRole" : true
               }
-            """
-          ) >>
-        As(Bob, withOrcidId = Some(oid))
-          .queryRoleTypes
-          .map: tpes =>
-            assertEq(tpes, Set(RoleType.Pi, RoleType.Staff))
+            }
+          """
+        ) >>
+      AsBob
+        .queryRoleTypes
+        .map: tpes =>
+          assertEq(tpes, Set(RoleType.Pi, RoleType.Staff))
 
 

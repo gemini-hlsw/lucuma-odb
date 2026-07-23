@@ -15,14 +15,13 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
   List(RoleRequest.Staff, RoleRequest.Ngo(Partner.AR)).foreach: role =>
     test(s"$role should not be able to give Bob a role"):
       flaky():
-        As(Bob)
-          .queryIds
+        AsBob.queryIds
           .flatMap: (bob, _) =>
-            As(Alice)
+            AsAlice
               .queryIds
               .flatMap: 
-                case (alice, aliceOrcid) =>
-                  As(Alice, Some(aliceOrcid), Some(role))
+                case (alice, _) =>
+                  AsAlice.withRoleRequest(role)
                     .expectQuery(
                       query = 
                         s"""
@@ -50,7 +49,7 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
       As(Bob)
         .queryIds
         .flatMap: bob =>
-          As(Alice, None, Some(RoleRequest.Admin))
+          AsAlice.withRoleRequest(RoleRequest.Admin)
             .query:
               s"""
                 mutation {
@@ -73,7 +72,7 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
       As(Bob)
         .queryIds
         .flatMap: bob =>
-          As(Alice, None, Some(RoleRequest.Admin))
+          AsAlice.withRoleRequest(RoleRequest.Admin)
             .query:
               s"""
                 mutation {
@@ -94,13 +93,13 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
   test("Admin Alice should be able to give Bob an Admin role, and aftewards he should be able to give a Staff role to Alice"):
     flaky():
-      As(Bob)
+      AsBob
         .queryIds
-        .flatMap: (bob, bobOrcid) =>
+        .flatMap: (bob, _) =>
           As(Alice)
             .queryIds
-            .flatMap: (alice, aliceOrcid) =>
-              As(Alice, Some(aliceOrcid), Some(RoleRequest.Admin))
+            .flatMap: (alice, _) =>
+              AsAlice.withRoleRequest(RoleRequest.Admin)
                 .query:
                   s"""
                     mutation {
@@ -112,7 +111,7 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
                   """
                 .flatMap: json =>
                   val newRole = json.hcursor.downFields("data", "addRole").require[StandardRole.Id]
-                  As(Bob, Some(bobOrcid), Some(newRole))
+                  AsBob.withRole(newRole)
                     .query:
                       s"""
                         mutation {

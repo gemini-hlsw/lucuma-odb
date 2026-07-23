@@ -13,10 +13,18 @@ import org.http4s.implicits.*
 
 trait Fixture { self: CatsEffectSuite =>
 
-  val SsoRoot     = uri"https://sso.gpp.lucuma.xyz"
-  val ExploreRoot = SsoRoot // uri"https://explore.lucuma.xyz"
+  lazy val SsoRoot     = uri"https://sso.gpp.lucuma.xyz"
+  lazy val ExploreRoot = SsoRoot // uri"https://explore.lucuma.xyz"
 
-  val Alice: OrcidPerson =
+  lazy val AliceOrcidId = OrcidId.parse("https://orcid.org/1388-2458-9396-3360").toOption.get
+  lazy val BobOrcidId = OrcidId.parse("https://orcid.org/7286-2347-4388-1398").toOption.get
+
+  // Some extras to use if we need them
+  // lazy val AliceOrcidId = OrcidId.parse("https://orcid.org/0633-2185-7266-6708").toOption.get
+  // lazy val AliceOrcidId = OrcidId.parse("https://orcid.org/5422-6667-1666-161X").toOption.get
+  // lazy val AliceOrcidId = OrcidId.parse("https://orcid.org/7832-3898-0128-7435").toOption.get
+
+  lazy val Alice: OrcidPerson =
     OrcidPerson(
       name = OrcidName(
         familyName = Some("Dallas"),
@@ -37,7 +45,7 @@ trait Fixture { self: CatsEffectSuite =>
       )
     )
 
-  val Bob: OrcidPerson =
+  lazy val Bob: OrcidPerson =
     OrcidPerson(
       name = OrcidName(
         familyName = Some("Dobbs"),

@@ -89,7 +89,20 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
       yield result
     .onError(e => IO(println(e)))
 
-  case class As(person: OrcidPerson, withOrcidId: Option[OrcidId] = None, withRole: Option[RoleRequest | StandardRole.Id] = None):
+  case class As private (person: OrcidPerson, withOrcidId: Option[OrcidId], withRole: Option[RoleRequest | StandardRole.Id]) {
+
+    def withOrcidId(oid: OrcidId): As =
+      copy(withOrcidId = Some(oid))
+
+    def withRoleRequest(rr: RoleRequest): As = 
+      copy(withRole = Some(rr))
+
+    def withRole(rid: StandardRole.Id): As = 
+      copy(withRole = Some(rid))
+
+    // just ensure the user exists
+    def canonicalizeUser: IO[Unit] =
+      query("bogus").void
 
     def query(query: String): IO[Json] =
       queryWithUser(_ => query)
@@ -113,6 +126,16 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
             json.hcursor.downFields("data", "role", "user", "id").require[User.Id],
             json.hcursor.downFields("data", "role", "user", "orcidId").require[OrcidId],
           )
+
+  }
+
+  object As {
+    def apply(person: OrcidPerson): As =
+      apply(person, None, None)
+  }
+
+  val AsAlice: As = As(Alice).withOrcidId(AliceOrcidId)
+  val AsBob: As = As(Bob).withOrcidId(BobOrcidId)
 
 }
 
