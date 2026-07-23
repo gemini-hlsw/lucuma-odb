@@ -14,10 +14,10 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.HourAngle
 import lucuma.core.math.RightAscension
-import lucuma.odb.graphql.table.ChronConditionsEntryView
-import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ArchiveDuplicationView
 import lucuma.odb.graphql.table.ArchiveMatchView
+import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ImagingConfigOptionTable
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.SpectroscopyConfigOptionTable

@@ -8,11 +8,11 @@ import grackle.Path
 import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.Declination
+import lucuma.odb.graphql.table.ArchiveDuplicationView
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.GhostIfuView
-import lucuma.odb.graphql.table.ArchiveDuplicationView
-import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.graphql.table.TargetView
 

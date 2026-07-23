@@ -54,6 +54,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -64,7 +65,6 @@ import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
