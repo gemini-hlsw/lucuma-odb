@@ -8,11 +8,11 @@ import cats.effect.*
 import cats.syntax.all.*
 import lucuma.sso.service.database.Database
 import munit.CatsEffectSuite
+import munit.Location
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import simulator.SsoSimulator
-import munit.Location
 
 trait SsoSuite extends CatsEffectSuite with SsoSimulator {
 
