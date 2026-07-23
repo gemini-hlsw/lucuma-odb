@@ -7,6 +7,7 @@ import grackle.Path
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ExchangeView
 import lucuma.odb.graphql.table.ExposureTimeModeView
@@ -17,7 +18,6 @@ import lucuma.odb.graphql.table.GhostStaticView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GnirsDynamicView
 import lucuma.odb.graphql.table.GnirsSpectroscopyView
-import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.GroupView
 import lucuma.odb.graphql.table.Igrins2DynamicTable
 import lucuma.odb.graphql.table.ObservationView
