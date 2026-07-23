@@ -6339,6 +6339,8 @@ enum TimeAccountingCategory {
   BR
   "Canada"
   CA
+  "Calibration"
+  CAL
   "CFHT Exchange"
   CFHT
   "Chile"
@@ -6347,6 +6349,8 @@ enum TimeAccountingCategory {
   DD
   "Demo Science"
   DS
+  "Engineering"
+  ENG
   "Guaranteed Time"
   GT
   "Subaru"
