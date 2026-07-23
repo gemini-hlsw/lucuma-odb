@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql
 
-package input
+package binding
 
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*

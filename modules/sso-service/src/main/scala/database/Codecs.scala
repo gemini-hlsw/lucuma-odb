@@ -7,6 +7,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.model.*
 import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
+import lucuma.odb.data.UserType
 import lucuma.sso.client.ApiKey
 import lucuma.sso.service.SessionToken
 import skunk.*
@@ -51,6 +52,9 @@ trait Codecs {
 
   val role_type: Codec[RoleType] =
     enums[RoleType](Enumerated[RoleType].tag(_).toLowerCase, x => Enumerated[RoleType].fromTag(toPrefix(x)), Type("lucuma_role_type"))
+
+  val user_type: Codec[UserType] =
+    enums[UserType](Enumerated[UserType].tag(_).toLowerCase, x => Enumerated[UserType].fromTag(x), Type("lucuma_user_type"))
 
   val partner: Codec[Partner] =
     enums[Partner](Enumerated[Partner].tag(_).toLowerCase, x => Enumerated[Partner].all.find(_.tag.equalsIgnoreCase(x)), Type("lucuma_ngo"))

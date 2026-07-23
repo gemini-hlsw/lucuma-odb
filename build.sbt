@@ -54,7 +54,6 @@ val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
-val weaverVersion                = "0.13.0"
 
 ThisBuild / tlBaseVersion      := "0.89"
 ThisBuild / scalaVersion       := "3.8.4"
@@ -434,11 +433,14 @@ lazy val ssoService = project
       "org.tpolecat"        %% "natchez-http4s"             % natchezHttp4sVersion,
       "org.tpolecat"        %% "natchez-log"                % natchezVersion,
       "edu.gemini"          %% "lucuma-graphql-routes"      % lucumaGraphQLRoutesVersion,
-      "io.circe"            %% "circe-literal"              % circeVersion  % Test,
-      "org.typelevel"       %% "weaver-cats"                % weaverVersion % Test,
-      "org.typelevel"       %% "weaver-scalacheck"          % weaverVersion % Test
+
+      "io.circe"            %% "circe-literal"                   % circeVersion               % Test,
+      "org.scalameta"       %% "munit"                           % munitVersion               % Test,
+      "org.typelevel"       %% "munit-cats-effect"               % munitCatsEffectVersion     % Test,
+      "com.dimafeng"        %% "testcontainers-scala-munit"      % testcontainersScalaVersion % Test,
+      "com.dimafeng"        %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
+
     ),
-    testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
     reStart / envVars += "PORT" -> "8082",
     reStartArgs       += "serve",
     description                     := "Lucuma SSO Service",
@@ -796,6 +798,7 @@ lazy val binding = project
       "co.fs2"        %% "fs2-io"             % fs2Version,
       "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
       "org.typelevel" %% "grackle-core"       % grackleVersion,
+      "org.typelevel" %% "grackle-sql-core"   % grackleVersion,
       "org.typelevel" %% "log4cats-core"      % log4catsVersion,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
       "org.typelevel" %% "munit-cats-effect"  % munitCatsEffectVersion % Test

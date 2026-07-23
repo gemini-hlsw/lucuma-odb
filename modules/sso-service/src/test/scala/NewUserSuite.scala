@@ -6,11 +6,10 @@ package lucuma.sso.service
 import cats.effect.*
 import cats.implicits.*
 import lucuma.core.model.Access
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.*
 import org.http4s.headers.Location
 
-object NewUserSuite extends SsoSuite with Fixture with FlakyTests {
+class NewUserSuite extends SsoSuite with Fixture with FlakyTests {
 
   test("Bob logs in via ORCID as a new lucuma user.") {
     flaky()(
@@ -20,9 +19,9 @@ object NewUserSuite extends SsoSuite with Fixture with FlakyTests {
 
           // stage1 auth should redirect
           res <- sso.get(stage1)(_.pure[IO])
-          _   <- expect.same(Status.Found, res.status).failFast
+          _   <- IO(res.status === Status.Found).assert
           loc  = res.headers.get[Location].map(_.uri)
-          _   <- expect(loc.isDefined).failFast
+          _   <- IO(loc.isDefined).assert
 
           // simulate the user authenticating as Bob, who is a new user
           stage2 <- sim.authenticate(loc.get, Bob, None)
@@ -32,10 +31,10 @@ object NewUserSuite extends SsoSuite with Fixture with FlakyTests {
 
           bob  <- db.use(_.getStandardUserFromToken(tok))
 
-          _ <- expect.same(Access.Pi, bob.role.access).failFast
-          _ <- expect.same(Bob.name.familyName, bob.profile.profile.familyName).failFast
+          _ <- IO(bob.role.access === Access.Pi).assert
+          _ <- IO(Bob.name.familyName === bob.profile.profile.familyName).assert
 
-        } yield success
+        } yield ()
       }
     )
   }

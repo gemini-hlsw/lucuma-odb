@@ -4,13 +4,12 @@
 package lucuma.sso.service
 
 import cats.effect.*
-import cats.implicits.*
+import cats.syntax.all.*
 import lucuma.core.model.*
 import lucuma.sso.service.database.RoleRequest
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.headers.Location
 
-object SetRoleSuite extends SsoSuite with Fixture with FlakyTests {
+class SetRoleSuite extends SsoSuite with Fixture with FlakyTests {
 
   def setRole(rid: StandardRole.Id)  = 
     (SsoRoot / "auth" / "v1" / "set-role").withQueryParam("role", rid.toString)
@@ -33,8 +32,14 @@ object SetRoleSuite extends SsoSuite with Fixture with FlakyTests {
         tok2   <- sso.get(setRole(rid))(CookieReader[IO].getSessionToken)
         user2  <- db.use(_.getStandardUserFromToken(tok2))
 
-      } yield expect.eql(Access.Pi, user1.role.access).and(expect.eql(Access.Admin, user2.role.access)).and(expect.eql(user1.id, user2.id)).and(expect.eql(user2.role.id, rid)).and(expect(user2.otherRoles.contains(user1.role)))
+        _ <- IO(user1.role.access === Access.Pi).assert
+        _ <- IO(user2.role.access === Access.Admin).assert
+        _ <- IO(user1.id === user2.id).assert
+        _ <- IO(user2.role.id === rid).assert
+        _ <- IO(user2.otherRoles.contains(user1.role)).assert
+
+      } yield ()
     }
   }
-
+ 
 }

@@ -13,6 +13,8 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereOptionString
+import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereConfigurationRequest {
 

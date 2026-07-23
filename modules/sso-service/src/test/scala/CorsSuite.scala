@@ -10,7 +10,7 @@ import org.http4s.*
 import org.http4s.implicits.*
 import org.typelevel.ci.CIString
 
-object CorsSuite extends SsoSuite {
+class CorsSuite extends SsoSuite {
 
   def routes(domain: String): HttpRoutes[IO] =
     CorsMiddleware.cors[IO](domain = List(domain)).apply(
@@ -40,7 +40,8 @@ object CorsSuite extends SsoSuite {
     test(s"CORS headers must not be added if no origin is provided. (domain=$domain)") {
       val req = Request[IO](uri = uri"/api/v1/whoami")
       routes(domain).orNotFound(req).map { res =>
-        forEach(CorsHeaders)(s => expect(!res.headers.headers.exists(_.name.toString == s)))
+        CorsHeaders.foreach: s => 
+          assert(!res.headers.headers.exists(_.name.toString == s))
       }
     }
 
@@ -65,14 +66,16 @@ object CorsSuite extends SsoSuite {
   test("CORS headers must not be added if origin is mismatched.") {
     val req = Request[IO](uri = uri"/api/v1/whoami").putHeaders(Header.Raw(CIString("Origin"), "https://woozle.com"))
     routes("gemini.edu").orNotFound(req).map { res =>
-      forEach(CorsHeaders)(s => expect(!res.headers.headers.exists(_.name.toString == s)))
+      CorsHeaders.foreach: s => 
+        assert(!res.headers.headers.exists(_.name.toString == s))
     }
   }
 
   test("CORS headers must be added if origin matches.") {
     val req = Request[IO](uri = uri"/api/v1/whoami").putHeaders(Header.Raw(CIString("Origin"), "https://gemini.edu"))
     routes("gemini.edu").orNotFound(req).map { res =>
-      forEach(CorsHeaders)(s => expect(!res.headers.headers.exists(_.name.toString == s)))
+      CorsHeaders.foreach: s => 
+        assert(!res.headers.headers.exists(_.name.toString == s))
     }
   }
 
