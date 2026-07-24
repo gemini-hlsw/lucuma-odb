@@ -229,7 +229,7 @@ trait ItcCodec:
             case ItcAcquisition.Available(times, _) =>
               science.deepMerge(Json.obj("acquisition" -> times.asJson))
             case _                                  =>
-              science.deepMerge(Json.obj("itcType" -> "igrins_2_spectroscopy".asJson))
+              science.deepMerge(Json.obj("itcType" -> "IGRINS_2_SPECTROSCOPY".asJson))
         case _                          =>
           science
 
