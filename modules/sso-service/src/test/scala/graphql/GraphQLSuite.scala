@@ -14,7 +14,6 @@ import lucuma.core.util.Gid
 import lucuma.sso.client.ApiKey
 import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.orcid.OrcidPerson
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.Credentials
 import org.http4s.Headers
 import org.http4s.Method
@@ -25,7 +24,6 @@ import org.http4s.client.Client
 import org.http4s.headers.Authorization
 import org.http4s.headers.Location
 import org.typelevel.ci.CIString
-import weaver.Expectations
 
 trait GraphQLSuite { this: SsoSuite & Fixture =>
 
@@ -75,7 +73,7 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
         user1  <- db.use(_.getStandardUserFromToken(tok1))
         user2  <-
           extraRole match
-            case None => user1.pure
+            case None => user1.pure[IO]
             case Some(rr: RoleRequest) => 
               for
                 rid    <- db.use(_.canonicalizeRole(user1, rr))
@@ -91,7 +89,20 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
       yield result
     .onError(e => IO(println(e)))
 
-  case class As(person: OrcidPerson, withOrcidId: Option[OrcidId] = None, withRole: Option[RoleRequest | StandardRole.Id] = None):
+  case class As private (person: OrcidPerson, withOrcidId: Option[OrcidId], withRole: Option[RoleRequest | StandardRole.Id]) {
+
+    def withOrcidId(oid: OrcidId): As =
+      copy(withOrcidId = Some(oid))
+
+    def withRoleRequest(rr: RoleRequest): As = 
+      copy(withRole = Some(rr))
+
+    def withRole(rid: StandardRole.Id): As = 
+      copy(withRole = Some(rid))
+
+    // just ensure the user exists
+    def canonicalizeUser: IO[Unit] =
+      query("bogus").void
 
     def query(query: String): IO[Json] =
       queryWithUser(_ => query)
@@ -99,14 +110,14 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
     def queryWithUser(query: StandardUser => String): IO[Json] =
       queryAs(person, query, withRole, withOrcidId)
 
-    def expectQuery(query: String, expected: Json): IO[Expectations] =
+    def expectQuery(query: String, expected: Json): IO[Unit] =
       expectQueryWithUser(_ => query, expected)
 
-    def expectQueryWithUser(query: StandardUser => String, expected: => Json): IO[Expectations] =
+    def expectQueryWithUser(query: StandardUser => String, expected: => Json): IO[Unit] =
       queryAs(person, query, withRole, withOrcidId).map: result =>
         if result != expected then
           println(s"Result: $result\n\nExpected: $expected")
-        expect.same(expected, result)
+        assertEq(expected, result)
 
     def queryIds: IO[(User.Id, OrcidId)] =
       query("query { role { user { id orcidId }}}")
@@ -115,6 +126,16 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
             json.hcursor.downFields("data", "role", "user", "id").require[User.Id],
             json.hcursor.downFields("data", "role", "user", "orcidId").require[OrcidId],
           )
+
+  }
+
+  object As {
+    def apply(person: OrcidPerson): As =
+      apply(person, None, None)
+  }
+
+  val AsAlice: As = As(Alice).withOrcidId(AliceOrcidId)
+  val AsBob: As = As(Bob).withOrcidId(BobOrcidId)
 
 }
 

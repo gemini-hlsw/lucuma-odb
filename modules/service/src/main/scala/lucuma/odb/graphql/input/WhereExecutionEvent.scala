@@ -19,6 +19,8 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereExecutionEvent {
 

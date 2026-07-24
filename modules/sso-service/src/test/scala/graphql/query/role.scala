@@ -7,7 +7,7 @@ package query
 
 import io.circe.literal.*
 
-object role extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
+class role extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
   test("Query current role."):
     flaky():

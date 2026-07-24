@@ -9,7 +9,7 @@ import cats.syntax.show.*
 import io.circe.literal.*
 import lucuma.sso.client.ApiKey
 
-object createApiKey extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
+class createApiKey extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
 
   test("Attempt to create API key with invalid role id"):
     flaky():
@@ -55,13 +55,13 @@ object createApiKey extends GraphQLSuite with SsoSuite with Fixture with FlakyTe
           }
         """
       } .map { json =>
-        expect(
-          json.hcursor
-          .downFields("data", "createApiKey")
-          .as[String]
-          .toOption
-          .map(ApiKey.fromString.getOption)
-          .isDefined
-        )
+        assert:
+          json
+            .hcursor
+            .downFields("data", "createApiKey")
+            .as[String]
+            .toOption
+            .map(ApiKey.fromString.getOption)
+            .isDefined
       }
 

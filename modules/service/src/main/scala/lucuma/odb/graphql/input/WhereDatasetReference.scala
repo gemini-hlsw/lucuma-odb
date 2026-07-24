@@ -13,6 +13,8 @@ import lucuma.odb.graphql.binding.BooleanBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.PosIntBinding
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereString
 
 object WhereDatasetReference {
 

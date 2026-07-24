@@ -13,6 +13,11 @@ import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.ProgramUser
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereBoolean
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereOptionBoolean
+import lucuma.odb.graphql.binding.WhereOptionEq
+import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereProgramUser {
 

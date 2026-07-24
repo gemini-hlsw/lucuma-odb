@@ -13,6 +13,7 @@ import lucuma.odb.graphql.binding.CalculationStateBinding
 import lucuma.odb.graphql.binding.Matcher
 import lucuma.odb.graphql.binding.ObjectFieldsBinding
 import lucuma.odb.graphql.binding.ObservationWorkflowStateBinding
+import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereCalculatedObservationWorkflow:
 

@@ -25,7 +25,7 @@ import lucuma.core.util.Gid
 import lucuma.sso.service.config.*
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
-import lucuma.sso.service.graphql.SsoMapping
+import lucuma.sso.service.graphql.mapping.SsoMapping
 import lucuma.sso.service.orcid.OrcidService
 import natchez.EntryPoint
 import natchez.Trace

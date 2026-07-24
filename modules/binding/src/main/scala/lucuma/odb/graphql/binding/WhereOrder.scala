@@ -1,22 +1,21 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.graphql.input
+package lucuma.odb.graphql
+package binding
 
 import cats.Order
-import cats.syntax.option.*
 import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.odb.graphql.binding.*
 
-object WhereOptionOrder {
+object WhereOrder {
 
   def binding[A: Order](path: Path, binding: Matcher[A]): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
-        BooleanBinding.Option("IS_NULL", rIsNull),
         binding.Option("EQ", rEQ),
         binding.Option("NEQ", rNEQ),
         binding.List.Option("IN", rIN),
@@ -26,18 +25,17 @@ object WhereOptionOrder {
         binding.Option("GTE", rGTE),
         binding.Option("LTE", rLTE)
       ) =>
-        (rIsNull, rEQ, rNEQ, rIN, rNIN, rGT, rLT, rGTE, rLTE).parMapN {
-          (isNull, EQ, NEQ, IN, NIN, GT, LT, GTE, LTE) =>
+        (rEQ, rNEQ, rIN, rNIN, rGT, rLT, rGTE, rLTE).parMapN {
+          (EQ, NEQ, IN, NIN, GT, LT, GTE, LTE) =>
             and(List(
-              isNull.map(IsNull(path, _)),
-              EQ.map(a => Eql(path, Const(a.some))),
-              NEQ.map(a => NEql(path, Const(a.some))),
-              IN.map(as => In(path, as.map(_.some))),
-              NIN.map(as => Not(In(path, as.map(_.some)))),
-              GT.map(a => Gt(path, Const(a.some))),
-              GTE.map(a => GtEql(path, Const(a.some))),
-              LT.map(a => Lt(path, Const(a.some))),
-              LTE.map(a => LtEql(path, Const(a.some)))
+              EQ.map(a => Eql(path, Const(a))),
+              NEQ.map(a => NEql(path, Const(a))),
+              IN.map(as => In(path, as)),
+              NIN.map(as => Not(In(path, as))),
+              GT.map(a => Gt(path, Const(a))),
+              GTE.map(a => GtEql(path, Const(a))),
+              LT.map(a => Lt(path, Const(a))),
+              LTE.map(a => LtEql(path, Const(a)))
             ).flatten)
         }
     }
