@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import cats.data.NonEmptyList
 import cats.syntax.all.*
 import grackle.Result
 import io.circe.Json
@@ -12,6 +13,7 @@ import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.SlitTelescopeConfigs
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.json.offset.query.given
 
@@ -71,6 +73,9 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
     ToSkyFormat.getOption(json) match
       case Some(nel) => Result(nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson)
       case None      => Result.failure(s"Could not parse persisted telescope configs '$json'.")
+
+  protected def telescopeConfigsJson(nel: NonEmptyList[TelescopeConfig]): Json =
+    nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
 
   /**
    * Cursor field for an effective/default `SlitTelescopeConfigs!`. The mode column may be null

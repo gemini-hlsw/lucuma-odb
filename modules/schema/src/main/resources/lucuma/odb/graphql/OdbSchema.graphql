@@ -10295,21 +10295,12 @@ type Igrins2LongSlit {
   exposureTimeMode: ExposureTimeMode!
 
   """
-  Whether to save SVC images, either explicitly specified in
-  explicitSaveSVCImages or else taken from defaultSaveSVCImages
+  Slit-Viewing Camera (SVC) acquisition configuration. Null (the default) means
+  SVC images are not saved.
+  A non-null value means SVC images are saved using the
+  given exposure time and telescope dither positions.
   """
-  saveSVCImages: Boolean!
-
-  """
-  Default save SVC images setting
-  """
-  defaultSaveSVCImages: Boolean!
-
-  """
-  Optional explicitly specified save SVC images setting. If set it overrides
-  the default.
-  """
-  explicitSaveSVCImages: Boolean
+  svc: Igrins2SvcConfig
 
   """
   Effective telescope configs (explicit override coalesced with the default).
@@ -10347,10 +10338,10 @@ input Igrins2LongSlitInput {
   exposureTimeMode: ExposureTimeModeInput
 
   """
-  The save SVC images field may be unset by assigning a null value, or ignored
-  by skipping it altogether
+  Slit-Viewing Camera (SVC) configuration. Each sub-field may be unset by
+  assigning a null value, or ignored by skipping it altogether.
   """
-  explicitSaveSVCImages: Boolean
+  svc: Igrins2SvcInput
 
   """
   Explicit telescope configs. May be unset by assigning a null value, or ignored by skipping.
@@ -10362,6 +10353,71 @@ input Igrins2LongSlitInput {
   On create the default is HOT.
   """
   telluricType: TelluricTypeInput
+
+}
+
+"""
+IGRINS-2 Slit-Viewing Camera (SVC) acquisition configuration. A non-null value
+means SVC images are saved using the given exposure duration and telescope dither
+positions; null means SVC images are not saved. Defaults come from instrument
+constants defined in lucuma-core.
+"""
+type Igrins2SvcConfig {
+
+  """
+  SVC exposure time, either explicitly specified in explicitExposure or else
+  taken from defaultExposure.
+  """
+  exposure: TimeSpan!
+
+  """
+  Default SVC exposure time (3.08 s).
+  """
+  defaultExposure: TimeSpan!
+
+  """
+  Optional explicitly specified SVC exposure time. If set it overrides the default.
+  """
+  explicitExposure: TimeSpan
+
+  """
+  Effective SVC telescope configs (explicit override coalesced with the default).
+  """
+  telescopeConfigs: [TelescopeConfig!]!
+
+  """
+  Default SVC telescope configs: the p-offset dither (0,0) and (5,0) arcsec,
+  both guided.
+  """
+  defaultTelescopeConfigs: [TelescopeConfig!]!
+
+  """
+  Optional explicitly specified SVC telescope configs. If set they override the
+  default.
+  """
+  explicitTelescopeConfigs: [TelescopeConfig!]
+
+}
+
+"""
+Edit or create IGRINS-2 Slit-Viewing Camera (SVC) configuration. A non-null
+object enables SVC image saving (turning it on if necessary) and applies the
+given sub-field overrides; a null value disables SVC image saving. Omitting the
+field leaves SVC state unchanged.
+"""
+input Igrins2SvcInput {
+
+  """
+  The SVC exposure time may be unset by assigning a null value, or ignored by
+  skipping it altogether.
+  """
+  explicitExposure: TimeSpanInput
+
+  """
+  Explicit SVC telescope configs. May be unset by assigning a null value, or
+  ignored by skipping.
+  """
+  explicitTelescopeConfigs: [TelescopeConfigInput!]
 
 }
 
