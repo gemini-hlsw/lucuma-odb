@@ -17,8 +17,7 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.json.offset.query.given
-
-import lucuma.odb.json.stepconfig.given Encoder[TelescopeConfig]
+import lucuma.odb.json.stepconfig.given
 
 /**
  * Shared encoding of the GraphQL `SlitTelescopeConfigs` output type from the two DB columns

@@ -4,13 +4,17 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.order.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.igrins2.MaxExposureTime
+import lucuma.core.model.sequence.igrins2.MinExposureTime
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.telescopeConfigs.*
@@ -23,6 +27,16 @@ object Igrins2LongSlitInput:
    * override of an SVC parameter (save toggle, exposure time, telescope dither positions).
    */
   object Svc:
+
+    private def secondsLabel(ts: TimeSpan): String =
+      ts.toSeconds.bigDecimal.stripTrailingZeros.toPlainString
+
+    /** An explicit SVC exposure must respect the IGRINS-2 detector limits. */
+    private def validateExposure(ts: TimeSpan): Result[TimeSpan] =
+      if ts >= MinExposureTime && ts <= MaxExposureTime then Result(ts)
+      else Matcher.validationFailure(
+        s"SVC exposure time must be between ${secondsLabel(MinExposureTime)} s and ${secondsLabel(MaxExposureTime)} s."
+      )
 
     /** Create semantics: each field is set-or-skip (`Option`). */
     case class Create(
@@ -37,7 +51,7 @@ object Igrins2LongSlitInput:
             TimeSpanInput.Binding.Option("explicitExposure", rExposure),
             TelescopeConfigInput.Binding.List.Option("explicitTelescopeConfigs", rTcs)
           ) =>
-            (rExposure, rTcs).parMapN(Create.apply)
+            (rExposure.flatMap(_.traverse(validateExposure)), rTcs).parMapN(Create.apply)
 
     /** Edit semantics: each field is set-clear-skip (`Nullable`). */
     case class Edit(
@@ -52,7 +66,7 @@ object Igrins2LongSlitInput:
             TimeSpanInput.Binding.Nullable("explicitExposure", rExposure),
             TelescopeConfigInput.Binding.List.Nullable("explicitTelescopeConfigs", rTcs)
           ) =>
-            (rExposure, rTcs).parMapN(Edit.apply)
+            (rExposure.flatMap(_.traverse(validateExposure)), rTcs).parMapN(Edit.apply)
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],

@@ -26,6 +26,6 @@ trait Igrins2LongSlitView[F[_]] extends BaseMapping[F]:
 
     val TelluricType: ColumnRef          = col("c_telluric_type", jsonb)
 
-    // SVC acquisition sub-config (explicit overrides; nullable).
+    // SVC acquisition sub-config.
     val SvcExposure: ColumnRef          = col("c_svc_exposure", time_span.opt)
     val SvcTelescopeConfigs: ColumnRef  = col("c_svc_telescope_configs", text.opt)

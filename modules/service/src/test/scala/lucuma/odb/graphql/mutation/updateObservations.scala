@@ -4581,6 +4581,34 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       Some(ObservingModeType.Igrins2LongSlit)
     )
 
+  test("igrins2 SVC: clearing explicitExposure keeps SVC on and reverts to the default"):
+    val query = "observations { observingMode { igrins2LongSlit { svc { exposure { microseconds } explicitExposure { microseconds } } } } }"
+    def expected(exposureUs: Long, explicit: Json): Either[String, Json] =
+      Right(json"""{ "updateObservations": { "observations": [{ "observingMode": { "igrins2LongSlit": { "svc": { "exposure": { "microseconds": $exposureUs }, "explicitExposure": $explicit } } } }] } }""")
+    multiUpdateTest(pi,
+      List(
+        // turn ON with an explicit exposure (10s)
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 10.0 } } } }", query,
+          expected(10000000L, json"""{ "microseconds": 10000000 }""")),
+        // clear just the exposure: SVC stays on, effective exposure reverts to the 3.08s default
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: null } } }", query,
+          expected(3080000L, Json.Null))
+      ),
+      Some(ObservingModeType.Igrins2LongSlit)
+    )
+
+  test("igrins2 SVC: an out-of-range explicit exposure is rejected on update"):
+    val boundsError = "Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s."
+    multiUpdateTest(pi,
+      List(
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 1.0 } } } }",
+          "observations { id }", Left(boundsError)),
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 700.0 } } } }",
+          "observations { id }", Left(boundsError))
+      ),
+      Some(ObservingModeType.Igrins2LongSlit)
+    )
+
   test("observing mode: update igrins2 telescope configs"):
 
     val update0 = """
