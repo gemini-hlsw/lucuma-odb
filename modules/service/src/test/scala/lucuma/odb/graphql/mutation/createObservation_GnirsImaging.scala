@@ -162,8 +162,9 @@ class createObservation_GnirsImaging extends OdbSuite:
                         skyCount
                         offsets {
                           generatorType
-                          spiral {
-                            size { arcseconds }
+                          uniform {
+                            cornerA { p { arcseconds } q { arcseconds } }
+                            cornerB { p { arcseconds } q { arcseconds } }
                           }
                         }
                         skyOffsets {
@@ -190,9 +191,10 @@ class createObservation_GnirsImaging extends OdbSuite:
                         "order": "INCREASING",
                         "skyCount": 0,
                         "offsets": {
-                          "generatorType": "SPIRAL",
-                          "spiral": {
-                            "size": { "arcseconds": 10 }
+                          "generatorType": "UNIFORM",
+                          "uniform": {
+                            "cornerA": { "p": { "arcseconds": 4 }, "q": { "arcseconds": 6 } },
+                            "cornerB": { "p": { "arcseconds": -1 }, "q": { "arcseconds": -6 } }
                           }
                         },
                         "skyOffsets": {
