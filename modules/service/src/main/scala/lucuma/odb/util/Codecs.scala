@@ -54,6 +54,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -355,6 +356,9 @@ trait Codecs {
 
   val gender: Codec[Gender] =
     enumerated(Type("e_gender"))
+
+  val archive_duplication_state: Codec[ArchiveDuplication.State] =
+    enumerated(Type("e_archive_duplication_state"))
 
   val guide_state: Codec[StepGuideState] =
     enumerated(Type("e_guide_state"))

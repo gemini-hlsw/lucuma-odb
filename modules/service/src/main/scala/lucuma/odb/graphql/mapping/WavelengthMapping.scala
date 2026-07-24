@@ -7,6 +7,7 @@ package mapping
 import grackle.Path
 import grackle.skunk.SkunkMapping
 import lucuma.core.math.Wavelength
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
@@ -26,6 +27,7 @@ trait WavelengthMapping[F[_]]
      with GmosDynamicTables[F]
      with GnirsDynamicView[F]
      with GnirsSpectroscopyView[F]
+     with ArchiveMatchView[F]
      with ObservationView[F]
      with SpectroscopyConfigOptionTable[F]
      with VisitorTable[F]:
@@ -63,6 +65,7 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(GmosNorthLongSlitType / "initialCentralWavelength", GmosNorthLongSlitView.Common.InitialCentralWavelength, GmosNorthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "centralWavelength", GmosSouthLongSlitView.Common.CentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "initialCentralWavelength", GmosSouthLongSlitView.Common.InitialCentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
+      wavelengthMappingAtPath(ArchiveMatchType / "wavelength", ArchiveMatchView.Wavelength.Value, ArchiveMatchView.Wavelength.SyntheticId),
       wavelengthMappingAtPath(SignalToNoiseExposureTimeModeType / "at", ExposureTimeModeView.SignalToNoise.At, ExposureTimeModeView.SignalToNoise.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMin", SpectroscopyConfigOptionTable.WavelengthMin, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMax", SpectroscopyConfigOptionTable.WavelengthMax, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),

@@ -18,6 +18,7 @@ import grackle.QueryCompiler.SelectElaborator
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
@@ -102,22 +103,23 @@ object OdbMapping {
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory as LF, SecureRandom}](
-    database:      Resource[F, Session[F]],
-    monitor0:      SkunkMonitor[F],
-    user0:         User,
-    topics0:       Topics[F],
-    gaiaClient0:   GaiaClient[F],
-    itcClient0:    ItcClient[F],
-    commitHash0:   CommitHash,
-    goaUsers0:     Set[User.Id],
-    enums:         Enums,
-    tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient0:   Client[F],
+    database:        Resource[F, Session[F]],
+    monitor0:        SkunkMonitor[F],
+    user0:           User,
+    topics0:         Topics[F],
+    gaiaClient0:     GaiaClient[F],
+    itcClient0:      ItcClient[F],
+    commitHash0:     CommitHash,
+    goaUsers0:       Set[User.Id],
+    enums:           Enums,
+    tec:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient0:     Client[F],
     horizonsClient0: HorizonsClient[F],
-    emailConfig0:  Config.Email,
-    allowSub:      Boolean = true,        // Are submappings (recursive calls) allowed?
-    schema0:       Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
-    shouldValidate:Boolean = true,        // should we validatate the TypeMappings?
+    goaClient0:      GoaClient[F],
+    emailConfig0:    Config.Email,
+    allowSub:        Boolean = true,        // Are submappings (recursive calls) allowed?
+    schema0:         Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
+    shouldValidate:  Boolean = true,        // should we validatate the TypeMappings?
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
@@ -203,6 +205,7 @@ object OdbMapping {
           with Igrins2LongSlitMapping[F]
           with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
+          with ArchiveDuplicationMapping[F]
           with GnirsDynamicMapping[F]
           with GnirsAcquisitionMirrorOutMapping[F]
           with GnirsStaticMapping[F]
@@ -268,6 +271,7 @@ object OdbMapping {
           with RecordDatasetResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
+          with RefreshArchiveDuplicationResultMapping[F]
           with RegionMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -362,6 +366,7 @@ object OdbMapping {
                     tec,
                     httpClient0,
                     horizonsClient0,
+                    goaClient0,
                     emailConfig0,
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
                     Some(schema),           // don't re-parse the schema
@@ -375,7 +380,8 @@ object OdbMapping {
                 gaiaClient0,
                 S3FileService.noop[F],
                 horizonsClient0,
-                TelluricTargetsClient.noop[F]
+                TelluricTargetsClient.noop[F],
+                goaClient0
               )(session)
 
           def mkTypeMappings(ms: List[TypeMapping]): TypeMappings =
@@ -462,6 +468,8 @@ object OdbMapping {
                 GoaPropertiesMapping,
                 GroupMapping,
                 GroupEditMapping,
+                ArchiveDuplicationMapping,
+                ArchiveMatchMapping,
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 Igrins2StaticMapping,
@@ -522,6 +530,7 @@ object OdbMapping {
                 RecordIgrins2VisitResultMapping,
                 RecordVisitResultMapping,
                 RedeemUserInvitationResultMapping,
+                RefreshArchiveDuplicationResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 SchedulingConstraintsMapping,
@@ -671,6 +680,7 @@ object OdbMapping {
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
                 GmosSouthLongSlitElaborator,
+                ArchiveDuplicationElaborator,
                 GroupElaborator,
                 MutationElaborator,
                 ObservationElaborator,
@@ -797,19 +807,20 @@ object OdbMapping {
    * subscriptions.
    */
   def forObscalc[F[_]: Async: Parallel: Tracer: Logger: LoggerFactory: SecureRandom](
-    database:    Resource[F, Session[F]],
-    monitor:     SkunkMonitor[F],
-    user:        User,
-    goaUsers:    Set[User.Id],
-    gaiaClient:  GaiaClient[F],
-    itcClient:   ItcClient[F],
-    commitHash:  CommitHash,
-    enums:       Enums,
-    tec:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient:  Client[F],
+    database:       Resource[F, Session[F]],
+    monitor:        SkunkMonitor[F],
+    user:           User,
+    goaUsers:       Set[User.Id],
+    gaiaClient:     GaiaClient[F],
+    itcClient:      ItcClient[F],
+    commitHash:     CommitHash,
+    enums:          Enums,
+    tec:            TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:     Client[F],
     horizonsClient: HorizonsClient[F],
-    emailConfig: Config.Email,
-    schema:      Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+    goaClient:      GoaClient[F],
+    emailConfig:    Config.Email,
+    schema:         Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
   ): Mapping[F] =
 
     apply(
@@ -825,6 +836,7 @@ object OdbMapping {
       tec,
       httpClient,
       horizonsClient,
+      goaClient,
       emailConfig,
       allowSub = false,
       schema,

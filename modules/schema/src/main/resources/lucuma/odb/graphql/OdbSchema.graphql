@@ -3528,6 +3528,16 @@ type Mutation {
   ): ReplaceGnirsSequenceResult!
 
   """
+  Re-runs the Archive Duplication Search for an observation, replacing its
+  stored result with what the Gemini Observatory Archive holds now.
+
+  Rejected once the observation's proposal has been submitted.
+  """
+  refreshArchiveDuplication(
+    input: RefreshArchiveDuplicationInput!
+  ): RefreshArchiveDuplicationResult!
+
+  """
   Resets the acquisition sequence to start from the initial step regardless of
   which acquisition steps may have been executed.  Requires staff (or better)
   access.
@@ -5207,6 +5217,26 @@ type RecordGmosSouthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
+}
+
+"""
+Input parameters for re-running the Archive Duplication Search.  Select one of
+`observationId` or `observationReference`.
+"""
+input RefreshArchiveDuplicationInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+}
+
+"""
+The result of re-running the Archive Duplication Search.
+"""
+type RefreshArchiveDuplicationResult {
+  "The search result as it now stands."
+  archiveDuplication: ArchiveDuplication!
+
+  "The observation that was searched."
+  observation: Observation!
 }
 
 """
@@ -13713,6 +13743,192 @@ type Observation {
   whether a pending update is expected.
   """
   workflow: CalculatedObservationWorkflow
+
+  """
+  Result of the Archive Duplication Search: what the Gemini Observatory Archive
+  held around this observation's pointing.
+  """
+  archiveDuplication: ArchiveDuplication!
+
+}
+
+"The outcome of the most recent Archive Duplication Search attempt."
+enum ArchiveDuplicationState {
+
+  """
+  No search result.  Either the search has never been run, or it ran against an
+  observation the archive cannot be asked about: an instrument it does not know,
+  or no resolvable pointing and no usable target name.
+  """
+  NOT_CHECKED
+
+  "The search ran and the reported matches are its result."
+  CHECKED
+
+  """
+  The most recent attempt failed.  Any previously found matches are still
+  reported, so a GOA outage leaves the last good snapshot readable.
+  """
+  ERROR
+
+}
+
+"""
+One archived file matched by an Archive Duplication Search.
+
+The fields are the archive's own record of the file, assembled from its FITS
+headers, so which of them are populated varies by instrument and by era.
+Every nullable field here is null when the archive does not report a value for that
+file; where absence means something more specific than that, the field says so.
+fields are typed where possible.
+"""
+type ArchiveMatch {
+
+  """
+  Archive file name, e.g. S20240101S0001.fits.  Always present, and unique.
+  """
+  name: String!
+
+  "Dataset label the file was recorded under, e.g. GN-2019A-Q-101-11-001."
+  dataLabel: String
+
+  """
+  Coordinates the file was taken at.  Null when the archive records no pointing
+  for the file.
+  """
+  coordinates: Coordinates
+
+  """
+  Archive instrument name, e.g. GMOS-N.  Always present, and always one of the
+  instruments the search queried.
+  """
+  instrument: String!
+
+  """
+  Observation type as the archive reports it.  Always present, and in practice
+  always OBJECT: the search asks the archive for object frames only.
+  """
+  observationType: String!
+
+  """
+  Observation class as the archive reports it, e.g. science.
+  """
+  observationClass: String
+
+  """
+  Quality assessment the file was given, e.g. Pass or Usable.  Never a failing
+  assessment: the search excludes files that failed QA.
+  """
+  qaState: String
+
+  "UT date and time the file was taken."
+  utDateTime: Timestamp
+
+  """
+  Date the file's proprietary period ends and it becomes publicly available.
+  May be in the future.
+  """
+  releaseDate: Date
+
+  """
+  Program id as the archive reports it.  The archive holds both OCS- and
+  GPP-era data, so this may be a GPP program id or an OCS one, e.g.
+  GN-2019A-Q-101.
+  """
+  programId: String
+
+  """
+  Observation id as the archive reports it.  A GPP observation id or an OCS
+  one, e.g. GN-2019A-Q-101-11, for the same reason as `programId`.
+  """
+  observationId: String
+
+  """
+  Target name recorded for the file.  Free text as the observer entered it.
+  """
+  objectName: String
+
+  "Exposure time of the file."
+  exposure: TimeSpan
+
+  """
+  Name of the dispersing element in the beam, e.g. B600.  Null for an imaging
+  frame, which has none.
+  """
+  disperser: String
+
+  "Name of the filter in the beam, e.g. g_G0301.  Null when there was none."
+  filter: String
+
+  """
+  Central wavelength the file was taken at.  Null for a frame with no
+  dispersing element.
+  """
+  wavelength: Wavelength
+
+  "Airmass the file was taken at, a dimensionless ratio starting at 1 at zenith."
+  airmass: BigDecimal
+
+  "Telescope azimuth the file was taken at."
+  azimuth: Angle
+
+  "Telescope elevation above the horizon the file was taken at."
+  elevation: Angle
+
+  """
+  Angular separation between this file's pointing and the search center,
+  telling a match on the target apart from one merely nearby in the field.
+  Null when the search ran by target name rather than coordinates, or when the
+  file itself has no pointing.
+  """
+  distance: Angle
+
+}
+
+"""
+Archive Duplication Search result for an observation, as of the last time the
+search was run.
+
+When `state` is ERROR only `error` describes the failed attempt.  A failure
+leaves the previously found results in place rather than discarding them, so
+`matchCount`, `matches`, `lastCheckedAt` and the search area still
+describe the last search that succeeded, and `lastCheckedAt` says when that was.
+"""
+type ArchiveDuplication {
+
+  state: ArchiveDuplicationState!
+
+  """
+  Number of matching archive files.  Counted per file rather than per archived
+  observation, to stay consistent with the PIT.  A floor rather than an exact
+  figure when `saturated`, and the count from the last successful search rather
+  than from the most recent attempt when `state` is ERROR.
+  """
+  matchCount: NonNegInt!
+
+  """
+  Whether a constituent query came back filled to the archive's hard cap of 500
+  records.  When true `matchCount` is a floor and should be rendered as "500+".
+  """
+  saturated: Boolean!
+
+  "When the reported matches were gathered.  Null until a search has run."
+  lastCheckedAt: Timestamp
+
+  "Why the most recent attempt failed.  Set when `state` is ERROR."
+  error: NonEmptyString
+
+  "Coordinates searched around, for a sidereal pointing."
+  searchCoordinates: Coordinates
+
+  "Target name searched for, for a non-sidereal pointing."
+  searchTargetName: NonEmptyString
+
+  "Radius searched around the search center, half the observation's field of view."
+  searchRadius: Angle
+
+  "The matched archive files, ordered by file name."
+  matches: [ArchiveMatch!]!
 
 }
 

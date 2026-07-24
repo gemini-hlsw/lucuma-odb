@@ -20,6 +20,7 @@ import fs2.io.net.Network
 import grackle.Mapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
@@ -244,7 +245,8 @@ object CalcMain extends MainParams:
       gaiaClient,
       S3FileService.noop[F],
       horizonsClient,
-      TelluricTargetsClient.noop[F]
+      TelluricTargetsClient.noop[F],
+      GoaClient.noop[F]
     )(session).pure
 
   /**
@@ -280,6 +282,7 @@ object CalcMain extends MainParams:
                         ptc,
                         http,
                         horizonsClient,
+                        GoaClient.noop[F],
                         c.email
                       )
       o          <- runObscalcDaemon(

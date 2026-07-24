@@ -8,6 +8,8 @@ import grackle.Path
 import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.RightAscension
+import lucuma.odb.graphql.table.ArchiveDuplicationView
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.GhostIfuView
@@ -17,6 +19,8 @@ import lucuma.odb.graphql.table.TargetView
 trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
                                      with ConfigurationRequestView[F]
                                      with GhostIfuView[F]
+                                     with ArchiveDuplicationView[F]
+                                     with ArchiveMatchView[F]
                                      with ObservationView[F]
                                      with TargetView[F] {
 
@@ -49,10 +53,11 @@ trait RightAscensionMapping[F[_]] extends CallForProposalsView[F]
       rightAscensionMappingAtPath(ConfigurationTargetType / "region" / "rightAscensionArc" / "end", ConfigurationRequestView.Target.Region.RightAscensionArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.RightAscensionArc.End),
       rightAscensionMappingAtPath(CoordinatesType / "ra", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Ra),
       rightAscensionMappingAtPath(GhostIfuType / "skyPosition" / "ra", GhostIfuView.Sky.Id, GhostIfuView.Sky.Ra),
+      rightAscensionMappingAtPath(ArchiveDuplicationType / "searchCoordinates" / "ra", ArchiveDuplicationView.SearchCoordinates.SyntheticId, ArchiveDuplicationView.SearchCoordinates.Ra),
+      rightAscensionMappingAtPath(ArchiveMatchType / "coordinates" / "ra", ArchiveMatchView.Coordinates.SyntheticId, ArchiveMatchView.Coordinates.Ra),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "start", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.Start),
       rightAscensionMappingAtPath(OpportunityType / "region" / "rightAscensionArc" / "end", TargetView.Opportunity.Region.RightAscensionArc.StartEndSyntheticId, TargetView.Opportunity.Region.RightAscensionArc.End),
       rightAscensionMappingAtPath(SiderealType / "ra", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Ra),
     )
 
 }
-

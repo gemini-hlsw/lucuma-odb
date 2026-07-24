@@ -6,6 +6,8 @@ package lucuma.odb.graphql
 package mapping
 
 import grackle.skunk.SkunkMapping
+import lucuma.odb.graphql.table.ArchiveDuplicationView
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.GhostIfuView
 
@@ -13,13 +15,17 @@ import table.ObservationView
 
 trait CoordinatesMapping[F[_]] extends ObservationView[F]
                                   with ConfigurationRequestView[F]
-                                  with GhostIfuView[F]:
+                                  with GhostIfuView[F]
+                                  with ArchiveDuplicationView[F]
+                                  with ArchiveMatchView[F]:
 
   lazy val CoordinatesMappings =
     List(
       CoordinatesMapping,
       ConfigurationRequestReferenceCoordinatesMapping,
-      GhostIfuSkyPositionMapping
+      GhostIfuSkyPositionMapping,
+      ArchiveDuplicationSearchCoordinatesMapping,
+      ArchiveMatchCoordinatesMapping
     )
 
   private lazy val CoordinatesMapping =
@@ -32,6 +38,20 @@ trait CoordinatesMapping[F[_]] extends ObservationView[F]
   private lazy val ConfigurationRequestReferenceCoordinatesMapping =
     ObjectMapping(ConfigurationTargetType / "coordinates")(
       SqlField("synthetic-id", ConfigurationRequestView.Target.ReferenceCoordinates.SyntheticId, key = true, hidden = true),
+      SqlObject("ra"),
+      SqlObject("dec")
+    )
+
+  private lazy val ArchiveDuplicationSearchCoordinatesMapping =
+    ObjectMapping(ArchiveDuplicationType / "searchCoordinates")(
+      SqlField("synthetic-id", ArchiveDuplicationView.SearchCoordinates.SyntheticId, key = true, hidden = true),
+      SqlObject("ra"),
+      SqlObject("dec")
+    )
+
+  private lazy val ArchiveMatchCoordinatesMapping =
+    ObjectMapping(ArchiveMatchType / "coordinates")(
+      SqlField("synthetic-id", ArchiveMatchView.Coordinates.SyntheticId, key = true, hidden = true),
       SqlObject("ra"),
       SqlObject("dec")
     )
