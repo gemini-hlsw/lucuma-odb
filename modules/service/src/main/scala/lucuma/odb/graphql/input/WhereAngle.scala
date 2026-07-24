@@ -9,6 +9,7 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereOrder
 
 
 object WhereAngle {

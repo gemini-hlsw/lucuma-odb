@@ -177,37 +177,146 @@ clean at a stale value — no lost update, regardless of commit order.
 (narrowed from `INSERT OR UPDATE OR DELETE` in V1210), so these `UPDATE`s do not
 re-invalidate obscalc.
 
-### Lock ordering (deadlock avoidance)
+### Locking (deadlock avoidance)
 
-Recording an execution event touches three rows via triggers: `t_observation`
-(`update_execution_information_for_step_event` takes it `FOR UPDATE`), `t_obscalc`
-(`invalidate_obscalc`), and `t_visit` (the invalidation marker). Every code path
-that touches these must acquire them in **one consistent order** or concurrent
-transactions deadlock. The order is:
+Recording an execution event touches three rows via triggers —
+`t_observation_execution` (the mutex), `t_obscalc` (`invalidate_obscalc`), and
+`t_visit` (the invalidation marker) — so concurrent writers need both a
+consistent **order** and the right lock **mode**. Get either wrong and you get
+deadlocks.
 
-```
-t_observation  →  t_obscalc  →  t_visit
-```
+#### The mutex: `t_observation_execution`
 
-`invalidate_visit_time_accounting` enforces this **itself**, so it does not depend
-on trigger firing order:
+Every observation has exactly one row in `t_observation_execution`, created with
+the observation. It carries `c_step_execution_order` and serves as **the** lock
+for observation-scoped execution state. Take it through the helper:
 
 ```sql
-PERFORM 1 FROM t_observation WHERE c_observation_id = observation_id FOR UPDATE; -- t_observation
-CALL invalidate_obscalc(observation_id);                                        -- t_obscalc
-UPDATE t_visit SET c_ta_invalidation = now() WHERE c_visit_id = visit_id;        -- t_visit
+PERFORM lock_observation_execution(observation_id);
 ```
 
-Because the procedure locks `t_observation` first regardless of when it runs, the
-order can't invert even if the trigger fires before `update_execution_information_*`
-(which also locks `t_observation` first) — and it survives renaming or adding
-triggers.
+It is deliberately *not* `t_observation`. Locking the observation row meant
+serializing against every unrelated edit of that observation (any `UPDATE` of a
+non-key column takes the same mode), and the counter living there meant every
+step event wrote the widest, most-read, 46-times-FK-referenced row in the schema
+— a dead tuple per step. Locking a row whose only job is this invariant costs
+neither. Nothing FK-references `t_observation_execution`, so its rows are never
+`KEY SHARE`-locked by child inserts and the mutex is a clean acquisition rather
+than an upgrade.
 
-This was a real production deadlock (V1210 named the trigger `event_…`, which
-Postgres fires in **name** order — *before* `update_execution_…` — so an event
-insert locked `t_obscalc` before `t_observation`, the reverse of `recordVisit`
-and observation edits). Fixed in V1211 with the explicit ordering above. **If you
-add another path that touches these tables, take the locks in this same order.**
+#### Order
+
+Acquire in this order, always:
+
+```
+t_observation_execution  →  t_obscalc  →  t_visit
+```
+
+`invalidate_visit_time_accounting` takes the mutex itself rather than relying on
+another trigger having done it, so the order holds no matter which trigger fires
+first (Postgres fires triggers in **name** order, which is not a thing to depend
+on):
+
+```sql
+PERFORM lock_observation_execution(observation_id);
+CALL invalidate_obscalc(observation_id);
+UPDATE t_visit SET c_ta_invalidation = now() WHERE c_visit_id = visit_id;
+```
+
+**Why the order matters even though these writers already serialize on the
+mutex.** They serialize only against *each other*, and plenty of writers never
+take it at all: `invalidate_obscalc` goes straight to `t_obscalc` (11 triggers
+reach it that way, via `obsid_obscalc_invalidate`), and the obscalc worker locks
+`t_obscalc` and writes `t_visit` without ever touching the mutex. Those are safe
+today only because each takes **one** of the three rows — it can block someone
+without wanting anything back. The order is the rule that keeps that true: a path
+claiming `t_obscalc` and *then* reaching for the mutex would deadlock against
+every mutex-first path, and the mutex cannot prevent it because such a path never
+participates in it.
+
+Note also that the mutex is **per observation**. A transaction spanning several
+observations is not serialized against another spanning the same set, so
+multi-observation work needs its own deterministic ordering (lock them in a fixed
+order, e.g. by id).
+
+#### Mode: `FOR NO KEY UPDATE`, never `FOR UPDATE`
+
+This is the part that is easy to get wrong, and it is *also* why the mutex was
+moved off `t_observation` rather than merely weakened.
+
+**46 tables FK-reference `t_observation`.** Inserting a row into any of them —
+`t_execution_event`, `t_visit`, `t_atom`, `t_dataset`,
+`t_sequence_materialization`, … — makes PostgreSQL take a **`FOR KEY SHARE`**
+lock on the referenced `t_observation` row to enforce the foreign key. This
+happens as part of the INSERT, **before any `AFTER` trigger runs**, and it is
+invisible in the code.
+
+`FOR UPDATE` is the **only** mode that conflicts with `FOR KEY SHARE`:
+
+| requested ↓ / held → | KEY SHARE | SHARE | NO KEY UPDATE | UPDATE |
+|---|---|---|---|---|
+| **KEY SHARE** | ok | ok | ok | **conflict** |
+| **NO KEY UPDATE** | **ok** | conflict | conflict | conflict |
+| **UPDATE** | **conflict** | conflict | conflict | conflict |
+
+So a trigger taking `FOR UPDATE` on the observation was *upgrading* a lock that
+every concurrent child insert also held. `FOR KEY SHARE` is self-compatible, so
+several transactions hold it at once, then each blocks upgrading — deadlock, and
+no amount of ordering discipline in the trigger can prevent it, because the FK
+lock is taken before any trigger exists to have an opinion.
+
+Two consequences, and both still bind:
+
+- **Never take `FOR UPDATE` on a row other tables FK-reference** unless you
+  genuinely mean to block their inserts. `FOR NO KEY UPDATE` conflicts with
+  itself — which is the entire requirement for a mutex — while staying compatible
+  with the FK's `KEY SHARE`.
+- **Prefer a row nothing FK-references at all.** That is what
+  `t_observation_execution` is. Its rows are never `KEY SHARE`-locked, so the
+  mutex is a fresh acquisition, not an upgrade, and it cannot false-share with
+  ordinary observation edits.
+
+#### What each lock is actually for
+
+Keeping these straight is what makes the choices above obvious:
+
+| Lock | Taken by | Protects |
+|---|---|---|
+| `FOR KEY SHARE` on `t_observation` (implicit) | the INSERT's FK check | the observation's *key* — stops it being deleted or key-updated while a child row referencing it is written |
+| `FOR NO KEY UPDATE` on `t_observation_execution` (explicit) | `lock_observation_execution` | the *trigger bodies* — stops them interleaving |
+
+They do different jobs on different rows, and the implicit one gives you **no**
+mutual exclusion — it is the weakest mode and is self-compatible. The explicit
+lock is doing all the serialization work; it is not redundant. Drop it from
+`update_execution_information_for_step_event` and its
+`IF NOT EXISTS … INSERT INTO t_step_execution` becomes a check-then-act race
+(`c_step_id` is that table's primary key, so the loser gets a unique violation).
+
+A corollary worth knowing: `lock_observation_execution` locks nothing if the row
+is missing, which would mean *silently* no mutual exclusion. That is why the row
+is created with the observation and why the helper self-heals rather than
+assuming.
+
+#### Rules for new code
+
+1. To serialize observation-scoped execution work, call
+   **`lock_observation_execution(observation_id)`** — first, before `t_obscalc`
+   or `t_visit`. Don't invent a second mutex; a mutex only works if everyone
+   agrees on it.
+2. If you must lock some *other* row that tables FK-reference, use
+   **`FOR NO KEY UPDATE`**. Reach for `FOR UPDATE` only if you genuinely need to
+   block child inserts or to change a referenced key column — and say why in a
+   comment.
+3. An `AFTER` trigger can never establish lock ordering on the parent row, because
+   the FK lock precedes it. If you need the parent locked first, do it in a
+   `BEFORE` trigger or in application code before the insert.
+4. Note that an `UPDATE` of a *referenced key* column (e.g.
+   `t_observation.c_instrument`, part of the FK'd `(c_observation_id,
+   c_instrument)` unique key) takes `FOR UPDATE` implicitly, and so conflicts with
+   every child insert. That is unavoidable, but worth knowing when a bulk
+   observation update starts deadlocking.
+5. The step-execution counter lives on `t_observation_execution`, not
+   `t_observation` (V1227 dropped the old column). Increment it under the mutex.
 
 ## What a recompute actually computes
 

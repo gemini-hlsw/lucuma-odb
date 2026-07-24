@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.sso.service.graphql
+package lucuma.sso.service.graphql.mapping
 
 import _root_.skunk.Channel
 import _root_.skunk.Session
@@ -29,10 +29,15 @@ import lucuma.core.model.OrcidId
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
 import lucuma.core.model.User
+import lucuma.odb.graphql.binding.BooleanBinding
+import lucuma.odb.graphql.binding.NonNegIntBinding
+import lucuma.odb.graphql.binding.UserIdBinding
 import lucuma.odb.graphql.schema.SchemaStitcher
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.database.RoleType
+import lucuma.sso.service.graphql.input.WhereUser
+import lucuma.sso.service.graphql.predicate.Predicates
 import natchez.Trace
 import org.typelevel.log4cats.Logger
 
@@ -113,23 +118,9 @@ object SsoMapping {
           .evalTap(n => Async[F].delay(println(n)))
           .map(a => Result.success(a.value))
 
-      new SkunkMapping[F](pool, monitor) with SsoTables[F] {
+      new SkunkMapping[F](pool, monitor) with SsoTables[F] with Predicates[F] with BaseMapping[F] with ResultMapping[F] {
 
         val schema: Schema = loadedSchema
-
-        val ApiKeyIdType     = schema.ref("ApiKeyId")
-        val ApiKeyType       = schema.ref("ApiKey")
-        val MutationType     = schema.ref("Mutation")
-        val OrcidIdType      = schema.ref("OrcidId")
-        val PartnerType      = schema.ref("Partner")
-        val QueryType        = schema.ref("Query")
-        val RoleIdType       = schema.ref("RoleId")
-        val RoleType         = schema.ref("Role")
-        val RoleTypeType     = schema.ref("RoleType")
-        val SubscriptionType = schema.ref("Subscription")
-        val UserIdType       = schema.ref("UserId")
-        val UserType         = schema.ref("User")
-        val UserProfileType  = schema.ref("UserProfile")
 
         val typeMappings: TypeMappings =
           TypeMappings(
@@ -139,6 +130,7 @@ object SsoMapping {
                 fieldMappings = List(
                   SqlObject("user"),
                   SqlObject("role"),
+                  SqlObject("users"),
                 )
               ),
               ObjectMapping(
@@ -151,16 +143,6 @@ object SsoMapping {
                 )
               ),
               ObjectMapping(
-                tpe = UserType,
-                fieldMappings = List(
-                  SqlField("id", User.Id, key = true),
-                  SqlField("orcidId", User.OrcidId),
-                  SqlObject("profile"),
-                  SqlObject("roles",   Join(User.Id, Role.UserId)),
-                  SqlObject("apiKeys", Join(User.Id, ApiKey.UserId)),
-                )
-              ),
-              ObjectMapping(
                 tpe = UserProfileType,
                 fieldMappings = List(
                   SqlField("synthetic-id", User.Id, key = true, hidden = true),
@@ -168,6 +150,18 @@ object SsoMapping {
                   SqlField("familyName", User.Profile.FamilyName),
                   SqlField("creditName", User.Profile.CreditName),
                   SqlField("email",      User.Profile.Email)
+                )
+              ),
+              ObjectMapping(
+                tpe = UserType,
+                fieldMappings = List(
+                  SqlField("id", User.Id, key = true),
+                  SqlField("orcidId",  User.OrcidId),
+                  SqlField("type", User.Type),
+                  SqlField("enabled", User.Enabled),
+                  SqlObject("profile"),
+                  SqlObject("roles", Join(User.Id, Role.UserId)),
+                  SqlObject("apiKeys", Join(User.Id, ApiKey.UserId)),
                 )
               ),
               ObjectMapping(
@@ -202,10 +196,48 @@ object SsoMapping {
               LeafMapping[RoleType](RoleTypeType),
               LeafMapping[Partner](PartnerType),
               LeafMapping[String](ApiKeyIdType),
+              LeafMapping[lucuma.odb.data.UserType](UserTypeType),
+              topLevelSelectResultMapping(UserSelectResultType),
             )
           )
 
+        val WhereUserBinding = WhereUser.binding(Path.from(UserType))
+
         override val selectElaborator = SelectElaborator {
+
+          case (QueryType, "users", List(
+            WhereUserBinding.Option("WHERE", rWHERE),
+            UserIdBinding.Option("OFFSET", rOFFSET),
+            NonNegIntBinding.Option("LIMIT", rLIMIT),
+            BooleanBinding("includeDisabled", rIncludeDisabled)
+          )) =>
+            Elab.transformChild { child =>
+              (rWHERE, rOFFSET, rLIMIT, rIncludeDisabled).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDisabled) =>
+                val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+                ResultMapping.selectResult(child, limit) { q =>
+                  FilterOrderByOffsetLimit(
+                    pred = Some(
+                      and(List(
+                        OFFSET.map(Predicates.user.id.gtEql).getOrElse(True),
+                        Predicates.user.enabled.includeDisabled(includeDisabled),
+                        or(List(
+                          Predicates.user.id.eql(user.id), // you can see yourself
+                          if user.role.access >= Access.Staff then True else False // and nobody else unless you're staff or better
+                        )),
+                        WHERE.getOrElse(True)
+                      ))
+                    ),
+                    oss = Some(List(
+                      OrderSelection[lucuma.core.model.User.Id](UserType / "id"),
+                    )),
+                    offset = None,
+                    limit = Some(limit + 1), // Select one extra row here.
+                    child = q
+                  )
+                }
+              }
+            }
+
           case (QueryType, "user", Nil) =>
             Elab.transformChild(c => Unique(Filter(Eql(UserType / "id", Const(user.id)), c)))
 

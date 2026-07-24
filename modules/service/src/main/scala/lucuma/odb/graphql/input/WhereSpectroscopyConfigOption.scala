@@ -14,6 +14,10 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.Site
 import lucuma.core.enums.SpectroscopyCapability
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereBoolean
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereOptionEq
+import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereSpectroscopyConfigOption {
 

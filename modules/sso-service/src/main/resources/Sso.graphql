@@ -1,8 +1,43 @@
-#import UserId, Partner, UserProfile from "lucuma/odb/graphql/OdbSchema.graphql"
+#import UserId, Partner, UserProfile, UserType, WhereUser from "lucuma/odb/graphql/OdbSchema.graphql"
 
 type Query {
+
+  "The current user."
   user: User!
+
+  "The current user's active role."
   role: Role!
+
+  "Select users. Available only to admin and staff roles."
+  users(
+    "Filters the selection of users."
+    WHERE: WhereUser
+
+    "Starts the result set at (or after if not existent) the given id."
+    OFFSET: UserId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+
+    "Set to true to include disabled values"
+    includeDisabled: Boolean! = false
+  ): UserSelectResult!
+
+}
+
+"""
+The user results, limited to a maximum of 1000 entries.
+"""
+type UserSelectResult {
+  """
+  Matching users up to the return size limit of 1000
+  """
+  matches: [User!]!
+
+  """
+  `true` when there were additional matches that were not returned.
+  """
+  hasMore: Boolean!
 }
 
 type Mutation {
@@ -34,8 +69,10 @@ type Subscription {
 
 type User {
   id:       UserId!
-  orcidId:  OrcidId!
-  profile:  UserProfile!
+  orcidId:  OrcidId
+  profile:  UserProfile
+  type:     UserType!
+  enabled:  Boolean!
   roles:    [Role!]!
   apiKeys:  [ApiKey!]!
 }
@@ -56,5 +93,6 @@ type ApiKey {
 scalar OrcidId
 scalar RoleId
 scalar ApiKeyId
+scalar NonNegInt
 
 enum RoleType { PI NGO STAFF ADMIN }

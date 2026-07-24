@@ -7,12 +7,11 @@ package query
 
 import cats.effect.IO
 import io.circe.Json
-import lucuma.sso.service.simulator.SsoSimulator
 import org.http4s.Method
 import org.http4s.Request
 import org.http4s.circe.*
 
-object introspection extends GraphQLSuite with SsoSuite with Fixture:
+class introspection extends GraphQLSuite with SsoSuite with Fixture:
 
   test("Schema introspection succeeds without authentication."):
     SsoSimulator[IO].use: (_, _, sso, _, _) =>
@@ -27,4 +26,4 @@ object introspection extends GraphQLSuite with SsoSuite with Fixture:
         .map: json =>
           val name =
             json.hcursor.downFields("data", "__schema", "queryType", "name").require[String]
-          expect.same("Query", name)
+          assertEq("Query", name)

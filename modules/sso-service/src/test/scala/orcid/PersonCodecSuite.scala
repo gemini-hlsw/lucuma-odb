@@ -6,9 +6,9 @@ package lucuma.sso.service.orcid
 import io.circe.parser.parse
 import lucuma.sso.service.SsoSuite
 
-object PersonCodecSuite extends SsoSuite {
+class PersonCodecSuite extends SsoSuite {
 
-  pureTest("deserialize a record with no credit name") {
+  test("deserialize a record with no credit name") {
 
     val json = parse {
       s"""{
@@ -73,11 +73,11 @@ object PersonCodecSuite extends SsoSuite {
           """
       } .toOption.get // yolo
 
-    expect(OrcidPerson.DecoderOrcidPerson.decodeJson(json).isRight)
+    assert(OrcidPerson.DecoderOrcidPerson.decodeJson(json).isRight)
 
   }
 
-  pureTest("deserialize a person with no public information at all") {
+  test("deserialize a person with no public information at all") {
 
     val json = parse {
       s"""{
@@ -126,7 +126,7 @@ object PersonCodecSuite extends SsoSuite {
 
     }.toOption.get // yolo
 
-    expect(OrcidPerson.DecoderOrcidPerson.decodeJson(json).isRight)
+    assert(OrcidPerson.DecoderOrcidPerson.decodeJson(json).isRight)
 
   }
 

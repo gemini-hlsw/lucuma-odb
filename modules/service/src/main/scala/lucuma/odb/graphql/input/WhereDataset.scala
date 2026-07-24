@@ -13,6 +13,12 @@ import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereBoolean
+import lucuma.odb.graphql.binding.WhereEq
+import lucuma.odb.graphql.binding.WhereOptionEq
+import lucuma.odb.graphql.binding.WhereOptionString
+import lucuma.odb.graphql.binding.WhereOrder
+import lucuma.odb.graphql.binding.WhereString
 
 object WhereDataset {
 
