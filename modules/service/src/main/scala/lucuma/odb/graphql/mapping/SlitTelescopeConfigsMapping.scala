@@ -7,6 +7,7 @@ package mapping
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 import grackle.Result
+import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.SlitOffsetMode
@@ -16,6 +17,8 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.json.offset.query.given
+
+import lucuma.odb.json.stepconfig.given Encoder[TelescopeConfig]
 
 /**
  * Shared encoding of the GraphQL `SlitTelescopeConfigs` output type from the two DB columns
@@ -27,12 +30,6 @@ import lucuma.odb.json.offset.query.given
  * IGRINS-2) so the JSON shaping and cursor-field wiring live in one place. GMOS is pending.
  */
 trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
-
-  private def telescopeConfigJson(offset: Offset, guiding: StepGuideState): Json =
-    Json.obj(
-      "offset"  -> Json.obj("p" -> offset.p.asJson, "q" -> offset.q.asJson),
-      "guiding" -> guiding.asJson
-    )
 
   private def telescopeConfigAlongSlitJson(q: Offset.Q, guiding: StepGuideState): Json =
     Json.obj(
@@ -59,7 +56,7 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
         Result(Json.obj(
           "offsetMode" -> mode.asJson,
           "alongSlit"  -> Json.Null,
-          "toSky"      -> nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
+          "toSky"      -> nel.toList.asJson
         ))
       case None =>
         Result.failure(s"Could not parse persisted telescope configs '$json' (mode ${mode.tag}).")
@@ -71,11 +68,11 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
    */
   protected def ifuTelescopeConfigsJson(json: String): Result[Json] =
     ToSkyFormat.getOption(json) match
-      case Some(nel) => Result(nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson)
+      case Some(nel) => Result(nel.toList.asJson)
       case None      => Result.failure(s"Could not parse persisted telescope configs '$json'.")
 
   protected def telescopeConfigsJson(nel: NonEmptyList[TelescopeConfig]): Json =
-    nel.toList.map(tc => telescopeConfigJson(tc.offset, tc.guiding)).asJson
+    nel.toList.asJson
 
   /**
    * Cursor field for an effective/default `SlitTelescopeConfigs!`. The mode column may be null
