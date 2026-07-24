@@ -15,6 +15,10 @@ ALTER TABLE t_igrins_2_long_slit
 
 -- c_save_svc_images is now always set
 UPDATE t_igrins_2_long_slit SET c_save_svc_images = false WHERE c_save_svc_images IS NULL;
+
+-- Flush the deferred FK trigger events queued by the UPDATE.
+SET CONSTRAINTS ALL IMMEDIATE;
+
 ALTER TABLE t_igrins_2_long_slit ALTER COLUMN c_save_svc_images SET DEFAULT false;
 ALTER TABLE t_igrins_2_long_slit ALTER COLUMN c_save_svc_images SET NOT NULL;
 
