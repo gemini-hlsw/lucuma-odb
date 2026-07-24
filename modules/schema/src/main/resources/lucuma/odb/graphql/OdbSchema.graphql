@@ -10298,7 +10298,7 @@ type Igrins2LongSlit {
   Slit-Viewing Camera (SVC) acquisition configuration. Null (the default) means
   SVC images are not saved.
   A non-null value means SVC images are saved using the
-  given exposure time and telescope dither positions.
+  given exposure time and telescope offset positions.
   """
   svc: Igrins2SvcConfig
 
@@ -10338,8 +10338,7 @@ input Igrins2LongSlitInput {
   exposureTimeMode: ExposureTimeModeInput
 
   """
-  Slit-Viewing Camera (SVC) configuration. Each sub-field may be unset by
-  assigning a null value, or ignored by skipping it altogether.
+  Slit-Viewing Camera (SVC) configuration.
   """
   svc: Igrins2SvcInput
 
@@ -10359,8 +10358,7 @@ input Igrins2LongSlitInput {
 """
 IGRINS-2 Slit-Viewing Camera (SVC) acquisition configuration. A non-null value
 means SVC images are saved using the given exposure duration and telescope dither
-positions; null means SVC images are not saved. Defaults come from instrument
-constants defined in lucuma-core.
+positions; null means SVC images are not saved.
 """
 type Igrins2SvcConfig {
 

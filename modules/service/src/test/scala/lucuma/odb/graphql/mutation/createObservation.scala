@@ -2909,14 +2909,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       }
     """
 
-  test("[igrins2] SVC is null by default (no SVC use)"):
-    createProgramAs(pi).flatMap: pid =>
-      query(pi, createObsWithIgrins2SvcQuery(pid, "")).flatMap: js =>
-        val ls = js.hcursor.downPath(
-          "createObservation", "observation", "observingMode", "igrins2LongSlit"
-        )
-        assertIO(IO(ls.downField("svc").focus), Some(Json.Null))
-
   test("[igrins2] SVC enabled with defaults: exposure 3.08s and telescope dither [(0,0),(5,0)] guided"):
     createProgramAs(pi).flatMap: pid =>
       query(pi, createObsWithIgrins2SvcQuery(pid, "svc: {}")).flatMap: js =>
@@ -2973,6 +2965,37 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
            igrins2SvcDefaultTelescopeConfigs
           )
         )
+
+  test("[igrins2] SVC empty explicit telescope configs revert to the default on create"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2SvcQuery(pid, "svc: { explicitTelescopeConfigs: [] }")).flatMap: js =>
+        val svc = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit", "svc"
+        )
+        assertIO(
+          (svc.downIO[Json]("telescopeConfigs"),
+           IO(svc.downField("explicitTelescopeConfigs").focus)
+          ).tupled,
+          (igrins2SvcDefaultTelescopeConfigs, Some(Json.Null))
+        )
+
+  private val igrins2SvcExposureBoundsError =
+    List("Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s.")
+
+  test("[igrins2] SVC exposure out of bounds is rejected on create"):
+    createProgramAs(pi).flatMap: pid =>
+      // below the 3.08s minimum
+      expect(
+        pi,
+        createObsWithIgrins2SvcQuery(pid, "svc: { explicitExposure: { seconds: 1.0 } }"),
+        Left(igrins2SvcExposureBoundsError)
+      ) *>
+      // above the 600s maximum
+      expect(
+        pi,
+        createObsWithIgrins2SvcQuery(pid, "svc: { explicitExposure: { seconds: 700.0 } }"),
+        Left(igrins2SvcExposureBoundsError)
+      )
 
   private def visitorInputFragment(mode: String, extras: String): String =
     s"""
