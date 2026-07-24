@@ -4218,9 +4218,9 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               alongSlit { q { arcseconds } guiding }
               toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
-            saveSVCImages
-            defaultSaveSVCImages
-            explicitSaveSVCImages
+            svc {
+              exposure { microseconds }
+            }
             exposureTimeMode {
               signalToNoise {
                 value
@@ -4262,9 +4262,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     "toSky": null
                   },
                   "explicitTelescopeConfigs": null,
-                  "saveSVCImages": false,
-                  "defaultSaveSVCImages": false,
-                  "explicitSaveSVCImages": null,
+                  "svc": null,
                   "exposureTimeMode": {
                     "signalToNoise": {
                       "value": 50.000,
@@ -4309,7 +4307,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
             ]
           }
-          explicitSaveSVCImages: true
+          svc: {}
         }
       }
     """
@@ -4333,9 +4331,9 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               alongSlit { q { arcseconds } guiding }
               toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
-            saveSVCImages
-            defaultSaveSVCImages
-            explicitSaveSVCImages
+            svc {
+              exposure { microseconds }
+            }
           }
         }
       }
@@ -4370,9 +4368,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     "toSky": null
                   },
                   "explicitTelescopeConfigs": null,
-                  "saveSVCImages": false,
-                  "defaultSaveSVCImages": false,
-                  "explicitSaveSVCImages": null
+                  "svc": null
                 }
               }
             }
@@ -4417,9 +4413,9 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                       { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" }
                     ]
                   },
-                  "saveSVCImages": true,
-                  "defaultSaveSVCImages": false,
-                  "explicitSaveSVCImages": true
+                  "svc": {
+                    "exposure": { "microseconds": 3080000 }
+                  }
                 }
               }
             }
@@ -4453,7 +4449,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               { offset: { p: { arcseconds:  0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
             ]
           }
-          explicitSaveSVCImages: true
+          svc: {}
         }
       }
     """
@@ -4462,7 +4458,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       observingMode: {
         igrins2LongSlit: {
           explicitTelescopeConfigs: null
-          explicitSaveSVCImages: null
+          svc: null
         }
       }
     """
@@ -4481,8 +4477,9 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               alongSlit { q { arcseconds } guiding }
               toSky { offset { p { arcseconds } q { arcseconds } } guiding }
             }
-            saveSVCImages
-            explicitSaveSVCImages
+            svc {
+              exposure { microseconds }
+            }
           }
         }
       }
@@ -4514,8 +4511,9 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                       { "offset": { "p": { "arcseconds":  0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED" }
                     ]
                   },
-                  "saveSVCImages": true,
-                  "explicitSaveSVCImages": true
+                  "svc": {
+                    "exposure": { "microseconds": 3080000 }
+                  }
                 }
               }
             }
@@ -4545,8 +4543,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     "toSky": null
                   },
                   "explicitTelescopeConfigs": null,
-                  "saveSVCImages": false,
-                  "explicitSaveSVCImages": null
+                  "svc": null
                 }
               }
             }
@@ -4560,6 +4557,56 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         (update0, query, expected0),
         (update1, query, expected1)
       )
+    )
+
+  test("igrins2 SVC toggle: off by default; on/off preserves params while off"):
+    val query = "observations { observingMode { igrins2LongSlit { svc { exposure { microseconds } } } } }"
+    def svcOn(microseconds: Long): Either[String, Json] =
+      Right(json"""{ "updateObservations": { "observations": [{ "observingMode": { "igrins2LongSlit": { "svc": { "exposure": { "microseconds": $microseconds } } } } }] } }""")
+    val svcOff: Either[String, Json] =
+      Right(json"""{ "updateObservations": { "observations": [{ "observingMode": { "igrins2LongSlit": { "svc": null } } }] } }""")
+    multiUpdateTest(pi,
+      List(
+        // off by default; turn ON with defaults (exposure 3.08s)
+        ("observingMode: { igrins2LongSlit: { svc: {} } }", query, svcOn(3080000L)),
+        // turn OFF
+        ("observingMode: { igrins2LongSlit: { svc: null } }", query, svcOff),
+        // turn ON with an explicit exposure (10s)
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 10.0 } } } }", query, svcOn(10000000L)),
+        // turn OFF (explicit params are retained in storage while off)
+        ("observingMode: { igrins2LongSlit: { svc: null } }", query, svcOff),
+        // turn ON again with `svc: {}`: the prior explicit exposure is still in effect
+        ("observingMode: { igrins2LongSlit: { svc: {} } }", query, svcOn(10000000L))
+      ),
+      Some(ObservingModeType.Igrins2LongSlit)
+    )
+
+  test("igrins2 SVC: clearing explicitExposure keeps SVC on and reverts to the default"):
+    val query = "observations { observingMode { igrins2LongSlit { svc { exposure { microseconds } explicitExposure { microseconds } } } } }"
+    def expected(exposureUs: Long, explicit: Json): Either[String, Json] =
+      Right(json"""{ "updateObservations": { "observations": [{ "observingMode": { "igrins2LongSlit": { "svc": { "exposure": { "microseconds": $exposureUs }, "explicitExposure": $explicit } } } }] } }""")
+    multiUpdateTest(pi,
+      List(
+        // turn ON with an explicit exposure (10s)
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 10.0 } } } }", query,
+          expected(10000000L, json"""{ "microseconds": 10000000 }""")),
+        // clear just the exposure: SVC stays on, effective exposure reverts to the 3.08s default
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: null } } }", query,
+          expected(3080000L, Json.Null))
+      ),
+      Some(ObservingModeType.Igrins2LongSlit)
+    )
+
+  test("igrins2 SVC: an out-of-range explicit exposure is rejected on update"):
+    val boundsError = "Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s."
+    multiUpdateTest(pi,
+      List(
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 1.0 } } } }",
+          "observations { id }", Left(boundsError)),
+        ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 700.0 } } } }",
+          "observations { id }", Left(boundsError))
+      ),
+      Some(ObservingModeType.Igrins2LongSlit)
     )
 
   test("observing mode: update igrins2 telescope configs"):

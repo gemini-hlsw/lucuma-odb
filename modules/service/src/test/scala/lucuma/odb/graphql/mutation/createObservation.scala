@@ -2601,7 +2601,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   private def createObsWithIgrins2ObservingMode(
     pid:                     Program.Id,
-    explicitSaveSVCImages:   Option[Boolean] = None,
     explicitTelescopeConfigs: Option[String] = None
   ): String =
     s"""
@@ -2625,7 +2624,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                     at: { nanometers: 2200 }
                   }
                 }
-                ${explicitSaveSVCImages.map(b => s"explicitSaveSVCImages: $b").getOrElse("")}
                 ${explicitTelescopeConfigs.map(c => s"explicitTelescopeConfigs: $c").getOrElse("")}
               }
             }
@@ -2640,9 +2638,9 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                     at { nanometers }
                   }
                 }
-                saveSVCImages
-                defaultSaveSVCImages
-                explicitSaveSVCImages
+                svc {
+                  exposure { microseconds }
+                }
                 telescopeConfigs {
                   offsetMode
                   alongSlit { q { arcseconds } guiding }
@@ -2687,9 +2685,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           "createObservation", "observation", "observingMode", "igrins2LongSlit"
         )
         assertIO(
-          (ls.downIO[Boolean]("saveSVCImages"),
-           ls.downIO[Boolean]("defaultSaveSVCImages"),
-           ls.downIO[Option[Boolean]]("explicitSaveSVCImages"),
+          (IO(ls.downField("svc").focus),
            ls.downIO[Double]("exposureTimeMode", "signalToNoise", "value"),
            ls.downIO[Double]("exposureTimeMode", "signalToNoise", "at", "nanometers"),
            ls.downIO[Json]("telescopeConfigs"),
@@ -2697,9 +2693,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
            IO(ls.downField("explicitTelescopeConfigs").focus),
            ls.downIO[TelluricType]("telluricType")
           ).tupled,
-          (false,
-           false,
-           None,
+          (Some(Json.Null),
            50.0,
            2200.0,
            igrins2NodAlongSlitDefault,
@@ -2723,7 +2717,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
     createProgramAs(pi).flatMap: pid =>
       query(pi, createObsWithIgrins2ObservingMode(
         pid,
-        explicitSaveSVCImages = Some(true),
         explicitTelescopeConfigs = Some("""{
           alongSlit: [
             { q: { arcseconds: -5.0 }, guiding: ENABLED },
@@ -2737,12 +2730,12 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           "createObservation", "observation", "observingMode", "igrins2LongSlit"
         )
         assertIO(
-          (ls.downIO[Boolean]("saveSVCImages"),
+          (IO(ls.downField("svc").focus),
            ls.downIO[Json]("telescopeConfigs"),
            ls.downIO[Json]("explicitTelescopeConfigs"),
            ls.downIO[Json]("defaultTelescopeConfigs")
           ).tupled,
-          (true, explicit, explicit, igrins2NodAlongSlitDefault)
+          (Some(Json.Null), explicit, explicit, igrins2NodAlongSlitDefault)
         )
 
   test("[igrins2] create observation with explicit to-sky configs"):
@@ -2778,7 +2771,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
 
   private def createObsWithIgrins2ObservingModeAllParams(
     pid:                    Program.Id,
-    explicitSaveSVCImages:  Option[Boolean],
     telluricType:           TelluricType
   ): String =
     s"""
@@ -2802,7 +2794,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                     at: { nanometers: 2200 }
                   }
                 }
-                explicitSaveSVCImages: ${explicitSaveSVCImages.map(_.toString).getOrElse("null")}
                 telluricType: ${telluricTypeToGraphQL(telluricType)}
               }
             }
@@ -2811,9 +2802,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           observation {
             observingMode {
               igrins2LongSlit {
-                saveSVCImages
-                defaultSaveSVCImages
-                explicitSaveSVCImages
                 telluricType {
                   tag
                   starTypes
@@ -2830,21 +2818,14 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       query(pi,
         createObsWithIgrins2ObservingModeAllParams(
           pid,
-          explicitSaveSVCImages = Some(true),
           telluricType = TelluricType.Solar
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
 
-          assertIO((
-            longSlit.downIO[Boolean]("saveSVCImages"),
-            longSlit.downIO[Option[Boolean]]("explicitSaveSVCImages"),
-            longSlit.downIO[TelluricType]("telluricType")
-          ).tupled, (
-            true,
-            Some(true),
+          assertIO(
+            longSlit.downIO[TelluricType]("telluricType"),
             TelluricType.Solar
           )
-        )
       }
     }
   }
@@ -2854,19 +2835,14 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       query(pi,
         createObsWithIgrins2ObservingModeAllParams(
           pid,
-          explicitSaveSVCImages = None,
           telluricType = TelluricType.A0V
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
 
-          assertIO((
-            longSlit.downIO[Option[Boolean]]("explicitSaveSVCImages"),
-            longSlit.downIO[TelluricType]("telluricType")
-          ).tupled, (
-            None,
+          assertIO(
+            longSlit.downIO[TelluricType]("telluricType"),
             TelluricType.A0V
           )
-        )
       }
     }
   }
@@ -2876,7 +2852,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       query(pi,
         createObsWithIgrins2ObservingModeAllParams(
           pid,
-          explicitSaveSVCImages = None,
           telluricType = TelluricType.Manual(NonEmptyList.of("A5V", "G2V"))
         )).flatMap { js =>
           val longSlit = js.hcursor.downPath("createObservation", "observation", "observingMode", "igrins2LongSlit")
@@ -2888,6 +2863,139 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       }
     }
   }
+
+  private val igrins2SvcDefaultTelescopeConfigs =
+    json"""[
+      { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" },
+      { "offset": { "p": { "arcseconds": 5.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
+    ]"""
+
+  private def createObsWithIgrins2SvcQuery(pid: Program.Id, svcInput: String): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: ${pid.asJson}
+          SET: {
+            scienceRequirements: {
+              exposureTimeMode: {
+                signalToNoise: { value: 100.0, at: { nanometers: 2200 } }
+              }
+            }
+            observingMode: {
+              igrins2LongSlit: {
+                exposureTimeMode: {
+                  signalToNoise: { value: 50.0, at: { nanometers: 2200 } }
+                }
+                $svcInput
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              igrins2LongSlit {
+                svc {
+                  exposure { microseconds }
+                  defaultExposure { microseconds }
+                  explicitExposure { microseconds }
+                  telescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+                  defaultTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+                  explicitTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("[igrins2] SVC enabled with defaults: exposure 3.08s and telescope dither [(0,0),(5,0)] guided"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2SvcQuery(pid, "svc: {}")).flatMap: js =>
+        val svc = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit", "svc"
+        )
+        assertIO(
+          (svc.downIO[Long]("exposure", "microseconds"),
+           svc.downIO[Long]("defaultExposure", "microseconds"),
+           IO(svc.downField("explicitExposure").focus),
+           svc.downIO[Json]("telescopeConfigs"),
+           svc.downIO[Json]("defaultTelescopeConfigs")
+          ).tupled,
+          (3080000L,
+           3080000L,
+           Some(Json.Null),
+           igrins2SvcDefaultTelescopeConfigs,
+           igrins2SvcDefaultTelescopeConfigs
+          )
+        )
+
+  test("[igrins2] SVC explicit exposure and telescope configs are editable on create"):
+    val explicitTcs =
+      json"""[
+        { "offset": { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": 2.000000 } }, "guiding": "ENABLED" },
+        { "offset": { "p": { "arcseconds": 3.000000 }, "q": { "arcseconds": 4.000000 } }, "guiding": "DISABLED" }
+      ]"""
+    val svcInput =
+      """svc: {
+            explicitExposure: { seconds: 10.0 }
+            explicitTelescopeConfigs: [
+              { offset: { p: { arcseconds: 1.0 }, q: { arcseconds: 2.0 } } }
+              { offset: { p: { arcseconds: 3.0 }, q: { arcseconds: 4.0 } }, guiding: DISABLED }
+            ]
+          }"""
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2SvcQuery(pid, svcInput)).flatMap: js =>
+        val svc = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit", "svc"
+        )
+        assertIO(
+          (svc.downIO[Long]("exposure", "microseconds"),
+           svc.downIO[Long]("defaultExposure", "microseconds"),
+           svc.downIO[Long]("explicitExposure", "microseconds"),
+           svc.downIO[Json]("telescopeConfigs"),
+           svc.downIO[Json]("explicitTelescopeConfigs"),
+           svc.downIO[Json]("defaultTelescopeConfigs")
+          ).tupled,
+          (10000000L,
+           3080000L,
+           10000000L,
+           explicitTcs,
+           explicitTcs,
+           igrins2SvcDefaultTelescopeConfigs
+          )
+        )
+
+  test("[igrins2] SVC empty explicit telescope configs revert to the default on create"):
+    createProgramAs(pi).flatMap: pid =>
+      query(pi, createObsWithIgrins2SvcQuery(pid, "svc: { explicitTelescopeConfigs: [] }")).flatMap: js =>
+        val svc = js.hcursor.downPath(
+          "createObservation", "observation", "observingMode", "igrins2LongSlit", "svc"
+        )
+        assertIO(
+          (svc.downIO[Json]("telescopeConfigs"),
+           IO(svc.downField("explicitTelescopeConfigs").focus)
+          ).tupled,
+          (igrins2SvcDefaultTelescopeConfigs, Some(Json.Null))
+        )
+
+  private val igrins2SvcExposureBoundsError =
+    List("Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s.")
+
+  test("[igrins2] SVC exposure out of bounds is rejected on create"):
+    createProgramAs(pi).flatMap: pid =>
+      // below the 3.08s minimum
+      expect(
+        pi,
+        createObsWithIgrins2SvcQuery(pid, "svc: { explicitExposure: { seconds: 1.0 } }"),
+        Left(igrins2SvcExposureBoundsError)
+      ) *>
+      // above the 600s maximum
+      expect(
+        pi,
+        createObsWithIgrins2SvcQuery(pid, "svc: { explicitExposure: { seconds: 700.0 } }"),
+        Left(igrins2SvcExposureBoundsError)
+      )
 
   private def visitorInputFragment(mode: String, extras: String): String =
     s"""
