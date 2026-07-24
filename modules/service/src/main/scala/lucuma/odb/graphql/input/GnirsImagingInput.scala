@@ -14,7 +14,8 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.WavelengthOrder
-import lucuma.core.math.Angle
+import lucuma.core.math.Offset
+import lucuma.core.math.syntax.int.*
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -26,12 +27,16 @@ object GnirsImagingInput extends ImagingFilterCheck:
   // GNIRS imaging defaults:
   // Variant = Grouped
   // Order = Increasing
-  // Offsets = Spiral
-  // Size = 10 (the GNIRS imaging field is far smaller than the F2/GMOS fields)
+  // Offsets = Uniform, A=(+4, +6), B=(-1, -6)
   val DefaultVariant: ImagingVariantInput =
     ImagingVariantInput.Grouped(
       WavelengthOrder.Increasing.some,
-      Nullable.NonNull(TelescopeConfigGeneratorInput.SpiralInput(Angle.fromMicroarcseconds(10_000_000L), none, none)),
+      Nullable.NonNull(
+        TelescopeConfigGeneratorInput.UniformInput(
+          cornerA = Offset(Offset.P(4.arcsec),  Offset.Q(6.arcsec)),
+          cornerB = Offset(Offset.P(-1.arcsec), Offset.Q(-6.arcsec))
+        )
+      ),
       none,
       Nullable.Absent
     )
