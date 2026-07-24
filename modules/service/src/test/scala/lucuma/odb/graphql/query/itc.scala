@@ -662,4 +662,74 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       )
     yield ()
 
+  // IGRINS-2 is science-only spectroscopy, so it serializes as
+  // ItcIgrins2Spectroscopy with a distinct `itcType`.
+  test("igrins2 itcType"):
+    def query(oid: Observation.Id) = s"""
+      query {
+        observation(observationId: "$oid") {
+          itc {
+            ... on ItcIgrins2Spectroscopy {
+              itcType
+              spectroscopyScience {
+                selected {
+                  targetId
+                  exposureTime {
+                    seconds
+                  }
+                  exposureCount
+                  signalToNoiseAt {
+                    wavelength {
+                      picometers
+                    }
+                    single
+                    total
+                  }
+                }
+                all {
+                  targetId
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    def expected(t: Target.Id) = json"""
+      {
+        "observation": {
+          "itc": {
+            "itcType": "IGRINS_2_SPECTROSCOPY",
+            "spectroscopyScience": {
+              "selected": {
+                "targetId": ${t.asJson},
+                "exposureTime": {
+                  "seconds": 10.000000
+                },
+                "exposureCount": ${FakeItcResult.exposureCount.value},
+                "signalToNoiseAt": ${fakeSignalToNoiseAt(Wavelength.fromIntNanometers(2200).get).asJson}
+              },
+              "all": [
+                {
+                  "targetId": ${t.asJson}
+                }
+              ]
+            }
+          }
+        }
+      }
+    """
+
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(user, p)
+      o <- createIgrins2LongSlitObservationAs(user, p, t)
+      _ <- expect(
+        user     = user,
+        query    = query(o),
+        expected = expected(t).asRight
+      )
+    yield ()
+
 }

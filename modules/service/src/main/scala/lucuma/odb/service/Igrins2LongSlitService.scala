@@ -12,6 +12,8 @@ import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Igrins2LongSlitInput
@@ -56,7 +58,7 @@ object Igrins2LongSlitService:
 
       val igrins2LS: Decoder[Config] =
         (exposure_time_mode  *:
-         bool.opt            *:
+         bool                *:
          slit_offset_mode    *:
          text                *:
          telluric_type
@@ -65,7 +67,7 @@ object Igrins2LongSlitService:
             .getOption((offsetMode, configsText))
             .toRight(s"Could not parse '$configsText' as telescope configs (mode ${offsetMode.tag}).")
             .map: configs =>
-              Config(sci, saveSVC.getOrElse(false), configs, telluricType)
+              Config(sci, saveSVC, configs, telluricType)
         }
 
       override def select(
@@ -155,37 +157,51 @@ object Igrins2LongSlitService:
     val InsertIgrins2LongSlit: Fragment[(
       Observation.Id,
       Option[Boolean],
+      Option[TimeSpan],
+      Option[String],
       Option[SlitOffsetMode],
       Option[String],
       TelluricType
     )] =
       sql"""
         INSERT INTO t_igrins_2_long_slit (
-          c_observation_id   ,
-          c_program_id       ,
-          c_save_svc_images  ,
-          c_slit_offset_mode ,
-          c_telescope_configs,
+          c_observation_id       ,
+          c_program_id           ,
+          c_save_svc_images      ,
+          c_svc_exposure         ,
+          c_svc_telescope_configs,
+          c_slit_offset_mode     ,
+          c_telescope_configs    ,
           c_telluric_type
         )
         SELECT
           $observation_id        ,
           c_program_id           ,
           ${bool.opt}            ,
+          ${time_span.opt}       ,
+          ${text.opt}            ,
           ${slit_offset_mode.opt},
           ${text.opt}            ,
           $telluric_type
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, s, m, tc, tt) => (o, s, m, tc, tt, o) }
+       """.contramap { (o, s, e, st, m, tc, tt) => (o, s, e, st, m, tc, tt, o) }
+
+    /** Encode explicit SVC telescope configs; an empty list reverts to the default (`None`). */
+    private def encodeSvcTelescopeConfigs(tcs: List[TelescopeConfig]): Option[String] =
+      NonEmptyList.fromList(tcs).map(ToSkyFormat.reverseGet)
 
     def insertIgrins2LongSlit(
       observationId: Observation.Id,
-      input: Igrins2LongSlitInput.Create
+      input:         Igrins2LongSlitInput.Create
     ): AppliedFragment =
+      val svcTelescopeConfigs =
+        input.svc.flatMap(_.explicitTelescopeConfigs).flatMap(encodeSvcTelescopeConfigs)
       InsertIgrins2LongSlit.apply(
         observationId,
-        input.explicitSaveSVCImages,
+        Some(input.svc.isDefined),
+        input.svc.flatMap(_.explicitExposure),
+        svcTelescopeConfigs,
         input.explicitSlitOffsetMode,
         input.formattedTelescopeConfigs,
         input.telluricType
@@ -199,14 +215,32 @@ object Igrins2LongSlitService:
 
     private def igrins2Updates(input: Igrins2LongSlitInput.Edit): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upSaveSVCImages   = sql"c_save_svc_images   = ${bool.opt}"
-      val upSlitOffsetMode  = sql"c_slit_offset_mode  = ${slit_offset_mode.opt}"
-      val upTelescopeConfig = sql"c_telescope_configs = ${text.opt}"
-      val upTelluricType    = sql"c_telluric_type     = ${telluric_type.opt}"
+      val upSaveSVCImages   = sql"c_save_svc_images       = ${bool.opt}"
+      val upSvcExposure     = sql"c_svc_exposure          = ${time_span.opt}"
+      val upSvcTelescope    = sql"c_svc_telescope_configs = ${text.opt}"
+      val upSlitOffsetMode  = sql"c_slit_offset_mode      = ${slit_offset_mode.opt}"
+      val upTelescopeConfig = sql"c_telescope_configs     = ${text.opt}"
+      val upTelluricType    = sql"c_telluric_type         = ${telluric_type.opt}"
+
+      // c_save_svc_images: svc omitted -> skip; svc:null -> OFF (false); svc:{...} -> ON (true).
+      val saveSvc: Option[Option[Boolean]] =
+        input.svc.fold(Some(Some(false)), None, _ => Some(Some(true)))
+
+      // SVC exposure / telescope configs apply only when svc is a non-null object (ON/edit).
+      val svcParams: Option[Igrins2LongSlitInput.Svc.Edit] = input.svc.toOption
+
+      val svcExposure: Option[Option[TimeSpan]] =
+        svcParams.flatMap(_.explicitExposure.toOptionOption)
+
+      val svcTelescopeConfigs: Option[Option[String]] =
+        svcParams.flatMap(_.explicitTelescopeConfigs.toOptionOption)
+          .map(_.flatMap(encodeSvcTelescopeConfigs))
 
       val ups: List[AppliedFragment] =
         List(
-          input.explicitSaveSVCImages.toOptionOption.map(upSaveSVCImages),
+          saveSvc.map(upSaveSVCImages),
+          svcExposure.map(upSvcExposure),
+          svcTelescopeConfigs.map(upSvcTelescope),
           input.explicitSlitOffsetMode.toOptionOption.map(upSlitOffsetMode),
           input.formattedTelescopeConfigs.toOptionOption.map(upTelescopeConfig),
           input.telluricType.map(tt => upTelluricType(Some(tt)))
@@ -241,12 +275,14 @@ object Igrins2LongSlitService:
     def cloneIgrins2(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       sql"""
       INSERT INTO t_igrins_2_long_slit (
-        c_observation_id     ,
-        c_program_id         ,
-        c_observing_mode_type,
-        c_save_svc_images    ,
-        c_slit_offset_mode   ,
-        c_telescope_configs  ,
+        c_observation_id       ,
+        c_program_id           ,
+        c_observing_mode_type  ,
+        c_save_svc_images      ,
+        c_svc_exposure         ,
+        c_svc_telescope_configs,
+        c_slit_offset_mode     ,
+        c_telescope_configs    ,
         c_telluric_type
       )
       SELECT
@@ -254,6 +290,8 @@ object Igrins2LongSlitService:
         (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id) AS c_program_id,
         c_observing_mode_type,
         c_save_svc_images,
+        c_svc_exposure,
+        c_svc_telescope_configs,
         c_slit_offset_mode,
         c_telescope_configs,
         c_telluric_type

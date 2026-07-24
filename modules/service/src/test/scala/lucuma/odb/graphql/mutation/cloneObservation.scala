@@ -265,9 +265,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             alongSlit { q { arcseconds } guiding }
             toSky { offset { p { arcseconds } q { arcseconds } } guiding }
           }
-          saveSVCImages
-          explicitSaveSVCImages
-          defaultSaveSVCImages
+          svc {
+            exposure { microseconds }
+          }
           exposureTimeMode {
             signalToNoise {
               value
@@ -2390,8 +2390,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         {
           observingMode {
             igrins2LongSlit {
-              saveSVCImages
-              explicitSaveSVCImages
+              svc {
+                exposure { microseconds }
+              }
             }
           }
         }
@@ -2410,16 +2411,14 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "saveSVCImages": false,
-                          "explicitSaveSVCImages": null
+                          "svc": null
                         }
                       }
                     },
                     "newObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "saveSVCImages": false,
-                          "explicitSaveSVCImages": null
+                          "svc": null
                         }
                       }
                     }
@@ -2442,7 +2441,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                       SET: {
                         observingMode: {
                           igrins2LongSlit: {
-                            explicitSaveSVCImages: true
+                            svc: {}
                           }
                         }
                       }
@@ -2460,8 +2459,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         {
           observingMode {
             igrins2LongSlit {
-              saveSVCImages
-              explicitSaveSVCImages
+              svc {
+                exposure { microseconds }
+              }
             }
           }
         }
@@ -2480,16 +2480,18 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                     "originalObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "saveSVCImages": true,
-                          "explicitSaveSVCImages": true
+                          "svc": {
+                            "exposure": { "microseconds": 3080000 }
+                          }
                         }
                       }
                     },
                     "newObservation": {
                       "observingMode": {
                         "igrins2LongSlit": {
-                          "saveSVCImages": true,
-                          "explicitSaveSVCImages": true
+                          "svc": {
+                            "exposure": { "microseconds": 3080000 }
+                          }
                         }
                       }
                     }
