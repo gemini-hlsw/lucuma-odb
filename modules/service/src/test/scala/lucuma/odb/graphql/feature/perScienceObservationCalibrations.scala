@@ -2064,6 +2064,97 @@ class perScienceObservationCalibrations
       assertEquals(tel2._2, Igrins2DefaultQs)
     }
 
+  private def enableIgrins2Svc(oid: Observation.Id): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: {
+            observingMode: {
+              igrins2LongSlit: {
+                svc: {}
+              }
+            }
+          }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  private def updateIgrins2SvcExposure(oid: Observation.Id, seconds: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: {
+            observingMode: {
+              igrins2LongSlit: {
+                svc: { explicitExposure: { seconds: $seconds } }
+              }
+            }
+          }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  private def queryIgrins2SvcIsNull(oid: Observation.Id): IO[Boolean] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode {
+                igrins2LongSlit {
+                  svc { exposure { seconds } }
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor.downFields("observation", "observingMode", "igrins2LongSlit", "svc").focus.exists(_.isNull)
+
+  test("igrins2 telluric derived from an SVC-enabled science observation reports a null svc configuration"):
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createIgrins2LongSlitObservationAs(pi, pid, tid)
+      _       <- enableIgrins2Svc(oid)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      sciNull <- queryIgrins2SvcIsNull(oid)
+      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      telNull <- queryIgrins2SvcIsNull(toid)
+    } yield {
+      // Science keeps its SVC configuration.
+      assert(!sciNull)
+      // Telluric never carries one.
+      assert(telNull)
+    }
+
+  test("igrins2 telluric's svc configuration stays null across repeated synchronisation"):
+    for {
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createIgrins2LongSlitObservationAs(pi, pid, tid)
+      _       <- enableIgrins2Svc(oid)
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      tel1    <- queryIgrins2SvcIsNull(toid)
+      // Edit the science SVC configuration.
+      _       <- updateIgrins2SvcExposure(oid, BigDecimal(10))
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      tel2    <- queryIgrins2SvcIsNull(toid)
+    } yield {
+      assert(tel1)
+      assert(tel2)
+    }
+
   // (has explicit override?, effective alongSlit q offsets in arcseconds) for a
   // Flamingos2 long slit observation.
   private def queryF2TelescopeConfigs(oid: Observation.Id): IO[(Boolean, List[Double])] =

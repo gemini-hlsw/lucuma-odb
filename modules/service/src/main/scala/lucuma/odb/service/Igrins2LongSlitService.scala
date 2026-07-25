@@ -13,6 +13,8 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.igrins2.SvcDefaultExposure
+import lucuma.core.model.sequence.igrins2.SvcDefaultTelescopeConfigs
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
@@ -59,15 +61,26 @@ object Igrins2LongSlitService:
       val igrins2LS: Decoder[Config] =
         (exposure_time_mode  *:
          bool                *:
+         time_span.opt       *:
+         text.opt            *:
          slit_offset_mode    *:
          text                *:
          telluric_type
-        ).emap { case (sci, saveSVC, offsetMode, configsText, telluricType) =>
-          SlitTelescopeConfigsFormat
-            .getOption((offsetMode, configsText))
-            .toRight(s"Could not parse '$configsText' as telescope configs (mode ${offsetMode.tag}).")
-            .map: configs =>
-              Config(sci, saveSVC, configs, telluricType)
+        ).emap { case (sci, saveSVC, svcExposureRaw, svcConfigsRaw, offsetMode, configsText, telluricType) =>
+          for
+            configs    <- SlitTelescopeConfigsFormat
+                            .getOption((offsetMode, configsText))
+                            .toRight(s"Could not parse '$configsText' as telescope configs (mode ${offsetMode.tag}).")
+            svcConfigs <- svcConfigsRaw.traverse { s =>
+                            ToSkyFormat.getOption(s).toRight(s"Could not parse '$s' as SVC telescope configs.")
+                          }
+          yield
+            val svc = Option.when(saveSVC):
+              Config.Svc(
+                svcExposureRaw.getOrElse(SvcDefaultExposure),
+                svcConfigs.getOrElse(SvcDefaultTelescopeConfigs)
+              )
+            Config(sci, svc, configs, telluricType)
         }
 
       override def select(
@@ -138,7 +151,9 @@ object Igrins2LongSlitService:
           sci.c_signal_to_noise   ,
           sci.c_exposure_time     ,
           sci.c_exposure_count    ,
-          ls.c_save_svc_images    ,
+          ls.c_save_svc_images            ,
+          ls.c_svc_exposure               ,
+          ls.c_svc_telescope_configs      ,
           ls.c_slit_offset_mode_effective ,
           ls.c_telescope_configs_effective,
           ls.c_telluric_type
@@ -261,14 +276,19 @@ object Igrins2LongSlitService:
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
-    // Tellurics need a fixed set of telescope configs
+    // Tellurics need a fixed set of telescope configs, and never carry an SVC configuration
+    // (the mode's clone operation copies the SVC columns from the science observation, so
+    // this must be cleared explicitly). See docs/adr/igrins2-svc-acquisition-generation.md.
     def applyIgrins2TelluricDefaults(oid: Observation.Id): AppliedFragment =
       val (mode, configs) = SlitTelescopeConfigsFormat.reverseGet(Config.DefaultTelescopeConfigs)
       sql"""
         UPDATE t_igrins_2_long_slit
         SET
-          c_slit_offset_mode  = $slit_offset_mode,
-          c_telescope_configs = $text
+          c_slit_offset_mode      = $slit_offset_mode,
+          c_telescope_configs     = $text,
+          c_save_svc_images       = false,
+          c_svc_exposure          = NULL,
+          c_svc_telescope_configs = NULL
         WHERE c_observation_id = $observation_id
       """.apply(mode, configs, oid)
 

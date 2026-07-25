@@ -8763,6 +8763,12 @@ type Igrins2ExecutionConfig {
   static: Igrins2Static!
 
   """
+  IGRINS-2 SVC (Slit-Viewing Camera) acquisition execution sequence. Null unless the
+  observation has an SVC configuration.
+  """
+  acquisition: Igrins2ExecutionSequence
+
+  """
   IGRINS-2 science execution
   """
   science: Igrins2ExecutionSequence

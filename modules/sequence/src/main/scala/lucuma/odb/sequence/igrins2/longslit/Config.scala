@@ -13,6 +13,7 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -20,7 +21,7 @@ import java.io.DataOutputStream
 
 case class Config(
   scienceExposureTimeMode: ExposureTimeMode,
-  saveSVCImages: Boolean,
+  svc: Option[Config.Svc],
   telescopeConfigs: SlitTelescopeConfigs,
   telluricType: TelluricType
 ) derives Eq:
@@ -43,7 +44,15 @@ case class Config(
     val out = new DataOutputStream(bao)
 
     out.write(scienceExposureTimeMode.hashBytes)
-    out.writeBoolean(saveSVCImages)
+    // Must stay byte-identical to the old boolean-false encoding when svc is absent, so that
+    // no existing observation's hash changes. See docs/adr/igrins2-svc-acquisition-generation.md.
+    svc match
+      case None      =>
+        out.writeBoolean(false)
+      case Some(cfg) =>
+        out.writeBoolean(true)
+        out.write(cfg.exposure.hashBytes)
+        out.write(cfg.telescopeConfigs.hashBytes)
     out.writeChars(telescopeConfigs.offsetsType.tag)
     steps.toList.foreach: tc =>
       out.write(tc.hashBytes)
@@ -53,6 +62,12 @@ case class Config(
     bao.toByteArray
 
 object Config:
+
+  /** The SVC (Slit-Viewing Camera) acquisition sub-config, with already-resolved effective values. */
+  case class Svc(
+    exposure: TimeSpan,
+    telescopeConfigs: NonEmptyList[TelescopeConfig]
+  ) derives Eq
 
   /** The default telescope configs — the nod-along-slit ABBA pattern. */
   val DefaultTelescopeConfigs: SlitTelescopeConfigs =
