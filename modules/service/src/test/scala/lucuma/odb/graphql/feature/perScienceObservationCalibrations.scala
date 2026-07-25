@@ -2064,59 +2064,6 @@ class perScienceObservationCalibrations
       assertEquals(tel2._2, Igrins2DefaultQs)
     }
 
-  private def enableIgrins2Svc(oid: Observation.Id): IO[Unit] =
-    query(
-      pi,
-      s"""mutation {
-        updateObservations(input: {
-          WHERE: { id: { EQ: "$oid" } }
-          SET: {
-            observingMode: {
-              igrins2LongSlit: {
-                svc: {}
-              }
-            }
-          }
-        }) {
-          observations { id }
-        }
-      }"""
-    ).void
-
-  private def updateIgrins2SvcExposure(oid: Observation.Id, seconds: BigDecimal): IO[Unit] =
-    query(
-      pi,
-      s"""mutation {
-        updateObservations(input: {
-          WHERE: { id: { EQ: "$oid" } }
-          SET: {
-            observingMode: {
-              igrins2LongSlit: {
-                svc: { explicitExposure: { seconds: $seconds } }
-              }
-            }
-          }
-        }) {
-          observations { id }
-        }
-      }"""
-    ).void
-
-  private def queryIgrins2SvcIsNull(oid: Observation.Id): IO[Boolean] =
-    query(
-      serviceUser,
-      s"""query {
-            observation(observationId: "$oid") {
-              observingMode {
-                igrins2LongSlit {
-                  svc { exposure { seconds } }
-                }
-              }
-            }
-          }"""
-    ).map: c =>
-      c.hcursor.downFields("observation", "observingMode", "igrins2LongSlit", "svc").focus.exists(_.isNull)
-
   test("igrins2 telluric derived from an SVC-enabled science observation reports a null svc configuration"):
     for {
       pid     <- createProgramAs(pi)
@@ -2146,7 +2093,7 @@ class perScienceObservationCalibrations
       toid    <- selectTelluricObservationFor(oid).map(_.get)
       tel1    <- queryIgrins2SvcIsNull(toid)
       // Edit the science SVC configuration.
-      _       <- updateIgrins2SvcExposure(oid, BigDecimal(10))
+      _       <- enableIgrins2Svc(oid, explicitExposureSeconds = Some(BigDecimal(10)))
       _       <- runObscalcUpdate(pid, oid)
       _       <- recalculateCalibrations(pid, when, oid)
       tel2    <- queryIgrins2SvcIsNull(toid)

@@ -23,11 +23,15 @@ import lucuma.odb.sequence.util.AtomBuilder
 import java.util.UUID
 
 /**
- * IGRINS-2 SVC (Slit-Viewing Camera) acquisition. A single atom holding one
- * acquisition-class step per SVC telescope dither position, at the effective SVC exposure,
- * with a breakpoint on the final step so the observer can confirm centring before science
- * begins. There is no repeating atom: the SVC dither is a fixed pattern, not a centring
- * probe to iterate on. See docs/adr/igrins2-svc-acquisition-generation.md.
+ * IGRINS-2 SVC (Slit-Viewing Camera) acquisition. 
+ * A single atom holding one acquisition-class step per SVC telescope offset position, 
+ * at the effective SVC exposure, with a breakpoint on the final step.
+ *
+ * There is no repeating atom: the SVC offset is a fixed pattern.
+ *
+ * IGRINS-2 acquisition is down with internal software used before we start the sequence.
+ * Though we call this an acquisition the aim is to take some images before the science sequence 
+ * starts, and not to acquire the target in the slit.
  */
 object Acquisition:
 

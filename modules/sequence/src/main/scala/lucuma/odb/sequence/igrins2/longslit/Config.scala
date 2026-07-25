@@ -44,11 +44,9 @@ case class Config(
     val out = new DataOutputStream(bao)
 
     out.write(scienceExposureTimeMode.hashBytes)
-    // Must stay byte-identical to the old boolean-false encoding when svc is absent, so that
-    // no existing observation's hash changes. See docs/adr/igrins2-svc-acquisition-generation.md.
     svc match
       case None      =>
-        out.writeBoolean(false)
+        out.writeBoolean(false) // this make is backwards compatible with the previous hashes.
       case Some(cfg) =>
         out.writeBoolean(true)
         out.write(cfg.exposure.hashBytes)
@@ -63,7 +61,7 @@ case class Config(
 
 object Config:
 
-  /** The SVC (Slit-Viewing Camera) acquisition sub-config, with already-resolved effective values. */
+  /** SVC acquisition config */
   case class Svc(
     exposure: TimeSpan,
     telescopeConfigs: NonEmptyList[TelescopeConfig]

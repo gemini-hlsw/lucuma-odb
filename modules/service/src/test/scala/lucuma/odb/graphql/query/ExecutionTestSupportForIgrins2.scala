@@ -44,12 +44,8 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
       """
     ).void
 
-  /**
-   * Turns on the SVC sub-config, optionally overriding the exposure and/or telescope dither
-   * positions. Passing no overrides turns SVC on at its defaults.
-   */
   def enableIgrins2Svc(
-    oid:                       Observation.Id,
+    oid:                      Observation.Id,
     explicitExposureSeconds:  Option[BigDecimal] = None,
     explicitTelescopeConfigs: Option[String] = None
   ): IO[Unit] =
@@ -76,6 +72,21 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
         }
       """
     ).void
+
+  def queryIgrins2SvcIsNull(oid: Observation.Id): IO[Boolean] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode {
+                igrins2LongSlit {
+                  svc { exposure { seconds } }
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor.downFields("observation", "observingMode", "igrins2LongSlit", "svc").focus.exists(_.isNull)
 
   val Igrins2AtomQuery: String =
     s"""

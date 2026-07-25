@@ -19,8 +19,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 
 /**
- * The IGRINS-2 SVC (Slit-Viewing Camera) acquisition sequence. See
- * docs/adr/igrins2-svc-acquisition-generation.md.
+ * The IGRINS-2 SVC (Slit-Viewing Camera) acquisition sequence. 
  */
 class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
   val ExposureTime: TimeSpan = 20.secondTimeSpan
@@ -38,7 +37,7 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
       o <- createIgrins2LongSlitObservationAs(pi, p, t)
     } yield o
 
-  test("[igrins2] no SVC configuration -> empty acquisition, unchanged science"):
+  test("[igrins2] no SVC configuration implies empty acquisition"):
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -70,7 +69,7 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asRight
       )
 
-  test("[igrins2] SVC at defaults -> one atom, two steps at the default dither, breakpoint on the last step only"):
+  test("[igrins2] SVC at defaults produces one atom with two steps at the default offsets and a breakpoint on the last step"):
     (for
       oid <- setup
       _   <- enableIgrins2Svc(oid)
@@ -112,7 +111,7 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asRight
       )
 
-  test("[igrins2] SVC with an explicit exposure -> every acquisition step uses it"):
+  test("[igrins2] SVC with an explicit exposure"):
     (for
       oid <- setup
       _   <- enableIgrins2Svc(oid, explicitExposureSeconds = Some(BigDecimal(10)))
@@ -137,7 +136,7 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asRight
       )
 
-  test("[igrins2] SVC with an explicit dither list of a different length -> one step per position, guiding preserved"):
+  test("[igrins2] SVC with an explicit set of offsets"):
     val explicitConfigs =
       """[
         { offset: { p: { arcseconds: 0 }, q: { arcseconds: 0 } }, guiding: ENABLED  },
