@@ -16,6 +16,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.CentralWavelength
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.igrins2.longslit.Acquisition as Igrins2Acquisition
 
 trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
 
@@ -189,8 +190,21 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
       }
     """
 
-  /** The single "SVC Acquisition" atom, which runs through without pausing. */
   protected def igrins2ExpectedAcquisitionAtom(
+    exposureTime: TimeSpan,
+    offsets:      (BigDecimal, BigDecimal, StepGuideState)*
+  ): Json =
+    igrins2ExpectedAcquisitionAtomNamed(Igrins2Acquisition.AtomTitle.value, exposureTime, offsets*)
+
+  protected def igrins2ExpectedAcquisitionRepeats(
+    exposureTime: TimeSpan,
+    lastOffset:   (BigDecimal, BigDecimal, StepGuideState)
+  ): List[Json] =
+    List.fill(Igrins2Acquisition.RepeatingAtomCount):
+      igrins2ExpectedAcquisitionAtomNamed(Igrins2Acquisition.RepeatAtomTitle.value, exposureTime, lastOffset)
+
+  private def igrins2ExpectedAcquisitionAtomNamed(
+    description:  String,
     exposureTime: TimeSpan,
     offsets:      (BigDecimal, BigDecimal, StepGuideState)*
   ): Json =
@@ -198,7 +212,7 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
       igrins2ExpectedAcquisitionStep(exposureTime, p, q, g)
 
     Json.obj(
-      "description"  -> "SVC Acquisition".asJson,
+      "description"  -> description.asJson,
       "observeClass" -> "ACQUISITION".asJson,
       "steps"        -> steps.asJson
     )

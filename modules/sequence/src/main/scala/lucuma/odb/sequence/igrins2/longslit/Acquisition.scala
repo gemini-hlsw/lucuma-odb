@@ -24,10 +24,11 @@ import java.util.UUID
 
 /**
  * IGRINS-2 SVC (Slit-Viewing Camera) acquisition.
- * A single atom holding one acquisition-class step per SVC telescope offset position,
- * at the effective SVC exposure. The steps run through without pausing,
+ * An atom holding one acquisition-class step per SVC telescope offset position,
+ * at the effective SVC exposure. The steps run through without pausing.
  *
- * There is no repeating atom: the SVC offset is a fixed pattern.
+ * The atom is followed by [[RepeatingAtomCount]] single-step atoms repeating the
+ * last SVC offset, as GMOS and Flamingos-2 repeat their final acquisition step.
  *
  * IGRINS-2 acquisition is down with internal software used before we start the sequence.
  * Though we call this an acquisition the aim is to take some images before the science sequence
@@ -36,6 +37,11 @@ import java.util.UUID
 object Acquisition:
 
   val AtomTitle: NonEmptyString = NonEmptyString.unsafeFrom("SVC Acquisition")
+
+  val RepeatAtomTitle: NonEmptyString = NonEmptyString.unsafeFrom("Additional SVC Images")
+
+  /** Repetitions offered after the initial atom, matching the other instruments. */
+  val RepeatingAtomCount: Int = 10
 
   private def steps(svc: Config.Svc): NonEmptyList[ProtoStep[Igrins2DynamicConfig]] =
     Science.Igrins2SequenceState.eval:
@@ -50,7 +56,11 @@ object Acquisition:
   ) extends SequenceGenerator[Igrins2DynamicConfig]:
 
     override val generate: Stream[Pure, Atom[Igrins2DynamicConfig]] =
-      builder.buildStream(Stream.emit(ProtoAtom(AtomTitle.some, steps(svc))))
+      val protoSteps    = steps(svc)
+      val repeatingAtom = ProtoAtom(RepeatAtomTitle.some, NonEmptyList.one(protoSteps.last))
+      val atoms         =
+        ProtoAtom(AtomTitle.some, protoSteps) :: List.fill(RepeatingAtomCount)(repeatingAtom)
+      builder.buildStream(Stream.emits(atoms))
 
   def instantiate(
     estimator: StepTimeEstimateCalculator[Igrins2StaticConfig, Igrins2DynamicConfig],
