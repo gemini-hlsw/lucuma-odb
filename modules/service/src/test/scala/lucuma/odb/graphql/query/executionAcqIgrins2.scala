@@ -17,9 +17,10 @@ import lucuma.core.model.sequence.igrins2.SvcDefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
+import lucuma.odb.sequence.igrins2.longslit.Acquisition as Igrins2Acquisition
 
 /**
- * The IGRINS-2 SVC (Slit-Viewing Camera) acquisition sequence. 
+ * The IGRINS-2 SVC (Slit-Viewing Camera) acquisition sequence.
  */
 class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
   val ExposureTime: TimeSpan = 20.secondTimeSpan
@@ -69,7 +70,7 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asRight
       )
 
-  test("[igrins2] SVC at defaults produces one atom with two steps at the default offsets and a breakpoint on the last step"):
+  test("[igrins2] SVC at defaults produces an uninterrupted atom at the default offsets, plus repetitions"):
     (for
       oid <- setup
       _   <- enableIgrins2Svc(oid)
@@ -86,7 +87,7 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
               "igrins2" -> Json.obj(
                 "acquisition" -> Json.obj(
                   "nextAtom" -> igrins2ExpectedAcquisitionAtom(SvcDefaultExposure, defaultOffsets*),
-                  "possibleFuture" -> List.empty[Json].asJson,
+                  "possibleFuture" -> igrins2ExpectedAcquisitionRepeats(SvcDefaultExposure, defaultOffsets.last).asJson,
                   "hasMore" -> false.asJson
                 )
               )
@@ -128,13 +129,42 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
               "igrins2" -> Json.obj(
                 "acquisition" -> Json.obj(
                   "nextAtom" -> igrins2ExpectedAcquisitionAtom(10.secondTimeSpan, defaultOffsets*),
-                  "possibleFuture" -> List.empty[Json].asJson,
+                  "possibleFuture" -> igrins2ExpectedAcquisitionRepeats(10.secondTimeSpan, defaultOffsets.last).asJson,
                   "hasMore" -> false.asJson
                 )
               )
             )
           ).asRight
       )
+
+  test("[igrins2] every SVC acquisition atom has a distinct id"):
+    (for
+      oid <- setup
+      _   <- enableIgrins2Svc(oid)
+    yield oid).flatMap: oid =>
+      query(
+        pi,
+        s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              igrins2 {
+                acquisition {
+                  nextAtom { id }
+                  possibleFuture { id }
+                }
+              }
+            }
+          }
+        """
+      ).map: c =>
+        val acq    = c.hcursor.downFields("executionConfig", "igrins2", "acquisition")
+        val next   = acq.downFields("nextAtom", "id").as[String].toOption.toList
+        val future = acq.downField("possibleFuture").values.toList.flatten.flatMap: j =>
+          j.hcursor.downField("id").as[String].toOption
+
+        assertEquals(future.size, Igrins2Acquisition.RepeatingAtomCount)
+        val ids = next ++ future
+        assertEquals(ids.distinct.size, ids.size)
 
   test("[igrins2] SVC with an explicit set of offsets"):
     val explicitConfigs =
@@ -159,7 +189,9 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
                   "nextAtom" -> igrins2ExpectedAcquisitionAtom(SvcDefaultExposure,
                     (0, 0, Enabled), (3, 0, Disabled), (6, 0, Enabled)
                   ),
-                  "possibleFuture" -> List.empty[Json].asJson,
+                  "possibleFuture" -> igrins2ExpectedAcquisitionRepeats(SvcDefaultExposure,
+                    (6, 0, Enabled)
+                  ).asJson,
                   "hasMore" -> false.asJson
                 )
               )

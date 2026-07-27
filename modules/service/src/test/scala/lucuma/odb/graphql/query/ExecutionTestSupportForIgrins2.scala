@@ -7,7 +7,6 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
@@ -17,6 +16,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.CentralWavelength
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.igrins2.longslit.Acquisition as Igrins2Acquisition
 
 trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
 
@@ -168,8 +168,7 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
     exposureTime: TimeSpan,
     p:            BigDecimal,
     q:            BigDecimal,
-    g:            StepGuideState,
-    breakpoint:   Breakpoint
+    g:            StepGuideState
   ): Json =
     val tc = TelescopeConfig(
       Offset(
@@ -187,25 +186,33 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
         "stepConfig": { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(tc)},
         "observeClass": "ACQUISITION",
-        "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
+        "breakpoint": "DISABLED"
       }
     """
 
-  /** The single "SVC Acquisition" atom, breakpoint on the final step only. */
   protected def igrins2ExpectedAcquisitionAtom(
     exposureTime: TimeSpan,
     offsets:      (BigDecimal, BigDecimal, StepGuideState)*
   ): Json =
-    val lastIndex = offsets.size - 1
-    val steps = offsets.toList.zipWithIndex.map { case ((p, q, g), ix) =>
-      igrins2ExpectedAcquisitionStep(
-        exposureTime, p, q, g,
-        if ix == lastIndex then Breakpoint.Enabled else Breakpoint.Disabled
-      )
-    }
+    igrins2ExpectedAcquisitionAtomNamed(Igrins2Acquisition.AtomTitle.value, exposureTime, offsets*)
+
+  protected def igrins2ExpectedAcquisitionRepeats(
+    exposureTime: TimeSpan,
+    lastOffset:   (BigDecimal, BigDecimal, StepGuideState)
+  ): List[Json] =
+    List.fill(Igrins2Acquisition.RepeatingAtomCount):
+      igrins2ExpectedAcquisitionAtomNamed(Igrins2Acquisition.RepeatAtomTitle.value, exposureTime, lastOffset)
+
+  private def igrins2ExpectedAcquisitionAtomNamed(
+    description:  String,
+    exposureTime: TimeSpan,
+    offsets:      (BigDecimal, BigDecimal, StepGuideState)*
+  ): Json =
+    val steps = offsets.toList.map: (p, q, g) =>
+      igrins2ExpectedAcquisitionStep(exposureTime, p, q, g)
 
     Json.obj(
-      "description"  -> "SVC Acquisition".asJson,
+      "description"  -> description.asJson,
       "observeClass" -> "ACQUISITION".asJson,
       "steps"        -> steps.asJson
     )
