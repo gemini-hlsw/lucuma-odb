@@ -23,14 +23,14 @@ import lucuma.odb.sequence.util.AtomBuilder
 import java.util.UUID
 
 /**
- * IGRINS-2 SVC (Slit-Viewing Camera) acquisition. 
- * A single atom holding one acquisition-class step per SVC telescope offset position, 
- * at the effective SVC exposure, with a breakpoint on the final step.
+ * IGRINS-2 SVC (Slit-Viewing Camera) acquisition.
+ * A single atom holding one acquisition-class step per SVC telescope offset position,
+ * at the effective SVC exposure. The steps run through without pausing,
  *
  * There is no repeating atom: the SVC offset is a fixed pattern.
  *
  * IGRINS-2 acquisition is down with internal software used before we start the sequence.
- * Though we call this an acquisition the aim is to take some images before the science sequence 
+ * Though we call this an acquisition the aim is to take some images before the science sequence
  * starts, and not to acquire the target in the slit.
  */
 object Acquisition:
@@ -38,13 +38,11 @@ object Acquisition:
   val AtomTitle: NonEmptyString = NonEmptyString.unsafeFrom("SVC Acquisition")
 
   private def steps(svc: Config.Svc): NonEmptyList[ProtoStep[Igrins2DynamicConfig]] =
-    val protoSteps =
-      Science.Igrins2SequenceState.eval:
-        for
-          _  <- State.modify[Igrins2DynamicConfig](_.copy(exposure = svc.exposure))
-          ss <- svc.telescopeConfigs.traverse(Science.Igrins2SequenceState.igrins2ScienceStep(ObserveClass.Acquisition))
-        yield ss
-    NonEmptyList.fromListUnsafe(protoSteps.toList.init :+ protoSteps.last.withBreakpoint)
+    Science.Igrins2SequenceState.eval:
+      for
+        _  <- State.modify[Igrins2DynamicConfig](_.copy(exposure = svc.exposure))
+        ss <- svc.telescopeConfigs.traverse(Science.Igrins2SequenceState.igrins2ScienceStep(ObserveClass.Acquisition))
+      yield ss
 
   private class Generator(
     builder: AtomBuilder[Igrins2DynamicConfig],

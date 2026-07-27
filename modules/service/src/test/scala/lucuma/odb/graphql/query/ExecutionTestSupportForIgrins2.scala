@@ -7,7 +7,6 @@ import cats.effect.IO
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.StepGuideState
@@ -168,8 +167,7 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
     exposureTime: TimeSpan,
     p:            BigDecimal,
     q:            BigDecimal,
-    g:            StepGuideState,
-    breakpoint:   Breakpoint
+    g:            StepGuideState
   ): Json =
     val tc = TelescopeConfig(
       Offset(
@@ -187,22 +185,17 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
         "stepConfig": { "stepType": "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(tc)},
         "observeClass": "ACQUISITION",
-        "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
+        "breakpoint": "DISABLED"
       }
     """
 
-  /** The single "SVC Acquisition" atom, breakpoint on the final step only. */
+  /** The single "SVC Acquisition" atom, which runs through without pausing. */
   protected def igrins2ExpectedAcquisitionAtom(
     exposureTime: TimeSpan,
     offsets:      (BigDecimal, BigDecimal, StepGuideState)*
   ): Json =
-    val lastIndex = offsets.size - 1
-    val steps = offsets.toList.zipWithIndex.map { case ((p, q, g), ix) =>
-      igrins2ExpectedAcquisitionStep(
-        exposureTime, p, q, g,
-        if ix == lastIndex then Breakpoint.Enabled else Breakpoint.Disabled
-      )
-    }
+    val steps = offsets.toList.map: (p, q, g) =>
+      igrins2ExpectedAcquisitionStep(exposureTime, p, q, g)
 
     Json.obj(
       "description"  -> "SVC Acquisition".asJson,

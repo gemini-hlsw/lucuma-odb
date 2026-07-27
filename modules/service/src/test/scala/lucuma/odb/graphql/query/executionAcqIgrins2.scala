@@ -19,7 +19,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 
 /**
- * The IGRINS-2 SVC (Slit-Viewing Camera) acquisition sequence. 
+ * The IGRINS-2 SVC (Slit-Viewing Camera) acquisition sequence.
  */
 class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
   val ExposureTime: TimeSpan = 20.secondTimeSpan
@@ -69,7 +69,7 @@ class executionAcqIgrins2 extends ExecutionTestSupportForIgrins2:
           ).asRight
       )
 
-  test("[igrins2] SVC at defaults produces one atom with two steps at the default offsets and a breakpoint on the last step"):
+  test("[igrins2] SVC at defaults produces one uninterrupted atom with two steps at the default offsets"):
     (for
       oid <- setup
       _   <- enableIgrins2Svc(oid)
