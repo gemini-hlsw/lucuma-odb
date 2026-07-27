@@ -177,7 +177,7 @@ object GeneratorParamsService {
       )(using Transaction[F]): F[Map[Observation.Id, Either[Error, GeneratorParams]]] =
         for
           paramsRows <- params
-          oms         = paramsRows.collect { case ParamsRow(oid, _, _, _, Some(om), _, _, _, _, _, _, _, _, _, _, _, _, _) => (oid, om) }.distinct
+          oms         = paramsRows.collect { case ParamsRow(observationId = oid, observingMode = Some(om)) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
         yield
           NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
@@ -779,8 +779,6 @@ object GeneratorParamsService {
         sql"""gp.c_program_id = $program_id""".apply(programId)              |+|
         void""" AND ob.c_existence = 'present' """                           |+|
         void""" AND ob.c_workflow_user_state is distinct from 'inactive' """ |+|
-        // sql""" AND ob.c_status >= $obs_status """.apply(minStatus) |+|
-        // void""" AND ob.c_active_status = 'active' """              |+|
         selector                                                             |+|
         existsUserReadAccess(user, programId).fold(AppliedFragment.empty) { af => void""" AND """ |+| af }
     }

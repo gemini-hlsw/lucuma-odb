@@ -48,7 +48,7 @@ object ItcResult:
  * states, kept explicit so a failure is never mistaken for "no acquisition":
  *
  *   - [[ItcAcquisition.NotApplicable]] — the observing mode has no acquisition
- *     sequence at all (imaging, GHOST, IGRINS-2).
+ *     sequence at all (imaging, GHOST).
  *   - [[ItcAcquisition.Failed]] — the mode has an acquisition sequence, but its
  *     ITC result could not be produced.  Only arises for acquisition-capable
  *     modes, so it means "expected but unavailable".
@@ -209,9 +209,12 @@ object ItcScience:
 
   /**
    * Spectroscopy science results, shared by every spectroscopy mode (whether or
-   * not it has an acquisition sequence — IGRINS-2, for instance, has none).  The
-   * corresponding acquisition results, for the modes that do have one, are held
-   * separately in [[ItcAcquisition]].
+   * not it has an acquisition ITC estimate — IGRINS-2, for instance, has none;
+   * its SVC acquisition sequence, when present, is generated from the mode
+   * config rather than from an ITC result).
+   *
+   * The corresponding acquisition results, for the modes that do have one, are
+   * held separately in [[ItcAcquisition]].
    */
   case class Spectroscopy(
     science: Zipper[ItcResult]

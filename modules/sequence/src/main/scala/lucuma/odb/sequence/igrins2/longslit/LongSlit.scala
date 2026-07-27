@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package igrins2.longslit
 
 import fs2.Pure
-import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
@@ -20,7 +19,7 @@ import java.util.UUID
 object LongSlit:
 
   def staticFrom(config: Config): Igrins2StaticConfig =
-    Igrins2StaticConfig(Igrins2SVCImages(config.saveSVCImages), config.offsetPreset)
+    Igrins2StaticConfig(Igrins2SVCImages(config.svc.isDefined), config.offsetPreset)
 
   def instantiate(
     observationId: Observation.Id,
@@ -31,6 +30,7 @@ object LongSlit:
     calRole:       Option[CalibrationRole]
   ): Either[OdbError, StreamingExecutionConfig[Pure, Igrins2StaticConfig, Igrins2DynamicConfig]] =
     val static = staticFrom(config)
+    val acquisition = Acquisition.instantiate(estimator, static, namespace, config)
     Science.instantiate(
       observationId,
       estimator,
@@ -39,4 +39,4 @@ object LongSlit:
       config,
       scienceItc,
       calRole
-    ).map(s => StreamingExecutionConfig(static, Stream.empty, s.generate))
+    ).map(s => StreamingExecutionConfig(static, acquisition, s.generate))
