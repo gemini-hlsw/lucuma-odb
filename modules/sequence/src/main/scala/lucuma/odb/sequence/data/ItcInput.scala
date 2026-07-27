@@ -61,15 +61,16 @@ object ItcInput:
   /**
    * ImagingInputs per-filter (as contained in the IntrumentMode in
    * ImagingParameters).
+
+   * GNIRS imaging has an acquisition sequence sized by its own ITC pass; other
+   * imaging modes have none.  When `gnirsAcqAutoClassify` is set, the ITC resolves
+   * the acquisition brightness type via a classification pass before the real
+   * exposure-time pass.  See the two-pass acquisition ITC in ItcService.
    */
   case class Imaging(
     science: NonEmptyList[ImagingParameters],
     targets: NonEmptyList[TargetDefinition],
     signalToNoiseTargetId: Option[Target.Id],
-    // GNIRS imaging has an acquisition sequence sized by its own ITC pass; other
-    // imaging modes have none.  When `gnirsAcqAutoClassify` is set, the ITC resolves
-    // the acquisition brightness type via a classification pass before the real
-    // exposure-time pass.  See the two-pass acquisition ITC in ItcService.
     acquisition:          Option[ImagingParameters] = None,
     gnirsAcqAutoClassify: Boolean                   = false
   ) extends ItcInput derives Eq:
