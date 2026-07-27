@@ -65,11 +65,24 @@ object ItcInput:
   case class Imaging(
     science: NonEmptyList[ImagingParameters],
     targets: NonEmptyList[TargetDefinition],
-    signalToNoiseTargetId: Option[Target.Id]
+    signalToNoiseTargetId: Option[Target.Id],
+    // GNIRS imaging has an acquisition sequence sized by its own ITC pass; other
+    // imaging modes have none.  When `gnirsAcqAutoClassify` is set, the ITC resolves
+    // the acquisition brightness type via a classification pass before the real
+    // exposure-time pass.  See the two-pass acquisition ITC in ItcService.
+    acquisition:          Option[ImagingParameters] = None,
+    gnirsAcqAutoClassify: Boolean                   = false
   ) extends ItcInput derives Eq:
 
     def scienceInput: NonEmptyList[ImagingInput] =
       science.map(ImagingInput(_, targets.map(_.input)))
+
+    // Imaging has no blind offset, so the acquisition uses the science targets.
+    def acquisitionTargets: NonEmptyList[TargetDefinition] =
+      targets
+
+    def acquisitionInput: Option[ImagingInput] =
+      acquisition.map(ImagingInput(_, acquisitionTargets.map(_.input)))
 
   object Imaging:
     given HashBytes[Imaging] with
@@ -79,6 +92,8 @@ object ItcInput:
           bld.addAll(params.hashBytes)
         bld.addAll(hashTargets(a.targets))
         bld.addAll(a.signalToNoiseTargetId.hashBytes)
+        bld.addAll(a.acquisition.hashBytes)
+        bld.addAll(a.gnirsAcqAutoClassify.hashBytes)
         bld.result()
 
   /**
@@ -163,6 +178,6 @@ object ItcInput:
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _, _)                  => in.hashBytes
+        case in @ Imaging(_, _, _, _, _)            => in.hashBytes
         case in @ Spectroscopy(_, _, _, _, _, _)    => in.hashBytes
         case in @ ScienceOnlySpectroscopy(_, _, _)  => in.hashBytes

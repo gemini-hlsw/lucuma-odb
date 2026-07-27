@@ -36,10 +36,14 @@ trait ArbItcInput:
         ct <- Gen.choose(1, 10)
         ts <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
         sn <- Gen.option(Gen.oneOf(ts.map(_.targetId)))
+        aq <- arbitrary[Option[ImagingParameters]]
+        ac <- arbitrary[Boolean]
       yield ItcInput.Imaging(
         NonEmptyList.fromListUnsafe(ss),
         NonEmptyList.fromListUnsafe(ts),
-        sn
+        sn,
+        aq,
+        ac
       )
 
   given Arbitrary[ItcInput.Spectroscopy] =

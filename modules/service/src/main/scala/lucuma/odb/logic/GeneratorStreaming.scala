@@ -384,8 +384,10 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.gnirs.imaging.Imaging
         (for
           cfg <- extractMode(ObservingMode.GnirsImagingName, context)(_.asGnirsImaging)
+          acq  = acquisitionTime(context.oid, context.itcRes)
+          typ  = gnirsAcqType(context.itcRes)
           itc  = requireImagingItc(ObservingMode.GnirsImagingName, context.oid, context.itcRes, ItcScience.gnirsImaging.getOption)
-          gen <- EitherT(Imaging.gnirs(calculator.gnirsStep, context.namespace, cfg, itc))
+          gen <- EitherT(Imaging.gnirs(context.oid, calculator.gnirsStep, context.namespace, cfg, acq, typ, itc))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

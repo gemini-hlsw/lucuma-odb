@@ -57,6 +57,7 @@ import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.ghost
 import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
+import lucuma.odb.sequence.imaging.ImagingSequence
 import lucuma.odb.sequence.visitor
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -363,11 +364,33 @@ object GeneratorParamsService {
                 )
               )
 
+            // The acquisition images the field in the first (wavelength-ordered) science
+            // filter to classify the target brightness at the classification S/N; the
+            // two-pass acquisition ITC then resolves the type (Very Bright / Bright /
+            // Faint) and re-images through H2 for Very Bright.  Fully auto, so it always
+            // classifies (`gnirsAcqAutoClassify = true`).
+            val firstFilter: GnirsFilter =
+              given Order[GnirsFilter] = ImagingSequence.wavelengthOrder(gnm.variant)(_.centralWavelength)
+              fs.map(_.filter).sorted.head
+
+            val acquisition =
+              ImagingParameters(
+                obsParams.constraints.toInput,
+                InstrumentMode.GnirsImaging(
+                  exposureTimeMode = ExposureTimeMode.SignalToNoiseMode(gnirs.AcquisitionClassificationSignalToNoise, firstFilter.centralWavelength),
+                  filter           = firstFilter,
+                  camera           = gnm.camera,
+                  readMode         = GnirsReadMode.Bright,
+                  wellDepth        = gnm.wellDepth,
+                  coadds           = gnm.coadds
+                )
+              )
+
             val itcInput =
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, gnirsAcqAutoClassify = true))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 

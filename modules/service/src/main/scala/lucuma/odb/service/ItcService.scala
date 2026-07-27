@@ -647,22 +647,33 @@ object ItcService {
             )
 
         def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
-          im.science.head.mode match
-            case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
-              callRemoteImagingItc(oid, im, Imaging.Flamingos2Imaging)
+          val science: EitherT[F, OdbError, Itc] =
+            im.science.head.mode match
+              case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
+                callRemoteImagingItc(oid, im, Imaging.Flamingos2Imaging)
 
-            case InstrumentMode.GmosNorthImaging(_, _, _, _) =>
-              callRemoteImagingItc(oid, im, Imaging.GmosNorthImaging)
+              case InstrumentMode.GmosNorthImaging(_, _, _, _) =>
+                callRemoteImagingItc(oid, im, Imaging.GmosNorthImaging)
 
-            case InstrumentMode.GmosSouthImaging(_, _, _, _) =>
-              callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
+              case InstrumentMode.GmosSouthImaging(_, _, _, _) =>
+                callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
 
-            case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
-              callRemoteImagingItc(oid, im, Imaging.GnirsImaging)
+              case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
+                callRemoteImagingItc(oid, im, Imaging.GnirsImaging)
 
-            case m                                     =>
-              EitherT.leftT:
-                OdbError.InvalidObservation(oid, s"Imaging ITC lookup is not supported for ${m.displayName}.".some)
+              case m                                     =>
+                EitherT.leftT:
+                  OdbError.InvalidObservation(oid, s"Imaging ITC lookup is not supported for ${m.displayName}.".some)
+
+          // GNIRS imaging has its own acquisition sequence, sized by a dedicated ITC pass;
+          // other imaging modes have none (`acquisitionInput` is empty for them).
+          im.acquisitionInput match
+            case None        => science
+            case Some(input) =>
+              for
+                sci <- science
+                acq <- acquisitionResult(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify)
+              yield sci.copy(acquisition = acq)
 
         def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
           for
@@ -678,7 +689,7 @@ object ItcService {
           yield Itc(ItcAcquisition.NotApplicable, ItcScience.Spectroscopy(sci))
 
         (input match
-          case im @ ItcInput.Imaging(_, _, _) =>
+          case im @ ItcInput.Imaging(_, _, _, _, _) =>
             imaging(im)
           case sp @ ItcInput.Spectroscopy(_, _, _, _, _, _) =>
             spectroscopy(sp)
@@ -737,9 +748,14 @@ object ItcService {
                 safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
                   .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
-              // Imaging has no acquisition sequence.
-              case ItcInputDerivation.Ready(_: ItcInput.Imaging)                 =>
-                NotApplicable
+              // GNIRS imaging has an acquisition sequence; other imaging modes don't
+              // (`acquisitionInput` is empty for them).
+              case ItcInputDerivation.Ready(im: ItcInput.Imaging)                =>
+                im.acquisitionInput match
+                  case None        => NotApplicable
+                  case Some(input) =>
+                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify)
+                      .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
               // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
               case ItcInputDerivation.Ready(_: ItcInput.ScienceOnlySpectroscopy) =>

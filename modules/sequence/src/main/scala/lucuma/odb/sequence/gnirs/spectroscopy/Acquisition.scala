@@ -11,7 +11,6 @@ import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.applicative.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -99,7 +98,7 @@ object Acquisition:
   ): Either[String, (GnirsFilter, TimeSpan)] =
     // "Use H": image the FPU in H (Order4) at the camera's H exposure (short 3s, long 15s).
     val useH: (GnirsFilter, TimeSpan) =
-      (GnirsFilter.Order4, if camera.pixelScale === GnirsPixelScale.PixelScale_0_05 then 15.secTimeSpan else 3.secTimeSpan)
+      (GnirsFilter.Order4, keyholeExposureTime(camera))
     (mode, selectedFilter, camera.pixelScale) match
       case (_, GnirsFilter.PAH, GnirsPixelScale.PixelScale_0_15)    =>
         s"PAH acquisition filter cannot be used with short camera".asLeft

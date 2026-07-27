@@ -230,7 +230,9 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
 
-  test("acquisition sequence is empty"):
+  // The acquisition sequence itself is asserted in detail in executionAcqGnirsImaging;
+  // here we just confirm it is now generated (no longer null).
+  test("acquisition sequence is generated"):
     val mode =
       s"""
         gnirsImaging: {
@@ -247,13 +249,5 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
       yield o
 
     setup.flatMap: oid =>
-      expect(pi, gnirsAcquisitionQuery(oid),
-        json"""
-          {
-            "executionConfig": {
-              "gnirs": {
-                "acquisition": null
-              }
-            }
-          }
-        """.asRight)
+      query(pi, gnirsAcquisitionQuery(oid)).map: json =>
+        assert(json.hcursor.downFields("executionConfig", "gnirs", "acquisition").focus.exists(!_.isNull))

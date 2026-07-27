@@ -8,8 +8,11 @@ package imaging
 import cats.data.EitherT
 import cats.effect.Sync
 import fs2.Pure
+import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
+import lucuma.itc.IntegrationTime
 import lucuma.odb.data.ItcScience.GnirsImaging
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.StreamingExecutionConfig
@@ -19,22 +22,37 @@ import java.util.UUID
 object Imaging:
 
   private def instantiate[F[_]: Sync](
-    static:  GnirsStaticConfig,
-    science: F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]]
+    observationId:  Observation.Id,
+    estimator:      StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
+    static:         GnirsStaticConfig,
+    namespace:      UUID,
+    config:         Config,
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    pinnedAcqType:  Option[GnirsAcquisitionType],
+    science:        F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
-    EitherT(science)
-      // Note acquisition is empty for imaging
-      .map(s => StreamingExecutionConfig(static, SequenceGenerator.empty.generate, s.generate))
-      .value
+    (for
+      a <- EitherT(Acquisition.instantiate(observationId, estimator, static, namespace, config, acquisitionItc, pinnedAcqType))
+      s <- EitherT(science)
+    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
 
   def gnirs[F[_]: Sync](
-    estimator:  StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
-    namespace:  UUID,
-    config:     Config,
-    scienceItc: Either[OdbError, GnirsImaging]
+    observationId:  Observation.Id,
+    estimator:      StepTimeEstimateCalculator[GnirsStaticConfig, GnirsDynamicConfig],
+    namespace:      UUID,
+    config:         Config,
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    pinnedAcqType:  Option[GnirsAcquisitionType],
+    scienceItc:     Either[OdbError, GnirsImaging]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
     val static = config.staticConfig
     instantiate(
+      observationId,
+      estimator,
       static,
+      namespace,
+      config,
+      acquisitionItc,
+      pinnedAcqType,
       Science.gnirs(estimator, static, namespace, config, scienceItc)
     )
