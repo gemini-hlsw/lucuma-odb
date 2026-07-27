@@ -9,7 +9,7 @@ import lucuma.core.model.*
 import lucuma.sso.service.database.RoleRequest
 import org.http4s.headers.Location
 
-class SetRoleSuite extends SsoSuite with Fixture with FlakyTests {
+class SetRoleSuite extends SsoSuite with Fixture {
 
   def setRole(rid: StandardRole.Id)  = 
     (SsoRoot / "auth" / "v1" / "set-role").withQueryParam("role", rid.toString)
@@ -41,5 +41,4 @@ class SetRoleSuite extends SsoSuite with Fixture with FlakyTests {
       } yield ()
     }
   }
- 
 }

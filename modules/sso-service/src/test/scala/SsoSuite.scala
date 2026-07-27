@@ -6,6 +6,7 @@ package lucuma.sso.service
 import cats.Eq
 import cats.effect.*
 import cats.syntax.all.*
+import lucuma.core.util.RetryFlakyTests
 import lucuma.sso.service.database.Database
 import munit.CatsEffectSuite
 import munit.Location
@@ -14,7 +15,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import simulator.SsoSimulator
 
-trait SsoSuite extends CatsEffectSuite with SsoSimulator {
+trait SsoSuite extends CatsEffectSuite with SsoSimulator with RetryFlakyTests {
 
   implicit val logger: Logger[IO] =
     Slf4jLogger.getLogger

@@ -9,59 +9,55 @@ import cats.syntax.show.*
 import io.circe.literal.*
 import lucuma.sso.client.ApiKey
 
-class createApiKey extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
+class createApiKey extends GraphQLSuite with SsoSuite with Fixture:
 
-  test("Attempt to create API key with invalid role id"):
-    flaky():
-      As(Bob).expectQuery(
-        query = """
-          mutation {
-            createApiKey(role: "bogus")
+  test("Attempt to create API key with invalid role id".flaky):
+    As(Bob).expectQuery(
+      query = """
+        mutation {
+          createApiKey(role: "bogus")
+        }
+      """,
+      expected = json"""{
+        "errors" : [
+          {
+            "message" : "Not a valid role id: bogus"
           }
-        """,
-        expected = json"""{
-          "errors" : [
-            {
-              "message" : "Not a valid role id: bogus"
-            }
-          ]
-        }"""
-      )
+        ]
+      }"""
+    )
 
-  test("Attempt to create API key with a role we don't own"):
-    flaky():
-      As(Bob).expectQuery(
-        query = """
-          mutation {
-            createApiKey(role: "r-99999")
+  test("Attempt to create API key with a role we don't own".flaky):
+    As(Bob).expectQuery(
+      query = """
+        mutation {
+          createApiKey(role: "r-99999")
+        }
+      """,
+      expected = json"""{
+        "errors" : [
+          {
+            "message" : "No such role: r-99999"
           }
-        """,
-        expected = json"""{
-          "errors" : [
-            {
-              "message" : "No such role: r-99999"
-            }
-          ],
-          "data" : null
-        }"""
-      )
+        ],
+        "data" : null
+      }"""
+    )
 
-  test("Create an API key"):
-    flaky():
-      As(Bob).queryWithUser { user =>
-        show"""
-          mutation {
-            createApiKey(role: "${user.role.id}")
-          }
-        """
-      } .map { json =>
-        assert:
-          json
-            .hcursor
-            .downFields("data", "createApiKey")
-            .as[String]
-            .toOption
-            .map(ApiKey.fromString.getOption)
-            .isDefined
-      }
-
+  test("Create an API key".flaky):
+    As(Bob).queryWithUser { user =>
+      show"""
+        mutation {
+          createApiKey(role: "${user.role.id}")
+        }
+      """
+    } .map { json =>
+      assert:
+        json
+          .hcursor
+          .downFields("data", "createApiKey")
+          .as[String]
+          .toOption
+          .map(ApiKey.fromString.getOption)
+          .isDefined
+    }

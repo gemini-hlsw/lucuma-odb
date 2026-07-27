@@ -7,69 +7,55 @@ import cats.effect.*
 import org.http4s.*
 import org.http4s.headers.Cookie
 
-class RefreshTokenSuite extends SsoSuite with Fixture with FlakyTests {
+class RefreshTokenSuite extends SsoSuite with Fixture {
 
-  test("Cookie shouldn't expire.") {
-    flaky()(
-      SsoSimulator[IO].use { case (_, _, sso, _, _) =>
-        for {
-          c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest")).use(CookieReader[IO].getCookie(_))
-        } yield assertEq(Some(HttpDate.MaxValue), c.expires)
-      }
-    )
+  test("Cookie shouldn't expire.".flaky) {
+    SsoSimulator[IO].use { case (_, _, sso, _, _) =>
+      for {
+        c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest")).use(CookieReader[IO].getCookie(_))
+      } yield assertEq(Some(HttpDate.MaxValue), c.expires)
+    }
   }
 
-  test("SomeSite should be Strict (simulator is pretending it's using https)") {
-    flaky()(
-      SsoSimulator[IO].use { case (_, _, sso, _, _) =>
-        for {
-          c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest")).use(CookieReader[IO].getCookie(_))
-        } yield assertEquals(Some(SameSite.Strict), c.sameSite)
-      }
-    )
+  test("SomeSite should be Strict (simulator is pretending it's using https)".flaky) {
+    SsoSimulator[IO].use { case (_, _, sso, _, _) =>
+      for {
+        c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest")).use(CookieReader[IO].getCookie(_))
+      } yield assertEquals(Some(SameSite.Strict), c.sameSite)
+    }
   }
 
-  test("Cookie should be removed on logout.") {
-    flaky()(
-      SsoSimulator[IO].use { case (_, _, sso, _, _) =>
-        for {
-          _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest"))
-          c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "logout")).use(CookieReader[IO].getCookie(_))
-        } yield assertEq(Some(HttpDate.Epoch), c.expires)
-      }
-    )
+  test("Cookie should be removed on logout.".flaky) {
+    SsoSimulator[IO].use { case (_, _, sso, _, _) =>
+      for {
+        _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest"))
+        c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "logout")).use(CookieReader[IO].getCookie(_))
+      } yield assertEq(Some(HttpDate.Epoch), c.expires)
+    }
   }
 
-  test("Refresh should fail after logout.") {
-    flaky()(
-      SsoSimulator[IO].use { case (_, _, sso, _, _) =>
-        for {
-          _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest"))
-          _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "logout"))
-          s  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "refresh-token"))
-        } yield assertEq(Status.Forbidden, s)
-      }
-    )
+  test("Refresh should fail after logout.".flaky) {
+    SsoSimulator[IO].use { case (_, _, sso, _, _) =>
+      for {
+        _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest"))
+        _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "logout"))
+        s  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "refresh-token"))
+      } yield assertEq(Status.Forbidden, s)
+    }
   }
 
-  test("Invalid cookie should yield 403.") {
-    flaky()(
-      SsoSimulator[IO].use { case (_, _, sso, _, _) =>
-        sso.status {
-          Request[IO](
-            method  = Method.POST,
-            uri     = SsoRoot / "api" / "v1" / "refresh-token",
-            headers = Headers(Cookie(RequestCookie("lucuma-refresh-token", "8241D73F-EE0B-44D3-A05F-A15416F039DE")))
-          )
-        } map { status =>
-          assertEq(Status.Forbidden, status)
-        }
+  test("Invalid cookie should yield 403.".flaky) {
+    SsoSimulator[IO].use { case (_, _, sso, _, _) =>
+      sso.status {
+        Request[IO](
+          method  = Method.POST,
+          uri     = SsoRoot / "api" / "v1" / "refresh-token",
+          headers = Headers(Cookie(RequestCookie("lucuma-refresh-token", "8241D73F-EE0B-44D3-A05F-A15416F039DE")))
+        )
+      } map { status =>
+        assertEq(Status.Forbidden, status)
       }
-    )
+    }
   }
 
 }
-
-
-
-
