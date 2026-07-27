@@ -1,0 +1,13 @@
+-- t_execution_event is filtered and aggregated by c_visit_id on the hot event
+-- ingestion path, but the merge of the old per-event tables into
+-- t_execution_event (V0382) dropped their visit indexes and never restored one.
+--
+-- Make it a compound (c_visit_id, c_received) so it serves both hot readers:
+--   * update_visit_times recomputes MIN/MAX(c_received) per visit on every
+--     insert -- with c_received in the index this is two index descents rather
+--     than a heap scan of the visit's events (same for SelectVisitRange).
+--   * time accounting streams `WHERE c_visit_id = ... ORDER BY c_received`,
+--     which the index now satisfies pre-sorted.
+--
+-- c_visit_id is NOT NULL, so no partial predicate is needed.
+CREATE INDEX ON t_execution_event (c_visit_id, c_received);
