@@ -7,43 +7,40 @@ package query
 
 import io.circe.literal.*
 
-class role extends GraphQLSuite with SsoSuite with Fixture with FlakyTests:
+class role extends GraphQLSuite with SsoSuite with Fixture:
 
-  test("Query current role."):
-    flaky():
-      As(Bob).expectQuery(
-        query = """
-          query {
-            role {
-              type
-              partner
-              user {
-                profile {
-                  givenName
-                  familyName
-                  creditName
-                  email
-                }
+  test("Query current role.".flaky):
+    As(Bob).expectQuery(
+      query = """
+        query {
+          role {
+            type
+            partner
+            user {
+              profile {
+                givenName
+                familyName
+                creditName
+                email
               }
             }
           }
-        """,
-        expected = json"""{
-          "data" : {
-            "role" : {
-              "type" : "PI",
-              "partner" : null,
-              "user" : {
-                "profile": {
-                  "givenName" : "Bob",
-                  "familyName" : "Dobbs",
-                  "creditName" : null,
-                  "email" : "bob@dobbs.com"
-                }
+        }
+      """,
+      expected = json"""{
+        "data" : {
+          "role" : {
+            "type" : "PI",
+            "partner" : null,
+            "user" : {
+              "profile": {
+                "givenName" : "Bob",
+                "familyName" : "Dobbs",
+                "creditName" : null,
+                "email" : "bob@dobbs.com"
               }
             }
           }
-        }"""
-      )
-
-
+        }
+      }"""
+    )

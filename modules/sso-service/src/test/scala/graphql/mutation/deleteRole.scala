@@ -14,7 +14,7 @@ import lucuma.sso.service.database.RoleRequest
 import lucuma.sso.service.database.RoleType
 import lucuma.sso.service.orcid.OrcidIdGenerator
 
-class deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests with OrcidIdGenerator[IO]:
+class deleteRole extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGenerator[IO]:
 
   extension (as: As)      
     def queryRoleTypes: IO[Set[RoleType]] =
@@ -23,49 +23,44 @@ class deleteRole extends GraphQLSuite with SsoSuite with Fixture with FlakyTests
           j.hcursor.downField("type").require[RoleType]
 
   List(None, Some(RoleRequest.Staff), Some(RoleRequest.Ngo(Partner.CA))).foreach: rr =>
-    test(s"${rr.getOrElse(RoleRequest.Pi).tpe} can't call deleteRole"):
-      flaky():
-        var bob: StandardUser = null // i'm sorry
-        rr.foldLeft(As(Bob))(_.withRoleRequest(_))
-          .expectQueryWithUser(
-            u => { bob = u; s"""mutation { deleteRole(roleId: "${bob.role.id}") }""" },
-            json"""
-              {
-                "errors" : [
-                  {
-                    "message" : ${s"User ${bob.id} is not authorized to perform this action."}
-                  }
-                ],
-                "data" : null
-              }
-            """
-          )
-  
-  test("Double-check that created roles hang around."):
-    flaky():
-      AsBob.withRoleRequest(RoleRequest.Admin).canonicalizeUser >>
-      AsBob
-        .queryRoleTypes
-        .map: tpes =>
-          assertEq(tpes, Set(RoleType.Pi, RoleType.Admin))
-
-  test(s"Admin *can* call deleteRole"):
-    flaky():
-      AsBob.withRoleRequest(RoleRequest.Staff).canonicalizeUser >>
-      AsBob.withRoleRequest(RoleRequest.Admin)
+    test(s"${rr.getOrElse(RoleRequest.Pi).tpe} can't call deleteRole".flaky):
+      var bob: StandardUser = null // i'm sorry
+      rr.foldLeft(As(Bob))(_.withRoleRequest(_))
         .expectQueryWithUser(
-          bob => s"""mutation { deleteRole(roleId: "${bob.role.id}") }""",
+          u => { bob = u; s"""mutation { deleteRole(roleId: "${bob.role.id}") }""" },
           json"""
             {
-              "data" : {
-                "deleteRole" : true
-              }
+              "errors" : [
+                {
+                  "message" : ${s"User ${bob.id} is not authorized to perform this action."}
+                }
+              ],
+              "data" : null
             }
           """
-        ) >>
-      AsBob
-        .queryRoleTypes
-        .map: tpes =>
-          assertEq(tpes, Set(RoleType.Pi, RoleType.Staff))
+        )
+  
+  test("Double-check that created roles hang around.".flaky):
+    AsBob.withRoleRequest(RoleRequest.Admin).canonicalizeUser >>
+    AsBob
+      .queryRoleTypes
+      .map: tpes =>
+        assertEq(tpes, Set(RoleType.Pi, RoleType.Admin))
 
-
+  test(s"Admin *can* call deleteRole".flaky):
+    AsBob.withRoleRequest(RoleRequest.Staff).canonicalizeUser >>
+    AsBob.withRoleRequest(RoleRequest.Admin)
+      .expectQueryWithUser(
+        bob => s"""mutation { deleteRole(roleId: "${bob.role.id}") }""",
+        json"""
+          {
+            "data" : {
+              "deleteRole" : true
+            }
+          }
+        """
+      ) >>
+    AsBob
+      .queryRoleTypes
+      .map: tpes =>
+        assertEq(tpes, Set(RoleType.Pi, RoleType.Staff))

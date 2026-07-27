@@ -57,6 +57,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.RetryFlakyTests
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
@@ -138,7 +139,7 @@ object OdbSuite:
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
-abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations {
+abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations with RetryFlakyTests {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
 
   // This is generally useful so put it here
