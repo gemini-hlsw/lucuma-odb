@@ -7,10 +7,12 @@ import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.model.Observation
 import lucuma.core.util.IdempotencyKey
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
 
 case class RecordVisitInput(
   observationId:  Observation.Id,
+  time:           Option[Timestamp],
   idempotencyKey: Option[IdempotencyKey]
 )
 
@@ -24,9 +26,10 @@ object RecordVisitInput:
       case List(
         ObservationIdBinding("observationId", rObservationId),
         staticMatcher(`instrumentName`, rStatic),
+        TimestampBinding.Option("time", rTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rObservationId, rStatic, rIdm).parMapN((obs, _, idm) => RecordVisitInput(obs, idm))
+        (rObservationId, rStatic, rTime, rIdm).parMapN((obs, _, time, idm) => RecordVisitInput(obs, time, idm))
 
   val Flamingos2Binding: Matcher[RecordVisitInput] =
     binding("flamingos2", Flamingos2StaticInput.Binding)
@@ -44,6 +47,7 @@ object RecordVisitInput:
     ObjectFieldsBinding.rmap:
       case List(
         ObservationIdBinding("observationId", rObservationId),
+        TimestampBinding.Option("time", rTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rObservationId, rIdm).parMapN(RecordVisitInput(_, _))
+        (rObservationId, rTime, rIdm).parMapN(RecordVisitInput(_, _, _))

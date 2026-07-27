@@ -23,6 +23,8 @@ import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 
+import java.time.Instant
+
 
 class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
 
@@ -276,3 +278,82 @@ class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
     recordDataset(mode, serviceUser, "N18630101S0011.fits").flatMap: (_, did) =>
       addWithIdempotencyKey(did, idm = idm).flatMap: (eid, _) =>
         assertIO(addWithIdempotencyKey(did, idm = idm).map(_._1), eid)
+
+  // A client-supplied event time relative to "now", well within the visit's
+  // window (the visit was just created).
+  private def nowMinus(seconds: Long): Timestamp =
+    Timestamp.unsafeFromInstantTruncated(Instant.now().minusSeconds(seconds))
+
+  private def addDatasetEventTimes(
+    did:   Dataset.Id,
+    stage: DatasetStage,
+    time:  Option[Timestamp]
+  ): IO[(Timestamp, Timestamp)] =
+    query(
+      serviceUser,
+      s"""
+        mutation {
+          addDatasetEvent(input: {
+            datasetId:    "$did"
+            datasetStage: ${stage.tag.toUpperCase}
+            ${time.fold("")(t => s"""time: "${t.isoFormat}"""")}
+          }) {
+            event {
+              effectiveTime
+              recordedTime
+            }
+          }
+        }
+      """
+    ).map: json =>
+      val c = json.hcursor.downFields("addDatasetEvent", "event")
+      (c.downField("effectiveTime").require[Timestamp], c.downField("recordedTime").require[Timestamp])
+
+  test("addDatasetEvent - supplied time is surfaced and independent of received"):
+    val t = nowMinus(60)
+    recordDataset(mode, serviceUser, "N18630101S0020.fits").flatMap: (_, did) =>
+      addDatasetEventTimes(did, DatasetStage.StartWrite, t.some).map: (time, received) =>
+        assertEquals(time, t)
+        assertNotEquals(received, t)
+
+  test("addDatasetEvent - omitted time defaults to received"):
+    recordDataset(mode, serviceUser, "N18630101S0021.fits").flatMap: (_, did) =>
+      addDatasetEventTimes(did, DatasetStage.StartWrite, None).map: (time, received) =>
+        assertEquals(time, received)
+
+  test("addDatasetEvent - supplied times drive the dataset interval"):
+    val t1 = nowMinus(120)
+    val t2 = nowMinus(60)
+    for
+      ids <- recordDataset(mode, serviceUser, "N18630101S0022.fits")
+      (_, did) = ids
+      _   <- addDatasetEventTimes(did, DatasetStage.StartExpose, t1.some)
+      _   <- addDatasetEventTimes(did, DatasetStage.EndWrite, t2.some)
+      ts  <- timestamps(did)
+    yield assertEquals(ts, TimestampInterval.between(t1, t2).some)
+
+  private val outOfRange: String =
+    "The supplied event time is outside the visit's expected timeframe."
+
+  private def rejectQuery(did: Dataset.Id, t: Timestamp): String =
+    s"""
+      mutation {
+        addDatasetEvent(input: {
+          datasetId:    "$did"
+          datasetStage: START_WRITE
+          time:         "${t.isoFormat}"
+        }) {
+          event { id }
+        }
+      }
+    """
+
+  test("addDatasetEvent - future time is rejected"):
+    val t = Timestamp.unsafeFromInstantTruncated(Instant.now().plusSeconds(3600))
+    recordDataset(mode, serviceUser, "N18630101S0023.fits").flatMap: (_, did) =>
+      expect(serviceUser, rejectQuery(did, t), List(outOfRange).asLeft)
+
+  test("addDatasetEvent - far-past time is rejected"):
+    val t = Timestamp.unsafeFromInstantTruncated(Instant.now().minusSeconds(7200))
+    recordDataset(mode, serviceUser, "N18630101S0024.fits").flatMap: (_, did) =>
+      expect(serviceUser, rejectQuery(did, t), List(outOfRange).asLeft)

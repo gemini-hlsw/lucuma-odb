@@ -12,6 +12,13 @@ input AddDatasetEventInput {
   datasetStage: DatasetStage!
 
   """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  time: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
   failure.
@@ -41,6 +48,13 @@ input AddSequenceEventInput {
   command: SequenceCommand!
 
   """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  time: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
   failure.
@@ -58,6 +72,13 @@ type AddSequenceEventResult {
 input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
+
+  """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  time: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -78,6 +99,13 @@ input AddStepEventInput {
   stepId: StepId!
   visitId: VisitId!
   stepStage: StepStage!
+
+  """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  time: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -167,8 +195,17 @@ type AtomEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received"
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -5193,6 +5230,13 @@ input RecordVisitInput {
   observationId: ObservationId!
 
   """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the visit is created and is used to enable problem-free retry in the case of
   failure.
@@ -5213,6 +5257,13 @@ Input parameters for creating a new GmosNorthVisit
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
   gmosNorth: GmosNorthStaticInput!
+
+  """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -5238,6 +5289,13 @@ Input parameters for creating a new GmosSouthVisit
 input RecordGmosSouthVisitInput {
   observationId: ObservationId!
   gmosSouth: GmosSouthStaticInput!
+
+  """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -8071,8 +8129,17 @@ type DatasetEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -8443,8 +8510,17 @@ interface ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -8647,6 +8723,13 @@ input RecordFlamingos2VisitInput {
   flamingos2:    Flamingos2StaticInput!
 
   """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the visit is created and is used to enable problem-free retry in the case of
   failure.
@@ -8687,6 +8770,13 @@ Input parameters for creating a new IGRINS-2 Visit
 input RecordIgrins2VisitInput {
   observationId: ObservationId!
   igrins2:       Igrins2StaticInput!
+
+  """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -15724,8 +15814,17 @@ type SequenceEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -15871,8 +15970,17 @@ type SlewEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -16821,8 +16929,17 @@ type StepEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received"
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -17978,8 +18095,18 @@ type Visit {
   "Observation associated with this visit."
   observation: Observation!
 
-  "Created by Observe at time."
-  created: Timestamp!
+  "Time at which this visit was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  created: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Time we associate with this visit.  This is the client-supplied creation time
+  when one was provided (by the slew or recordVisit that opened the visit),
+  otherwise the time it was recorded in the database (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Site of the visit."
   site: Site!

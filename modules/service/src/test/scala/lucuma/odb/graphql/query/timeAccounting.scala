@@ -302,7 +302,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
     withSession { s =>
       val cmd = sql"""
         UPDATE t_visit
-           SET c_created  = $core_timestamp
+           SET c_recorded_time  = $core_timestamp
          WHERE c_visit_id = $visit_id
       """.command
 
@@ -353,7 +353,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       val cmd = sql"""
         INSERT INTO t_execution_event (
           c_event_type,
-          c_received,
+          c_recorded_time,
           c_program_id,
           c_observation_id,
           c_visit_id,
@@ -376,7 +376,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       val cmd = sql"""
         INSERT INTO t_execution_event (
           c_event_type,
-          c_received,
+          c_recorded_time,
           c_program_id,
           c_observation_id,
           c_visit_id,
@@ -399,7 +399,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       val cmd = sql"""
         INSERT INTO t_execution_event (
           c_event_type,
-          c_received,
+          c_recorded_time,
           c_program_id,
           c_observation_id,
           c_visit_id,
@@ -424,7 +424,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       val cmd = sql"""
         INSERT INTO t_execution_event (
           c_event_type,
-          c_received,
+          c_recorded_time,
           c_program_id,
           c_observation_id,
           c_visit_id,
@@ -451,7 +451,7 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       val cmd = sql"""
         INSERT INTO t_execution_event (
           c_event_type,
-          c_received,
+          c_recorded_time,
           c_program_id,
           c_observation_id,
           c_visit_id,
