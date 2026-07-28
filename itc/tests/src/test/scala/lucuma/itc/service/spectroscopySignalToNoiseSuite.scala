@@ -251,7 +251,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
                 filter: GG455,
                 fpu: {
                   customMask: {
-                    filename: "my_mask.fits",
                     slitWidth: CUSTOM_WIDTH_0_75
                   }
                 },
@@ -347,7 +346,6 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
                 filter: RG610,
                 fpu: {
                   customMask: {
-                    filename: "my_mask.fits",
                     slitWidth: CUSTOM_WIDTH_1_00
                   }
                 },
