@@ -1858,9 +1858,9 @@ GMOS Custom Mask
 """
 type GmosCustomMask {
   """
-  Custom Mask Filename
+  The MOS mask attachment id, or null if the mask has not yet been defined.
   """
-  filename: String!
+  attachmentId: AttachmentId
 
   """
   Custom Slit Width
@@ -1873,9 +1873,9 @@ GMOS custom mask input parameters
 """
 input GmosCustomMaskInput {
   """
-  Custom mask file name
+  The MOS mask attachment id, or null if the mask has not yet been defined.
   """
-  filename: String!
+  attachmentId: AttachmentId
 
   """
   Custom mask slit width
@@ -9164,9 +9164,9 @@ Flamingos 2 Custom Mask
 """
 type Flamingos2CustomMask {
   """
-  Custom Mask Filename
+  The MOS mask attachment id, or null if the mask has not yet been defined.
   """
-  filename: String!
+  attachmentId: AttachmentId
 
   """
   Custom Slit Width
@@ -9179,9 +9179,9 @@ Flamingos 2 custom mask input parameters
 """
 input Flamingos2CustomMaskInput {
   """
-  Custom mask file name
+  The MOS mask attachment id, or null if the mask has not yet been defined.
   """
-  filename: String!
+  attachmentId: AttachmentId
 
   """
   Custom mask slit width

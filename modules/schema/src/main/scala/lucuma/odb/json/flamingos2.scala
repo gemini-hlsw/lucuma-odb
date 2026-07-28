@@ -4,9 +4,7 @@
 package lucuma.odb.json
 
 import cats.syntax.either.*
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
-import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.syntax.*
@@ -21,6 +19,10 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
@@ -49,17 +51,18 @@ trait Flamingos2Codec:
   given given_Decoder_Flamingos2FpuMask_Custom: Decoder[Flamingos2FpuMask.Custom] =
     Decoder.instance: c =>
       for
-        f <- c.downField("filename").as[String].flatMap: s =>
-               NonEmptyString.from(s).leftMap: _ =>
-                 DecodingFailure(s"Flamingos 2 custom mask file name cannot be empty", c.history)
+        m <- c.downField("attachmentId").as[Option[Attachment.Id]]
         s <- c.downField("slitWidth").as[Flamingos2CustomSlitWidth]
-      yield Flamingos2FpuMask.Custom(f, s)
+      yield Flamingos2FpuMask.Custom(m.fold[MaskDefinition](ToBeDefined)(Defined(_)), s)
 
   given given_Encoder_Flamingos2FpuMask_Custom: Encoder[Flamingos2FpuMask.Custom] =
     Encoder.instance: a =>
       Json.obj(
-        "filename"  -> a.filename.value.asJson,
-        "slitWidth" -> a.slitWidth.asJson
+        "attachmentId" -> (a.mask match
+          case ToBeDefined => Json.Null
+          case Defined(id) => id.asJson
+        ),
+        "slitWidth"    -> a.slitWidth.asJson
       )
 
   given Decoder[Flamingos2FpuMask] =

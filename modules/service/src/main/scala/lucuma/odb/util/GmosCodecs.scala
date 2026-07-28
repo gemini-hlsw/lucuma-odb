@@ -5,7 +5,6 @@ package lucuma.odb.util
 
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -27,6 +26,10 @@ import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosSouthStageMode
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -34,12 +37,12 @@ import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Enumerated
 import skunk.*
-import skunk.codec.all.*
 import skunk.data.Arr
 import skunk.data.Type
 
 trait GmosCodecs {
 
+  import Codecs.attachment_id
   import Codecs.enumerated
   import Codecs.time_span
   import Codecs.wavelength_pm
@@ -118,12 +121,16 @@ trait GmosCodecs {
       (m.xBin.value, m.yBin.value, m.ampCount, m.ampGain, m.ampReadMode)
     }
 
+  // The slit width, not the attachment id, marks a custom mask as present.
   val gmos_fpu_mask_custom: Codec[GmosFpuMask.Custom] =
-    (varchar *: gmos_custom_slit_width).eimap { case (n, w) =>
-      NonEmptyString.from(n).leftMap(_ => "Custom mask filename cannot be empty").map { ne =>
-        GmosFpuMask.Custom(ne, w)
-      }
-    } { c => (c.filename.value, c.slitWidth)}
+    (attachment_id.opt *: gmos_custom_slit_width).imap { case (moid, w) =>
+      GmosFpuMask.Custom(moid.fold[MaskDefinition](ToBeDefined)(Defined(_)), w)
+    } { c =>
+      val moid: Option[Attachment.Id] = c.mask match
+        case ToBeDefined => None
+        case Defined(id) => Some(id)
+      (moid, c.slitWidth)
+    }
 
   val gmos_north_fpu_mask: Codec[GmosFpuMask[GmosNorthFpu]] =
      (gmos_fpu_mask_custom.opt *: gmos_north_fpu.opt).eimap {

@@ -3,11 +3,8 @@
 
 package lucuma.odb.json
 
-import cats.syntax.either.*
 import eu.timepit.refined.types.numeric.PosInt
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
-import io.circe.DecodingFailure
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
@@ -35,6 +32,10 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.MosPreImaging
 import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -128,11 +129,9 @@ trait GmosCodec {
   given given_Decoder_GmosFpuMask_Custom: Decoder[GmosFpuMask.Custom] =
     Decoder.instance { c =>
       for {
-        f <- c.downField("filename").as[String].flatMap { s =>
-          NonEmptyString.from(s).leftMap { _ => DecodingFailure(s"GMOS custom mask file name cannot be empty", c.history) }
-        }
+        m <- c.downField("attachmentId").as[Option[Attachment.Id]]
         s <- c.downField("slitWidth").as[GmosCustomSlitWidth]
-      } yield GmosFpuMask.Custom(f, s)
+      } yield GmosFpuMask.Custom(m.fold[MaskDefinition](ToBeDefined)(Defined(_)), s)
     }
 
   given [A](using Decoder[A]): Decoder[GmosFpuMask[A]] =
@@ -201,8 +200,11 @@ trait GmosCodec {
   given given_Encoder_GmosFpuMask_Custom: Encoder[GmosFpuMask.Custom] =
     Encoder.instance { (a: GmosFpuMask.Custom) =>
       Json.obj(
-        "filename"  -> a.filename.value.asJson,
-        "slitWidth" -> a.slitWidth.asJson
+        "attachmentId" -> (a.mask match {
+          case ToBeDefined => Json.Null
+          case Defined(id) => id.asJson
+        }),
+        "slitWidth"    -> a.slitWidth.asJson
       )
     }
 

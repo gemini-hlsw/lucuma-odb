@@ -27,7 +27,9 @@ import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
 import lucuma.core.enums.StepGuideState
+import lucuma.core.model.Defined
 import lucuma.core.model.Observation
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
@@ -212,7 +214,11 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
           f2.fpu match
             case Flamingos2FpuMask.Imaging      => Json.Null
             case Flamingos2FpuMask.Builtin(f)   => json"""{ "builtin": $f }"""
-            case Flamingos2FpuMask.Custom(f, w) => json"""{ "filename": ${f.value}, "slitWidth": $w }"""
+            case Flamingos2FpuMask.Custom(m, w) =>
+              val attachmentId: Json = m match
+                case ToBeDefined => Json.Null
+                case Defined(id) => id.asJson
+              json"""{ "customMask": { "attachmentId": $attachmentId, "slitWidth": $w } }"""
         },
         "decker": ${f2.decker},
         "readoutMode": ${f2.readoutMode},

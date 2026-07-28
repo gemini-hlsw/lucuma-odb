@@ -200,7 +200,7 @@ object GmosSequenceService:
         "c_grating_order",
         "c_grating_wavelength",
         "c_filter",
-        "c_fpu_custom_mask_filename",
+        "c_fpu_custom_mask_attachment_id",
         "c_fpu_custom_mask_slit_width",
         "c_fpu_builtin"
       )
