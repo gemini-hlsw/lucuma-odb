@@ -3,7 +3,7 @@
 
 package lucuma.itc.legacy
 
-import cats.syntax.option.*
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsCamera
@@ -99,15 +99,18 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
         ).asJson.noSpaces
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
+  // Note `traverse_`, not `foreach`: `assertIOBoolean` returns an IO, and `foreach` discards it,
+  // which would make the assertion a no-op.
   test("gnirs IFU".tag(LegacyITCTest)):
-    Enumerated[GnirsFpuIfu].all.foreach: ifu =>
+    Enumerated[GnirsFpuIfu].all.traverse_ { ifu =>
       val ifuMode = gnirs.copy(
         fpu = GnirsFpu.Spectroscopy.Ifu(ifu),
         camera = gnirsCameraForIfu(ifu)
       )
       val result  = localItc.calculate:
         bodyConf(sourceDefinition, obs, ifuMode, gnirsIfuAnalysisMethod).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResultsWithSNAt)))
+    }
 
   test("gnirs well depth".tag(LegacyITCTest)):
     Enumerated[GnirsWellDepth].all.foreach: w =>

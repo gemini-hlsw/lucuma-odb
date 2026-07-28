@@ -52,6 +52,11 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     r.exposureCalculation.selectedIndex < r.exposureCalculation.exposures.length &&
       r.exposureCalculation.exposures.forall(e => e.exposureTime >= 0 && e.exposureCount.value >= 0)
 
+  // For modes that must also report the S/N at the requested wavelength. Not every mode does,
+  // so this is opt-in rather than being folded into `containsValidResults`.
+  def containsValidResultsWithSNAt(r: IntegrationTimeRemoteResult): Boolean =
+    containsValidResults(r) && r.signalToNoiseAt.isDefined
+
   def allowedErrors(err: List[String]) =
     err.exists(_.contains("Invalid S/N")) || err.exists(_.contains("do not overlap")) ||
       err.exists(_.contains("Unsupported configuration")) ||

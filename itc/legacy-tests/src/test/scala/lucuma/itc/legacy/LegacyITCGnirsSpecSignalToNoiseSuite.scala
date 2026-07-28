@@ -3,6 +3,7 @@
 
 package lucuma.itc.legacy
 
+import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
 import lucuma.core.enums.GnirsCamera
@@ -73,15 +74,22 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   // encodes to LR_IFU / HR_IFU, crossDispersed to NO, and the analysis method is
   // "sum of 2x2 elements at the center" with a single sky fibre (the production
   // default). Each resolution requires its specific camera.
+  //
+  // The S/N at the requested wavelength is asserted explicitly: the OCS GnirsRecipe IFU
+  // branch used to hardcode an empty signalToNoiseAt, which left the S/N column of the
+  // Explore spectroscopy modes table blank for GNIRS IFU rows in time-and-count mode.
+  // Note `traverse_`, not `foreach`: `assertIOBoolean` returns an IO, and `foreach` discards it,
+  // which would make the assertion a no-op.
   test("gnirs IFU".tag(LegacyITCTest)):
-    Enumerated[GnirsFpuIfu].all.foreach: ifu =>
+    Enumerated[GnirsFpuIfu].all.traverse_ { ifu =>
       val ifuMode = gnirs.copy(
         fpu = GnirsFpu.Spectroscopy.Ifu(ifu),
         camera = gnirsCameraForIfu(ifu)
       )
       val result  = localItc.calculate:
         bodyConf(sourceDefinition, obs, ifuMode, gnirsIfuAnalysisMethod).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+      assertIOBoolean(result.map(_.fold(_ => false, containsValidResultsWithSNAt)))
+    }
 
   test("gnirs grating".tag(LegacyITCTest)):
     Enumerated[GnirsGrating].all.foreach: g =>

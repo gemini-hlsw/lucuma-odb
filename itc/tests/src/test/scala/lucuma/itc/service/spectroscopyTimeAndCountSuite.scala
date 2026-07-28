@@ -2000,3 +2000,124 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
         }
       """
     )
+
+  // Input-wiring coverage for the IFU arm of the @oneOf GnirsFpuSpectroscopyInput; the other
+  // GNIRS cases all use `slitWidth`. This runs against MockItc, so it says nothing about what
+  // the real recipe computes — the S/N the OCS ITC actually reports for GNIRS IFU is covered
+  // by the "gnirs IFU" test in LegacyITCGnirsSpecSignalToNoiseSuite.
+  test("gnirs ifu case"):
+    query(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      }
+                      brightnesses: [ {
+                        band: J
+                        value: 12
+                        units: AB_MAGNITUDE
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 0
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gnirsSpectroscopy: {
+                exposureTimeMode: { timeAndCount: { time: { seconds: 120 }, count: 30, at: { nanometers: 2200 } } },
+                centralWavelength: { nanometers: 2200 },
+                filter: ORDER3,
+                fpu: { ifu: LOW_RESOLUTION },
+                prism: MIRROR,
+                grating: D32,
+                camera: SHORT_BLUE,
+                readMode: BRIGHT,
+                wellDepth: SHALLOW,
+                coadds: 1
+              }
+            }
+          }) {
+            targetTimes {
+              ... on TargetIntegrationTime {
+                signalToNoiseAt {
+                  single
+                  total
+                  wavelength {
+                    nanometers
+                  }
+                }
+              }
+            }
+            brightest {
+              selected {
+                exposureCount
+                exposureTime {
+                  seconds
+                }
+              }
+              ccds {
+                singleSNRatio
+                totalSNRatio
+                peakPixelFlux
+                warnings {
+                  msg
+                }
+              }
+            }
+          }
+        }
+      """,
+      json"""
+        {
+          "data": {
+            "spectroscopy" : {
+              "targetTimes": [
+                {
+                  "signalToNoiseAt": {
+                    "single": 101.000,
+                    "total": 102.000,
+                    "wavelength": {
+                      "nanometers": 2200.000
+                    }
+                  }
+                }
+              ],
+              "brightest": {
+                "selected" : {
+                  "exposureCount" : 10,
+                  "exposureTime" : {
+                    "seconds" : 120.000000
+                  }
+                },
+                "ccds": []
+              }
+            }
+          }
+        }
+      """
+    )
