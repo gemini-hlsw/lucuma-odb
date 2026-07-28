@@ -124,8 +124,8 @@ object SsoMapping {
 
         override def parserConfig: GraphQLParser.Config = 
           GraphQLParser.defaultConfig.copy(
-            maxInputValueDepth = 20, // arbitrary; default is 5, which is too low 
-            maxListTypeDepth = 20,
+            maxInputValueDepth = 10, // arbitrary; default is 5, which is too low 
+            maxListTypeDepth = 10,
           )
 
         val typeMappings: TypeMappings =
