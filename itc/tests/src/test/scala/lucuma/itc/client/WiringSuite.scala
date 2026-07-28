@@ -663,7 +663,7 @@ object WiringSuite:
           GmosNorthGrating.B1200_G5301,
           GmosNorthFilter.GPrime.some,
           GmosFpu.North.customMask(
-            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_0_75, "mos_mask.fits")
+            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_0_75)
           ),
           GmosCcdMode(
             GmosXBinning.Two,
@@ -757,7 +757,7 @@ object WiringSuite:
           GmosSouthGrating.B1200_G5321,
           GmosSouthFilter.GPrime.some,
           GmosFpu.South.customMask(
-            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_1_00, "mos_mask.fits")
+            GmosCustomMask(GmosCustomSlitWidth.CustomWidth_1_00)
           ),
           GmosCcdMode(
             GmosXBinning.Two,

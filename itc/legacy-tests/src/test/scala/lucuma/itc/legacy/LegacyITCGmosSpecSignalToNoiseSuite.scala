@@ -4,11 +4,11 @@
 package lucuma.itc.legacy
 
 import cats.implicits.*
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
@@ -108,9 +108,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
           bodyConf(
             sourceDefinition,
             obs,
-            gnConf.copy(fpu =
-              GmosNorthFpuParam(GmosFpuMask.Custom(NonEmptyString.unsafeFrom("mos_mask.fits"), w))
-            )
+            gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Custom(ToBeDefined, w)))
           ).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
@@ -165,9 +163,7 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
           bodyConf(
             sourceDefinition,
             obs,
-            gsConf.copy(fpu =
-              GmosSouthFpuParam(GmosFpuMask.Custom(NonEmptyString.unsafeFrom("mos_mask.fits"), w))
-            )
+            gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Custom(ToBeDefined, w)))
           ).asJson.noSpaces
         )
       assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))

@@ -14,25 +14,10 @@ trait ArbGmosCustomMask {
   import ArbEnumerated.given
 
   given Arbitrary[GmosCustomMask] =
-    Arbitrary {
-      for {
-        w <- arbitrary[GmosCustomSlitWidth]
-        n <- arbitrary[String]
-      } yield GmosCustomMask(w, n)
-    }
+    Arbitrary(arbitrary[GmosCustomSlitWidth].map(GmosCustomMask(_)))
 
   given Cogen[GmosCustomMask] =
-    Cogen[
-      (
-        GmosCustomSlitWidth,
-        String
-      )
-    ].contramap { a =>
-      (
-        a.slitWidth,
-        a.fileName
-      )
-    }
+    Cogen[GmosCustomSlitWidth].contramap(_.slitWidth)
 
 }
 

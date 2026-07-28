@@ -100,7 +100,7 @@ object Flamingos2SequenceService:
         "c_filter",
         "c_read_mode",
         "c_lyot_wheel",
-        "c_fpu_custom_mask_filename",
+        "c_fpu_custom_mask_attachment_id",
         "c_fpu_custom_mask_slit_width",
         "c_fpu_builtin",
         "c_decker",

@@ -267,3 +267,6 @@ Tests use Testcontainers (not docker-compose) to build a custom PostgreSQL image
 2. Then rerun; Testcontainers will rebuild the image fresh.
 
 **Migration type stability:** `CREATE OR REPLACE VIEW` cannot change a column's PostgreSQL type — the Docker build will fail even if the dev server accepted the migration (because the dev server had an older view already in place). Always use `DROP VIEW; CREATE VIEW` when changing column types, and cast bare string literals to `::varchar` to match domain-derived column types.
+
+## Code Conventions
+Don't put comments directly on method or class parameters, those belong to the method or class documentation or scaladoc.
