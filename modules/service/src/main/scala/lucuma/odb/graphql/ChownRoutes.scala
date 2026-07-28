@@ -26,7 +26,6 @@ import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.NoTransaction
@@ -73,7 +72,6 @@ object ChownRoutes:
     pool:           Resource[F, Session[F]],
     s3:             S3FileService[F],
     ssoClient:      SsoClient[F, User],
-    enums:          Enums,
     emailConfig:    Config.Email,
     commitHash:     CommitHash,
     calculator:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
@@ -101,7 +99,6 @@ object ChownRoutes:
                 pool.map(
                   Services.forUser(
                     u,
-                    enums,
                     None,
                     emailConfig,
                     commitHash,

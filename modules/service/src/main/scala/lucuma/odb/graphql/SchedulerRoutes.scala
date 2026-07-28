@@ -27,7 +27,6 @@ import lucuma.core.util.Uid
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
@@ -52,7 +51,6 @@ object SchedulerRoutes:
   def apply[F[_]: Async: Parallel: Logger: LoggerFactory: Tracer: SecureRandom](
     pool:           Resource[F, Session[F]],
     ssoClient:      SsoClient[F, User],
-    enums:          Enums,
     emailConfig:    Config.Email,
     commitHash:     CommitHash,
     tc:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
@@ -65,7 +63,6 @@ object SchedulerRoutes:
       [A] => (u: User) => (fa: Services[F] => F[A]) => pool.map(
         Services.forUser(
           u,
-          enums,
           None,
           emailConfig,
           commitHash,

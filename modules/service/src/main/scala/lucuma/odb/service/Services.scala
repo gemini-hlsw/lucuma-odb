@@ -29,7 +29,6 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.logic.TimeEstimateService
@@ -62,9 +61,6 @@ trait Services[F[_]]:
 
   /** The associated `User`. */
   def user: User
-
-  /** The dynamic enums loaded from the DB. */
-  val enums: Enums
 
   /** Availability metadata (hardcoded for now). */
   def metadata: Metadata = Metadata.placeholder
@@ -284,7 +280,6 @@ object Services:
    */
   def forUser[F[_]: Tracer: Logger: LoggerFactory: UUIDGen: Async: Parallel](
     user0: User,
-    enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],
     emailConfig0: Config.Email,
     commitHash0: CommitHash,
@@ -301,7 +296,6 @@ object Services:
 
       val user = user0
       val session = s
-      val enums = enums0
       val emailConfig = emailConfig0
       val httpClient = httpClient0
       val itcClient = itcClient0
@@ -494,19 +488,6 @@ object Services:
     def requireServiceAccessOrThrow[F[_], A](fa: Services.ServiceAccess ?=> F[A])(using Services[F], MonadError[F, Throwable]): F[A] =
       requireServiceAccess(fa.map(Result.success)).flatMap: r =>
         ApplicativeError.liftFromOption(r.toOption, new RuntimeException(s"ServiceAccess required, ${user.id} not authorized."))
-
-    // In order to actually use this as an Enumerated, you'll probably have to assign it to a val in
-    // the service in which you want to use it. Like:
-    //   'val enumVal = services.enums' or `val enumVal = enums`.
-    // This is because you need a stable identifier in order to do anything like
-    //   `Enumerated[enumVal.ProposalStatus]`
-    // Alternatively, you could assign a variable to the implicit Services in the service instantiation
-    // method, like
-    //   `(using theSvcs: Services[F])`
-    // and then use
-    //   `Enumerated[theSvcs.enums.ProposalStatus]`
-    // You just need to be consistent within a service.
-    def enums[F[_]](using Services[F]): Enums = summon[Services[F]].enums
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 

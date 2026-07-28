@@ -455,7 +455,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, horizonsClient, emailConfig)
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, emailConfig)
     } yield map
 
   protected def trace: Resource[IO, Trace[IO]] =
@@ -788,7 +788,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       enm  <- db.evalMap(Enums.load)
       ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       tc   <- Resource.eval(telluricClient)
-    yield Services.forUser(u, enm, None, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, tc)
+    yield Services.forUser(u, None, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, tc)
 
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
@@ -834,9 +834,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         db   <- FMain.databasePoolResource[IO](databaseConfig)
         enm  <- db.evalMap(Enums.load)
         ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      yield (db, enm, ptc)
+      yield (db, ptc)
 
-    res.use: (db, enm, ptc) =>
+    res.use: (db, ptc) =>
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
@@ -845,14 +845,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         gaiaClient,
         itcClient,
         CommitHash.Zero,
-        enm,
         ptc,
         httpClient,
         horizonsClient,
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, TelluricTargetsClient.noop[IO])(s)
+        given services: Services[IO] = Services.forUser(u, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, TelluricTargetsClient.noop[IO])(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)
