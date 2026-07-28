@@ -222,7 +222,6 @@ object CalcMain extends MainParams:
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
     user:        User,
-    enums:       Enums,
     mapping:     Session[F] => Mapping[F],
     emailConfig: Config.Email,
     commitHash:  CommitHash,
@@ -234,7 +233,6 @@ object CalcMain extends MainParams:
   )(session: Session[F]): F[Services[F]] =
     Services.forUser(
       user,
-      enums,
       mapping.some,
       emailConfig,
       commitHash,
@@ -276,7 +274,6 @@ object CalcMain extends MainParams:
                         gaiaClient,
                         itc,
                         c.commitHash,
-                        enums,
                         ptc,
                         http,
                         horizonsClient,
@@ -289,7 +286,6 @@ object CalcMain extends MainParams:
                       pool.evalMap(
                         services(
                           user,
-                          enums,
                           mapping,
                           c.email,
                           c.commitHash,

@@ -254,17 +254,17 @@ object FMain extends MainParams {
       middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      introspecService   = GraphQLService(IntrospectionMapping(OdbMapping.introspectionSchema(enums)))
-      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, enums, ptc, httpClient, horizonsClient, emailConfig, introspecService)
+      introspecService   = GraphQLService(IntrospectionMapping(OdbMapping.introspectionSchema))
+      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, ptc, httpClient, horizonsClient, emailConfig, introspecService)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)
       webhookService    <- pool.map(EmailWebhookService.fromSession(_))
     } yield { wsb =>
-      val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, enums, awsConfig.fileUploadMaxMb, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
-      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, enums, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
+      val attachmentRoutes   = AttachmentRoutes.apply[F](pool, s3FileService, ssoClient, awsConfig.fileUploadMaxMb, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
+      val schedulerRoutes    = SchedulerRoutes.apply[F](pool, ssoClient, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       val emailWebhookRoutes = EmailWebhookRoutes(webhookService, emailConfig)
-      val chownRoutes        = ChownRoutes(pool, s3FileService, ssoClient, enums, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
+      val chownRoutes        = ChownRoutes(pool, s3FileService, ssoClient, emailConfig, commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient)
       middleware(graphQLRoutes(wsb) <+> attachmentRoutes <+> GraphQLRoutes.dummyMetadata <+> emailWebhookRoutes <+> schedulerRoutes <+> chownRoutes)
     }
 

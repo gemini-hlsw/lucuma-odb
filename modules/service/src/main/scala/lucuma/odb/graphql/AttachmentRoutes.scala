@@ -19,7 +19,6 @@ import lucuma.core.util.Enumerated
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService
@@ -46,7 +45,6 @@ object AttachmentRoutes {
     pool:           Resource[F, Session[F]],
     s3:             S3FileService[F],
     ssoClient:      SsoClient[F, User],
-    enums:          Enums,
     maxUploadMb:    Int,
     emailConfig:    Config.Email,
     commitHash:     CommitHash,
@@ -61,7 +59,6 @@ object AttachmentRoutes {
         pool.map(
           Services.forUser(
             u,
-            enums,
             None,
             emailConfig,
             commitHash,

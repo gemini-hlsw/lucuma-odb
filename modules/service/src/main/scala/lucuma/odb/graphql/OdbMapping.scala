@@ -23,7 +23,6 @@ import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.mapping.*
 import lucuma.odb.graphql.topic.ConfigurationRequestTopic
 import lucuma.odb.graphql.topic.DatasetTopic
@@ -34,7 +33,6 @@ import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.util.*
-import lucuma.odb.graphql.util.SchemaSemigroup.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
@@ -110,7 +108,6 @@ object OdbMapping {
     itcClient0:    ItcClient[F],
     commitHash0:   CommitHash,
     goaUsers0:     Set[User.Id],
-    enums:         Enums,
     tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient0:   Client[F],
     horizonsClient0: HorizonsClient[F],
@@ -330,7 +327,7 @@ object OdbMapping {
 
           // Our schema
           val schema: Schema =
-            schema0.getOrElse(unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema)
+            schema0.getOrElse(unsafeLoadSchema("OdbSchema.graphql"))
 
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
@@ -347,7 +344,6 @@ object OdbMapping {
             pool.map: session =>
               Services.forUser(
                 user,
-                enums,
                 Option.when(allowSub): (s: Session[F]) =>
                   apply(
                     Resource.pure(s),     // Always use the provided session
@@ -358,7 +354,6 @@ object OdbMapping {
                     itcClient0,
                     commitHash0,
                     goaUsers0,
-                    enums,
                     tec,
                     httpClient0,
                     horizonsClient0,
@@ -784,11 +779,11 @@ object OdbMapping {
         }
 
   /**
-    * The full ODB schema, including the dynamically-loaded enums. This is the schema exposed for
-    * introspection (see `IntrospectionMapping`).
+    * The full ODB schema. This is the schema exposed for introspection (see
+    * `IntrospectionMapping`).
     */
-  def introspectionSchema(enums: Enums): Schema =
-    unsafeLoadSchema("OdbSchema.graphql") |+| enums.schema
+  def introspectionSchema: Schema =
+    unsafeLoadSchema("OdbSchema.graphql")
 
   /**
    * A reduced mapping for use with the Obscalc service.  Obscalc computes the
@@ -804,7 +799,6 @@ object OdbMapping {
     gaiaClient:  GaiaClient[F],
     itcClient:   ItcClient[F],
     commitHash:  CommitHash,
-    enums:       Enums,
     tec:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:  Client[F],
     horizonsClient: HorizonsClient[F],
@@ -821,7 +815,6 @@ object OdbMapping {
       itcClient,
       commitHash,
       goaUsers,
-      enums,
       tec,
       httpClient,
       horizonsClient,

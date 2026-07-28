@@ -235,6 +235,12 @@ trait Codecs {
   val cloud_extinction_preset: Codec[CloudExtinction.Preset] =
     enumerated[CloudExtinction.Preset](Type.varchar)
 
+  val conditions_expectation_type: Codec[ConditionsExpectationType] =
+    enumerated[ConditionsExpectationType](Type.varchar)
+
+  val conditions_measurement_source: Codec[ConditionsMeasurementSource] =
+    enumerated[ConditionsMeasurementSource](Type.varchar)
+
   val core_timestamp: Codec[Timestamp] =
     timestamp.imap(Timestamp.fromLocalDateTimeTruncatedAndBounded)(_.toLocalDateTime)
 
@@ -581,6 +587,9 @@ trait Codecs {
 
   val science_subtype: Codec[ScienceSubtype] =
     enumerated(Type("e_science_subtype"))
+
+  val seeing_trend: Codec[SeeingTrend] =
+    enumerated[SeeingTrend](Type.varchar)
 
   val semester: Codec[Semester] =
     varchar.eimap(

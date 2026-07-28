@@ -6,11 +6,9 @@ package lucuma.odb.graphql
 import grackle.circe.CirceMappingLike
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
-import lucuma.odb.graphql.util.SchemaSemigroup
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
-     with SchemaSemigroup
      with MappingExtras[F]
      with CirceMappingLike[F] {
 

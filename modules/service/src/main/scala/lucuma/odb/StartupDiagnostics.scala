@@ -137,6 +137,8 @@ object StartupDiagnostics:
           // Postgres Lookup Tables
           checkPostgresLookupTable(atom_execution_state, "t_atom_execution_state"),
           checkPostgresLookupTable(cloud_extinction_preset, "t_cloud_extinction"),
+          checkPostgresLookupTable(conditions_expectation_type, "t_conditions_expectation_type"),
+          checkPostgresLookupTable(conditions_measurement_source, "t_conditions_source"),
           checkPostgresLookupTable(filterType, "t_filter_type"),
           checkPostgresLookupTable(focal_plane, "t_focal_plane"),
           checkPostgresLookupTable(gcal_continuum, "t_gcal_continuum"),
@@ -171,6 +173,7 @@ object StartupDiagnostics:
           checkPostgresLookupTable(imaging_capability, "t_imaging_capability"),
           checkPostgresLookupTable(instrument, "t_instrument"),
           checkPostgresLookupTable(proposal_status, "t_proposal_status"),
+          checkPostgresLookupTable(seeing_trend, "t_seeing_trend"),
           checkPostgresLookupTable(spectroscopy_capability, "t_spectroscopy_capability"),
           checkPostgresLookupTable(step_execution_state, "t_step_execution_state"),
           checkPostgresLookupTable(water_vapor, "t_water_vapor"),
