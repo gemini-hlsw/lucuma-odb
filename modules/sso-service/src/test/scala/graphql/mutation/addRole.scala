@@ -13,7 +13,7 @@ import lucuma.sso.service.database.RoleRequest
 class addRole extends GraphQLSuite with SsoSuite with Fixture:
 
   List(RoleRequest.Staff, RoleRequest.Ngo(Partner.AR)).foreach: role =>
-    test(s"$role should not be able to give Bob a role".flaky):
+    test(s"$role should not be able to give Bob a role"):
       AsBob.queryIds
         .flatMap: (bob, _) =>
           AsAlice
@@ -43,7 +43,7 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture:
                       """
                   )
 
-  test("Admin Alice should be able to give Bob a role".flaky):
+  test("Admin Alice should be able to give Bob a role"):
     As(Bob)
       .queryIds
       .flatMap: bob =>
@@ -65,7 +65,7 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture:
                 .as[StandardRole.Id]
                 .isRight
 
-  test("Admin Alice should be able to give Bob an NGO role".flaky):
+  test("Admin Alice should be able to give Bob an NGO role"):
     As(Bob)
       .queryIds
       .flatMap: bob =>
@@ -88,7 +88,7 @@ class addRole extends GraphQLSuite with SsoSuite with Fixture:
                 .as[StandardRole.Id]
                 .isRight
 
-  test("Admin Alice should be able to give Bob an Admin role, and aftewards he should be able to give a Staff role to Alice".flaky):
+  test("Admin Alice should be able to give Bob an Admin role, and aftewards he should be able to give a Staff role to Alice"):
     AsBob
       .queryIds
       .flatMap: (bob, _) =>

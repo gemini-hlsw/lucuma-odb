@@ -9,7 +9,7 @@ import org.http4s.headers.Cookie
 
 class RefreshTokenSuite extends SsoSuite with Fixture {
 
-  test("Cookie shouldn't expire.".flaky) {
+  test("Cookie shouldn't expire.") {
     SsoSimulator[IO].use { case (_, _, sso, _, _) =>
       for {
         c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest")).use(CookieReader[IO].getCookie(_))
@@ -17,7 +17,7 @@ class RefreshTokenSuite extends SsoSuite with Fixture {
     }
   }
 
-  test("SomeSite should be Strict (simulator is pretending it's using https)".flaky) {
+  test("SomeSite should be Strict (simulator is pretending it's using https)") {
     SsoSimulator[IO].use { case (_, _, sso, _, _) =>
       for {
         c  <- sso.run(Request(Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest")).use(CookieReader[IO].getCookie(_))
@@ -25,7 +25,7 @@ class RefreshTokenSuite extends SsoSuite with Fixture {
     }
   }
 
-  test("Cookie should be removed on logout.".flaky) {
+  test("Cookie should be removed on logout.") {
     SsoSimulator[IO].use { case (_, _, sso, _, _) =>
       for {
         _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest"))
@@ -34,7 +34,7 @@ class RefreshTokenSuite extends SsoSuite with Fixture {
     }
   }
 
-  test("Refresh should fail after logout.".flaky) {
+  test("Refresh should fail after logout.") {
     SsoSimulator[IO].use { case (_, _, sso, _, _) =>
       for {
         _  <- sso.status(Request[IO](Method.POST, SsoRoot / "api" / "v1" / "auth-as-guest"))
@@ -44,7 +44,7 @@ class RefreshTokenSuite extends SsoSuite with Fixture {
     }
   }
 
-  test("Invalid cookie should yield 403.".flaky) {
+  test("Invalid cookie should yield 403.") {
     SsoSimulator[IO].use { case (_, _, sso, _, _) =>
       sso.status {
         Request[IO](

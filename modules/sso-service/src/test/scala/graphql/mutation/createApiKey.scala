@@ -11,7 +11,7 @@ import lucuma.sso.client.ApiKey
 
 class createApiKey extends GraphQLSuite with SsoSuite with Fixture:
 
-  test("Attempt to create API key with invalid role id".flaky):
+  test("Attempt to create API key with invalid role id"):
     As(Bob).expectQuery(
       query = """
         mutation {
@@ -27,7 +27,7 @@ class createApiKey extends GraphQLSuite with SsoSuite with Fixture:
       }"""
     )
 
-  test("Attempt to create API key with a role we don't own".flaky):
+  test("Attempt to create API key with a role we don't own"):
     As(Bob).expectQuery(
       query = """
         mutation {
@@ -44,7 +44,7 @@ class createApiKey extends GraphQLSuite with SsoSuite with Fixture:
       }"""
     )
 
-  test("Create an API key".flaky):
+  test("Create an API key"):
     As(Bob).queryWithUser { user =>
       show"""
         mutation {

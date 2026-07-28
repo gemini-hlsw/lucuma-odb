@@ -9,7 +9,7 @@ import io.circe.literal.*
 
 class role extends GraphQLSuite with SsoSuite with Fixture:
 
-  test("Query current role.".flaky):
+  test("Query current role."):
     As(Bob).expectQuery(
       query = """
         query {
