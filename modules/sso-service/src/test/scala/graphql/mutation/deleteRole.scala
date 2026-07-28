@@ -23,7 +23,7 @@ class deleteRole extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGen
           j.hcursor.downField("type").require[RoleType]
 
   List(None, Some(RoleRequest.Staff), Some(RoleRequest.Ngo(Partner.CA))).foreach: rr =>
-    test(s"${rr.getOrElse(RoleRequest.Pi).tpe} can't call deleteRole".flaky):
+    test(s"${rr.getOrElse(RoleRequest.Pi).tpe} can't call deleteRole"):
       var bob: StandardUser = null // i'm sorry
       rr.foldLeft(As(Bob))(_.withRoleRequest(_))
         .expectQueryWithUser(
@@ -40,14 +40,14 @@ class deleteRole extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGen
           """
         )
   
-  test("Double-check that created roles hang around.".flaky):
+  test("Double-check that created roles hang around."):
     AsBob.withRoleRequest(RoleRequest.Admin).canonicalizeUser >>
     AsBob
       .queryRoleTypes
       .map: tpes =>
         assertEq(tpes, Set(RoleType.Pi, RoleType.Admin))
 
-  test(s"Admin *can* call deleteRole".flaky):
+  test(s"Admin *can* call deleteRole"):
     AsBob.withRoleRequest(RoleRequest.Staff).canonicalizeUser >>
     AsBob.withRoleRequest(RoleRequest.Admin)
       .expectQueryWithUser(

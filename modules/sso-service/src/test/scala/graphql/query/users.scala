@@ -17,7 +17,7 @@ class users extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGenerato
   lazy val setup: IO[Unit] =
     List(AsAlice, AsBob).traverse(_.canonicalizeUser).void
 
-  test("Standard user can only see self (and can see full record).".flaky):
+  test("Standard user can only see self (and can see full record)."):
     setup >>
     AsBob.expectQuery(
       query =
@@ -69,7 +69,7 @@ class users extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGenerato
       """
     )
 
-  test("Staff can see many users.".flaky):
+  test("Staff can see many users."):
     setup >>
     AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
       query = 
@@ -111,7 +111,7 @@ class users extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGenerato
         """
     )
 
-  test("Staff can see many users (filter for type).".flaky):
+  test("Staff can see many users (filter for type)."):
     setup >>
     AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
       query = 
@@ -154,7 +154,7 @@ class users extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGenerato
         """
     )
 
-  test("Andy issue ('exceeded maximum input value depth').".flaky):
+  test("Andy issue ('exceeded maximum input value depth')."):
     setup >>
     AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
       query = 

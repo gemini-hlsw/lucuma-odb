@@ -10,7 +10,7 @@ import org.http4s.headers.Location
 
 class ExistingUserSuite extends SsoSuite with Fixture {
 
-  test("Log in as existing user.".flaky) {
+  test("Log in as existing user.") {
     SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
