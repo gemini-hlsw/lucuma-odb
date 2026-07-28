@@ -122,6 +122,12 @@ object SsoMapping {
 
         val schema: Schema = loadedSchema
 
+        override def parserConfig: GraphQLParser.Config = 
+          GraphQLParser.defaultConfig.copy(
+            maxInputValueDepth = 20, // arbitrary; default is 5, which is too low 
+            maxListTypeDepth = 20,
+          )
+
         val typeMappings: TypeMappings =
           TypeMappings(
             List[TypeMapping](

@@ -153,3 +153,65 @@ class users extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGenerato
           }
         """
     )
+
+  test("Andy issue ('exceeded maximum input value depth').".flaky):
+    setup >>
+    AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+      query = 
+        """
+          query {
+            users(
+              WHERE: {
+                AND: [
+                  { 
+                    profile: {
+                      email: {
+                        LIKE: "%noirlab%", 
+                        MATCH_CASE: false
+                      }
+                    }
+                  }, 
+                  {
+                    OR: [
+                      {
+                        profile: {
+                          givenName: {
+                            LIKE: "%andrew%", 
+                            MATCH_CASE: false
+                          }
+                        }
+                      }, 
+                      {
+                        profile: {
+                          familyName: {
+                            LIKE: "%andrew%", 
+                            MATCH_CASE: false
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ) {
+              matches {
+                id
+                profile {
+                  givenName
+                  familyName
+                  email
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "data" : {
+              "users" : {
+                "matches" : []
+              }
+            }
+          }
+        """
+    )
