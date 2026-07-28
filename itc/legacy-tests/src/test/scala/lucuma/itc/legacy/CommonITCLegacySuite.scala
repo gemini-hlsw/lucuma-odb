@@ -32,11 +32,13 @@ import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.Main.ReverseClassLoader
 import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.TargetData
+import munit.Location
 import munit.Tag
 
 import java.io.File
 import java.io.FileFilter
 import scala.collection.immutable.SortedMap
+import scala.concurrent.duration.*
 
 object LegacyITCTest extends Tag("LegacyItcTest")
 
@@ -46,6 +48,11 @@ import munit.CatsEffectSuite
  * This is a common trait for tests of the legacy ITC code
  */
 trait CommonITCLegacySuite extends CatsEffectSuite:
+
+  // Each of these tests makes one real (and slow) call into the legacy ITC per enum value, and
+  // some of those enums are large — StellarLibrarySpectrum alone has 158. The default 30s is not
+  // enough now that the assertions actually run.
+  override def munitIOTimeout: Duration = 15.minutes
 
   // Common validation functions
   def containsValidResults(r: IntegrationTimeRemoteResult): Boolean =
@@ -57,23 +64,59 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
   def containsValidResultsWithSNAt(r: IntegrationTimeRemoteResult): Boolean =
     containsValidResults(r) && r.signalToNoiseAt.isDefined
 
-  def allowedErrors(err: List[String]) =
-    err.exists(_.contains("Invalid S/N")) || err.exists(_.contains("do not overlap")) ||
-      err.exists(_.contains("Unsupported configuration")) ||
-      err.exists(_.contains("Unsupported calculation method")) ||
-      err.exists(_.matches("Configuration would require \\d* exposures")) ||
-      err.exists(_.contains("target is too bright")) ||
-      err.exists(_.contains("Signal = 0")) ||
-      err.exists(_.contains("Redshifted SED")) ||
-      err.exists(_.contains("Wavelength"))
+  /**
+   * Messages the legacy ITC produces when a configuration simply is not calculable, rather than
+   * because something is wrong.
+   *
+   * The wording is not consistent across instruments: REL-4806 rewrote the messages in GmosRecipe
+   * but left GnirsRecipe and Flamingos2Recipe on the older phrasing, so both forms are listed here.
+   */
+  private val notCalculablePatterns: List[String] = List(
+    "do not overlap",
+    "Unsupported configuration",
+    "Unsupported calculation method",
+    "target is too bright",
+    // GNIRS / Flamingos2 wording
+    "Configuration would require",
+    // GMOS wording, since REL-4806
+    "Insufficient signal at",
+    "exposures required for this configuration",
+    // No read mode satisfies the configuration, e.g. GNIRS imaging with the Order1 / PAH filters
+    "Could not find best read mode"
+  )
 
-  def allowedErrorsWithLargeSN(err: List[String]) =
-    err.exists(_.contains("Invalid S/N")) || err.exists(_.contains("do not overlap")) ||
-      err.exists(_.contains("Unsupported configuration")) ||
-      err.exists(_.contains("Unsupported calculation method")) ||
-      err.exists(_.matches("Configuration would require \\d* exposures")) ||
-      err.exists(_.contains("target is too bright")) ||
-      err.exists(_.contains("Invalid SignalToNoise value"))
+  // "Signal = 0" is GNIRS/Flamingos2; "Signal is <= 0" is the shared ExposureTimeCalculator.
+  private val noSignalPatterns: List[String] = List("Signal = 0", "Signal is <= 0")
+
+  def allowedErrors(err: List[String]): Boolean =
+    val patterns = notCalculablePatterns ++ noSignalPatterns ++ List("Redshifted SED", "Wavelength")
+    err.exists(e => patterns.exists(e.contains))
+
+  def allowedErrorsWithLargeSN(err: List[String]): Boolean =
+    val patterns = notCalculablePatterns :+ "Invalid SignalToNoise value"
+    err.exists(e => patterns.exists(e.contains))
+
+  /**
+   * Runs `run` for every value and fails listing every value whose result was not acceptable, each
+   * paired with why it was rejected.
+   *
+   * Always iterate with this rather than `foreach`: `assertIOBoolean` returns an `IO`, which
+   * `foreach` discards, silently turning the assertion into a no-op.
+   */
+  def assertAllValid[A](
+    values:      List[A],
+    errorCheck:  List[String] => Boolean = allowedErrors,
+    resultCheck: IntegrationTimeRemoteResult => Boolean = containsValidResults
+  )(run: A => IO[Either[List[String], IntegrationTimeRemoteResult]])(using Location): IO[Unit] =
+    values
+      .traverse: a =>
+        run(a).map:
+          case Left(errs) if !errorCheck(errs) =>
+            (a -> s"disallowed error: ${errs.mkString("; ")}").some
+          case Right(r) if !resultCheck(r)     => (a -> s"unacceptable result: $r").some
+          case _                               => none
+      .map(_.flattenOption)
+      .map(assertEquals(_, List.empty[(A, String)]))
 
   // Initialize the local ITC
   lazy val localItc = {
@@ -130,6 +173,13 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     ifu match
       case GnirsFpuIfu.LowResolution  => GnirsCamera.ShortBlue
       case GnirsFpuIfu.HighResolution => GnirsCamera.LongBlue
+
+  // The 10 l/mm grating is only usable with a long camera (Gnirs.java rejects it on the
+  // 0.15"/pix short camera), so pair it up rather than leaving it untested.
+  def gnirsCameraForGrating(grating: GnirsGrating, default: GnirsCamera): GnirsCamera =
+    grating match
+      case GnirsGrating.D10 => GnirsCamera.LongBlue
+      case _                => default
 
   // Common telescope details - this will be used in tests
   def telescope = ItcTelescopeDetails(
@@ -352,42 +402,38 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
   // Common test implementations
   def testConditions(name: String, params: ItcParameters): Unit =
     test(s"$name - image quality".tag(LegacyITCTest)):
-      Enumerated[ImageQuality.Preset].all.foreach: iq =>
-        val result = localItc
+      assertAllValid(Enumerated[ImageQuality.Preset].all): iq =>
+        localItc
           .calculate(
             params
               .copy(conditions = params.conditions.copy(iq = iq.toImageQuality.toArcSeconds))
               .asJson
               .noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - cloud extinction".tag(LegacyITCTest)):
-      Enumerated[CloudExtinction.Preset].all.foreach: ce =>
-        val result = localItc
+      assertAllValid(Enumerated[CloudExtinction.Preset].all): ce =>
+        localItc
           .calculate(
             params
               .copy(conditions = params.conditions.copy(cc = ce.toCloudExtinction.toVegaMagnitude))
               .asJson
               .noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - water vapor".tag(LegacyITCTest)):
-      Enumerated[WaterVapor].all.foreach: wv =>
-        val result = localItc
+      assertAllValid(Enumerated[WaterVapor].all): wv =>
+        localItc
           .calculate(
             params.copy(conditions = params.conditions.copy(wv = wv)).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - sky background".tag(LegacyITCTest)):
-      Enumerated[SkyBackground].all.foreach: sb =>
-        val result = localItc
+      assertAllValid(Enumerated[SkyBackground].all): sb =>
+        localItc
           .calculate(
             params.copy(conditions = params.conditions.copy(sb = sb)).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   def testSEDs(
     name:        String,
@@ -397,8 +443,8 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
   ): Unit =
     test(s"$name - stellar library spectrum".tag(LegacyITCTest)):
       assume(runStellar, "Skip stellar library spectrum test")
-      Enumerated[StellarLibrarySpectrum].all.foreach: f =>
-        val result = localItc
+      assertAllValid(Enumerated[StellarLibrarySpectrum].all): f =>
+        localItc
           .calculate(
             bodySED(
               baseParams.source,
@@ -408,12 +454,11 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               UnnormalizedSED.StellarLibrary(f)
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - cool star".tag(LegacyITCTest)):
       assume(runCoolStar, "Skip cool star test")
-      Enumerated[CoolStarTemperature].all.foreach: f =>
-        val result = localItc
+      assertAllValid(Enumerated[CoolStarTemperature].all): f =>
+        localItc
           .calculate(
             bodySED(
               baseParams.source,
@@ -423,11 +468,10 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               UnnormalizedSED.CoolStarModel(f)
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - galaxy spectrum".tag(LegacyITCTest)):
-      Enumerated[GalaxySpectrum].all.foreach: f =>
-        val result = localItc
+      assertAllValid(Enumerated[GalaxySpectrum].all): f =>
+        localItc
           .calculate(
             bodySED(
               baseParams.source,
@@ -437,11 +481,10 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               UnnormalizedSED.Galaxy(f)
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - planet spectrum".tag(LegacyITCTest)):
-      Enumerated[PlanetSpectrum].all.foreach: f =>
-        val result = localItc
+      assertAllValid(Enumerated[PlanetSpectrum].all): f =>
+        localItc
           .calculate(
             bodySED(
               baseParams.source,
@@ -451,11 +494,10 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               UnnormalizedSED.Planet(f)
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - quasar spectrum".tag(LegacyITCTest)):
-      Enumerated[QuasarSpectrum].all.foreach: f =>
-        val result = localItc
+      assertAllValid(Enumerated[QuasarSpectrum].all): f =>
+        localItc
           .calculate(
             bodySED(
               baseParams.source,
@@ -465,11 +507,10 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               UnnormalizedSED.Quasar(f)
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - hii region spectrum".tag(LegacyITCTest)):
-      Enumerated[HIIRegionSpectrum].all.foreach: f =>
-        val result = localItc
+      assertAllValid(Enumerated[HIIRegionSpectrum].all): f =>
+        localItc
           .calculate(
             bodySED(
               baseParams.source,
@@ -479,11 +520,10 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               UnnormalizedSED.HIIRegion(f)
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
     test(s"$name - planetary nebula spectrum".tag(LegacyITCTest)):
-      Enumerated[PlanetaryNebulaSpectrum].all.foreach: f =>
-        val result = localItc
+      assertAllValid(Enumerated[PlanetaryNebulaSpectrum].all): f =>
+        localItc
           .calculate(
             bodySED(
               baseParams.source,
@@ -493,7 +533,6 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               UnnormalizedSED.PlanetaryNebula(f)
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   def testUserDefinedSED(name: String, baseParams: ItcParameters): Unit =
     test(s"$name - user defined SED".tag(LegacyITCTest)):
@@ -522,8 +561,8 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
     errorCheck: List[String] => Boolean = allowedErrors
   ): Unit =
     test(s"$name - brightness integrated units".tag(LegacyITCTest)):
-      Brightness.Integrated.all.toList.foreach: f =>
-        val result = localItc
+      assertAllValid(Brightness.Integrated.all.toList, errorCheck = errorCheck): f =>
+        localItc
           .calculate(
             bodyIntMagUnits(
               baseParams.source,
@@ -533,11 +572,10 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               f.withValueTagged(BrightnessValue.unsafeFrom(5))
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(errorCheck, containsValidResults)))
 
     test(s"$name - surface units".tag(LegacyITCTest)):
-      Brightness.Surface.all.toList.foreach: f =>
-        val result = localItc
+      assertAllValid(Brightness.Surface.all.toList, errorCheck = errorCheck): f =>
+        localItc
           .calculate(
             bodySurfaceMagUnits(
               baseParams.source,
@@ -547,11 +585,10 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               f.withValueTagged(BrightnessValue.unsafeFrom(5))
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(errorCheck, containsValidResults)))
 
     test(s"$name - gaussian units".tag(LegacyITCTest)):
-      Brightness.Integrated.all.toList.foreach: f =>
-        val result = localItc
+      assertAllValid(Brightness.Integrated.all.toList, errorCheck = errorCheck): f =>
+        localItc
           .calculate(
             bodyIntGaussianMagUnits(
               baseParams.source,
@@ -561,12 +598,11 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               f.withValueTagged(BrightnessValue.unsafeFrom(5))
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(errorCheck, containsValidResults)))
 
   def testPowerAndBlackbody(name: String, baseParams: ItcParameters): Unit =
     test(s"$name - power law".tag(LegacyITCTest)):
-      List(-10, 0, 10).foreach: f =>
-        val result = localItc
+      assertAllValid(List(-10, 0, 10)): f =>
+        localItc
           .calculate(
             bodyPowerLaw(
               baseParams.source,
@@ -576,4 +612,3 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
               f
             ).asJson.noSpaces
           )
-        assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))

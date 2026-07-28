@@ -54,28 +54,24 @@ class LegacyITCGnirsImgExpTimeSuite extends CommonITCLegacySuite:
     assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
   test("gnirs imaging filter".tag(LegacyITCTest)):
-    Enumerated[GnirsFilter].all.foreach: f =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsFilter].all): f =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(filter = f)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs imaging camera".tag(LegacyITCTest)):
-    Enumerated[GnirsCamera].all.foreach: c =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsCamera].all): c =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(camera = c)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs imaging read mode".tag(LegacyITCTest)):
-    Enumerated[GnirsReadMode].all.foreach: r =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsReadMode].all): r =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(readMode = r)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs imaging well depth".tag(LegacyITCTest)):
-    Enumerated[GnirsWellDepth].all.foreach: w =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsWellDepth].all): w =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(wellDepth = w)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   testConditions("GNIRS imaging S/N", baseParams)
 
