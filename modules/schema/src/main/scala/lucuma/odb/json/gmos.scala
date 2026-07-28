@@ -34,7 +34,6 @@ import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
-import lucuma.core.model.MaskDefinition
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosCcdMode
@@ -131,7 +130,7 @@ trait GmosCodec {
       for {
         m <- c.downField("attachmentId").as[Option[Attachment.Id]]
         s <- c.downField("slitWidth").as[GmosCustomSlitWidth]
-      } yield GmosFpuMask.Custom(m.fold[MaskDefinition](ToBeDefined)(Defined(_)), s)
+      } yield GmosFpuMask.Custom(m.fold(ToBeDefined)(Defined(_)), s)
     }
 
   given [A](using Decoder[A]): Decoder[GmosFpuMask[A]] =

@@ -99,13 +99,12 @@ object AttachmentRoutes {
     import dsl._
 
     extension (exc: AttachmentException)
-      def toErrorResponse: F[Response[F]] = exc match {
-        case AttachmentException.Forbidden        => Forbidden()
-        case AttachmentException.FileNotFound     => NotFound()
+      def toErrorResponse: F[Response[F]] = exc match
+        case AttachmentException.Forbidden           => Forbidden()
+        case AttachmentException.FileNotFound        => NotFound()
         case AttachmentException.InvalidRequest(msg) => BadRequest(msg)
-        case AttachmentException.AttachmentInUse  =>
+        case AttachmentException.AttachmentInUse     =>
           Conflict("The attachment is in use and cannot be deleted.")
-      }
 
     extension[A](fe: F[Either[AttachmentException, A]])
       def toResponse(fa: A => F[Response[F]]): F[Response[F]] =

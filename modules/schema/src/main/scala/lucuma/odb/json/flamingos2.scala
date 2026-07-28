@@ -21,7 +21,6 @@ import lucuma.core.enums.MosPreImaging
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
-import lucuma.core.model.MaskDefinition
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
@@ -53,7 +52,7 @@ trait Flamingos2Codec:
       for
         m <- c.downField("attachmentId").as[Option[Attachment.Id]]
         s <- c.downField("slitWidth").as[Flamingos2CustomSlitWidth]
-      yield Flamingos2FpuMask.Custom(m.fold[MaskDefinition](ToBeDefined)(Defined(_)), s)
+      yield Flamingos2FpuMask.Custom(m.fold(ToBeDefined)(Defined(_)), s)
 
   given given_Encoder_Flamingos2FpuMask_Custom: Encoder[Flamingos2FpuMask.Custom] =
     Encoder.instance: a =>
