@@ -103,6 +103,8 @@ object AttachmentRoutes {
         case AttachmentException.Forbidden        => Forbidden()
         case AttachmentException.FileNotFound     => NotFound()
         case AttachmentException.InvalidRequest(msg) => BadRequest(msg)
+        case AttachmentException.AttachmentInUse  =>
+          Conflict("The attachment is in use and cannot be deleted.")
       }
 
     extension[A](fe: F[Either[AttachmentException, A]])

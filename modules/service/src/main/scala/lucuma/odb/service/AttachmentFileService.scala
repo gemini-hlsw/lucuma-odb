@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+Make gmos/f2 custom masks use an attachment id// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -79,6 +79,7 @@ object AttachmentFileService {
     case object Forbidden                      extends AttachmentException
     case class InvalidRequest(message: String) extends AttachmentException
     case object FileNotFound                   extends AttachmentException
+    case object AttachmentInUse                extends AttachmentException
   }
 
   import AttachmentException.*
@@ -248,6 +249,8 @@ object AttachmentFileService {
         session
           .option(Statements.DeleteAttachment)(attachmentId)
           .map(_.toRight(FileNotFound))
+          .recover:
+            case SqlState.ForeignKeyViolation(_) => AttachmentInUse.asLeft
       }
 
     def checkForDuplicateName(
