@@ -149,7 +149,7 @@ class refreshArchiveDuplication extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.MaroonX, tid)
+      oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.VisitorNorth, tid)
       _   <- archive.set(Archive.Holding(records("a.fits")))
       js  <- refreshArchiveDuplicationAs(pi, oid, "state matchCount error matches { name }")
     yield assertEquals(

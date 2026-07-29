@@ -13892,24 +13892,43 @@ type ArchiveMatch {
   Archive instrument name, e.g. GMOS-N.  Always present, and always one of the
   instruments the search queried.
   """
-  instrument: String!
+  instrumentString: String!
+
+  """
+  `instrumentString` as an `Instrument`, or null where the archive names an
+  instrument GPP has no case for.
+  """
+  instrument: Instrument
 
   """
   Observation type as the archive reports it.  Always present, and in practice
-  always OBJECT: the search asks the archive for object frames only.
+  always OBJECT
   """
   observationType: String!
 
   """
-  Observation class as the archive reports it, e.g. science.
+  Observation class as the archive reports it, e.g. science.  This is the
+  legacy GOA class.
   """
-  observationClass: String
+  observeClassString: String
 
   """
-  Quality assessment the file was given, e.g. Pass or Usable.  Never a failing
-  assessment: the search excludes files that failed QA.
+  `observeClassString` as an `ObserveClass`, or null where the archive's class
+  has no faithful GPP equivalent.
   """
-  qaState: String
+  observeClass: ObserveClass
+
+  """
+  Quality assessment the file was given, e.g. Pass or Usable.
+  """
+  qaStateString: String
+
+  """
+  `qaStateString` as a `DatasetQaState`, or null where the archive settled on
+  no assessment (`Undefined`, or the retired transient `CHECK`).  Only PASS and
+  USABLE ever appear
+  """
+  qaState: DatasetQaState
 
   "UT date and time the file was taken."
   utDateTime: Timestamp
@@ -13921,17 +13940,17 @@ type ArchiveMatch {
   releaseDate: Date
 
   """
-  Program id as the archive reports it.  The archive holds both OCS- and
-  GPP-era data, so this may be a GPP program id or an OCS one, e.g.
-  GN-2019A-Q-101.
+  Program reference as the archive reports it.  The archive holds both OCS- and
+  GPP-era data, so this may be a GPP program reference or an OCS one.
   """
-  programId: String
+  programReference: String
 
   """
-  Observation id as the archive reports it.  A GPP observation id or an OCS
-  one, e.g. GN-2019A-Q-101-11, for the same reason as `programId`.
+  Observation reference as the archive reports it.  A GPP observation reference
+  or an OCS one, e.g. GN-2019A-Q-101-11, for the same reason as
+  `programReference`.
   """
-  observationId: String
+  observationReference: String
 
   """
   Target name recorded for the file.  Free text as the observer entered it.

@@ -53,11 +53,12 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
     yield oid
 
-  private def maroonXObservation: IO[Observation.Id] =
+  /** A generic visitor instrument, which the archive has no name for. */
+  private def visitorObservation: IO[Observation.Id] =
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.MaroonX, tid)
+      oid <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.VisitorNorth, tid)
     yield oid
 
   /** A program carrying a proposal with a semester, so it can be submitted. */
@@ -207,7 +208,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   test("an instrument GOA does not know is reported as not checked"):
     for
-      oid <- maroonXObservation
+      oid <- visitorObservation
       s   <- refresh(mockOf("a.fits"))(oid)
       db  <- stored(oid)
     yield

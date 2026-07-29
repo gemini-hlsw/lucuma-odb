@@ -86,6 +86,21 @@ class archiveDuplication extends OdbSuite:
       ]
     """
 
+  /**
+   * The classes and QA states the projection onto GPP vocabulary declines to
+   * assert, alongside the ones it does, plus GOA's inconsistent casing.
+   */
+  private val VocabularyRecords: String =
+    """
+      [
+        { "name": "b1.fits", "instrument": "GMOS-S", "observation_type": "OBJECT", "observation_class": "progCal",    "qa_state": "PASS"   },
+        { "name": "b2.fits", "instrument": "GMOS-S", "observation_type": "OBJECT", "observation_class": "partnerCal", "qa_state": "usable" },
+        { "name": "b3.fits", "instrument": "GMOS-S", "observation_type": "OBJECT", "observation_class": "acqCal",     "qa_state": "Fail"   },
+        { "name": "b4.fits", "instrument": "MICHELLE", "observation_type": "OBJECT", "observation_class": "acq",      "qa_state": "CHECK"  },
+        { "name": "b5.fits", "instrument": "IGRINS-2", "observation_type": "OBJECT", "observation_class": "science", "qa_state": "Pass"   }
+      ]
+    """
+
   private def siderealObservation: IO[Observation.Id] =
     for
       pid <- createProgramAs(pi)
@@ -154,14 +169,17 @@ class archiveDuplication extends OdbSuite:
                  name
                  dataLabel
                  coordinates { ra { degrees } dec { degrees } }
+                 instrumentString
                  instrument
                  observationType
-                 observationClass
+                 observeClassString
+                 observeClass
+                 qaStateString
                  qaState
                  utDateTime
                  releaseDate
-                 programId
-                 observationId
+                 programReference
+                 observationReference
                  objectName
                  exposure { seconds }
                  disperser
@@ -185,14 +203,17 @@ class archiveDuplication extends OdbSuite:
               "name": "S20240101S0001.fits",
               "dataLabel": "GS-2024A-Q-1-1-001",
               "coordinates": { "ra": { "degrees": 0.0 }, "dec": { "degrees": 0.01 } },
-              "instrument": "GMOS-S",
+              "instrumentString": "GMOS-S",
+              "instrument": "GMOS_SOUTH",
               "observationType": "OBJECT",
-              "observationClass": "science",
-              "qaState": "Pass",
+              "observeClassString": "science",
+              "observeClass": "SCIENCE",
+              "qaStateString": "Pass",
+              "qaState": "PASS",
               "utDateTime": "2024-01-01T03:04:05Z",
               "releaseDate": "2025-07-01",
-              "programId": "GS-2024A-Q-1",
-              "observationId": "GS-2024A-Q-1-1",
+              "programReference": "GS-2024A-Q-1",
+              "observationReference": "GS-2024A-Q-1-1",
               "objectName": "NGC 1234",
               "exposure": { "seconds": 300.000000 },
               "disperser": "R400_G5325",
@@ -211,7 +232,7 @@ class archiveDuplication extends OdbSuite:
     for
       oid <- siderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](AwkwardRecord))(oid)
-      js  <- archiveDuplication(oid, "matchCount matches { name observationType observationClass qaState utDateTime }")
+      js  <- archiveDuplication(oid, "matchCount matches { name observationType observeClassString observeClass qaStateString qaState utDateTime }")
     yield assertEquals(
       js,
       json"""
@@ -221,16 +242,80 @@ class archiveDuplication extends OdbSuite:
             {
               "name": "S20240101S0002.fits",
               "observationType": "TELLURIC_STANDARD",
-              "observationClass": "science_verification",
-              "qaState": "Undefined",
+              "observeClassString": "science_verification",
+              "observeClass": null,
+              "qaStateString": "Undefined",
+              "qaState": null,
               "utDateTime": "2024-01-01T03:04:05.678Z"
             },
             {
               "name": "S20240101S0003.fits",
               "observationType": "OBJECT",
-              "observationClass": null,
+              "observeClassString": null,
+              "observeClass": null,
+              "qaStateString": null,
               "qaState": null,
               "utDateTime": "2024-01-01T08:04:05Z"
+            }
+          ]
+        }
+      """
+    )
+
+  test("the typed projection asserts only what GPP vocabulary can express"):
+    for
+      oid <- siderealObservation
+      _   <- refresh(GoaClientMock.fromJson[IO](VocabularyRecords))(oid)
+      js  <- archiveDuplication(oid, "matches { name instrumentString instrument observeClassString observeClass qaStateString qaState }")
+    yield assertEquals(
+      js,
+      json"""
+        {
+          "matches": [
+            {
+              "name": "b1.fits",
+              "instrumentString": "GMOS-S",
+              "instrument": "GMOS_SOUTH",
+              "observeClassString": "progCal",
+              "observeClass": "NIGHT_CAL",
+              "qaStateString": "PASS",
+              "qaState": "PASS"
+            },
+            {
+              "name": "b2.fits",
+              "instrumentString": "GMOS-S",
+              "instrument": "GMOS_SOUTH",
+              "observeClassString": "partnerCal",
+              "observeClass": null,
+              "qaStateString": "usable",
+              "qaState": "USABLE"
+            },
+            {
+              "name": "b3.fits",
+              "instrumentString": "GMOS-S",
+              "instrument": "GMOS_SOUTH",
+              "observeClassString": "acqCal",
+              "observeClass": null,
+              "qaStateString": "Fail",
+              "qaState": null
+            },
+            {
+              "name": "b4.fits",
+              "instrumentString": "MICHELLE",
+              "instrument": null,
+              "observeClassString": "acq",
+              "observeClass": "ACQUISITION",
+              "qaStateString": "CHECK",
+              "qaState": null
+            },
+            {
+              "name": "b5.fits",
+              "instrumentString": "IGRINS-2",
+              "instrument": "IGRINS2",
+              "observeClassString": "science",
+              "observeClass": "SCIENCE",
+              "qaStateString": "Pass",
+              "qaState": "PASS"
             }
           ]
         }

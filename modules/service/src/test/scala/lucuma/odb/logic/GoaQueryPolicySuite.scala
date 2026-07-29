@@ -101,14 +101,15 @@ class GoaQueryPolicySuite extends FunSuite:
   private val exchange: Exchange =
     Exchange(KeckInstrument.Hires.asLeft, 1.hourTimeSpan)
 
-  private val maroonX: Visitor =
+  /** A generic visitor instrument, which the archive has no name for. */
+  private val visitorNorth: Visitor =
     Visitor(
-      mode               = VisitorObservingModeType.MaroonX,
+      mode               = VisitorObservingModeType.VisitorNorth,
       centralWavelength  = wavelength,
       agsDiameter        = Angle.fromDoubleArcseconds(60.0),
       scienceFovDiameter = Angle.fromDoubleArcseconds(10.0),
-      name               = none,
-      totalRequestTime   = none
+      name               = name("test visitor").some,
+      totalRequestTime   = 1.hourTimeSpan.some
     )
 
   private def coordinates(raDeg: Double, decDeg: Double): Coordinates =
@@ -150,12 +151,19 @@ class GoaQueryPolicySuite extends FunSuite:
     assertEquals(GoaQueryPolicy.equivalenceGroup(Instrument.Gnirs), both)
 
   test("an instrument with no equivalent is searched on its own"):
-    List(Instrument.Ghost, Instrument.Gsaoi, Instrument.Niri, Instrument.Gpi, Instrument.Igrins2)
+    List(Instrument.Ghost, Instrument.Gsaoi, Instrument.Niri, Instrument.Gpi, Instrument.Igrins2, Instrument.MaroonX)
       .foreach: i =>
         assertEquals(GoaQueryPolicy.equivalenceGroup(i), List(i), i.tag)
 
   test("an instrument GOA does not know yields no queries at all"):
-    assertEquals(GoaQueryPolicy.equivalenceGroup(Instrument.MaroonX), Nil)
+    assertEquals(GoaQueryPolicy.equivalenceGroup(Instrument.Scorpio), Nil)
+
+  // GOA silently drops an instrument filter it does not recognize and answers
+  // with everything else the query matched, so a misspelled token yields a
+  // large, meaningless, saturated match set rather than an error.
+  test("the instrument names the search sends are the archive's own spelling"):
+    assertEquals(Instrument.Igrins2.goaName, "IGRINS-2".some)
+    assertEquals(Instrument.MaroonX.goaName, "MAROON-X".some)
 
   test("every instrument in a group is one GOA can be asked about"):
     Enumerated[Instrument].all.foreach: i =>
@@ -263,7 +271,7 @@ class GoaQueryPolicySuite extends FunSuite:
 
   test("an observation GOA cannot be asked about yields no queries"):
     assertEquals(
-      GoaQueryPolicy.queries(maroonX, base.some, none, List(TargetPointing.Sidereal)),
+      GoaQueryPolicy.queries(visitorNorth, base.some, none, List(TargetPointing.Sidereal)),
       Nil
     )
 

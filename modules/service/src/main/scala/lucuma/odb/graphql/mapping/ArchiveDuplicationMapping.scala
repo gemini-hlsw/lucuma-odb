@@ -11,6 +11,10 @@ import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import lucuma.core.enums.DatasetQaState
+import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObserveClass
+import lucuma.odb.goa
 
 import table.ArchiveDuplicationView
 import table.ArchiveMatchView
@@ -41,14 +45,29 @@ trait ArchiveDuplicationMapping[F[_]]
       SqlField("name", ArchiveMatchView.Name),
       SqlField("dataLabel", ArchiveMatchView.DataLabel),
       SqlObject("coordinates"),
-      SqlField("instrument", ArchiveMatchView.Instrument),
+      SqlField("instrumentString", ArchiveMatchView.Instrument),
+      CursorField[Option[Instrument]](
+        "instrument",
+        _.fieldAs[String]("instrumentString").map(goa.instrument),
+        List("instrumentString")
+      ),
       SqlField("observationType", ArchiveMatchView.ObservationType),
-      SqlField("observationClass", ArchiveMatchView.ObservationClass),
-      SqlField("qaState", ArchiveMatchView.QaState),
+      SqlField("observeClassString", ArchiveMatchView.ObservationClass),
+      CursorField[Option[ObserveClass]](
+        "observeClass",
+        _.fieldAs[Option[String]]("observeClassString").map(_.flatMap(goa.observeClass)),
+        List("observeClassString")
+      ),
+      SqlField("qaStateString", ArchiveMatchView.QaState),
+      CursorField[Option[DatasetQaState]](
+        "qaState",
+        _.fieldAs[Option[String]]("qaStateString").map(_.flatMap(goa.qaState)),
+        List("qaStateString")
+      ),
       SqlField("utDateTime", ArchiveMatchView.UtDateTime),
       SqlField("releaseDate", ArchiveMatchView.ReleaseDate),
-      SqlField("programId", ArchiveMatchView.ProgramId),
-      SqlField("observationId", ArchiveMatchView.GoaObservationId),
+      SqlField("programReference", ArchiveMatchView.ProgramId),
+      SqlField("observationReference", ArchiveMatchView.GoaObservationId),
       SqlField("objectName", ArchiveMatchView.ObjectName),
       SqlObject("exposure"),
       SqlField("disperser", ArchiveMatchView.Disperser),
