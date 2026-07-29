@@ -4,10 +4,11 @@
 package lucuma.odb.sequence
 
 import cats.Applicative
-import cats.Functor
+import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.either.*
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType
@@ -44,14 +45,22 @@ trait SmartGcalExpander[F[_], S, D]:
   ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
 
   /**
-   * Expands a single step, best-effort.  Like `expandStep`, but a missing
-   * SmartGcal mapping yields no steps instead of an error.
+   * Expands a (flat, arc) SmartGcal pair.  Either mapping may be missing, but
+   * not both.
    */
-  def expandStepOptional(
+  def expandFlatAndArc(
     static: S,
-    step:   ProtoStep[D]
-  )(using Functor[F]): F[List[ProtoStep[D]]] =
-    expandStep(static, step).map(_.fold(_ => List.empty, _.toList))
+    flat:   ProtoStep[D],
+    arc:    ProtoStep[D]
+  )(using Monad[F]): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
+    for
+      f <- expandStep(static, flat)
+      a <- expandStep(static, arc)
+    yield (f, a) match
+      case (Right(fs), Right(as)) => (fs ::: as).asRight
+      case (Right(fs), Left(_)  ) => fs.asRight
+      case (Left(_),   Right(as)) => as.asRight
+      case (Left(m),   Left(_)  ) => s"$m (a flat or an arc is required)".asLeft
 
 
 object SmartGcalExpander:

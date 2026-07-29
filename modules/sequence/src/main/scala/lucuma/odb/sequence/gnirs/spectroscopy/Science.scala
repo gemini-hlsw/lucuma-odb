@@ -78,9 +78,9 @@ object Science:
 
   private object SeqState extends gnirs.GnirsSequenceState
 
+  /** `cals` holds the flat, the arc or both; empty for telluric sequences. */
   case class StepDefinition(
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
-    // Inline nighttime calibrations (flat + arc).  Empty for telluric sequences.
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
     /**
@@ -114,11 +114,9 @@ object Science:
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
         cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
-          // The flat is required, but the arc is best-effort
-          for
-            fs <- EitherT(expander.expandStep(static, flat))
-            as <- EitherT.liftF(expander.expandStepOptional(static, arc))
-          yield StepDefinition(scienceSteps, (fs.map(adjustReadMode) ++ as.map(adjustReadMode)).some)
+          // 111/LXD, for instance, has arcs but no slit flat.
+          EitherT(expander.expandFlatAndArc(static, flat, arc))
+            .map(cs => StepDefinition(scienceSteps, cs.map(adjustReadMode).some))
 
     object PreDef:
 

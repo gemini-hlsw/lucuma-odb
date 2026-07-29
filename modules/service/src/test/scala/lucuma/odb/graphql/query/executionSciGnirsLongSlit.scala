@@ -89,7 +89,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
-  // thermal-IR (L/M-band) long-camera config 
+  // thermal-IR (L/M-band) long-camera config
   // 0.05"/pix (LONG_BLUE), D10, MIRROR, 0.20" slit, 3.3 µm.
   // This config has a flat but no arc in the smart gcal tables.
   val ThermalIrSnapshot: GnirsDynamicSnapshot =
@@ -141,6 +141,55 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               )
             )
           ).asRight
+      )
+
+  test("[gnirs] 111/LXD long camera yields arc-only calibrations, no flat"):
+    // 0.05"/pix + 111/LXD + 0.675" has arcs but no slit flat (the 111/LXD flat
+    // block only covers 0.10" + pinhole), which science confirmed is correct.
+    val calLampQuery =
+      """
+        description
+        steps {
+          stepConfig {
+            ... on Gcal {
+              continuum
+              arcs
+            }
+          }
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- configureGnirsCrossDispersed(oid, "LONG_BLUE")
+      yield oid
+
+    setup.flatMap: oid =>
+      query(pi, executionConfigQuery(oid, "gnirs", "science", calLampQuery, None)).map: js =>
+        val continua = js.findAllByKey("continuum")
+        val arcs     = js.findAllByKey("arcs")
+        assert(continua.nonEmpty, "expected at least one Gcal step, found none")
+        assert(continua.forall(_.isNull), s"expected no flat steps, got continua=$continua")
+        assert(arcs.exists(a => a.asArray.exists(_.nonEmpty)), s"expected an arc step, got arcs=$arcs")
+
+  test("[gnirs] 111/LXD short camera has neither flat nor arc -> sequence error"):
+    // The 111/LXD rows exist only for the long camera (0.05"/pix), so the same
+    // config on the short camera resolves to neither flat nor arc.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- configureGnirsCrossDispersed(oid, "SHORT_BLUE")
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          List(
+            s"Could not generate a sequence for $oid: missing Smart GCAL mapping: Gnirs { pixelScale: PixelScale_0_15, disperser: D111, crossDispersed: Lxd, wavelength: 1600.000 nm, fpu: LongSlit_0_675, wellDepth: Shallow } (a flat or an arc is required)"
+          ).asLeft
       )
 
   test("[gnirs] short camera default offsets, exposureCount=3 -> 1 cycle of 4, unsplittable"):
