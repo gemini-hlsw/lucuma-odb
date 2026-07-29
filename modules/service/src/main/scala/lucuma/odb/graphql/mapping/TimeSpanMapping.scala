@@ -7,6 +7,7 @@ import grackle.Path
 import lucuma.core.optics.Format
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ChronConditionsEntryView
 import lucuma.odb.graphql.table.ExchangeView
 import lucuma.odb.graphql.table.ExposureTimeModeView
@@ -35,6 +36,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
                                with Flamingos2DynamicView[F]
                                with GhostDynamicTable[F]
                                with GnirsSpectroscopyView[F]
+                               with ArchiveMatchView[F]
                                with GhostIfuView[F]
                                with GhostStaticView[F]
                                with GmosDynamicTables[F]
@@ -61,6 +63,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(ExchangeType / "totalRequestTime", ExchangeView.TotalRequestTime)(ExchangeView.TotalRequestTimeId),
       timeSpanMappingAtPath(GhostIfuType    / "slitViewingCameraExposureTime", GhostIfuView.SlitViewingCamera.ExposureTime)(GhostIfuView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(GhostStaticType / "slitViewingCameraExposureTime", GhostStaticView.SlitViewingCamera.ExposureTime)(GhostStaticView.SlitViewingCamera.Id),
+      timeSpanMappingAtPath(ArchiveMatchType / "exposure", ArchiveMatchView.Exposure.Value)(ArchiveMatchView.Exposure.SyntheticId),
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
       timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
       timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalView.LargeProgram.TotalTime)(ProposalView.ProgramId),

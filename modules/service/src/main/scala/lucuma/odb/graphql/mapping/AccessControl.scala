@@ -48,6 +48,7 @@ import lucuma.odb.graphql.input.ObservationTimesInput
 import lucuma.odb.graphql.input.ProgramNotePropertiesInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.input.ProgramReferencePropertiesInput
+import lucuma.odb.graphql.input.RefreshArchiveDuplicationInput
 import lucuma.odb.graphql.input.ReplaceSequenceInput
 import lucuma.odb.graphql.input.ResetAcquisitionInput
 import lucuma.odb.graphql.input.SetAllocationsInput
@@ -361,7 +362,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
           SET.existence.isDefined           ||
           SET.observerNotes.isDefined
         then ObservationWorkflowState.preExecutionSet // ok prior to execution
-        else if 
+        else if
           // staff can edit blind offsets for ongoing observations and some acquisition info
           SET.targetEnvironment.isDefined ||
             SET.observingMode.isDefined
@@ -538,6 +539,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
           AccessControl.unchecked(input.SET, oid, observation_id)
 
   }
+
+  def selectForUpdate(
+    input: RefreshArchiveDuplicationInput,
+  )(using Services[F], NoTransaction[F]): F[Result[AccessControl.CheckedWithId[Unit, Observation.Id]]] =
+    Services.asSuperUser:
+      observationService
+        .resolveOid(input.observationId, input.observationRef)
+        .flatMap: r =>
+          r.flatTraverse: oid =>
+            verifyWritable(oid).nestMap: _ =>
+              AccessControl.unchecked((), oid, observation_id)
 
   def selectForUpdate(
     input: ResetAcquisitionInput,
@@ -731,10 +743,10 @@ trait AccessControl[F[_]] extends Predicates[F] {
     Services.asSuperUser:
       observationWorkflowService.getWorkflowsAndModes(List(input.observationId))
         .map: res =>
-          res.map(_(input.observationId)).flatMap: 
+          res.map(_(input.observationId)).flatMap:
             case (w, om) =>
               if w.state === input.state || w.validTransitions.contains(input.state)
-              then 
+              then
                 Result(AccessControl.unchecked((om, w, input.state), input.observationId, observation_id))
               else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
 

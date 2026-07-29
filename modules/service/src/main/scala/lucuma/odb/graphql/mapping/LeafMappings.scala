@@ -46,6 +46,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.CalculationState
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -164,6 +165,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GnirsCamera](GnirsCameraType),
       LeafMapping[GnirsReadMode](GnirsReadModeType),
       LeafMapping[GnirsWellDepth](GnirsWellDepthType),
+      LeafMapping[ArchiveDuplication.State](ArchiveDuplicationStateType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),

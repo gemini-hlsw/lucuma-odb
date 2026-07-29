@@ -17,6 +17,7 @@ import fs2.compression.Compression
 import fs2.io.net.Network
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.common.middleware.TracingMiddleware
@@ -117,6 +118,10 @@ case class Config(
       simbadClient = SimbadClient.build(httpClient, sedMatcher)
       result      <- Resource.eval(TelluricTargetsClient.build(telluric.root, httpClient, simbadClient))
     } yield result
+
+  // Gemini Observatory Archive client resource, used by the archive duplication search.
+  def goaClient[F[_]: Async: Network: TracerProvider]: Resource[F, GoaClient[F]] =
+    otelHttpClient[F].map(GoaClient.build[F](_))
 
   // SSO Client resource (has to be a resource because it owns an HTTP client).
   def ssoClient[F[_]: Async: Trace: Network: Logger]: Resource[F, SsoClient[F, User]] =
