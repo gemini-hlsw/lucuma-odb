@@ -9,14 +9,18 @@
 
 -- The outcome of the most recent search attempt.
 --
---   not_checked  the search ran but could not be performed -- an instrument GOA
---                does not know, or no resolvable pointing and no usable target name.
---   checked      the search ran and the stored matches are its result.
---   error        the most recent attempt failed (GOA unreachable, bad response).
---                The matches and c_last_checked_at still describe the last good
---                snapshot.
+--   not_checked     no search has ever been run.  Never stored: this is what
+--                   v_archive_duplication reports for an observation with no row
+--                   here, and a CHECK below keeps it out of the table.
+--   not_applicable  the search ran but could not be performed -- an instrument GOA
+--                   does not know, or no resolvable pointing and no usable target name.
+--   checked         the search ran and the stored matches are its result.
+--   error           the most recent attempt failed (GOA unreachable, bad response).
+--                   The matches and c_last_checked_at still describe the last good
+--                   snapshot.
 CREATE TYPE e_archive_duplication_state AS ENUM (
   'not_checked',
+  'not_applicable',
   'checked',
   'error'
 );
@@ -51,7 +55,8 @@ CREATE TABLE t_archive_duplication (
   c_search_radius   d_angle_µas             NULL CHECK (c_search_radius > 0),
 
   CONSTRAINT archive_duplication_error_message CHECK ((c_state = 'error') = (c_error IS NOT NULL)),
-  CONSTRAINT archive_duplication_checked_at    CHECK (c_state <> 'checked' OR c_last_checked_at IS NOT NULL),
+  CONSTRAINT archive_duplication_attempted     CHECK (c_state <> 'not_checked'),
+  CONSTRAINT archive_duplication_checked_at    CHECK (c_state NOT IN ('checked', 'not_applicable') OR c_last_checked_at IS NOT NULL),
   CONSTRAINT archive_duplication_search_coords CHECK (num_nulls(c_search_ra, c_search_dec) <> 1),
   CONSTRAINT archive_duplication_search_key    CHECK (num_nonnulls(c_search_ra, c_search_target) <= 1)
 );
@@ -63,10 +68,12 @@ COMMENT ON TABLE t_archive_duplication IS
 --
 -- The GOA record fields do not all map onto lucuma types, so the archive
 -- instrument name, disperser, filter, QA state, observation type and class, and
--- the program and observation ids are all kept as text.
---
--- The archive holds both
+-- the program and observation ids are all kept as text.  The archive holds both
 -- OCS- and GPP-era data, so those last four carry values from either era.
+--
+-- Instrument, observation class and QA state also get a partial typed projection
+-- onto lucuma vocabulary, but it is derived when read (ArchiveDuplicationMapping)
+-- rather than stored or translated here.
 CREATE TABLE t_archive_match (
 
   c_observation_id     d_observation_id NOT NULL
@@ -111,6 +118,9 @@ COMMENT ON COLUMN t_archive_match.c_goa_observation_id IS
 --
 -- The match count is aggregated over t_archive_match rather than read from a
 -- stored column, so it always agrees with the matches served alongside it.
+--
+-- Every observation appears here, so an observation that has never been searched
+-- reads as 'not_checked' -- the one place that state comes from.
 CREATE VIEW v_archive_duplication AS
   SELECT
     o.c_observation_id,

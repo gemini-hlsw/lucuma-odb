@@ -13845,12 +13845,15 @@ type Observation {
 "The outcome of the most recent Archive Duplication Search attempt."
 enum ArchiveDuplicationState {
 
-  """
-  No search result.  Either the search has never been run, or it ran against an
-  observation the archive cannot be asked about: an instrument it does not know,
-  or no resolvable pointing and no usable target name.
-  """
+  "The search has never been run for this observation."
   NOT_CHECKED
+
+  """
+  The search ran, but this observation is one the archive cannot be asked about:
+  an instrument it does not know, or no resolvable pointing and no usable target
+  name.  Re-running will report the same thing until the observation changes.
+  """
+  NOT_APPLICABLE
 
   "The search ran and the reported matches are its result."
   CHECKED
@@ -14022,7 +14025,10 @@ type ArchiveDuplication {
   """
   saturated: Boolean!
 
-  "When the reported matches were gathered.  Null until a search has run."
+  """
+  When the reported matches were gathered.  Null exactly when `state` is
+  NOT_CHECKED, since every other state follows an attempt.
+  """
   lastCheckedAt: Timestamp
 
   "Why the most recent attempt failed.  Set when `state` is ERROR."

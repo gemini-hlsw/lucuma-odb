@@ -206,24 +206,24 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       assertEquals(s.summary.matchCount.value, 0)
       assertEquals(s.matches, Nil)
 
-  test("an instrument GOA does not know is reported as not checked"):
+  test("an instrument GOA does not know is reported as not applicable"):
     for
       oid <- visitorObservation
       s   <- refresh(mockOf("a.fits"))(oid)
       db  <- stored(oid)
     yield
-      assertEquals(s.summary.state, ArchiveDuplication.State.NotChecked)
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
       assertEquals(s.summary.error, none)
       assertEquals(s.matches, Nil)
-      assertEquals(db.summary.state, ArchiveDuplication.State.NotChecked)
+      assertEquals(db.summary.state, ArchiveDuplication.State.NotApplicable)
       assert(db.summary.lastCheckedAt.isDefined)
 
-  test("an observation with no pointing is reported as not checked"):
+  test("an observation with no pointing is reported as not applicable"):
     for
       pid <- createProgramAs(pi)
       oid <- createGmosNorthImagingObservationAs(pi, pid)
       s   <- refresh(mockOf("a.fits"))(oid)
     yield
-      assertEquals(s.summary.state, ArchiveDuplication.State.NotChecked)
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
       assertEquals(s.summary.searchArea.center, none)
       assertEquals(s.matches, Nil)

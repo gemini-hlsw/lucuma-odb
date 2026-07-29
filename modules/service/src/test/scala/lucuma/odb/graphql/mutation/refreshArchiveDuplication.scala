@@ -145,7 +145,7 @@ class refreshArchiveDuplication extends OdbSuite:
       """
     )
 
-  test("an instrument GOA does not know is reported as not checked"):
+  test("an instrument GOA does not know is reported as not applicable"):
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
@@ -156,13 +156,26 @@ class refreshArchiveDuplication extends OdbSuite:
       js,
       json"""
         {
-          "state": "NOT_CHECKED",
+          "state": "NOT_APPLICABLE",
           "matchCount": 0,
           "error": null,
           "matches": []
         }
       """
     )
+
+  test("a search that could not be performed is distinguishable from one never run"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      oid  <- createVisitorModeObservationAs(pi, pid, VisitorObservingModeType.VisitorNorth, tid)
+      _    <- archive.set(Archive.Holding(records("a.fits")))
+      pre  <- storedDuplication(oid, "state lastCheckedAt")
+      _    <- refreshArchiveDuplicationAs(pi, oid)
+      post <- storedDuplication(oid, "state")
+    yield
+      assertEquals(pre, json"""{ "state": "NOT_CHECKED", "lastCheckedAt": null }""")
+      assertEquals(post, json"""{ "state": "NOT_APPLICABLE" }""")
 
   test("re-checking replaces the previous result rather than adding to it"):
     for

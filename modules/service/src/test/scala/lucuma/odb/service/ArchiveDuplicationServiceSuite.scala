@@ -172,13 +172,13 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       assertEquals(s.summary.matchCount.value, 0)
       assertEquals(s.matches, Nil)
 
-  test("a not-checked snapshot records that the search ran but could not be performed"):
-    val h = ArchiveDuplication.Summary.notChecked(checkedAt, ArchiveDuplication.SearchArea.Empty)
+  test("a not-applicable snapshot records that the search ran but could not be performed"):
+    val h = ArchiveDuplication.Summary.notApplicable(checkedAt, ArchiveDuplication.SearchArea.Empty)
     for
       oid <- newObservation
       _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.summary.state, ArchiveDuplication.State.NotChecked)
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
       assertEquals(s.summary.lastCheckedAt, checkedAt.some)
       assertEquals(s.matches, Nil)

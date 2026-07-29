@@ -24,11 +24,16 @@ object ArchiveDuplication:
 
   /**
    * The outcome of the most recent search attempt.
+   *
+   * `NotChecked` is the absence of an attempt and is never stored: it is what
+   * an observation with no snapshot row reads as.  `NotApplicable` is an
+   * attempt that concluded there is nothing to ask the archive.
    */
   enum State(val tag: String) derives Enumerated:
-    case NotChecked extends State("not_checked")
-    case Checked    extends State("checked")
-    case Error      extends State("error")
+    case NotChecked    extends State("not_checked")
+    case NotApplicable extends State("not_applicable")
+    case Checked       extends State("checked")
+    case Error         extends State("error")
 
   /**
    * The circle on the sky a search ran over: where it looked and how wide.
@@ -65,8 +70,9 @@ object ArchiveDuplication:
     val NeverChecked: Summary =
       Summary(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, SearchArea.Empty)
 
-    def notChecked(at: Timestamp, searchArea: SearchArea): Summary =
-      Summary(State.NotChecked, NonNegInt.unsafeFrom(0), false, at.some, none, searchArea)
+    /** The summary of a search that found nothing to ask the archive. */
+    def notApplicable(at: Timestamp, searchArea: SearchArea): Summary =
+      Summary(State.NotApplicable, NonNegInt.unsafeFrom(0), false, at.some, none, searchArea)
 
   /** The summary, together with the matched files it describes. */
   final case class Snapshot(

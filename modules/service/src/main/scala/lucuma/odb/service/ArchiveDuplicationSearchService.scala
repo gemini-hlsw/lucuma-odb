@@ -157,15 +157,19 @@ object ArchiveDuplicationSearchService:
           ctx.mode.toList.flatMap(GoaQueryPolicy.queries(_, ctx.explicitBase, center, ctx.pointings))
 
         params match
-          case Nil => storeNotChecked(observationId, searchArea)
+          case Nil => storeNotApplicable(observationId, searchArea)
           case ps  => runQueries(observationId, searchArea, ps)
 
-      private def storeNotChecked(
+      /**
+       * Records that the search ran and found nothing to ask GOA, which is a
+       * different answer from never having run at all.
+       */
+      private def storeNotApplicable(
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         now.flatMap: t =>
-          val summary = ArchiveDuplication.Summary.notChecked(t, searchArea)
+          val summary = ArchiveDuplication.Summary.notApplicable(t, searchArea)
           storeUnlessFrozen(observationId):
             archiveDuplicationService.store(observationId, summary, Nil)
               .as(ArchiveDuplication.Snapshot(summary, Nil))
