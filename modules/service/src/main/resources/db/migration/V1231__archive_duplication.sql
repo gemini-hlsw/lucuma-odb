@@ -47,7 +47,7 @@ CREATE TABLE t_archive_duplication (
   -- A sidereal search stores coordinates, a non-sidereal one the target name it was run against.
   c_search_ra       d_angle_µas             NULL,
   c_search_dec      d_angle_µas             NULL,
-  c_search_target   text                    NULL,
+  c_search_target   text                    NULL CHECK (c_search_target <> ''),
   c_search_radius   d_angle_µas             NULL CHECK (c_search_radius > 0),
 
   CONSTRAINT archive_duplication_error_message CHECK ((c_state = 'error') = (c_error IS NOT NULL)),

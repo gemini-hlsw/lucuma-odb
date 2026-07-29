@@ -13925,8 +13925,9 @@ type ArchiveMatch {
 
   """
   `qaStateString` as a `DatasetQaState`, or null where the archive settled on
-  no assessment (`Undefined`, or the retired transient `CHECK`).  Only PASS and
-  USABLE ever appear
+  no assessment (`Undefined`, or the retired transient `CHECK`).  PASS and
+  USABLE are what the search expects to see. FAIL may appear though GOA queries
+  should not return FAIL.
   """
   qaState: DatasetQaState
 

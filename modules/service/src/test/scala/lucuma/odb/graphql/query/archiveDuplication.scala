@@ -297,7 +297,7 @@ class archiveDuplication extends OdbSuite:
               "observeClassString": "acqCal",
               "observeClass": null,
               "qaStateString": "Fail",
-              "qaState": null
+              "qaState": "FAIL"
             },
             {
               "name": "b4.fits",
