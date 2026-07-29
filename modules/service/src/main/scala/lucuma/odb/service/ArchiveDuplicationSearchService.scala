@@ -233,10 +233,13 @@ object ArchiveDuplicationSearchService:
        * multi-second GOA call runs between that check and this write, so a
        * proposal submitted in the meantime would otherwise overwrite the frozen
        * snapshot the TAC is meant to see.  Re-reading the status here — inside
-       * the writing transaction and behind a `FOR UPDATE` lock on the program
-       * row, which serialises against the submission `UPDATE` — makes the freeze
-       * hold at the one place that writes the snapshot, as the ADR requires.  A
-       * refused write returns whatever is currently stored.
+       * the writing transaction and behind a `FOR NO KEY UPDATE` lock on the
+       * program row, which serialises against the submission `UPDATE` — makes the
+       * freeze hold at the one place that writes the snapshot, as the ADR
+       * requires.  A refused write returns whatever is currently stored.
+       *
+       * The lock spans this transaction only.  The GOA call has already returned
+       * by the time it opens, which is why `refresh` takes `NoTransaction`.
        */
       private def storeUnlessFrozen(
         observationId: Observation.Id
@@ -279,6 +282,17 @@ object ArchiveDuplicationSearchService:
      * The observation's proposal status, taking a row lock on the program so a
      * submission that lands during the GOA call cannot slip in between this read
      * and the snapshot write that follows it in the same transaction.
+     *
+     * `FOR NO KEY UPDATE` rather than `FOR UPDATE`, for the reason V1227 gives:
+     * `FOR UPDATE` is the only mode conflicting with the `FOR KEY SHARE` that
+     * PostgreSQL takes on `t_program` to enforce the foreign key of every child
+     * row inserted, so holding it would block those inserts for the duration.
+     *
+     * It still serializes against submission, by a wider margin than the mode
+     * name suggests: `c_proposal_status` feeds `c_program_reference`, a STORED
+     * generated column carrying a UNIQUE constraint (V0845), so submission
+     * changes a key column and its `UPDATE` takes `FOR UPDATE` — which conflicts
+     * with every mode, this one included.
      */
     val LockProposalStatus: Query[Observation.Id, ProposalStatus] =
       sql"""
@@ -286,5 +300,5 @@ object ArchiveDuplicationSearchService:
         FROM t_observation o
         JOIN t_program p ON p.c_program_id = o.c_program_id
         WHERE o.c_observation_id = $observation_id
-        FOR UPDATE OF p
+        FOR NO KEY UPDATE OF p
       """.query(proposal_status)

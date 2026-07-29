@@ -19,7 +19,10 @@ import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
 import lucuma.odb.util.Codecs.program_id
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
+import skunk.exception.PostgresErrorException
 import skunk.syntax.all.*
+
+import scala.concurrent.duration.*
 
 class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
@@ -227,3 +230,66 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
       assertEquals(s.summary.searchArea.center, none)
       assertEquals(s.matches, Nil)
+
+  // The two tests below cover the lock the snapshot write takes, which V1227
+  // shows is easy to get wrong in a way nothing else notices.  Both run the
+  // production statement rather than a copy of it, so a change to it is felt
+  // here.
+  //
+  // Only the first discriminates the lock *mode*: it fails under FOR UPDATE and
+  // passes under the weaker modes.  The second cannot, because submission's
+  // UPDATE takes FOR UPDATE itself -- c_proposal_status feeds the STORED UNIQUE
+  // c_program_reference (V0845), making it a key column -- and FOR UPDATE
+  // conflicts with every mode.  It guards the weaker claim that some lock is
+  // held at all, and fails if the locking is dropped.
+
+  /**
+   * Runs `use` on a different connection while a fresh session holds the lock
+   * the snapshot write takes.
+   */
+  private def holdingSnapshotLock[A](oid: Observation.Id)(use: IO[A]): IO[A] =
+    withFreshSession: s =>
+      s.transaction.use: _ =>
+        s.unique(ArchiveDuplicationSearchService.Statements.LockProposalStatus)(oid) >> use
+
+  /** SQLSTATE `lock_not_available`. */
+  private val LockNotAvailable = "55P03"
+
+  /**
+   * Submits the way `markSubmitted` does, but with a bounded lock wait, so a
+   * lock this cannot get surfaces as an error rather than hanging the suite.
+   */
+  private def submitAwaitingLock(pid: Program.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.transaction.use: _ =>
+        s.execute(sql"set local lock_timeout = '2000ms'".command) >>
+        s.execute(
+          sql"update t_program set c_proposal_status = 'submitted' where c_program_id = $program_id".command
+        )(pid).void
+
+  test("the snapshot lock does not block inserts that reference the program"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- holdingSnapshotLock(oid):
+               // PostgreSQL takes FOR KEY SHARE on the program row to enforce this
+               // insert's foreign key, which FOR NO KEY UPDATE tolerates and
+               // FOR UPDATE does not.  A regression blocks here until the lock is
+               // released, which never happens: the holder is waiting on this.
+               createObservationAs(pi, pid).timeoutTo(
+                 15.seconds,
+                 IO.raiseError(AssertionError("an insert referencing the program blocked on the snapshot lock"))
+               )
+    yield ()
+
+  test("the snapshot lock blocks a concurrent submission"):
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      e   <- holdingSnapshotLock(oid)(submitAwaitingLock(pid).attempt)
+    yield e match
+      case Left(ex: PostgresErrorException) => assertEquals(ex.code, LockNotAvailable)
+      case Left(ex)                         => fail(s"expected a lock timeout, got $ex")
+      case Right(_)                         => fail("a submission slipped past the snapshot lock")
