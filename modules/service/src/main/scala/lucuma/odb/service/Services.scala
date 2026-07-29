@@ -210,6 +210,9 @@ trait Services[F[_]]:
   /** The `ProgramNoteService`. */
   def programNoteService: ProgramNoteService[F]
 
+  /** The `TooTriggerService`. */
+  def tooTriggerService: TooTriggerService[F]
+
   /** The `ProgramService`. */
   def programService: ProgramService[F]
 
@@ -384,6 +387,7 @@ object Services:
       lazy val telescopeConfigGeneratorService = TelescopeConfigGeneratorService.instantiate
       lazy val partnerSplitsService = PartnerSplitsService.instantiate
       lazy val programNoteService = ProgramNoteService.instantiate
+      lazy val tooTriggerService = TooTriggerService.instantiate
       lazy val programUserService = ProgramUserService.instantiate
       lazy val smartGcalService = SmartGcalService.instantiate
       lazy val targetService = TargetService.instantiate
@@ -463,6 +467,7 @@ object Services:
     def offsetGeneratorService[F[_]](using Services[F]): TelescopeConfigGeneratorService[F] = summon[Services[F]].telescopeConfigGeneratorService
     def partnerSplitsService[F[_]](using Services[F]): PartnerSplitsService[F] = summon[Services[F]].partnerSplitsService
     def programNoteService[F[_]](using Services[F]): ProgramNoteService[F] = summon[Services[F]].programNoteService
+    def tooTriggerService[F[_]](using Services[F]): TooTriggerService[F] = summon[Services[F]].tooTriggerService
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
     def programUserService[F[_]](using Services[F]): ProgramUserService[F] = summon[Services[F]].programUserService
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService

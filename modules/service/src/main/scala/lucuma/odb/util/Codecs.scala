@@ -74,6 +74,8 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
 import lucuma.odb.data.TimingWindowEndTypeEnum
+import lucuma.odb.data.TooTrigger
+import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.data.UserType
 import lucuma.odb.json.all.query.given
 import lucuma.odb.sequence.data.VisitOrigin
@@ -770,6 +772,12 @@ trait Codecs {
       µs => TimeSpan.FromDuration.getOption(µs).toRight(s"Invalid TimeSpan, must be non-negative µs <  9,223,372,036,854,775,807 µs: $µs"))(
       TimeSpan.FromDuration.reverseGet
     )
+
+  val too_trigger_id: Codec[TooTrigger.Id] =
+    gid[TooTrigger.Id]
+
+  val too_trigger_status: Codec[TooTriggerStatus] =
+    enumerated(Type("e_too_trigger_status"))
 
   val timing_window_end_type: Codec[TimingWindowEndTypeEnum] =
     enumerated(Type("e_timing_window_end_type"))

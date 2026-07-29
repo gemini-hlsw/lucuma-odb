@@ -35,6 +35,7 @@ import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.ObservationTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
+import lucuma.odb.graphql.topic.TooTriggerTopic
 import lucuma.odb.graphql.util.*
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
@@ -62,7 +63,8 @@ object OdbMapping {
     group:                Topic[F, GroupTopic.Element],
     configurationRequest: Topic[F, ConfigurationRequestTopic.Element],
     executionEvent:       Topic[F, ExecutionEventAddedTopic.Element],
-    dataset:              Topic[F, DatasetTopic.Element]
+    dataset:              Topic[F, DatasetTopic.Element],
+    tooTrigger:           Topic[F, TooTriggerTopic.Element]
   )
 
   object Topics {
@@ -78,7 +80,8 @@ object OdbMapping {
         cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))
         exe <- Resource.eval(ExecutionEventAddedTopic(ses, 1024, sup))
         dst <- Resource.eval(DatasetTopic(ses, 1024, sup))
-      } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst)
+        tt  <- Resource.eval(TooTriggerTopic(ses, 1024, sup))
+      } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst, tt)
   }
 
   val dumpDir: Option[String] = sys.env.get("ODB_FETCH_DUMP_DIR")
@@ -150,6 +153,12 @@ object OdbMapping {
           with ConfigurationRequestMapping[F]
           with ConfigurationRequestEditMapping[F]
           with ConfigurationRequestSelectResultMapping[F]
+          with TooTriggerMapping[F]
+          with TooTriggerEditMapping[F]
+          with TooTriggerResultMappings[F]
+          with TooTriggerSelectResultMapping[F]
+          with TooTriggerChronicleEntryMapping[F]
+          with TooTriggerChronicleEntrySelectResultMapping[F]
           with ConfigurationObservingModeMappings[F]
           with ConfigurationTargetMapping[F]
           with ConfigurationVisitorMappings[F]
@@ -412,6 +421,15 @@ object OdbMapping {
                 ConditionsMeasurementMapping,
                 ConfigurationRequestMapping,
                 ConfigurationRequestEditMapping,
+                TooTriggerMapping,
+                TooTriggerEditMapping,
+                RequestTooTriggerResultMapping,
+                WithdrawTooTriggerResultMapping,
+                AcceptTooTriggerResultMapping,
+                DenyTooTriggerResultMapping,
+                TooTriggerSelectResultMapping,
+                TooTriggerChronicleEntryMapping,
+                TooTriggerChronicleEntrySelectResultMapping,
                 ConstraintSetGroupMapping,
                 ConstraintSetGroupSelectResultMapping,
                 ConstraintSetMapping,
