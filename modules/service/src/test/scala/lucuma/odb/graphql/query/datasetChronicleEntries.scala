@@ -20,8 +20,6 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
-import lucuma.odb.util.Codecs.core_timestamp
-import lucuma.odb.util.Codecs.dataset_id
 import skunk.codec.temporal.timestamptz
 import skunk.syntax.all.*
 
@@ -35,19 +33,6 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
     )
 
   val mode = ObservingModeType.GmosNorthLongSlit
-
-  def setInterval(did: Dataset.Id, interval: TimestampInterval): IO[Unit] =
-    withServices(serviceUser): srv =>
-      srv.transactionally:
-        srv.session.execute(
-          sql"""
-            UPDATE t_dataset
-               SET c_start_time = $core_timestamp,
-                   c_end_time   = $core_timestamp
-             WHERE c_dataset_id = $dataset_id
-          """.command
-        )(interval.start, interval.end, did)
-    .void
 
   test("Basic DatasetChronicleEntry Mapping"):
     for
@@ -69,7 +54,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0001.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
-      _   <- setInterval(did, TimestampInterval.between(t0, t1))
+      _   <- setInterval(serviceUser, did, TimestampInterval.between(t0, t1))
       _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
 
       _   <- expect(
@@ -300,7 +285,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       did <- recordDatasetAs(serviceUser, sid, vid, f"N18630703S$index%04d.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
-      _   <- setInterval(did, TimestampInterval.between(t0, t1))
+      _   <- setInterval(serviceUser, did, TimestampInterval.between(t0, t1))
       _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
       _   <- comment("foo", List(did))
     yield (pid, did)

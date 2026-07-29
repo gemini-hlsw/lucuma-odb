@@ -11,9 +11,14 @@ import cats.syntax.traverse.*
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
+import lucuma.core.util.TimestampInterval
+import lucuma.odb.util.Codecs.core_timestamp
+import lucuma.odb.util.Codecs.dataset_id
+import skunk.syntax.all.*
 
 trait DatasetSetupOperations extends DatabaseOperations with query.GenerationTestSupport  { this: OdbSuite =>
 
@@ -25,6 +30,17 @@ trait DatasetSetupOperations extends DatabaseOperations with query.GenerationTes
     stepCount: Int = 3,
     datasetsPerStep: Int = 2
   ):IO[(Observation.Id, List[(Step.Id, List[Dataset.Id])])] =
+    recordDatasetsWithProgram(mode, user, service, offset, stepCount, datasetsPerStep)
+      .map((_, oid, ids) => (oid, ids))
+
+  def recordDatasetsWithProgram(
+    mode: ObservingModeType,
+    user: User,
+    service: User,
+    offset: Int = 0,
+    stepCount: Int = 3,
+    datasetsPerStep: Int = 2
+  ):IO[(Program.Id, Observation.Id, List[(Step.Id, List[Dataset.Id])])] =
     for
       pid <- createProgramAs(user)
       tid <- createTargetWithProfileAs(user, pid)
@@ -37,6 +53,19 @@ trait DatasetSetupOperations extends DatabaseOperations with query.GenerationTes
           recordDatasetAs(service, sid, vid, f"N18630101S${offset + x * datasetsPerStep + y + 1}%04d.fits")
         }.tupleLeft(sid)
       }
-    yield (oid, ids)
+    yield (pid, oid, ids)
+
+  def setInterval(service: User, did: Dataset.Id, interval: TimestampInterval): IO[Unit] =
+    withServices(service): srv =>
+      srv.transactionally:
+        srv.session.execute(
+          sql"""
+            UPDATE t_dataset
+               SET c_start_time = $core_timestamp,
+                   c_end_time   = $core_timestamp
+             WHERE c_dataset_id = $dataset_id
+          """.command
+        )(interval.start, interval.end, did)
+    .void
 
 }
