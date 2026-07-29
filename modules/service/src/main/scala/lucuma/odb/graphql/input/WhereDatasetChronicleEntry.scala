@@ -24,6 +24,7 @@ object WhereDatasetChronicleEntry:
     val WhereEqDatabaseOperation = WhereEq.binding[DatabaseOperation](path / "operation", DatabaseOperationBinding)
     val WhereOrderTimestamp      = WhereOrder.binding[Timestamp](path / "timestamp", TimestampBinding)
     val WhereOrderDatasetId      = WhereOrder.binding[Dataset.Id](path / "dataset" / "id", DatasetIdBinding)
+    val WhereProgramBinding      = WhereProgram.binding(path / "dataset" / "observation" / "program")
 
     val WhereModDatasetId        = WhereBoolean.binding(path / "modDatasetId", BooleanBinding)
     val WhereModStepId           = WhereBoolean.binding(path / "modStepId", BooleanBinding)
@@ -49,6 +50,7 @@ object WhereDatasetChronicleEntry:
         WhereEqDatabaseOperation.Option("operation", rOp),
         WhereOrderTimestamp.Option("timestamp", rTimestamp),
         WhereOrderDatasetId.Option("dataset", rDatasetId),
+        WhereProgramBinding.Option("program", rProgram),
 
         WhereModDatasetId.Option("modDatasetId", rModDatasetId),
         WhereModStepId.Option("modStepId", rModStepId),
@@ -62,8 +64,8 @@ object WhereDatasetChronicleEntry:
         WhereModComment.Option("modComment", rModComment)
 
       ) =>
-        (rAND, rOR, rNOT, rId, rUser, rOp, rTimestamp, rDatasetId, rModDatasetId, rModStepId, rModObservationId, rModVisitId, rModReference, rModFilename, rModQa, rModInterval, rModComment).parMapN:
-          (AND, OR, NOT, id, user, op, timestamp, datasetId, modDatasetId, modStepId, modObservationId, modVisitId, modReference, modFilename, modQa, modInterval, modComment) =>
+        (rAND, rOR, rNOT, rId, rUser, rOp, rTimestamp, rDatasetId, rProgram, rModDatasetId, rModStepId, rModObservationId, rModVisitId, rModReference, rModFilename, rModQa, rModInterval, rModComment).parMapN:
+          (AND, OR, NOT, id, user, op, timestamp, datasetId, program, modDatasetId, modStepId, modObservationId, modVisitId, modReference, modFilename, modQa, modInterval, modComment) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -73,6 +75,7 @@ object WhereDatasetChronicleEntry:
               op,
               timestamp,
               datasetId,
+              program,
               modDatasetId,
               modStepId,
               modObservationId,

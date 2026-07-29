@@ -7982,6 +7982,11 @@ input WhereDatasetChronicleEntry {
   dataset: WhereOrderDatasetId
 
   """
+  Limits the results to the program associated with the dataset.
+  """
+  program: WhereProgram
+
+  """
   Add this item to match only when a dataset id is or isn't updated.
   """
   modDatasetId: WhereBoolean
