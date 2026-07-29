@@ -115,7 +115,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       oid <- newObservation
       s   <- run(_.select(oid))
     yield
-      assertEquals(s.summary, ArchiveDuplication.Summary.NeverChecked)
+      assertEquals(s.summary, ArchiveDuplication.Summary.NotChecked)
       assertEquals(s.matches, Nil)
 
   test("a stored snapshot round-trips with every column"):

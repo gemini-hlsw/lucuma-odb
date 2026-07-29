@@ -67,7 +67,7 @@ object ArchiveDuplication:
   object Summary:
 
     /** The summary of an observation that has never been searched. */
-    val NeverChecked: Summary =
+    val NotChecked: Summary =
       Summary(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, SearchArea.Empty)
 
     /** The summary of a search that found nothing to ask the archive. */

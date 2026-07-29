@@ -12,6 +12,13 @@ import lucuma.core.math.Coordinates
 /**
  * The single point an Archive Duplication Search is run around.  GOA locates
  * sidereal pointings by coordinates and moving targets by object name.
+ *
+ * The non-sidereal name is the GPP target's own name, not its `EphemerisKey`
+ * designation.  GOA matches it against the `object` value the observer recorded
+ * in the file's headers, which is free text of the same kind, so a designation
+ * would match less often rather than more.  Matching moving targets is therefore
+ * by name and inherently approximate: a file archived under a different spelling
+ * of the same body is not found.
  */
 enum ArchiveSearchPointing derives Eq:
   case Sidereal(coordinates: Coordinates)

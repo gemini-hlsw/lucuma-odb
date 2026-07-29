@@ -70,7 +70,7 @@ object ArchiveDuplicationService:
       override def selectSummary(observationId: Observation.Id)(using Transaction[F]): F[ArchiveDuplication.Summary] =
         session
           .option(Statements.SelectSummary)(observationId)
-          .map(_.getOrElse(ArchiveDuplication.Summary.NeverChecked))
+          .map(_.getOrElse(ArchiveDuplication.Summary.NotChecked))
 
       override def store(
         observationId: Observation.Id,
