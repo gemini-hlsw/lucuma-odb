@@ -115,7 +115,7 @@ object Science:
 
         cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
           // 111/LXD, for instance, has arcs but no slit flat.
-          EitherT(expander.expandFlatAndArc(static, flat, arc))
+          EitherT(expander.expandFlatAndOrArc(static, flat, arc))
             .map(cs => StepDefinition(scienceSteps, cs.map(adjustReadMode).some))
 
     object PreDef:

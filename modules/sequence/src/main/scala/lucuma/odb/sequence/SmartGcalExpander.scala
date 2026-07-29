@@ -4,6 +4,7 @@
 package lucuma.odb.sequence
 
 import cats.Applicative
+import cats.Functor
 import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.applicative.*
@@ -45,22 +46,34 @@ trait SmartGcalExpander[F[_], S, D]:
   ): F[Either[String, ProtoAtom[ProtoStep[D]]]]
 
   /**
+   * Expands a single step, best-effort.  Like `expandStep`, but a missing
+   * SmartGcal mapping yields no steps instead of an error.
+   */
+  def expandStepOptional(
+    static: S,
+    step:   ProtoStep[D]
+  )(using Functor[F]): F[List[ProtoStep[D]]] =
+    expandStep(static, step).map(_.fold(_ => List.empty, _.toList))
+
+  /**
    * Expands a (flat, arc) SmartGcal pair.  Either mapping may be missing, but
    * not both.
    */
-  def expandFlatAndArc(
+  def expandFlatAndOrArc(
     static: S,
     flat:   ProtoStep[D],
     arc:    ProtoStep[D]
   )(using Monad[F]): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
     for
-      f <- expandStep(static, flat)
-      a <- expandStep(static, arc)
-    yield (f, a) match
-      case (Right(fs), Right(as)) => (fs ::: as).asRight
-      case (Right(fs), Left(_)  ) => fs.asRight
-      case (Left(_),   Right(as)) => as.asRight
-      case (Left(m),   Left(_)  ) => s"$m (a flat or an arc is required)".asLeft
+      fs  <- expandStepOptional(static, flat)
+      as  <- expandStepOptional(static, arc)
+      res <- NonEmptyList
+               .fromList(fs ++ as)
+               .fold(
+                 // Neither resolved, so repeat the flat lookup for its error.
+                 expandStep(static, flat).map(_.leftMap(m => s"$m (a flat or an arc is required)"))
+               )(_.asRight.pure[F])
+    yield res
 
 
 object SmartGcalExpander:

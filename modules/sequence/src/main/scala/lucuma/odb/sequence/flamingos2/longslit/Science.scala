@@ -127,7 +127,7 @@ object Science:
           val mode = Flamingos2ReadMode.forExposureTime(f2.value.exposure)
           f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
 
-        EitherT(expander.expandFlatAndArc(static, flat, arc))
+        EitherT(expander.expandFlatAndOrArc(static, flat, arc))
           .map(cs => StepDefinition(a0, b0, b1, a1, cs.map(adjustReadMode)))
 
     object PreDef:
