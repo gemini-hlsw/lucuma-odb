@@ -124,9 +124,10 @@ object ArchiveDuplicationService:
       ).to[GoaSummaryRecord]
 
     /**
-     * Summary columns, in the order the summary is selected and written.
+     * Summary columns as `v_archive_duplication` reports them.  Read-only,
+     * because the match count it carries is aggregated over `t_archive_match`.
      */
-    private val archive_duplication_summary: Codec[ArchiveDuplication.Summary] =
+    private val archive_duplication_summary: Decoder[ArchiveDuplication.Summary] =
       (archive_duplication_state *:
        int4_nonneg           *:
        bool                  *:
@@ -136,7 +137,7 @@ object ArchiveDuplicationService:
        declination.opt       *:
        text_nonempty.opt     *:
        angle_µas.opt
-      ).imap { (state, count, saturated, checkedAt, error, ra, dec, targetName, radius) =>
+      ).map { (state, count, saturated, checkedAt, error, ra, dec, targetName, radius) =>
         val center = (ra, dec)
           .mapN((r, d) => ArchiveSearchPointing.Sidereal(Coordinates(r, d)))
           .orElse(targetName.map(ArchiveSearchPointing.NonSidereal(_)))
@@ -148,12 +149,23 @@ object ArchiveDuplicationService:
           error,
           ArchiveDuplication.SearchArea(center, radius)
         )
-      } { h =>
+      }
+
+    private val archive_duplication_summary_write: Encoder[ArchiveDuplication.Summary] =
+      (archive_duplication_state *:
+       bool                  *:
+       core_timestamp.opt    *:
+       text_nonempty.opt     *:
+       right_ascension.opt   *:
+       declination.opt       *:
+       text_nonempty.opt     *:
+       angle_µas.opt
+      ).contramap { h =>
         val (ra, dec, targetName) = h.searchArea.center match
           case Some(ArchiveSearchPointing.Sidereal(c))    => (c.ra.some, c.dec.some, none)
           case Some(ArchiveSearchPointing.NonSidereal(n)) => (none, none, n.some)
           case None                                 => (none, none, none)
-        (h.state, h.matchCount, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.searchArea.radius)
+        (h.state, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.searchArea.radius)
       }
 
     val SelectSummary: Query[Observation.Id, ArchiveDuplication.Summary] =
@@ -205,7 +217,6 @@ object ArchiveDuplicationService:
         INSERT INTO t_archive_duplication (
           c_observation_id,
           c_state,
-          c_match_count,
           c_saturated,
           c_last_checked_at,
           c_error,
@@ -213,10 +224,9 @@ object ArchiveDuplicationService:
           c_search_dec,
           c_search_target,
           c_search_radius
-        ) VALUES ($observation_id, $archive_duplication_summary)
+        ) VALUES ($observation_id, $archive_duplication_summary_write)
         ON CONFLICT (c_observation_id) DO UPDATE SET
           c_state           = EXCLUDED.c_state,
-          c_match_count     = EXCLUDED.c_match_count,
           c_saturated       = EXCLUDED.c_saturated,
           c_last_checked_at = EXCLUDED.c_last_checked_at,
           c_error           = EXCLUDED.c_error,

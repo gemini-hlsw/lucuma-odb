@@ -4,17 +4,17 @@
 -- The snapshot lives in its own table rather than in columns on t_observation
 -- deliberately to avoid generating observation edit events.
 --
--- The values count, saturation, last checked are denormalized here
--- so the proposal PDF and GraphQL can read them without aggregating over
--- t_archive_match.
+-- The match count is not stored: v_archive_duplication aggregates it over
+-- t_archive_match.  Saturation and last checked are stored.
 
 -- The outcome of the most recent search attempt.
 --
 --   not_checked  the search ran but could not be performed -- an instrument GOA
---                does not know, or no resolvable pointing and no usable target name.  
+--                does not know, or no resolvable pointing and no usable target name.
 --   checked      the search ran and the stored matches are its result.
 --   error        the most recent attempt failed (GOA unreachable, bad response).
---                c_match_count / c_last_checked_at still describe the last good snapshot.
+--                The matches and c_last_checked_at still describe the last good
+--                snapshot.
 CREATE TYPE e_archive_duplication_state AS ENUM (
   'not_checked',
   'checked',
@@ -28,10 +28,13 @@ CREATE TABLE t_archive_duplication (
 
   c_state           e_archive_duplication_state NOT NULL,
 
-  -- File-level match count, matching the PIT.  Saturated when a constituent
-  -- query came back with GOA's hard cap of 500 records, in which case the
-  -- count is a floor rather than an exact figure.
-  c_match_count     int4                    NOT NULL DEFAULT 0 CHECK (c_match_count >= 0),
+  -- Set when a constituent query came back with GOA's hard cap of 500 records,
+  -- making the match count a floor rather than an exact figure.  Stored rather
+  -- than derived: the equivalence group fans out into several capped queries
+  -- whose results are then flattened and deduplicated by file name, so the
+  -- stored row count is neither necessary nor sufficient evidence that a query
+  -- was truncated.  Three capped queries can leave 1500 rows; one capped query
+  -- with heavy overlap can leave far fewer than 500.
   c_saturated       boolean                 NOT NULL DEFAULT FALSE,
 
   -- When the stored matches were gathered.  Null until a search has succeeded.
@@ -40,7 +43,7 @@ CREATE TABLE t_archive_duplication (
   c_error           text                    NULL CHECK (c_error <> ''),
 
   -- The area searched.  Kept so the per-match angular distance can be derived
-  -- from what was actually searched rather than from the observation as it stands now.  
+  -- from what was actually searched rather than from the observation as it stands now.
   -- A sidereal search stores coordinates, a non-sidereal one the target name it was run against.
   c_search_ra       d_angle_µas             NULL,
   c_search_dec      d_angle_µas             NULL,
@@ -56,11 +59,11 @@ CREATE TABLE t_archive_duplication (
 COMMENT ON TABLE t_archive_duplication IS
   'Archive Duplication Search snapshot header, one row per observation that has been searched.';
 
--- One row per matched archive file.  
+-- One row per matched archive file.
 --
 -- The GOA record fields do not all map onto lucuma types, so the archive
 -- instrument name, disperser, filter, QA state, observation type and class, and
--- the program and observation ids are all kept as text.  
+-- the program and observation ids are all kept as text.
 --
 -- The archive holds both
 -- OCS- and GPP-era data, so those last four carry values from either era.
@@ -106,11 +109,13 @@ COMMENT ON COLUMN t_archive_match.c_goa_observation_id IS
 
 -- Views the Archive Duplication Search is read through.
 --
+-- The match count is aggregated over t_archive_match rather than read from a
+-- stored column, so it always agrees with the matches served alongside it.
 CREATE VIEW v_archive_duplication AS
   SELECT
     o.c_observation_id,
     COALESCE(d.c_state, 'not_checked'::e_archive_duplication_state) AS c_state,
-    COALESCE(d.c_match_count, 0)                                AS c_match_count,
+    COALESCE(m.c_match_count, 0)                                AS c_match_count,
     COALESCE(d.c_saturated, FALSE)                              AS c_saturated,
     d.c_last_checked_at,
     d.c_error,
@@ -121,7 +126,12 @@ CREATE VIEW v_archive_duplication AS
     CASE WHEN d.c_search_ra     IS NOT NULL THEN o.c_observation_id END AS c_search_center_id,
     CASE WHEN d.c_search_radius IS NOT NULL THEN o.c_observation_id END AS c_search_radius_id
   FROM t_observation o
-  LEFT JOIN t_archive_duplication d ON d.c_observation_id = o.c_observation_id;
+  LEFT JOIN t_archive_duplication d ON d.c_observation_id = o.c_observation_id
+  LEFT JOIN (
+    SELECT c_observation_id, COUNT(*)::int4 AS c_match_count
+    FROM t_archive_match
+    GROUP BY c_observation_id
+  ) m ON m.c_observation_id = o.c_observation_id;
 
 -- t_archive_match is keyed by observation and file name together, so the view
 -- supplies c_match_id to identify a match with a single column.

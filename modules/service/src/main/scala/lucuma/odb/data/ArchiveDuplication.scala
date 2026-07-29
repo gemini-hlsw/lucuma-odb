@@ -44,9 +44,11 @@ object ArchiveDuplication:
     val Empty: SearchArea = SearchArea(none, none)
 
   /**
-   * One row of `t_archive_duplication`: a snapshot's headline values, without the
-   * matches they summarize.  This is the storage side only — GraphQL serves the
-   * same values independently, straight from `v_archive_duplication`.
+   * A snapshot's headline values, without the matches they summarize.  Read
+   * from `v_archive_duplication`, which counts `matchCount` over the matches
+   * rather than storing it; the rest are columns of `t_archive_duplication`.
+   * This is the storage side only — GraphQL serves the same values
+   * independently, straight from the same view.
    */
   final case class Summary(
     state:         State,
