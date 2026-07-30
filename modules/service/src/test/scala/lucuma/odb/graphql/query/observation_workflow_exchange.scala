@@ -15,7 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.service.ObservationWorkflowService.Messages
+import lucuma.odb.service.workflow.ObservationWorkflowService.Messages
 
 class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
 

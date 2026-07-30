@@ -76,7 +76,7 @@ import lucuma.odb.data.TimingWindowEndTypeEnum
 import lucuma.odb.data.UserType
 import lucuma.odb.json.all.query.given
 import lucuma.odb.sequence.data.VisitOrigin
-import lucuma.odb.service.ObservationWorkflowService
+import lucuma.odb.service.workflow.ObservationWorkflowService
 import lucuma.odb.syntax.exposureTimeMode.*
 import monocle.Prism
 import skunk.*

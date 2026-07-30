@@ -9,7 +9,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
-import lucuma.odb.service.ObservationWorkflowService
+import lucuma.odb.service.workflow.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
 import lucuma.odb.util.GmosCodecs.*

@@ -32,7 +32,7 @@ import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.ObservationService
-import lucuma.odb.service.ObservationWorkflowService
+import lucuma.odb.service.workflow.ObservationWorkflowService
 
 class observation_workflow
   extends ExecutionTestSupportForGmos
