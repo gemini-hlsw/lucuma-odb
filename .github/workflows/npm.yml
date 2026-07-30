@@ -1,0 +1,49 @@
+# Publishes the npm package containing the graphql schemas.
+# Only runs on the main branch when one of the schemas is changed.
+
+name: Publish npm package
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "**.graphql"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # Required for OIDC
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }} @ ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Publish NPM package
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current branch (full)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: sbt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          registry-url: "https://registry.npmjs.org"
+
+      - name: NPM Publish
+        run: sbt schemaJVM/npmPublish
