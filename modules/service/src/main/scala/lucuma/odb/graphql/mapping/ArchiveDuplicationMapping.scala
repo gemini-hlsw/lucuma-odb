@@ -36,6 +36,7 @@ trait ArchiveDuplicationMapping[F[_]]
       SqlObject("searchCoordinates"),
       SqlField("searchTargetName", ArchiveDuplicationView.SearchTargetName),
       SqlObject("searchRadius"),
+      SqlField("queryUrls", ArchiveDuplicationView.QueryUrls),
       SqlObject("matches", Join(ArchiveDuplicationView.ObservationId, ArchiveMatchView.ObservationId))
     )
 

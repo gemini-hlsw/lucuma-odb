@@ -186,7 +186,13 @@ object ArchiveDuplicationSearchService:
                 storeError(observationId, errors)
             case Right(byQuery) =>
               info"$observationId: Archive Duplication Search returned ${byQuery.map(_.size).mkString(" + ")} record(s)" *>
-                storeMatches(observationId, searchArea, byQuery)
+                storeMatches(observationId, searchArea, byQuery, queryUrlsOf(params))
+
+      /**
+       * The GOA query URLs for these params, in order.
+       */
+      private def queryUrlsOf(params: List[GoaParams]): List[String] =
+        params.mapFilter(p => GoaParams.toUri(p).map(_.renderString))
 
       /**
        * Records the failure without disturbing the stored matches, so a GOA
@@ -207,7 +213,8 @@ object ArchiveDuplicationSearchService:
       private def storeMatches(
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea,
-        byQuery:       List[List[GoaSummaryRecord]]
+        byQuery:       List[List[GoaSummaryRecord]],
+        queryUrls:     List[String]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         // A file returned by more than one query in the group is one duplicate,
         // not several, so the count is of distinct files.
@@ -221,7 +228,8 @@ object ArchiveDuplicationSearchService:
               saturated     = byQuery.exists(_.sizeIs == ArchiveDuplication.QueryLimit),
               lastCheckedAt = t.some,
               error         = none,
-              searchArea    = searchArea
+              searchArea    = searchArea,
+              queryUrls     = queryUrls
             )
           storeUnlessFrozen(observationId):
             archiveDuplicationService.store(observationId, summary, matches)

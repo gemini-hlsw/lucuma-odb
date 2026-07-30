@@ -136,8 +136,9 @@ object ArchiveDuplicationService:
        right_ascension.opt   *:
        declination.opt       *:
        text_nonempty.opt     *:
-       angle_µas.opt
-      ).map { (state, count, saturated, checkedAt, error, ra, dec, targetName, radius) =>
+       angle_µas.opt         *:
+       text_list
+      ).map { (state, count, saturated, checkedAt, error, ra, dec, targetName, radius, queryUrls) =>
         val center = (ra, dec)
           .mapN((r, d) => ArchiveSearchPointing.Sidereal(Coordinates(r, d)))
           .orElse(targetName.map(ArchiveSearchPointing.NonSidereal(_)))
@@ -147,7 +148,8 @@ object ArchiveDuplicationService:
           saturated,
           checkedAt,
           error,
-          ArchiveDuplication.SearchArea(center, radius)
+          ArchiveDuplication.SearchArea(center, radius),
+          queryUrls
         )
       }
 
@@ -159,13 +161,14 @@ object ArchiveDuplicationService:
        right_ascension.opt   *:
        declination.opt       *:
        text_nonempty.opt     *:
-       angle_µas.opt
+       angle_µas.opt         *:
+       text_list
       ).contramap { h =>
         val (ra, dec, targetName) = h.searchArea.center match
           case Some(ArchiveSearchPointing.Sidereal(c))    => (c.ra.some, c.dec.some, none)
           case Some(ArchiveSearchPointing.NonSidereal(n)) => (none, none, n.some)
           case None                                 => (none, none, none)
-        (h.state, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.searchArea.radius)
+        (h.state, h.saturated, h.lastCheckedAt, h.error, ra, dec, targetName, h.searchArea.radius, h.queryUrls)
       }
 
     val SelectSummary: Query[Observation.Id, ArchiveDuplication.Summary] =
@@ -179,7 +182,8 @@ object ArchiveDuplicationService:
           c_search_ra,
           c_search_dec,
           c_search_target,
-          c_search_radius
+          c_search_radius,
+          c_query_urls
         FROM v_archive_duplication
         WHERE c_observation_id = $observation_id
       """.query(archive_duplication_summary)
@@ -223,7 +227,8 @@ object ArchiveDuplicationService:
           c_search_ra,
           c_search_dec,
           c_search_target,
-          c_search_radius
+          c_search_radius,
+          c_query_urls
         ) VALUES ($observation_id, $archive_duplication_summary_write)
         ON CONFLICT (c_observation_id) DO UPDATE SET
           c_state           = EXCLUDED.c_state,
@@ -233,7 +238,8 @@ object ArchiveDuplicationService:
           c_search_ra       = EXCLUDED.c_search_ra,
           c_search_dec      = EXCLUDED.c_search_dec,
           c_search_target   = EXCLUDED.c_search_target,
-          c_search_radius   = EXCLUDED.c_search_radius
+          c_search_radius   = EXCLUDED.c_search_radius,
+          c_query_urls      = EXCLUDED.c_query_urls
       """.command
 
     /**

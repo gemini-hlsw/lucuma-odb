@@ -141,7 +141,7 @@ class archiveDuplication extends OdbSuite:
   test("an observation that has never been searched reads as not checked"):
     for
       oid <- siderealObservation
-      js  <- archiveDuplication(oid, "state matchCount saturated lastCheckedAt error matches { name }")
+      js  <- archiveDuplication(oid, "state matchCount saturated lastCheckedAt error queryUrls matches { name }")
     yield assertEquals(
       js,
       json"""
@@ -151,6 +151,7 @@ class archiveDuplication extends OdbSuite:
           "saturated": false,
           "lastCheckedAt": null,
           "error": null,
+          "queryUrls": [],
           "matches": []
         }
       """
@@ -348,6 +349,20 @@ class archiveDuplication extends OdbSuite:
       assert(js.hcursor.downField("lastCheckedAt").focus.exists(!_.isNull))
       assert(js.hcursor.downField("searchRadius").downField("microarcseconds").focus.exists(!_.isNull))
 
+  test("the GOA query URLs the search ran are recorded as provenance"):
+    for
+      oid <- siderealObservation
+      _   <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
+      js  <- archiveDuplication(oid, "queryUrls")
+    yield
+      val urls = js.hcursor.downField("queryUrls").as[List[String]].toOption.get
+      // GMOS fans out to both sites, and both are instruments GOA knows by name.
+      assertEquals(urls.size, 2)
+      assert(urls.exists(_.contains("/GMOS-N/")))
+      assert(urls.exists(_.contains("/GMOS-S/")))
+      assert(urls.forall(_.startsWith("https://archive.gemini.edu/jsonsummary/notengineering/NotFail/")))
+      assert(urls.forall(_.contains("/OBJECT/ra=")))
+
   test("distance is the separation from the stored search center"):
     for
       oid    <- siderealObservation
@@ -389,20 +404,20 @@ class archiveDuplication extends OdbSuite:
       js  <- archiveDuplication(oid, """
                searchTargetName
                searchCoordinates { ra { degrees } }
+               queryUrls
                matches { name distance { microarcseconds } }
              """)
-    yield assertEquals(
-      js,
-      json"""
-        {
-          "searchTargetName": "Halley",
-          "searchCoordinates": null,
-          "matches": [
-            { "name": "S20240101S0001.fits", "distance": null }
-          ]
-        }
-      """
-    )
+    yield
+      val urls = js.hcursor.downField("queryUrls").as[List[String]].toOption.get
+      // A non-sidereal search carries the target name in the URL rather than coordinates.
+      assertEquals(urls.size, 2)
+      assert(urls.forall(_.contains("/object=Halley/")))
+      assertEquals(js.hcursor.downField("searchTargetName").focus, Json.fromString("Halley").some)
+      assertEquals(js.hcursor.downField("searchCoordinates").focus, Json.Null.some)
+      assertEquals(
+        js.hcursor.downField("matches").focus,
+        json"""[ { "name": "S20240101S0001.fits", "distance": null } ]""".some
+      )
 
   test("re-checking replaces the previous matches"):
     for

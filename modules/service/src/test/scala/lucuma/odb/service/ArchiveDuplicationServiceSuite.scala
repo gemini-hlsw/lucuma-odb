@@ -96,7 +96,8 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       saturated     = false,
       lastCheckedAt = checkedAt.some,
       error         = none,
-      searchArea    = ArchiveDuplication.SearchArea(center, Angle.fromDoubleArcseconds(180.0).some)
+      searchArea    = ArchiveDuplication.SearchArea(center, Angle.fromDoubleArcseconds(180.0).some),
+      queryUrls     = Nil
     )
 
   private def sidereal(count: Int): ArchiveDuplication.Summary =
