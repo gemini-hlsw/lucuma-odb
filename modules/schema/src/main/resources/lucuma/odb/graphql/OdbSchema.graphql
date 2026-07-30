@@ -7982,6 +7982,11 @@ input WhereDatasetChronicleEntry {
   dataset: WhereOrderDatasetId
 
   """
+  Limits the results to the program associated with the dataset.
+  """
+  program: WhereProgram
+
+  """
   Add this item to match only when a dataset id is or isn't updated.
   """
   modDatasetId: WhereBoolean
@@ -18397,6 +18402,9 @@ input WhereDataset {
   "Matches all datasets associated with the observation."
   observation: WhereObservation
 
+  "Matches all datasets associated with the program."
+  program: WhereProgram
+
   "Matches all datasets associated with the step."
   stepId: WhereEqStepId
 
@@ -18418,6 +18426,18 @@ input WhereDataset {
   recieved.
   """
   isWritten: WhereBoolean
+
+  """
+  Matches the start of the dataset time interval, which is not defined until the
+  dataset collection has started.
+  """
+  start: WhereOptionOrderTimestamp
+
+  """
+  Matches the end of the dataset time interval, which is not defined until the
+  dataset collection has finished.
+  """
+  end: WhereOptionOrderTimestamp
 }
 
 input WhereDatasetReference {
@@ -19925,6 +19945,59 @@ input WhereOrderTimestamp {
 
   """
   Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Timestamp
+}
+
+"""
+Filters on equality or order comparisons of an optional timestamp property.  All
+supplied criteria must match, but usually only one is selected.  Note that a
+property which is not defined matches nothing but `IS_NULL: true`.
+"""
+input WhereOptionOrderTimestamp {
+  """
+  When `true`, matches if the timestamp is not defined.  When `false` matches if
+  the timestamp is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the timestamp is exactly the supplied value.
+  """
+  EQ: Timestamp
+
+  """
+  Matches if the timestamp is not the supplied value.
+  """
+  NEQ: Timestamp
+
+  """
+  Matches if the timestamp is any of the supplied options.
+  """
+  IN: [Timestamp!]
+
+  """
+  Matches if the timestamp is none of the supplied values.
+  """
+  NIN: [Timestamp!]
+
+  """
+  Matches if the timestamp is ordered after (>) the supplied value.
+  """
+  GT: Timestamp
+
+  """
+  Matches if the timestamp is ordered before (<) the supplied value.
+  """
+  LT: Timestamp
+
+  """
+  Matches if the timestamp is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Timestamp
+
+  """
+  Matches if the timestamp is ordered before or equal (<=) the supplied value.
   """
   LTE: Timestamp
 }
