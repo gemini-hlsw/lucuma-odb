@@ -751,13 +751,25 @@ lazy val common = project
     )
   )
 
+// For publishing the GraphQL schemas as an NPM package
+lazy val createNpmProject = taskKey[Unit]("Create NPM project, package.json and files")
+lazy val npmPublish       = taskKey[Unit]("Run npm publish")
+
+def npmPublishForDir(dir: String) = Def.task {
+  val publishDir = target.value / dir
+
+  val _ = createNpmProject.value
+  scala.sys.process.Process(List("npm", "publish", "--tag", "latest"), publishDir).!!
+  streams.value.log.info(s"Published NPM package from ${publishDir}")
+}
+
 lazy val schema =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
     .dependsOn(itcModel, ssoFrontendClient)
     .in(file("modules/schema"))
     .settings(
-      name := "lucuma-odb-schema",
+      name             := "lucuma-odb-schema",
       libraryDependencies ++= Seq(
         "io.circe"      %%% "circe-parser"               % circeVersion,
         "io.circe"      %%% "circe-literal"              % circeVersion,
@@ -768,7 +780,60 @@ lazy val schema =
         "org.scalameta" %%% "munit"                      % munitVersion           % Test,
         "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
         "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test
-      )
+      ),
+      createNpmProject := {
+        val npmDir  = target.value / "npm"
+        val rootDir = (ThisBuild / baseDirectory).value
+
+        val odbSchemaFile: File          =
+          rootDir / "modules" / "schema" / "src" / "main" / "resources" / "lucuma" / "odb" / "graphql" / "OdbSchema.graphql"
+        val itcSchemaFile: File          =
+          rootDir / "itc" / "service" / "src" / "main" / "resources" / "graphql" / "itc.graphql"
+        val ssoSchemaFile: File          =
+          rootDir / "modules" / "sso-service" / "src" / "main" / "resources" / "Sso.graphql"
+        val resourceSchemaFile: File     =
+          rootDir / "resource" / "service" / "src" / "main" / "resources" / "graphql" / "resource.graphql"
+        val semVerWithPrerelease: String = version.value.replace("-SNAPSHOT", "")
+
+        IO.write(
+          npmDir / "package.json",
+          s"""|{
+             |  "name": "@gemini-hlsw/lucuma-odb-schemas",
+             |  "version": "$semVerWithPrerelease",
+             |  "type": "module",
+             |  "license": "${licenses.value.head._1}",
+             |  "exports": {
+             |    "./package.json": "./package.json",
+             |    "./odb": "./${odbSchemaFile.getName}",
+             |    "./itc": "./${itcSchemaFile.getName}",
+             |    "./sso": "./${ssoSchemaFile.getName}",
+             |    "./resource": "./${resourceSchemaFile.getName}",
+             |    "./*": "./*"
+             |  },
+             |  "repository": {
+             |    "type": "git",
+             |    "url": "git+https://github.com/gemini-hlsw/lucuma-odb.git"
+             |  }
+             |}
+             |""".stripMargin
+        )
+
+        IO.copyFile(odbSchemaFile, npmDir / odbSchemaFile.getName)
+
+        // The schemas are flat in the NPM package, so replace the import path to the ODB schema
+        List(itcSchemaFile, ssoSchemaFile, resourceSchemaFile).foreach { schemaFile =>
+          val schemaContent = IO
+            .read(schemaFile)
+            .replace(
+              "from \"lucuma/odb/graphql/OdbSchema.graphql\"",
+              "from \"./" + odbSchemaFile.getName + "\""
+            )
+          IO.write(npmDir / schemaFile.getName, schemaContent)
+        }
+
+        streams.value.log.info(s"Created NPM project in ${npmDir}")
+      },
+      npmPublish       := npmPublishForDir("npm").value
     )
 
 lazy val otel = project
