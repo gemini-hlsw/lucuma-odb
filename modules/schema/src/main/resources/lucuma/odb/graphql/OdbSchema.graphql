@@ -14048,6 +14048,12 @@ type ArchiveDuplication {
   "Radius searched around the search center, half the observation's field of view."
   searchRadius: Angle
 
+  """
+  The GOA query URLs the snapshot was gathered from, one per fan-out query the
+  search ran. Empty when the search could not be run or has never been run.
+  """
+  queryUrls: [String!]!
+
   "The matched archive files, ordered by file name."
   matches: [ArchiveMatch!]!
 

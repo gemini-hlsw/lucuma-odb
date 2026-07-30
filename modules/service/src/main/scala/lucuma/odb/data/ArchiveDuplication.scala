@@ -61,18 +61,19 @@ object ArchiveDuplication:
     saturated:     Boolean,
     lastCheckedAt: Option[Timestamp],
     error:         Option[NonEmptyString],
-    searchArea:    SearchArea
+    searchArea:    SearchArea,
+    queryUrls:     List[String]
   ) derives Eq
 
   object Summary:
 
     /** The summary of an observation that has never been searched. */
     val NotChecked: Summary =
-      Summary(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, SearchArea.Empty)
+      Summary(State.NotChecked, NonNegInt.unsafeFrom(0), false, none, none, SearchArea.Empty, Nil)
 
     /** The summary of a search that found nothing to ask the archive. */
     def notApplicable(at: Timestamp, searchArea: SearchArea): Summary =
-      Summary(State.NotApplicable, NonNegInt.unsafeFrom(0), false, at.some, none, searchArea)
+      Summary(State.NotApplicable, NonNegInt.unsafeFrom(0), false, at.some, none, searchArea, Nil)
 
   /** The summary, together with the matched files it describes. */
   final case class Snapshot(

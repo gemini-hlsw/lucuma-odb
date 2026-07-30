@@ -743,6 +743,10 @@ trait Codecs {
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
 
+  /** A `text[]` column read as `List[String]`, for array-valued provenance such as GOA query URLs. */
+  val text_list: Codec[List[String]] =
+    _text.imap(_.toList)(Arr(_*))
+
   val varchar_nonempty: Codec[NonEmptyString] =
     varchar.eimap(NonEmptyString.from)(_.value)
 

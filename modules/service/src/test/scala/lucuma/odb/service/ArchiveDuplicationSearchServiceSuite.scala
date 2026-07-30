@@ -128,10 +128,14 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
     for
       oid <- gmosObservation
       s   <- refresh(mockOf("a.fits"))(oid)
+      db  <- stored(oid)
     yield
       assert(s.summary.searchArea.center.isDefined)
       assert(s.summary.searchArea.radius.isDefined)
       assert(s.summary.lastCheckedAt.isDefined)
+      assertEquals(s.summary.queryUrls.size, 2)
+      assertEquals(db.summary.queryUrls.size, 2)
+      assert(s.summary.queryUrls.forall(_.startsWith("https://archive.gemini.edu/jsonsummary/")))
 
   test("no matches is a successful search, not an error"):
     for
@@ -218,6 +222,8 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
       assertEquals(s.summary.error, none)
       assertEquals(s.matches, Nil)
+      // Nothing was asked of the archive, so there are no query URLs.
+      assertEquals(s.summary.queryUrls, Nil)
       assertEquals(db.summary.state, ArchiveDuplication.State.NotApplicable)
       assert(db.summary.lastCheckedAt.isDefined)
 
