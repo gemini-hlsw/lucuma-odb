@@ -12,13 +12,16 @@ on:
 
 jobs:
   legacy-tests:
-    name: ITC Legacy Tests
+    name: ITC Legacy Tests (shard ${{ matrix.shard }})
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     strategy:
+      # One shard failing should not cancel the others; we want the full picture.
+      fail-fast: false
       matrix:
         java: [temurin@25]
         scala: [3]
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
       - name: Checkout code
         uses: nschloe/action-cached-lfs-checkout@v1
@@ -37,7 +40,12 @@ jobs:
           java-version: 25
           cache: sbt
 
+      # Sharding is handled by sbt-test-shards (auto-enabled on every project), which reads
+      # these two variables and filters the suites by name hash. Keep TEST_SHARD_COUNT in step
+      # with the `shard` matrix above.
       - name: Run Legacy ITC Tests
         env:
           RUN_LEGACY_TESTS: true
+          TEST_SHARD_COUNT: 6
+          TEST_SHARD: ${{ matrix.shard }}
         run: sbt -v -J-Xmx6g itcLegacyTests/test

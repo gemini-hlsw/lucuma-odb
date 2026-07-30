@@ -15,7 +15,7 @@ trait Flamingos2CustomMaskMapping[F[_]] extends Flamingos2DynamicView[F]:
   ): ObjectMapping =
     ObjectMapping(path)(
       SqlField("synthetic_id", Flamingos2DynamicView.Fpu.CustomMask.SyntheticId, key = true, hidden = true),
-      SqlField("filename",     Flamingos2DynamicView.Fpu.CustomMask.Filename),
+      SqlField("attachmentId", Flamingos2DynamicView.Fpu.CustomMask.AttachmentId),
       SqlField("slitWidth",    Flamingos2DynamicView.Fpu.CustomMask.SlitWidth)
     )
 

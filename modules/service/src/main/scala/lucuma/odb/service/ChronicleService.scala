@@ -41,15 +41,15 @@ object ChronicleService {
           c_intuition_timespan,        
           c_intuition_seeing_trend    
         ) VALUES (
-          ${tag.opt},
+          ${conditions_measurement_source.opt},
           ${angle_µas.opt},
           ${extinction.opt},
           ${wavelength_pm.opt},
           ${angle_µas.opt},
           ${angle_µas.opt},
-          ${tag.opt},
+          ${conditions_expectation_type.opt},
           ${time_span.opt},
-          ${tag.opt}
+          ${seeing_trend.opt}
         ) RETURNING c_chron_id
       """.query(int8).contramap[ConditionsEntryInput] { cie =>
 

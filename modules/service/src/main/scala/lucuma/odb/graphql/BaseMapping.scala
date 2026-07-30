@@ -6,11 +6,9 @@ package lucuma.odb.graphql
 import grackle.circe.CirceMappingLike
 import grackle.skunk.SkunkMapping
 import lucuma.odb.graphql.util.MappingExtras
-import lucuma.odb.graphql.util.SchemaSemigroup
 
 trait BaseMapping[F[_]]
   extends SkunkMapping[F]
-     with SchemaSemigroup
      with MappingExtras[F]
      with CirceMappingLike[F] {
 
@@ -248,6 +246,9 @@ trait BaseMapping[F[_]]
   lazy val GnirsReadModeType                       = schema.ref("GnirsReadMode")
   lazy val GnirsStaticType                         = schema.ref("GnirsStatic")
   lazy val GnirsWellDepthType                      = schema.ref("GnirsWellDepth")
+  lazy val ArchiveDuplicationType                  = schema.ref("ArchiveDuplication")
+  lazy val ArchiveDuplicationStateType             = schema.ref("ArchiveDuplicationState")
+  lazy val ArchiveMatchType                        = schema.ref("ArchiveMatch")
   lazy val GoaPropertiesType                       = schema.ref("GoaProperties")
   lazy val GroupedImagingVariantType               = schema.ref("GroupedImagingVariant")
   lazy val GroupType                               = schema.ref("Group")
@@ -361,6 +362,7 @@ trait BaseMapping[F[_]]
   lazy val RecordIgrins2VisitResultType            = schema.ref("RecordIgrins2VisitResult")
   lazy val RecordVisitResultType                   = schema.ref("RecordVisitResult")
   lazy val RedeemUserInvitationResultType          = schema.ref("RedeemUserInvitationResult")
+  lazy val RefreshArchiveDuplicationResultType     = schema.ref("RefreshArchiveDuplicationResult")
   lazy val ReplaceFlamingos2SequenceResultType     = schema.ref("ReplaceFlamingos2SequenceResult")
   lazy val ReplaceGmosNorthSequenceResultType      = schema.ref("ReplaceGmosNorthSequenceResult")
   lazy val ReplaceGmosSouthSequenceResultType      = schema.ref("ReplaceGmosSouthSequenceResult")

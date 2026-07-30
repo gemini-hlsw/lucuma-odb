@@ -8,6 +8,8 @@ import grackle.Path
 import grackle.skunk.SkunkMapping
 import io.circe
 import lucuma.core.math.Declination
+import lucuma.odb.graphql.table.ArchiveDuplicationView
+import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.GhostIfuView
@@ -19,6 +21,8 @@ import scala.reflect.ClassTag
 trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
                                   with ConfigurationRequestView[F]
                                   with GhostIfuView[F]
+                                  with ArchiveDuplicationView[F]
+                                  with ArchiveMatchView[F]
                                   with ObservationView[F]
                                   with TargetView[F] {
 
@@ -50,10 +54,11 @@ trait DeclinationMapping[F[_]] extends CallForProposalsView[F]
       declinationMappingAtPath(ConfigurationTargetType / "region" / "declinationArc" / "end", ConfigurationRequestView.Target.Region.DeclinationArc.PartialSyntheticId, ConfigurationRequestView.Target.Region.DeclinationArc.End),
       declinationMappingAtPath(CoordinatesType / "dec", ObservationView.TargetEnvironment.Coordinates.SyntheticId, ObservationView.TargetEnvironment.Coordinates.Dec),
       declinationMappingAtPath(GhostIfuType / "skyPosition" / "dec", GhostIfuView.Sky.Id, GhostIfuView.Sky.Dec),
+      declinationMappingAtPath(ArchiveDuplicationType / "searchCoordinates" / "dec", ArchiveDuplicationView.SearchCoordinates.SyntheticId, ArchiveDuplicationView.SearchCoordinates.Dec),
+      declinationMappingAtPath(ArchiveMatchType / "coordinates" / "dec", ArchiveMatchView.Coordinates.SyntheticId, ArchiveMatchView.Coordinates.Dec),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "start", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.Start),
       declinationMappingAtPath(OpportunityType / "region" / "declinationArc" / "end", TargetView.Opportunity.Region.DeclinationArc.StartEndSyntheticId, TargetView.Opportunity.Region.DeclinationArc.End),
       declinationMappingAtPath(SiderealType / "dec", TargetView.Sidereal.SyntheticId, TargetView.Sidereal.Dec),
     )
 
 }
-

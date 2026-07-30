@@ -4,11 +4,11 @@
 package lucuma.itc.legacy
 
 import cats.implicits.*
-import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
@@ -74,24 +74,22 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   )
 
   test("gmos north grating".tag(LegacyITCTest)):
-    Enumerated[GmosNorthGrating].all.foreach: d =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosNorthGrating].all): d =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition, obs, gnConf.copy(disperser = d)).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos north filter".tag(LegacyITCTest)):
-    Enumerated[GmosNorthFilter].all.foreach: f =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosNorthFilter].all): f =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition, obs, gnConf.copy(filter = f.some)).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos north fpu".tag(LegacyITCTest)):
-    Enumerated[GmosNorthFpu].all.foreach: f =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosNorthFpu].all): f =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition,
                    obs,
@@ -99,21 +97,17 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
                    analysis = if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
           ).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos north mos custom slit width".tag(LegacyITCTest)):
-    Enumerated[GmosCustomSlitWidth].all.foreach: w =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosCustomSlitWidth].all): w =>
+      localItc
         .calculate(
           bodyConf(
             sourceDefinition,
             obs,
-            gnConf.copy(fpu =
-              GmosNorthFpuParam(GmosFpuMask.Custom(NonEmptyString.unsafeFrom("mos_mask.fits"), w))
-            )
+            gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Custom(ToBeDefined, w)))
           ).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   val gsConf = ObservingMode.SpectroscopyMode.GmosSouth(
     Wavelength.decimalNanometers.getOption(600).get,
@@ -131,24 +125,22 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   )
 
   test("gmos south grating".tag(LegacyITCTest)):
-    Enumerated[GmosSouthGrating].all.foreach: d =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosSouthGrating].all): d =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition, obs, gsConf.copy(disperser = d)).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south filter".tag(LegacyITCTest)):
-    Enumerated[GmosSouthFilter].all.foreach: f =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosSouthFilter].all): f =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition, obs, gsConf.copy(filter = f.some)).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south fpu".tag(LegacyITCTest)):
-    Enumerated[GmosSouthFpu].all.foreach: f =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosSouthFpu].all): f =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition,
                    obs,
@@ -156,21 +148,17 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
                    analysis = if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
           ).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gmos south mos custom slit width".tag(LegacyITCTest)):
-    Enumerated[GmosCustomSlitWidth].all.foreach: w =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosCustomSlitWidth].all): w =>
+      localItc
         .calculate(
           bodyConf(
             sourceDefinition,
             obs,
-            gsConf.copy(fpu =
-              GmosSouthFpuParam(GmosFpuMask.Custom(NonEmptyString.unsafeFrom("mos_mask.fits"), w))
-            )
+            gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Custom(ToBeDefined, w)))
           ).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // Testing various SEDs
   testSEDs("GMOS spectroscopy S/N", baseParams)

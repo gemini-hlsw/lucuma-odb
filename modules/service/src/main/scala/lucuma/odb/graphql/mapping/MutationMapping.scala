@@ -102,6 +102,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordIgrins2Visit,
       RecordVisit,
       RedeemUserInvitation,
+      RefreshArchiveDuplication,
       ReplaceFlamingos2Sequence,
       ReplaceGmosNorthSequence,
       ReplaceGmosSouthSequence,
@@ -365,6 +366,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                   Predicates.cloneObservationResult.newObservation.id.eql(ids.cloneId),
                   child
                 )
+
+  private lazy val RefreshArchiveDuplication: MutationField =
+    MutationField("refreshArchiveDuplication", RefreshArchiveDuplicationInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
+              // A GOA failure is reported as the snapshot's ERROR state, not as
+              // a failed mutation, so only a rejected refresh fails here.
+              archiveDuplicationSearchService.refresh(oid).nestMap: _ =>
+                Filter(Predicates.refreshArchiveDuplicationResult.observation.id.eql(oid), child)
 
   private lazy val ResetAcquisition: MutationField =
     MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>

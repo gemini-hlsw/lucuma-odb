@@ -15,13 +15,13 @@ import grackle.Result
 import grackle.skunk.SkunkMonitor
 import io.circe.Json
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
@@ -70,10 +70,10 @@ object GraphQLRoutes {
     monitor:              SkunkMonitor[F],
     ttl:                  FiniteDuration,
     userSvc:              UserService[F],
-    enums:                Enums,
     ptc:                  TimeEstimateCalculatorImplementation.ForInstrumentMode,
     httpClient:           Client[F],
     horizonsClient:       HorizonsClient[F],
+    goaClient:            GoaClient[F],
     emailConfig:          Config.Email,
     introspectionService: GraphQLService[F]
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
@@ -117,7 +117,7 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                         _    <- OptionT.liftF(info(user, s"New service instance."))
-                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, enums, ptc, httpClient, horizonsClient, emailConfig)
+                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig)
                         svc   = new GraphQLService(map, props.toList*) {
                                   override def query(
                                     request:       Operation,

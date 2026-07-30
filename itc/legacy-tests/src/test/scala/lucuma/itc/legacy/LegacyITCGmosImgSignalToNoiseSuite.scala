@@ -64,12 +64,11 @@ class LegacyITCGmosImgSignalToNoiseSuite extends CommonITCLegacySuite:
   )
 
   test("gmos north filter".tag(LegacyITCTest)):
-    Enumerated[GmosNorthFilter].all.foreach: f =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosNorthFilter].all): f =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition, obs, gmosNConf.copy(filter = f)).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // GMOS South filter testing
   val gmosSConf = ObservingMode.ImagingMode.GmosSouth(
@@ -85,12 +84,11 @@ class LegacyITCGmosImgSignalToNoiseSuite extends CommonITCLegacySuite:
   )
 
   test("gmos south filter".tag(LegacyITCTest)):
-    Enumerated[GmosSouthFilter].all.foreach: f =>
-      val result = localItc
+    assertAllValid(Enumerated[GmosSouthFilter].all): f =>
+      localItc
         .calculate(
           bodyConf(sourceDefinition, obs, gmosSConf.copy(filter = f)).asJson.noSpaces
         )
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   // Testing various SEDs
   testSEDs("GMOS imaging TxC S/N", baseParams, false, false)

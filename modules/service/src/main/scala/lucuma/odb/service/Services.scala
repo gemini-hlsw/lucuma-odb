@@ -18,6 +18,7 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.data.Metadata
 import lucuma.core.model.Access
@@ -29,7 +30,6 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.Generator
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.logic.TimeEstimateService
@@ -62,9 +62,6 @@ trait Services[F[_]]:
 
   /** The associated `User`. */
   def user: User
-
-  /** The dynamic enums loaded from the DB. */
-  val enums: Enums
 
   /** Availability metadata (hardcoded for now). */
   def metadata: Metadata = Metadata.placeholder
@@ -173,6 +170,12 @@ trait Services[F[_]]:
 
   /** The `GnirsSpectroscopyService`. */
   def gnirsSpectroscopyService: GnirsSpectroscopyService[F]
+
+  /** The `ArchiveDuplicationService`. */
+  def archiveDuplicationService: ArchiveDuplicationService[F]
+
+  /** Construct a `ArchiveDuplicationSearchService`, given a `GoaClient`. */
+  def archiveDuplicationSearchService: ArchiveDuplicationSearchService[F]
 
   /** The `GroupService`. */
   def groupService: GroupService[F]
@@ -284,7 +287,6 @@ object Services:
    */
   def forUser[F[_]: Tracer: Logger: LoggerFactory: UUIDGen: Async: Parallel](
     user0: User,
-    enums0: Enums,
     mapping0: Option[Session[F] => Mapping[F]],
     emailConfig0: Config.Email,
     commitHash0: CommitHash,
@@ -295,13 +297,13 @@ object Services:
     s3FileService0: S3FileService[F],
     horizonsClient: HorizonsClient[F],
     telluricClient0: TelluricTargetsClient[F],
+    goaClient0: GoaClient[F],
     hminCache0: HminBrightnessCache = HminBrightnessCache.Empty,
   )(s: Session[F]): Services[F[_]] =
     new Services[F]:
 
       val user = user0
       val session = s
-      val enums = enums0
       val emailConfig = emailConfig0
       val httpClient = httpClient0
       val itcClient = itcClient0
@@ -369,6 +371,7 @@ object Services:
       lazy val gnirsImagingService = GnirsImagingService.instantiate
       lazy val gnirsSequenceService = GnirsSequenceService.instantiate
       lazy val gnirsSpectroscopyService = GnirsSpectroscopyService.instantiate
+      lazy val archiveDuplicationService = ArchiveDuplicationService.instantiate
       lazy val igrins2LongSlitService = Igrins2LongSlitService.instantiate
       lazy val igrins2SequenceService = Igrins2SequenceService.instantiate
       lazy val obsAttachmentAssignmentService = ObsAttachmentAssignmentService.instantiate
@@ -399,6 +402,7 @@ object Services:
       lazy val attachmentFileService = AttachmentFileService.instantiate(s3FileService)
       lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
       lazy val generator = Generator.instantiate(commitHash, tc)
+      lazy val archiveDuplicationSearchService = ArchiveDuplicationSearchService.instantiate(goaClient0)
       lazy val guideService = GuideService.instantiate(gaiaClient)
       lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
@@ -442,6 +446,8 @@ object Services:
     def gnirsImagingService[F[_]](using Services[F]): GnirsImagingService[F] = summon[Services[F]].gnirsImagingService
     def gnirsSequenceService[F[_]](using Services[F]): GnirsSequenceService[F] = summon[Services[F]].gnirsSequenceService
     def gnirsSpectroscopyService[F[_]](using Services[F]): GnirsSpectroscopyService[F] = summon[Services[F]].gnirsSpectroscopyService
+    def archiveDuplicationService[F[_]](using Services[F]): ArchiveDuplicationService[F] = summon[Services[F]].archiveDuplicationService
+    def archiveDuplicationSearchService[F[_]](using Services[F]): ArchiveDuplicationSearchService[F] = summon[Services[F]].archiveDuplicationSearchService
     def groupService[F[_]](using Services[F]): GroupService[F] = summon[Services[F]].groupService
     def igrins2LongSlitService[F[_]](using Services[F]): Igrins2LongSlitService[F] = summon[Services[F]].igrins2LongSlitService
     def igrins2SequenceService[F[_]](using Services[F]): Igrins2SequenceService[F] = summon[Services[F]].igrins2SequenceService
@@ -494,19 +500,6 @@ object Services:
     def requireServiceAccessOrThrow[F[_], A](fa: Services.ServiceAccess ?=> F[A])(using Services[F], MonadError[F, Throwable]): F[A] =
       requireServiceAccess(fa.map(Result.success)).flatMap: r =>
         ApplicativeError.liftFromOption(r.toOption, new RuntimeException(s"ServiceAccess required, ${user.id} not authorized."))
-
-    // In order to actually use this as an Enumerated, you'll probably have to assign it to a val in
-    // the service in which you want to use it. Like:
-    //   'val enumVal = services.enums' or `val enumVal = enums`.
-    // This is because you need a stable identifier in order to do anything like
-    //   `Enumerated[enumVal.ProposalStatus]`
-    // Alternatively, you could assign a variable to the implicit Services in the service instantiation
-    // method, like
-    //   `(using theSvcs: Services[F])`
-    // and then use
-    //   `Enumerated[theSvcs.enums.ProposalStatus]`
-    // You just need to be consistent within a service.
-    def enums[F[_]](using Services[F]): Enums = summon[Services[F]].enums
 
     extension [F[_]: MonadCancelThrow, A](s: Resource[F, Services[F]])
 

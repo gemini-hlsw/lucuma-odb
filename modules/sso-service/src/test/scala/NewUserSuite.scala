@@ -11,7 +11,7 @@ import org.http4s.headers.Location
 
 class NewUserSuite extends SsoSuite with Fixture {
 
-  test("Bob logs in via ORCID as a new lucuma user.".flaky) {
+  test("Bob logs in via ORCID as a new lucuma user.") {
     SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {

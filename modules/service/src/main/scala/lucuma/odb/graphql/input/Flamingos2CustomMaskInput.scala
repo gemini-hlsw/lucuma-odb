@@ -4,8 +4,10 @@
 package lucuma.odb.graphql.input
 
 import cats.syntax.parallel.*
-import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import lucuma.core.model.Defined
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask.Custom
 import lucuma.odb.graphql.binding.*
 
@@ -14,9 +16,7 @@ object Flamingos2CustomMaskInput:
   val Binding: Matcher[Custom] =
     ObjectFieldsBinding.rmap:
       case List(
-        StringBinding("filename", rFilename),
+        AttachmentIdBinding.Option("attachmentId", rAttachmentId),
         Flamingos2CustomSlitWidthBinding("slitWidth", rSlitWidth)
-      ) => (rFilename, rSlitWidth).parTupled.flatMap: (filename, slitWidth) =>
-        NonEmptyString.from(filename) match
-          case Left(_)  => Matcher.validationFailure("The Flamingos 2 custom FPU mask 'filename' cannot be empty.")
-          case Right(n) => Result(Custom(n, slitWidth))
+      ) => (rAttachmentId, rSlitWidth).parTupled.flatMap: (attachmentId, slitWidth) =>
+        Result(Custom(attachmentId.fold[MaskDefinition](ToBeDefined)(Defined(_)), slitWidth))

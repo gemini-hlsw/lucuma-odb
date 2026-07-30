@@ -17,6 +17,7 @@ import grackle.Result.Warning
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -26,7 +27,6 @@ import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.NoTransaction
@@ -73,7 +73,6 @@ object ChownRoutes:
     pool:           Resource[F, Session[F]],
     s3:             S3FileService[F],
     ssoClient:      SsoClient[F, User],
-    enums:          Enums,
     emailConfig:    Config.Email,
     commitHash:     CommitHash,
     calculator:     TimeEstimateCalculatorImplementation.ForInstrumentMode,
@@ -101,7 +100,6 @@ object ChownRoutes:
                 pool.map(
                   Services.forUser(
                     u,
-                    enums,
                     None,
                     emailConfig,
                     commitHash,
@@ -111,7 +109,8 @@ object ChownRoutes:
                     gaiaClient,
                     s3,
                     horizonsClient,
-                    TelluricTargetsClient.noop[F]
+                    TelluricTargetsClient.noop[F],
+                    GoaClient.noop[F]
                   )).useGiven:
 
                       // This request is coming from SSO so it's possible (although unlikely) that one or 

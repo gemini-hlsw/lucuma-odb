@@ -6,12 +6,12 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.all.*
+import lucuma.core.enums.ConditionsExpectationType
 import lucuma.core.util.TimeSpan
-import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
 
 final case class ConditionsExpectationInput(
-   tpe: Tag,
+   tpe: ConditionsExpectationType,
    timespan: TimeSpan
 )
 
@@ -20,7 +20,7 @@ object ConditionsExpectationInput:
  val Binding: Matcher[ConditionsExpectationInput] =
    ObjectFieldsBinding.rmap {
    case List(
-      TagBinding("type", rType),
+      ConditionsExpectationTypeBinding("type", rType),
       TimeSpanInput.Binding("timeframe", rTimeFrame)
    ) =>
       (rType, rTimeFrame).parMapN(ConditionsExpectationInput.apply)

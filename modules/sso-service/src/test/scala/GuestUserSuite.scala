@@ -14,7 +14,7 @@ import org.http4s.headers.Location
 
 class GuestUserSuite extends SsoSuite with Fixture {
 
-  test("Guest Login.".flaky) {
+  test("Guest Login.") {
     SsoSimulator[IO]
       .flatMap { case (pool, _, sso, jwtReader, _) => pool.map(db => (db, sso, jwtReader)) }
       .use { case (db, sso, jwtReader) =>
@@ -39,7 +39,7 @@ class GuestUserSuite extends SsoSuite with Fixture {
       }
   }
 
-  test("Guest user promotion.".flaky) {
+  test("Guest user promotion.") {
     val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
     SsoSimulator[IO]
       .flatMap { case (pool, sim, sso, jwtReader, _) => pool.map(db => (db, sim, sso, jwtReader)) }
@@ -81,7 +81,7 @@ class GuestUserSuite extends SsoSuite with Fixture {
       }
   }
 
-  test("Log in as guest, then as existing user.".flaky) {
+  test("Log in as guest, then as existing user.") {
     SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {

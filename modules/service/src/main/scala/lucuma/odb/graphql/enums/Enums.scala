@@ -3,40 +3,32 @@
 
 package lucuma.odb.graphql.enums
 
-import cats.Monad
+import cats.Functor
 import cats.data.NonEmptyList
-import cats.syntax.flatMap.*
 import cats.syntax.functor.*
-import cats.syntax.traverse.*
-import grackle.DirectiveDef
-import grackle.EnumType
-import grackle.NamedType
-import grackle.Schema
-import grackle.SchemaExtension
-import grackle.TypeExtension
 import lucuma.core.enums.Instrument
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
-import org.tpolecat.sourcepos.SourcePos
 import skunk.Session
 
 /**
- * Enums loaded from the database on startup.  These fall into two categories:
- * "referenced" enums, those for which we need to reference individual values
- * in code and "unreferenced" enums, those which are simply a listing of
- * elements to add to the schema.
+ * Enums whose values are loaded from the database on startup.  Ordinary enums
+ * are static: a Scala enum in lucuma-core, a GraphQL enum in `OdbSchema.graphql`
+ * and a database lookup table, kept in sync and verified by `StartupDiagnostics`.
+ * The enums here are the exception -- their members are known at compile time but
+ * their associated metadata lives in the database.
  *
- * @param enumMeta metadata for referenced enums
+ * @param enumMeta metadata for the enums defined here
  */
 final class Enums(
   enumMeta: Enums.Meta
 ) {
 
-  // The referenced enums defined in this class appear to be lazily constructed.
-  // Since they reference metadata which comes from the database, we want them
-  // to fail immediately if the associated meta data was not found.  For this
-  // reason they must be explicitly "used" in the construction of `Enums`. Add
-  // any new enums to the list below.
+  // The enums defined in this class appear to be lazily constructed.  Since they
+  // reference metadata which comes from the database, we want them to fail
+  // immediately if the associated meta data was not found.  For this reason they
+  // must be explicitly "used" in the construction of `Enums`. Add any new enums
+  // to the list below.
   Enumerated[TimeEstimate]
 
   /**
@@ -132,34 +124,15 @@ final class Enums(
 
   }
 
-  val schema: Schema =
-    new Schema {
-      def pos: SourcePos = SourcePos.instance
-      def baseTypes: List[NamedType] = enumMeta.unreferencedTypes
-      def directives: List[DirectiveDef] = Nil
-      def schemaExtensions: List[SchemaExtension] = Nil
-      def typeExtensions: List[TypeExtension] = Nil
-    }
-
 }
 
 object Enums {
 
   case class Meta(
-    timeEstimate:      Map[String, TimeEstimateMeta],
-    unreferencedTypes: List[EnumType]
+    timeEstimate: Map[String, TimeEstimateMeta]
   )
 
-  def load[F[_]: Monad](s: Session[F]): F[Enums] =
-    for {
-      te  <- TimeEstimateMeta.select(s)
-      un  <- List(
-               // "Unreferenced" types -- those for which we do not need to refer
-               // to individual instance in ODB code.
-               ConditionsExpectationTypeEnumType.fetch(s),
-               ConditionsMeasurementSourceEnumType.fetch(s),
-               SeeingTrendEnumType.fetch(s),
-             ).sequence
-    } yield Enums(Meta(te, un))
+  def load[F[_]: Functor](s: Session[F]): F[Enums] =
+    TimeEstimateMeta.select(s).map(te => Enums(Meta(te)))
 
 }

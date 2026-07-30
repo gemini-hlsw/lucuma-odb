@@ -16,6 +16,7 @@ import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.CentralWavelength
 import lucuma.core.syntax.string.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.igrins2.longslit.Acquisition as Igrins2Acquisition
 
 trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
 
@@ -42,6 +43,50 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
         }
       """
     ).void
+
+  def enableIgrins2Svc(
+    oid:                      Observation.Id,
+    explicitExposureSeconds:  Option[BigDecimal] = None,
+    explicitTelescopeConfigs: Option[String] = None
+  ): IO[Unit] =
+    val fields = List(
+      explicitExposureSeconds.map(s => s"explicitExposure: { seconds: $s }"),
+      explicitTelescopeConfigs.map(tcs => s"explicitTelescopeConfigs: $tcs")
+    ).flatten.mkString(", ")
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                igrins2LongSlit: {
+                  svc: { $fields }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  def queryIgrins2SvcIsNull(oid: Observation.Id): IO[Boolean] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode {
+                igrins2LongSlit {
+                  svc { exposure { seconds } }
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor.downFields("observation", "observingMode", "igrins2LongSlit", "svc").focus.exists(_.isNull)
 
   val Igrins2AtomQuery: String =
     s"""
@@ -114,4 +159,60 @@ trait ExecutionTestSupportForIgrins2 extends ExecutionTestSupport:
       "description"  -> "ABBA Cycle".asJson,
       "observeClass" -> obsClass.tag.toScreamingSnakeCase.asJson,
       "steps"        -> sciSteps.asJson
+    )
+
+  def igrins2AcquisitionQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
+    executionConfigQuery(oid, "igrins2", "acquisition", Igrins2AtomQuery, futureLimit)
+
+  private def igrins2ExpectedAcquisitionStep(
+    exposureTime: TimeSpan,
+    p:            BigDecimal,
+    q:            BigDecimal,
+    g:            StepGuideState
+  ): Json =
+    val tc = TelescopeConfig(
+      Offset(
+        Offset.P.signedDecimalArcseconds.reverseGet(p),
+        Offset.Q.signedDecimalArcseconds.reverseGet(q)
+      ),
+      g
+    )
+    json"""
+      {
+        "instrumentConfig": {
+          "exposure": { "seconds": ${exposureTime.toSeconds} },
+          "centralWavelength": { "nanometers": ${CentralWavelength.toNanometers.value.value.asJson} }
+        },
+        "stepConfig": { "stepType": "SCIENCE" },
+        "telescopeConfig": ${expectedTelescopeConfig(tc)},
+        "observeClass": "ACQUISITION",
+        "breakpoint": "DISABLED"
+      }
+    """
+
+  protected def igrins2ExpectedAcquisitionAtom(
+    exposureTime: TimeSpan,
+    offsets:      (BigDecimal, BigDecimal, StepGuideState)*
+  ): Json =
+    igrins2ExpectedAcquisitionAtomNamed(Igrins2Acquisition.AtomTitle.value, exposureTime, offsets*)
+
+  protected def igrins2ExpectedAcquisitionRepeats(
+    exposureTime: TimeSpan,
+    lastOffset:   (BigDecimal, BigDecimal, StepGuideState)
+  ): List[Json] =
+    List.fill(Igrins2Acquisition.RepeatingAtomCount):
+      igrins2ExpectedAcquisitionAtomNamed(Igrins2Acquisition.RepeatAtomTitle.value, exposureTime, lastOffset)
+
+  private def igrins2ExpectedAcquisitionAtomNamed(
+    description:  String,
+    exposureTime: TimeSpan,
+    offsets:      (BigDecimal, BigDecimal, StepGuideState)*
+  ): Json =
+    val steps = offsets.toList.map: (p, q, g) =>
+      igrins2ExpectedAcquisitionStep(exposureTime, p, q, g)
+
+    Json.obj(
+      "description"  -> description.asJson,
+      "observeClass" -> "ACQUISITION".asJson,
+      "steps"        -> steps.asJson
     )

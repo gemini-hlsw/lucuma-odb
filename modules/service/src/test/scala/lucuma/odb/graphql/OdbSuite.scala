@@ -43,6 +43,8 @@ import io.circe.syntax.*
 import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.clients.SimbadClient
+import lucuma.catalog.goa.GoaClient
+import lucuma.catalog.goa.GoaClientMock
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.catalog.votable.CatalogAdapter
@@ -158,7 +160,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       client <- httpClientResource
       res    <- client.run(req)
     yield res
-    
+
   /** Ensure that exactly the specified errors are reported, in order. */
   def interceptGraphQL(messages: String*)(fa: IO[Any])(using Location): IO[Unit] =
     fa.attempt.flatMap {
@@ -406,6 +408,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       TelluricTargetsClient
         .build[IO](uri"https://telluric-targets.gpp.gemini.edu/", httpClient, sc)
 
+  /** Override to control what the archive duplication search sees. */
+  protected def goaClient: IO[GoaClient[IO]] =
+    GoaClientMock.empty[IO].pure[IO]
+
   // These are overriden in OdbSuiteWithS3 for tests that need it.
   protected def s3ClientOpsResource: Resource[IO, S3AsyncClientOp[IO]] =
     S3FileService.s3AsyncClientOpsResource[IO](awsConfig)
@@ -442,7 +448,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       s3ClientOpsResource,
       s3PresignerResource,
       httpClient.pure[Resource[IO, *]],
-      horizonsClient.pure[Resource[IO, *]]
+      horizonsClient.pure[Resource[IO, *]],
+      Resource.eval(goaClient)
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
@@ -455,7 +462,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, enm, ptc, httpClient, horizonsClient, emailConfig)
+      goa <- Resource.eval(goaClient)
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig)
     } yield map
 
   protected def trace: Resource[IO, Trace[IO]] =
@@ -788,7 +796,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       enm  <- db.evalMap(Enums.load)
       ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       tc   <- Resource.eval(telluricClient)
-    yield Services.forUser(u, enm, None, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, tc)
+      goa  <- Resource.eval(goaClient)
+    yield Services.forUser(u, None, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, tc, goa)
 
   def withSession[A](f: Session[IO] => IO[A]): IO[A] =
     Resource.eval(IO(sessionFixture())).use(f)
@@ -834,9 +843,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         db   <- FMain.databasePoolResource[IO](databaseConfig)
         enm  <- db.evalMap(Enums.load)
         ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      yield (db, enm, ptc)
+      yield (db, ptc)
 
-    res.use: (db, enm, ptc) =>
+    res.use: (db, ptc) =>
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
@@ -845,14 +854,14 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         gaiaClient,
         itcClient,
         CommitHash.Zero,
-        enm,
         ptc,
         httpClient,
         horizonsClient,
+        GoaClient.noop[IO],
         emailConfig
       )
       db.use: s =>
-        given services: Services[IO] = Services.forUser(u, enm, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, TelluricTargetsClient.noop[IO])(s)
+        given services: Services[IO] = Services.forUser(u, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, TelluricTargetsClient.noop[IO], GoaClient.noop[IO])(s)
         requireServiceAccess:
           f(services).map(Result.success)
         .flatMap(_.get)

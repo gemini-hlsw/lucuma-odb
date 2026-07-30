@@ -5,9 +5,11 @@ package lucuma.odb.sequence
 
 import cats.Applicative
 import cats.Functor
+import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.either.*
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SmartGcalType
@@ -52,6 +54,26 @@ trait SmartGcalExpander[F[_], S, D]:
     step:   ProtoStep[D]
   )(using Functor[F]): F[List[ProtoStep[D]]] =
     expandStep(static, step).map(_.fold(_ => List.empty, _.toList))
+
+  /**
+   * Expands a (flat, arc) SmartGcal pair.  Either mapping may be missing, but
+   * not both.
+   */
+  def expandFlatAndOrArc(
+    static: S,
+    flat:   ProtoStep[D],
+    arc:    ProtoStep[D]
+  )(using Monad[F]): F[Either[String, NonEmptyList[ProtoStep[D]]]] =
+    for
+      fs  <- expandStepOptional(static, flat)
+      as  <- expandStepOptional(static, arc)
+      res <- NonEmptyList
+               .fromList(fs ++ as)
+               .fold(
+                 // Neither resolved, so repeat the flat lookup for its error.
+                 expandStep(static, flat).map(_.leftMap(m => s"$m (a flat or an arc is required)"))
+               )(_.asRight.pure[F])
+    yield res
 
 
 object SmartGcalExpander:

@@ -8,11 +8,11 @@ package input
 import cats.data.Ior
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.odb.data.Tag
+import lucuma.core.enums.SeeingTrend
 import lucuma.odb.graphql.binding.*
 
 final case class ConditionsIntuitionInput(
-   value: Ior[ConditionsExpectationInput, Tag]
+   value: Ior[ConditionsExpectationInput, SeeingTrend]
 )
 
 object ConditionsIntuitionInput:
@@ -21,7 +21,7 @@ object ConditionsIntuitionInput:
       ObjectFieldsBinding.rmap {
          case List(
             ConditionsExpectationInput.Binding.Option("expectation", rExpectation),
-            TagBinding.Option("seeingTrend", rSeeingTrend)
+            SeeingTrendBinding.Option("seeingTrend", rSeeingTrend)
          ) =>
             (rExpectation, rSeeingTrend).parTupled.flatMap { case (o1, o2) =>
                Result.fromOption(

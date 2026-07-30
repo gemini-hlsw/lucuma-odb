@@ -30,7 +30,7 @@ class ApiKeySuite extends SsoSuite with Fixture {
   implicit def gidQueryParamEncoder[A: Gid]: QueryParamEncoder[A] =
     QueryParamEncoder[String].contramap(Gid[A].fromString.reverseGet)
 
-  test("Create and redeem an API key.".flaky) {
+  test("Create and redeem an API key.") {
     SsoSimulator[IO].use { case (db, sim, sso, reader, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
@@ -67,7 +67,7 @@ class ApiKeySuite extends SsoSuite with Fixture {
     } .onError(e => IO(println(e)))
   }
 
-  test("Delete an API key and try to re-use it.".flaky) {
+  test("Delete an API key and try to re-use it.") {
     SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
@@ -91,7 +91,7 @@ class ApiKeySuite extends SsoSuite with Fixture {
     } .onError(e => IO(println(e)))
   }
 
-  test("Can't create an API key for someone else!".flaky) {
+  test("Can't create an API key for someone else!") {
     SsoSimulator[IO].use { case (_, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {
@@ -123,7 +123,7 @@ class ApiKeySuite extends SsoSuite with Fixture {
   }
 
 
-  test("Promote an API key.".flaky) {
+  test("Promote an API key.") {
     SsoSimulator[IO].use { case (db, sim, sso, reader, writer) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       val Bearer = CIString("Bearer")
@@ -154,7 +154,7 @@ class ApiKeySuite extends SsoSuite with Fixture {
     } .onError(e => IO(println(e)))
   }
 
-  test("Can't promote an API key without a user.".flaky) {
+  test("Can't promote an API key without a user.") {
     SsoSimulator[IO].use { case (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {

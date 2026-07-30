@@ -78,6 +78,23 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       GnirsWellDepth.Deep
     )
 
+  // 111/LXD cross-dispersed, mirroring the real 0.05"/pix 0.675" arc row.
+  //
+  // It has an arc but no flat, since the real flat block only covers 0.10" +
+  // pinhole.  Used to verify the sequence still generates without a flat.
+  private val gnirsCrossDispersedArcOnlyKey: Gnirs.TableKey =
+    Gnirs.TableKey(
+      GnirsPixelScale.PixelScale_0_05,
+      GnirsGrating.D111,
+      GnirsPrism.Lxd,
+      BoundedInterval.unsafeOpenUpper(
+        Wavelength.fromIntNanometers(900).get,
+        Wavelength.fromIntNanometers(2560).get
+      ),
+      GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_675),
+      GnirsWellDepth.Shallow
+    )
+
   val gnirsSmartFlat: SmartGcalValue.Legacy =
     SmartGcalValue(
       Gcal(
@@ -135,7 +152,8 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
         )
       ::: List(
-        Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrKey, gnirsSmartFlat)
+        Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrKey, gnirsSmartFlat),
+        Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsCrossDispersedArcOnlyKey, gnirsSmartArc)
       )
 
     prior >>
@@ -238,6 +256,36 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                   slit: { fpu: LONG_SLIT_0_20 }
                   centralWavelength: { nanometers: 3300 }
                   explicitWellDepth: DEEP
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  /**
+   * Configure a GNIRS LongSlit observation as 111 l/mm + LXD cross-dispersed,
+   * 0.675" slit, 1.6 µm, Shallow, on the given camera.
+   */
+  def configureGnirsCrossDispersed(oid: Observation.Id, camera: String): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  camera: $camera
+                  explicitGrating: D111
+                  explicitPrism: LXD
+                  slit: { fpu: LONG_SLIT_0_675 }
+                  centralWavelength: { nanometers: 1600 }
+                  explicitWellDepth: SHALLOW
                 }
               }
             }

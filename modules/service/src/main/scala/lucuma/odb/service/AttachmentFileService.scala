@@ -79,6 +79,7 @@ object AttachmentFileService {
     case object Forbidden                      extends AttachmentException
     case class InvalidRequest(message: String) extends AttachmentException
     case object FileNotFound                   extends AttachmentException
+    case object AttachmentInUse                extends AttachmentException
   }
 
   import AttachmentException.*
@@ -248,6 +249,8 @@ object AttachmentFileService {
         session
           .option(Statements.DeleteAttachment)(attachmentId)
           .map(_.toRight(FileNotFound))
+          .recover:
+            case SqlState.ForeignKeyViolation(_) => AttachmentInUse.asLeft
       }
 
     def checkForDuplicateName(

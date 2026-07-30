@@ -253,7 +253,7 @@ When writing a `Fragment` / `encoder` for an INSERT that maps to a table with `c
 |---|---|---|---|
 | GMOS North/South LongSlit, Flamingos-2 LongSlit | (none inline; comes from observation/defaults) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
 | GNIRS LongSlit | Inline columns in `t_gnirs_long_slit`: `c_acq_type`, `c_acq_coadds`, `c_acq_filter`, `c_acq_sky_offset_p`, `c_acq_sky_offset_q` (the two components together form a single `Option[Offset]` sky offset, enforced by a both-or-neither CHECK) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
-| IGRINS-2 LongSlit | (no acquisition sequence) | — | `t_exposure_time_mode` (role=science) |
+| IGRINS-2 LongSlit | Inline SVC (Slit-Viewing Camera) columns in `t_igrins_2_long_slit`: `c_save_svc_images`, `c_svc_exposure`, `c_svc_telescope_configs`. No acquisition sequence when SVC images aren't saved. | — | `t_exposure_time_mode` (role=science) |
 | GHOST IFU | — | — | Two rows (red + blue) in `t_exposure_time_mode` |
 
 The `check_etm_consistent` trigger function must be updated for each new mode.
@@ -267,3 +267,6 @@ Tests use Testcontainers (not docker-compose) to build a custom PostgreSQL image
 2. Then rerun; Testcontainers will rebuild the image fresh.
 
 **Migration type stability:** `CREATE OR REPLACE VIEW` cannot change a column's PostgreSQL type — the Docker build will fail even if the dev server accepted the migration (because the dev server had an older view already in place). Always use `DROP VIEW; CREATE VIEW` when changing column types, and cast bare string literals to `::varchar` to match domain-derived column types.
+
+## Code Conventions
+Don't put comments directly on method or class parameters, those belong to the method or class documentation or scaladoc.

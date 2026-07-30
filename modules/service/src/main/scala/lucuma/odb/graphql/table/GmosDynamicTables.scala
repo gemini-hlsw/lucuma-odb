@@ -7,7 +7,6 @@ package table
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import org.tpolecat.typename.TypeName
-import skunk.codec.text.varchar
 
 trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
 
@@ -47,9 +46,9 @@ trait GmosDynamicTables[F[_]] extends BaseMapping[F] {
     object Fpu {
       val SyntheticId: ColumnRef   = col("c_fpu_id",                     step_id.embedded)
       object CustomMask {
-        val SyntheticId: ColumnRef = col("c_fpu_custom_mask_id",         step_id.embedded)
-        val Filename: ColumnRef    = col("c_fpu_custom_mask_filename",   varchar.embedded)
-        val SlitWidth: ColumnRef   = col("c_fpu_custom_mask_slit_width", gmos_custom_slit_width.embedded)
+        val SyntheticId: ColumnRef  = col("c_fpu_custom_mask_id",            step_id.embedded)
+        val AttachmentId: ColumnRef = col("c_fpu_custom_mask_attachment_id", attachment_id.opt)
+        val SlitWidth: ColumnRef    = col("c_fpu_custom_mask_slit_width",    gmos_custom_slit_width.embedded)
       }
       val Builtin: ColumnRef       = col("c_fpu_builtin",                fpu.opt)
     }

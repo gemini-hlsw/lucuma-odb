@@ -5,8 +5,10 @@ package lucuma.odb.graphql
 package input
 
 import cats.syntax.parallel.*
-import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
+import lucuma.core.model.Defined
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask.Custom
 import lucuma.odb.graphql.binding.*
 
@@ -15,13 +17,10 @@ object GmosCustomMaskInput {
   val Binding: Matcher[Custom] =
     ObjectFieldsBinding.rmap {
       case List(
-        StringBinding("filename", rFilename),
+        AttachmentIdBinding.Option("attachmentId", rAttachmentId),
         GmosCustomSlitWidthBinding("slitWidth", rSlitWidth)
-      ) => (rFilename, rSlitWidth).parTupled.flatMap { (filename, slitWidth) =>
-        NonEmptyString.from(filename) match {
-          case Left(_)  => Matcher.validationFailure("The GMOS custom FPU mask 'filename' cannot be empty.")
-          case Right(n) => Result(Custom(n, slitWidth))
-        }
+      ) => (rAttachmentId, rSlitWidth).parTupled.flatMap { (attachmentId, slitWidth) =>
+        Result(Custom(attachmentId.fold[MaskDefinition](ToBeDefined)(Defined(_)), slitWidth))
       }
     }
 

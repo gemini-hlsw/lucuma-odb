@@ -54,6 +54,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -235,6 +236,12 @@ trait Codecs {
   val cloud_extinction_preset: Codec[CloudExtinction.Preset] =
     enumerated[CloudExtinction.Preset](Type.varchar)
 
+  val conditions_expectation_type: Codec[ConditionsExpectationType] =
+    enumerated[ConditionsExpectationType](Type.varchar)
+
+  val conditions_measurement_source: Codec[ConditionsMeasurementSource] =
+    enumerated[ConditionsMeasurementSource](Type.varchar)
+
   val core_timestamp: Codec[Timestamp] =
     timestamp.imap(Timestamp.fromLocalDateTimeTruncatedAndBounded)(_.toLocalDateTime)
 
@@ -355,6 +362,9 @@ trait Codecs {
 
   val gender: Codec[Gender] =
     enumerated(Type("e_gender"))
+
+  val archive_duplication_state: Codec[ArchiveDuplication.State] =
+    enumerated(Type("e_archive_duplication_state"))
 
   val guide_state: Codec[StepGuideState] =
     enumerated(Type("e_guide_state"))
@@ -581,6 +591,9 @@ trait Codecs {
 
   val science_subtype: Codec[ScienceSubtype] =
     enumerated(Type("e_science_subtype"))
+
+  val seeing_trend: Codec[SeeingTrend] =
+    enumerated[SeeingTrend](Type.varchar)
 
   val semester: Codec[Semester] =
     varchar.eimap(

@@ -127,11 +127,8 @@ object Science:
           val mode = Flamingos2ReadMode.forExposureTime(f2.value.exposure)
           f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
 
-        // The flat is required, but the arc is best-effort
-        for
-          fs <- EitherT(expander.expandStep(static, flat))
-          rs <- EitherT.liftF(expander.expandStepOptional(static, arc))
-        yield StepDefinition(a0, b0, b1, a1, fs.map(adjustReadMode) ++ rs.map(adjustReadMode))
+        EitherT(expander.expandFlatAndOrArc(static, flat, arc))
+          .map(cs => StepDefinition(a0, b0, b1, a1, cs.map(adjustReadMode)))
 
     object PreDef:
 

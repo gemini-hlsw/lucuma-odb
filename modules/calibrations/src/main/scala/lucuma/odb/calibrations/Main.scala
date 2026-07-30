@@ -18,6 +18,7 @@ import fs2.concurrent.Topic
 import fs2.io.net.Network
 import grackle.Result
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
@@ -211,7 +212,6 @@ object CMain extends MainParams {
 
   def services[F[_]: Async: Parallel: UUIDGen: Tracer: Logger: LoggerFactory](
     user: Option[User],
-    enums: Enums,
     emailConfig: Config.Email,
     commitHash: CommitHash,
     calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode,
@@ -226,7 +226,6 @@ object CMain extends MainParams {
       case Some(u) if u.role.access === Access.Service =>
         Services.forUser(
           u,
-          enums,
           None,
           emailConfig,
           commitHash,
@@ -237,6 +236,7 @@ object CMain extends MainParams {
           S3FileService.noop[F],
           horizonsClient,
           telClient,
+          GoaClient.noop[F],
           hminCache
         )(pool).pure
       case Some(u) =>
@@ -270,7 +270,7 @@ object CMain extends MainParams {
       itcClient          <- c.itcClient
       hminCache          <- Resource.eval(pool.use(TelluricTargetsService.loadBrightnessCache))
       _                  <- Resource.eval(info"Loading ${hminCache.value.size} configurations for telluric brightness")
-      servicesResource   = pool.evalMap(services(user, enums, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient, hminCache))
+      servicesResource   = pool.evalMap(services(user, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient, hminCache))
       _                  <- runCalibrationsDaemon(obsT, ctT, servicesResource)
       _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, servicesResource)
     } yield ExitCode.Success

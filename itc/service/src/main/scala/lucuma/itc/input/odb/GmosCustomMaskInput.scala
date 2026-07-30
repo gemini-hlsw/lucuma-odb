@@ -4,26 +4,21 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.parallel.*
-import eu.timepit.refined.types.string.NonEmptyString
-import grackle.Result
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask.Custom
 import lucuma.odb.graphql.binding.*
 
 object GmosCustomMaskInput {
 
+  // The ITC never uses the identity of a custom mask we only use the stlit width
+  // We can just ignore the param but we need to parse it anyway.
   val Binding: Matcher[Custom] =
     ObjectFieldsBinding.rmap {
       case List(
-            StringBinding("filename", rFilename),
+            AttachmentIdBinding.Option("attachmentId", _),
             GmosCustomSlitWidthBinding("slitWidth", rSlitWidth)
           ) =>
-        (rFilename, rSlitWidth).parTupled.flatMap { (filename, slitWidth) =>
-          NonEmptyString.from(filename) match {
-            case Left(_)  => Result.failure("The GMOS custom FPU mask 'filename' cannot be empty.")
-            case Right(n) => Result(Custom(n, slitWidth))
-          }
-        }
+        rSlitWidth.map(Custom(ToBeDefined, _))
     }
 
 }

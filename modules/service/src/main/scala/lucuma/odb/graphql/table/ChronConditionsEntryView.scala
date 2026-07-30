@@ -16,7 +16,7 @@ trait ChronConditionsEntryView[F[_]] extends BaseMapping[F] {
     val TransationId = col("c_transaction_id", int8) // xid8
     object Measurement {
       val SyntheticId   = col("c_measurement_id", int8.embedded)
-      val Source        = col("c_measurement_source", tag.embedded)
+      val Source        = col("c_measurement_source", conditions_measurement_source.embedded)
       object Seeing {
         val SyntheticId = col("c_measurement_seeing_id", int8.embedded)
         val Value       = col("c_measurement_seeing", angle_µas.embedded)
@@ -34,10 +34,10 @@ trait ChronConditionsEntryView[F[_]] extends BaseMapping[F] {
     }
     object Intuition {
       val SyntheticId = col("c_intuition_id", int8.embedded)
-      val SeeingTrend = col("c_intuition_seeing_trend", tag.opt)
+      val SeeingTrend = col("c_intuition_seeing_trend", seeing_trend.opt)
       object Expectation {
         val SyntheticId = col("c_expectation_id", int8.embedded)
-        val Expectation = col("c_intuition_expectation", tag.embedded)
+        val Expectation = col("c_intuition_expectation", conditions_expectation_type.embedded)
         val Timespan    = col("c_intuition_timespan", time_span.embedded)
       }
     }

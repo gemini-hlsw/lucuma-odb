@@ -5,7 +5,6 @@ package lucuma.odb.util
 
 import cats.syntax.either.*
 import cats.syntax.functor.*
-import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
@@ -15,18 +14,22 @@ import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.model.Attachment
+import lucuma.core.model.Defined
+import lucuma.core.model.MaskDefinition
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.util.Enumerated
 import skunk.*
 import skunk.codec.boolean.bool
-import skunk.codec.text.varchar
 import skunk.data.Arr
 import skunk.data.Type
 
 trait Flamingos2Codecs:
 
+  import Codecs.attachment_id
   import Codecs.enumerated
   import Codecs.time_span
 
@@ -69,12 +72,16 @@ trait Flamingos2Codecs:
       f2.useElectronicOffsetting
     )}
 
+  // The slit width, not the attachment id, marks a custom mask as present.
   val flamingos_2_fpu_mask_custom: Codec[Flamingos2FpuMask.Custom] =
-    (varchar *: flamingos_2_custom_slit_width).eimap { case (n, w) =>
-      NonEmptyString.from(n).leftMap(_ => "Custom mask filename cannot be empty").map { ne =>
-        Flamingos2FpuMask.Custom(ne, w)
-      }
-    } { c => (c.filename.value, c.slitWidth)}
+    (attachment_id.opt *: flamingos_2_custom_slit_width).imap { case (moid, w) =>
+      Flamingos2FpuMask.Custom(moid.fold[MaskDefinition](ToBeDefined)(Defined(_)), w)
+    } { c =>
+      val moid: Option[Attachment.Id] = c.mask match
+        case ToBeDefined => None
+        case Defined(id) => Some(id)
+      (moid, c.slitWidth)
+    }
 
   val flamingos_2_fpu_mask: Codec[Flamingos2FpuMask] =
      (flamingos_2_fpu_mask_custom.opt *: flamingos_2_fpu.opt).eimap {

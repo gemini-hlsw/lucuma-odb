@@ -10,6 +10,7 @@ import cats.effect.std.UUIDGen
 import cats.implicits.*
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
@@ -19,7 +20,6 @@ import lucuma.core.util.Enumerated
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.AttachmentFileService
@@ -46,7 +46,6 @@ object AttachmentRoutes {
     pool:           Resource[F, Session[F]],
     s3:             S3FileService[F],
     ssoClient:      SsoClient[F, User],
-    enums:          Enums,
     maxUploadMb:    Int,
     emailConfig:    Config.Email,
     commitHash:     CommitHash,
@@ -61,7 +60,6 @@ object AttachmentRoutes {
         pool.map(
           Services.forUser(
             u,
-            enums,
             None,
             emailConfig,
             commitHash,
@@ -71,7 +69,8 @@ object AttachmentRoutes {
             gaiaClient,
             s3,
             horizonsClient,
-            TelluricTargetsClient.noop[F]
+            TelluricTargetsClient.noop[F],
+            GoaClient.noop[F]
           )).map(_.attachmentFileService).use(fa),
       ssoClient,
       maxUploadMb
@@ -99,11 +98,12 @@ object AttachmentRoutes {
     import dsl._
 
     extension (exc: AttachmentException)
-      def toErrorResponse: F[Response[F]] = exc match {
-        case AttachmentException.Forbidden        => Forbidden()
-        case AttachmentException.FileNotFound     => NotFound()
+      def toErrorResponse: F[Response[F]] = exc match
+        case AttachmentException.Forbidden           => Forbidden()
+        case AttachmentException.FileNotFound        => NotFound()
         case AttachmentException.InvalidRequest(msg) => BadRequest(msg)
-      }
+        case AttachmentException.AttachmentInUse     =>
+          Conflict("The attachment is in use and cannot be deleted.")
 
     extension[A](fe: F[Either[AttachmentException, A]])
       def toResponse(fa: A => F[Response[F]]): F[Response[F]] =

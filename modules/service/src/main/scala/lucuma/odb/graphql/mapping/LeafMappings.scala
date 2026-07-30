@@ -46,6 +46,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.CalculationState
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -93,8 +94,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[DatabaseOperation](DatabaseOperationType),
       LeafMapping[DatasetQaState](DatasetQaStateType),
       LeafMapping[DatasetReference](DatasetReferenceLabelType),
-      LeafMapping[Tag](ConditionsExpectationTypeType),
-      LeafMapping[Tag](ConditionsMeasurementSourceType),
+      LeafMapping[ConditionsExpectationType](ConditionsExpectationTypeType),
+      LeafMapping[ConditionsMeasurementSource](ConditionsMeasurementSourceType),
       LeafMapping[NonEmptyString](DatasetFilenameType),
       LeafMapping[Dataset.Id](DatasetIdType),
       LeafMapping[DatasetStage](DatasetStageType),
@@ -164,6 +165,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GnirsCamera](GnirsCameraType),
       LeafMapping[GnirsReadMode](GnirsReadModeType),
       LeafMapping[GnirsWellDepth](GnirsWellDepthType),
+      LeafMapping[ArchiveDuplication.State](ArchiveDuplicationStateType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),
@@ -206,7 +208,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[ScienceBand](ScienceBandType),
       LeafMapping[ScienceMode](ScienceModeType),
       LeafMapping[ScienceSubtype](ScienceSubtypeType),
-      LeafMapping[Tag](SeeingTrendType),
+      LeafMapping[SeeingTrend](SeeingTrendType),
       LeafMapping[Semester](SemesterType),
       LeafMapping[SequenceCommand](SequenceCommandType),
       LeafMapping[SequenceType](SequenceTypeType),

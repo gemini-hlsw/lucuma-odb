@@ -36,7 +36,7 @@ class SsoClientSuite extends SsoSuite with Fixture {
   def otherServer(ssoClient: SsoClient[IO, UserInfo]): Client[IO] =
     Client.fromHttpApp(routes(ssoClient).orNotFound)
 
-  test("Call a remote service with a JWT.".flaky) {
+  test("Call a remote service with a JWT.") {
     SsoSimulator[IO].use { case (_, sim, sso, reader, writer) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       val Bearer = CIString("Bearer")
@@ -71,7 +71,7 @@ class SsoClientSuite extends SsoSuite with Fixture {
     }
   }
 
-  test("Call a remote service with an API key.".flaky) {
+  test("Call a remote service with an API key.") {
     SsoSimulator[IO].use { case (db, sim, sso, reader, writer) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       val Bearer = CIString("Bearer")
@@ -108,7 +108,7 @@ class SsoClientSuite extends SsoSuite with Fixture {
   }
 
 
-  test("Can't call remote service with no user.".flaky) {
+  test("Can't call remote service with no user.") {
     SsoSimulator[IO].use { case (_, sim, sso, reader, writer) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
       for {

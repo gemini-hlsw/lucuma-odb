@@ -73,60 +73,64 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
   // encodes to LR_IFU / HR_IFU, crossDispersed to NO, and the analysis method is
   // "sum of 2x2 elements at the center" with a single sky fibre (the production
   // default). Each resolution requires its specific camera.
+  //
+  // The S/N at the requested wavelength is asserted explicitly: the OCS GnirsRecipe IFU
+  // branch used to hardcode an empty signalToNoiseAt, which left the S/N column of the
+  // Explore spectroscopy modes table blank for GNIRS IFU rows in time-and-count mode.
   test("gnirs IFU".tag(LegacyITCTest)):
-    Enumerated[GnirsFpuIfu].all.foreach: ifu =>
+    assertAllValid(
+      Enumerated[GnirsFpuIfu].all,
+      errorCheck = _ => false,
+      resultCheck = containsValidResultsWithSNAt
+    ): ifu =>
       val ifuMode = gnirs.copy(
         fpu = GnirsFpu.Spectroscopy.Ifu(ifu),
         camera = gnirsCameraForIfu(ifu)
       )
-      val result  = localItc.calculate:
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, ifuMode, gnirsIfuAnalysisMethod).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
   test("gnirs grating".tag(LegacyITCTest)):
-    Enumerated[GnirsGrating].all.foreach: g =>
-      val result = localItc.calculate:
-        bodyConf(sourceDefinition, obs, gnirs.copy(grating = g)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
+    assertAllValid(Enumerated[GnirsGrating].all): g =>
+      localItc.calculate:
+        bodyConf(
+          sourceDefinition,
+          obs,
+          gnirs.copy(grating = g, camera = gnirsCameraForGrating(g, gnirs.camera))
+        ).asJson.noSpaces
 
   test("gnirs filter".tag(LegacyITCTest)):
-    Enumerated[GnirsFilter].all.foreach: f =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsFilter].all): f =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(filter = f)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs camera".tag(LegacyITCTest)):
-    Enumerated[GnirsCamera].all.foreach: c =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsCamera].all): c =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(camera = c)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs prism".tag(LegacyITCTest)):
-    Enumerated[GnirsPrism].all.foreach: p =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsPrism].all): p =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(prism = p)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs read mode".tag(LegacyITCTest)):
-    Enumerated[GnirsReadMode].all.foreach: r =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsReadMode].all): r =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(readMode = r)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs slit width".tag(LegacyITCTest)):
-    Enumerated[GnirsFpuSlit].all.foreach: s =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsFpuSlit].all): s =>
+      localItc.calculate:
         bodyConf(sourceDefinition,
                  obs,
                  gnirs.copy(fpu = GnirsFpu.Spectroscopy.Slit(s))
         ).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   test("gnirs well depth".tag(LegacyITCTest)):
-    Enumerated[GnirsWellDepth].all.foreach: w =>
-      val result = localItc.calculate:
+    assertAllValid(Enumerated[GnirsWellDepth].all): w =>
+      localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(wellDepth = w)).asJson.noSpaces
-      assertIOBoolean(result.map(_.fold(allowedErrors, containsValidResults)))
 
   testConditions("GNIRS spectroscopy integration time", baseParams)
 
