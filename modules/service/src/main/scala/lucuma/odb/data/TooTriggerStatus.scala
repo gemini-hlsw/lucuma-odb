@@ -18,14 +18,8 @@ import lucuma.core.util.Enumerated
  * Defined here in the odb project for now; move to lucuma-core once the design
  * settles.
  */
-sealed abstract class TooTriggerStatus(val tag: String) extends Product with Serializable
-
-object TooTriggerStatus:
-
-  case object Requested extends TooTriggerStatus("requested")
-  case object Accepted  extends TooTriggerStatus("accepted")
-  case object Denied    extends TooTriggerStatus("denied")
-  case object Withdrawn extends TooTriggerStatus("withdrawn")
-
-  given Enumerated[TooTriggerStatus] =
-    Enumerated.from(Requested, Accepted, Denied, Withdrawn).withTag(_.tag)
+enum TooTriggerStatus(val tag: String) derives Enumerated:
+  case Requested extends TooTriggerStatus("requested")
+  case Accepted  extends TooTriggerStatus("accepted")
+  case Denied    extends TooTriggerStatus("denied")
+  case Withdrawn extends TooTriggerStatus("withdrawn")
