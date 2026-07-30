@@ -3557,6 +3557,15 @@ type Mutation {
   ): ReplaceGnirsSequenceResult!
 
   """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGhostSequence(
+    input: ReplaceGhostSequenceInput!
+  ): ReplaceGhostSequenceResult!
+
+  """
   Re-runs the Archive Duplication Search for an observation, replacing its
   stored result with what the Gemini Observatory Archive holds now.
 
@@ -21599,6 +21608,39 @@ input GnirsAtomInput {
 }
 
 """
+GHOST detector configuration input for a single step.
+"""
+input GhostDetectorInput {
+  exposureTime: TimeSpanInput!
+  exposureCount: PosInt!
+  binning: GhostBinning!
+  readMode: GhostReadMode!
+}
+
+"""
+GHOST dynamic step configuration input.
+"""
+input GhostDynamicInput {
+  red: GhostDetectorInput!
+  blue: GhostDetectorInput!
+  ifu1FiberAgitator: GhostIfu1FiberAgitator!
+  ifu2FiberAgitator: GhostIfu2FiberAgitator!
+}
+
+input GhostStepInput {
+  instrumentConfig: GhostDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GhostAtomInput {
+  description: NonEmptyString
+  steps: [GhostStepInput!]!
+}
+
+"""
 Replace Flamingos 2 sequence input.  Select the observation using one of the
 observation ID or the observation reference.  If both are provided, they must
 refer to the same observation.
@@ -21736,4 +21778,32 @@ sequence.
 """
 type ReplaceGnirsSequenceResult {
   sequence: [GnirsAtom!]!
+}
+
+"""
+Replace GHOST sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGhostSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GhostAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGhostSequenceResult {
+  sequence: [GhostAtom!]!
 }

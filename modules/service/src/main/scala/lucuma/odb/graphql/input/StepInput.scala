@@ -7,6 +7,7 @@ import cats.syntax.parallel.*
 import lucuma.core.enums.Breakpoint
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
@@ -50,3 +51,6 @@ object StepInput:
 
   val GnirsBinding: Matcher[ProtoStep[GnirsDynamicConfig]] =
     binding(GnirsDynamicInput.Binding)
+
+  val GhostBinding: Matcher[ProtoStep[GhostDynamicConfig]] =
+    binding(GhostDynamicInput.Binding)

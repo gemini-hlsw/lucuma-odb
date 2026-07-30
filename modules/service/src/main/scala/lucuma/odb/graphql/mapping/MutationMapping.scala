@@ -55,6 +55,7 @@ import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.instances.given
 import lucuma.odb.json.all.query.given
+import lucuma.odb.json.ghost.query.given
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.SuperUserAccess
@@ -108,6 +109,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       ReplaceGmosSouthSequence,
       ReplaceIgrins2Sequence,
       ReplaceGnirsSequence,
+      ReplaceGhostSequence,
       ResetAcquisition,
       RevokeUserInvitation,
       SetAllocations,
@@ -577,6 +579,18 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             services.useTransactionally:
               sequenceService
                 .replaceGnirsSequence(checked)
+                .nestMap: s =>
+                  Json.obj("sequence" -> s.compile.toList.asJson)
+
+  private lazy val ReplaceGhostSequence =
+    MutationField.json("replaceGhostSequence", ReplaceSequenceInput.ReplaceGhostBinding): input =>
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            services.useTransactionally:
+              sequenceService
+                .replaceGhostSequence(checked)
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
