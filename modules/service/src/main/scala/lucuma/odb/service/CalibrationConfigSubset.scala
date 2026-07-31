@@ -338,10 +338,7 @@ object CalibrationConfigSubset:
             gs.roi
           )
 
-        // MOS is calibrated as a long slit: the calibration is a standard star
-        // observed through a slit of the mask's width, so it collapses into the
-        // same config group as an equivalent long slit observation.  See ADR
-        // "GMOS MOS shares the long slit calibration config subset".
+        // MOS is calibrated as a long slit
         case gnm: MosConfig.GmosNorth =>
           GmosNConfigs(
             gnm.grating,

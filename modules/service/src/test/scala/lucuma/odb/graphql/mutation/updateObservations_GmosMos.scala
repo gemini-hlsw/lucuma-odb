@@ -14,8 +14,11 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.enums.AttachmentType
 import lucuma.odb.service.GmosMosService
 import lucuma.odb.util.Codecs.attachment_id
+import lucuma.odb.util.Codecs.attachment_type
+import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import skunk.Query
 import skunk.codec.text.text
@@ -41,6 +44,18 @@ class updateObservations_GmosMos extends OdbSuite:
         RETURNING c_attachment_id
       """.query(attachment_id)
     withSession(_.unique(q)(pid, tpe, fileName))
+
+  // The mask attachment is stored as two columns (id + type) pinned together
+  // by a composite foreign key, and the type column is not exposed via GraphQL,
+  // so clearing the mask can only be fully verified against the row itself.
+  private def readNorthMaskColumns(oid: Observation.Id): IO[(Option[Attachment.Id], Option[AttachmentType])] =
+    val q: Query[Observation.Id, (Option[Attachment.Id], Option[AttachmentType])] =
+      sql"""
+        SELECT c_mask_attachment_id, c_mask_attachment_type
+        FROM t_gmos_north_mos
+        WHERE c_observation_id = $observation_id
+      """.query((attachment_id.opt *: attachment_type.opt).map((aid, tpe) => (aid, tpe)))
+    withSession(_.unique(q)(oid))
 
   private val scienceRequirements: String =
     """
@@ -175,6 +190,8 @@ class updateObservations_GmosMos extends OdbSuite:
                  }
                }
              """.asRight)
+      cols <- readNorthMaskColumns(oid)
+      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
 
   test("edit the slit width alone, leaving the attachment in place"):

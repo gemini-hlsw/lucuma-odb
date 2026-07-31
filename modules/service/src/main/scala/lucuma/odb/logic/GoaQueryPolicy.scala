@@ -127,8 +127,9 @@ object GoaQueryPolicy:
         List(gmosScienceArea.longSlitMode.shapeAt(pa, off, c.fpu.asLeft))
       case c: GmosSouthLongSlit  =>
         List(gmosScienceArea.longSlitMode.shapeAt(pa, off, c.fpu.asRight))
-      // A MOS mask spreads its slitlets over the whole GMOS field, so the
+      // A MOS mask spreads its slits over the whole GMOS field, so the
       // science area is the imaging field rather than a single slit.
+      // This is debatable of course but we don't have a precise location of the slits yet.
       case _: GmosNorthMos       =>
         List(gmosScienceArea.imaging)
       case _: GmosSouthMos       =>

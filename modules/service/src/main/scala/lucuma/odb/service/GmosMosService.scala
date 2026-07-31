@@ -179,8 +179,7 @@ object GmosMosService {
           case SqlState.ForeignKeyViolation(e) if e.constraintName.exists(_.contains("mask_attachment_fkey")) =>
             Result.failure(MaskAttachmentViolationMessage)
 
-      // MOS has no acquisition sequence, so it has no acquisition exposure time
-      // mode; only the science one is inserted.
+      // MOS has no acquisition sequence, so it has no acquisition exposure time mode
       private def insert(
         name:  String,
         input: GmosMosInput.Create[?, ?],
@@ -302,9 +301,7 @@ object GmosMosService {
     ): AppliedFragment =
       selectGmosMos("v_gmos_south_mos", observationIds)
 
-    // The attachment type is written alongside the id purely to satisfy the
-    // composite foreign key that pins the attachment to this program and to
-    // 'mos_mask'; it is never read back.
+    // The attachment type is written alongside the id to satisfy the foreign key.
     val InsertGmosNorthMos: Fragment[(
       Observation.Id,
       GmosNorthGrating,

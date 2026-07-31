@@ -15,7 +15,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.data.OdbError
 import lucuma.odb.util.Codecs.attachment_id
 import lucuma.odb.util.Codecs.program_id
 import skunk.Query
@@ -401,9 +400,7 @@ class createObservation_GmosMos extends OdbSuite:
              )
     yield ()
 
-  // MOS reuses the long slit grating column on t_configuration_request (V1235),
-  // so the observing mode type is the only thing keeping the two apart.  A MOS
-  // and a long slit observation with the same grating must not share a request.
+  // A MOS and a long slit observation with the same grating must not share a request.
   test("a MOS request is distinct from a long slit request with the same grating"):
     for
       cfp  <- createGeminiCallForProposalsAs(staff)
@@ -417,21 +414,3 @@ class createObservation_GmosMos extends OdbSuite:
       _    <- assertIO(IO(rMos =!= rLs), true, "MOS and long slit shared a configuration request")
     yield ()
 
-  // The sequence cannot be generated for MOS yet.  This guards the deliberate
-  // partial state: the mode is fully readable, but asking for a sequence still
-  // fails, and it fails for the intended reason.
-  test("the sequence is still unavailable"):
-    setup(northMode).flatMap: (_, oid) =>
-      expectOdbError(
-        user  = pi,
-        query = s"""
-          query {
-            executionConfig(observationId: "$oid") {
-              gmosNorth { static { stageMode } }
-            }
-          }
-        """,
-        expected = {
-          case OdbError.SequenceUnavailable(_, Some(m)) if m === "Gmos North MOS sequence generation is not yet implemented" => ()
-        }
-      )

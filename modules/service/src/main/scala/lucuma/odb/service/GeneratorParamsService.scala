@@ -464,9 +464,6 @@ object GeneratorParamsService {
             ).asRight
 
           // MOS has no acquisition sequence yet, so it takes the science-only
-          // shape (as IGRINS-2 does).  The ITC already models a custom mask, so
-          // exposure times can be calculated even though the sequence cannot be
-          // generated.
           case gnm @ gmos.mos.Config.GmosNorth(g, f, m, c) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.exposureTimeMode,

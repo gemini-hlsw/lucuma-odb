@@ -1997,10 +1997,8 @@ input GmosCustomMaskInput {
 """
 GMOS MOS custom mask input parameters.
 
-Unlike `GmosCustomMaskInput`, which describes a mask as executed on a recorded
-step, this describes the mask a MOS observation requests.  Both fields are
-optional so that an edit can change one without resending the other; the slit
-width is required when the mode is created.
+Distinct from `GmosCustomMaskInput`, which carries a *complete* mask (slit width
+required) as the FPU of a dynamic sequence step. 
 """
 input GmosMosCustomMaskInput {
   """

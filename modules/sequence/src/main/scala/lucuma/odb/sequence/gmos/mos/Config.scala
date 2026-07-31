@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 package gmos.mos
 
 import cats.Eq
+import cats.derived.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosCustomSlitWidth
@@ -169,7 +170,7 @@ object Config:
     filter:     Option[GmosNorthFilter],
     customMask: GmosFpuMask.Custom,
     common:     Common
-  ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
+  ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
@@ -213,23 +214,12 @@ object Config:
     override def explicitSpatialOffsets: Option[List[Q]] =
       common.explicitSpatialOffsets
 
-  object GmosNorth:
-
-    given Eq[GmosNorth] =
-      Eq.by: a =>
-        (
-          a.grating,
-          a.filter,
-          a.customMask,
-          a.common
-        )
-
   final case class GmosSouth(
     grating:    GmosSouthGrating,
     filter:     Option[GmosSouthFilter],
     customMask: GmosFpuMask.Custom,
     common:     Common
-  ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
+  ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
@@ -272,17 +262,6 @@ object Config:
 
     override def explicitSpatialOffsets: Option[List[Q]] =
       common.explicitSpatialOffsets
-
-  object GmosSouth:
-
-    given Eq[GmosSouth] =
-      Eq.by: a =>
-        (
-          a.grating,
-          a.filter,
-          a.customMask,
-          a.common
-        )
 
   def explicitWavelengthDithers[G, L, U]: Lens[Config[G, L, U], Option[List[WavelengthDither]]] =
     Lens[Config[G, L, U], Option[List[WavelengthDither]]](_.explicitWavelengthDithers) { dithers => {
