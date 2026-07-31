@@ -8,13 +8,13 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.enums.AttachmentType
 import lucuma.odb.service.GmosMosService
 import lucuma.odb.util.Codecs.attachment_id
 import lucuma.odb.util.Codecs.attachment_type
