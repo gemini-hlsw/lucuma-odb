@@ -31,6 +31,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
+import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
 import lucuma.odb.sequence.syntax.hash.*
 import monocle.Lens
 
@@ -151,38 +152,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     bao.toByteArray
 
 object Config:
-
-  final case class Common(
-    centralWavelength:           Wavelength,
-    exposureTimeMode:            ExposureTimeMode,
-    defaultXBin:                 GmosXBinning,
-    explicitXBin:                Option[GmosXBinning],
-    defaultYBin:                 GmosYBinning,
-    explicitYBin:                Option[GmosYBinning],
-    explicitAmpReadMode:         Option[GmosAmpReadMode],
-    explicitAmpGain:             Option[GmosAmpGain],
-    explicitRoi:                 Option[GmosRoi],
-    explicitWavelengthDithers:   Option[List[WavelengthDither]],
-    explicitSpatialOffsets:      Option[List[Q]]
-  )
-
-  object Common:
-
-    given Eq[Common] =
-      Eq.by: a =>
-        (
-          a.centralWavelength,
-          a.exposureTimeMode,
-          a.defaultXBin,
-          a.explicitXBin,
-          a.defaultYBin,
-          a.explicitYBin,
-          a.explicitAmpReadMode,
-          a.explicitAmpGain,
-          a.explicitRoi,
-          a.explicitWavelengthDithers,
-          a.explicitSpatialOffsets
-        )
 
   final case class GmosNorth(
     grating:     GmosNorthGrating,

@@ -11,6 +11,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.arb.ArbEnumerated.given
+import lucuma.odb.sequence.gmos.SpectroscopyConfig
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.service.CalibrationConfigMatcher.UnknownConfig
@@ -30,7 +31,7 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
       grating = GmosNorthGrating.B1200_G5301,
       filter = GmosNorthFilter.GPrime.some,
       fpu = GmosNorthFpu.LongSlit_1_00,
-      common = Config.Common(
+      common = SpectroscopyConfig.Common(
         centralWavelength = w,
         exposureTimeMode = e,
         defaultXBin = GmosXBinning.One,

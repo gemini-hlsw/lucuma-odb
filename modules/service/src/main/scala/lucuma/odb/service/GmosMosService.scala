@@ -9,6 +9,7 @@ import cats.effect.Concurrent
 import cats.syntax.all.*
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosCustomSlitWidth
@@ -26,12 +27,11 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.MaskDefinition
 import lucuma.core.model.Observation
 import lucuma.core.model.ToBeDefined
-import lucuma.core.enums.AttachmentType
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
-import lucuma.odb.sequence.gmos.mos.Config.Common
+import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
 import lucuma.odb.sequence.gmos.mos.Config.GmosNorth
 import lucuma.odb.sequence.gmos.mos.Config.GmosSouth
 import lucuma.odb.util.Codecs.*
