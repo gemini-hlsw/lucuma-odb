@@ -122,6 +122,7 @@ object OdbMapping {
           with BaseMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
+          with AddEventsResultMapping[F]
           with AddProgramUserResultMapping[F]
           with AddSequenceEventResultMapping[F]
           with AddSlewEventResultMapping[F]
@@ -389,6 +390,7 @@ object OdbMapping {
               List[TypeMapping](
                 AddConditionsEntryResultMapping,
                 AddDatasetEventResultMapping,
+                AddEventsResultMapping,
                 AddProgramUserResultMapping,
                 AddSequenceEventResultMapping,
                 AddSlewEventResultMapping,

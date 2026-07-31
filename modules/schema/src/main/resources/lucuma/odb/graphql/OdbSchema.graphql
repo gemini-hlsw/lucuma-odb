@@ -122,6 +122,45 @@ type AddStepEventResult {
 }
 
 """
+A single event within an 'addEvents' batch.  Exactly one of the fields must be
+set, identifying the event type.  Unlike the singular mutations, every event in
+a batch must supply both a 'clientTime' and an 'idempotencyKey' (see 'addEvents').
+"""
+input AddEventInput {
+  dataset:  AddDatasetEventInput
+  sequence: AddSequenceEventInput
+  slew:     AddSlewEventInput
+  step:     AddStepEventInput
+}
+
+"""
+Input to the 'addEvents' mutation, recording a batch of execution events in a
+single request.
+
+Because a batch shares one database transaction, its events would otherwise all
+receive the same recorded time; every event must therefore supply its own
+'clientTime' (the mutation fails otherwise).  Every event must also supply a
+distinct 'idempotencyKey' so the batch can be retried safely.  All events must
+belong to the same observation.
+"""
+input AddEventsInput {
+  events: [AddEventInput!]!
+}
+
+"The result of adding a batch of events."
+type AddEventsResult {
+  "The new events that were added, in the order they were recorded."
+  events: [ExecutionEvent!]!
+
+  """
+  `true` when the batch contained more events than were returned (the default
+  maximum is 1000).  All submitted events are recorded regardless; only the
+  returned list is truncated.
+  """
+  hasMore: Boolean!
+}
+
+"""
 Input to the 'addTimeChargeCorrection' mutation. Identifies the visit
 that will be corrected and describes the correction itself.
 """
@@ -3368,6 +3407,17 @@ type Mutation {
     """
     input: AddStepEventInput!
   ): AddStepEventResult!
+
+  """
+  Records a batch of execution events (of any type) for a single observation in
+  one request, reducing the per-event round trips that recording a sequence would
+  otherwise incur.  Every event must supply its own 'clientTime' and a distinct
+  'idempotencyKey'; the events are recorded in the order given.  The batch is
+  atomic -- if any event is rejected, none are recorded.
+  """
+  addEvents(
+    input: AddEventsInput!
+  ): AddEventsResult!
 
   """
   Adds a new time accounting correction for a particular observation.  Note

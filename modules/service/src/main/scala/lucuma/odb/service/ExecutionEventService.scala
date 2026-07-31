@@ -10,6 +10,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.show.*
+import cats.syntax.traverse.*
 import fs2.Stream
 import grackle.Result
 import grackle.ResultT
@@ -30,6 +31,8 @@ import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AddDatasetEventInput
+import lucuma.odb.graphql.input.AddEventInput
+import lucuma.odb.graphql.input.AddEventsInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
@@ -69,6 +72,10 @@ trait ExecutionEventService[F[_]]:
   def insertStepEvent(
     input: AddStepEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent.Id]]
+
+  def insertEvents(
+    input: AddEventsInput
+  )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]]
 
   def selectSequenceEvents(
     oid: Observation.Id
@@ -200,6 +207,49 @@ object ExecutionEventService:
           .map((eid, _) => eid)
           .value
 
+      override def insertEvents(
+        input: AddEventsInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]] =
+
+        def observationOf(e: AddEventInput): F[Result[Observation.Id]] =
+          e match
+            case AddEventInput.Slew(v)     =>
+              v.observationId.success.pure
+            case AddEventInput.Dataset(v)  =>
+              session.option(Statements.SelectDatasetObservation)(v.datasetId)
+                .map(_.toResult(OdbError.InvalidDataset(v.datasetId, s"Dataset '${v.datasetId.show}' not found".some).asProblem))
+            case AddEventInput.Step(v)     =>
+              session.option(Statements.SelectStepObservation)(v.stepId)
+                .map(_.toResult(OdbError.InvalidStep(v.stepId, s"Step '${v.stepId}' not found".some).asProblem))
+            case AddEventInput.Sequence(v) =>
+              session.option(Statements.SelectVisitObservation)(v.visitId)
+                .map(_.toResult(OdbError.InvalidVisit(v.visitId, s"Visit '${v.visitId}' not found".some).asProblem))
+
+        // Batches are scoped to a single observation: every event insert takes the
+        // observation's execution mutex, so a multi-observation batch would take
+        // several in array order and could deadlock against a concurrent batch
+        // taking them in another order.  One observation means one mutex per batch.
+        val requireSingleObservation: F[Result[Unit]] =
+          input.events.traverse(observationOf).map: results =>
+            results.sequence.flatMap: oids =>
+              if oids.toList.distinct.size <= 1 then ().success
+              else OdbError.InvalidArgument("All events in a batch must belong to the same observation.".some).asFailure
+
+        def insertOne(e: AddEventInput): F[Result[ExecutionEvent.Id]] =
+          e match
+            case AddEventInput.Dataset(v)  => insertDatasetEvent(v)
+            case AddEventInput.Sequence(v) => insertSequenceEvent(v)
+            case AddEventInput.Slew(v)     => insertSlewEvent(v)
+            case AddEventInput.Step(v)     => insertStepEvent(v)
+
+        // Insert in array order (that order is the events' arrival order, which the
+        // step-execution state machine depends on).  One transaction makes the
+        // batch atomic, so a failure rolls the whole thing back.
+        (for
+          _   <- ResultT(requireSingleObservation)
+          ids <- input.events.traverse(e => ResultT(insertOne(e)))
+        yield ids.toList).value
+
       override def selectSequenceEvents(
         oid: Observation.Id
       ): Stream[F, SequenceEvent] =
@@ -211,6 +261,27 @@ object ExecutionEventService:
       (core_timestamp *: core_timestamp).map { (min, max) =>
         TimestampInterval.between(min, max)
       }
+
+    // Observation-resolution queries, used to enforce that an addEvents batch is
+    // scoped to a single observation.
+
+    val SelectDatasetObservation: Query[Dataset.Id, Observation.Id] =
+      sql"""
+        SELECT c_observation_id FROM t_dataset WHERE c_dataset_id = $dataset_id
+      """.query(observation_id)
+
+    val SelectStepObservation: Query[Step.Id, Observation.Id] =
+      sql"""
+        SELECT a.c_observation_id
+        FROM t_step s
+        INNER JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+        WHERE s.c_step_id = $step_id
+      """.query(observation_id)
+
+    val SelectVisitObservation: Query[Visit.Id, Observation.Id] =
+      sql"""
+        SELECT c_observation_id FROM t_visit WHERE c_visit_id = $visit_id
+      """.query(observation_id)
 
     val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
       sql"""
