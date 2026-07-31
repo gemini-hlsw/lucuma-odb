@@ -20,6 +20,7 @@ import fs2.Pure
 import fs2.Stream
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
@@ -288,6 +289,8 @@ trait SequenceService[F[_]]:
 
 object SequenceService:
 
+  private val BatchSize = 256
+
   def instantiate[F[_]: Concurrent: UUIDGen](
     estimator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   )(using Services[F]): SequenceService[F] =
@@ -338,7 +341,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
-          Flamingos2SequenceService.Statements.InsertDynamic
+          Flamingos2SequenceService.Statements.insertDynamics
         )
 
       override def insertGhostSequence(
@@ -351,7 +354,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
-          GhostSequenceService.Statements.InsertDynamic
+          GhostSequenceService.Statements.insertDynamics
         )
 
       override def insertGmosNorthSequence(
@@ -364,7 +367,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
-          GmosSequenceService.Statements.InsertGmosNorthDynamic
+          GmosSequenceService.Statements.insertNorthDynamics
         )
 
       override def insertGmosSouthSequence(
@@ -377,7 +380,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
-          GmosSequenceService.Statements.InsertGmosSouthDynamic
+          GmosSequenceService.Statements.insertSouthDynamics
         )
 
       override def insertIgrins2Sequence(
@@ -390,7 +393,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
-          Igrins2SequenceService.Statements.InsertDynamic
+          Igrins2SequenceService.Statements.insertDynamics
         )
 
       override def insertGnirsSequence(
@@ -403,7 +406,7 @@ object SequenceService:
           observationId,
           sequenceType,
           sequence,
-          GnirsSequenceService.Statements.InsertDynamic
+          GnirsSequenceService.Statements.insertDynamics
         )
 
       private def insertSequence[D](
@@ -411,7 +414,7 @@ object SequenceService:
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
         sequence:         Stream[F, Atom[D]],
-        insertInstConfig: Command[(Step.Id, D)]
+        insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type]
       ): F[Unit] =
 
         val atom: Pipe[F, Atom[D], Nothing] = atomStream =>
@@ -420,7 +423,11 @@ object SequenceService:
             .map { case (atom, idx) =>
               (atom.id, observationId, sequenceType, instrument, idx.toInt, atom.description.map(_.value))
             }
-            .through(session.pipe(Statements.insertAtom))
+            .chunkN(BatchSize)
+            .evalMap { c =>
+              val rows = c.toList
+              session.execute(Statements.insertAtoms(rows))(rows)
+            }
             .drain
 
         val step: Pipe[F, Atom[D], Nothing] = atomStream =>
@@ -428,10 +435,15 @@ object SequenceService:
             .flatMap: atom =>
               Stream.emits(
                 atom.steps.toList.zipWithIndex.tupleLeft(atom.id).map { case (aid, (step, idx)) =>
-                  (step, aid, instrument, idx)
+                  (step.id, aid, instrument, step.stepConfig.stepType, idx, step.observeClass,
+                   step.estimate.total, step.telescopeConfig, step.breakpoint)
                 }
               )
-            .through(session.pipe(Statements.insertStep[D]))
+            .chunkN(BatchSize)
+            .evalMap { c =>
+              val rows = c.toList
+              session.execute(Statements.insertSteps(rows))(rows)
+            }
             .drain
 
         val gcal: Pipe[F, Atom[D], Nothing] = atomStream =>
@@ -441,7 +453,11 @@ object SequenceService:
                 atom.steps.toList.flatMap: step =>
                   StepConfig.gcal.getOption(step.stepConfig).tupleLeft(step.id)
               )
-            .through(session.pipe(Statements.InsertStepConfigGcal))
+            .chunkN(BatchSize)
+            .evalMap { c =>
+              val rows = c.toList
+              session.execute(Statements.insertGcalConfigs(rows))(rows)
+            }
             .drain
 
         val instrumentConfig: Pipe[F, Atom[D], Nothing] = atomStream =>
@@ -451,7 +467,11 @@ object SequenceService:
                 atom.steps.toList.map: step =>
                   (step.id, step.instrumentConfig)
               )
-            .through(session.pipe(insertInstConfig))
+            .chunkN(BatchSize)
+            .evalMap { c =>
+              val rows = c.toList
+              session.execute(insertInstConfig(rows))(rows)
+            }
             .drain
 
         sequence
@@ -541,7 +561,7 @@ object SequenceService:
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
         sequence:         List[ProtoAtom[ProtoStep[D]]],
-        insertInstConfig: Command[(Step.Id, D)],
+        insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type],
         atomBuilder:      AtomBuilder[D]
       )(using Transaction[F]): ResultT[F, Stream[Pure, Atom[D]]] =
 
@@ -605,7 +625,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
-                 Flamingos2SequenceService.Statements.InsertDynamic,
+                 Flamingos2SequenceService.Statements.insertDynamics,
                  b
                )
         yield r).value
@@ -643,7 +663,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
-                 GhostSequenceService.Statements.InsertDynamic,
+                 GhostSequenceService.Statements.insertDynamics,
                  b
                )
         yield r).value
@@ -673,7 +693,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
-                 GmosSequenceService.Statements.InsertGmosNorthDynamic,
+                 GmosSequenceService.Statements.insertNorthDynamics,
                  b
                )
         yield r).value
@@ -703,7 +723,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
-                 GmosSequenceService.Statements.InsertGmosSouthDynamic,
+                 GmosSequenceService.Statements.insertSouthDynamics,
                  b
                )
         yield r).value
@@ -734,7 +754,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
-                 Igrins2SequenceService.Statements.InsertDynamic,
+                 Igrins2SequenceService.Statements.insertDynamics,
                  b
                )
         yield r).value
@@ -764,7 +784,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
-                 GnirsSequenceService.Statements.InsertDynamic,
+                 GnirsSequenceService.Statements.insertDynamics,
                  b
                )
         yield r).value
@@ -975,7 +995,7 @@ object SequenceService:
           estimator.gnirsStep
         )
 
-      private def deleteMaterializedSequence(observationId: Observation.Id, sequenceType: SequenceType): F[Unit] = 
+      private def deleteMaterializedSequence(observationId: Observation.Id, sequenceType: SequenceType): F[Unit] =
         deleteMaterialized(observationId, sequenceType).ifM(
           abandonAndDeleteUnexecuted(observationId, sequenceType),
           Applicative[F].unit
@@ -994,7 +1014,7 @@ object SequenceService:
         visitService.hasVisits(observationId).ifM(
           OdbError.InvalidArgument(s"Cannot delete sequence for observation $observationId because it has visits.".some).asFailureF,
           doDelete.map(Result.success)
-        ) 
+        )
 
   object Statements:
 
@@ -1003,7 +1023,7 @@ object SequenceService:
         CALL abandon_ongoing_and_delete_unexecuted_steps($observation_id, $sequence_type)
       """.command
 
-    val insertAtom: Command[(
+    private val atom_row: Codec[(
       Atom.Id,
       Observation.Id,
       SequenceType,
@@ -1011,6 +1031,17 @@ object SequenceService:
       Int,
       Option[String]
     )] =
+      atom_id *: observation_id *: sequence_type *: instrument *: int4 *: text.opt
+
+    def insertAtoms(rows: List[(
+      Atom.Id,
+      Observation.Id,
+      SequenceType,
+      Instrument,
+      Int,
+      Option[String]
+    )]): Command[rows.type] =
+      val enc = atom_row.values.list(rows)
       sql"""
         INSERT INTO t_atom (
           c_atom_id,
@@ -1019,21 +1050,35 @@ object SequenceService:
           c_instrument,
           c_atom_index,
           c_description
-        ) SELECT
-          $atom_id,
-          $observation_id,
-          $sequence_type,
-          $instrument,
-          $int4,
-          ${text.opt}
+        ) VALUES $enc
       """.command
 
-    def insertStep[D]: Command[(
-      Step[D],
+    private val step_row: Codec[(
+      Step.Id,
       Atom.Id,
       Instrument,
-      Int
+      StepType,
+      Int,
+      ObserveClass,
+      TimeSpan,
+      TelescopeConfig,
+      Breakpoint
     )] =
+      step_id *: atom_id *: instrument *: step_type *: int4 *: obs_class *: time_span *:
+        telescope_config *: breakpoint
+
+    def insertSteps(rows: List[(
+      Step.Id,
+      Atom.Id,
+      Instrument,
+      StepType,
+      Int,
+      ObserveClass,
+      TimeSpan,
+      TelescopeConfig,
+      Breakpoint
+    )]): Command[rows.type] =
+      val enc = step_row.values.list(rows)
       sql"""
         INSERT INTO t_step (
           c_step_id,
@@ -1047,27 +1092,8 @@ object SequenceService:
           c_offset_q,
           c_guide_state,
           c_breakpoint
-        ) SELECT
-          $step_id,
-          $atom_id,
-          $instrument,
-          $step_type,
-          $int4,
-          $obs_class,
-          $time_span,
-          $telescope_config,
-          $breakpoint
-      """.command.contramap { (step, aid, inst, idx) => (
-        step.id,
-        aid,
-        inst,
-        step.stepConfig.stepType,
-        idx,
-        step.observeClass,
-        step.estimate.total,
-        step.telescopeConfig,
-        step.breakpoint
-      )}
+        ) VALUES $enc
+      """.command
 
     private def insertStepConfigFragment(table: String, columns: List[String]): Fragment[Void] =
       sql"""
@@ -1089,11 +1115,13 @@ object SequenceService:
         "c_gcal_shutter"
       )
 
-    val InsertStepConfigGcal: Command[(Step.Id, StepConfig.Gcal)] =
+    private val gcal_row: Codec[(Step.Id, StepConfig.Gcal)] =
+      step_id *: step_config_gcal
+
+    def insertGcalConfigs(rows: List[(Step.Id, StepConfig.Gcal)]): Command[rows.type] =
+      val enc = gcal_row.values.list(rows)
       sql"""
-        ${insertStepConfigFragment("t_step_config_gcal", StepConfigGcalColumns)} SELECT
-          $step_id,
-          $step_config_gcal
+        ${insertStepConfigFragment("t_step_config_gcal", StepConfigGcalColumns)} VALUES $enc
       """.command
 
     private val StepConfigSmartGcalColumns: List[String] =
@@ -1346,5 +1374,3 @@ object SequenceService:
         )
         SELECT EXISTS (SELECT 1 FROM deleted_rows) AS deleted
       """.query(bool)
-
-    
