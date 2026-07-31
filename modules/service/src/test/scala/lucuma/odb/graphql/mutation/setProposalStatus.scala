@@ -12,11 +12,13 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProposalStatus
+import lucuma.core.model.CallForProposals
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -86,17 +88,39 @@ class setProposalStatus extends OdbSuite
     }
   }
 
+  // A Gemini call that offers Keck as an exchange partner, optionally with a
+  // deadline override for it.
+  private def createCallWithKeckExchangeAs(
+    semester:         Semester,
+    activeStart:      LocalDate,
+    activeEnd:        LocalDate,
+    deadlineOverride: Option[Timestamp] = none
+  ): IO[CallForProposals.Id] =
+    createGeminiCallForProposalsAs(
+      staff,
+      GeminiCallForProposalsType.RegularSemester,
+      semester    = semester,
+      activeStart = activeStart,
+      activeEnd   = activeEnd,
+      otherGemini = s"""
+        exchangePartners: [
+          {
+            exchangePartner: KECK
+            ${deadlineOverride.fold("")(ts => s"submissionDeadlineOverride: \"${ts.isoFormat}\"")}
+          }
+        ]
+      """.some
+    )
+
   test("✓ exchange partner submission") {
     // A Keck/Subaru PI requesting Gemini time: the proposal carries an exchange
     // partner instead of partner splits, and uses the call's default submission
     // deadline rather than any Gemini partner deadline.  Uses its own semester
     // so the assigned proposal reference doesn't perturb other tests' counts.
-    createGeminiCallForProposalsAs(
-      staff,
-      GeminiCallForProposalsType.RegularSemester,
-      semester    = Semester.unsafeFromString("2026A"),
-      activeStart = LocalDate.parse("2026-02-01"),
-      activeEnd   = LocalDate.parse("2026-07-31")
+    createCallWithKeckExchangeAs(
+      Semester.unsafeFromString("2026A"),
+      LocalDate.parse("2026-02-01"),
+      LocalDate.parse("2026-07-31")
     ).flatMap { cid =>
       createProgramWithNonPartnerPi(pi).flatMap { pid =>
         addProposal(pi, pid, cid.some, "classical: { exchangePartner: KECK }".some) *>
@@ -143,6 +167,75 @@ class setProposalStatus extends OdbSuite
                 }
               }
             """.asRight
+        )
+      }
+    }
+  }
+
+  test("⨯ exchange partner submission past the community's deadline override") {
+    // The call is open (its default deadline is Timestamp.Max) but closed for the
+    // Keck community, so the request is past its deadline.  The PI belongs to the
+    // exchange community, so neither the Gemini partner nor the non-partner
+    // deadline applies.
+    createCallWithKeckExchangeAs(
+      Semester.unsafeFromString("2026B"),
+      LocalDate.parse("2026-08-01"),
+      LocalDate.parse("2027-01-31"),
+      deadlineOverride = yesterday.some
+    ).flatMap { cid =>
+      createProgramWithPiAffiliation(
+        pi,
+        PartnerLink.HasExchangePartner(ExchangePartner.Keck)
+      ).flatMap { pid =>
+        addProposal(pi, pid, cid.some, "classical: { exchangePartner: KECK }".some) *>
+        addCoisAs(pi, pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) { program { id } }
+            }
+          """,
+          expected = List(error.pastDeadline(pid).message).asLeft
+        )
+      }
+    }
+  }
+
+  test("⨯ exchange partner the call does not offer has no deadline") {
+    // The call offers no exchange partners at all, so a Keck request has no
+    // deadline to meet and cannot be submitted.
+    createGeminiCallForProposalsAs(
+      staff,
+      GeminiCallForProposalsType.RegularSemester,
+      semester    = Semester.unsafeFromString("2027A"),
+      activeStart = LocalDate.parse("2027-02-01"),
+      activeEnd   = LocalDate.parse("2027-07-31")
+    ).flatMap { cid =>
+      createProgramWithPiAffiliation(
+        pi,
+        PartnerLink.HasExchangePartner(ExchangePartner.Keck)
+      ).flatMap { pid =>
+        addProposal(pi, pid, cid.some, "classical: { exchangePartner: KECK }".some) *>
+        addCoisAs(pi, pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) { program { id } }
+            }
+          """,
+          expected = List(error.missingDeadline(pid).message).asLeft
         )
       }
     }

@@ -1068,9 +1068,10 @@ object ProposalService {
             (SELECT cfp.c_gemini_non_partner_deadline
              WHERE pi.c_partner_link = 'has_non_partner'),
             -- An exchange-partner request is not tied to any Gemini partner, so
-            -- it uses the call's default submission deadline.
-            (SELECT cfp.c_deadline_default
-             WHERE prop.c_exchange_partner IS NOT NULL)
+            -- it uses that community's deadline for the call: its override if it
+            -- has one, and otherwise the call's default.  Null when the call does
+            -- not offer the community at all.
+            cfp_ep.c_deadline
           ) AS c_deadline,
           cfp.c_title,
           cfp.c_cfp_id,
@@ -1093,6 +1094,9 @@ object ProposalService {
         LEFT JOIN v_gemini_cfp_partner cfp_pi
           ON cfp.c_cfp_id = cfp_pi.c_cfp_id
           AND cfp_pi.c_partner = pi.c_gemini_partner
+        LEFT JOIN v_gemini_cfp_exchange_partner cfp_ep
+          ON cfp.c_cfp_id = cfp_ep.c_cfp_id
+          AND cfp_ep.c_exchange_partner = prop.c_exchange_partner
         WHERE
           prog.c_program_id = $program_id
       """.apply(pid) |+|
