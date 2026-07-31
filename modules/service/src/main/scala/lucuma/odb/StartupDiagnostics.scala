@@ -63,6 +63,7 @@ object StartupDiagnostics:
           checkPostgresEnum(ephemeris_key_type),
           checkPostgresEnum(exchange_partner),
           checkPostgresEnum(execution_event_type),
+          checkPostgresEnum(execution_requirement),
           checkPostgresEnum(execution_state),
           checkPostgresEnum(existence),
           checkPostgresEnum(exposure_time_mode_role),
