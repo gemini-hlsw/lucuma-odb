@@ -33,6 +33,8 @@ import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
+import lucuma.odb.sequence.gmos.mos.Config.GmosNorth as GmosNorthMos
+import lucuma.odb.sequence.gmos.mos.Config.GmosSouth as GmosSouthMos
 import lucuma.odb.sequence.gnirs.imaging.Config as GnirsImaging
 import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopy
 import lucuma.odb.sequence.igrins2.longslit.Config as Igrins2LongSlit
@@ -125,6 +127,12 @@ object GoaQueryPolicy:
         List(gmosScienceArea.longSlitMode.shapeAt(pa, off, c.fpu.asLeft))
       case c: GmosSouthLongSlit  =>
         List(gmosScienceArea.longSlitMode.shapeAt(pa, off, c.fpu.asRight))
+      // A MOS mask spreads its slitlets over the whole GMOS field, so the
+      // science area is the imaging field rather than a single slit.
+      case _: GmosNorthMos       =>
+        List(gmosScienceArea.imaging)
+      case _: GmosSouthMos       =>
+        List(gmosScienceArea.imaging)
       case c: GnirsImaging       =>
         c.filters.toList.map(f => gnirsScienceArea.imagingShapeAt(pa, off, c.camera, f.filter))
       case c: GnirsSpectroscopy  =>

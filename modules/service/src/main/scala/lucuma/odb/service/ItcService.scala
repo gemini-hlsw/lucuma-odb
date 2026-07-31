@@ -682,7 +682,8 @@ object ItcService {
             acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
           yield Itc(acq, ItcScience.Spectroscopy(sci))
 
-        def igrins2Spectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
+        // Modes with no acquisition sequence: the science call is the whole result.
+        def scienceOnlySpectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr), sp.signalToNoiseTargetId).map(_.head))
@@ -696,7 +697,12 @@ object ItcService {
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets, _) =>
             ghost(gh, targets)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _, _) =>
-            igrins2Spectroscopy(sp)
+            scienceOnlySpectroscopy(sp)
+          // GMOS MOS: spectroscopy through a custom mask, with no acquisition.
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, _: InstrumentMode.GmosNorthSpectroscopy), _, _) =>
+            scienceOnlySpectroscopy(sp)
+          case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, _: InstrumentMode.GmosSouthSpectroscopy), _, _) =>
+            scienceOnlySpectroscopy(sp)
           case _ =>
             EitherT.leftT(OdbError.InvalidObservation(oid, s"Unrecognized ItcInput: $input".some))
         ).value

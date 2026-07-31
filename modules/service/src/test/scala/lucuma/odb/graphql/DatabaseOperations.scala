@@ -1148,8 +1148,13 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosNorthLongSlit |
-           ObservingModeType.GmosSouthLongSlit =>
-        """{
+           ObservingModeType.GmosSouthLongSlit |
+           ObservingModeType.GmosNorthMos      |
+           ObservingModeType.GmosSouthMos      =>
+        val focalPlane = observingMode match
+          case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos => "MULTIPLE_SLIT"
+          case _                                                              => "SINGLE_SLIT"
+        s"""{
             exposureTimeMode: {
               signalToNoise: {
                 value: 100.0
@@ -1160,7 +1165,7 @@ trait DatabaseOperations { this: OdbSuite =>
               wavelength: { nanometers: 500 }
               resolution: 100
               wavelengthCoverage: { nanometers: 20 }
-              focalPlane: SINGLE_SLIT
+              focalPlane: $focalPlane
               focalPlaneAngle: { microarcseconds: 0 }
             }
           }"""
@@ -1323,7 +1328,16 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosNorthMos =>
-        """{}"""
+        """{
+          gmosNorthMos: {
+            grating: R831_G5302
+            filter: R_PRIME
+            customMask: {
+              slitWidth: CUSTOM_WIDTH_0_50
+            }
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
@@ -1356,7 +1370,16 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosSouthMos =>
-        """{}"""
+        """{
+          gmosSouthMos: {
+            grating: B1200_G5321
+            filter: R_PRIME
+            customMask: {
+              slitWidth: CUSTOM_WIDTH_0_50
+            }
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
       case ObservingModeType.GnirsImaging =>
         s"""{
           gnirsImaging: {

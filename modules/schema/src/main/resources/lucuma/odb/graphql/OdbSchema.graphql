@@ -1995,6 +1995,29 @@ input GmosCustomMaskInput {
 }
 
 """
+GMOS MOS custom mask input parameters.
+
+Unlike `GmosCustomMaskInput`, which describes a mask as executed on a recorded
+step, this describes the mask a MOS observation requests.  Both fields are
+optional so that an edit can change one without resending the other; the slit
+width is required when the mode is created.
+"""
+input GmosMosCustomMaskInput {
+  """
+  The MOS mask attachment id.  May be unset by assigning a null value, or
+  ignored by skipping it altogether.  Null means the mask has not yet been
+  defined, which is the normal state before Phase 2.
+  """
+  attachmentId: AttachmentId
+
+  """
+  Custom mask slit width.  Required when creating the mode; it cannot be unset
+  with a null value.
+  """
+  slitWidth: GmosCustomSlitWidth
+}
+
+"""
 GMOS Custom Slit Width
 """
 enum GmosCustomSlitWidth {
@@ -3007,6 +3030,144 @@ input GmosSouthLongSlitInput {
   Parameters that override acquisition defaults.
   """
   acquisition: GmosSouthLongSlitAcquisitionInput
+
+}
+
+"""
+Edit or create GMOS North MOS advanced configuration
+"""
+input GmosNorthMosInput {
+  """
+  The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  grating: GmosNorthGrating
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: GmosNorthFilter
+
+  """
+  The custom mask through which the observation is taken.  On creation its
+  `slitWidth` is required.  On edit, either field may be skipped to leave it
+  unchanged.
+  """
+  customMask: GmosMosCustomMaskInput
+
+  """
+  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  centralWavelength: WavelengthInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitXBin: GmosBinning
+
+  """
+  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitYBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+
+  """
+  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWavelengthDithers: [WavelengthDitherInput!]
+
+  """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+}
+
+"""
+Edit or create GMOS South MOS advanced configuration
+"""
+input GmosSouthMosInput {
+  """
+  The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  grating: GmosSouthGrating
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: GmosSouthFilter
+
+  """
+  The custom mask through which the observation is taken.  On creation its
+  `slitWidth` is required.  On edit, either field may be skipped to leave it
+  unchanged.
+  """
+  customMask: GmosMosCustomMaskInput
+
+  """
+  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  centralWavelength: WavelengthInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitXBin: GmosBinning
+
+  """
+  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitYBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+
+  """
+  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWavelengthDithers: [WavelengthDitherInput!]
+
+  """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
 
 }
 
@@ -5489,6 +5650,11 @@ input ObservingModeInput @oneOf {
   gmosNorthLongSlit: GmosNorthLongSlitInput
 
   """
+  The gmosNorthMos field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gmosNorthMos: GmosNorthMosInput
+
+  """
   The gmosSouthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthImaging: GmosSouthImagingInput
@@ -5497,6 +5663,11 @@ input ObservingModeInput @oneOf {
   The gmosSouthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthLongSlit: GmosSouthLongSlitInput
+
+  """
+  The gmosSouthMos field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gmosSouthMos: GmosSouthMosInput
 
   """
   The gnirsImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -7719,6 +7890,11 @@ enum ObservingModeType {
   GMOS_NORTH_LONG_SLIT
 
   """
+  ObservingModeType GmosNorthMos
+  """
+  GMOS_NORTH_MOS
+
+  """
   ObservingModeType GmosSouthImaging
   """
   GMOS_SOUTH_IMAGING
@@ -7727,6 +7903,11 @@ enum ObservingModeType {
   ObservingModeType GmosSouthLongSlit
   """
   GMOS_SOUTH_LONG_SLIT
+
+  """
+  ObservingModeType GmosSouthMos
+  """
+  GMOS_SOUTH_MOS
 
   """
   ObservingModeType GnirsImaging
@@ -12561,6 +12742,360 @@ type GmosSouthLongSlit {
 }
 
 """
+GMOS North MOS mode
+"""
+type GmosNorthMos {
+
+  """
+  GMOS North Grating
+  """
+  grating: GmosNorthGrating!
+
+  """
+  GMOS North Filter
+  """
+  filter: GmosNorthFilter
+
+  """
+  The custom mask through which the observation is taken.  Its `attachmentId`
+  is null until the mask has been designed, which normally happens in Phase 2.
+  """
+  customMask: GmosCustomMask!
+
+  """
+  The central wavelength.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning, calculated from the custom mask's slit width, the
+  target source profile and the image quality.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """
+  Default GMOS Y-Binning, capped at TWO to keep adequate spatial sampling for
+  object identification along the mask.
+  """
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it overrides the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  Q offsets, either explicitly specified in explicitOffsets or else taken from
+  defaultOffsets.
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosNorthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosNorthFilter
+
+  """
+  The custom mask slit width as it was initially selected.  See
+  `customMask.slitWidth` for the width that will be used in the observation.
+  The mask attachment has no initial counterpart; it is expected to arrive
+  after the mode is created.
+  """
+  initialSlitWidth: GmosCustomSlitWidth!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+}
+
+"""
+GMOS South MOS mode
+"""
+type GmosSouthMos {
+
+  """
+  GMOS South Grating
+  """
+  grating: GmosSouthGrating!
+
+  """
+  GMOS South Filter
+  """
+  filter: GmosSouthFilter
+
+  """
+  The custom mask through which the observation is taken.  Its `attachmentId`
+  is null until the mask has been designed, which normally happens in Phase 2.
+  """
+  customMask: GmosCustomMask!
+
+  """
+  The central wavelength.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning, calculated from the custom mask's slit width, the
+  target source profile and the image quality.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """
+  Default GMOS Y-Binning, capped at TWO to keep adequate spatial sampling for
+  object identification along the mask.
+  """
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it overrides the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  Q offsets, either explicitly specified in explicitOffsets or else taken from
+  defaultOffsets.
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosSouthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosSouthFilter
+
+  """
+  The custom mask slit width as it was initially selected.  See
+  `customMask.slitWidth` for the width that will be used in the observation.
+  The mask attachment has no initial counterpart; it is expected to arrive
+  after the mode is created.
+  """
+  initialSlitWidth: GmosCustomSlitWidth!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+}
+
+"""
 GMOS South Imaging mode
 """
 type GmosSouthImaging {
@@ -14275,6 +14810,8 @@ type ConfigurationObservingMode {
   mode: ObservingModeType!
   gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
   gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
+  gmosNorthMos: ConfigurationGmosNorthMos
+  gmosSouthMos: ConfigurationGmosSouthMos
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
@@ -14294,6 +14831,14 @@ type ConfigurationGmosNorthLongSlit {
 }
 
 type ConfigurationGmosSouthLongSlit {
+  grating: GmosSouthGrating!
+}
+
+type ConfigurationGmosNorthMos {
+  grating: GmosNorthGrating!
+}
+
+type ConfigurationGmosSouthMos {
   grating: GmosSouthGrating!
 }
 
@@ -15606,6 +16151,11 @@ type ObservingMode {
   gmosNorthLongSlit: GmosNorthLongSlit
 
   """
+  GMOS North MOS mode
+  """
+  gmosNorthMos: GmosNorthMos
+
+  """
   GMOS South Imaging mode
   """
   gmosSouthImaging: GmosSouthImaging
@@ -15614,6 +16164,11 @@ type ObservingMode {
   GMOS South Long Slit mode
   """
   gmosSouthLongSlit: GmosSouthLongSlit
+
+  """
+  GMOS South MOS mode
+  """
+  gmosSouthMos: GmosSouthMos
 
   """
   GNIRS Imaging mode
