@@ -219,6 +219,14 @@ object GmosSequenceService:
     val InsertGmosSouthDynamic: Command[(Step.Id, DynamicConfig.GmosSouth)] =
       (insertGmosDynamic("south") ~> sql"SELECT $step_id, $gmos_south_dynamic").command
 
+    def insertNorthDynamics(rows: List[(Step.Id, DynamicConfig.GmosNorth)]): Command[rows.type] =
+      val enc = (step_id *: gmos_north_dynamic).values.list(rows)
+      (insertGmosDynamic("north") ~> sql"VALUES $enc").command
+
+    def insertSouthDynamics(rows: List[(Step.Id, DynamicConfig.GmosSouth)]): Command[rows.type] =
+      val enc = (step_id *: gmos_south_dynamic).values.list(rows)
+      (insertGmosDynamic("south") ~> sql"VALUES $enc").command
+
     private def selectGmosDynamicStep[A](site: String, decoderA: Decoder[A]): Query[Step.Id, A] =
       sql"""
         SELECT

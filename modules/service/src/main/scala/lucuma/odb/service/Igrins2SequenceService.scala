@@ -78,6 +78,15 @@ object Igrins2SequenceService:
           $igrins_2_dynamic
       """.command
 
+    def insertDynamics(rows: List[(Step.Id, Igrins2DynamicConfig)]): Command[rows.type] =
+      val enc = (step_id *: igrins_2_dynamic).values.list(rows)
+      sql"""
+        INSERT INTO t_igrins_2_dynamic (
+          c_step_id,
+          #${encodeColumns(none, Igrins2DynamicColumns)}
+        ) VALUES $enc
+      """.command
+
     val InsertStatic: Query[(Observation.Id, Igrins2StaticConfig), Long] =
       sql"""
         INSERT INTO t_igrins_2_static (

@@ -84,6 +84,16 @@ object GhostSequenceService:
           $ghost_dynamic
       """.command
 
+    def insertDynamics(rows: List[(Step.Id, GhostDynamicConfig)]): Command[rows.type] =
+      val enc = (step_id *: ghost_dynamic).values.list(rows)
+      sql"""
+        INSERT INTO t_ghost_dynamic (
+          c_step_id,
+          #${encodeColumns(none, DynamicColumns)}
+        )
+        VALUES $enc
+      """.command
+
     val InsertStatic: Query[(Observation.Id, GhostStaticConfig), Long] =
       sql"""
         INSERT INTO t_ghost_static (
