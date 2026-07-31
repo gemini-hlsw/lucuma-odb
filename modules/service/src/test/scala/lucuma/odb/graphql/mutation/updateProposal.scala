@@ -249,7 +249,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         """
       ) *>
       // ...then setting an exchange partner (leaving the splits) violates the
-      // deferred constraint trigger at commit.
+      // time-request trigger.
       expect(
         user = pi,
         query = s"""
@@ -261,6 +261,114 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """,
         expected = List("A proposal may not have both an exchange partner and partner splits.").asLeft
+      )
+    }
+  }
+
+  test("✓ swap partner splits for an exchange partner in one edit") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      // First give it partner splits...
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: { gemini: { queue: { partnerSplits: [ { partner: US, percent: 100 } ] } } }
+            }) { proposal { gemini { scienceSubtype } } }
+          }
+        """
+      ) *>
+      // ...then hand the whole request over to an exchange partner.  The splits
+      // are emptied before the proposal takes on the exchange partner, so the
+      // two never coexist.
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: { gemini: { queue: { exchangePartner: KECK, partnerSplits: null } } }
+            }) {
+              proposal {
+                gemini {
+                  ... on Queue { exchangePartner partnerSplits { partner percent } }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "gemini": {
+                  "exchangePartner": "KECK",
+                  "partnerSplits": []
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
+  test("✓ swap an exchange partner for partner splits in one edit") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      // First hand the request to an exchange partner...
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: { gemini: { queue: { exchangePartner: KECK } } }
+            }) { proposal { gemini { scienceSubtype } } }
+          }
+        """
+      ) *>
+      // ...then take it back and apportion it across Gemini partners.  The
+      // exchange partner is cleared before the splits are inserted.
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(input: {
+              programId: "$pid"
+              SET: {
+                gemini: {
+                  queue: {
+                    exchangePartner: null
+                    partnerSplits: [ { partner: US, percent: 100 } ]
+                  }
+                }
+              }
+            }) {
+              proposal {
+                gemini {
+                  ... on Queue { exchangePartner partnerSplits { partner percent } }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "gemini": {
+                  "exchangePartner": null,
+                  "partnerSplits": [
+                    { "partner": "US", "percent": 100 }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
       )
     }
   }

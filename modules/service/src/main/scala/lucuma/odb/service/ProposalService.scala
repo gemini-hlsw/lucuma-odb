@@ -696,6 +696,15 @@ object ProposalService {
               partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
           ).sequence.void)
 
+        // The time-request trigger fires immediately and rejects a proposal that has
+        // both an exchange partner and partner splits, so an edit that swaps one for
+        // the other has to give up what it holds before taking on the other.  Only
+        // assigning an exchange partner needs the splits emptied first; going the
+        // other way clears the exchange partner with the proposal update, ahead of
+        // the splits that replace it.
+        def splitsFirst(set: ProposalPropertiesInput.Edit): Boolean =
+          set.exchangePartner.isPresent
+
         (for {
           pid    <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           before <- ResultT(ProposalContext.lookup(pid))
@@ -705,9 +714,10 @@ object ProposalService {
           _      <- ResultT.fromResult(after.validateSubmission(pid, after.status))
           _      <- ResultT.liftF(deferConstraints)
           set     = handleTypeChange(before)
+          _      <- updateSplits(pid, set).whenA(splitsFirst(set))
           _      <- updateProposal(pid, set)
           _      <- updateProgram(pid, before, after)
-          _      <- updateSplits(pid, set)
+          _      <- updateSplits(pid, set).unlessA(splitsFirst(set))
         } yield pid).value
       }
 
