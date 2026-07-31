@@ -3130,4 +3130,73 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
             .require[Boolean]
 
+  test("[general] created observation should have specified executionRequirement"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                schedulingConstraints: {
+                  executionRequirement: UNINTERRUPTIBLE
+                }
+              }
+            }) {
+              observation {
+                schedulingConstraints {
+                  executionRequirement
+                  isSplittable
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "isSplittable": false
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("[general] created observation should default to UNCONSTRAINED executionRequirement"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                schedulingConstraints {
+                  executionRequirement
+                  isSplittable
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNCONSTRAINED",
+                  "isSplittable": true
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
 }

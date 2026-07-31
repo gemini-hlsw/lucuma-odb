@@ -53,6 +53,7 @@ import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
+import lucuma.odb.data.ExecutionRequirement
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.PosAngleConstraintMode
@@ -111,6 +112,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[ExchangePartner](ExchangePartnerType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[ExecutionEventType](ExecutionEventTypeType),
+      LeafMapping[ExecutionRequirement](ExecutionRequirementType),
       LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),

@@ -43,6 +43,7 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.ExecutionRequirement
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
@@ -539,7 +540,7 @@ object ObservationService {
 
                 // If we are trying to edit this observation to make it unsplittable,
                 // then ensure that any existing materialized sequence is compatible.
-                isSplittable = SET.scheduling.toOption.forall(_.isSplittable.forall(identity))
+                isSplittable = SET.scheduling.toOption.forall(_.executionRequirement.forall(_.isSplittable))
                 _ <- if isSplittable then ResultT.unit else validateUnsplittableStoredSequence
 
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
@@ -760,7 +761,7 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           calibrationRole,
-          SET.scheduling.flatMap(_.isSplittable).getOrElse(true)
+          SET.scheduling.flatMap(_.executionRequirement).getOrElse(ExecutionRequirement.Unconstrained)
         )
       }
 
@@ -782,7 +783,7 @@ object ObservationService {
       useBlindOffset:      Boolean,
       blindOffsetType:     BlindOffsetType,
       calibrationRole:     Option[CalibrationRole],
-      isSplittable:        Boolean
+      executionRequirement: ExecutionRequirement
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -827,7 +828,7 @@ object ObservationService {
            useBlindOffset                                                                                                         ,
            blindOffsetType                                                                                                        ,
            calibrationRole                                                                                                        ,
-           isSplittable
+           executionRequirement
         )
       }
 
@@ -874,7 +875,7 @@ object ObservationService {
       Boolean                          ,
       BlindOffsetType                  ,
       Option[CalibrationRole]          ,
-      Boolean
+      ExecutionRequirement
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -912,7 +913,7 @@ object ObservationService {
           c_use_blind_offset,
           c_blind_offset_type,
           c_calibration_role,
-          c_is_splittable
+          c_execution_requirement
         )
         SELECT
           $program_id,
@@ -949,7 +950,7 @@ object ObservationService {
           $bool,
           $blind_offset_type,
           ${calibration_role.opt},
-          $bool
+          $execution_requirement
       """
 
     def selectObservingModes(
@@ -1099,7 +1100,7 @@ object ObservationService {
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
-      val upIsSplittable      = sql"c_is_splittable = $bool"
+      val upExecutionReq      = sql"c_execution_requirement = $execution_requirement"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1108,7 +1109,7 @@ object ObservationService {
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
-          SET.scheduling.fold(true.some, none, _.isSplittable).map(upIsSplittable)
+          SET.scheduling.fold(ExecutionRequirement.Unconstrained.some, none, _.executionRequirement).map(upExecutionReq)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1230,7 +1231,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
-          c_is_splittable
+          c_execution_requirement
         )
         SELECT
           c_program_id,
@@ -1267,7 +1268,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
-          c_is_splittable
+          c_execution_requirement
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id
@@ -1338,7 +1339,7 @@ object ObservationService {
 
     val SelectIsSplittable: Query[Observation.Id, Boolean] =
       sql"""
-        SELECT c_is_splittable
+        SELECT (c_execution_requirement = 'unconstrained')
           FROM t_observation
          WHERE c_observation_id = $observation_id
       """.query(bool)
