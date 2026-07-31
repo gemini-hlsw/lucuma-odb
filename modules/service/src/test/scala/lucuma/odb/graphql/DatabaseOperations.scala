@@ -3007,6 +3007,15 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(query).use(_.unique(id)))
   }
 
+  // The recipients of all the emails sent for a program, in address order.
+  def getEmailRecipients(pid: Program.Id): IO[List[EmailAddress]] = {
+    val query =
+      sql"select c_recipient_email from t_email where c_program_id = $program_id order by c_recipient_email"
+        .query(email_address)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.stream(pid, chunkSize = 1024).compile.toList))
+  }
+
   def getEmailStatusesByAddress(address: NonEmptyString): IO[List[EmailStatus]] = {
     val query = sql"select c_status from t_email where c_recipient_email = $text_nonempty".query(email_status)
     FMain.databasePoolResource[IO](databaseConfig).flatten

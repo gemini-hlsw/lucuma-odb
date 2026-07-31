@@ -15,6 +15,7 @@ import grackle.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
@@ -233,6 +234,10 @@ object ProposalService {
         val subaruProposalType: Option[SubaruCallForProposalsType] =
           cfp.flatMap(_.subaruProposalType)
 
+        // The Gemini call type, which is empty for an external (Keck/Subaru) proposal.
+        val geminiCallType: Option[GeminiCallForProposalsType] =
+          cfp.flatMap(_.gemini).map(_.callType)
+
         val isPastDeadline: Option[Boolean] =
           deadline.map(_ < currentTime)
 
@@ -418,12 +423,41 @@ object ProposalService {
               } yield ()).value
             )
 
+        // Addresses notified when a proposal is submitted, in addition to the PI.  An
+        // external (Keck/Subaru) proposal has no Gemini call type and is not announced.
+        // Duplicates are removed because several of the configured addresses may be the
+        // same, in particular when they all fall back to PROPOSAL_EMAIL_DEFAULT.
+        private lazy val notificationRecipients: List[EmailAddress] =
+          geminiCallType.toList.flatMap {
+            case GeminiCallForProposalsType.RegularSemester =>
+              // A regular semester proposal requests time either from an exchange partner
+              // or from the Gemini partners named in its splits, never both.
+              exchangePartner.fold(
+                requestedPartners.toList.sortBy(_.tag).map(emailConfig.proposalEmails.forPartner)
+              )(p => List(emailConfig.proposalEmails.forExchangePartner(p)))
+            case callType                                   =>
+              emailConfig.proposalEmails.forCfpType(callType).toList
+          }.distinct
+
+        private val notificationSubject: NonEmptyString =
+          NonEmptyString.unsafeFrom("Proposal Received")
+
+        private val notificationText: NonEmptyString =
+          NonEmptyString.unsafeFrom("A new proposal has been received")
+
+        def sendNotificationEmails(pid: Program.Id)(using Transaction[F]): F[Result[Unit]] =
+          notificationRecipients
+            .traverse(a => ResultT(sendEmailHelper(pid, a, notificationSubject, notificationText, none)))
+            .void
+            .value
+
         def sendEmail(
           pid: Program.Id,
           newStatus: ProposalStatus
          )(using Transaction[F]): F[Result[Unit]] =
-          // There might be other emails in the future
-          if newStatus === ProposalStatus.Submitted then sendSubmissionEmail(pid)
+          // There might be emails for other status changes in the future
+          if newStatus === ProposalStatus.Submitted then
+            (ResultT(sendSubmissionEmail(pid)) *> ResultT(sendNotificationEmails(pid))).value
           else Result.unit.pure
 
       }
