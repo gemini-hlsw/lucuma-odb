@@ -10,8 +10,12 @@ import cats.syntax.option.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
+import lucuma.core.model.ProposalReference
+import lucuma.core.model.UserProfile
 import lucuma.odb.Config
 import lucuma.refined.*
 import org.http4s.implicits.*
@@ -161,6 +165,80 @@ class setProposalStatusEmails extends OdbSuite {
       _   <- assertRecipients(pid, List(piAddress, address("us")))
     } yield ()
   }
+
+  test("✓ the notification message names the proposal, the investigators and the request") {
+    val expectedText = (ref: ProposalReference) =>
+      s"""|A new Queue proposal has been received:
+          |Id: ${ref.label}
+          |URL: https://explore.gemini.edu/${ref.label}
+          |Title: Ann & Bob's Big Adventure
+          |PI: Petra Ito (Gemini Observatory)
+          |CoIs: Ann Coi, Zoe CoiRO
+          |Request: Not available
+          |Instruments: None
+          |Abstract: A study of <interesting> things.""".stripMargin
+
+    val expectedHtml = (ref: ProposalReference) =>
+      s"""|A new Queue proposal has been received:<br/>
+          |Id: ${ref.label}<br/>
+          |URL: <a href="https://explore.gemini.edu/${ref.label}">https://explore.gemini.edu/${ref.label}</a><br/>
+          |Title: Ann &amp; Bob's Big Adventure<br/>
+          |PI: Petra Ito (Gemini Observatory)<br/>
+          |CoIs: Ann Coi, Zoe CoiRO<br/>
+          |Request: Not available<br/>
+          |Instruments: None<br/>
+          |Abstract: A study of &lt;interesting&gt; things.""".stripMargin
+
+    for {
+      cid <- geminiCall(GeminiCallForProposalsType.RegularSemester)
+      pid <- createProgramWithNonPartnerPi(pi, "Ann & Bob's Big Adventure")
+      _   <- setProgramDescription(pid, "A study of <interesting> things.")
+      pu  <- piProgramUserIdAs(pi, pid)
+      _   <- setCreditName(pu, "Petra Ito")
+      _   <- addProgramUserAs(pi, pid, ProgramUserRole.Coi, preferred = creditName("Ann Coi"))
+      _   <- addProgramUserAs(pi, pid, ProgramUserRole.CoiRO, preferred = creditName("Zoe CoiRO"))
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      ref <- submitProposal(pi, pid)
+      ms  <- getEmailMessages(pid, address("us"))
+    } yield assertEquals(
+      ms,
+      List((s"New Queue proposal received: ${ref.label}", expectedText(ref), expectedHtml(ref).some))
+    )
+  }
+
+  private def creditName(name: String): UserProfile =
+    UserProfile(givenName = none, familyName = none, creditName = name.some, email = none)
+
+  private def setCreditName(puid: ProgramUser.Id, name: String): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateProgramUsers(input: {
+            WHERE: { id: { EQ: "$puid" } }
+            SET: { preferredProfile: { creditName: "$name" } }
+          }) {
+            programUsers { id }
+          }
+        }
+      """
+    ).void
+
+  private def setProgramDescription(pid: Program.Id, description: String): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updatePrograms(input: {
+            WHERE: { id: { EQ: "$pid" } }
+            SET: { description: "$description" }
+          }) {
+            programs { id }
+          }
+        }
+      """
+    ).void
 
   // An external (Subaru) proposal apportions its time across Gemini partners, so it
   // carries its splits directly.  There is no `addProposal` variant for one.

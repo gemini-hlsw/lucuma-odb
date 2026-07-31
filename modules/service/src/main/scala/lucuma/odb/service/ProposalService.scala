@@ -16,6 +16,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
@@ -31,6 +32,9 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.model.sequence.CategorizedTimeRange
+import lucuma.core.util.CalculatedValue
+import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
@@ -184,6 +188,32 @@ object ProposalService {
 
   }
 
+  /** Stand-in for a value that the proposal doesn't have. */
+  private val Missing: String = "<Missing>"
+
+  /** Stand-in for a list that has no elements. */
+  private val Empty: String = "None"
+
+  private def orMissing(s: Option[String]): String =
+    s.map(_.trim).filter(_.nonEmpty).getOrElse(Missing)
+
+  /**
+   * The observing time requested for a program, in decimal hours.  A single value is
+   * given when the minimum and maximum agree.  The calculation state is ignored: a
+   * stale estimate is still the best one available.
+   */
+  private[odb] def timeRequestedText(cv: Option[CalculatedValue[CategorizedTimeRange]]): String =
+    def hours(t: TimeSpan): String = f"${t.toHours}%.2f"
+
+    cv.map(_.value).filter(_.max.programTime.toMicroseconds > 0L) match
+      case None                                               => "Not available"
+      case Some(r) if r.min.programTime === r.max.programTime => s"${hours(r.max.programTime)} hours"
+      case Some(r)                                            => s"${hours(r.min.programTime)} - ${hours(r.max.programTime)} hours"
+
+  /** Escapes the characters that would otherwise be markup in an html message. */
+  private[odb] def escapeHtml(s: String): String =
+    s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
   /** Construct a `ProposalService` using the specified `Session`. */
   def instantiate[F[_]: Concurrent](emailConfig: Config.Email)(using Services[F]): ProposalService[F] =
     new ProposalService[F] {
@@ -208,13 +238,17 @@ object ProposalService {
         status:            ProposalStatus,
         hasProposal:       Boolean,
         piEmailStr:        Option[NonEmptyString],
+        piName:            Option[String],
         title:             Option[NonEmptyString],
+        description:       Option[String],
         reference:         Option[ProposalReference],
         semester:          Option[Semester],
         scienceSubtype:    Option[ScienceSubtype],
         splitsSum:         Long,
         availablePartners: Set[Partner],
         requestedPartners: Set[Partner],
+        coiNames:          List[String],
+        instruments:       List[Instrument],
         proprietary:       NonNegInt,
         currentTime:       Timestamp,
         deadline:          Option[Timestamp],
@@ -240,6 +274,36 @@ object ProposalService {
 
         val isPastDeadline: Option[Boolean] =
           deadline.map(_ < currentTime)
+
+        // Descriptions of the proposal for the emails sent upon submission.  A missing
+        // value is reported rather than left blank, as in the PI submission email.
+        val typeText: String =
+          scienceSubtype.fold(Missing)(_.title)
+
+        val titleText: String =
+          title.fold(Missing)(_.value)
+
+        val cfpTitleText: String =
+          cfpTitle.fold(Missing)(_.value)
+
+        val piNameText: String =
+          orMissing(piName)
+
+        val abstractText: String =
+          orMissing(description)
+
+        // The observatory the PI is associated with, which is Gemini unless the time
+        // request is on behalf of an exchange partner community.
+        val piObservatory: String =
+          exchangePartner.fold("Gemini Observatory"):
+            case ExchangePartner.Keck   => "Keck Observatory"
+            case ExchangePartner.Subaru => "Subaru Observatory"
+
+        val coiNamesText: String =
+          if coiNames.isEmpty then Empty else coiNames.mkString(", ")
+
+        val instrumentsText: String =
+          if instruments.isEmpty then Empty else instruments.map(_.longName).sorted.mkString(", ")
 
         val piEmailAddress: Option[EmailAddress] =
           piEmailStr.flatMap(nes =>
@@ -374,15 +438,15 @@ object ProposalService {
         )
 
         private def htmlSubmissionEmail(newReference: ProposalReference): NonEmptyString = NonEmptyString.unsafeFrom(
-          s"""Hello,<br/>
-          <br/>
+          s"""|Hello,<br/>
+          |<br/>
           |Thanks for submitting a Gemini proposal!<br/>
           |<br/>
           |This email confirms that your proposal was received on ${formatDate(currentTime)} at ${formatTime(currentTime)} UT.<br/>
           |<br/>
-          |Call for Proposals: ${cfpTitle.getOrElse("<Missing>")}<br/>
+          |Call for Proposals: ${escapeHtml(cfpTitleText)}<br/>
           |Proposal Id: <a href="${programUrl(newReference)}">${newReference.label}</a><br/>
-          |Proposal Title: ${title.getOrElse("<Missing>")}<br/>
+          |Proposal Title: ${escapeHtml(titleText)}<br/>
           |<br/>
           |This proposal may be revised until the CfP deadline on ${deadline.fold("<Missing>")(formatDate)} at ${deadline.fold("<Missing>")(formatTime)} UT.<br/>
           |<br/>
@@ -414,13 +478,10 @@ object ProposalService {
               .send(pid, emailConfig.invitationFrom, recipient, subject, text, html)
               .map(_ => Result.unit)
 
-        def sendSubmissionEmail(pid: Program.Id)(using Transaction[F]): F[Result[Unit]] =
+        def sendSubmissionEmail(pid: Program.Id, newReference: ProposalReference)(using Transaction[F]): F[Result[Unit]] =
           piEmailAddress // this has already been validated, so we should have one
             .fold(Result.unit.pure)(email =>
-              (for {
-                newReference <- ResultT(getNewReference(pid))
-                _            <- ResultT(sendEmailHelper(pid, email, emailSubject(newReference), textSubmissionEmail(newReference), htmlSubmissionEmail(newReference).some))
-              } yield ()).value
+              sendEmailHelper(pid, email, emailSubject(newReference), textSubmissionEmail(newReference), htmlSubmissionEmail(newReference).some)
             )
 
         // Addresses notified when a proposal is submitted, in addition to the PI.  An
@@ -439,17 +500,54 @@ object ProposalService {
               emailConfig.proposalEmails.forCfpType(callType).toList
           }.distinct
 
-        private val notificationSubject: NonEmptyString =
-          NonEmptyString.unsafeFrom("Proposal Received")
+        private def notificationSubject(newReference: ProposalReference): NonEmptyString =
+          NonEmptyString.unsafeFrom(s"New $typeText proposal received: ${newReference.label}")
 
-        private val notificationText: NonEmptyString =
-          NonEmptyString.unsafeFrom("A new proposal has been received")
+        private def notificationText(
+          newReference: ProposalReference,
+          timeRequested: Option[CalculatedValue[CategorizedTimeRange]]
+        ): NonEmptyString = NonEmptyString.unsafeFrom(
+          s"""|A new $typeText proposal has been received:
+              |Id: ${newReference.label}
+              |URL: ${programUrl(newReference)}
+              |Title: $titleText
+              |PI: $piNameText ($piObservatory)
+              |CoIs: $coiNamesText
+              |Request: ${timeRequestedText(timeRequested)}
+              |Instruments: $instrumentsText
+              |Abstract: $abstractText""".stripMargin
+        )
 
-        def sendNotificationEmails(pid: Program.Id)(using Transaction[F]): F[Result[Unit]] =
-          notificationRecipients
-            .traverse(a => ResultT(sendEmailHelper(pid, a, notificationSubject, notificationText, none)))
-            .void
-            .value
+        private def notificationHtml(
+          newReference: ProposalReference,
+          timeRequested: Option[CalculatedValue[CategorizedTimeRange]]
+        ): NonEmptyString = NonEmptyString.unsafeFrom(
+          s"""|A new $typeText proposal has been received:<br/>
+              |Id: ${newReference.label}<br/>
+              |URL: <a href="${programUrl(newReference)}">${programUrl(newReference)}</a><br/>
+              |Title: ${escapeHtml(titleText)}<br/>
+              |PI: ${escapeHtml(piNameText)} ($piObservatory)<br/>
+              |CoIs: ${escapeHtml(coiNamesText)}<br/>
+              |Request: ${timeRequestedText(timeRequested)}<br/>
+              |Instruments: $instrumentsText<br/>
+              |Abstract: ${escapeHtml(abstractText)}""".stripMargin
+        )
+
+        def sendNotificationEmails(pid: Program.Id, newReference: ProposalReference)(using Transaction[F]): F[Result[Unit]] =
+          notificationRecipients match
+            case Nil        => Result.unit.pure
+            case recipients =>
+              (for {
+                timeRequested <- ResultT.liftF(timeEstimateService.estimateProgramRange(pid))
+                _             <- recipients.traverse: a =>
+                                   ResultT(sendEmailHelper(
+                                     pid,
+                                     a,
+                                     notificationSubject(newReference),
+                                     notificationText(newReference, timeRequested),
+                                     notificationHtml(newReference, timeRequested).some
+                                   ))
+              } yield ()).value
 
         def sendEmail(
           pid: Program.Id,
@@ -457,7 +555,11 @@ object ProposalService {
          )(using Transaction[F]): F[Result[Unit]] =
           // There might be emails for other status changes in the future
           if newStatus === ProposalStatus.Submitted then
-            (ResultT(sendSubmissionEmail(pid)) *> ResultT(sendNotificationEmails(pid))).value
+            (for {
+              newReference <- ResultT(getNewReference(pid))
+              _            <- ResultT(sendSubmissionEmail(pid, newReference))
+              _            <- ResultT(sendNotificationEmails(pid, newReference))
+            } yield ()).value
           else Result.unit.pure
 
       }
@@ -466,11 +568,11 @@ object ProposalService {
         val parts: Decoder[Set[Partner]] =
           _partner.map(_.toList.toSet)
 
-        val coNames: Decoder[List[Option[NonEmptyString]]] =
-          _text.map(_.toList.map(n => NonEmptyString.from(n).toOption))
+        val instrumentList: Decoder[List[Instrument]] =
+          _instrument.map(_.toList)
 
         val codec: Decoder[ProposalContext] =
-          (proposal_status *: bool *: varchar_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: observatory.opt).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: observatory.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -901,7 +1003,9 @@ object ProposalService {
           prog.c_proposal_status,
           prop.c_program_id IS NOT NULL,
           pi.c_email,
+          pi.c_display_name,
           prog.c_name,
+          prog.c_description,
           prog.c_proposal_reference,
           prog.c_semester,
           prog.c_science_subtype,
@@ -927,6 +1031,26 @@ object ProposalService {
             (SELECT ARRAY_AGG(DISTINCT c_partner) FROM t_partner_split WHERE c_program_id = prog.c_program_id AND c_percent > 0),
             '{}'
           ) AS c_requested_partners,
+          COALESCE(
+            (SELECT ARRAY_AGG(pu.c_display_name ORDER BY pu.c_display_name)
+             FROM v_program_user pu
+             WHERE pu.c_program_id = prog.c_program_id
+               AND pu.c_role IN ('coi', 'coi_ro')
+               AND pu.c_display_name IS NOT NULL
+            ),
+            '{}'
+          ) AS c_coi_names,
+          COALESCE(
+            (SELECT ARRAY_AGG(DISTINCT obs.c_instrument)
+             FROM t_observation obs
+             WHERE obs.c_program_id = prog.c_program_id
+               AND obs.c_existence = 'present'
+               AND obs.c_workflow_user_state IS DISTINCT FROM 'inactive'
+               AND obs.c_calibration_role IS NULL
+               AND obs.c_instrument IS NOT NULL
+            ),
+            '{}'
+          ) AS c_instruments,
           prog.c_goa_proprietary,
           LOCALTIMESTAMP,
           COALESCE(

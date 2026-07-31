@@ -3016,6 +3016,20 @@ trait DatabaseOperations { this: OdbSuite =>
       .use(_.prepareR(query).use(_.stream(pid, chunkSize = 1024).compile.toList))
   }
 
+  // The subject, text and html of the emails sent to a recipient for a program.
+  def getEmailMessages(pid: Program.Id, recipient: EmailAddress): IO[List[(String, String, Option[String])]] = {
+    val query =
+      sql"""
+        select c_subject, c_text_message, c_html_message
+        from t_email
+        where c_program_id = $program_id and c_recipient_email = $email_address
+        order by c_original_time
+      """.query(text_nonempty *: text_nonempty *: text_nonempty.opt)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.stream((pid, recipient), chunkSize = 1024).compile.toList))
+      .map(_.map((s, t, h) => (s.value, t.value, h.map(_.value))))
+  }
+
   def getEmailStatusesByAddress(address: NonEmptyString): IO[List[EmailStatus]] = {
     val query = sql"select c_status from t_email where c_recipient_email = $text_nonempty".query(email_status)
     FMain.databasePoolResource[IO](databaseConfig).flatten
