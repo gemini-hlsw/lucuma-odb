@@ -4,10 +4,6 @@
 -- required slit width plus an optional attachment.  The attachment is nullable
 -- because the mask is usually only machined during Phase 2 (cf. V1230, which
 -- made the same allowance for the dynamic config).
---
--- There is no acquisition configuration.  Sequence generation for MOS is not
--- implemented, and inventing an acquisition contract ahead of it would be
--- guesswork; it can be added later without disturbing what is here.
 
 CREATE TABLE t_gmos_north_mos (
 
@@ -20,7 +16,7 @@ CREATE TABLE t_gmos_north_mos (
   c_filter                     d_tag                 NULL DEFAULT NULL REFERENCES t_gmos_north_filter(c_tag),
   c_central_wavelength         d_wavelength_pm       NOT NULL,
 
-  -- The custom mask: slit width is always known, the machined mask often is not.
+  -- The custom mask: slit width is always known, the mask is often set on phase 2.
   c_slit_width                 d_tag                 NOT NULL          REFERENCES t_gmos_custom_slit_width(c_tag),
   c_mask_attachment_id         d_attachment_id       NULL DEFAULT NULL,
   c_mask_attachment_type       e_attachment_type     NULL DEFAULT NULL CHECK (c_mask_attachment_type = 'mos_mask'),
@@ -56,10 +52,7 @@ CREATE TABLE t_gmos_north_mos (
     REFERENCES t_observation(c_observation_id, c_instrument, c_observing_mode_type)
     ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
 
-  -- Matching on the program id as well makes another program's attachment
-  -- unreferenceable, and on the type makes a non-mask attachment unreferenceable.
-  -- Deleting the attachment returns the observation to "mask not yet defined";
-  -- the column list keeps the program id out of it.
+  -- The attachment if it exists must be a mask and on the same program.
   CONSTRAINT gmos_north_mos_mask_attachment_fkey
     FOREIGN KEY (c_program_id, c_mask_attachment_id, c_mask_attachment_type)
     REFERENCES t_attachment (c_program_id, c_attachment_id, c_attachment_type)
@@ -120,9 +113,6 @@ CREATE TABLE t_gmos_south_mos (
 COMMENT ON TABLE t_gmos_south_mos IS 'GMOS South MOS mode configuration';
 
 -- Default binning.  MOS uses the same spectral/spatial calculation as long slit
--- (cf. lucuma-core's gmos.mos.northBinning, which delegates to the same
--- functions with the same 2x spatial cap), reading the slit width from the
--- custom mask rather than from a builtin FPU.
 CREATE OR REPLACE PROCEDURE set_gmos_default_binning(
   oid d_observation_id
 ) AS $$
@@ -285,9 +275,8 @@ ON t_gmos_south_mos
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_gmos_default_binning();
 
--- Mode grouping.  MOS keys on the same fields as long slit; the custom slit
--- width takes the FPU slot and the observing mode type in the key keeps MOS and
--- long slit rows from colliding.
+-- Mode grouping.  MOS keys on the same fields as long slit
+-- the custom slit width takes the FPU slot and the observing mode type in the key
 ALTER TABLE t_gmos_north_mos
   ADD COLUMN c_mode_key text NOT NULL GENERATED ALWAYS AS (
     format_gmos_long_slit_mode_group(
@@ -482,9 +471,6 @@ EXECUTE FUNCTION ch_observation_edit_associated_table_update();
 -- Configuration requests.  A MOS request is discriminated by its grating alone,
 -- exactly as long slit, so the existing grating column is reused and its CHECK
 -- widened to admit the MOS mode.
--- The two checks were declared anonymously in V0913 and reference a second
--- column, so Postgres named them positionally rather than after their column.
--- Names looked up in pg_constraint, as in V1086.
 ALTER TABLE t_configuration_request
   DROP CONSTRAINT t_configuration_request_check,
   DROP CONSTRAINT t_configuration_request_check1;
