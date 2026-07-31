@@ -10,7 +10,6 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.show.*
-import cats.syntax.traverse.*
 import fs2.Stream
 import grackle.Result
 import grackle.ResultT
@@ -211,29 +210,31 @@ object ExecutionEventService:
         input: AddEventsInput
       )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]] =
 
-        def observationOf(e: AddEventInput): F[Result[Observation.Id]] =
-          e match
-            case AddEventInput.Slew(v)     =>
-              v.observationId.success.pure
-            case AddEventInput.Dataset(v)  =>
-              session.option(Statements.SelectDatasetObservation)(v.datasetId)
-                .map(_.toResult(OdbError.InvalidDataset(v.datasetId, s"Dataset '${v.datasetId.show}' not found".some).asProblem))
-            case AddEventInput.Step(v)     =>
-              session.option(Statements.SelectStepObservation)(v.stepId)
-                .map(_.toResult(OdbError.InvalidStep(v.stepId, s"Step '${v.stepId}' not found".some).asProblem))
-            case AddEventInput.Sequence(v) =>
-              session.option(Statements.SelectVisitObservation)(v.visitId)
-                .map(_.toResult(OdbError.InvalidVisit(v.visitId, s"Visit '${v.visitId}' not found".some).asProblem))
+        // Resolves the distinct observations referenced by a batch of ids, running
+        // nothing when the list is empty (an empty IN-list is invalid SQL).  Ids
+        // that don't resolve simply contribute no observation here; the per-event
+        // insert below still rejects them with a precise not-found error.
+        def distinctObservations[A](ids: List[A], stmt: Int => Query[List[A], Observation.Id]): F[List[Observation.Id]] =
+          if ids.isEmpty then List.empty.pure
+          else session.execute(stmt(ids.size))(ids)
 
         // Batches are scoped to a single observation: every event insert takes the
         // observation's execution mutex, so a multi-observation batch would take
         // several in array order and could deadlock against a concurrent batch
         // taking them in another order.  One observation means one mutex per batch.
+        // Resolve them a kind at a time (one round trip each) rather than per event.
         val requireSingleObservation: F[Result[Unit]] =
-          input.events.traverse(observationOf).map: results =>
-            results.sequence.flatMap: oids =>
-              if oids.toList.distinct.size <= 1 then ().success
-              else OdbError.InvalidArgument("All events in a batch must belong to the same observation.".some).asFailure
+          val datasetIds = input.events.collect { case AddEventInput.Dataset(v)  => v.datasetId }
+          val stepIds    = input.events.collect { case AddEventInput.Step(v)     => v.stepId }
+          val visitIds   = input.events.collect { case AddEventInput.Sequence(v) => v.visitId }
+          val slewOids   = input.events.collect { case AddEventInput.Slew(v)     => v.observationId }
+          for
+            d <- distinctObservations(datasetIds, Statements.SelectDatasetObservations)
+            s <- distinctObservations(stepIds,    Statements.SelectStepObservations)
+            v <- distinctObservations(visitIds,   Statements.SelectVisitObservations)
+          yield
+            if (d ++ s ++ v ++ slewOids).distinct.sizeIs <= 1 then ().success
+            else OdbError.InvalidArgument("All events in a batch must belong to the same observation.".some).asFailure
 
         def insertOne(e: AddEventInput): F[Result[ExecutionEvent.Id]] =
           e match
@@ -263,24 +264,29 @@ object ExecutionEventService:
       }
 
     // Observation-resolution queries, used to enforce that an addEvents batch is
-    // scoped to a single observation.
+    // scoped to a single observation.  Each resolves the distinct observations
+    // referenced by a whole batch's worth of ids in a single round trip.
 
-    val SelectDatasetObservation: Query[Dataset.Id, Observation.Id] =
+    def SelectDatasetObservations(count: Int): Query[List[Dataset.Id], Observation.Id] =
       sql"""
-        SELECT c_observation_id FROM t_dataset WHERE c_dataset_id = $dataset_id
+        SELECT DISTINCT c_observation_id
+        FROM t_dataset
+        WHERE c_dataset_id IN (${dataset_id.values.list(count)})
       """.query(observation_id)
 
-    val SelectStepObservation: Query[Step.Id, Observation.Id] =
+    def SelectStepObservations(count: Int): Query[List[Step.Id], Observation.Id] =
       sql"""
-        SELECT a.c_observation_id
+        SELECT DISTINCT a.c_observation_id
         FROM t_step s
         INNER JOIN t_atom a ON a.c_atom_id = s.c_atom_id
-        WHERE s.c_step_id = $step_id
+        WHERE s.c_step_id IN (${step_id.values.list(count)})
       """.query(observation_id)
 
-    val SelectVisitObservation: Query[Visit.Id, Observation.Id] =
+    def SelectVisitObservations(count: Int): Query[List[Visit.Id], Observation.Id] =
       sql"""
-        SELECT c_observation_id FROM t_visit WHERE c_visit_id = $visit_id
+        SELECT DISTINCT c_observation_id
+        FROM t_visit
+        WHERE c_visit_id IN (${visit_id.values.list(count)})
       """.query(observation_id)
 
     val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
