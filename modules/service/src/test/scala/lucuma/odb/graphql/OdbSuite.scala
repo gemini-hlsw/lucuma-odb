@@ -394,7 +394,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       domain            = "gpp.com".refined,
       webhookSigningKey = "webhookKey".refined,
       invitationFrom    = EmailAddress.unsafeFrom("explore@gpp.com"),
-      exploreUrl        = uri"https://explore.gemini.edu/"
+      exploreUrl        = uri"https://explore.gemini.edu/",
+      proposalEmails    = Config.ProposalEmails.uniform(EmailAddress.unsafeFrom("proposals@gpp.com"))
     )
 
   val simbadClient: IO[SimbadClient[IO]] =

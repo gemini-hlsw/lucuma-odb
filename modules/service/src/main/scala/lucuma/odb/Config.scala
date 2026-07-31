@@ -22,6 +22,9 @@ import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.common.middleware.TracingMiddleware
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.ExchangePartner
+import lucuma.core.enums.GeminiCallForProposalsType
+import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Gid
@@ -274,7 +277,8 @@ object Config:
     domain:            NonEmptyString,
     webhookSigningKey: NonEmptyString,
     invitationFrom:    EmailAddress,
-    exploreUrl:        Uri
+    exploreUrl:        Uri,
+    proposalEmails:    ProposalEmails
   ):
     // add to environment?
     lazy val baseUri        = uri"https://api.mailgun.net/v3"
@@ -287,12 +291,96 @@ object Config:
       envOrProp("MAILGUN_DOMAIN").as[NonEmptyString],
       envOrProp("MAILGUN_WEBHOOK_SIGNING_KEY").as[NonEmptyString],
       envOrProp("INVITATION_SENDER_EMAIL").as[EmailAddress],
-      envOrProp("EXPLORE_URL").as[Uri]
+      envOrProp("EXPLORE_URL").as[Uri],
+      ProposalEmails.fromCiris
     ).parMapN(Email.apply)
 
-    private given ConfigDecoder[String, EmailAddress] =
-      ConfigDecoder[String].mapOption("Email Address"): s =>
-        EmailAddress.from(s).toOption
+  /**
+   * Addresses that are notified when a proposal is submitted, in addition to the PI. Which
+   * address is used depends on the type of the proposal: the call for proposals type for Gemini
+   * proposals, the exchange partner for Keck and Subaru proposals, and the partner for the NGOs.
+   */
+  case class ProposalEmails(
+    demoScience:        EmailAddress,
+    directorsTime:      EmailAddress,
+    fastTurnaround:     EmailAddress,
+    largeProgram:       EmailAddress,
+    poorWeather:        EmailAddress,
+    systemVerification: EmailAddress,
+    subaru:             EmailAddress,
+    keck:               EmailAddress,
+    ar:                 EmailAddress,
+    br:                 EmailAddress,
+    ca:                 EmailAddress,
+    cl:                 EmailAddress,
+    kr:                 EmailAddress,
+    uh:                 EmailAddress,
+    us:                 EmailAddress
+  ):
+
+    /**
+     * The address for a Gemini call for proposals type, if any. There is no address for the
+     * regular semester (classical and queue) proposals.
+     */
+    def forCfpType(cfpType: GeminiCallForProposalsType): Option[EmailAddress] =
+      cfpType match
+        case GeminiCallForProposalsType.DemoScience        => demoScience.some
+        case GeminiCallForProposalsType.DirectorsTime      => directorsTime.some
+        case GeminiCallForProposalsType.FastTurnaround     => fastTurnaround.some
+        case GeminiCallForProposalsType.LargeProgram       => largeProgram.some
+        case GeminiCallForProposalsType.PoorWeather        => poorWeather.some
+        case GeminiCallForProposalsType.SystemVerification => systemVerification.some
+        case GeminiCallForProposalsType.RegularSemester    => none
+
+    def forExchangePartner(partner: ExchangePartner): EmailAddress =
+      partner match
+        case ExchangePartner.Keck   => keck
+        case ExchangePartner.Subaru => subaru
+
+    def forPartner(partner: Partner): EmailAddress =
+      partner match
+        case Partner.AR => ar
+        case Partner.BR => br
+        case Partner.CA => ca
+        case Partner.CL => cl
+        case Partner.KR => kr
+        case Partner.UH => uh
+        case Partner.US => us
+
+  object ProposalEmails:
+
+    /** A `ProposalEmails` where every address is the same, as if only the default were set. */
+    def uniform(address: EmailAddress): ProposalEmails =
+      ProposalEmails(
+        address, address, address, address, address,
+        address, address, address, address, address,
+        address, address, address, address, address
+      )
+
+    // Falls back to PROPOSAL_EMAIL_DEFAULT if the specific variable is not set. Note that `or`
+    // only falls back when the value is missing, so a malformed address remains an error.
+    private def address(suffix: String): ConfigValue[Effect, EmailAddress] =
+      envOrProp(s"PROPOSAL_EMAIL_$suffix")
+        .or(envOrProp("PROPOSAL_EMAIL_DEFAULT"))
+        .as[EmailAddress]
+
+    lazy val fromCiris: ConfigValue[Effect, ProposalEmails] = (
+      address("DEMO_SCIENCE"),
+      address("DIRECTORS_TIME"),
+      address("FAST_TURNAROUND"),
+      address("LARGE_PROGRAM"),
+      address("POOR_WEATHER"),
+      address("SYSTEM_VERIFICATION"),
+      address("SUBARU"),
+      address("KECK"),
+      address("AR"),
+      address("BR"),
+      address("CA"),
+      address("CL"),
+      address("KR"),
+      address("UH"),
+      address("US")
+    ).parMapN(ProposalEmails.apply)
 
   case class HttpClient(
     timeout:            Duration,
@@ -310,6 +398,10 @@ object Config:
         .as[Duration]
         .default(60.seconds) // 60s is Ember's default
     ).parMapN(HttpClient.apply)
+
+  private given ConfigDecoder[String, EmailAddress] =
+    ConfigDecoder[String].mapOption("Email Address"): s =>
+      EmailAddress.from(s).toOption
 
   private given ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapOption("Public Key"): s =>

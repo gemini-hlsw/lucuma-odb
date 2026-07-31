@@ -154,6 +154,20 @@ Two more config variables are required:
 - INVITATION_SENDER_EMAIL - this should be some user in the MAILGUN_DOMAIN. For example `explore@mail.odb-dev.lucuma.xyz`. This will be the sender of the invitation emails.
 - EXPLORE_URL - The url of the Explore instance for this version of the ODB. For example `https://explore-dev.lucuma.xyz`. This is used to put a link to explore in the invitation emails.
 
+### Proposal notification emails
+
+When a proposal is submitted, a notification is sent to an address that depends on the type of the
+proposal. Each address is read from its own variable, falling back to `PROPOSAL_EMAIL_DEFAULT` when
+that variable is not set. If neither is set, the odb will fail when loading the configuration.
+
+- PROPOSAL_EMAIL_DEFAULT - used for any of the variables below that is not set.
+- By call for proposals type: PROPOSAL_EMAIL_DEMO_SCIENCE, PROPOSAL_EMAIL_DIRECTORS_TIME,
+  PROPOSAL_EMAIL_FAST_TURNAROUND, PROPOSAL_EMAIL_LARGE_PROGRAM, PROPOSAL_EMAIL_POOR_WEATHER,
+  PROPOSAL_EMAIL_SYSTEM_VERIFICATION
+- By exchange partner: PROPOSAL_EMAIL_KECK, PROPOSAL_EMAIL_SUBARU
+- By partner: PROPOSAL_EMAIL_AR, PROPOSAL_EMAIL_BR, PROPOSAL_EMAIL_CA, PROPOSAL_EMAIL_CL,
+  PROPOSAL_EMAIL_KR, PROPOSAL_EMAIL_UH, PROPOSAL_EMAIL_US
+
 To run the odb locally, the environment variables in this section must be set or the odb will fail when
 loading the configuration. Here is the complete list with some example values.
 
@@ -162,6 +176,7 @@ loading the configuration. Here is the complete list with some example values.
 - MAILGUN_WEBHOOK_SIGNING_KEY=<Any string> (Can be anything, since webhooks won't be received locally)
 - INVITATION_SENDER_EMAIL=explore@mail.odb-dev.lucuma.xyz
 - EXPLORE_URL=https://explore-dev.lucuma.xyz
+- PROPOSAL_EMAIL_DEFAULT=noreply@gemini.edu (The per-type variables are all optional)
 
 Mailgun sets other variables in the Heroku app, but they are for things we are not using.
 
