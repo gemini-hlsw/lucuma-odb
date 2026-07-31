@@ -207,9 +207,9 @@ class setProposalStatus extends OdbSuite
     }
   }
 
-  test("⨯ exchange partner the call does not offer has no deadline") {
-    // The call offers no exchange partners at all, so a Keck request has no
-    // deadline to meet and cannot be submitted.
+  test("⨯ exchange partner the call does not offer") {
+    // The call offers no exchange partners at all, so it cannot be asked for time
+    // on behalf of the Keck community.
     createGeminiCallForProposalsAs(
       staff,
       GeminiCallForProposalsType.RegularSemester,
@@ -235,7 +235,8 @@ class setProposalStatus extends OdbSuite
               ) { program { id } }
             }
           """,
-          expected = List(error.missingDeadline(pid).message).asLeft
+          expected =
+            List(error.unofferedExchangePartner(pid, ExchangePartner.Keck).message).asLeft
         )
       }
     }

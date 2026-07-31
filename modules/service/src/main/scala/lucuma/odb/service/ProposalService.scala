@@ -143,6 +143,9 @@ object ProposalService {
     def bothTimeRequests(pid: Program.Id): OdbError =
       s"Proposal $pid may not have both an exchange partner and partner splits.".invalidArg
 
+    def unofferedExchangePartner(pid: Program.Id, xp: ExchangePartner): OdbError =
+      s"Program $pid requests time on behalf of ${xp.tag.toUpperCase}, but the Call for Proposals does not offer that exchange partner.".invalidArg
+
     def missingPartners(pid: Program.Id, partners: Set[Partner] = Set.empty): OdbError =
       partners.toList.map(_.abbreviation).sorted match
         case Nil     =>
@@ -256,6 +259,9 @@ object ProposalService {
         cfp:               Option[CfpProperties],
         considerForBand3:  Option[ConsiderForBand3],
         exchangePartner:   Option[ExchangePartner],
+        // Whether the call offers the exchange partner named above.  False when
+        // there is no exchange partner to begin with.
+        exchangeOffered:   Boolean,
         observatory:       Option[Observatory]
       ) {
         // Every stored proposal has an observatory; default to Gemini defensively.
@@ -331,6 +337,9 @@ object ProposalService {
             // both-set time request here with a clear message rather than
             // silently treating it as an exchange request below.
             bothTimeRequests(pid).asFailure.whenA(exchangePartner.isDefined && splitsSum =!= 0),
+            // Time may only be requested on behalf of a community the call invites.
+            exchangePartner.filterNot(_ => exchangeOffered).fold(Result.unit): xp =>
+              unofferedExchangePartner(pid, xp).asFailure,
             scienceSubtype.fold(().success) { s =>
               // An exchange-partner time request carries no Gemini partner
               // splits, so the sum-to-100 rule does not apply to it.
@@ -572,7 +581,7 @@ object ProposalService {
           _instrument.map(_.toList)
 
         val codec: Decoder[ProposalContext] =
-          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: observatory.opt).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: bool *: observatory.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -1082,6 +1091,7 @@ object ProposalService {
           cfp.c_gemini_proprietary,
           prop.c_consider_for_band_3,
           prop.c_exchange_partner,
+          cfp_ep.c_cfp_id IS NOT NULL AS c_exchange_offered,
           prop.c_observatory
         FROM t_program prog
         LEFT JOIN t_proposal prop
