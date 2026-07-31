@@ -57,7 +57,7 @@ DECLARE
   visit_created timestamp;
 BEGIN
   IF NEW.c_client_time IS NOT NULL THEN
-    SELECT c_created INTO visit_created
+    SELECT c_effective_time INTO visit_created
       FROM t_visit
      WHERE c_visit_id = NEW.c_visit_id;
 

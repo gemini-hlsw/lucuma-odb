@@ -172,7 +172,7 @@ object ExecutionEventService:
               case ClientTimeError() => invalidEventTime.asFailureF
 
         (for
-          v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none, input.time))
+          v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none, input.clientTime))
           e <- ResultT(insert(v))
           (eid, _) = e
         yield eid).value
@@ -287,7 +287,7 @@ object ExecutionEventService:
           c_effective_time,
           xmax = 0 AS inserted
       """.query(execution_event_id *: core_timestamp *: bool)
-         .contramap(in => (in.datasetId, in.datasetStage, in.time, in.idempotencyKey, in.datasetId))
+         .contramap(in => (in.datasetId, in.datasetStage, in.clientTime, in.idempotencyKey, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Boolean)] =
       sql"""
@@ -320,7 +320,7 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap(in => (in.visitId, in.command, in.time, in.idempotencyKey, in.visitId))
+         .contramap(in => (in.visitId, in.command, in.clientTime, in.idempotencyKey, in.visitId))
 
     val InsertSlewEvent: Query[(Visit.Id, AddSlewEventInput), (Id, Boolean)] =
       sql"""
@@ -353,7 +353,7 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap((v, in) => (v, in.slewStage, in.time, in.idempotencyKey, v))
+         .contramap((v, in) => (v, in.slewStage, in.clientTime, in.idempotencyKey, v))
 
     val InsertStepEvent: Query[AddStepEventInput, (Id, Boolean)] =
       sql"""
@@ -392,7 +392,7 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap(in => (in.visitId, in.stepId, in.stepStage, in.time, in.idempotencyKey, in.stepId))
+         .contramap(in => (in.visitId, in.stepId, in.stepStage, in.clientTime, in.idempotencyKey, in.stepId))
 
     val SelectSequenceEvents: Query[Observation.Id, ExecutionEvent.SequenceEvent] =
       sql"""

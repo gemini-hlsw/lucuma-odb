@@ -20,6 +20,7 @@ trait VisitTable[F[_]] extends BaseMapping[F]:
     val ObservationId: ColumnRef  = col("c_observation_id",  observation_id)
     val Instrument: ColumnRef     = col("c_instrument",      instrument)
     val RecordedTime: ColumnRef   = col("c_recorded_time",   core_timestamp)
+    val ClientTime: ColumnRef     = col("c_client_time",     core_timestamp.opt)
     val EffectiveTime: ColumnRef  = col("c_effective_time",  core_timestamp)
     val Site: ColumnRef           = col("c_site",            site)
     val Chargeable: ColumnRef     = col("c_chargeable",      bool)

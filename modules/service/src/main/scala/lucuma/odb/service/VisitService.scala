@@ -221,7 +221,7 @@ object VisitService:
           .materializeAndThen(input.observationId): ctx =>
             (for
               record <- EitherT.liftF(session.unique(Statements.ShouldRecordOriginalEstimate)(input.observationId))
-              visit  <- lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey, input.time)
+              visit  <- lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey, input.clientTime)
               _      <- recordOriginalTimeEstimate(ctx).whenA(record)
               _      <- EitherT.liftF(freezeItcResult(ctx))
             yield visit.visitId).value

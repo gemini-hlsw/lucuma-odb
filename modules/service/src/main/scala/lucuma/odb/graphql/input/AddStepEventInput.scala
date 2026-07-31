@@ -16,7 +16,7 @@ case class AddStepEventInput(
   stepId:         Step.Id,
   visitId:        Visit.Id,
   stepStage:      StepStage,
-  time:           Option[Timestamp],
+  clientTime:     Option[Timestamp],
   idempotencyKey: Option[IdempotencyKey]
 )
 
@@ -28,8 +28,8 @@ object AddStepEventInput:
         StepIdBinding("stepId", rStepId),
         VisitIdBinding("visitId", rVisitId),
         StepStageBinding("stepStage", rStepStage),
-        TimestampBinding.Option("time", rTime),
+        TimestampBinding.Option("clientTime", rClientTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rStepId, rVisitId, rStepStage, rTime, rIdm).parMapN: (sid, vid, stage, time, idm) =>
-          AddStepEventInput(sid, vid, stage, time, idm)
+        (rStepId, rVisitId, rStepStage, rClientTime, rIdm).parMapN: (sid, vid, stage, clientTime, idm) =>
+          AddStepEventInput(sid, vid, stage, clientTime, idm)

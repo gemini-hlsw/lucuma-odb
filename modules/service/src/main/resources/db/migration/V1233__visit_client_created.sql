@@ -53,29 +53,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER check_visit_client_time_trigger
   BEFORE INSERT ON t_visit
   FOR EACH ROW EXECUTE FUNCTION check_visit_client_time();
-
--- The execution-event time check (V1230) reads the visit's recorded creation time
--- as its lower bound.  That column was just renamed from c_created, so repoint the
--- function; plpgsql resolves column names at run time, so this must be updated in
--- lockstep with the rename.
-CREATE OR REPLACE FUNCTION check_execution_event_client_time()
-  RETURNS TRIGGER AS $$
-DECLARE
-  visit_recorded timestamp;
-BEGIN
-  IF NEW.c_client_time IS NOT NULL THEN
-    SELECT c_recorded_time INTO visit_recorded
-      FROM t_visit
-     WHERE c_visit_id = NEW.c_visit_id;
-
-    IF NEW.c_client_time < visit_recorded - interval '5 minutes'
-       OR NEW.c_client_time > now() + interval '5 minutes' THEN
-      RAISE EXCEPTION 'execution event time % is out of range for visit %',
-        NEW.c_client_time, NEW.c_visit_id
-        USING ERRCODE = 'ODB01';
-    END IF;
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;

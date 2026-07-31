@@ -12,7 +12,7 @@ import lucuma.odb.graphql.binding.*
 
 case class RecordVisitInput(
   observationId:  Observation.Id,
-  time:           Option[Timestamp],
+  clientTime:     Option[Timestamp],
   idempotencyKey: Option[IdempotencyKey]
 )
 
@@ -26,10 +26,10 @@ object RecordVisitInput:
       case List(
         ObservationIdBinding("observationId", rObservationId),
         staticMatcher(`instrumentName`, rStatic),
-        TimestampBinding.Option("time", rTime),
+        TimestampBinding.Option("clientTime", rClientTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rObservationId, rStatic, rTime, rIdm).parMapN((obs, _, time, idm) => RecordVisitInput(obs, time, idm))
+        (rObservationId, rStatic, rClientTime, rIdm).parMapN((obs, _, clientTime, idm) => RecordVisitInput(obs, clientTime, idm))
 
   val Flamingos2Binding: Matcher[RecordVisitInput] =
     binding("flamingos2", Flamingos2StaticInput.Binding)
@@ -47,7 +47,7 @@ object RecordVisitInput:
     ObjectFieldsBinding.rmap:
       case List(
         ObservationIdBinding("observationId", rObservationId),
-        TimestampBinding.Option("time", rTime),
+        TimestampBinding.Option("clientTime", rClientTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rObservationId, rTime, rIdm).parMapN(RecordVisitInput(_, _, _))
+        (rObservationId, rClientTime, rIdm).parMapN(RecordVisitInput(_, _, _))

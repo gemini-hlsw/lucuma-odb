@@ -27,21 +27,25 @@ class visitClientCreated extends OdbSuite with query.ExecutionTestSupportForGmos
   private def nowMinus(seconds: Long): Timestamp =
     Timestamp.unsafeFromInstantTruncated(Instant.now().minusSeconds(seconds))
 
-  private def timeArg(time: Option[Timestamp]): String =
-    time.fold("")(t => s"""time: "${t.isoFormat}"""")
+  private def clientTimeArg(time: Option[Timestamp]): String =
+    time.fold("")(t => s"""clientTime: "${t.isoFormat}"""")
 
-  // (recordedTime, effectiveTime)
-  private def recordVisitTimes(oid: Observation.Id, time: Option[Timestamp]): IO[(Timestamp, Timestamp)] =
+  // (recordedTime, clientTime, effectiveTime)
+  private def recordVisitTimes(
+    oid:        Observation.Id,
+    clientTime: Option[Timestamp]
+  ): IO[(Timestamp, Option[Timestamp], Timestamp)] =
     query(
       serviceUser,
       s"""
         mutation {
           recordVisit(input: {
             observationId: "$oid"
-            ${timeArg(time)}
+            ${clientTimeArg(clientTime)}
           }) {
             visit {
               recordedTime
+              clientTime
               effectiveTime
             }
           }
@@ -49,10 +53,16 @@ class visitClientCreated extends OdbSuite with query.ExecutionTestSupportForGmos
       """
     ).map: json =>
       val c = json.hcursor.downFields("recordVisit", "visit")
-      (c.downField("recordedTime").require[Timestamp], c.downField("effectiveTime").require[Timestamp])
+      (
+        c.downField("recordedTime").require[Timestamp],
+        c.downField("clientTime").require[Option[Timestamp]],
+        c.downField("effectiveTime").require[Timestamp]
+      )
 
-  // (recordedTime, effectiveTime) of the observation's single visit
-  private def visitTimes(oid: Observation.Id): IO[(Timestamp, Timestamp)] =
+  // (recordedTime, clientTime, effectiveTime) of the observation's single visit
+  private def visitTimes(
+    oid: Observation.Id
+  ): IO[(Timestamp, Option[Timestamp], Timestamp)] =
     query(
       pi,
       s"""
@@ -62,6 +72,7 @@ class visitClientCreated extends OdbSuite with query.ExecutionTestSupportForGmos
               visits {
                 matches {
                   recordedTime
+                  clientTime
                   effectiveTime
                 }
               }
@@ -71,18 +82,24 @@ class visitClientCreated extends OdbSuite with query.ExecutionTestSupportForGmos
       """
     ).map: json =>
       val c = json.hcursor.downFields("observation", "execution", "visits", "matches").downN(0)
-      (c.downField("recordedTime").require[Timestamp], c.downField("effectiveTime").require[Timestamp])
+      (
+        c.downField("recordedTime").require[Timestamp],
+        c.downField("clientTime").require[Option[Timestamp]],
+        c.downField("effectiveTime").require[Timestamp]
+      )
 
   test("recordVisit - supplied time drives effectiveTime"):
     val t = nowMinus(60)
     createObservation(pi).flatMap: oid =>
-      recordVisitTimes(oid, t.some).map: (created, effective) =>
+      recordVisitTimes(oid, t.some).map: (created, client, effective) =>
         assertEquals(effective, t)
+        assertEquals(client, t.some)
         assertNotEquals(created, t)
 
   test("recordVisit - omitted time defaults to created"):
     createObservation(pi).flatMap: oid =>
-      recordVisitTimes(oid, None).map: (created, effective) =>
+      recordVisitTimes(oid, None).map: (created, client, effective) =>
+        assertEquals(client, none)
         assertEquals(effective, created)
 
   private val outOfRange: String =
@@ -97,7 +114,7 @@ class visitClientCreated extends OdbSuite with query.ExecutionTestSupportForGmos
           mutation {
             recordVisit(input: {
               observationId: "$oid"
-              ${timeArg(t.some)}
+              ${clientTimeArg(t.some)}
             }) { visit { id } }
           }
         """,
@@ -110,7 +127,7 @@ class visitClientCreated extends OdbSuite with query.ExecutionTestSupportForGmos
         addSlewEvent(input: {
           observationId: "$oid"
           slewStage: ${stage.tag.toUpperCase}
-          ${timeArg(time)}
+          ${clientTimeArg(time)}
         }) {
           event { id }
         }
@@ -123,9 +140,10 @@ class visitClientCreated extends OdbSuite with query.ExecutionTestSupportForGmos
       oid <- createObservation(pi)
       _   <- query(serviceUser, addSlewWithTime(oid, SlewStage.StartSlew, t.some))
       ts  <- visitTimes(oid)
-      (created, effective) = ts
+      (created, client, effective) = ts
     yield
       assertEquals(effective, t)
+      assertEquals(client, t.some)
       assertNotEquals(created, t)
 
   test("addSlewEvent - a visit-creating slew with an out-of-range time is rejected"):

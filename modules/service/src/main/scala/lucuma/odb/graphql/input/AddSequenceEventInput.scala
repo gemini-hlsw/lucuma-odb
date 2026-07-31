@@ -14,7 +14,7 @@ import lucuma.odb.graphql.binding.*
 case class AddSequenceEventInput(
   visitId:        Visit.Id,
   command:        SequenceCommand,
-  time:           Option[Timestamp],
+  clientTime:     Option[Timestamp],
   idempotencyKey: Option[IdempotencyKey]
 )
 
@@ -25,8 +25,8 @@ object AddSequenceEventInput:
       case List(
         VisitIdBinding("visitId", rVisitId),
         SequenceCommandBinding("command", rCommand),
-        TimestampBinding.Option("time", rTime),
+        TimestampBinding.Option("clientTime", rClientTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rVisitId, rCommand, rTime, rIdm).parMapN: (vid, cmd, time, idm) =>
-          AddSequenceEventInput(vid, cmd, time, idm)
+        (rVisitId, rCommand, rClientTime, rIdm).parMapN: (vid, cmd, clientTime, idm) =>
+          AddSequenceEventInput(vid, cmd, clientTime, idm)

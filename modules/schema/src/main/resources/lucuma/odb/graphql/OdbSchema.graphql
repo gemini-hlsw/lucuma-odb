@@ -16,7 +16,7 @@ input AddDatasetEventInput {
   time the event is received by the ODB is used instead.  A supplied time that
   falls outside the visit's expected timeframe is rejected.
   """
-  time: Timestamp
+  clientTime: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -52,7 +52,7 @@ input AddSequenceEventInput {
   time the event is received by the ODB is used instead.  A supplied time that
   falls outside the visit's expected timeframe is rejected.
   """
-  time: Timestamp
+  clientTime: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -78,7 +78,7 @@ input AddSlewEventInput {
   time the event is received by the ODB is used instead.  A supplied time that
   falls outside the visit's expected timeframe is rejected.
   """
-  time: Timestamp
+  clientTime: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -105,7 +105,7 @@ input AddStepEventInput {
   time the event is received by the ODB is used instead.  A supplied time that
   falls outside the visit's expected timeframe is rejected.
   """
-  time: Timestamp
+  clientTime: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -200,6 +200,11 @@ type AtomEvent implements ExecutionEvent {
 
   "Deprecated alias for `recordedTime`."
   received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
 
   """
   Time we associate with this event.  This is the client-supplied event time when
@@ -3909,7 +3914,7 @@ Configuration that controls how and when the Scheduler may plan execution of an
 observation, including whether it can be split across multiple visits and any
 timing constraints.
 """
-input SchedulingConstraintsInput {
+input SchedulingConstraintsfInput {
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -5234,7 +5239,7 @@ input RecordVisitInput {
   the time the visit is recorded by the ODB is used instead.  A supplied time
   outside the acceptable range is rejected.
   """
-  time: Timestamp
+  clientTime: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -8136,6 +8141,11 @@ type DatasetEvent implements ExecutionEvent {
   received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
 
   """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
   Time we associate with this event.  This is the client-supplied event time when
   one was provided, otherwise the time the event was recorded (see `recordedTime`).
   """
@@ -8515,6 +8525,11 @@ interface ExecutionEvent {
 
   "Deprecated alias for `recordedTime`."
   received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
 
   """
   Time we associate with this event.  This is the client-supplied event time when
@@ -15821,6 +15836,11 @@ type SequenceEvent implements ExecutionEvent {
   received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
 
   """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
   Time we associate with this event.  This is the client-supplied event time when
   one was provided, otherwise the time the event was recorded (see `recordedTime`).
   """
@@ -15975,6 +15995,11 @@ type SlewEvent implements ExecutionEvent {
 
   "Deprecated alias for `recordedTime`."
   received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
 
   """
   Time we associate with this event.  This is the client-supplied event time when
@@ -16934,6 +16959,11 @@ type StepEvent implements ExecutionEvent {
 
   "Deprecated alias for `recordedTime`."
   received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
 
   """
   Time we associate with this event.  This is the client-supplied event time when
@@ -18100,6 +18130,11 @@ type Visit {
 
   "Deprecated alias for `recordedTime`."
   created: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  The client-suplied creation time, if one was supplied.
+  """
+  clientTime: Timestamp
 
   """
   Time we associate with this visit.  This is the client-supplied creation time

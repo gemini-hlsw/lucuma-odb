@@ -25,6 +25,7 @@ trait ExecutionEventTable[F[_]] extends BaseMapping[F]:
     val Id: ColumnRef              = col("c_execution_event_id", execution_event_id)
     val EventType: ColumnRef       = col("c_event_type",         execution_event_type)
     val RecordedTime: ColumnRef    = col("c_recorded_time",      core_timestamp)
+    val ClientTime: ColumnRef      = col("c_client_time",        core_timestamp.opt)
     val EffectiveTime: ColumnRef   = col("c_effective_time",     core_timestamp)
 
     val ObservationId: ColumnRef   = col("c_observation_id",     observation_id)

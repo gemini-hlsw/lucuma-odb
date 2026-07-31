@@ -14,7 +14,7 @@ import lucuma.odb.graphql.binding.*
 case class AddDatasetEventInput(
   datasetId:      Dataset.Id,
   datasetStage:   DatasetStage,
-  time:           Option[Timestamp],
+  clientTime:     Option[Timestamp],
   idempotencyKey: Option[IdempotencyKey]
 )
 
@@ -25,8 +25,8 @@ object AddDatasetEventInput:
       case List(
         DatasetIdBinding("datasetId", rDatasetId),
         DatasetStageBinding("datasetStage", rDatasetStage),
-        TimestampBinding.Option("time", rTime),
+        TimestampBinding.Option("clientTime", rClientTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rDatasetId, rDatasetStage, rTime, rIdm).parMapN: (did, stage, time, idm) =>
-          AddDatasetEventInput(did, stage, time, idm)
+        (rDatasetId, rDatasetStage, rClientTime, rIdm).parMapN: (did, stage, clientTime, idm) =>
+          AddDatasetEventInput(did, stage, clientTime, idm)

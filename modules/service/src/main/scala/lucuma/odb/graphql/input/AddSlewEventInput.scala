@@ -13,7 +13,7 @@ import lucuma.odb.graphql.binding.*
 case class AddSlewEventInput(
   observationId:  Observation.Id,
   slewStage:      SlewStage,
-  time:           Option[Timestamp],
+  clientTime:     Option[Timestamp],
   idempotencyKey: Option[IdempotencyKey]
 )
 
@@ -24,8 +24,8 @@ object AddSlewEventInput:
       case List(
         ObservationIdBinding("observationId", rObsId),
         SlewStageBinding("slewStage", rStage),
-        TimestampBinding.Option("time", rTime),
+        TimestampBinding.Option("clientTime", rClientTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rObsId, rStage, rTime, rIdm).parMapN: (oid, stg, time, idm) =>
-          AddSlewEventInput(oid, stg, time, idm)
+        (rObsId, rStage, rClientTime, rIdm).parMapN: (oid, stg, clientTime, idm) =>
+          AddSlewEventInput(oid, stg, clientTime, idm)

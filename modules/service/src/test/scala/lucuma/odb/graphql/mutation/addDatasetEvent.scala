@@ -285,10 +285,10 @@ class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
     Timestamp.unsafeFromInstantTruncated(Instant.now().minusSeconds(seconds))
 
   private def addDatasetEventTimes(
-    did:   Dataset.Id,
-    stage: DatasetStage,
-    time:  Option[Timestamp]
-  ): IO[(Timestamp, Timestamp)] =
+    did:        Dataset.Id,
+    stage:      DatasetStage,
+    clientTime: Option[Timestamp]
+  ): IO[(Timestamp, Option[Timestamp], Timestamp)] =
     query(
       serviceUser,
       s"""
@@ -296,10 +296,11 @@ class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
           addDatasetEvent(input: {
             datasetId:    "$did"
             datasetStage: ${stage.tag.toUpperCase}
-            ${time.fold("")(t => s"""time: "${t.isoFormat}"""")}
+            ${clientTime.fold("")(t => s"""clientTime: "${t.isoFormat}"""")}
           }) {
             event {
               effectiveTime
+              clientTime
               recordedTime
             }
           }
@@ -307,18 +308,24 @@ class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
       """
     ).map: json =>
       val c = json.hcursor.downFields("addDatasetEvent", "event")
-      (c.downField("effectiveTime").require[Timestamp], c.downField("recordedTime").require[Timestamp])
+      (
+        c.downField("effectiveTime").require[Timestamp],
+        c.downField("clientTime").require[Option[Timestamp]],
+        c.downField("recordedTime").require[Timestamp]
+      )
 
   test("addDatasetEvent - supplied time is surfaced and independent of received"):
     val t = nowMinus(60)
     recordDataset(mode, serviceUser, "N18630101S0020.fits").flatMap: (_, did) =>
-      addDatasetEventTimes(did, DatasetStage.StartWrite, t.some).map: (time, received) =>
+      addDatasetEventTimes(did, DatasetStage.StartWrite, t.some).map: (time, client, received) =>
         assertEquals(time, t)
+        assertEquals(client, t.some)
         assertNotEquals(received, t)
 
   test("addDatasetEvent - omitted time defaults to received"):
     recordDataset(mode, serviceUser, "N18630101S0021.fits").flatMap: (_, did) =>
-      addDatasetEventTimes(did, DatasetStage.StartWrite, None).map: (time, received) =>
+      addDatasetEventTimes(did, DatasetStage.StartWrite, None).map: (time, client, received) =>
+        assertEquals(client, none)
         assertEquals(time, received)
 
   test("addDatasetEvent - supplied times drive the dataset interval"):
@@ -341,7 +348,7 @@ class addDatasetEvent extends OdbSuite with query.ExecutionTestSupportForGmos:
         addDatasetEvent(input: {
           datasetId:    "$did"
           datasetStage: START_WRITE
-          time:         "${t.isoFormat}"
+          clientTime:   "${t.isoFormat}"
         }) {
           event { id }
         }
