@@ -3914,7 +3914,7 @@ Configuration that controls how and when the Scheduler may plan execution of an
 observation, including whether it can be split across multiple visits and any
 timing constraints.
 """
-input SchedulingConstraintsfInput {
+input SchedulingConstraintsInput {
 
   """
   Controls whether the observation may be split across multiple visits. When
