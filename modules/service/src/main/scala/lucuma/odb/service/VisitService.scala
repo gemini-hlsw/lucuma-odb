@@ -17,6 +17,7 @@ import lucuma.core.model.ObservingNight
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.IdempotencyKey
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.ResultExtensions.*
 import lucuma.odb.graphql.input.RecordVisitInput
@@ -52,7 +53,8 @@ trait VisitService[F[_]]:
 
   def lookupOrInsertForSlew(
     observationId:  Observation.Id,
-    idempotencyKey: Option[IdempotencyKey]
+    idempotencyKey: Option[IdempotencyKey],
+    clientCreated:  Option[Timestamp]
   )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]]
 
   def lookupOrInsertForObserve(
@@ -87,6 +89,11 @@ object VisitService:
   def instantiate[F[_]: Concurrent](using Services[F]): VisitService[F] =
     new VisitService[F]:
 
+      // Raised by the check_visit_client_time trigger when a client supplies a
+      // visit creation time outside the acceptable clock-skew window.
+      private val invalidVisitTime: OdbError =
+        OdbError.InvalidArgument("The supplied visit creation time is outside the acceptable range.".some)
+
       override def select(
         visitId: Visit.Id
       )(using Services.ServiceAccess): F[Option[VisitRecord]] =
@@ -112,7 +119,8 @@ object VisitService:
       private def lookupOrInsertImpl(
         observationId:  Observation.Id,
         origin:         VisitOrigin,
-        idempotencyKey: Option[IdempotencyKey]
+        idempotencyKey: Option[IdempotencyKey],
+        clientCreated:  Option[Timestamp]
       )(using Transaction[F], Services.ServiceAccess): EitherT[F, OdbError, VisitRecord] =
 
         def lookupVisit(desc:  ObsDescription, night: ObservingNight): F[Option[VisitRecord]] =
@@ -129,7 +137,7 @@ object VisitService:
               .option(Statements.SelectLastVisit)(night, observationId)
 
         def insertNewVisit(desc: ObsDescription): F[VisitRecord] =
-          session.unique(Statements.InsertVisit)(observationId, desc, origin, idempotencyKey)
+          session.unique(Statements.InsertVisit)(observationId, desc, origin, idempotencyKey, clientCreated)
 
         // Decide what to do based on whether the lookup of the current visit
         // succeeded, what we're going to use this visit for, and what the
@@ -170,11 +178,15 @@ object VisitService:
 
       override def lookupOrInsertForSlew(
         observationId:  Observation.Id,
-        idempotencyKey: Option[IdempotencyKey]
+        idempotencyKey: Option[IdempotencyKey],
+        clientCreated:  Option[Timestamp]
       )(using Transaction[F], Services.ServiceAccess): F[Result[Visit.Id]] =
-        lookupOrInsertImpl(observationId, VisitOrigin.Slew, idempotencyKey)
+        lookupOrInsertImpl(observationId, VisitOrigin.Slew, idempotencyKey, clientCreated)
           .map(_.visitId)
           .value
+          .recover:
+            case ClientTimeError() =>
+              invalidVisitTime.asLeft
           .map(Result.fromEitherOdbError)
 
       // Records the observation's time estimate (as computed from the just
@@ -209,10 +221,13 @@ object VisitService:
           .materializeAndThen(input.observationId): ctx =>
             (for
               record <- EitherT.liftF(session.unique(Statements.ShouldRecordOriginalEstimate)(input.observationId))
-              visit  <- lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey)
+              visit  <- lookupOrInsertImpl(input.observationId, VisitOrigin.Observe, input.idempotencyKey, input.clientTime)
               _      <- recordOriginalTimeEstimate(ctx).whenA(record)
               _      <- EitherT.liftF(freezeItcResult(ctx))
             yield visit.visitId).value
+          .recover:
+            case ClientTimeError() =>
+              invalidVisitTime.asLeft
           .map(Result.fromEitherOdbError)
 
   object Statements:
@@ -245,7 +260,7 @@ object VisitService:
           c_visit_id,
           c_observation_id,
           c_instrument,
-          c_created,
+          c_recorded_time,
           c_site,
           c_chargeable,
           c_origin,
@@ -260,7 +275,7 @@ object VisitService:
           c_visit_id,
           c_observation_id,
           c_instrument,
-          c_created,
+          c_recorded_time,
           c_site,
           c_chargeable,
           c_origin,
@@ -284,17 +299,17 @@ object VisitService:
           c_visit_id,
           c_observation_id,
           c_instrument,
-          c_created,
+          c_recorded_time,
           c_site,
           c_chargeable,
           c_origin,
           c_idempotency_key
          FROM t_visit
         WHERE c_chargeable = true
-          AND c_created >= $timestamp
-          AND c_created  < $timestamp
+          AND c_recorded_time >= $timestamp
+          AND c_recorded_time  < $timestamp
           AND c_site = ${lucuma.odb.util.Codecs.site}
-        ORDER BY c_created DESC LIMIT 1;
+        ORDER BY c_recorded_time DESC LIMIT 1;
       """
         .query(visit_record)
         .contramap: n =>
@@ -310,16 +325,16 @@ object VisitService:
           c_visit_id,
           c_observation_id,
           c_instrument,
-          c_created,
+          c_recorded_time,
           c_site,
           c_chargeable,
           c_origin,
           c_idempotency_key
          FROM t_visit
-        WHERE c_created >= $timestamp
-          AND c_created  < $timestamp
+        WHERE c_recorded_time >= $timestamp
+          AND c_recorded_time  < $timestamp
           AND c_observation_id = $observation_id
-        ORDER BY c_created DESC LIMIT 1;
+        ORDER BY c_recorded_time DESC LIMIT 1;
       """
         .query(visit_record)
         .contramap: (n, o) =>
@@ -338,7 +353,7 @@ object VisitService:
            AND c_instrument IS NOT NULL
       """.query(obs_description)
 
-    val InsertVisit: Query[(Observation.Id, ObsDescription, VisitOrigin, Option[IdempotencyKey]), VisitRecord] =
+    val InsertVisit: Query[(Observation.Id, ObsDescription, VisitOrigin, Option[IdempotencyKey], Option[Timestamp]), VisitRecord] =
       sql"""
         INSERT INTO t_visit (
           c_observation_id,
@@ -346,7 +361,8 @@ object VisitService:
           c_idempotency_key,
           c_instrument,
           c_site,
-          c_chargeable
+          c_chargeable,
+          c_client_time
         )
         SELECT
           $observation_id,
@@ -354,26 +370,28 @@ object VisitService:
           ${idempotency_key.opt},
           $instrument,
           ${lucuma.odb.util.Codecs.site},
-          $bool
+          $bool,
+          ${core_timestamp.opt}
         ON CONFLICT (c_idempotency_key) DO UPDATE
           SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_visit_id,
           c_observation_id,
           c_instrument,
-          c_created,
+          c_recorded_time,
           c_site,
           c_chargeable,
           c_origin,
           c_idempotency_key
-      """.query(visit_record).contramap: (oid, od, origin, idm) =>
+      """.query(visit_record).contramap: (oid, od, origin, idm, clientCreated) =>
         (
           oid,
           origin,
           idm,
           od.instrument,
           od.site,
-          od.isChargeable
+          od.isChargeable,
+          clientCreated
         )
 
     val MarkPurpose: Command[(Visit.Id, VisitOrigin)] =

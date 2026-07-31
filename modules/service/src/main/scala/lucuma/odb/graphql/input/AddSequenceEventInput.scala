@@ -8,11 +8,13 @@ import cats.syntax.parallel.*
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.model.Visit
 import lucuma.core.util.IdempotencyKey
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
 
 case class AddSequenceEventInput(
   visitId:        Visit.Id,
   command:        SequenceCommand,
+  clientTime:     Option[Timestamp],
   idempotencyKey: Option[IdempotencyKey]
 )
 
@@ -23,7 +25,8 @@ object AddSequenceEventInput:
       case List(
         VisitIdBinding("visitId", rVisitId),
         SequenceCommandBinding("command", rCommand),
+        TimestampBinding.Option("clientTime", rClientTime),
         IdempotencyKeyBinding.Option("idempotencyKey", rIdm)
       ) =>
-        (rVisitId, rCommand, rIdm).parMapN: (vid, cmd, idm) =>
-          AddSequenceEventInput(vid, cmd, idm)
+        (rVisitId, rCommand, rClientTime, rIdm).parMapN: (vid, cmd, clientTime, idm) =>
+          AddSequenceEventInput(vid, cmd, clientTime, idm)

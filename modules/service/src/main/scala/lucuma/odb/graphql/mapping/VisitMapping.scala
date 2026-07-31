@@ -47,11 +47,14 @@ trait VisitMapping[F[_]] extends VisitTable[F]
 
   lazy val VisitMapping: ObjectMapping =
     ObjectMapping(VisitType)(
-      SqlField("id",           VisitTable.Id,         key = true),
-      SqlField("instrument",   VisitTable.Instrument, discriminator = true),
-      SqlObject("observation", Join(VisitTable.ObservationId, ObservationView.Id)),
-      SqlField("created",      VisitTable.Created),
-      SqlField("site",         VisitTable.Site),
+      SqlField("id",            VisitTable.Id,         key = true),
+      SqlField("instrument",    VisitTable.Instrument, discriminator = true),
+      SqlObject("observation",  Join(VisitTable.ObservationId, ObservationView.Id)),
+      SqlField("recordedTime",  VisitTable.RecordedTime),
+      SqlField("created",       VisitTable.RecordedTime),
+      SqlField("clientTime",    VisitTable.ClientTime),
+      SqlField("effectiveTime", VisitTable.EffectiveTime),
+      SqlField("site",          VisitTable.Site),
       EffectField("interval", intervalHandler, List("id")),
       SqlObject("atomRecords"),
       SqlObject("datasets"),

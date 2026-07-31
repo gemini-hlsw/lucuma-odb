@@ -79,6 +79,11 @@ object ExecutionEventService:
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
     new ExecutionEventService[F]:
 
+      // Raised by the check_execution_event_client_time trigger when a client
+      // supplies an event time outside the visit's expected timeframe.
+      private val invalidEventTime: OdbError =
+        OdbError.InvalidArgument("The supplied event time is outside the visit's expected timeframe.".some)
+
       override def atomRange(
         atomId: Atom.Id
       )(using Transaction[F]): F[Option[TimestampInterval]] =
@@ -106,6 +111,7 @@ object ExecutionEventService:
             .option(Statements.InsertDatasetEvent)(input)
             .map(_.toResult(invalidDataset.asProblem))
             .recoverWith:
+              case ClientTimeError()               => invalidEventTime.asFailureF
               case SqlState.ForeignKeyViolation(_) => invalidDataset.asFailureF
 
         // Best-effort to set the dataset time accordingly.  This can fail (leaving the timestamps
@@ -145,7 +151,9 @@ object ExecutionEventService:
             .option(Statements.InsertSequenceEvent)(input)
             .map(_.toResult(invalidVisit.asProblem))
             .recoverWith:
-              case SqlState.ForeignKeyViolation(_)                                        =>
+              case ClientTimeError()               =>
+                invalidEventTime.asFailureF
+              case SqlState.ForeignKeyViolation(_) =>
                 invalidVisit.asFailureF
 
         ResultT(insert)
@@ -160,9 +168,11 @@ object ExecutionEventService:
           session
             .unique(Statements.InsertSlewEvent)(v, input)
             .map(_.success)
+            .recoverWith:
+              case ClientTimeError() => invalidEventTime.asFailureF
 
         (for
-          v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none))
+          v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none, input.clientTime))
           e <- ResultT(insert(v))
           (eid, _) = e
         yield eid).value
@@ -182,6 +192,7 @@ object ExecutionEventService:
             .option(Statements.InsertStepEvent)(input)
             .map(_.toResult(invalidStep.asProblem))
             .recoverWith:
+              case ClientTimeError()               => invalidEventTime.asFailureF
               case SqlState.CheckViolation(_)      => invalidVisit.asFailureF
               case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
 
@@ -204,8 +215,8 @@ object ExecutionEventService:
     val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
       sql"""
         SELECT
-          MIN(e.c_received),
-          MAX(e.c_received)
+          MIN(e.c_effective_time),
+          MAX(e.c_effective_time)
         FROM
           t_execution_event e
         INNER JOIN t_step s ON
@@ -217,8 +228,8 @@ object ExecutionEventService:
     val SelectStepRange: Query[Step.Id, Option[TimestampInterval]] =
       sql"""
         SELECT
-          MIN(c_received),
-          MAX(c_received)
+          MIN(c_effective_time),
+          MAX(c_effective_time)
         FROM
           t_execution_event
         WHERE
@@ -228,8 +239,8 @@ object ExecutionEventService:
     val SelectVisitRange: Query[Visit.Id, Option[TimestampInterval]] =
       sql"""
         SELECT
-          MIN(c_received),
-          MAX(c_received)
+          MIN(c_effective_time),
+          MAX(c_effective_time)
         FROM
           t_execution_event
         WHERE
@@ -247,6 +258,7 @@ object ExecutionEventService:
           c_step_id,
           c_dataset_id,
           c_dataset_stage,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -258,6 +270,7 @@ object ExecutionEventService:
           d.c_step_id,
           $dataset_id,
           $dataset_stage,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_dataset d
@@ -271,10 +284,10 @@ object ExecutionEventService:
           SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
-          c_received,
+          c_effective_time,
           xmax = 0 AS inserted
       """.query(execution_event_id *: core_timestamp *: bool)
-         .contramap(in => (in.datasetId, in.datasetStage, in.idempotencyKey, in.datasetId))
+         .contramap(in => (in.datasetId, in.datasetStage, in.clientTime, in.idempotencyKey, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Boolean)] =
       sql"""
@@ -284,6 +297,7 @@ object ExecutionEventService:
           c_observation_id,
           c_visit_id,
           c_sequence_command,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -292,6 +306,7 @@ object ExecutionEventService:
           v.c_observation_id,
           $visit_id,
           $sequence_command,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_visit v
@@ -305,7 +320,7 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap(in => (in.visitId, in.command, in.idempotencyKey, in.visitId))
+         .contramap(in => (in.visitId, in.command, in.clientTime, in.idempotencyKey, in.visitId))
 
     val InsertSlewEvent: Query[(Visit.Id, AddSlewEventInput), (Id, Boolean)] =
       sql"""
@@ -315,6 +330,7 @@ object ExecutionEventService:
           c_observation_id,
           c_visit_id,
           c_slew_stage,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -323,6 +339,7 @@ object ExecutionEventService:
           v.c_observation_id,
           $visit_id,
           $slew_stage,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_visit v
@@ -336,7 +353,7 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap((v, in) => (v, in.slewStage, in.idempotencyKey, v))
+         .contramap((v, in) => (v, in.slewStage, in.clientTime, in.idempotencyKey, v))
 
     val InsertStepEvent: Query[AddStepEventInput, (Id, Boolean)] =
       sql"""
@@ -348,6 +365,7 @@ object ExecutionEventService:
           c_atom_id,
           c_step_id,
           c_step_stage,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -358,6 +376,7 @@ object ExecutionEventService:
           s.c_atom_id,
           $step_id,
           $step_stage,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_step s
@@ -373,13 +392,13 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap(in => (in.visitId, in.stepId, in.stepStage, in.idempotencyKey, in.stepId))
+         .contramap(in => (in.visitId, in.stepId, in.stepStage, in.clientTime, in.idempotencyKey, in.stepId))
 
     val SelectSequenceEvents: Query[Observation.Id, ExecutionEvent.SequenceEvent] =
       sql"""
         SELECT
           c_execution_event_id,
-          c_received,
+          c_recorded_time,
           c_observation_id,
           c_visit_id,
           c_idempotency_key,
@@ -390,7 +409,7 @@ object ExecutionEventService:
           c_observation_id = $observation_id AND
           c_sequence_command IS NOT NULL
         ORDER BY
-          c_received
+          c_effective_time, c_execution_event_id
       """.query((
         execution_event_id  *:
         core_timestamp      *:

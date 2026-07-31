@@ -31,7 +31,10 @@ trait ExecutionEventMapping[F[_]] extends ExecutionEventTable[F]
       SqlField("id",             ExecutionEventTable.Id, key = true),
       SqlObject("visit",         Join(ExecutionEventTable.VisitId,       VisitTable.Id)),
       SqlObject("observation",   Join(ExecutionEventTable.ObservationId, ObservationView.Id)),
-      SqlField("received",       ExecutionEventTable.Received),
+      SqlField("recordedTime",   ExecutionEventTable.RecordedTime),
+      SqlField("received",       ExecutionEventTable.RecordedTime),
+      SqlField("clientTime",     ExecutionEventTable.ClientTime),
+      SqlField("effectiveTime",  ExecutionEventTable.EffectiveTime),
       SqlField("eventType",      ExecutionEventTable.EventType, discriminator = true),
       SqlField("idempotencyKey", ExecutionEventTable.IdempotencyKey),
 
