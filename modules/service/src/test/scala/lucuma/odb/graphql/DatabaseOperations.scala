@@ -1314,6 +1314,8 @@ trait DatabaseOperations { this: OdbSuite =>
             fpu: LONG_SLIT_2
           }
         }"""
+      case ObservingModeType.Flamingos2Mos =>
+        """{}"""
       case ObservingModeType.GmosNorthImaging =>
         """{
           gmosNorthImaging: {
