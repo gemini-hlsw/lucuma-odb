@@ -54,6 +54,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
+import lucuma.odb.data.GmosMosAcquisitionType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
@@ -142,6 +143,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
       LeafMapping[ImagingVariantType](ImagingVariantTypeType),
       LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
+      LeafMapping[GmosMosAcquisitionType](GmosMosAcquisitionTypeType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
       LeafMapping[GmosNorthFilter](GmosNorthFilterType),

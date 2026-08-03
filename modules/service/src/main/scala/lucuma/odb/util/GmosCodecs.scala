@@ -36,6 +36,7 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Enumerated
+import lucuma.odb.data.GmosMosAcquisitionType
 import skunk.*
 import skunk.data.Arr
 import skunk.data.Type
@@ -67,6 +68,9 @@ trait GmosCodecs {
 
   val gmos_long_slit_acquisition_roi: Codec[GmosLongSlitAcquisitionRoi] =
     enumerated(Type("e_gmos_long_slit_acquisition_roi"))
+
+  val gmos_mos_acquisition_type: Codec[GmosMosAcquisitionType] =
+    enumerated(Type("e_gmos_mos_acquisition_type"))
 
   val gmos_north_detector: Codec[GmosNorthDetector] =
     enumerated(Type.varchar)

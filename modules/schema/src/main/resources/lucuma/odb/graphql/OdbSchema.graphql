@@ -2040,6 +2040,23 @@ enum GmosCustomSlitWidth {
 }
 
 """
+GMOS MOS acquisition type: whether the acquisition image is taken with the
+mask in the beam (imaging the alignment holes cut into the mask) or out of
+the beam.
+"""
+enum GmosMosAcquisitionType {
+  """
+  Acquisition image taken through the mask, imaging its alignment holes.
+  """
+  MASK_IN
+
+  """
+  Acquisition image taken without the mask in the beam.
+  """
+  MASK_OUT
+}
+
+"""
 GMOS Detector Translation X Offset
 """
 enum GmosDtax {
@@ -3041,6 +3058,13 @@ input GmosNorthMosInput {
   centralWavelength: WavelengthInput
 
   """
+  Whether the acquisition image is taken with the mask in the beam or out of
+  the beam.  If not specified on creation, defaults to MASK_IN.  It cannot be
+  unset with a null value.
+  """
+  acquisitionType: GmosMosAcquisitionType
+
+  """
   Exposure time mode for the science sequence.  If not specified, the exposure
   time mode of the observation's science requirements are used.
   """
@@ -3107,6 +3131,13 @@ input GmosSouthMosInput {
   The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   centralWavelength: WavelengthInput
+
+  """
+  Whether the acquisition image is taken with the mask in the beam or out of
+  the beam.  If not specified on creation, defaults to MASK_IN.  It cannot be
+  unset with a null value.
+  """
+  acquisitionType: GmosMosAcquisitionType
 
   """
   Exposure time mode for the science sequence.  If not specified, the exposure
@@ -12748,6 +12779,12 @@ type GmosNorthMos {
   centralWavelength: Wavelength!
 
   """
+  Whether the acquisition image is taken with the mask in the beam (imaging
+  the alignment holes cut into the mask) or out of the beam.
+  """
+  acquisitionType: GmosMosAcquisitionType!
+
+  """
   The exposure time mode used for ITC lookup for the science sequence.
   """
   exposureTimeMode: ExposureTimeMode!
@@ -12923,6 +12960,12 @@ type GmosSouthMos {
   The central wavelength.
   """
   centralWavelength: Wavelength!
+
+  """
+  Whether the acquisition image is taken with the mask in the beam (imaging
+  the alignment holes cut into the mask) or out of the beam.
+  """
+  acquisitionType: GmosMosAcquisitionType!
 
   """
   The exposure time mode used for ITC lookup for the science sequence.

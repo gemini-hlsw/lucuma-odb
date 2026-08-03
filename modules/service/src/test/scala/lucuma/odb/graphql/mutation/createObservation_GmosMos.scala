@@ -126,6 +126,7 @@ class createObservation_GmosMos extends OdbSuite:
                 attachmentId
               }
               centralWavelength { nanometers }
+              acquisitionType
               initialGrating
               initialFilter
               initialSlitWidth
@@ -154,6 +155,7 @@ class createObservation_GmosMos extends OdbSuite:
                   "attachmentId": null
                 },
                 "centralWavelength": { "nanometers": 500.000 },
+                "acquisitionType": "MASK_IN",
                 "initialGrating": "R831_G5302",
                 "initialFilter": "R_PRIME",
                 "initialSlitWidth": "CUSTOM_WIDTH_1_00",
@@ -182,6 +184,7 @@ class createObservation_GmosMos extends OdbSuite:
                   "attachmentId": null
                 },
                 "centralWavelength": { "nanometers": 500.000 },
+                "acquisitionType": "MASK_IN",
                 "initialGrating": "B1200_G5321",
                 "initialFilter": "R_PRIME",
                 "initialSlitWidth": "CUSTOM_WIDTH_1_00",
@@ -315,6 +318,37 @@ class createObservation_GmosMos extends OdbSuite:
                          { "arcseconds": 10.000000 }
                        ]
                      }
+                   }
+                 }
+               }
+             """.asRight)
+    yield ()
+
+  test("acquisitionType is explicitly settable on create"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- create(pid, tid, """
+               gmosNorthMos: {
+                 grating: R831_G5302
+                 customMask: { slitWidth: CUSTOM_WIDTH_1_00 }
+                 centralWavelength: { nanometers: 500 }
+                 acquisitionType: MASK_OUT
+               }
+             """)
+      _   <- expect(pi, s"""
+               query {
+                 observation(observationId: "$oid") {
+                   observingMode {
+                     gmosNorthMos { acquisitionType }
+                   }
+                 }
+               }
+             """, json"""
+               {
+                 "observation": {
+                   "observingMode": {
+                     "gmosNorthMos": { "acquisitionType": "MASK_OUT" }
                    }
                  }
                }
