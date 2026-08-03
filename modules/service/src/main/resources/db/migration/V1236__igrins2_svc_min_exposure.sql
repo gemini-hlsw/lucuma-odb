@@ -8,3 +8,6 @@ ALTER TABLE t_igrins_2_long_slit
     CHECK (c_svc_exposure IS NULL
            OR (c_svc_exposure >= interval '1630 milliseconds'
                AND c_svc_exposure <= interval '600 seconds'));
+
+-- Add the Flamingos 2 MOS observing mode type
+ALTER TYPE e_observing_mode_type ADD VALUE 'flamingos_2_mos';
