@@ -125,6 +125,7 @@ class executionTwilight extends ExecutionTestSupportForGmos {
                        p { arcseconds }
                        q { arcseconds }
                      }
+                     guiding
                    }
                  }
                }
@@ -193,7 +194,8 @@ class executionTwilight extends ExecutionTestSupportForGmos {
                               "q": {
                                 "arcseconds": 0.000000
                               }
-                            }
+                            },
+                            "guiding": "DISABLED"
                           }
                         }
                       ]
