@@ -30,6 +30,8 @@ import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AddDatasetEventInput
+import lucuma.odb.graphql.input.AddEventBatchEntryInput
+import lucuma.odb.graphql.input.AddEventBatchInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
@@ -69,6 +71,10 @@ trait ExecutionEventService[F[_]]:
   def insertStepEvent(
     input: AddStepEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent.Id]]
+
+  def insertEvents(
+    input: AddEventBatchInput
+  )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]]
 
   def selectSequenceEvents(
     oid: Observation.Id
@@ -200,6 +206,51 @@ object ExecutionEventService:
           .map((eid, _) => eid)
           .value
 
+      override def insertEvents(
+        input: AddEventBatchInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]] =
+
+        // Resolves the distinct observations referenced by a batch of ids, running
+        // nothing when the list is empty (an empty IN-list is invalid SQL).  Ids
+        // that don't resolve simply contribute no observation here; the per-event
+        // insert below still rejects them with a precise not-found error.
+        def distinctObservations[A](ids: List[A], stmt: Int => Query[List[A], Observation.Id]): F[List[Observation.Id]] =
+          if ids.isEmpty then List.empty.pure
+          else session.execute(stmt(ids.size))(ids)
+
+        // Batches are scoped to a single observation: every event insert takes the
+        // observation's execution mutex, so a multi-observation batch would take
+        // several in array order and could deadlock against a concurrent batch
+        // taking them in another order.  One observation means one mutex per batch.
+        // Resolve them a kind at a time (one round trip each) rather than per event.
+        val requireSingleObservation: F[Result[Unit]] =
+          val datasetIds = input.events.collect { case AddEventBatchEntryInput.Dataset(v)  => v.datasetId }
+          val stepIds    = input.events.collect { case AddEventBatchEntryInput.Step(v)     => v.stepId }
+          val visitIds   = input.events.collect { case AddEventBatchEntryInput.Sequence(v) => v.visitId }
+          val slewOids   = input.events.collect { case AddEventBatchEntryInput.Slew(v)     => v.observationId }
+          for
+            d <- distinctObservations(datasetIds.distinct, Statements.SelectDatasetObservations)
+            s <- distinctObservations(stepIds.distinct,    Statements.SelectStepObservations)
+            v <- distinctObservations(visitIds.distinct,   Statements.SelectVisitObservations)
+          yield
+            if (d ++ s ++ v ++ slewOids).distinct.sizeIs <= 1 then ().success
+            else OdbError.InvalidArgument("All events in a batch must belong to the same observation.".some).asFailure
+
+        def insertOne(e: AddEventBatchEntryInput): F[Result[ExecutionEvent.Id]] =
+          e match
+            case AddEventBatchEntryInput.Dataset(v)  => insertDatasetEvent(v)
+            case AddEventBatchEntryInput.Sequence(v) => insertSequenceEvent(v)
+            case AddEventBatchEntryInput.Slew(v)     => insertSlewEvent(v)
+            case AddEventBatchEntryInput.Step(v)     => insertStepEvent(v)
+
+        // Insert in array order (that order is the events' arrival order, which the
+        // step-execution state machine depends on).  One transaction makes the
+        // batch atomic, so a failure rolls the whole thing back.
+        (for
+          _   <- ResultT(requireSingleObservation)
+          ids <- input.events.traverse(e => ResultT(insertOne(e)))
+        yield ids.toList).value
+
       override def selectSequenceEvents(
         oid: Observation.Id
       ): Stream[F, SequenceEvent] =
@@ -211,6 +262,32 @@ object ExecutionEventService:
       (core_timestamp *: core_timestamp).map { (min, max) =>
         TimestampInterval.between(min, max)
       }
+
+    // Observation-resolution queries, used to enforce that an addEventBatch is
+    // scoped to a single observation.  Each resolves the distinct observations
+    // referenced by a whole batch's worth of ids in a single round trip.
+
+    def SelectDatasetObservations(count: Int): Query[List[Dataset.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT c_observation_id
+        FROM t_dataset
+        WHERE c_dataset_id IN (${dataset_id.values.list(count)})
+      """.query(observation_id)
+
+    def SelectStepObservations(count: Int): Query[List[Step.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT a.c_observation_id
+        FROM t_step s
+        INNER JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+        WHERE s.c_step_id IN (${step_id.values.list(count)})
+      """.query(observation_id)
+
+    def SelectVisitObservations(count: Int): Query[List[Visit.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT c_observation_id
+        FROM t_visit
+        WHERE c_visit_id IN (${visit_id.values.list(count)})
+      """.query(observation_id)
 
     val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
       sql"""

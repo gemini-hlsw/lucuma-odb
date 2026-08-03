@@ -15,6 +15,7 @@ trait BaseMapping[F[_]]
   // TODO: auto-generate this
   lazy val AddConditionsEntryResultType            = schema.ref("AddConditionsEntryResult")
   lazy val AddDatasetEventResultType               = schema.ref("AddDatasetEventResult")
+  lazy val AddEventBatchResultType                 = schema.ref("AddEventBatchResult")
   lazy val AddProgramUserResultType                = schema.ref("AddProgramUserResult")
   lazy val AddSequenceEventResultType              = schema.ref("AddSequenceEventResult")
   lazy val AddSlewEventResultType                  = schema.ref("AddSlewEventResult")
