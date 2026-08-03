@@ -483,7 +483,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.executionRequirement.isSplittable).asRight
 
           case gsm @ gmos.mos.Config.GmosSouth(g, f, m, _, c) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
@@ -503,7 +503,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gsm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gsm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.executionRequirement.isSplittable).asRight
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
