@@ -10,9 +10,11 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Attachment
 import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
@@ -23,6 +25,13 @@ import lucuma.core.util.Enumerated
 import lucuma.core.util.Gid
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.isImplemented
+import lucuma.odb.util.Codecs.attachment_id
+import lucuma.odb.util.Codecs.attachment_type
+import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.program_id
+import skunk.Query
+import skunk.codec.text.text
+import skunk.syntax.all.*
 
 class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
@@ -114,6 +123,29 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             }
           }
         }
+        gmosNorthMos {
+          grating
+          filter
+          customMask {
+            slitWidth
+            attachmentId
+          }
+          centralWavelength { nanometers }
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+          offsets { arcseconds }
+          explicitOffsets { arcseconds }
+          defaultOffsets { arcseconds }
+        }
         gmosSouthLongSlit {
           grating
           filter
@@ -155,6 +187,29 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               }
             }
           }
+        }
+        gmosSouthMos {
+          grating
+          filter
+          customMask {
+            slitWidth
+            attachmentId
+          }
+          centralWavelength { nanometers }
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+          offsets { arcseconds }
+          explicitOffsets { arcseconds }
+          defaultOffsets { arcseconds }
         }
         gmosNorthImaging {
           filters { filter }
@@ -2500,5 +2555,120 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
               )
             )
     } yield ()
+
+  // The mask attachment is a two-column (id + type) composite-FK reference.
+  private def insertMosMaskAttachment(pid: Program.Id, fileName: String): IO[Attachment.Id] =
+    val q: Query[(Program.Id, String), Attachment.Id] =
+      sql"""
+        INSERT INTO t_attachment (c_program_id, c_attachment_type, c_file_name, c_file_size, c_remote_path)
+        VALUES ($program_id, 'mos_mask', $text, 42, 'unused')
+        RETURNING c_attachment_id
+      """.query(attachment_id)
+    withSession(_.unique(q)(pid, fileName))
+
+  private def readMaskColumns(
+    table: String,
+    oid:   Observation.Id
+  ): IO[(Option[Attachment.Id], Option[AttachmentType])] =
+    val q: Query[Observation.Id, (Option[Attachment.Id], Option[AttachmentType])] =
+      sql"""
+        SELECT c_mask_attachment_id, c_mask_attachment_type
+        FROM #$table
+        WHERE c_observation_id = $observation_id
+      """.query((attachment_id.opt *: attachment_type.opt).map((aid, tpe) => (aid, tpe)))
+    withSession(_.unique(q)(oid))
+
+  test("clone GMOS North MOS observation preserves the custom mask"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      aid  <- insertMosMaskAttachment(pid, "mask.fits")
+      mode  = s"""
+        gmosNorthMos: {
+          grating: R831_G5302
+          filter: R_PRIME
+          customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" }
+          centralWavelength: { nanometers: 500 }
+        }
+      """
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), mode)
+      coid <- cloneObservationAs(pi, oid)
+      _    <- expect(
+               user  = pi,
+               query = s"""
+                 query {
+                   clone: observation(observationId: "$coid") {
+                     observingMode {
+                       gmosNorthMos {
+                         customMask { slitWidth attachmentId }
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                 {
+                   "clone": {
+                     "observingMode": {
+                       "gmosNorthMos": {
+                         "customMask": {
+                           "slitWidth": "CUSTOM_WIDTH_1_00",
+                           "attachmentId": ${aid.asJson}
+                         }
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      cols <- readMaskColumns("t_gmos_north_mos", coid)
+      _    <- IO(assertEquals(cols, (aid.some, AttachmentType.MosMask.some)))
+    yield ()
+
+  test("clone GMOS South MOS observation with no mask defined keeps the empty mask"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      mode  = s"""
+        gmosSouthMos: {
+          grating: B1200_G5321
+          filter: R_PRIME
+          customMask: { slitWidth: CUSTOM_WIDTH_1_00 }
+          centralWavelength: { nanometers: 500 }
+        }
+      """
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), mode)
+      coid <- cloneObservationAs(pi, oid)
+      _    <- expect(
+               user  = pi,
+               query = s"""
+                 query {
+                   clone: observation(observationId: "$coid") {
+                     observingMode {
+                       gmosSouthMos {
+                         customMask { slitWidth attachmentId }
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                 {
+                   "clone": {
+                     "observingMode": {
+                       "gmosSouthMos": {
+                         "customMask": {
+                           "slitWidth": "CUSTOM_WIDTH_1_00",
+                           "attachmentId": null
+                         }
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      cols <- readMaskColumns("t_gmos_south_mos", coid)
+      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+    yield ()
 
 }

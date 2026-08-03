@@ -39,6 +39,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.logic.GoaQueryPolicy.TargetPointing
 import lucuma.odb.sequence.exchange.Config as Exchange
+import lucuma.odb.sequence.gmos.SpectroscopyConfig
 import lucuma.odb.sequence.gmos.imaging.Config as GmosImaging
 import lucuma.odb.sequence.gmos.imaging.Filter as GmosImagingFilter
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
@@ -76,7 +77,7 @@ class GoaQueryPolicySuite extends FunSuite:
       grating     = GmosNorthGrating.B1200_G5301,
       filter      = GmosNorthFilter.GPrime.some,
       fpu         = fpu,
-      common      = GmosLongSlit.Common(
+      common      = SpectroscopyConfig.Common(
         centralWavelength         = wavelength,
         exposureTimeMode          = exposureTimeMode,
         defaultXBin               = GmosXBinning.One,

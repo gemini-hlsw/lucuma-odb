@@ -153,6 +153,7 @@ object OdbMapping {
           with ConfigurationConditionsMapping[F]
           with ConfigurationGmosImagingMappings[F]
           with ConfigurationGmosLongSlitMappings[F]
+          with ConfigurationGmosMosMappings[F]
           with ConfigurationMapping[F]
           with ConfigurationRequestMapping[F]
           with ConfigurationRequestEditMapping[F]
@@ -219,6 +220,7 @@ object OdbMapping {
           with GmosImagingFilterMapping[F]
           with GmosImagingMapping[F]
           with GmosLongSlitMapping[F]
+          with GmosMosMapping[F]
           with GmosNorthStaticMapping[F]
           with GmosSouthStaticMapping[F]
           with GoaPropertiesMapping[F]
@@ -614,6 +616,9 @@ object OdbMapping {
                 ConfigurationGmosSouthImagingMappings,
                 ConfigurationGmosNorthLongSlitMappings,
                 ConfigurationGmosSouthLongSlitMappings,
+                ConfigurationGmosNorthMosMappings,
+                ConfigurationGmosSouthMosMappings,
+                GmosMosMappings,
                 ConfigurationObservingModeMappings,
                 ConfigurationTargetMappings,
                 ConfigurationVisitorMappings,
@@ -677,6 +682,7 @@ object OdbMapping {
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
                 GmosSouthLongSlitElaborator,
+                GmosMosElaborator,
                 ArchiveDuplicationElaborator,
                 GroupElaborator,
                 MutationElaborator,

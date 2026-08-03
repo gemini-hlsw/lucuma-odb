@@ -39,6 +39,7 @@ import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
+import lucuma.itc.client.GmosCustomMask
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
@@ -461,6 +462,47 @@ object GeneratorParamsService {
               ),
               sciMode  = sciMode
             ).asRight
+
+          // MOS has no acquisition sequence yet, so it takes the science-only
+          case gnm @ gmos.mos.Config.GmosNorth(g, f, m, c) =>
+            val sciMode = InstrumentMode.GmosNorthSpectroscopy(
+              c.exposureTimeMode,
+              c.centralWavelength,
+              g,
+              f,
+              GmosFpu.North.customMask(GmosCustomMask(m.slitWidth)),
+              gnm.ccdMode.some,
+              gnm.roi.some
+            )
+            val science  = SpectroscopyParameters(obsParams.constraints.toInput, sciMode)
+            val itcInput =
+              obsParams.targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
+
+          case gsm @ gmos.mos.Config.GmosSouth(g, f, m, c) =>
+            val sciMode = InstrumentMode.GmosSouthSpectroscopy(
+              c.exposureTimeMode,
+              c.centralWavelength,
+              g,
+              f,
+              GmosFpu.South.customMask(GmosCustomMask(m.slitWidth)),
+              gsm.ccdMode.some,
+              gsm.roi.some
+            )
+            val science  = SpectroscopyParameters(obsParams.constraints.toInput, sciMode)
+            val itcInput =
+              obsParams.targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gsm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.isSplittable).asRight
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.

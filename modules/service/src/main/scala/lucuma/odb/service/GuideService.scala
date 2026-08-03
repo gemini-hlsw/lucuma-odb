@@ -310,6 +310,10 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosSouth             =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
+        case mode: gmos.mos.Config.GmosNorth                  =>
+          (Site.GN, ObservingModeType.GmosNorthMos, mode.centralWavelength)
+        case mode: gmos.mos.Config.GmosSouth                  =>
+          (Site.GS, ObservingModeType.GmosSouthMos, mode.centralWavelength)
         case gnirs.imaging.Config(filters = filters)          =>
           (Site.GN, ObservingModeType.GnirsImaging, filters.map(_.filter.centralWavelength).maximum)
         case mode: gnirs.spectroscopy.Config                  =>

@@ -61,6 +61,16 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val Id = col("c_gmos_south_longslit_id", configuration_request_id.embedded)
       val Grating = col("c_gmos_south_longslit_grating", gmos_south_grating.embedded)
 
+    // MOS reuses the long slit grating column; only the discriminating id
+    // column is distinct (see V1235).
+    object GmosNorthMos:
+      val Id = col("c_gmos_north_mos_id", configuration_request_id.embedded)
+      val Grating = col("c_gmos_north_longslit_grating", gmos_north_grating.embedded)
+
+    object GmosSouthMos:
+      val Id = col("c_gmos_south_mos_id", configuration_request_id.embedded)
+      val Grating = col("c_gmos_south_longslit_grating", gmos_south_grating.embedded)
+
     object GmosNorthImaging:
       val Id = col("c_gmos_north_imaging_id", configuration_request_id.embedded)
       val Filters = col("c_gmos_north_imaging_filters", _gmos_north_filter.embedded)

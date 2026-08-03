@@ -13,6 +13,7 @@ import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
 import lucuma.odb.graphql.table.GmosDynamicTables
 import lucuma.odb.graphql.table.GmosLongSlitView
+import lucuma.odb.graphql.table.GmosMosView
 import lucuma.odb.graphql.table.GnirsDynamicView
 import lucuma.odb.graphql.table.GnirsSpectroscopyView
 import lucuma.odb.graphql.table.ObservationView
@@ -21,6 +22,7 @@ import lucuma.odb.graphql.table.VisitorTable
 
 trait WavelengthMapping[F[_]]
   extends GmosLongSlitView[F]
+     with GmosMosView[F]
      with ChronConditionsEntryView[F]
      with ExposureTimeModeView[F]
      with Flamingos2DynamicView[F]
@@ -65,6 +67,10 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(GmosNorthLongSlitType / "initialCentralWavelength", GmosNorthLongSlitView.Common.InitialCentralWavelength, GmosNorthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "centralWavelength", GmosSouthLongSlitView.Common.CentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
       wavelengthMappingAtPath(GmosSouthLongSlitType / "initialCentralWavelength", GmosSouthLongSlitView.Common.InitialCentralWavelength, GmosSouthLongSlitView.Common.ObservationId),
+      wavelengthMappingAtPath(GmosNorthMosType / "centralWavelength", GmosNorthMosView.Common.CentralWavelength, GmosNorthMosView.Common.ObservationId),
+      wavelengthMappingAtPath(GmosNorthMosType / "initialCentralWavelength", GmosNorthMosView.Common.InitialCentralWavelength, GmosNorthMosView.Common.ObservationId),
+      wavelengthMappingAtPath(GmosSouthMosType / "centralWavelength", GmosSouthMosView.Common.CentralWavelength, GmosSouthMosView.Common.ObservationId),
+      wavelengthMappingAtPath(GmosSouthMosType / "initialCentralWavelength", GmosSouthMosView.Common.InitialCentralWavelength, GmosSouthMosView.Common.ObservationId),
       wavelengthMappingAtPath(ArchiveMatchType / "wavelength", ArchiveMatchView.Wavelength.Value, ArchiveMatchView.Wavelength.SyntheticId),
       wavelengthMappingAtPath(SignalToNoiseExposureTimeModeType / "at", ExposureTimeModeView.SignalToNoise.At, ExposureTimeModeView.SignalToNoise.SyntheticId),
       wavelengthMappingAtPath(SpectroscopyConfigOptionType / "wavelengthMin", SpectroscopyConfigOptionTable.WavelengthMin, SpectroscopyConfigOptionTable.Instrument, SpectroscopyConfigOptionTable.Index),

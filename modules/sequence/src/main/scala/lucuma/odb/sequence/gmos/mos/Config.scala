@@ -2,36 +2,35 @@
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
-package gmos.longslit
+package gmos.mos
 
 import cats.Eq
-import coulomb.*
-import eu.timepit.refined.types.numeric.PosInt
+import cats.derived.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosNorthDetector
+import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
-import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.enums.Site
-import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
-import lucuma.core.math.units.Pixels
+import lucuma.core.model.Defined
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosCcdMode
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
+import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
 import lucuma.odb.sequence.syntax.hash.*
 import monocle.Lens
 
@@ -39,20 +38,33 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 /**
- * Configuration for the GMOS Long Slit science mode.  Using these parameters, a
- * GMOS long slit sequence may be generated.
+ * Configuration for the GMOS MOS science mode.
+ *
+ * This is GMOS long slit with the builtin FPU replaced by a custom mask and
+ * with no acquisition. Sequence generation for MOS is not implemented, so the
+ * configuration is currently only read back, used for the ITC, and used to
+ * derive the shared long slit calibration.
+ *
  * @tparam G grating type
  * @tparam L filter type
- * @tparam U FPU type
+ * @tparam U the builtin FPU type the custom mask's slit width corresponds to
  */
-sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product with Serializable:
+sealed trait Config[G: Enumerated, L: Enumerated, U] extends Product with Serializable:
   def grating: G
 
   def coverage: WavelengthDelta
 
   def filter: Option[L]
 
-  def fpu: U
+  def customMask: GmosFpuMask.Custom
+
+  /**
+   * The builtin long slit FPU whose aperture matches the custom mask's slit
+   * width. GmosCustomSlitWidth and the builtin long slit FPUs are in 1:1
+   * correspondence, which is what lets a MOS observation be calibrated, binned
+   * and estimated as a long slit.
+   */
+  def equivalentFpu: U
 
   def centralWavelength: Wavelength
 
@@ -113,7 +125,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
     explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
 
   def defaultSpatialOffsets: List[Q] =
-    Config.DefaultSpatialOffsets
+    LongSlitConfig.DefaultSpatialOffsets
 
   def explicitSpatialOffsets: Option[List[Q]]
 
@@ -126,15 +138,16 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       ampReadMode
     )
 
-  def acquisition: AcquisitionConfig[L]
-
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.writeChars(Enumerated[G].tag(grating))
     filter.foreach(f => out.writeChars(Enumerated[L].tag(f)))
-    out.writeChars(Enumerated[U].tag(fpu))
+    out.writeChars(customMask.slitWidth.tag)
+    customMask.mask match
+      case ToBeDefined => ()
+      case Defined(id) => out.writeLong(id.value.value)
     out.writeInt(centralWavelength.toPicometers.value.value)
     out.write(exposureTimeMode.hashBytes)
     out.writeChars(xBin.tag)
@@ -146,7 +159,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
       out.writeInt(d.toPicometers.value)
     spatialOffsets.foreach: o =>
       out.writeLong(o.toAngle.toMicroarcseconds)
-    out.write(acquisition.hashBytes)
 
     out.close()
     bao.toByteArray
@@ -154,15 +166,17 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product
 object Config:
 
   final case class GmosNorth(
-    grating:     GmosNorthGrating,
-    filter:      Option[GmosNorthFilter],
-    fpu:         GmosNorthFpu,
-    common:      Common,
-    acquisition: AcquisitionConfig.GmosNorth
-  ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
+    grating:    GmosNorthGrating,
+    filter:     Option[GmosNorthFilter],
+    customMask: GmosFpuMask.Custom,
+    common:     Common
+  ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
+
+    override def equivalentFpu: GmosNorthFpu =
+      Config.northFpu(customMask.slitWidth)
 
     override def centralWavelength: Wavelength =
       common.centralWavelength
@@ -192,36 +206,26 @@ object Config:
       common.explicitRoi
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
-      defaultWavelengthDithersNorth(this.grating)
+      LongSlitConfig.defaultWavelengthDithersNorth(this.grating)
 
     override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
       common.explicitWavelengthDithers
 
     override def explicitSpatialOffsets: Option[List[Q]] =
       common.explicitSpatialOffsets
-
-  object GmosNorth:
-
-    given Eq[GmosNorth] =
-      Eq.by: a =>
-        (
-          a.grating,
-          a.filter,
-          a.fpu,
-          a.common,
-          a.acquisition
-        )
 
   final case class GmosSouth(
-    grating:     GmosSouthGrating,
-    filter:      Option[GmosSouthFilter],
-    fpu:         GmosSouthFpu,
-    common:      Common,
-    acquisition: AcquisitionConfig.GmosSouth
-  ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
+    grating:    GmosSouthGrating,
+    filter:     Option[GmosSouthFilter],
+    customMask: GmosFpuMask.Custom,
+    common:     Common
+  ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
+
+    override def equivalentFpu: GmosSouthFpu =
+      Config.southFpu(customMask.slitWidth)
 
     override def centralWavelength: Wavelength =
       common.centralWavelength
@@ -251,25 +255,13 @@ object Config:
       common.explicitRoi
 
     override def defaultWavelengthDithers: List[WavelengthDither] =
-      defaultWavelengthDithersSouth(this.grating)
+      LongSlitConfig.defaultWavelengthDithersSouth(this.grating)
 
     override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
       common.explicitWavelengthDithers
 
     override def explicitSpatialOffsets: Option[List[Q]] =
       common.explicitSpatialOffsets
-
-  object GmosSouth:
-
-    given Eq[GmosSouth] =
-      Eq.by: a =>
-        (
-          a.grating,
-          a.filter,
-          a.fpu,
-          a.common,
-          a.acquisition
-        )
 
   def explicitWavelengthDithers[G, L, U]: Lens[Config[G, L, U], Option[List[WavelengthDither]]] =
     Lens[Config[G, L, U], Option[List[WavelengthDither]]](_.explicitWavelengthDithers) { dithers => {
@@ -283,49 +275,22 @@ object Config:
       case gs: GmosSouth => gs.copy(common = gs.common.copy(explicitSpatialOffsets = qs))
     }}
 
-  val IfuSlitWidth: Angle =
-    Angle.fromMicroarcseconds(310_000L)
+  def northFpu(slitWidth: GmosCustomSlitWidth): GmosNorthFpu =
+    slitWidth match
+      case GmosCustomSlitWidth.CustomWidth_0_25 => GmosNorthFpu.LongSlit_0_25
+      case GmosCustomSlitWidth.CustomWidth_0_50 => GmosNorthFpu.LongSlit_0_50
+      case GmosCustomSlitWidth.CustomWidth_0_75 => GmosNorthFpu.LongSlit_0_75
+      case GmosCustomSlitWidth.CustomWidth_1_00 => GmosNorthFpu.LongSlit_1_00
+      case GmosCustomSlitWidth.CustomWidth_1_50 => GmosNorthFpu.LongSlit_1_50
+      case GmosCustomSlitWidth.CustomWidth_2_00 => GmosNorthFpu.LongSlit_2_00
+      case GmosCustomSlitWidth.CustomWidth_5_00 => GmosNorthFpu.LongSlit_5_00
 
-  // ShortCut 3374
-  val DefaultSpatialOffsets: List[Q] =
-    List(
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(  0)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal( 15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(-15))
-    )
-
-  def gapSize(site: Site): Quantity[PosInt, Pixels] =
-    site match {
-      case Site.GN => GmosNorthDetector.Hamamatsu.gapSize
-      case Site.GS => GmosSouthDetector.Hamamatsu.gapSize
-    }
-
-  // wavelength dither needed to fill the chip gaps.
-  private def defaultWavelengthDithers(ditherNm: Int): List[WavelengthDither] =
-    List(
-      WavelengthDither.Zero,
-      WavelengthDither.decimalNanometers.getOption(BigDecimal( ditherNm)).get,
-      WavelengthDither.decimalNanometers.getOption(BigDecimal(-ditherNm)).get
-    )
-
-  // ShortCut 3374, 6778
-  def defaultWavelengthDithersNorth(grating: GmosNorthGrating): List[WavelengthDither] =
-    defaultWavelengthDithers(grating match
-      case GmosNorthGrating.B1200_G5301 |
-           GmosNorthGrating.R831_G5302  |
-           GmosNorthGrating.R600_G5304  => 5
-      case GmosNorthGrating.R400_G5310  |
-           GmosNorthGrating.B480_G5309  => 8
-      case GmosNorthGrating.R150_G5308  => 20
-    )
-
-  // ShortCut 3374, 6778
-  def defaultWavelengthDithersSouth(grating: GmosSouthGrating): List[WavelengthDither] =
-    defaultWavelengthDithers(grating match
-      case GmosSouthGrating.B1200_G5321 |
-           GmosSouthGrating.R831_G5322  |
-           GmosSouthGrating.R600_G5324  => 5
-      case GmosSouthGrating.R400_G5325  |
-           GmosSouthGrating.B480_G5327  => 8
-      case GmosSouthGrating.R150_G5326  => 20
-    )
+  def southFpu(slitWidth: GmosCustomSlitWidth): GmosSouthFpu =
+    slitWidth match
+      case GmosCustomSlitWidth.CustomWidth_0_25 => GmosSouthFpu.LongSlit_0_25
+      case GmosCustomSlitWidth.CustomWidth_0_50 => GmosSouthFpu.LongSlit_0_50
+      case GmosCustomSlitWidth.CustomWidth_0_75 => GmosSouthFpu.LongSlit_0_75
+      case GmosCustomSlitWidth.CustomWidth_1_00 => GmosSouthFpu.LongSlit_1_00
+      case GmosCustomSlitWidth.CustomWidth_1_50 => GmosSouthFpu.LongSlit_1_50
+      case GmosCustomSlitWidth.CustomWidth_2_00 => GmosSouthFpu.LongSlit_2_00
+      case GmosCustomSlitWidth.CustomWidth_5_00 => GmosSouthFpu.LongSlit_5_00
