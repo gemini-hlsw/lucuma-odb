@@ -2041,8 +2041,7 @@ enum GmosCustomSlitWidth {
 
 """
 GMOS MOS acquisition type: whether the acquisition image is taken with the
-mask in the beam (imaging the alignment holes cut into the mask) or out of
-the beam.
+mask in or out the light path.
 """
 enum GmosMosAcquisitionType {
   """
@@ -2051,7 +2050,7 @@ enum GmosMosAcquisitionType {
   MASK_IN
 
   """
-  Acquisition image taken without the mask in the beam.
+  Acquisition image taken without the mask in the light path.
   """
   MASK_OUT
 }
@@ -3058,9 +3057,8 @@ input GmosNorthMosInput {
   centralWavelength: WavelengthInput
 
   """
-  Whether the acquisition image is taken with the mask in the beam or out of
-  the beam.  If not specified on creation, defaults to MASK_IN.  It cannot be
-  unset with a null value.
+  Whether the acquisition image is taken with the mask in or out the light path.
+  If not specified on creation, defaults to MASK_IN.  It cannot be unset with a null value.
   """
   acquisitionType: GmosMosAcquisitionType
 
@@ -3133,9 +3131,8 @@ input GmosSouthMosInput {
   centralWavelength: WavelengthInput
 
   """
-  Whether the acquisition image is taken with the mask in the beam or out of
-  the beam.  If not specified on creation, defaults to MASK_IN.  It cannot be
-  unset with a null value.
+  Whether the acquisition image is taken with the mask in or out the light path.
+  If not specified on creation, defaults to MASK_IN.  It cannot be unset with a null value.
   """
   acquisitionType: GmosMosAcquisitionType
 
@@ -12779,8 +12776,7 @@ type GmosNorthMos {
   centralWavelength: Wavelength!
 
   """
-  Whether the acquisition image is taken with the mask in the beam (imaging
-  the alignment holes cut into the mask) or out of the beam.
+  Whether the acquisition image is taken with the mask in or out the light path.
   """
   acquisitionType: GmosMosAcquisitionType!
 
@@ -12962,8 +12958,7 @@ type GmosSouthMos {
   centralWavelength: Wavelength!
 
   """
-  Whether the acquisition image is taken with the mask in the beam (imaging
-  the alignment holes cut into the mask) or out of the beam.
+  Whether the acquisition image is taken with the mask in or out the light path.
   """
   acquisitionType: GmosMosAcquisitionType!
 

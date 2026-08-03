@@ -2580,9 +2580,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """.query((attachment_id.opt *: attachment_type.opt).map((aid, tpe) => (aid, tpe)))
     withSession(_.unique(q)(oid))
 
-  // MASK_OUT is deliberately the non-default acquisition type, so a clone that
-  // re-applied the column default rather than copying the value would fail here.
-  test("clone GMOS North MOS observation preserves the custom mask and acquisition type"):
+  test("clone GN MOS observation preserves the custom mask and acquisition type"):
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetAs(pi, pid)

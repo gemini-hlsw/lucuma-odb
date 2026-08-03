@@ -1,5 +1,4 @@
--- Acquisition type: whether the acquisition image is taken with the mask in
--- the beam (imaging the alignment holes cut into the mask) or out of the beam.
+-- Acquisition type: whether the acquisition image is taken with the mask in or out.
 CREATE TYPE e_gmos_mos_acquisition_type AS ENUM ('MaskIn', 'MaskOut');
 
 ALTER TABLE t_gmos_north_mos

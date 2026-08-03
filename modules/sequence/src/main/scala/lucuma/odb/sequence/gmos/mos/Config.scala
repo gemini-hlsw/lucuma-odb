@@ -60,8 +60,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends Product with Serial
   def customMask: GmosFpuMask.Custom
 
   /**
-   * Whether the acquisition image is taken with the mask in the beam (imaging
-   * the alignment holes cut into the mask) or out of the beam.
+   * Whether the acquisition image is taken with the mask in or out the light path.
    */
   def acquisitionType: GmosMosAcquisitionType
 
