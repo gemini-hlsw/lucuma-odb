@@ -9,7 +9,7 @@ import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
 
-val otherConfigErrorValidator: Validator = info =>
+val otherConfigErrorValidator: ObservationValidator = info =>
   NonEmptyChain.fromSeq(info.otherConfigErrors) match
     case None       => ObservationValidationMap.empty
     case Some(errs) => ObservationValidationMap.singleton(ObservationValidation(ObservationValidationCode.ConfigurationError, errs))

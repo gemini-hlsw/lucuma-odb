@@ -16,9 +16,10 @@ import lucuma.odb.data.ObservationValidationMap
 // maps to Undefined and blocks Ready; during execution the frozen snapshot
 // is present and execution-state dominance keeps the observation Ongoing,
 // so it is a non-blocking standing error there.
-def acquisitionValidator(itcFor: Observation.Id => Option[Itc]): Validator = info =>
+def acquisitionValidator(itcFor: Observation.Id => Option[Itc]): ObservationValidator = info =>
   if info.isVisitor then ObservationValidationMap.empty
   else itcFor(info.oid).foldMap:
     _.acquisition match
       case ItcAcquisition.Failed(msg) => ObservationValidationMap.singleton(ObservationValidation.itc(msg))
       case _                          => ObservationValidationMap.empty
+

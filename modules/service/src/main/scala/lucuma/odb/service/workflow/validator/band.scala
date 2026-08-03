@@ -5,12 +5,17 @@ package lucuma.odb.service.workflow
 package validator
 
 import cats.syntax.all.*
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.ObservationValidation
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.ObservationValidationMap
 
-import ObservationWorkflowService.*
+object bandValidator extends ObservationValidator:
 
-val bandValidator: Validator = info =>
-  (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
-    if bs.toList.contains(b) then ObservationValidationMap.empty
-    else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
+  def invalidScienceBand(b: ScienceBand): String =
+    s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
+
+  def apply(info: ObservationValidationInfo) =
+    (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
+      if bs.toList.contains(b) then ObservationValidationMap.empty
+      else ObservationValidationMap.singleton(ObservationValidation.configuration(invalidScienceBand(b)))

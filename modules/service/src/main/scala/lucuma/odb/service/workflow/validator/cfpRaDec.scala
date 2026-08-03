@@ -8,13 +8,14 @@ import cats.syntax.all.*
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
 
-import ObservationWorkflowService.*
+object cfpRaDecValidator extends ObservationValidator:
+  
+  val CoordinatesOutOfRange = "Base coordinates out of Call for Proposals limits."
 
-
-val cfpRaDecValidator: Validator = info =>
-  info.cfpInfo.foldMap: cfp =>
-    info.site.foldMap: site =>
-      info.coordinates.foldMap: coords =>
-        val ok = cfp.limits.siteLimits(site).inLimits(coords)
-        if ok then ObservationValidationMap.empty
-        else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
+  def apply(info: ObservationValidationInfo): ObservationValidationMap =
+    info.cfpInfo.foldMap: cfp =>
+      info.site.foldMap: site =>
+        info.coordinates.foldMap: coords =>
+          val ok = cfp.limits.siteLimits(site).inLimits(coords)
+          if ok then ObservationValidationMap.empty
+          else ObservationValidationMap.singleton(ObservationValidation.callForProposals(CoordinatesOutOfRange))

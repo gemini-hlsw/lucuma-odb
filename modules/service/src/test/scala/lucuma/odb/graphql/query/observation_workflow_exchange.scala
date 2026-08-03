@@ -15,7 +15,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.Program
 import lucuma.core.model.User
-import lucuma.odb.service.workflow.ObservationWorkflowService.Messages
+import lucuma.odb.service.workflow.validator.exchangeValidator
 
 class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
 
@@ -87,7 +87,7 @@ class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       ves <- validationErrors(oid)
       _   <- IO(assert(
-               ves.contains_(ObservationValidation.callForProposals(Messages.exchangeObservatoryMismatch(Observatory.Keck, Observatory.Subaru))),
+               ves.contains_(ObservationValidation.callForProposals(exchangeValidator.exchangeObservatoryMismatch(Observatory.Keck, Observatory.Subaru))),
                s"Expected observatory-mismatch validation, got: $ves"
              ))
     yield ()
@@ -101,7 +101,7 @@ class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       ves <- validationErrors(oid)
       _   <- IO(assert(
-               ves.contains_(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(KeckInstrument.Hires.tag))),
+               ves.contains_(ObservationValidation.callForProposals(exchangeValidator.invalidExchangeInstrument(KeckInstrument.Hires.tag))),
                s"Expected invalid-instrument validation, got: $ves"
              ))
     yield ()

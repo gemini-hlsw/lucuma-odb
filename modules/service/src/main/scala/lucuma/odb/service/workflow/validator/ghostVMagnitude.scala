@@ -9,11 +9,11 @@ import lucuma.core.enums.Band
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
-import lucuma.odb.service.workflow.ObservationWorkflowService.Messages
 
 // V magnitudes are used by Observe to set the GHOST slit viewing
 // camera exposure time, so every target in a GHOST observation needs one.
-val ghostVMagnitudeValidator: Validator = info =>
+val ghostVMagnitudeValidator: ObservationValidator = info =>
+  val MissingVMagnitude = "Please add a V magnitude."
   if info.observingMode.contains(ObservingModeType.GhostIfu) && info.asterism.exists(!_.sourceProfile.hasBand(Band.V)) then
-    ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.MissingVMagnitude))
+    ObservationValidationMap.singleton(ObservationValidation.configuration(MissingVMagnitude))
   else ObservationValidationMap.empty

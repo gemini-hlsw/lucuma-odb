@@ -4,22 +4,22 @@
 package lucuma.odb.service
 package workflow
 
-import lucuma.odb.data.ObservationValidationMap
-import lucuma.core.model.Observation
-import lucuma.odb.data.Itc
-import skunk.Transaction
-import grackle.ResultT
-import cats.syntax.all.*
-import cats.data.NonEmptyList
-import Services.Syntax.*
-import lucuma.core.model.ObservationValidation
-import lucuma.core.enums.ConfigurationRequestStatus
-import cats.Functor
 import cats.Applicative
+import cats.Functor
+import cats.data.NonEmptyList
+import cats.syntax.all.*
+import grackle.ResultT
+import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.model.Observation
+import lucuma.core.model.ObservationValidation
+import lucuma.odb.data.Itc
+import lucuma.odb.data.ObservationValidationMap
+import skunk.Transaction
+import Services.Syntax.*
 
-type Validator = ObservationValidationInfo => ObservationValidationMap
+type ObservationValidator = ObservationValidationInfo => ObservationValidationMap
 
-object Validator:
+object ObservationValidator:
 
   def validate[F[_]: Applicative](
     infos:  Map[Observation.Id, ObservationValidationInfo],
@@ -34,10 +34,10 @@ object Validator:
 
     // Here are our composed validators
 
-    val calibrationValidator, engValidator: Validator = _ =>
+    val calibrationValidator, engValidator: ObservationValidator = _ =>
       ObservationValidationMap.empty
 
-    val scienceValidator1: Validator =
+    val scienceValidator1: ObservationValidator =
       generatorValidator       |+|
       cfpInstrumentValidator   |+|
       exchangeValidator        |+|
@@ -46,7 +46,7 @@ object Validator:
       ghostVMagnitudeValidator |+|
       otherConfigErrorValidator
 
-    val scienceValidator2: Validator =
+    val scienceValidator2: ObservationValidator =
       itcValidator(itcFor) |+| acquisitionValidator(itcFor)
 
     // And our validation results

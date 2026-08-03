@@ -11,7 +11,7 @@ import lucuma.odb.sequence.data.ItcInputDerivation
 
 import ObservationWorkflowService.*
 
-val generatorValidator: Validator = info =>
+val generatorValidator: ObservationValidator = info =>
   if info.isVisitor || info.isExchange then ObservationValidationMap.empty
   else info.generatorParams.foldMap:
     case Left(error)                                                                   => ObservationValidationMap.singleton(error.toObsValidation)

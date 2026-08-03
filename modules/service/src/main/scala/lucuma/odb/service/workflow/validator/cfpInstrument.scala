@@ -5,14 +5,15 @@ package lucuma.odb.service.workflow
 package validator
 
 import cats.syntax.all.*
+import lucuma.core.enums.Instrument
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
 
-import ObservationWorkflowService.*
-
-val cfpInstrumentValidator: Validator = info =>
+val cfpInstrumentValidator: ObservationValidator = info =>
+  def invalidInstrument(instr: Instrument): String =
+    s"Instrument $instr not part of Call for Proposals."
   info.cfpInfo.foldMap: cfp =>
     if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
     else info.instrument.foldMap: inst =>
       if cfp.instruments.contains(inst) then ObservationValidationMap.empty
-      else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidInstrument(inst)))
+      else ObservationValidationMap.singleton(ObservationValidation.callForProposals(invalidInstrument(inst)))

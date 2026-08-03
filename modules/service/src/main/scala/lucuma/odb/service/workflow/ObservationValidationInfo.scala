@@ -5,7 +5,9 @@ package lucuma.odb.service
 package workflow
 
 import cats.data.NonEmptyList
+import cats.effect.Concurrent
 import cats.implicits.*
+import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
@@ -25,6 +27,7 @@ import lucuma.core.model.CallCoordinatesLimits
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.util.DateInterval
@@ -33,16 +36,14 @@ import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.workflow.ObservationWorkflowService.UserState
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.syntax.observingModeType.*
-
 import lucuma.odb.util.Codecs.*
-import java.time.Instant
-import skunk.Transaction
-import Services.Syntax.*
-import grackle.Result
 import skunk.*
+import skunk.Transaction
 import skunk.syntax.all.*
-import cats.effect.Concurrent
-import lucuma.core.model.SiteCoordinatesLimits
+
+import java.time.Instant
+
+import Services.Syntax.*
 
 /* Validation Info Record */
 case class ObservationValidationInfo(

@@ -32,7 +32,7 @@ import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.ObservationService
-import lucuma.odb.service.workflow.ObservationWorkflowService
+import lucuma.odb.service.workflow.validator.cfpRaDecValidator
 
 class observation_workflow
   extends ExecutionTestSupportForGmos
@@ -496,7 +496,7 @@ class observation_workflow
                 ObservationWorkflow(
                   ObservationWorkflowState.Undefined,
                   List(ObservationWorkflowState.Inactive),
-                  List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
+                  List(ObservationValidation.callForProposals(cfpRaDecValidator.CoordinatesOutOfRange))
                 )
               )
             ).asRight
@@ -525,7 +525,7 @@ class observation_workflow
                 ObservationWorkflow(
                   ObservationWorkflowState.Undefined,
                   List(ObservationWorkflowState.Inactive),
-                  List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
+                  List(ObservationValidation.callForProposals(cfpRaDecValidator.CoordinatesOutOfRange))
                 )
               )
             ).asRight
@@ -583,7 +583,7 @@ class observation_workflow
             ObservationWorkflow(
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
-              List(ObservationValidation.callForProposals(ObservationWorkflowService.Messages.CoordinatesOutOfRange))
+              List(ObservationValidation.callForProposals(cfpRaDecValidator.CoordinatesOutOfRange))
             )
           )
         ).asRight
@@ -614,7 +614,7 @@ class observation_workflow
               List(
                 ObservationValidation.callForProposals(
                   ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
-                  ObservationWorkflowService.Messages.CoordinatesOutOfRange
+                  cfpRaDecValidator.CoordinatesOutOfRange
                 )
               )
             )
@@ -892,7 +892,7 @@ class observation_workflow
               List(
                 ObservationValidation.callForProposals(
                   ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
-                  ObservationWorkflowService.Messages.CoordinatesOutOfRange
+                  cfpRaDecValidator.CoordinatesOutOfRange
                 ),
               )
             )

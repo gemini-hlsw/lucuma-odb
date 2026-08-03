@@ -10,12 +10,9 @@ import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState as CoreExecutionState
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
@@ -24,7 +21,6 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
-import lucuma.core.syntax.string.*
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
@@ -92,7 +88,6 @@ sealed trait ObservationWorkflowService[F[_]] {
 
 }
 
-
 object ObservationWorkflowService {
 
   // Construct some finer-grained types to make it harder to do something dumb in the status computation.
@@ -101,25 +96,6 @@ object ObservationWorkflowService {
   type ExecutionState  = Ongoing.type   | Completed.type
   type ValidationState = Undefined.type | Unapproved.type | Defined.type
 
-  /* Validation Messages */
-  object Messages {
-
-    val CoordinatesOutOfRange = "Base coordinates out of Call for Proposals limits."
-
-    def invalidInstrument(instr: Instrument): String =
-      s"Instrument $instr not part of Call for Proposals."
-
-    def invalidScienceBand(b: ScienceBand): String =
-      s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
-
-    def exchangeObservatoryMismatch(modeObs: Observatory, cfpObs: Observatory): String =
-      s"Exchange observation requires a $modeObs Call for Proposals, but the proposal's observatory is $cfpObs."
-
-    def invalidExchangeInstrument(instr: String): String =
-      s"Instrument $instr is not part of the Call for Proposals."
-
-    val MissingVMagnitude = "Please add a V magnitude."
-  }
 
   extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
     ws match
@@ -285,7 +261,7 @@ object ObservationWorkflowService {
               for
                 infos  <- ResultT.liftF(ObservationValidationInfo.fetch(oids))         // Map[Observation.Id, ObsDefinition]
                 itcRes <- ResultT.liftF(lookupCachedItcResults(infos))      // Map[Observation.Id, ItcService.AsterismResults]
-                errs   <- Validator.validate(infos, itcRes.get)          // Map[Observation.Id, ObservationValidationMap]
+                errs   <- ObservationValidator.validate(infos, itcRes.get)          // Map[Observation.Id, ObservationValidationMap]
               yield (infos, errs, itcRes)
             ).value
 
@@ -316,7 +292,7 @@ object ObservationWorkflowService {
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
         (for
           infos <- ResultT.liftF(ObservationValidationInfo.fetch(List(oid)))
-          errs  <- Validator.validate(infos, _ => itc)
+          errs  <- ObservationValidator.validate(infos, _ => itc)
           exec = exec0.filter:
             case a: DeclaredExecutionState => true // always ok
             case _ => !infos.get(oid).exists(i => i.isVisitor || i.isExchange) // otherwise discard the state if it's a visitor or exchange
