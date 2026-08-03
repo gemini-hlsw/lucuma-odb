@@ -2888,8 +2888,9 @@ trait DatabaseOperations { this: OdbSuite =>
               partnerLink: {
                 ${
                   partnerLink match
-                    case PartnerLink.HasGeminiPartner(gp) => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
-                    case _                                => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                    case PartnerLink.HasGeminiPartner(gp)   => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
+                    case PartnerLink.HasExchangePartner(xp) => s"exchangePartner: ${xp.tag.toScreamingSnakeCase}"
+                    case _                                  => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                 }
               }
               $preferred

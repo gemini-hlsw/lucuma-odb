@@ -132,7 +132,13 @@ class setProposalStatusEmails extends OdbSuite {
 
   test("✓ an exchange partner request notifies the exchange partner") {
     for {
-      cid <- geminiCall(GeminiCallForProposalsType.RegularSemester)
+      // The call has to invite the Keck community before it can be asked for time
+      // on its behalf.
+      cid <- createGeminiCallForProposalsAs(
+               staff,
+               GeminiCallForProposalsType.RegularSemester,
+               otherGemini = "exchangePartners: [{ exchangePartner: KECK }]".some
+             )
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some, "classical: { exchangePartner: KECK }".some)
       _   <- addCoisAs(pi, pid)

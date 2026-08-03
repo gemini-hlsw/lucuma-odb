@@ -143,6 +143,9 @@ object ProposalService {
     def bothTimeRequests(pid: Program.Id): OdbError =
       s"Proposal $pid may not have both an exchange partner and partner splits.".invalidArg
 
+    def unofferedExchangePartner(pid: Program.Id, xp: ExchangePartner): OdbError =
+      s"Program $pid requests time on behalf of ${xp.tag.toUpperCase}, but the Call for Proposals does not offer that exchange partner.".invalidArg
+
     def missingPartners(pid: Program.Id, partners: Set[Partner] = Set.empty): OdbError =
       partners.toList.map(_.abbreviation).sorted match
         case Nil     =>
@@ -256,6 +259,9 @@ object ProposalService {
         cfp:               Option[CfpProperties],
         considerForBand3:  Option[ConsiderForBand3],
         exchangePartner:   Option[ExchangePartner],
+        // Whether the call offers the exchange partner named above.  False when
+        // there is no exchange partner to begin with.
+        exchangeOffered:   Boolean,
         observatory:       Option[Observatory]
       ) {
         // Every stored proposal has an observatory; default to Gemini defensively.
@@ -331,6 +337,9 @@ object ProposalService {
             // both-set time request here with a clear message rather than
             // silently treating it as an exchange request below.
             bothTimeRequests(pid).asFailure.whenA(exchangePartner.isDefined && splitsSum =!= 0),
+            // Time may only be requested on behalf of a community the call invites.
+            exchangePartner.filterNot(_ => exchangeOffered).fold(Result.unit): xp =>
+              unofferedExchangePartner(pid, xp).asFailure,
             scienceSubtype.fold(().success) { s =>
               // An exchange-partner time request carries no Gemini partner
               // splits, so the sum-to-100 rule does not apply to it.
@@ -572,7 +581,7 @@ object ProposalService {
           _instrument.map(_.toList)
 
         val codec: Decoder[ProposalContext] =
-          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: observatory.opt).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: bool *: observatory.opt).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -696,6 +705,15 @@ object ProposalService {
               partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
           ).sequence.void)
 
+        // The time-request trigger fires immediately and rejects a proposal that has
+        // both an exchange partner and partner splits, so an edit that swaps one for
+        // the other has to give up what it holds before taking on the other.  Only
+        // assigning an exchange partner needs the splits emptied first; going the
+        // other way clears the exchange partner with the proposal update, ahead of
+        // the splits that replace it.
+        def splitsFirst(set: ProposalPropertiesInput.Edit): Boolean =
+          set.exchangePartner.isPresent
+
         (for {
           pid    <- ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           before <- ResultT(ProposalContext.lookup(pid))
@@ -705,9 +723,10 @@ object ProposalService {
           _      <- ResultT.fromResult(after.validateSubmission(pid, after.status))
           _      <- ResultT.liftF(deferConstraints)
           set     = handleTypeChange(before)
+          _      <- updateSplits(pid, set).whenA(splitsFirst(set))
           _      <- updateProposal(pid, set)
           _      <- updateProgram(pid, before, after)
-          _      <- updateSplits(pid, set)
+          _      <- updateSplits(pid, set).unlessA(splitsFirst(set))
         } yield pid).value
       }
 
@@ -1058,9 +1077,10 @@ object ProposalService {
             (SELECT cfp.c_gemini_non_partner_deadline
              WHERE pi.c_partner_link = 'has_non_partner'),
             -- An exchange-partner request is not tied to any Gemini partner, so
-            -- it uses the call's default submission deadline.
-            (SELECT cfp.c_deadline_default
-             WHERE prop.c_exchange_partner IS NOT NULL)
+            -- it uses that community's deadline for the call: its override if it
+            -- has one, and otherwise the call's default.  Null when the call does
+            -- not offer the community at all.
+            cfp_ep.c_deadline
           ) AS c_deadline,
           cfp.c_title,
           cfp.c_cfp_id,
@@ -1071,6 +1091,7 @@ object ProposalService {
           cfp.c_gemini_proprietary,
           prop.c_consider_for_band_3,
           prop.c_exchange_partner,
+          cfp_ep.c_cfp_id IS NOT NULL AS c_exchange_offered,
           prop.c_observatory
         FROM t_program prog
         LEFT JOIN t_proposal prop
@@ -1083,6 +1104,9 @@ object ProposalService {
         LEFT JOIN v_gemini_cfp_partner cfp_pi
           ON cfp.c_cfp_id = cfp_pi.c_cfp_id
           AND cfp_pi.c_partner = pi.c_gemini_partner
+        LEFT JOIN v_gemini_cfp_exchange_partner cfp_ep
+          ON cfp.c_cfp_id = cfp_ep.c_cfp_id
+          AND cfp_ep.c_exchange_partner = prop.c_exchange_partner
         WHERE
           prog.c_program_id = $program_id
       """.apply(pid) |+|
