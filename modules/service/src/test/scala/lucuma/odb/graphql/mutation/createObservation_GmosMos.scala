@@ -371,7 +371,7 @@ class createObservation_GmosMos extends OdbSuite:
         }
       """.asRight)
 
-  test("slitWidth is required"):
+  test("customMask is required"):
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
@@ -396,7 +396,7 @@ class createObservation_GmosMos extends OdbSuite:
                    }
                  }
                """,
-               expected = List("Argument 'input.SET.observingMode.gmosNorthMos' is invalid: A customMask slitWidth is required in order to create a GMOS North MOS observing mode.").asLeft
+               expected = List("Argument 'input.SET.observingMode.gmosNorthMos' is invalid: A customMask is required in order to create a GMOS North MOS observing mode.").asLeft
              )
     yield ()
 
@@ -413,4 +413,3 @@ class createObservation_GmosMos extends OdbSuite:
       rLs  <- createConfigurationRequestAs(pi, ls)
       _    <- assertIO(IO(rMos =!= rLs), true, "MOS and long slit shared a configuration request")
     yield ()
-

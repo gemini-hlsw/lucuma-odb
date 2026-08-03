@@ -527,20 +527,21 @@ object GmosMosService {
       ).flatten
     }
 
-    // The id and type columns move together so the composite foreign key stays
-    // satisfiable: clearing the id must also clear the type.
+    // The mask is replaced whole, so every column is assigned.
+    // clearing the id must also clear the type.
     def customMaskUpdates(
-      mask: GmosMosInput.CustomMask
+      mask: GmosFpuMask.Custom
     ): List[AppliedFragment] =
       val upSlitWidth  = sql"c_slit_width           = $gmos_custom_slit_width"
       val upAttachment = sql"c_mask_attachment_id   = ${attachment_id.opt}"
       val upType       = sql"c_mask_attachment_type = ${attachment_type.opt}"
 
+      val aid = maskAttachmentId(mask)
       List(
-        mask.slitWidth.map(upSlitWidth),
-        mask.attachmentId.toOptionOption.map(upAttachment),
-        mask.attachmentId.toOptionOption.map(a => upType(a.as(AttachmentType.MosMask)))
-      ).flatten
+        upSlitWidth(mask.slitWidth),
+        upAttachment(aid),
+        upType(aid.as(AttachmentType.MosMask))
+      )
 
     def gmosNorthUpdates(
       input: GmosMosInput.Edit.North

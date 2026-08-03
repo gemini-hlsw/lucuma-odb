@@ -140,7 +140,7 @@ class updateObservations_GmosMos extends OdbSuite:
       aid        <- insertAttachment(pid, "mos_mask", "mask.fits")
       _          <- expect(pi, updateMutation(
                       oid,
-                      s"""gmosNorthMos: { customMask: { attachmentId: "$aid" } }""",
+                      s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" } }""",
                       "gmosNorthMos { customMask { slitWidth attachmentId } }"
                     ), json"""
                       {
@@ -170,7 +170,7 @@ class updateObservations_GmosMos extends OdbSuite:
       oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
       _   <- expect(pi, updateMutation(
                oid,
-               "gmosNorthMos: { customMask: { attachmentId: null } }",
+               "gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: null } }",
                "gmosNorthMos { customMask { slitWidth attachmentId } }"
              ), json"""
                {
@@ -194,7 +194,8 @@ class updateObservations_GmosMos extends OdbSuite:
       _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
 
-  test("edit the slit width alone, leaving the attachment in place"):
+  // The mask is a whole value, so supplying it replaces it outright.
+  test("editing the slit width without resending the attachment clears it"):
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
@@ -203,6 +204,38 @@ class updateObservations_GmosMos extends OdbSuite:
       _   <- expect(pi, updateMutation(
                oid,
                "gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_0_25 } }",
+               "gmosNorthMos { customMask { slitWidth attachmentId } }"
+             ), json"""
+               {
+                 "updateObservations": {
+                   "observations": [
+                     {
+                       "observingMode": {
+                         "gmosNorthMos": {
+                           "customMask": {
+                             "slitWidth": "CUSTOM_WIDTH_0_25",
+                             "attachmentId": null
+                           }
+                         }
+                       }
+                     }
+                   ]
+                 }
+               }
+             """.asRight)
+      cols <- readNorthMaskColumns(oid)
+      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+    yield ()
+
+  test("resending the attachment alongside a new slit width keeps it"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      aid <- insertAttachment(pid, "mos_mask", "mask.fits")
+      oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
+      _   <- expect(pi, updateMutation(
+               oid,
+               s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_0_25, attachmentId: "$aid" } }""",
                "gmosNorthMos { customMask { slitWidth attachmentId } }"
              ), json"""
                {
@@ -288,7 +321,7 @@ class updateObservations_GmosMos extends OdbSuite:
                       user     = pi,
                       query    = updateMutation(
                         oid,
-                        s"""gmosNorthMos: { customMask: { attachmentId: "$aid" } }""",
+                        s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" } }""",
                         "gmosNorthMos { customMask { attachmentId } }"
                       ),
                       expected = List(GmosMosService.MaskAttachmentViolationMessage).asLeft
@@ -341,7 +374,7 @@ class updateObservations_GmosMos extends OdbSuite:
                     user     = pi,
                     query    = updateMutation(
                       oid,
-                      s"""gmosNorthMos: { customMask: { attachmentId: "$aid" } }""",
+                      s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" } }""",
                       "gmosNorthMos { customMask { attachmentId } }"
                     ),
                     expected = List(GmosMosService.MaskAttachmentViolationMessage).asLeft

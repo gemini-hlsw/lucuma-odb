@@ -1980,11 +1980,16 @@ type GmosCustomMask {
 }
 
 """
-GMOS custom mask input parameters
+GMOS custom mask input parameters.
+
+Skipping `customMask` leaves the existing mask untouched while supplying it
+replaces the mask outright, `slitWidth` must be resent even when only the
+attachment changes.
 """
 input GmosCustomMaskInput {
   """
   The MOS mask attachment id, or null if the mask has not yet been defined.
+  Null is the normal state before the mask is attached in Phase 2.
   """
   attachmentId: AttachmentId
 
@@ -1992,27 +1997,6 @@ input GmosCustomMaskInput {
   Custom mask slit width
   """
   slitWidth: GmosCustomSlitWidth!
-}
-
-"""
-GMOS MOS custom mask input parameters.
-
-Distinct from `GmosCustomMaskInput`, which carries a *complete* mask (slit width
-required) as the FPU of a dynamic sequence step. 
-"""
-input GmosMosCustomMaskInput {
-  """
-  The MOS mask attachment id.  May be unset by assigning a null value, or
-  ignored by skipping it altogether.  Null means the mask has not yet been
-  defined, which is the normal state before Phase 2.
-  """
-  attachmentId: AttachmentId
-
-  """
-  Custom mask slit width.  Required when creating the mode; it cannot be unset
-  with a null value.
-  """
-  slitWidth: GmosCustomSlitWidth
 }
 
 """
@@ -3046,11 +3030,10 @@ input GmosNorthMosInput {
   filter: GmosNorthFilter
 
   """
-  The custom mask through which the observation is taken.  On creation its
-  `slitWidth` is required.  On edit, either field may be skipped to leave it
-  unchanged.
+  The custom mask through which the observation is taken.  Supply it complete or
+  skip it altogether.
   """
-  customMask: GmosMosCustomMaskInput
+  customMask: GmosCustomMaskInput
 
   """
   The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -3115,11 +3098,10 @@ input GmosSouthMosInput {
   filter: GmosSouthFilter
 
   """
-  The custom mask through which the observation is taken.  On creation its
-  `slitWidth` is required.  On edit, either field may be skipped to leave it
-  unchanged.
+  The custom mask through which the observation is taken.  Supply it complete or
+  skip it altogether.
   """
-  customMask: GmosMosCustomMaskInput
+  customMask: GmosCustomMaskInput
 
   """
   The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.

@@ -10,7 +10,6 @@ import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
-import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
@@ -23,11 +22,7 @@ import lucuma.core.enums.Site
 import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
-import lucuma.core.model.Attachment
-import lucuma.core.model.Defined
 import lucuma.core.model.ExposureTimeMode
-import lucuma.core.model.MaskDefinition
-import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -39,31 +34,6 @@ import lucuma.odb.graphql.binding.*
  * mask and with no acquisition configuration.
  */
 object GmosMosInput:
-
-  /**
-   * The custom mask as it arrives from a client.  Both fields are optional so
-   * that an edit can change one without resending the other; `Create` requires
-   * the slit width.
-   */
-  final case class CustomMask(
-    slitWidth:    Option[GmosCustomSlitWidth],
-    attachmentId: Nullable[Attachment.Id]
-  ) derives Eq
-
-  object CustomMask:
-
-    val AllUndefined: CustomMask =
-      CustomMask(None, Nullable.Absent)
-
-    val Binding: Matcher[CustomMask] =
-      ObjectFieldsBinding.rmap:
-        case List(
-          AttachmentIdBinding.Nullable("attachmentId", rAttachmentId),
-          GmosCustomSlitWidthBinding.Option("slitWidth", rSlitWidth)
-        ) => (
-          rSlitWidth,
-          rAttachmentId
-        ).parMapN(apply)
 
   sealed trait Create[G, F]:
     def grating:    G
@@ -170,14 +140,10 @@ object GmosMosInput:
 
       Result.fromOption(oa, Matcher.validationProblem(s"A $itemName is required in order to create a GMOS $siteName MOS observing mode."))
 
-    private def toCreateMask(site: Site, mask: CustomMask): Result[GmosFpuMask.Custom] =
-      required(site, mask.slitWidth, "customMask slitWidth").map: w =>
-        GmosFpuMask.Custom(mask.attachmentId.toOption.fold[MaskDefinition](ToBeDefined)(Defined(_)), w)
-
     final case class North(
       grating:    Option[GmosNorthGrating],
       filter:     Nullable[GmosNorthFilter],
-      customMask: Option[CustomMask],
+      customMask: Option[GmosFpuMask.Custom],
       common:     Edit.Common
     ) derives Eq:
 
@@ -187,7 +153,7 @@ object GmosMosInput:
       val toCreate: Result[Create.North] =
         for
           g <- required(Site.GN, grating, "grating")
-          m <- toCreateMask(Site.GN, customMask.getOrElse(CustomMask.AllUndefined))
+          m <- required(Site.GN, customMask, "customMask")
           c <- common.toCreate(Site.GN)
         yield Create.North(g, filter.toOption, m, c)
 
@@ -201,7 +167,7 @@ object GmosMosInput:
     final case class South(
       grating:    Option[GmosSouthGrating],
       filter:     Nullable[GmosSouthFilter],
-      customMask: Option[CustomMask],
+      customMask: Option[GmosFpuMask.Custom],
       common:     Edit.Common
     ) derives Eq:
 
@@ -211,7 +177,7 @@ object GmosMosInput:
       val toCreate: Result[Create.South] =
         for
           g <- required(Site.GS, grating, "grating")
-          m <- toCreateMask(Site.GS, customMask.getOrElse(CustomMask.AllUndefined))
+          m <- required(Site.GS, customMask, "customMask")
           c <- common.toCreate(Site.GS)
         yield Create.South(g, filter.toOption, m, c)
 
@@ -225,14 +191,14 @@ object GmosMosInput:
   private val NorthData: Matcher[(
     Option[GmosNorthGrating],
     Nullable[GmosNorthFilter],
-    Option[CustomMask],
+    Option[GmosFpuMask.Custom],
     Edit.Common
   )] =
     ObjectFieldsBinding.rmap:
       case List(
         GmosNorthGratingBinding.Option("grating", rGrating),
         GmosNorthFilterBinding.Nullable("filter", rFilter),
-        CustomMask.Binding.Option("customMask", rCustomMask),
+        GmosCustomMaskInput.Binding.Option("customMask", rCustomMask),
         WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
         ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
         GmosBinningBinding.Nullable("explicitXBin", rExplicitXBin),
@@ -262,14 +228,14 @@ object GmosMosInput:
   private val SouthData: Matcher[(
     Option[GmosSouthGrating],
     Nullable[GmosSouthFilter],
-    Option[CustomMask],
+    Option[GmosFpuMask.Custom],
     Edit.Common
   )] =
     ObjectFieldsBinding.rmap:
       case List(
         GmosSouthGratingBinding.Option("grating", rGrating),
         GmosSouthFilterBinding.Nullable("filter", rFilter),
-        CustomMask.Binding.Option("customMask", rCustomMask),
+        GmosCustomMaskInput.Binding.Option("customMask", rCustomMask),
         WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
         ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode),
         GmosBinningBinding.Nullable("explicitXBin", rExplicitXBin),
