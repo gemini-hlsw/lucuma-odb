@@ -130,6 +130,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             slitWidth
             attachmentId
           }
+          acquisitionType
           centralWavelength { nanometers }
           exposureTimeMode {
             signalToNoise {
@@ -195,6 +196,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             slitWidth
             attachmentId
           }
+          acquisitionType
           centralWavelength { nanometers }
           exposureTimeMode {
             signalToNoise {
@@ -2578,7 +2580,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """.query((attachment_id.opt *: attachment_type.opt).map((aid, tpe) => (aid, tpe)))
     withSession(_.unique(q)(oid))
 
-  test("clone GMOS North MOS observation preserves the custom mask"):
+  // MASK_OUT is deliberately the non-default acquisition type, so a clone that
+  // re-applied the column default rather than copying the value would fail here.
+  test("clone GMOS North MOS observation preserves the custom mask and acquisition type"):
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetAs(pi, pid)
@@ -2589,6 +2593,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           filter: R_PRIME
           customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" }
           centralWavelength: { nanometers: 500 }
+          acquisitionType: MASK_OUT
         }
       """
       oid  <- createObservationWithModeAs(pi, pid, List(tid), mode)
@@ -2601,6 +2606,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                      observingMode {
                        gmosNorthMos {
                          customMask { slitWidth attachmentId }
+                         acquisitionType
                        }
                      }
                    }
@@ -2614,7 +2620,8 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                          "customMask": {
                            "slitWidth": "CUSTOM_WIDTH_1_00",
                            "attachmentId": ${aid.asJson}
-                         }
+                         },
+                         "acquisitionType": "MASK_OUT"
                        }
                      }
                    }
@@ -2647,6 +2654,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                      observingMode {
                        gmosSouthMos {
                          customMask { slitWidth attachmentId }
+                         acquisitionType
                        }
                      }
                    }
@@ -2660,7 +2668,8 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                          "customMask": {
                            "slitWidth": "CUSTOM_WIDTH_1_00",
                            "attachmentId": null
-                         }
+                         },
+                         "acquisitionType": "MASK_IN"
                        }
                      }
                    }
