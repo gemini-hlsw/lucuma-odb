@@ -2980,11 +2980,11 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
         )
 
   private val igrins2SvcExposureBoundsError =
-    List("Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s.")
+    List("Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 1.63 s and 600 s.")
 
   test("[igrins2] SVC exposure out of bounds is rejected on create"):
     createProgramAs(pi).flatMap: pid =>
-      // below the 3.08s minimum
+      // below the 1.63s minimum
       expect(
         pi,
         createObsWithIgrins2SvcQuery(pid, "svc: { explicitExposure: { seconds: 1.0 } }"),

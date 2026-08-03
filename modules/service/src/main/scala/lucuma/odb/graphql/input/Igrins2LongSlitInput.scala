@@ -14,7 +14,7 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.igrins2.MaxExposureTime
-import lucuma.core.model.sequence.igrins2.MinExposureTime
+import lucuma.core.model.sequence.igrins2.SvcMinExposureTime
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.format.telescopeConfigs.*
@@ -31,11 +31,12 @@ object Igrins2LongSlitInput:
     private def secondsLabel(ts: TimeSpan): String =
       ts.toSeconds.bigDecimal.stripTrailingZeros.toPlainString
 
-    /** An explicit SVC exposure must respect the IGRINS-2 detector limits. */
+    /** An explicit SVC exposure must respect the slit-viewing camera limit.
+      */
     private def validateExposure(ts: TimeSpan): Result[TimeSpan] =
-      if ts >= MinExposureTime && ts <= MaxExposureTime then Result(ts)
+      if ts >= SvcMinExposureTime && ts <= MaxExposureTime then Result(ts)
       else Matcher.validationFailure(
-        s"SVC exposure time must be between ${secondsLabel(MinExposureTime)} s and ${secondsLabel(MaxExposureTime)} s."
+        s"SVC exposure time must be between ${secondsLabel(SvcMinExposureTime)} s and ${secondsLabel(MaxExposureTime)} s."
       )
 
     /** Create semantics: each field is set-or-skip (`Option`). */
