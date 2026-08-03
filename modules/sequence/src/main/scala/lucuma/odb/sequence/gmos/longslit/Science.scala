@@ -282,6 +282,7 @@ object Science:
         val goals        = Goal.compute(config.wavelengthDithers, config.spatialOffsets, expTimeμs, expCount)
         val gcalClass    = calRole.gcalClass
         val sciClass     = calRole.sciClass
+        val sciGuiding   = calRole.sciGuiding
 
         def define(g: Goal): EitherT[F, OdbError, StepDefinition[D]] =
           val (smartArc, smartFlat, science) =
@@ -291,7 +292,7 @@ object Science:
                 _ <- optics.wavelength := λ.offset(g.Δλ).getOrElse(λ)
                 a <- arcStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), gcalClass)
                 f <- flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), gcalClass)
-                s <- scienceStep(TelescopeConfig(Offset.Zero, StepGuideState.Enabled), sciClass)
+                s <- scienceStep(TelescopeConfig(Offset.Zero, sciGuiding), sciClass)
               yield (a, f, s)
 
           val defn = for
