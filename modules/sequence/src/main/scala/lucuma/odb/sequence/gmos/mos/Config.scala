@@ -9,6 +9,7 @@ import cats.derived.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosCustomSlitWidth
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -29,7 +30,6 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.core.util.Enumerated
-import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
 import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
 import lucuma.odb.sequence.syntax.hash.*

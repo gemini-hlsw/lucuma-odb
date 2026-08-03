@@ -10,6 +10,7 @@ import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
@@ -24,7 +25,6 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 

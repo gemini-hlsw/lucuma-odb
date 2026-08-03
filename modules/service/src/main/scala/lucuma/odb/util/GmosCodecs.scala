@@ -13,6 +13,7 @@ import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
@@ -36,7 +37,6 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Enumerated
-import lucuma.core.enums.GmosMosAcquisitionType
 import skunk.*
 import skunk.data.Arr
 import skunk.data.Type

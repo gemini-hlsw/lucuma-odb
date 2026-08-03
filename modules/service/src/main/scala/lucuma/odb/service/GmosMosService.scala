@@ -13,6 +13,7 @@ import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosCustomSlitWidth
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
@@ -29,7 +30,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
 import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
