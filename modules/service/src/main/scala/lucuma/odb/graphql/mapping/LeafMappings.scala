@@ -54,7 +54,7 @@ import lucuma.odb.data.EditType
 import lucuma.odb.data.ExecutionEventType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
-import lucuma.odb.data.GmosMosAcquisitionType
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag

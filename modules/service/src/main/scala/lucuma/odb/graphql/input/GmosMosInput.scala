@@ -24,7 +24,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.odb.data.GmosMosAcquisitionType
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 

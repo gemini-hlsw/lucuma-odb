@@ -36,7 +36,7 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.GmosGratingConfig
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.util.Enumerated
-import lucuma.odb.data.GmosMosAcquisitionType
+import lucuma.core.enums.GmosMosAcquisitionType
 import skunk.*
 import skunk.data.Arr
 import skunk.data.Type

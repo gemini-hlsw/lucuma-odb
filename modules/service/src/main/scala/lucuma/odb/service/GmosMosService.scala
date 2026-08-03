@@ -29,7 +29,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.data.GmosMosAcquisitionType
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
 import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common

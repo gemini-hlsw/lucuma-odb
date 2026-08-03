@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.odb.data.GmosMosAcquisitionType
+import lucuma.core.enums.GmosMosAcquisitionType
 
 val GmosMosAcquisitionTypeBinding: Matcher[GmosMosAcquisitionType] =
   enumeratedBinding
