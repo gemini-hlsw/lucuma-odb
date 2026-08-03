@@ -135,7 +135,7 @@ object configurationrequest:
         "visitor"            -> Json.Null,  // one of these will be replaced below
         m match
           case Flamingos2LongSlit(disperser)         => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
-          case Flamingos2Mos(disperser)         => "flamingos2Mos" -> Json.obj("disperser" -> disperser.asJson)
+          case Flamingos2Mos(disperser)              => "flamingos2Mos"      -> Json.obj("disperser" -> disperser.asJson)
           case GhostIfu                              => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
           case GmosNorthImaging(filter)              => "gmosNorthImaging"   -> Json.obj("filter" -> filter.asJson)
           case GmosNorthLongSlit(grating)            => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)
