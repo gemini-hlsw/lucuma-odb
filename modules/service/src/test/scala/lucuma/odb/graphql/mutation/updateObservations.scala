@@ -4598,7 +4598,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     )
 
   test("igrins2 SVC: an out-of-range explicit exposure is rejected on update"):
-    val boundsError = "Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s."
+    val boundsError = "Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 1.63 s and 600 s."
     multiUpdateTest(pi,
       List(
         ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 1.0 } } } }",

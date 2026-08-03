@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
+import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -89,6 +90,9 @@ object ObservingModeServices:
             flamingos2LongSlitService
               .select(oids)
               .map(_.widen[ObservingMode])
+
+          case (Flamingos2Mos, _) =>
+            Map.empty.pure
 
           case (Flamingos2Imaging, oids) =>
             flamingos2ImagingService
@@ -206,6 +210,7 @@ object ObservingModeServices:
             case _: ExchangeObservingModeType         => exchangeService.delete(which)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.delete(which)
+            case ObservingModeType.Flamingos2Mos      => MonadCancelThrow[F].raiseError(new Exception("Flamingos2Mos is not supported for deletion."))
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
@@ -262,6 +267,7 @@ object ObservingModeServices:
             case _: ExchangeObservingModeType         => exchangeService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.clone(origOid, newOid, etms)
+            case ObservingModeType.Flamingos2Mos      => MonadCancelThrow[F].raiseError(new Exception("Flamingos2Mos is not supported for clonning."))
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)
