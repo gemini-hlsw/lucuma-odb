@@ -3,9 +3,9 @@
 
 package lucuma.odb.graphql.mapping
 
-trait AddEventsResultMapping[F[_]] extends ResultMapping[F] {
+trait AddEventBatchResultMapping[F[_]] extends ResultMapping[F] {
 
-  lazy val AddEventsResultMapping: ObjectMapping =
-    updateResultMapping(AddEventsResultType, "events")
+  lazy val AddEventBatchResultMapping: ObjectMapping =
+    updateResultMapping(AddEventBatchResultType, "events")
 
 }

@@ -30,8 +30,8 @@ import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AddDatasetEventInput
-import lucuma.odb.graphql.input.AddEventInput
-import lucuma.odb.graphql.input.AddEventsInput
+import lucuma.odb.graphql.input.AddEventBatchEntryInput
+import lucuma.odb.graphql.input.AddEventBatchInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
@@ -73,7 +73,7 @@ trait ExecutionEventService[F[_]]:
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent.Id]]
 
   def insertEvents(
-    input: AddEventsInput
+    input: AddEventBatchInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]]
 
   def selectSequenceEvents(
@@ -207,7 +207,7 @@ object ExecutionEventService:
           .value
 
       override def insertEvents(
-        input: AddEventsInput
+        input: AddEventBatchInput
       )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]] =
 
         // Resolves the distinct observations referenced by a batch of ids, running
@@ -224,24 +224,24 @@ object ExecutionEventService:
         // taking them in another order.  One observation means one mutex per batch.
         // Resolve them a kind at a time (one round trip each) rather than per event.
         val requireSingleObservation: F[Result[Unit]] =
-          val datasetIds = input.events.collect { case AddEventInput.Dataset(v)  => v.datasetId }
-          val stepIds    = input.events.collect { case AddEventInput.Step(v)     => v.stepId }
-          val visitIds   = input.events.collect { case AddEventInput.Sequence(v) => v.visitId }
-          val slewOids   = input.events.collect { case AddEventInput.Slew(v)     => v.observationId }
+          val datasetIds = input.events.collect { case AddEventBatchEntryInput.Dataset(v)  => v.datasetId }
+          val stepIds    = input.events.collect { case AddEventBatchEntryInput.Step(v)     => v.stepId }
+          val visitIds   = input.events.collect { case AddEventBatchEntryInput.Sequence(v) => v.visitId }
+          val slewOids   = input.events.collect { case AddEventBatchEntryInput.Slew(v)     => v.observationId }
           for
-            d <- distinctObservations(datasetIds, Statements.SelectDatasetObservations)
-            s <- distinctObservations(stepIds,    Statements.SelectStepObservations)
-            v <- distinctObservations(visitIds,   Statements.SelectVisitObservations)
+            d <- distinctObservations(datasetIds.distinct, Statements.SelectDatasetObservations)
+            s <- distinctObservations(stepIds.distinct,    Statements.SelectStepObservations)
+            v <- distinctObservations(visitIds.distinct,   Statements.SelectVisitObservations)
           yield
             if (d ++ s ++ v ++ slewOids).distinct.sizeIs <= 1 then ().success
             else OdbError.InvalidArgument("All events in a batch must belong to the same observation.".some).asFailure
 
-        def insertOne(e: AddEventInput): F[Result[ExecutionEvent.Id]] =
+        def insertOne(e: AddEventBatchEntryInput): F[Result[ExecutionEvent.Id]] =
           e match
-            case AddEventInput.Dataset(v)  => insertDatasetEvent(v)
-            case AddEventInput.Sequence(v) => insertSequenceEvent(v)
-            case AddEventInput.Slew(v)     => insertSlewEvent(v)
-            case AddEventInput.Step(v)     => insertStepEvent(v)
+            case AddEventBatchEntryInput.Dataset(v)  => insertDatasetEvent(v)
+            case AddEventBatchEntryInput.Sequence(v) => insertSequenceEvent(v)
+            case AddEventBatchEntryInput.Slew(v)     => insertSlewEvent(v)
+            case AddEventBatchEntryInput.Step(v)     => insertStepEvent(v)
 
         // Insert in array order (that order is the events' arrival order, which the
         // step-execution state machine depends on).  One transaction makes the
@@ -263,7 +263,7 @@ object ExecutionEventService:
         TimestampInterval.between(min, max)
       }
 
-    // Observation-resolution queries, used to enforce that an addEvents batch is
+    // Observation-resolution queries, used to enforce that an addEventBatch is
     // scoped to a single observation.  Each resolves the distinct observations
     // referenced by a whole batch's worth of ids in a single round trip.
 

@@ -73,7 +73,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     List(
       AddConditionsEntry,
       AddDatasetEvent,
-      AddEvents,
+      AddEventBatch,
       AddProgramUser,
       AddSequenceEvent,
       AddSlewEvent,
@@ -656,8 +656,8 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       executionEventService.insertStepEvent(input)
     }
 
-  private lazy val AddEvents: MutationField =
-    MutationField("addEvents", AddEventsInput.Binding): (input, child) =>
+  private lazy val AddEventBatch: MutationField =
+    MutationField("addEventBatch", AddEventBatchInput.Binding): (input, child) =>
       services.useTransactionally:
         requireServiceAccess:
           executionEventService.insertEvents(input).map: rIds =>

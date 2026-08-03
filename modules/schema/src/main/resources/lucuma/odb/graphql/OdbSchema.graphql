@@ -122,11 +122,12 @@ type AddStepEventResult {
 }
 
 """
-A single event within an 'addEvents' batch.  Exactly one of the fields must be
+A single event within an 'addEventBatch'.  Exactly one of the fields must be
 set, identifying the event type.  Unlike the singular mutations, every event in
-a batch must supply both a 'clientTime' and an 'idempotencyKey' (see 'addEvents').
+a batch must supply both a 'clientTime' and an 'idempotencyKey' (see
+'addEventBatch').
 """
-input AddEventInput {
+input AddEventBatchEntryInput {
   dataset:  AddDatasetEventInput
   sequence: AddSequenceEventInput
   slew:     AddSlewEventInput
@@ -134,7 +135,7 @@ input AddEventInput {
 }
 
 """
-Input to the 'addEvents' mutation, recording a batch of execution events in a
+Input to the 'addEventBatch' mutation, recording a batch of execution events in a
 single request.
 
 Because a batch shares one database transaction, its events would otherwise all
@@ -143,12 +144,12 @@ receive the same recorded time; every event must therefore supply its own
 distinct 'idempotencyKey' so the batch can be retried safely.  All events must
 belong to the same observation.
 """
-input AddEventsInput {
-  events: [AddEventInput!]!
+input AddEventBatchInput {
+  events: [AddEventBatchEntryInput!]!
 }
 
 "The result of adding a batch of events."
-type AddEventsResult {
+type AddEventBatchResult {
   "The new events that were added, in the order they were recorded."
   events: [ExecutionEvent!]!
 
@@ -3415,9 +3416,9 @@ type Mutation {
   'idempotencyKey'; the events are recorded in the order given.  The batch is
   atomic -- if any event is rejected, none are recorded.
   """
-  addEvents(
-    input: AddEventsInput!
-  ): AddEventsResult!
+  addEventBatch(
+    input: AddEventBatchInput!
+  ): AddEventBatchResult!
 
   """
   Adds a new time accounting correction for a particular observation.  Note

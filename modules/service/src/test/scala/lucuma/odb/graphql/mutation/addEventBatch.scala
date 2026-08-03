@@ -21,7 +21,7 @@ import lucuma.core.util.Timestamp
 import java.time.Instant
 import java.util.UUID
 
-class addEvents extends OdbSuite with query.ExecutionTestSupportForGmos:
+class addEventBatch extends OdbSuite with query.ExecutionTestSupportForGmos:
 
   val mode: ObservingModeType = ObservingModeType.GmosNorthLongSlit
 
@@ -49,10 +49,10 @@ class addEvents extends OdbSuite with query.ExecutionTestSupportForGmos:
   private def datasetEvent(did: Dataset.Id, stage: String, t: Timestamp, key: String): String =
     s"""{ dataset: { datasetId: "$did", datasetStage: $stage, clientTime: "${t.isoFormat}", idempotencyKey: "$key" } }"""
 
-  private def addEventsQuery(events: List[String]): String =
+  private def addEventBatchQuery(events: List[String]): String =
     s"""
       mutation {
-        addEvents(input: { events: [ ${events.mkString(", ")} ] }) {
+        addEventBatch(input: { events: [ ${events.mkString(", ")} ] }) {
           events {
             eventType
             effectiveTime
@@ -61,78 +61,78 @@ class addEvents extends OdbSuite with query.ExecutionTestSupportForGmos:
       }
     """
 
-  test("addEvents - a mixed batch is recorded in order"):
+  test("addEventBatch - a mixed batch is recorded in order"):
     val ts = List(nowMinus(240), nowMinus(180), nowMinus(120), nowMinus(60))
     setup(serviceUser, "N18630101S1001.fits").flatMap: (_, vid, sid, did) =>
-      val q = addEventsQuery(List(
+      val q = addEventBatchQuery(List(
         stepEvent(sid, vid, "START_STEP", ts(0), newKey),
         datasetEvent(did, "START_EXPOSE", ts(1), newKey),
         datasetEvent(did, "END_WRITE", ts(2), newKey),
         stepEvent(sid, vid, "END_STEP", ts(3), newKey)
       ))
       query(serviceUser, q).map: json =>
-        val events = json.hcursor.downFields("addEvents", "events").values.toList.flatten
+        val events = json.hcursor.downFields("addEventBatch", "events").values.toList.flatten
         val types  = events.map(_.hcursor.downField("eventType").require[String])
         val times  = events.map(_.hcursor.downField("effectiveTime").require[Timestamp])
         assertEquals(types, List("STEP", "DATASET", "DATASET", "STEP"))
         assertEquals(times, ts)
 
-  test("addEvents - a missing clientTime is rejected"):
+  test("addEventBatch - a missing clientTime is rejected"):
     setup(serviceUser, "N18630101S1002.fits").flatMap: (_, vid, sid, _) =>
       val q =
         s"""
           mutation {
-            addEvents(input: { events: [
+            addEventBatch(input: { events: [
               { step: { stepId: "$sid", visitId: "$vid", stepStage: START_STEP, idempotencyKey: "$newKey" } }
             ] }) { events { eventType } }
           }
         """
-      expect(serviceUser, q, List("Argument 'input.events' is invalid: at index 0: Each event in a batch must supply a 'clientTime'.").asLeft)
+      expect(serviceUser, q, List("Argument 'input.events' is invalid: at index 0: Each event in a batch must supply both a 'clientTime' and an 'idempotencyKey'.").asLeft)
 
-  test("addEvents - a missing idempotencyKey is rejected"):
+  test("addEventBatch - a missing idempotencyKey is rejected"):
     setup(serviceUser, "N18630101S1003.fits").flatMap: (_, vid, sid, _) =>
       val q =
         s"""
           mutation {
-            addEvents(input: { events: [
+            addEventBatch(input: { events: [
               { step: { stepId: "$sid", visitId: "$vid", stepStage: START_STEP, clientTime: "${nowMinus(60).isoFormat}" } }
             ] }) { events { eventType } }
           }
         """
-      expect(serviceUser, q, List("Argument 'input.events' is invalid: at index 0: Each event in a batch must supply an 'idempotencyKey'.").asLeft)
+      expect(serviceUser, q, List("Argument 'input.events' is invalid: at index 0: Each event in a batch must supply both a 'clientTime' and an 'idempotencyKey'.").asLeft)
 
-  test("addEvents - duplicate idempotency keys within a batch are rejected"):
+  test("addEventBatch - duplicate idempotency keys within a batch are rejected"):
     val key = newKey
     setup(serviceUser, "N18630101S1004.fits").flatMap: (_, vid, sid, _) =>
-      val q = addEventsQuery(List(
+      val q = addEventBatchQuery(List(
         stepEvent(sid, vid, "START_STEP", nowMinus(120), key),
         stepEvent(sid, vid, "END_STEP", nowMinus(60), key)
       ))
       expect(serviceUser, q, List("Argument 'input' is invalid: Idempotency keys within a batch must be distinct.").asLeft)
 
-  test("addEvents - an empty batch is rejected"):
+  test("addEventBatch - an empty batch is rejected"):
     val q =
       s"""
         mutation {
-          addEvents(input: { events: [] }) { events { eventType } }
+          addEventBatch(input: { events: [] }) { events { eventType } }
         }
       """
-    expect(serviceUser, q, List("Argument 'input' is invalid: An 'addEvents' batch must contain at least one event.").asLeft)
+    expect(serviceUser, q, List("Argument 'input' is invalid: An 'addEventBatch' batch must contain at least one event.").asLeft)
 
-  test("addEvents - events from two observations are rejected"):
+  test("addEventBatch - events from two observations are rejected"):
     for
       a  <- setup(serviceUser, "N18630101S1005.fits")
       b  <- setup(serviceUser, "N18630101S1006.fits")
       (_, vidA, sidA, _) = a
       (_, vidB, sidB, _) = b
-      q   = addEventsQuery(List(
+      q   = addEventBatchQuery(List(
               stepEvent(sidA, vidA, "START_STEP", nowMinus(120), newKey),
               stepEvent(sidB, vidB, "START_STEP", nowMinus(60), newKey)
             ))
       _  <- expect(serviceUser, q, List("All events in a batch must belong to the same observation.").asLeft)
     yield ()
 
-  test("addEvents - retrying a batch is idempotent"):
+  test("addEventBatch - retrying a batch is idempotent"):
     val events = (sid: Step.Id, vid: Visit.Id, did: Dataset.Id) => List(
       stepEvent(sid, vid, "START_STEP", nowMinus(120), newKey),
       datasetEvent(did, "START_EXPOSE", nowMinus(60), newKey)
@@ -141,7 +141,7 @@ class addEvents extends OdbSuite with query.ExecutionTestSupportForGmos:
     def eventIds(q: String): IO[List[ExecutionEvent.Id]] =
       query(serviceUser, q).map: json =>
         json.hcursor
-          .downFields("addEvents", "events")
+          .downFields("addEventBatch", "events")
           .values.toList.flatten
           .traverse(_.hcursor.downField("id").as[ExecutionEvent.Id])
           .fold(f => throw new RuntimeException(f.message), identity)
@@ -152,7 +152,7 @@ class addEvents extends OdbSuite with query.ExecutionTestSupportForGmos:
       val q  =
         s"""
           mutation {
-            addEvents(input: { events: [ ${es.mkString(", ")} ] }) {
+            addEventBatch(input: { events: [ ${es.mkString(", ")} ] }) {
               events { id }
             }
           }

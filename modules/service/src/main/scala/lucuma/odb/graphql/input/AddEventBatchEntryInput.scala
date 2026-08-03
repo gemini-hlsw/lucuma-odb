@@ -10,7 +10,7 @@ import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
 
-enum AddEventInput:
+enum AddEventBatchEntryInput:
   case Dataset(value: AddDatasetEventInput)
   case Sequence(value: AddSequenceEventInput)
   case Slew(value: AddSlewEventInput)
@@ -30,9 +30,9 @@ enum AddEventInput:
       case Slew(v)     => v.idempotencyKey
       case Step(v)     => v.idempotencyKey
 
-object AddEventInput:
+object AddEventBatchEntryInput:
 
-  val Binding: Matcher[AddEventInput] =
+  val Binding: Matcher[AddEventBatchEntryInput] =
     ObjectFieldsBinding.rmap:
       case List(
         AddDatasetEventInput.Binding.Option("dataset", rDataset),
@@ -48,14 +48,15 @@ object AddEventInput:
             st.map(Step(_)).toList
           chosen match
             case one :: Nil => requireComplete(one)
-            case Nil        => Result.failure("An AddEventInput must set exactly one event; none were set.")
-            case _          => Result.failure("An AddEventInput must set exactly one event; more than one was set.")
+            case Nil        => Result.failure("An AddEventBatchEntryInput must set exactly one event; none were set.")
+            case _          => Result.failure("An AddEventBatchEntryInput must set exactly one event; more than one was set.")
 
   // A batched event, unlike a singular one, must carry both its own client time
   // (its recorded time would otherwise collapse onto the batch transaction's) and
-  // an idempotency key (so the batch can be retried safely).
-  private def requireComplete(e: AddEventInput): Result[AddEventInput] =
-    (e.clientTime, e.idempotencyKey) match
-      case (None, _) => Result.failure("Each event in a batch must supply a 'clientTime'.")
-      case (_, None) => Result.failure("Each event in a batch must supply an 'idempotencyKey'.")
-      case _         => Result.success(e)
+  // an idempotency key (so the batch can be retried safely).  Report both
+  // requirements at once so a caller missing both needn't fix them one at a time.
+  private def requireComplete(e: AddEventBatchEntryInput): Result[AddEventBatchEntryInput] =
+    if e.clientTime.isEmpty || e.idempotencyKey.isEmpty then
+      Result.failure("Each event in a batch must supply both a 'clientTime' and an 'idempotencyKey'.")
+    else
+      Result.success(e)
