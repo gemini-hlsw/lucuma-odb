@@ -16,6 +16,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExecutionRequirement
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
@@ -43,7 +44,6 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.BlindOffsetType
-import lucuma.odb.data.ExecutionRequirement
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
