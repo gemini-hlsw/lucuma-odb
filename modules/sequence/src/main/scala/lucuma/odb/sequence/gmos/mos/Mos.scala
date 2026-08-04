@@ -20,14 +20,10 @@ import lucuma.odb.sequence.data.StreamingExecutionConfig
 import java.util.UUID
 
 /**
- * GMOS MOS sequence generation.  The science sequence is the shared GMOS
- * slit-spectroscopy sequence, generated exactly as it would be for the long
- * slit the custom mask's slit width corresponds to.
+ * GMOS MOS sequence generation.
  *
- * There is no MOS acquisition sequence yet — aligning a mask is a different
- * procedure from acquiring a long slit target — so the acquisition sequence is
- * empty.  This matches the science-only ITC input MOS observations produce, and
- * means a MOS time estimate does not yet account for mask alignment.
+ * The science sequence is a shared GMOS spectroscopy sequence, generated exactly as it would
+ * be for the long slit using the custom mask's slit width.
  */
 object Mos:
 

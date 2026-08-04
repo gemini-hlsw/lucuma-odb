@@ -10,7 +10,6 @@ import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
 import lucuma.core.enums.GcalShutter
-import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosMosAcquisitionType
@@ -43,8 +42,7 @@ import munit.FunSuite
 import java.util.UUID
 
 /**
- * A GMOS MOS science sequence is identical to a GMOS long slit science sequence
- * with the built in FPU replaced by the custom mask.
+ * These tests verify that sequence generation for MOS and long slit are essentially the same.
  */
 class MosLongSlitSequencesSuite extends FunSuite:
 
@@ -95,8 +93,6 @@ class MosLongSlitSequencesSuite extends FunSuite:
       common
     )
 
-  // Resolves a smart gcal step to a concrete gcal step, leaving the dynamic
-  // config (and therefore the FPU it was looked up with) untouched.
   private val expander: SmartGcalExpander[Eval, StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
     SmartGcalExpander.pure[Eval, StaticConfig.GmosNorth, DynamicConfig.GmosNorth]: (_, _, d) =>
       (d, StepConfig.Gcal(StepConfig.Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.None, GcalDiffuser.Ir, GcalShutter.Open), ObserveClass.NightCal)
@@ -143,22 +139,17 @@ class MosLongSlitSequencesSuite extends FunSuite:
     assert(ls.nonEmpty, "expected a non-empty long slit sequence")
     assertEquals(ms.map(withoutFpu), ls.map(withoutFpu))
 
-  test("long slit steps carry the builtin FPU"):
-    val fpus = generate(longSlit).flatMap(_.steps.toList).map(fpuOf)
-    assert(fpus.nonEmpty)
-    assert(
-      fpus.forall(_.contains(GmosFpuMask.Builtin(Fpu))),
-      s"expected every step to carry the builtin FPU, got ${fpus.distinct}"
-    )
+  test("each mode's steps carry its own aperture"):
+    val lsFpus = generate(longSlit).flatMap(_.steps.toList).map(fpuOf)
+    val msFpus = generate(mosConfig).flatMap(_.steps.toList).map(fpuOf)
 
-  test("every MOS step carries the custom mask"):
-    val fpus = generate(mosConfig).flatMap(_.steps.toList).map(fpuOf)
-    assert(fpus.nonEmpty)
+    assert(lsFpus.nonEmpty)
+    assertEquals(msFpus.length, lsFpus.length)
     assert(
-      fpus.forall(_.contains(GmosFpuMask.Custom(ToBeDefined, SlitWidth))),
-      s"expected every step to carry the custom mask, got ${fpus.distinct}"
+      lsFpus.forall(_.contains(GmosFpuMask.Builtin(Fpu))),
+      s"expected every long slit step to carry the builtin FPU, got ${lsFpus.distinct}"
     )
-
-  test("binning is unaffected by the aperture"):
-    assertEquals(mosConfig.ccdMode, longSlit.ccdMode)
-    assertEquals(mosConfig.ccdMode.ampCount, GmosAmpCount.Twelve)
+    assert(
+      msFpus.forall(_.contains(GmosFpuMask.Custom(ToBeDefined, SlitWidth))),
+      s"expected every MOS step to carry the custom mask, got ${msFpus.distinct}"
+    )

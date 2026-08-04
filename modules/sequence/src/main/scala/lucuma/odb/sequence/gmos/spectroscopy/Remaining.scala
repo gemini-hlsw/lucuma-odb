@@ -15,8 +15,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSeqMap
 
-// This is used by the shared GMOS slit-spectroscopy science generator (long
-// slit and MOS).  If it is needed elsewhere I'll move it.
+// This is used by GMOS long slit and MOS.
 
 /**
  * 'Remaining' tracks how many instances of a particular class of items are

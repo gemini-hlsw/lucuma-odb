@@ -509,9 +509,8 @@ object Generator:
                   case ObservingModeType.GmosSouthLongSlit  =>
                     go(freshAcq, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
-                  // MOS generates no acquisition sequence, so there is nothing
-                  // to reset.
                   case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
+                    // Not sure about acquisition for MOS yet
                     EitherT.pure(())
 
                   case ObservingModeType.GnirsImaging       =>

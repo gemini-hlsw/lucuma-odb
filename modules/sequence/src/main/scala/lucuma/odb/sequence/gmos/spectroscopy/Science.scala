@@ -273,11 +273,7 @@ object Science:
        * @param calRole   calibration role, which determines whether arcs and/or
        *                  flats are needed
        */
-      /**
-       * Replaces the FPU used for the smart gcal lookup with the aperture the
-       * observation actually uses.  A no-op for long slit, where the two are
-       * the same builtin FPU.
-       */
+      // Replaces the FPU used for the smart gcal lookup with custom width requested.
       private def applyFpuMask(mask: GmosFpuMask[U])(step: ProtoStep[D]): ProtoStep[D] =
         (ProtoStep.value[D] andThen optics.fpu).replace(mask.some)(step)
 

@@ -123,9 +123,6 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       """
     )
 
-  // The slit width matches the long slit FPU used by
-  // createGmosNorthLongSlitObservationAs, so the two produce equivalent
-  // science sequences.
   def createGmosNorthMosObservationAs(
     user:         User,
     pid:          Program.Id,
