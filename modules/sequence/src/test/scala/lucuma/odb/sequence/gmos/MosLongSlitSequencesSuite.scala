@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.gmos
 
 import cats.Eval
+import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GcalContinuum
@@ -19,6 +20,7 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObserveClass
+import lucuma.core.math.Offset
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
@@ -93,6 +95,9 @@ class MosLongSlitSequencesSuite extends FunSuite:
       common
     )
 
+  private val mosConfigAtLongSlitOffsets: mos.Config.GmosNorth =
+    mosConfig.withSpatialOffsets(longSlit.spatialOffsets.some)
+
   private val expander: SmartGcalExpander[Eval, StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
     SmartGcalExpander.pure[Eval, StaticConfig.GmosNorth, DynamicConfig.GmosNorth]: (_, _, d) =>
       (d, StepConfig.Gcal(StepConfig.Gcal.Lamp.fromContinuum(GcalContinuum.QuartzHalogen5W), GcalFilter.None, GcalDiffuser.Ir, GcalShutter.Open), ObserveClass.NightCal)
@@ -134,14 +139,21 @@ class MosLongSlitSequencesSuite extends FunSuite:
 
   test("MOS generates the same science sequence as the equivalent long slit"):
     val ls = generate(longSlit)
-    val ms = generate(mosConfig)
+    val ms = generate(mosConfigAtLongSlitOffsets)
 
     assert(ls.nonEmpty, "expected a non-empty long slit sequence")
     assertEquals(ms.map(withoutFpu), ls.map(withoutFpu))
 
+  test("MOS has no default offsets"):
+    assertEquals(mosConfig.spatialOffsets, List.empty)
+
+    val qs = generate(mosConfig).flatMap(_.steps.toList).map(_.telescopeConfig.offset.q)
+    assert(qs.nonEmpty)
+    assert(qs.forall(_ === Offset.Q.Zero), s"expected every MOS step on axis, got ${qs.distinct}")
+
   test("each mode's steps carry its own aperture"):
     val lsFpus = generate(longSlit).flatMap(_.steps.toList).map(fpuOf)
-    val msFpus = generate(mosConfig).flatMap(_.steps.toList).map(fpuOf)
+    val msFpus = generate(mosConfigAtLongSlitOffsets).flatMap(_.steps.toList).map(fpuOf)
 
     assert(lsFpus.nonEmpty)
     assertEquals(msFpus.length, lsFpus.length)

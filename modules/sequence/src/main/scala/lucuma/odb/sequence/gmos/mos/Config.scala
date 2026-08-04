@@ -62,6 +62,12 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
   override def gcalFpu: U =
     equivalentFpu
 
+  /**
+   * MOS does not nod along the slit by default.
+   */
+  override def defaultSpatialOffsets: List[Q] =
+    Config.DefaultSpatialOffsets
+
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
@@ -136,7 +142,8 @@ object Config:
     override def withSpatialOffsets(offsets: Option[List[Q]]): GmosSouth =
       copy(common = common.copy(explicitSpatialOffsets = offsets))
 
-  export spectroscopy.Config.DefaultSpatialOffsets
+  val DefaultSpatialOffsets: List[Q] =
+    List.empty
 
   def northFpu(slitWidth: GmosCustomSlitWidth): GmosNorthFpu =
     slitWidth match

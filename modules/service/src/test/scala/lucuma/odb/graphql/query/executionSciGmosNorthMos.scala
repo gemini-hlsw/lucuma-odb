@@ -45,7 +45,6 @@ class executionSciGmosNorthMos extends ExecutionTestSupportForGmos:
         o <- createGmosNorthMosObservationAs(pi, p, List(t))
       yield o
 
-    pprint.pprintln(gmosNorthExpectedScienceAtom(ditherNm = 0, 0, 15, -15).spaces2)
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -55,8 +54,9 @@ class executionSciGmosNorthMos extends ExecutionTestSupportForGmos:
             "executionConfig" -> Json.obj(
               "gmosNorth" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, 0, 15, -15),
-                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, 0, 15, -15)).asJson,
+                  // MOS has no default offsets, so every step is on axis.
+                  "nextAtom" -> gmosNorthExpectedScienceAtom(ditherNm = 0, 0, 0, 0),
+                  "possibleFuture" -> List(gmosNorthExpectedScienceAtom(ditherNm = 5, 0, 0, 0)).asJson,
                   "hasMore" -> true.asJson
                 )
               )
