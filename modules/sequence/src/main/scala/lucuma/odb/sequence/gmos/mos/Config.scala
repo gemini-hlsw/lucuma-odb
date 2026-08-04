@@ -21,9 +21,9 @@ import lucuma.core.model.Defined
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
-import lucuma.odb.sequence.gmos.SpectroscopyConfig
-import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
 import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
+import lucuma.odb.sequence.gmos.spectroscopy
+import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.hash.*
 
 import java.io.ByteArrayOutputStream
@@ -40,7 +40,7 @@ import java.io.DataOutputStream
  * @tparam L filter type
  * @tparam U the builtin FPU type the custom mask's slit width corresponds to
  */
-sealed trait Config[G: Enumerated, L: Enumerated, U] extends SpectroscopyConfig[G, L, U]:
+sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config[G, L, U]:
 
   def customMask: GmosFpuMask.Custom
 
@@ -138,7 +138,7 @@ object Config:
     override def withSpatialOffsets(offsets: Option[List[Q]]): GmosSouth =
       copy(common = common.copy(explicitSpatialOffsets = offsets))
 
-  export SpectroscopyConfig.DefaultSpatialOffsets
+  export spectroscopy.Config.DefaultSpatialOffsets
 
   def northFpu(slitWidth: GmosCustomSlitWidth): GmosNorthFpu =
     slitWidth match

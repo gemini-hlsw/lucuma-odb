@@ -32,9 +32,9 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
-import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
 import lucuma.odb.sequence.gmos.mos.Config.GmosNorth
 import lucuma.odb.sequence.gmos.mos.Config.GmosSouth
+import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*

@@ -3,6 +3,7 @@
 
 package lucuma.odb.sequence
 package gmos
+package spectroscopy
 
 import cats.Comparison.*
 import cats.Monad
@@ -74,7 +75,7 @@ import java.util.UUID
  * calibrations and science steps appear in the execution sequence or whether
  * unrelated steps are executed in the atom.
  */
-object SpectroscopyScience:
+object Science:
 
   /**
    * Defines how long a calibration remains valid.  After this amount of time,
@@ -244,7 +245,7 @@ object SpectroscopyScience:
        * tables are keyed on builtin FPUs and would not match a custom mask.
        * The real aperture is put back by `applyFpuMask` once expansion is done.
        */
-      def setup(config: SpectroscopyConfig[G, L, U], time: TimeSpan): State[D, Unit] =
+      def setup(config: Config[G, L, U], time: TimeSpan): State[D, Unit] =
         for {
           _ <- optics.exposure    := time
           _ <- optics.grating     := (config.grating, GmosGratingOrder.One, config.centralWavelength).some
@@ -284,7 +285,7 @@ object SpectroscopyScience:
         oid:       Observation.Id,
         static:    S,
         expander:  SmartGcalExpander[F, S, D],
-        config:    SpectroscopyConfig[G, L, U],
+        config:    Config[G, L, U],
         expTimeμs: PosLong,
         expCount:  PosInt,
         calRole:   Option[CalibrationRole]
@@ -408,8 +409,8 @@ object SpectroscopyScience:
   private object ScienceGenerator:
 
     private def calibrationObservationConfig[G, L, U](
-      c: SpectroscopyConfig[G, L, U]
-    ): SpectroscopyConfig[G, L, U] =
+      c: Config[G, L, U]
+    ): Config[G, L, U] =
       val limit   = c.coverage.toPicometers.value.value / 10.0
       val dithers = if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
                     else List(WavelengthDither.Zero)
@@ -424,7 +425,7 @@ object SpectroscopyScience:
       expander:  SmartGcalExpander[F, S, D],
       stepDef:   StepDefinition.Computer[D, G, L, U],
       modeName:  String,
-      config:    SpectroscopyConfig[G, L, U],
+      config:    Config[G, L, U],
       time:      Either[OdbError, IntegrationTime],
       calRole:   Option[CalibrationRole]
     ): F[Either[OdbError, SequenceGenerator[D]]] =
@@ -491,7 +492,7 @@ object SpectroscopyScience:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, StaticConfig.GmosNorth, GmosNorth],
     modeName:      String,
-    config:        SpectroscopyConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu],
+    config:        Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu],
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GmosNorth]]] =
@@ -504,7 +505,7 @@ object SpectroscopyScience:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, StaticConfig.GmosSouth, GmosSouth],
     modeName:      String,
-    config:        SpectroscopyConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu],
+    config:        Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu],
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GmosSouth]]] =

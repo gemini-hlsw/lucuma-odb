@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos
+package lucuma.odb.sequence.gmos.spectroscopy
 
 import cats.data.NonEmptyList
 import cats.syntax.eq.*
@@ -16,10 +16,10 @@ import lucuma.core.util.TimeSpan
 import munit.Location
 import munit.ScalaCheckSuite
 
-class SpectroscopyScienceSuite extends ScalaCheckSuite:
+class ScienceSuite extends ScalaCheckSuite:
 
-  import SpectroscopyScience.Goal
-  import SpectroscopyScience.SciencePeriod
+  import Science.Goal
+  import Science.SciencePeriod
 
   def plan(
     μs:    Long,

@@ -23,8 +23,8 @@ import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Pixels
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
-import lucuma.odb.sequence.gmos.SpectroscopyConfig
-import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
+import lucuma.odb.sequence.gmos.spectroscopy
+import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.hash.*
 
 import java.io.ByteArrayOutputStream
@@ -37,7 +37,7 @@ import java.io.DataOutputStream
  * @tparam L filter type
  * @tparam U FPU type
  */
-sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends SpectroscopyConfig[G, L, U]:
+sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectroscopy.Config[G, L, U]:
 
   def fpu: U
 
@@ -141,7 +141,7 @@ object Config:
   val IfuSlitWidth: Angle =
     Angle.fromMicroarcseconds(310_000L)
 
-  export SpectroscopyConfig.DefaultSpatialOffsets
+  export spectroscopy.Config.DefaultSpatialOffsets
 
   def gapSize(site: Site): Quantity[PosInt, Pixels] =
     site match {

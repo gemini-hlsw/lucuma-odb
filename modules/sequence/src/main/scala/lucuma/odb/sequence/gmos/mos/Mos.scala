@@ -49,7 +49,7 @@ object Mos:
     val static = InitialConfigs.GmosNorthStatic
     instantiate(
       static,
-      SpectroscopyScience.gmosNorth(observationId, estimator, static, namespace, expander, ObservingMode.GmosNorthMosName, config, scienceItc, calRole)
+      spectroscopy.Science.gmosNorth(observationId, estimator, static, namespace, expander, ObservingMode.GmosNorthMosName, config, scienceItc, calRole)
     )
 
   def gmosSouth[F[_]: Monad](
@@ -64,7 +64,7 @@ object Mos:
     val static = InitialConfigs.GmosSouthStatic
     instantiate(
       static,
-      SpectroscopyScience.gmosSouth(observationId, estimator, static, namespace, expander, ObservingMode.GmosSouthMosName, config, scienceItc, calRole)
+      spectroscopy.Science.gmosSouth(observationId, estimator, static, namespace, expander, ObservingMode.GmosSouthMosName, config, scienceItc, calRole)
     )
 
 end Mos

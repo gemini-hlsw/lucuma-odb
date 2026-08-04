@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos
+package lucuma.odb.sequence.gmos.spectroscopy
 
 import cats.Eq
 import cats.derived.*
@@ -37,9 +37,9 @@ import lucuma.core.model.sequence.gmos.longslit.*
  * @tparam L filter type
  * @tparam U builtin FPU type
  */
-trait SpectroscopyConfig[G, L, U] extends Product with Serializable:
+trait Config[G, L, U] extends Product with Serializable:
 
-  import SpectroscopyConfig.Common
+  import Config.Common
 
   def common: Common
 
@@ -118,7 +118,7 @@ trait SpectroscopyConfig[G, L, U] extends Product with Serializable:
     explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
 
   def defaultSpatialOffsets: List[Q] =
-    SpectroscopyConfig.DefaultSpatialOffsets
+    Config.DefaultSpatialOffsets
 
   def explicitSpatialOffsets: Option[List[Q]] =
     common.explicitSpatialOffsets
@@ -135,14 +135,14 @@ trait SpectroscopyConfig[G, L, U] extends Product with Serializable:
   /**
    * Replaces the explicit wavelength dithers, preserving the concrete mode.
    */
-  def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): SpectroscopyConfig[G, L, U]
+  def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): Config[G, L, U]
 
   /**
    * Replaces the explicit spatial offsets, preserving the concrete mode.
    */
-  def withSpatialOffsets(offsets: Option[List[Q]]): SpectroscopyConfig[G, L, U]
+  def withSpatialOffsets(offsets: Option[List[Q]]): Config[G, L, U]
 
-object SpectroscopyConfig:
+object Config:
 
   final case class Common(
     centralWavelength:         Wavelength,

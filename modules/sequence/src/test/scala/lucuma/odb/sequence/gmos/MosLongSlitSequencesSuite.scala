@@ -37,7 +37,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
-import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
+import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import munit.FunSuite
 
 import java.util.UUID
@@ -113,9 +113,9 @@ class MosLongSlitSequencesSuite extends FunSuite:
     IntegrationTime(5.minTimeSpan, PosInt.unsafeFrom(12))
 
   private def generate(
-    config: SpectroscopyConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
+    config: spectroscopy.Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]
   ): List[Atom[DynamicConfig.GmosNorth]] =
-    SpectroscopyScience
+    spectroscopy.Science
       .gmosNorth[Eval](
         Oid,
         estimator,
