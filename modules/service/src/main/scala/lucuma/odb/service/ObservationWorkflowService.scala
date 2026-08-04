@@ -27,6 +27,7 @@ import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.enums.SubaruInstrument
+import lucuma.core.enums.TooActivation
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -131,6 +132,8 @@ case class ObservationValidationInfo(
   userState:              Option[ObservationWorkflowService.UserState],
   declaredExecutionState: Option[DeclaredExecutionState],
   proposalStatus:         ProposalStatus,
+  tooActivation:          TooActivation,
+  tooCeiling:             Option[TooActivation], // effective proposal ceiling; None when the program has no proposal
   cfpid:                  Option[CallForProposals.Id],
   scienceBand:            Option[ScienceBand],
   asterism:               List[Target],
@@ -161,6 +164,16 @@ case class ObservationValidationInfo(
   /* Has the proposal been accepted? */
   def isAccepted:Boolean =
     proposalStatus === ProposalStatus.Accepted
+
+  /**
+   * Does this observation demand more Target-of-Opportunity disruption than the
+   * program's proposal allows?  Before acceptance the ceiling is derived as the
+   * maximum over the program's own observations, so this can only be true then
+   * if the PI explicitly chose a ceiling below one of their observations -- also
+   * worth surfacing.  A program with no proposal has no ceiling to enforce.
+   */
+  def exceedsTooCeiling: Boolean =
+    tooCeiling.exists(tooActivation > _)
 
   def site: Option[Site] =
     instrument.map(_.site)
@@ -224,6 +237,10 @@ object ObservationWorkflowService {
 
     def invalidScienceBand(b: ScienceBand): String =
       s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
+
+    def tooActivationExceedsCeiling(obs: TooActivation, ceiling: TooActivation): String =
+      s"Target of Opportunity activation ${obs.tag.toScreamingSnakeCase} exceeds the maximum " +
+      s"${ceiling.tag.toScreamingSnakeCase} allowed by the proposal."
 
     def exchangeObservatoryMismatch(modeObs: Observatory, cfpObs: Observatory): String =
       s"Exchange observation requires a $modeObs Call for Proposals, but the proposal's observatory is $cfpObs."
@@ -475,17 +492,19 @@ object ObservationWorkflowService {
             case ObservationValidationCode.ConfigurationRequestNotRequested => 5
             case ObservationValidationCode.ConfigurationRequestDenied => 6
             case ObservationValidationCode.ConfigurationRequestPending => 7
+            case ObservationValidationCode.TooActivationUnapproved => 8
 
         val validationStatus: ValidationState =
           if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined
           else codes.minOption.fold(Defined):
-            case ObservationValidationCode.CallForProposalsError            |
+            case ObservationValidationCode.CallForProposalsError             |
                   ObservationValidationCode.ConfigurationError               |
                   ObservationValidationCode.ItcError                         => Undefined
-            case ObservationValidationCode.ConfigurationRequestUnavailable  |
+            case ObservationValidationCode.ConfigurationRequestUnavailable   |
                   ObservationValidationCode.ConfigurationRequestNotRequested |
                   ObservationValidationCode.ConfigurationRequestDenied       |
-                  ObservationValidationCode.ConfigurationRequestPending      => Unapproved
+                  ObservationValidationCode.ConfigurationRequestPending      |
+                  ObservationValidationCode.TooActivationUnapproved          => Unapproved
 
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:
@@ -592,6 +611,17 @@ object ObservationWorkflowService {
             if bs.toList.contains(b) then ObservationValidationMap.empty
             else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
 
+        // The Target-of-Opportunity ceiling.  This is an authorization failure
+        // rather than a misconfiguration, so it maps to Unapproved -- the
+        // observation cannot advance to Ready until the activation is lowered or
+        // the proposal's ceiling is raised.
+        val tooActivationValidator: Validator = info =>
+          if !info.exceedsTooCeiling then ObservationValidationMap.empty
+          else
+            ObservationValidationMap.singleton:
+              ObservationValidation.tooActivationUnapproved:
+                Messages.tooActivationExceedsCeiling(info.tooActivation, info.tooCeiling.get)
+
         val itcValidator: Validator = info =>
           if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
@@ -632,6 +662,7 @@ object ObservationWorkflowService {
           cfpRaDecValidator        |+|
           bandValidator            |+|
           ghostVMagnitudeValidator |+|
+          tooActivationValidator   |+|
           otherConfigErrors
 
         val scienceValidator2: Validator =
@@ -904,12 +935,16 @@ object ObservationWorkflowService {
           o.c_workflow_user_state,
           o.c_declared_state,
           p.c_proposal_status,
+          o.c_too_activation,
+          x.c_too_activation_effective,
           x.c_cfp_id,
           o.c_science_band,
           s.c_workflow_user_state
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
-        LEFT JOIN t_proposal x
+        -- v_proposal rather than t_proposal: it adds the effective ToO ceiling
+        -- (explicit, else derived from the program's observations).
+        LEFT JOIN v_proposal x
           ON o.c_program_id = x.c_program_id
         LEFT JOIN t_observation s
           ON  o.c_calibration_role = ANY(ARRAY['telluric','daytime_pinhole']::e_calibration_role[])
@@ -917,10 +952,10 @@ object ObservationWorkflowService {
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: cfp_id.opt *: science_band.opt *: user_state.opt)
+      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: too_activation *: too_activation.opt *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, cfp, sci, Nil, state2)
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, ceil, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, ceil, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

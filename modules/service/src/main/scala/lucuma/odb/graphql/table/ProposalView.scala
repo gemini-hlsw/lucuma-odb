@@ -23,7 +23,12 @@ trait ProposalView[F[_]] extends BaseMapping[F]:
 
     val Category        = col("c_category", tag.opt)
 
-    val TooActivation   = col("c_too_activation", too_activation)
+    // Explicit / default / effective ToO ceiling.  The stored column is the
+    // explicit choice (null when nobody has made one); the other two are
+    // computed in the view.  See the ceiling discussion in V1241.
+    val TooActivationCeilingExplicit  = col("c_too_activation", too_activation.opt)
+    val TooActivationCeilingDefault   = col("c_too_activation_default", too_activation)
+    val TooActivationCeilingEffective = col("c_too_activation_effective", too_activation)
     val MinPercent      = col("c_min_percent",    int_percent)
     val ExchangePartner = col("c_exchange_partner", exchange_partner.opt)
 

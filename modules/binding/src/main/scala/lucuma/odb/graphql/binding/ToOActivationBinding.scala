@@ -3,7 +3,7 @@
 
 package lucuma.odb.graphql.binding
 
-import lucuma.core.enums.ToOActivation
+import lucuma.core.enums.TooActivation
 
-val ToOActivationBinding: Matcher[ToOActivation] =
+val TooActivationBinding: Matcher[TooActivation] =
   enumeratedBinding

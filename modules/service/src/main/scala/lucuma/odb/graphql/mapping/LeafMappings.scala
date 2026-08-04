@@ -236,7 +236,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[TimeChargeCorrection.Op](TimeChargeCorrectionOpType),
       LeafMapping[Timestamp](TimestampType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
-      LeafMapping[ToOActivation](ToOActivationType),
+      LeafMapping[TooActivation](TooActivationType),
       LeafMapping[TooTrigger.Id](TooTriggerIdType),
       LeafMapping[TooTriggerStatus](TooTriggerStatusType),
       LeafMapping[Long](TransactionIdType),

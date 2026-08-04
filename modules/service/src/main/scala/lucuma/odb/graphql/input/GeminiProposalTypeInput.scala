@@ -16,7 +16,7 @@ import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
-import lucuma.core.enums.ToOActivation
+import lucuma.core.enums.TooActivation
 import lucuma.core.model.IntPercent
 import lucuma.core.model.ProgramUser
 import lucuma.core.optics.syntax.lens.*
@@ -60,24 +60,24 @@ object GeminiProposalTypeInput:
       .whenA(exchangePartner.isDefined && partnerSplits.exists(_.nonEmpty))
 
   case class Create(
-    scienceSubtype:     ScienceSubtype,
-    tooActivation:      ToOActivation            = ToOActivation.None,
-    minPercentTime:     IntPercent               = HundredPercent,
-    minPercentTotal:    Option[IntPercent]       = none,
-    totalTime:          Option[TimeSpan]         = none,
-    partnerSplits:      Map[Partner, IntPercent] = Map.empty,
-    exchangePartner:    Option[ExchangePartner]  = none,
-    reviewerId:         Option[ProgramUser.Id]   = none,
-    mentorId:           Option[ProgramUser.Id]   = none,
-    aeonMultiFacility:  Boolean                  = false,
-    jwstSynergy:        Boolean                  = false,
-    usLongTerm:         Boolean                  = false,
-    considerForBand3:   ConsiderForBand3         = ConsiderForBand3.Unset
+    scienceSubtype:       ScienceSubtype,
+    tooActivationCeiling: Option[TooActivation]    = none,
+    minPercentTime:       IntPercent               = HundredPercent,
+    minPercentTotal:      Option[IntPercent]       = none,
+    totalTime:            Option[TimeSpan]         = none,
+    partnerSplits:        Map[Partner, IntPercent] = Map.empty,
+    exchangePartner:      Option[ExchangePartner]  = none,
+    reviewerId:           Option[ProgramUser.Id]   = none,
+    mentorId:             Option[ProgramUser.Id]   = none,
+    aeonMultiFacility:    Boolean                  = false,
+    jwstSynergy:          Boolean                  = false,
+    usLongTerm:           Boolean                  = false,
+    considerForBand3:     ConsiderForBand3         = ConsiderForBand3.Unset
   ):
     def asEdit: Edit =
       Edit(
         scienceSubtype,
-        tooActivation.some,
+        Nullable.orNull(tooActivationCeiling),
         minPercentTime.some,
         Nullable.orNull(minPercentTotal),
         Nullable.orNull(totalTime),
@@ -107,8 +107,8 @@ object GeminiProposalTypeInput:
 
     val Default: Create = DefaultFor(ScienceSubtype.Queue)
 
-    val tooActivation: Lens[Create, ToOActivation]             = Focus[Create](_.tooActivation)
-    val minPercentTime: Lens[Create, IntPercent]               = Focus[Create](_.minPercentTime)
+    val tooActivationCeiling: Lens[Create, Option[TooActivation]] = Focus[Create](_.tooActivationCeiling)
+    val minPercentTime: Lens[Create, IntPercent]                  = Focus[Create](_.minPercentTime)
     val minPercentTotal: Lens[Create, Option[IntPercent]]      = Focus[Create](_.minPercentTotal)
     val totalTime: Lens[Create, Option[TimeSpan]]              = Focus[Create](_.totalTime)
     val partnerSplits: Lens[Create, Map[Partner, IntPercent]]  = Focus[Create](_.partnerSplits)
@@ -123,12 +123,12 @@ object GeminiProposalTypeInput:
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Option("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin)
         ) => (rToo, rMin).parMapN: (too, min) =>
           Create(s).update(
             for
-              _ <- tooActivation  := too
+              _ <- tooActivationCeiling := too
               _ <- minPercentTime := min
             yield ()
           )
@@ -166,14 +166,14 @@ object GeminiProposalTypeInput:
     private val FastTurnaround: Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Option("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           ProgramUserIdBinding.Option("reviewerId", rReviewerId),
           ProgramUserIdBinding.Option("mentorId", rMentorId)
         ) => (rToo, rMin, rReviewerId, rMentorId).parMapN: (too, min, reviewer, mentor) =>
           Create(ScienceSubtype.FastTurnaround).update(
             for
-              _ <- tooActivation  := too
+              _ <- tooActivationCeiling := too
               _ <- minPercentTime := min
               _ <- reviewerId     := reviewer
               _ <- mentorId       := mentor
@@ -183,7 +183,7 @@ object GeminiProposalTypeInput:
     private val LargeProgram: Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Option("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           IntPercentBinding.Option("minPercentTotalTime", rMinTotal),
           TimeSpanInput.Binding.Option("totalTime", rTotal),
@@ -192,7 +192,7 @@ object GeminiProposalTypeInput:
         ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN: (too, min, minTotal, total, aeon, jwst) =>
           Create(ScienceSubtype.LargeProgram).update:
             for
-              _ <- tooActivation     := too
+              _ <- tooActivationCeiling := too
               _ <- minPercentTime    := min
               _ <- minPercentTotal   := minTotal.orElse(HundredPercent.some)
               _ <- totalTime         := total.orElse(TimeSpan.Zero.some)
@@ -209,7 +209,7 @@ object GeminiProposalTypeInput:
     private val Queue: Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Option("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitInput.BindingAll.Option("partnerSplits", rSplits),
           ExchangePartnerBinding.Option("exchangePartner", rExchange),
@@ -221,7 +221,7 @@ object GeminiProposalTypeInput:
           exchangeXorSplits(exchange, splits).as(
             Create(ScienceSubtype.Queue).update(
               for
-                _ <- tooActivation     := too
+                _ <- tooActivationCeiling := too
                 _ <- minPercentTime    := min
                 _ <- partnerSplits     := splits
                 _ <- exchangePartner   := exchange
@@ -250,24 +250,24 @@ object GeminiProposalTypeInput:
       )
 
   case class Edit(
-    scienceSubtype:     ScienceSubtype,
-    tooActivation:      Option[ToOActivation]              = None,
-    minPercentTime:     Option[IntPercent]                 = None,
-    minPercentTotal:    Nullable[IntPercent]               = Nullable.Null,
-    totalTime:          Nullable[TimeSpan]                 = Nullable.Null,
-    partnerSplits:      Nullable[Map[Partner, IntPercent]] = Nullable.Null,
-    exchangePartner:    Nullable[ExchangePartner]          = Nullable.Null,
-    reviewerId:         Nullable[ProgramUser.Id]           = Nullable.Null,
-    mentorId:           Nullable[ProgramUser.Id]           = Nullable.Null,
-    aeonMultiFacility:  Option[Boolean]                    = None,
-    jwstSynergy:        Option[Boolean]                    = None,
-    usLongTerm:         Option[Boolean]                    = None,
-    considerForBand3:   Option[ConsiderForBand3]           = None
+    scienceSubtype:       ScienceSubtype,
+    tooActivationCeiling: Nullable[TooActivation]            = Nullable.Null,
+    minPercentTime:       Option[IntPercent]                 = None,
+    minPercentTotal:      Nullable[IntPercent]               = Nullable.Null,
+    totalTime:            Nullable[TimeSpan]                 = Nullable.Null,
+    partnerSplits:        Nullable[Map[Partner, IntPercent]] = Nullable.Null,
+    exchangePartner:      Nullable[ExchangePartner]          = Nullable.Null,
+    reviewerId:           Nullable[ProgramUser.Id]           = Nullable.Null,
+    mentorId:             Nullable[ProgramUser.Id]           = Nullable.Null,
+    aeonMultiFacility:    Option[Boolean]                    = None,
+    jwstSynergy:          Option[Boolean]                    = None,
+    usLongTerm:           Option[Boolean]                    = None,
+    considerForBand3:     Option[ConsiderForBand3]           = None
   ):
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update:
         for
-          _ <- Create.tooActivation     := tooActivation
+          _ <- Create.tooActivationCeiling := tooActivationCeiling.toOptionOption
           _ <- Create.minPercentTime    := minPercentTime
           _ <- Create.minPercentTotal   := minPercentTotal.toOptionOption
           _ <- Create.totalTime         := totalTime.toOptionOption
@@ -285,10 +285,10 @@ object GeminiProposalTypeInput:
     private def simpleEditBinding(s: ScienceSubtype): Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Nullable("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin)
         ) => (rToo, rMin).parMapN: (too, min) =>
-          Edit(s, tooActivation = too, minPercentTime = min)
+          Edit(s, tooActivationCeiling = too, minPercentTime = min)
 
     private val Classical: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
@@ -314,17 +314,17 @@ object GeminiProposalTypeInput:
     private val FastTurnaround: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Nullable("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           ProgramUserIdBinding.Nullable("reviewerId", rReviewerId),
           ProgramUserIdBinding.Nullable("mentorId", rMentorId)
         ) => (rToo, rMin, rReviewerId, rMentorId).parMapN: (too, min, reviewerId, mentorId) =>
-          Edit(ScienceSubtype.FastTurnaround, tooActivation = too, minPercentTime = min, reviewerId = reviewerId, mentorId = mentorId)
+          Edit(ScienceSubtype.FastTurnaround, tooActivationCeiling = too, minPercentTime = min, reviewerId = reviewerId, mentorId = mentorId)
 
     private val LargeProgram: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Nullable("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           IntPercentBinding.Nullable("minPercentTotalTime", rMinTotal),
           TimeSpanInput.Binding.Nullable("totalTime", rTotal),
@@ -342,7 +342,7 @@ object GeminiProposalTypeInput:
     private val Queue: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
-          ToOActivationBinding.Option("toOActivation", rToo),
+          TooActivationBinding.Nullable("explicitTooActivationCeiling", rToo),
           IntPercentBinding.Option("minPercentTime", rMin),
           PartnerSplitInput.BindingAll.Nullable("partnerSplits", rSplits),
           ExchangePartnerBinding.Nullable("exchangePartner", rExchange),

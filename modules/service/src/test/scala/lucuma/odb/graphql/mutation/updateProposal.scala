@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package mutation
 
+import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
@@ -12,8 +13,11 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.literal.*
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.GeminiCallForProposalsType
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Program
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.DateInterval
 import lucuma.odb.data.OdbError
 
@@ -25,9 +29,10 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   val pi    = TestUsers.Standard.pi(nextId, nextId)
   val pi2   = TestUsers.Standard.pi(nextId, nextId)
   val guest = TestUsers.guest(nextId)
+  val ngo   = TestUsers.Standard.ngo(nextId, nextId, Partner.CA)
   val staff = TestUsers.Standard.staff(nextId, nextId)
 
-  val validUsers = List(pi, pi2, guest, staff)
+  val validUsers = List(pi, pi2, guest, ngo, staff)
 
   test("✓ generic properties") {
     createProgramAs(pi).flatMap { pid =>
@@ -387,7 +392,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   category: SMALL_BODIES
                   gemini: {
                     demoScience: {
-                      toOActivation: STANDARD
+                      explicitTooActivationCeiling: STANDARD
                       minPercentTime: 50
                     }
                   }
@@ -399,7 +404,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on DemoScience {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                   }
                 }
@@ -414,7 +419,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 "category": "SMALL_BODIES",
                 "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
-                  "toOActivation": "STANDARD",
+                  "tooActivationCeiling": "STANDARD",
                   "minPercentTime": 50
                 }
               }
@@ -536,7 +541,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         s"""
           largeProgram: {
              minPercentTime: 50
-             toOActivation: STANDARD
+             explicitTooActivationCeiling: STANDARD
              minPercentTotalTime: 25
              totalTime: { hours: 10.0 }
           }
@@ -586,7 +591,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         s"""
           largeProgram: {
              minPercentTime: 50
-             toOActivation: STANDARD
+             explicitTooActivationCeiling: STANDARD
              minPercentTotalTime: 25
              totalTime: { hours: 10.0 }
           }
@@ -837,7 +842,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   SET: {
                     gemini: {
                       demoScience: {
-                        toOActivation: STANDARD
+                        explicitTooActivationCeiling: STANDARD
                         minPercentTime: 50
                       }
                     }
@@ -887,7 +892,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                       callId: "$cid2"
                       gemini: {
                         demoScience: {
-                          toOActivation: STANDARD
+                          explicitTooActivationCeiling: STANDARD
                           minPercentTime: 50
                         }
                       }
@@ -945,7 +950,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                     callId: null
                     gemini: {
                       demoScience: {
-                        toOActivation: STANDARD
+                        explicitTooActivationCeiling: STANDARD
                         minPercentTime: 50
                       }
                     }
@@ -1091,7 +1096,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 50
                       partnerSplits: [
                         {
@@ -1366,7 +1371,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     largeProgram: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       minPercentTotalTime: 90
                       totalTime: { hours: 120.0 }
@@ -1380,7 +1385,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 gemini {
                   ... on LargeProgram {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     minPercentTotalTime
                     totalTime { hours }
@@ -1397,7 +1402,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
                   "minPercentTotalTime": 90,
                   "totalTime": { "hours": 120.000000 },
@@ -1423,7 +1428,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
                       aeonMultiFacility: true
@@ -1438,7 +1443,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 gemini {
                   ... on Queue {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     aeonMultiFacility
                     jwstSynergy
@@ -1455,7 +1460,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,
@@ -1481,7 +1486,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
                       aeonMultiFacility: true
@@ -1676,4 +1681,110 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
+
+  // The freeze-at-acceptance design leans on the PI being locked out of the
+  // proposal once it is submitted: the accepted tooActivationCeiling is supposed
+  // to be what the TAC awarded, not something the PI can revise afterwards.
+  // ProposalService gates this on `userCanEditProposal`, which permits the edit
+  // when the proposal is not yet submitted, or when the user is NGO or better.
+
+  /** A proposal that satisfies the submission requirements. */
+  private def submittableProposal: IO[Program.Id] =
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramWithNonPartnerPi(pi).flatTap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        addPartnerSplits(pi, pid) *>
+        addCoisAs(pi, pid)
+      }
+    }
+
+  private def setCeiling(pid: Program.Id, ceiling: String) = s"""
+    mutation {
+      updateProposal(
+        input: {
+          programId: "$pid"
+          SET: { gemini: { queue: { explicitTooActivationCeiling: $ceiling } } }
+        }
+      ) {
+        proposal { gemini { ... on Queue { explicitTooActivationCeiling } } }
+      }
+    }
+  """
+
+  private def ceilingSet(v: String) =
+    json"""{ "updateProposal": { "proposal": { "gemini": { "explicitTooActivationCeiling": $v } } } }"""
+
+
+  test("✓ the PI may set the ToO ceiling before submission") {
+    submittableProposal.flatMap { pid =>
+      expect(
+        user     = pi,
+        query    = setCeiling(pid, "RAPID"),
+        expected = ceilingSet("RAPID").asRight
+      )
+    }
+  }
+
+  test("⨯ the PI may not change the ToO ceiling once the proposal is accepted") {
+    submittableProposal.flatMap { pid =>
+      submitProposal(pi, pid) *>
+      acceptProposal(staff, pid) *>
+      expect(
+        user     = pi,
+        query    = setCeiling(pid, "INTERRUPTING"),
+        expected = List(s"User ${pi.id} cannot edit this proposal $pid because it has been submitted.").asLeft
+      )
+    }
+  }
+
+  test("⨯ the PI may not change the ToO ceiling once the proposal is submitted") {
+    submittableProposal.flatMap { pid =>
+      submitProposal(pi, pid) *>
+      expect(
+        user     = pi,
+        query    = setCeiling(pid, "INTERRUPTING"),
+        expected = List(s"User ${pi.id} cannot edit this proposal $pid because it has been submitted.").asLeft
+      )
+    }
+  }
+
+  // An NGO user only reaches a program at all when their own partner holds a
+  // time allocation for it (existsAllocationForPartner), so the allocation is
+  // part of the setup rather than incidental to it.
+  test("✓ an NGO user whose partner holds an allocation may change the ToO ceiling once accepted") {
+    submittableProposal.flatMap { pid =>
+      submitProposal(pi, pid) *>
+      acceptProposal(staff, pid) *>
+      setOneAllocationAs(staff, pid, Partner.CA.timeAccountingCategory, ScienceBand.Band1, 42.hourTimeSpan) *>
+      expect(
+        user     = ngo,
+        query    = setCeiling(pid, "STANDARD"),
+        expected = ceilingSet("STANDARD").asRight
+      )
+    }
+  }
+
+  test("⨯ an NGO user whose partner holds no allocation cannot reach the proposal at all") {
+    submittableProposal.flatMap { pid =>
+      submitProposal(pi, pid) *>
+      acceptProposal(staff, pid) *>
+      expect(
+        user     = ngo,
+        query    = setCeiling(pid, "STANDARD"),
+        expected = List(s"Program $pid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
+      )
+    }
+  }
+
+  test("✓ staff may change the ToO ceiling once the proposal is accepted") {
+    submittableProposal.flatMap { pid =>
+      submitProposal(pi, pid) *>
+      acceptProposal(staff, pid) *>
+      expect(
+        user     = staff,
+        query    = setCeiling(pid, "INTERRUPTING"),
+        expected = ceilingSet("INTERRUPTING").asRight
+      )
+    }
+  }
 }
