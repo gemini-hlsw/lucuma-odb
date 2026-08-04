@@ -251,7 +251,7 @@ object Generator:
             case ObservingModeType.GmosNorthLongSlit  =>
               EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx)).flatMap(digest(_, calculator.gmosNorthLongSlitSetup))
             case ObservingModeType.GmosNorthMos       =>
-              EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "Gmos North MOS sequence generation is not yet implemented".some))
+              EitherT(streaming.selectOrGenerateGmosNorthMos(ctx)).flatMap(digest(_, calculator.gmosNorthLongSlitSetup))
             case ObservingModeType.GmosSouthImaging   =>
               EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImagingSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
@@ -259,7 +259,7 @@ object Generator:
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, calculator.gnirsImagingSetup))
             case ObservingModeType.GmosSouthMos       =>
-              EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "Gmos South MOS sequence generation is not yet implemented".some))
+              EitherT(streaming.selectOrGenerateGmosSouthMos(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, calculator.gnirsLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
@@ -319,12 +319,10 @@ object Generator:
           case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
           case ObservingModeType.GmosNorthImaging   => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
           case ObservingModeType.GmosNorthLongSlit  => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
-          case ObservingModeType.GmosNorthMos       =>
-            EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos North MOS sequence generation is not yet implemented".some))
+          case ObservingModeType.GmosNorthMos       => EitherT(streaming.selectOrGenerateGmosNorthMos(ctx))
           case ObservingModeType.GmosSouthImaging   => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
           case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
-          case ObservingModeType.GmosSouthMos       =>
-            EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos South MOS sequence generation is not yet implemented".some))
+          case ObservingModeType.GmosSouthMos       => EitherT(streaming.selectOrGenerateGmosSouthMos(ctx))
           case ObservingModeType.GnirsImaging       => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
@@ -414,8 +412,10 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosNorth.apply)
 
-            case ObservingModeType.GmosNorthMos  =>
-                EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos North MOS sequence generation is not yet implemented".some))
+            case ObservingModeType.GmosNorthMos       =>
+              EitherT(streaming.selectOrGenerateGmosNorthMos(ctx))
+                .flatMap(s => EitherT.liftF(executionConfig(s)))
+                .map(InstrumentExecutionConfig.GmosNorth.apply)
 
             case ObservingModeType.GmosSouthImaging   =>
               EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
@@ -427,8 +427,10 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
 
-            case ObservingModeType.GmosSouthMos  =>
-                EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos South MOS sequence generation is not yet implemented".some))
+            case ObservingModeType.GmosSouthMos       =>
+              EitherT(streaming.selectOrGenerateGmosSouthMos(ctx))
+                .flatMap(s => EitherT.liftF(executionConfig(s)))
+                .map(InstrumentExecutionConfig.GmosSouth.apply)
 
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
@@ -507,8 +509,9 @@ object Generator:
                   case ObservingModeType.GmosSouthLongSlit  =>
                     go(freshAcq, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
+                  // MOS generates no acquisition sequence, so there is nothing
+                  // to reset.
                   case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-                    // Not sure about acquisition for MOS yet
                     EitherT.pure(())
 
                   case ObservingModeType.GnirsImaging       =>
@@ -560,7 +563,8 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
 
             case ObservingModeType.GmosNorthMos       =>
-              EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos North mos sequence generation is not yet implemented".some))
+              EitherT(streaming.generateGmosNorthMos(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosNorthExecutionConfig(oid, s)))
 
             case ObservingModeType.GmosNorthLongSlit  =>
               EitherT(streaming.generateGmosNorthLongSlit(ctx))
@@ -575,7 +579,8 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
 
             case ObservingModeType.GmosSouthMos       =>
-              EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos South mos sequence generation is not yet implemented".some))
+              EitherT(streaming.generateGmosSouthMos(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
 
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.generateGnirsImaging(ctx))

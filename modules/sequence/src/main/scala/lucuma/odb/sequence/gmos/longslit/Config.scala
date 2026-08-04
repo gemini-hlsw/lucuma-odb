@@ -7,33 +7,25 @@ package gmos.longslit
 import cats.Eq
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosInt
-import lucuma.core.enums.GmosAmpGain
-import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
-import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset.Q
-import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Pixels
-import lucuma.core.model.ExposureTimeMode
-import lucuma.core.model.sequence.gmos.GmosCcdMode
-import lucuma.core.model.sequence.gmos.longslit.*
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
+import lucuma.odb.sequence.gmos.SpectroscopyConfig
 import lucuma.odb.sequence.gmos.SpectroscopyConfig.Common
 import lucuma.odb.sequence.syntax.hash.*
-import monocle.Lens
 
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -45,86 +37,15 @@ import java.io.DataOutputStream
  * @tparam L filter type
  * @tparam U FPU type
  */
-sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends Product with Serializable:
-  def grating: G
-
-  def coverage: WavelengthDelta
-
-  def filter: Option[L]
+sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends SpectroscopyConfig[G, L, U]:
 
   def fpu: U
 
-  def centralWavelength: Wavelength
+  override def fpuMask: GmosFpuMask[U] =
+    GmosFpuMask.Builtin(fpu)
 
-  def exposureTimeMode: ExposureTimeMode
-
-  def xBin: GmosXBinning =
-    explicitXBin.getOrElse(defaultXBin)
-
-  def defaultXBin: GmosXBinning
-
-  def explicitXBin: Option[GmosXBinning]
-
-
-  def yBin: GmosYBinning =
-    explicitYBin.getOrElse(defaultYBin)
-
-  def defaultYBin: GmosYBinning
-
-  def explicitYBin: Option[GmosYBinning]
-
-
-  def ampReadMode: GmosAmpReadMode =
-    explicitAmpReadMode.getOrElse(defaultAmpReadMode)
-
-  def defaultAmpReadMode: GmosAmpReadMode =
-    DefaultAmpReadMode
-
-  def explicitAmpReadMode: Option[GmosAmpReadMode]
-
-
-  def ampGain: GmosAmpGain =
-    explicitAmpGain.getOrElse(defaultAmpGain)
-
-  def defaultAmpGain: GmosAmpGain =
-    DefaultAmpGain
-
-  def explicitAmpGain: Option[GmosAmpGain]
-
-
-  def roi: GmosRoi =
-    explicitRoi.getOrElse(defaultRoi)
-
-  def defaultRoi: GmosRoi =
-    DefaultRoi
-
-  def explicitRoi: Option[GmosRoi]
-
-
-  def wavelengthDithers: List[WavelengthDither] =
-    explicitWavelengthDithers.getOrElse(defaultWavelengthDithers)
-
-  def defaultWavelengthDithers: List[WavelengthDither]
-
-  def explicitWavelengthDithers: Option[List[WavelengthDither]]
-
-
-  def spatialOffsets: List[Q] =
-    explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
-
-  def defaultSpatialOffsets: List[Q] =
-    Config.DefaultSpatialOffsets
-
-  def explicitSpatialOffsets: Option[List[Q]]
-
-  def ccdMode: GmosCcdMode =
-    GmosCcdMode(
-      xBin,
-      yBin,
-      DefaultAmpCount,
-      ampGain,
-      ampReadMode
-    )
+  override def gcalFpu: U =
+    fpu
 
   def acquisition: AcquisitionConfig[L]
 
@@ -164,41 +85,14 @@ object Config:
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
 
-    override def centralWavelength: Wavelength =
-      common.centralWavelength
-
-    override def exposureTimeMode: ExposureTimeMode =
-      common.exposureTimeMode
-
-    override def defaultXBin: GmosXBinning =
-      common.defaultXBin
-
-    override def explicitXBin: Option[GmosXBinning] =
-      common.explicitXBin
-
-    override def defaultYBin: GmosYBinning =
-      common.defaultYBin
-
-    override def explicitYBin: Option[GmosYBinning] =
-      common.explicitYBin
-
-    override def explicitAmpReadMode: Option[GmosAmpReadMode] =
-      common.explicitAmpReadMode
-
-    override def explicitAmpGain: Option[GmosAmpGain] =
-      common.explicitAmpGain
-
-    override def explicitRoi: Option[GmosRoi] =
-      common.explicitRoi
-
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersNorth(this.grating)
 
-    override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
-      common.explicitWavelengthDithers
+    override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosNorth =
+      copy(common = common.copy(explicitWavelengthDithers = dithers))
 
-    override def explicitSpatialOffsets: Option[List[Q]] =
-      common.explicitSpatialOffsets
+    override def withSpatialOffsets(offsets: Option[List[Q]]): GmosNorth =
+      copy(common = common.copy(explicitSpatialOffsets = offsets))
 
   object GmosNorth:
 
@@ -223,41 +117,14 @@ object Config:
     override def coverage: WavelengthDelta =
       grating.simultaneousCoverage
 
-    override def centralWavelength: Wavelength =
-      common.centralWavelength
-
-    override def exposureTimeMode: ExposureTimeMode =
-      common.exposureTimeMode
-
-    override def defaultXBin: GmosXBinning =
-      common.defaultXBin
-
-    override def explicitXBin: Option[GmosXBinning] =
-      common.explicitXBin
-
-    override def defaultYBin: GmosYBinning =
-      common.defaultYBin
-
-    override def explicitYBin: Option[GmosYBinning] =
-      common.explicitYBin
-
-    override def explicitAmpReadMode: Option[GmosAmpReadMode] =
-      common.explicitAmpReadMode
-
-    override def explicitAmpGain: Option[GmosAmpGain] =
-      common.explicitAmpGain
-
-    override def explicitRoi: Option[GmosRoi] =
-      common.explicitRoi
-
     override def defaultWavelengthDithers: List[WavelengthDither] =
       defaultWavelengthDithersSouth(this.grating)
 
-    override def explicitWavelengthDithers: Option[List[WavelengthDither]] =
-      common.explicitWavelengthDithers
+    override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosSouth =
+      copy(common = common.copy(explicitWavelengthDithers = dithers))
 
-    override def explicitSpatialOffsets: Option[List[Q]] =
-      common.explicitSpatialOffsets
+    override def withSpatialOffsets(offsets: Option[List[Q]]): GmosSouth =
+      copy(common = common.copy(explicitSpatialOffsets = offsets))
 
   object GmosSouth:
 
@@ -271,28 +138,10 @@ object Config:
           a.acquisition
         )
 
-  def explicitWavelengthDithers[G, L, U]: Lens[Config[G, L, U], Option[List[WavelengthDither]]] =
-    Lens[Config[G, L, U], Option[List[WavelengthDither]]](_.explicitWavelengthDithers) { dithers => {
-      case gn: GmosNorth => gn.copy(common = gn.common.copy(explicitWavelengthDithers = dithers))
-      case gs: GmosSouth => gs.copy(common = gs.common.copy(explicitWavelengthDithers = dithers))
-    }}
-
-  def explicitSpatialOffsets[G, L, U]: Lens[Config[G, L, U], Option[List[Q]]] =
-    Lens[Config[G, L, U], Option[List[Q]]](_.explicitSpatialOffsets) { qs => {
-      case gn: GmosNorth => gn.copy(common = gn.common.copy(explicitSpatialOffsets = qs))
-      case gs: GmosSouth => gs.copy(common = gs.common.copy(explicitSpatialOffsets = qs))
-    }}
-
   val IfuSlitWidth: Angle =
     Angle.fromMicroarcseconds(310_000L)
 
-  // ShortCut 3374
-  val DefaultSpatialOffsets: List[Q] =
-    List(
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(  0)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal( 15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(-15))
-    )
+  export SpectroscopyConfig.DefaultSpatialOffsets
 
   def gapSize(site: Site): Quantity[PosInt, Pixels] =
     site match {

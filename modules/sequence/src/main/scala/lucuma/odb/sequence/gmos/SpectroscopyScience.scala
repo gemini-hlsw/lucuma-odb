@@ -3,7 +3,6 @@
 
 package lucuma.odb.sequence
 package gmos
-package longslit
 
 import cats.Comparison.*
 import cats.Monad
@@ -57,14 +56,17 @@ import java.util.UUID
 
 
 /**
- * GMOS Long Slit science sequence generation.  GMOS Long Slit divides up the
- * time in nominal one hour blocks where each block is associated with a
- * wavelength dither.  Each block is given a nighttime arc and a flat for that
- * configuration followed by as many science datasets as we can fit in an hour
- * of exposure time, distributed across as many selected offset positions as
- * possible.  Calibrations are considered still valid within a block if they are
- * no longer than 1.5 hours old, so there is extra time to complete the hour of
- * science if necessary.
+ * GMOS slit-spectroscopy science sequence generation, shared by long slit and
+ * MOS.  The two modes differ only in their aperture: MOS steps carry a custom
+ * mask where long slit steps carry a builtin FPU.
+ *
+ * The time is divided up in nominal one hour blocks where each block is
+ * associated with a wavelength dither.  Each block is given a nighttime arc and
+ * a flat for that configuration followed by as many science datasets as we can
+ * fit in an hour of exposure time, distributed across as many selected offset
+ * positions as possible.  Calibrations are considered still valid within a
+ * block if they are no longer than 1.5 hours old, so there is extra time to
+ * complete the hour of science if necessary.
  *
  * Each block is placed in its own atom, but of course that doesn't preclude
  * stopping early.  All science steps for which there are valid calibrations in
@@ -72,7 +74,7 @@ import java.util.UUID
  * calibrations and science steps appear in the execution sequence or whether
  * unrelated steps are executed in the atom.
  */
-object Science:
+object SpectroscopyScience:
 
   /**
    * Defines how long a calibration remains valid.  After this amount of time,
@@ -237,12 +239,17 @@ object Science:
 
     sealed trait Computer[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
 
-      def setup(config: Config[G, L, U], time: TimeSpan): State[D, Unit] =
+      /**
+       * Steps are built carrying the config's `gcalFpu`, since the smart gcal
+       * tables are keyed on builtin FPUs and would not match a custom mask.
+       * The real aperture is put back by `applyFpuMask` once expansion is done.
+       */
+      def setup(config: SpectroscopyConfig[G, L, U], time: TimeSpan): State[D, Unit] =
         for {
           _ <- optics.exposure    := time
           _ <- optics.grating     := (config.grating, GmosGratingOrder.One, config.centralWavelength).some
           _ <- optics.filter      := config.filter
-          _ <- optics.fpu         := GmosFpuMask.builtin.reverseGet(config.fpu).some
+          _ <- optics.fpu         := GmosFpuMask.builtin.reverseGet(config.gcalFpu).some
 
           _ <- optics.xBin        := config.xBin
           _ <- optics.yBin        := config.yBin
@@ -265,11 +272,19 @@ object Science:
        * @param calRole   calibration role, which determines whether arcs and/or
        *                  flats are needed
        */
+      /**
+       * Replaces the FPU used for the smart gcal lookup with the aperture the
+       * observation actually uses.  A no-op for long slit, where the two are
+       * the same builtin FPU.
+       */
+      private def applyFpuMask(mask: GmosFpuMask[U])(step: ProtoStep[D]): ProtoStep[D] =
+        (ProtoStep.value[D] andThen optics.fpu).replace(mask.some)(step)
+
       def compute[F[_]: Monad, S](
         oid:       Observation.Id,
         static:    S,
         expander:  SmartGcalExpander[F, S, D],
-        config:    Config[G, L, U],
+        config:    SpectroscopyConfig[G, L, U],
         expTimeμs: PosLong,
         expCount:  PosInt,
         calRole:   Option[CalibrationRole]
@@ -295,10 +310,12 @@ object Science:
                 s <- scienceStep(TelescopeConfig(Offset.Zero, sciGuiding), sciClass)
               yield (a, f, s)
 
+          val fpu = applyFpuMask(config.fpuMask)
+
           val defn = for
             fs <- if includeFlats then EitherT(expander.expandStep(static, smartFlat)).map(_.toList) else EitherT.pure(List.empty)
             as <- if includeArcs then EitherT(expander.expandStep(static, smartArc)).map(_.toList) else EitherT.pure(List.empty)
-          yield StepDefinition(g, as.toList, fs, science)
+          yield StepDefinition(g, as.toList.map(fpu), fs.map(fpu), fpu(science))
 
           defn.leftMap(s => OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $s".some))
 
@@ -391,15 +408,13 @@ object Science:
   private object ScienceGenerator:
 
     private def calibrationObservationConfig[G, L, U](
-      c: Config[G, L, U]
-    ): Config[G, L, U] =
+      c: SpectroscopyConfig[G, L, U]
+    ): SpectroscopyConfig[G, L, U] =
       val limit   = c.coverage.toPicometers.value.value / 10.0
       val dithers = if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
                     else List(WavelengthDither.Zero)
-      (for {
-        _ <- Config.explicitWavelengthDithers := dithers.some
-        _ <- Config.explicitSpatialOffsets    := List(Offset.Q.Zero).some
-      } yield ()).runS(c).value
+      c.withWavelengthDithers(dithers.some)
+       .withSpatialOffsets(List(Offset.Q.Zero).some)
 
     def instantiate[F[_]: Monad, S, D, G, L, U](
       oid:       Observation.Id,
@@ -408,7 +423,8 @@ object Science:
       namespace: UUID,
       expander:  SmartGcalExpander[F, S, D],
       stepDef:   StepDefinition.Computer[D, G, L, U],
-      config:    Config[G, L, U],
+      modeName:  String,
+      config:    SpectroscopyConfig[G, L, U],
       time:      Either[OdbError, IntegrationTime],
       calRole:   Option[CalibrationRole]
     ): F[Either[OdbError, SequenceGenerator[D]]] =
@@ -421,7 +437,7 @@ object Science:
           PosLong
             .from(t.exposureTime.toNonNegMicroseconds.value)
             .bimap(
-              _  => sequenceUnavailable(s"GMOS Long Slit science requires a positive exposure time."),
+              _  => sequenceUnavailable(s"$modeName science requires a positive exposure time."),
               μs => (μs, t.exposureCount)
             )
 
@@ -442,7 +458,7 @@ object Science:
           (configʹ, (μs, n)).asRight[OdbError]
 
         case Some(c)                                  =>
-          sequenceUnavailable(s"GMOS Long Slit ${c.tag} not implemented").asLeft
+          sequenceUnavailable(s"$modeName ${c.tag} not implemented").asLeft
 
       // If exposure time is longer than the science period, there will never be
       // time enough to do any science steps.
@@ -474,11 +490,12 @@ object Science:
     static:        StaticConfig.GmosNorth,
     namespace:     UUID,
     expander:      SmartGcalExpander[F, StaticConfig.GmosNorth, GmosNorth],
-    config:        Config.GmosNorth,
+    modeName:      String,
+    config:        SpectroscopyConfig[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu],
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GmosNorth]]] =
-    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, StepDefinition.North, config, time, calRole)
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, StepDefinition.North, modeName, config, time, calRole)
 
   def gmosSouth[F[_]: Monad](
     observationId: Observation.Id,
@@ -486,8 +503,9 @@ object Science:
     static:        StaticConfig.GmosSouth,
     namespace:     UUID,
     expander:      SmartGcalExpander[F, StaticConfig.GmosSouth, GmosSouth],
-    config:        Config.GmosSouth,
+    modeName:      String,
+    config:        SpectroscopyConfig[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu],
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GmosSouth]]] =
-    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, StepDefinition.South, config, time, calRole)
+    ScienceGenerator.instantiate(observationId, estimator, static, namespace, expander, StepDefinition.South, modeName, config, time, calRole)
