@@ -16,6 +16,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -142,6 +143,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
       LeafMapping[ImagingVariantType](ImagingVariantTypeType),
       LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
+      LeafMapping[GmosMosAcquisitionType](GmosMosAcquisitionTypeType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
       LeafMapping[GmosNorthFilter](GmosNorthFilterType),

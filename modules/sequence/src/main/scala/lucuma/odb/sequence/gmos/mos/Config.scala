@@ -9,6 +9,7 @@ import cats.derived.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosCustomSlitWidth
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -57,6 +58,11 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends Product with Serial
   def filter: Option[L]
 
   def customMask: GmosFpuMask.Custom
+
+  /**
+   * Whether the acquisition image is taken with the mask in or out the light path.
+   */
+  def acquisitionType: GmosMosAcquisitionType
 
   /**
    * The builtin long slit FPU whose aperture matches the custom mask's slit
@@ -149,6 +155,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends Product with Serial
       case ToBeDefined => ()
       case Defined(id) => out.writeLong(id.value.value)
     out.writeInt(centralWavelength.toPicometers.value.value)
+    out.writeChars(acquisitionType.tag)
     out.write(exposureTimeMode.hashBytes)
     out.writeChars(xBin.tag)
     out.writeChars(yBin.tag)
@@ -166,10 +173,11 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends Product with Serial
 object Config:
 
   final case class GmosNorth(
-    grating:    GmosNorthGrating,
-    filter:     Option[GmosNorthFilter],
-    customMask: GmosFpuMask.Custom,
-    common:     Common
+    grating:         GmosNorthGrating,
+    filter:          Option[GmosNorthFilter],
+    customMask:      GmosFpuMask.Custom,
+    acquisitionType: GmosMosAcquisitionType,
+    common:          Common
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =
@@ -215,10 +223,11 @@ object Config:
       common.explicitSpatialOffsets
 
   final case class GmosSouth(
-    grating:    GmosSouthGrating,
-    filter:     Option[GmosSouthFilter],
-    customMask: GmosFpuMask.Custom,
-    common:     Common
+    grating:         GmosSouthGrating,
+    filter:          Option[GmosSouthFilter],
+    customMask:      GmosFpuMask.Custom,
+    acquisitionType: GmosMosAcquisitionType,
+    common:          Common
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =

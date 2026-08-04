@@ -283,6 +283,28 @@ class updateObservations_GmosMos extends OdbSuite:
                   """.asRight)
     yield ()
 
+  test("edit the acquisition type"):
+    for
+      (_, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
+      _        <- expect(pi, updateMutation(
+                    oid,
+                    "gmosNorthMos: { acquisitionType: MASK_OUT }",
+                    "gmosNorthMos { acquisitionType }"
+                  ), json"""
+                    {
+                      "updateObservations": {
+                        "observations": [
+                          {
+                            "observingMode": {
+                              "gmosNorthMos": { "acquisitionType": "MASK_OUT" }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """.asRight)
+    yield ()
+
   test("GMOS South round-trips too"):
     for
       pid <- createProgramAs(pi)

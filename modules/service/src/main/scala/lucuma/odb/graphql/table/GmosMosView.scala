@@ -16,6 +16,7 @@ trait GmosMosView[F[_]] extends BaseMapping[F]:
 
     val SlitWidth: ColumnRef                = col("c_slit_width", gmos_custom_slit_width)
     val MaskAttachmentId: ColumnRef         = col("c_mask_attachment_id", attachment_id.opt)
+    val AcquisitionType: ColumnRef          = col("c_acquisition_type", gmos_mos_acquisition_type)
 
     val CentralWavelength: ColumnRef        = col("c_central_wavelength", wavelength_pm)
 

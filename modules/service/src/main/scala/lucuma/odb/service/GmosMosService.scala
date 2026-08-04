@@ -13,6 +13,7 @@ import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosCustomSlitWidth
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
@@ -139,16 +140,18 @@ object GmosMosService {
           )
 
       val north: Decoder[GmosNorth] =
-        (gmos_north_grating    *:
-         gmos_north_filter.opt *:
-         custom_mask           *:
+        (gmos_north_grating       *:
+         gmos_north_filter.opt    *:
+         custom_mask              *:
+         gmos_mos_acquisition_type *:
          common
         ).to[GmosNorth]
 
       val south: Decoder[GmosSouth] =
-        (gmos_south_grating    *:
-         gmos_south_filter.opt *:
-         custom_mask           *:
+        (gmos_south_grating       *:
+         gmos_south_filter.opt    *:
+         custom_mask              *:
+         gmos_mos_acquisition_type *:
          common
         ).to[GmosSouth]
 
@@ -264,6 +267,7 @@ object GmosMosService {
           m.c_filter,
           m.c_slit_width,
           m.c_mask_attachment_id,
+          m.c_acquisition_type,
           m.c_central_wavelength,
           sci.c_exposure_time_mode,
           sci.c_signal_to_noise_at,
@@ -308,6 +312,7 @@ object GmosMosService {
       Option[GmosNorthFilter],
       GmosCustomSlitWidth,
       Option[Attachment.Id],
+      GmosMosAcquisitionType,
       Wavelength,
       Option[GmosXBinning],
       Option[GmosYBinning],
@@ -330,6 +335,7 @@ object GmosMosService {
           c_slit_width,
           c_mask_attachment_id,
           c_mask_attachment_type,
+          c_acquisition_type,
           c_central_wavelength,
           c_xbin,
           c_ybin,
@@ -351,6 +357,7 @@ object GmosMosService {
           $gmos_custom_slit_width,
           ${attachment_id.opt},
           ${attachment_type.opt},
+          $gmos_mos_acquisition_type,
           $wavelength_pm,
           ${gmos_binning.opt},
           ${gmos_binning.opt},
@@ -365,8 +372,8 @@ object GmosMosService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, sw, a, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
-         o, g, l, sw, a, a.as(AttachmentType.MosMask), w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
+       """.contramap { (o, g, l, sw, a, at, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
+         o, g, l, sw, a, a.as(AttachmentType.MosMask), at, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
        )}
 
     def insertGmosNorthMos(
@@ -379,6 +386,7 @@ object GmosMosService {
         input.filter,
         input.customMask.slitWidth,
         maskAttachmentId(input.customMask),
+        input.acquisitionType,
         input.common.centralWavelength,
         input.common.explicitXBin,
         input.common.explicitYBin,
@@ -399,6 +407,7 @@ object GmosMosService {
       Option[GmosSouthFilter],
       GmosCustomSlitWidth,
       Option[Attachment.Id],
+      GmosMosAcquisitionType,
       Wavelength,
       Option[GmosXBinning],
       Option[GmosYBinning],
@@ -421,6 +430,7 @@ object GmosMosService {
           c_slit_width,
           c_mask_attachment_id,
           c_mask_attachment_type,
+          c_acquisition_type,
           c_central_wavelength,
           c_xbin,
           c_ybin,
@@ -442,6 +452,7 @@ object GmosMosService {
           $gmos_custom_slit_width,
           ${attachment_id.opt},
           ${attachment_type.opt},
+          $gmos_mos_acquisition_type,
           $wavelength_pm,
           ${gmos_binning.opt},
           ${gmos_binning.opt},
@@ -456,8 +467,8 @@ object GmosMosService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, sw, a, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
-         o, g, l, sw, a, a.as(AttachmentType.MosMask), w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
+       """.contramap { (o, g, l, sw, a, at, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
+         o, g, l, sw, a, a.as(AttachmentType.MosMask), at, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
        )}
 
     def insertGmosSouthMos(
@@ -470,6 +481,7 @@ object GmosMosService {
         input.filter,
         input.customMask.slitWidth,
         maskAttachmentId(input.customMask),
+        input.acquisitionType,
         input.common.centralWavelength,
         input.common.explicitXBin,
         input.common.explicitYBin,
@@ -547,13 +559,15 @@ object GmosMosService {
       input: GmosMosInput.Edit.North
     ): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upGrating = sql"c_grating              = $gmos_north_grating"
-      val upFilter  = sql"c_filter               = ${gmos_north_filter.opt}"
+      val upGrating         = sql"c_grating         = $gmos_north_grating"
+      val upFilter          = sql"c_filter          = ${gmos_north_filter.opt}"
+      val upAcquisitionType = sql"c_acquisition_type = $gmos_mos_acquisition_type"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
-          input.filter.toOptionOption.map(upFilter)
+          input.filter.toOptionOption.map(upFilter),
+          input.acquisitionType.map(upAcquisitionType)
         ).flatten ++ input.customMask.toList.flatMap(customMaskUpdates) ++ commonUpdates(input.common)
 
       NonEmptyList.fromList(ups)
@@ -575,13 +589,15 @@ object GmosMosService {
       input: GmosMosInput.Edit.South
     ): Option[NonEmptyList[AppliedFragment]] = {
 
-      val upGrating = sql"c_grating              = $gmos_south_grating"
-      val upFilter  = sql"c_filter               = ${gmos_south_filter.opt}"
+      val upGrating         = sql"c_grating         = $gmos_south_grating"
+      val upFilter          = sql"c_filter          = ${gmos_south_filter.opt}"
+      val upAcquisitionType = sql"c_acquisition_type = $gmos_mos_acquisition_type"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
-          input.filter.toOptionOption.map(upFilter)
+          input.filter.toOptionOption.map(upFilter),
+          input.acquisitionType.map(upAcquisitionType)
         ).flatten ++ input.customMask.toList.flatMap(customMaskUpdates) ++ commonUpdates(input.common)
 
       NonEmptyList.fromList(ups)
@@ -614,6 +630,7 @@ object GmosMosService {
         c_slit_width,
         c_mask_attachment_id,
         c_mask_attachment_type,
+        c_acquisition_type,
         c_central_wavelength,
         c_xbin,
         c_ybin,
@@ -636,6 +653,7 @@ object GmosMosService {
         c_slit_width,
         c_mask_attachment_id,
         c_mask_attachment_type,
+        c_acquisition_type,
         c_central_wavelength,
         c_xbin,
         c_ybin,

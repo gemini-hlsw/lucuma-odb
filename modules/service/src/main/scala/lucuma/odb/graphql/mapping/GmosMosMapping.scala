@@ -131,6 +131,7 @@ trait GmosMosMapping[F[_]]
       SqlObject("customMask"),
 
       SqlObject("centralWavelength"),
+      SqlField("acquisitionType", GmosNorthMosView.Common.AcquisitionType),
       SqlObject("exposureTimeMode", Join(GmosNorthMosView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
 
       common.xBin,
@@ -206,6 +207,7 @@ trait GmosMosMapping[F[_]]
       SqlObject("customMask"),
 
       SqlObject("centralWavelength"),
+      SqlField("acquisitionType", GmosSouthMosView.Common.AcquisitionType),
       SqlObject("exposureTimeMode", Join(GmosSouthMosView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
 
       common.xBin,
