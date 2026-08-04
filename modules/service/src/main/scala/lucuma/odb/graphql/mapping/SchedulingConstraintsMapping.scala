@@ -19,6 +19,7 @@ trait SchedulingConstraintsMapping[F[_]]
   lazy val SchedulingConstraintsMapping: ObjectMapping =
     ObjectMapping(SchedulingConstraintsType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
+      SqlField("executionRequirement", ObservationView.ExecutionRequirement),
       SqlField("isSplittable", ObservationView.IsSplittable),
       SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId))
     )

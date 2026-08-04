@@ -4130,6 +4130,32 @@ input ConfigurationRequestProperties {
 }
 
 """
+Controls how the Scheduler may treat an observation once it is running or
+planned.  The values form a chain of increasing restriction: each withdraws one
+freedom from the scheduler relative to the previous.
+"""
+enum ExecutionRequirement {
+  """
+  Normal: the science sequence may be divided into discrete segments (i.e.
+  "atoms") scheduled in order across separate visits, and a running visit may be
+  interrupted.
+  """
+  UNCONSTRAINED
+
+  """
+  The science sequence must complete within a single visit (it may not be split
+  across visits), but a running visit may still be interrupted.
+  """
+  NO_SPLITTING
+
+  """
+  The science sequence must run start-to-finish within a single, uninterrupted
+  visit.
+  """
+  UNINTERRUPTIBLE
+}
+
+"""
 Configuration that controls how and when the Scheduler may plan execution of an
 observation, including whether it can be split across multiple visits and any
 timing constraints.
@@ -4137,12 +4163,19 @@ timing constraints.
 input SchedulingConstraintsInput {
 
   """
-  Controls whether the observation may be split across multiple visits. When
-  true (default), the scheduler may divide the science sequence into discrete
-  segments (i.e. "atoms") scheduled in order across separate visits. When false,
-  the entire science sequence must complete within a single uninterrupted visit.
+  Controls how the Scheduler may treat this observation once it is running or
+  planned.  Defaults to `UNCONSTRAINED`.  This field is mutually exclusive with
+  the deprecated `isSplittable`; supplying both is an error.
   """
-  isSplittable: Boolean = true
+  executionRequirement: ExecutionRequirement
+
+  """
+  Controls whether the observation may be split across multiple visits. When
+  true, the scheduler may divide the science sequence into discrete segments
+  (i.e. "atoms") scheduled in order across separate visits. When false, the
+  entire science sequence must complete within a single uninterrupted visit.
+  """
+  isSplittable: Boolean @deprecated(reason: "Use `executionRequirement` instead (`true` maps to `UNCONSTRAINED`, `false` to `NO_SPLITTING`). (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.
@@ -4163,12 +4196,18 @@ timing constraints.
 type SchedulingConstraints {
 
   """
+  Controls how the Scheduler may treat this observation once it is running or
+  planned.
+  """
+  executionRequirement: ExecutionRequirement!
+
+  """
   Controls whether the observation may be split across multiple visits. When
   true, the scheduler may divide the science sequence into discrete segments
   (i.e. "atoms") scheduled in order across separate visits. When false, the
   entire science sequence must complete within a single uninterrupted visit.
   """
-  isSplittable: Boolean!
+  isSplittable: Boolean! @deprecated(reason: "Use `executionRequirement` instead; this is `true` exactly when `executionRequirement` is `UNCONSTRAINED`. (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.  If

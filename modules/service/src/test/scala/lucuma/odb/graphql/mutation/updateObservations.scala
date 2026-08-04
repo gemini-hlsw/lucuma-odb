@@ -5118,3 +5118,84 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       oid <- createObservationAs(pi, pid)
       _   <- updateObservation(pi, oid, update, query, expected)
     yield ()
+
+  test("scheduling: update executionRequirement"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          executionRequirement: NO_SPLITTING
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            executionRequirement
+            isSplittable
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "executionRequirement": "NO_SPLITTING",
+                  "isSplittable": false
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: executionRequirement UNINTERRUPTIBLE implies not splittable"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          executionRequirement: UNINTERRUPTIBLE
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            executionRequirement
+            isSplittable
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "isSplittable": false
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: executionRequirement and isSplittable are mutually exclusive"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          executionRequirement: NO_SPLITTING
+          isSplittable: false
+        }
+      """,
+      query = """
+        observations {
+          id
+        }
+      """,
+      expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `executionRequirement` and the deprecated `isSplittable` may be specified.".asLeft
+    )

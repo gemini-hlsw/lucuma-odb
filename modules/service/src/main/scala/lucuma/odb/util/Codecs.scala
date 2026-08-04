@@ -60,6 +60,7 @@ import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
+import lucuma.odb.data.ExecutionRequirement
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
@@ -309,6 +310,9 @@ trait Codecs {
 
   val execution_event_type: Codec[ExecutionEventType] =
     enumerated(Type("e_execution_event_type"))
+
+  val execution_requirement: Codec[ExecutionRequirement] =
+    enumerated(Type("e_execution_requirement"))
 
   val execution_state: Codec[ExecutionState] =
     enumerated(Type("e_execution_state"))
