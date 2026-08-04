@@ -5,7 +5,7 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.odb.data.ExecutionRequirement
+import lucuma.core.enums.ExecutionRequirement
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 

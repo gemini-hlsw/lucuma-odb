@@ -22,6 +22,7 @@ import cats.syntax.option.*
 import cats.syntax.traverse.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
+import lucuma.core.enums.ExecutionRequirement
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GnirsFilter
@@ -46,7 +47,6 @@ import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
-import lucuma.odb.data.ExecutionRequirement
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams

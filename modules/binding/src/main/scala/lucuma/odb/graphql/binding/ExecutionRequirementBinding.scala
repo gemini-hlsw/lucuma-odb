@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package binding
 
-import lucuma.odb.data.ExecutionRequirement
+import lucuma.core.enums.ExecutionRequirement
 
 val ExecutionRequirementBinding: Matcher[ExecutionRequirement] =
   enumeratedBinding
