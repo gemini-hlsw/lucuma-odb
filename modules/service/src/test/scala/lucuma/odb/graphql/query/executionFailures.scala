@@ -226,7 +226,7 @@ class executionFailures extends ExecutionTestSupportForGmos {
                }
              }
            """,
-        expected = List(s"Could not generate a sequence for $oid: GMOS Long Slit photometric not implemented").asLeft
+        expected = List(s"Could not generate a sequence for $oid: GMOS North Long Slit photometric not implemented").asLeft
       )
     }
   }
