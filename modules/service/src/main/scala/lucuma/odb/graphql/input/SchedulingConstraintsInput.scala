@@ -19,7 +19,7 @@ object SchedulingConstraintsInput:
   // Resolves the (mutually exclusive) `executionRequirement` and deprecated
   // `isSplittable` inputs into a single optional `ExecutionRequirement`.  `None`
   // means "leave the requirement untouched"; the deprecated `isSplittable` maps
-  // `true -> Unconstrained` and `false -> Contiguous` (`Uninterruptible` is not
+  // `true -> Unconstrained` and `false -> NoSplitting` (`Uninterruptible` is not
   // reachable through it).
   val Binding: Matcher[SchedulingConstraintsInput] =
     ObjectFieldsBinding.rmap:
@@ -35,7 +35,7 @@ object SchedulingConstraintsInput:
             case (Some(r), None)    =>
               Result(SchedulingConstraintsInput(r.some, timing))
             case (None, Some(s))    =>
-              val r = if s then ExecutionRequirement.Unconstrained else ExecutionRequirement.Contiguous
+              val r = if s then ExecutionRequirement.Unconstrained else ExecutionRequirement.NoSplitting
               Result(SchedulingConstraintsInput(r.some, timing))
             case (None, None)       =>
               Result(SchedulingConstraintsInput(none, timing))

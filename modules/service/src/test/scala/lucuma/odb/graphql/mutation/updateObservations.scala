@@ -5124,7 +5124,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       user   = pi,
       update = """
         schedulingConstraints: {
-          executionRequirement: CONTIGUOUS
+          executionRequirement: NO_SPLITTING
         }
       """,
       query = """
@@ -5141,7 +5141,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             "observations": [
               {
                 "schedulingConstraints": {
-                  "executionRequirement": "CONTIGUOUS",
+                  "executionRequirement": "NO_SPLITTING",
                   "isSplittable": false
                 }
               }
@@ -5188,7 +5188,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       user   = pi,
       update = """
         schedulingConstraints: {
-          executionRequirement: CONTIGUOUS
+          executionRequirement: NO_SPLITTING
           isSplittable: false
         }
       """,

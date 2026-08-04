@@ -28,7 +28,7 @@ enum ExecutionRequirement(
   case Unconstrained extends ExecutionRequirement("unconstrained", true, true)
 
   /** The sequence may be interrupted, but not planned across multiple visits. */
-  case Contiguous extends ExecutionRequirement("contiguous", false, true)
+  case NoSplitting extends ExecutionRequirement("no_splitting", false, true)
 
   /** The sequence must run start-to-finish in one uninterrupted visit. */
   case Uninterruptible extends ExecutionRequirement("uninterruptible", false, false)

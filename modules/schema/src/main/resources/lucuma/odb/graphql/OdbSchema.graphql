@@ -4146,7 +4146,7 @@ enum ExecutionRequirement {
   The science sequence must complete within a single visit (it may not be split
   across visits), but a running visit may still be interrupted.
   """
-  CONTIGUOUS
+  NO_SPLITTING
 
   """
   The science sequence must run start-to-finish within a single, uninterrupted
@@ -4175,7 +4175,7 @@ input SchedulingConstraintsInput {
   (i.e. "atoms") scheduled in order across separate visits. When false, the
   entire science sequence must complete within a single uninterrupted visit.
   """
-  isSplittable: Boolean @deprecated(reason: "Use `executionRequirement` instead (`true` maps to `UNCONSTRAINED`, `false` to `CONTIGUOUS`). (Deprecated July 31, 2026)")
+  isSplittable: Boolean @deprecated(reason: "Use `executionRequirement` instead (`true` maps to `UNCONSTRAINED`, `false` to `NO_SPLITTING`). (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.

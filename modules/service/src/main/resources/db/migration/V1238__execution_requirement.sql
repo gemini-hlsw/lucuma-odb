@@ -2,7 +2,7 @@
 -- also captures uninterruptibility.
 --
 --   c_is_splittable = true   ->  unconstrained
---   c_is_splittable = false  ->  contiguous
+--   c_is_splittable = false  ->  no_splitting
 --
 -- 'uninterruptible' (neither splittable nor interruptible) was not expressible
 -- before, so no existing row maps to it.  c_execution_requirement is now the
@@ -18,7 +18,7 @@
 
 CREATE TYPE e_execution_requirement AS ENUM(
   'unconstrained',
-  'contiguous',
+  'no_splitting',
   'uninterruptible'
 );
 
@@ -28,5 +28,5 @@ ALTER TABLE t_observation
 -- Every row starts at the 'unconstrained' default; only the non-splittable ones
 -- differ, so touch just those.
 UPDATE t_observation
-   SET c_execution_requirement = 'contiguous'::e_execution_requirement
+   SET c_execution_requirement = 'no_splitting'::e_execution_requirement
  WHERE NOT c_is_splittable;
