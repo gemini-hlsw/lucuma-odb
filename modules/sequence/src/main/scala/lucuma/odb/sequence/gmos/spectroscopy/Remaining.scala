@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.gmos.longslit
+package lucuma.odb.sequence.gmos.spectroscopy
 
 import cats.Order
 import cats.Order.catsKernelOrderingForOrder
@@ -15,8 +15,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import scala.collection.immutable.TreeMap
 import scala.collection.immutable.TreeSeqMap
 
-// This is used for GMOS long slit for now.  If it is needed elsewhere I'll
-// move it.
+// This is used by GMOS long slit and MOS.
 
 /**
  * 'Remaining' tracks how many instances of a particular class of items are

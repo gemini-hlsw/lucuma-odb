@@ -382,21 +382,13 @@ class createObservation_GmosMos extends OdbSuite:
                   { "nanometers": 5.000 },
                   { "nanometers": -5.000 }
                 ],
-                "defaultOffsets": [
-                  { "arcseconds": 0.000000 },
-                  { "arcseconds": 15.000000 },
-                  { "arcseconds": -15.000000 }
-                ],
+                "defaultOffsets": [],
                 "wavelengthDithers": [
                   { "nanometers": 0.000 },
                   { "nanometers": 5.000 },
                   { "nanometers": -5.000 }
                 ],
-                "offsets": [
-                  { "arcseconds": 0.000000 },
-                  { "arcseconds": 15.000000 },
-                  { "arcseconds": -15.000000 }
-                ],
+                "offsets": [],
                 "explicitWavelengthDithers": null,
                 "explicitOffsets": null
               }

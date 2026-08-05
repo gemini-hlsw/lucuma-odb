@@ -186,7 +186,8 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
         },
         "filter" : null,
         "fpu" : {
-          "builtin" : "LONG_SLIT_0_75"
+          "builtin" : "LONG_SLIT_0_75",
+          "customMask" : null
         },
         "centralWavelength" : {
           "nanometers" : ${Json.fromBigDecimal(BigDecimal(s"$wavelength.000"))}

@@ -31,6 +31,7 @@ import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
+import lucuma.odb.sequence.gmos.mos.Config as MosConfig
 
 trait GmosMosMapping[F[_]]
   extends GmosMosView[F]
@@ -301,4 +302,4 @@ object GmosMosMapping:
     parseCsvBigDecimals(s).map(arcsec => Q.signedDecimalArcseconds.reverseGet(arcsec).asJson).asJson
 
   private val defaultSpatialOffsetsJson: Json =
-    LongSlitConfig.DefaultSpatialOffsets.map(_.asJson).asJson
+    MosConfig.DefaultSpatialOffsets.map(_.asJson).asJson
