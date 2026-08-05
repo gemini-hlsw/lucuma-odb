@@ -151,3 +151,50 @@ BEGIN
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Update existing observation to add the acquisition exposure time mode.
+INSERT INTO t_exposure_time_mode (
+  c_observation_id,
+  c_role,
+  c_exposure_time_mode,
+  c_signal_to_noise_at,
+  c_exposure_time,
+  c_exposure_count
+)
+SELECT
+  m.c_observation_id,
+  'acquisition'::e_exposure_time_mode_role,
+  'time_and_count'::e_exp_time_mode,
+  m.c_central_wavelength,
+  '30 seconds'::interval,
+  10
+FROM t_gmos_north_mos m
+WHERE NOT EXISTS (
+  SELECT 1
+    FROM t_exposure_time_mode e
+   WHERE e.c_observation_id = m.c_observation_id
+     AND e.c_role = 'acquisition'
+);
+
+INSERT INTO t_exposure_time_mode (
+  c_observation_id,
+  c_role,
+  c_exposure_time_mode,
+  c_signal_to_noise_at,
+  c_exposure_time,
+  c_exposure_count
+)
+SELECT
+  m.c_observation_id,
+  'acquisition'::e_exposure_time_mode_role,
+  'time_and_count'::e_exp_time_mode,
+  m.c_central_wavelength,
+  '30 seconds'::interval,
+  10
+FROM t_gmos_south_mos m
+WHERE NOT EXISTS (
+  SELECT 1
+    FROM t_exposure_time_mode e
+   WHERE e.c_observation_id = m.c_observation_id
+     AND e.c_role = 'acquisition'
+);
