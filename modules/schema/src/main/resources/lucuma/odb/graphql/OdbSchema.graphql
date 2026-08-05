@@ -20738,6 +20738,11 @@ input WhereConfigurationRequest {
   Matches the last update time.
   """
   updatedAt: WhereOrderTimestamp
+
+  """
+  Matches the configuration's observing mode type, if any.
+  """
+  observingModeType: WhereOptionEqObservingModeType
 }
 
 input WhereObservationReference {

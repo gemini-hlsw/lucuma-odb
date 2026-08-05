@@ -10,6 +10,7 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
@@ -27,6 +28,30 @@ object WhereConfigurationRequest {
     val WhereCreatedAtBinding = WhereOrder.binding[Timestamp](path / "createdAt", TimestampBinding)
     val WhereUpdatedAtBinding = WhereOrder.binding[Timestamp](path / "updatedAt", TimestampBinding)
 
+    // A configuration request exposes its observing mode type nested under its
+    // `configuration.observingMode`, so the predicate path is one segment deeper
+    // than the equivalent field on `WhereObservation`.
+    def observingModeTypeBinding(binding: Matcher[ObservingModeType]): Matcher[Predicate] =
+      val modePath = path / "configuration" / "observingMode" / "mode"
+      ObjectFieldsBinding.rmap:
+        case List(
+          BooleanBinding.Option("IS_NULL", rIsNull),
+          binding.Option("EQ", rEQ),
+          binding.Option("NEQ", rNEQ),
+          binding.List.Option("IN", rIN),
+          binding.List.Option("NIN", rNIN)
+        ) =>
+          (rIsNull, rEQ, rNEQ, rIN, rNIN).parMapN: (isNull, EQ, NEQ, IN, NIN) =>
+            and(List(
+              isNull.map(IsNull(modePath, _)),
+              EQ.map(a => Eql(modePath, Const(a))),
+              NEQ.map(a => NEql(modePath, Const(a))),
+              IN.map(as => In(modePath, as)),
+              NIN.map(as => Not(In(modePath, as)))
+            ).flatten)
+
+    val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
+
     lazy val WhereObservationBinding = binding(path) // lazy self-reference
     ObjectFieldsBinding.rmap {
       case List(
@@ -40,9 +65,10 @@ object WhereConfigurationRequest {
         WhereFeedbackBinding.Option("feedback", rFeedback),
         WhereCreatedAtBinding.Option("createdAt", rCreatedAt),
         WhereUpdatedAtBinding.Option("updatedAt", rUpdatedAt),
+        ObservingModeTypeBinding.Option("observingModeType", rObservingModeType),
       ) =>
-        (rAND, rOR, rNOT, rId, rStatus, rProgram, rJustification, rFeedback, rCreatedAt, rUpdatedAt).parMapN {
-          (AND, OR, NOT, id, status, program, justification, feedback, createdAt, updatedAt) =>
+        (rAND, rOR, rNOT, rId, rStatus, rProgram, rJustification, rFeedback, rCreatedAt, rUpdatedAt, rObservingModeType).parMapN {
+          (AND, OR, NOT, id, status, program, justification, feedback, createdAt, updatedAt, observingModeType) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -54,6 +80,7 @@ object WhereConfigurationRequest {
               feedback,
               createdAt,
               updatedAt,
+              observingModeType,
             ).flatten)
         }
     }
