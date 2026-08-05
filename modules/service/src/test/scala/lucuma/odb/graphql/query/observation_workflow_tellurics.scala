@@ -108,8 +108,15 @@ class observation_workflow_tellurics
         ps.execute(req).void
 
   // A per-observation calibration (telluric or daytime pinhole) inherits its
-  // science observation's workflow state and has no valid transitions.
+  // science observation's workflow state. A daytime pinhole has no transitions
+  // of its own; a telluric may additionally be declined.
   private def workflowFollowsScience(role: CalibrationRole): IO[Unit] =
+
+    // Offered while the calibration is inherited and not itself declined.
+    val declinable: List[ObservationWorkflowState] =
+      if role === CalibrationRole.Telluric then List(ObservationWorkflowState.Inactive)
+      else Nil
+
     val setup: IO[(Program.Id, Observation.Id, Observation.Id)] =
       for
         cfp <- createGeminiCallForProposalsAs(staff)
@@ -164,7 +171,7 @@ class observation_workflow_tellurics
             CalculationState.Ready,
             ObservationWorkflow(
               ObservationWorkflowState.Defined,
-              Nil,
+              declinable,
               Nil
             )
           )
@@ -181,13 +188,15 @@ class observation_workflow_tellurics
             CalculationState.Ready,
             ObservationWorkflow(
               ObservationWorkflowState.Ready,
-              Nil,
+              declinable,
               Nil
             )
           )
         ).asRight
       ) >>
-      // Set science to Inactive and Telluric should follow
+      // Set science to Inactive and Telluric should follow. Note that even a
+      // telluric offers nothing here: it is Inactive purely by inheritance, so
+      // there is no override of its own to clear.
       setObservationWorkflowState(pi, sci, ObservationWorkflowState.Inactive) >>
       runObscalcUpdateAs(serviceUser, pid, cal) >>
       expect(
@@ -215,7 +224,7 @@ class observation_workflow_tellurics
             CalculationState.Ready,
             ObservationWorkflow(
               ObservationWorkflowState.Defined,
-              Nil,
+              declinable,
               Nil
             )
           )

@@ -64,9 +64,10 @@ import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
+import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.user_state
 import lucuma.refined.*
 import skunk.syntax.all.*
-import lucuma.odb.util.Codecs.{observation_id, user_state}
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
