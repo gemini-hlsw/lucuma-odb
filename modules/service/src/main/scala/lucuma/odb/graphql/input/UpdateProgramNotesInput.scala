@@ -18,7 +18,7 @@ final case class UpdateProgramNotesInput(
 
 object UpdateProgramNotesInput:
 
-  def binding(path: Path): Matcher[UpdateProgramNotesInput] =
+  def binding(path: Path)(using serverDate: java.time.LocalDate): Matcher[UpdateProgramNotesInput] =
     val WhereProgramNoteBinding = WhereProgramNote.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

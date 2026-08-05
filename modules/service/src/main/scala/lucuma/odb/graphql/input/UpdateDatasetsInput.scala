@@ -17,7 +17,7 @@ case class UpdateDatasetsInput(
 
 object UpdateDatasetsInput {
 
-  def binding(path: Path) = {
+  def binding(path: Path)(using serverDate: java.time.LocalDate) = {
     val WhereDatasetsBinding = WhereDataset.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

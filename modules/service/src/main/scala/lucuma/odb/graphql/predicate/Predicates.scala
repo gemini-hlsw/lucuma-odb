@@ -5,8 +5,15 @@ package lucuma.odb.graphql
 package predicate
 
 import grackle.Path
+import java.time.LocalDate
 
 trait Predicates[F[_]] extends BaseMapping[F]:
+
+  /** The server's current date, used to resolve program `isActive` filters.
+   *  Threaded request-scoped (like `user`) and overridable for tests.
+   */
+  def serverDate: LocalDate = LocalDate.now()
+  given currentServerDate: LocalDate = serverDate
 
   /**
    * Module of predicates for top-level types. Start here (with whatever your result type is) when
