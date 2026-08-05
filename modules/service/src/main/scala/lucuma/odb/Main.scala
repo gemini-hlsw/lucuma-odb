@@ -258,8 +258,9 @@ object FMain extends MainParams {
       middleware        <- ServerMiddleware(corsOverHttps, domain, ssoClient, userSvc)
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
-      introspecService   = GraphQLService(IntrospectionMapping(OdbMapping.introspectionSchema))
-      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, ptc, httpClient, horizonsClient, goaClient, emailConfig, introspecService)
+      schema            <- Resource.eval(OdbMapping.loadSchema[F])
+      introspecService   = GraphQLService(IntrospectionMapping(schema))
+      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, ptc, httpClient, horizonsClient, goaClient, emailConfig, introspecService, schema)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)

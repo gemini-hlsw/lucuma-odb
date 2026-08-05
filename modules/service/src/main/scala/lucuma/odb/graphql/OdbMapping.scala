@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
+import cats.ApplicativeThrow
 import cats.Monoid
 import cats.Parallel
 import cats.effect.*
@@ -25,6 +26,7 @@ import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.mapping.*
+import lucuma.odb.graphql.schema.SchemaStitcher
 import lucuma.odb.graphql.topic.ConfigurationRequestTopic
 import lucuma.odb.graphql.topic.DatasetTopic
 import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
@@ -40,7 +42,6 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
 import org.http4s.client.Client
-import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.Attribute
@@ -50,7 +51,6 @@ import java.nio.file.Files
 import java.nio.file.Path as NIOPath
 import scala.concurrent.duration.*
 import scala.io.AnsiColor
-import scala.io.Source
 
 object OdbMapping {
 
@@ -89,14 +89,6 @@ object OdbMapping {
       .map(_.millis)
       .getOrElse(5.seconds)
 
-  // Loads a GraphQL file from the classpath, relative to this Class.
-  def unsafeLoadSchema(fileName: String): Schema = {
-    val stream = getClass.getResourceAsStream(fileName)
-    val src  = Source.fromInputStream(stream, "UTF-8")
-    try Schema(src.getLines().mkString("\n")).toEither.fold(x => sys.error(s"Invalid schema: $fileName: ${x.toList.mkString(", ")}"), identity)
-    finally src.close()
-  }
-
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
@@ -114,8 +106,8 @@ object OdbMapping {
     horizonsClient0: HorizonsClient[F],
     goaClient0:      GoaClient[F],
     emailConfig0:    Config.Email,
+    schema0:         Schema,
     allowSub:        Boolean = true,        // Are submappings (recursive calls) allowed?
-    schema0:         Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
     shouldValidate:  Boolean = true,        // should we validatate the TypeMappings?
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
@@ -333,8 +325,7 @@ object OdbMapping {
               .copy(terseError = false)
 
           // Our schema
-          val schema: Schema =
-            schema0.getOrElse(unsafeLoadSchema("OdbSchema.graphql"))
+          val schema: Schema = schema0
 
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
@@ -366,8 +357,8 @@ object OdbMapping {
                     horizonsClient0,
                     goaClient0,
                     emailConfig0,
+                    schema,
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
-                    Some(schema),           // don't re-parse the schema
                     shouldValidate = false  // already validated
                   ),
                 emailConfig0,
@@ -797,13 +788,6 @@ object OdbMapping {
         }
 
   /**
-    * The full ODB schema. This is the schema exposed for introspection (see
-    * `IntrospectionMapping`).
-    */
-  def introspectionSchema: Schema =
-    unsafeLoadSchema("OdbSchema.graphql")
-
-  /**
    * A reduced mapping for use with the Obscalc service.  Obscalc computes the
    * observation workflow, which makes a GraphQL call which in turn requires
    * a `Services` instance that has a mapping.  This mapping ignores
@@ -822,7 +806,7 @@ object OdbMapping {
     horizonsClient: HorizonsClient[F],
     goaClient:      GoaClient[F],
     emailConfig:    Config.Email,
-    schema:         Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+    schema:         Schema
   ): Mapping[F] =
 
     apply(
@@ -839,9 +823,12 @@ object OdbMapping {
       horizonsClient,
       goaClient,
       emailConfig,
-      allowSub = false,
       schema,
+      allowSub = false,
       shouldValidate = false, // seems to cause overflow from time to time
     )
 
+
+  def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
+    SchemaStitcher.load("lucuma/odb/graphql/OdbSchema.graphql")
 }
