@@ -123,6 +123,56 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       """
     )
 
+  def createGmosNorthMosObservationAs(
+    user:         User,
+    pid:          Program.Id,
+    tids:         List[Target.Id],
+    offsetArcsec: Option[List[Int]] = None
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids,
+      s"""
+        gmosNorthMos: {
+          grating: R831_G5302
+          filter: R_PRIME
+          customMask: {
+            slitWidth: CUSTOM_WIDTH_0_50
+          }
+          centralWavelength: {
+            nanometers: 500
+          }
+          explicitYBin: TWO
+          ${offsetArcsec.fold("")(formatExplicitSpatialOffsetsInput)}
+        }
+      """
+    )
+
+  def createGmosSouthMosObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tids: List[Target.Id]
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids,
+      """
+        gmosSouthMos: {
+          grating: R600_G5324,
+          filter: R_PRIME,
+          customMask: {
+            slitWidth: CUSTOM_WIDTH_0_50
+          },
+          centralWavelength: {
+            nanometers: 500
+          },
+          explicitYBin: TWO
+        }
+      """
+    )
+
   def createObservationWithModeQuery(
     pid:  Program.Id,
     tids: List[Target.Id],

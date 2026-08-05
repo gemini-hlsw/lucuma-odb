@@ -593,7 +593,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
           services.session.transaction.use: xa =>
             for
               _ <- services.executionDigestService.insertOrUpdate(o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
+              _ <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.EndStep, None, None))(using xa, ().asInstanceOf) // shhh
               d <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d.isEmpty
 
@@ -616,9 +616,9 @@ class executionDigest extends ExecutionTestSupportForGmos {
           services.session.transaction.use: xa =>
             for
               _  <- services.executionDigestService.insertOrUpdate(o, Md5Hash.Zero, ExecutionDigest.Zero)(using xa)
-              _  <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.StartStep, None))(using xa, ().asInstanceOf) // shhh
+              _  <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.StartStep, None, None))(using xa, ().asInstanceOf) // shhh
               d0 <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
-              _  <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.EndStep, None))(using xa, ().asInstanceOf) // shhh
+              _  <- services.executionEventService.insertStepEvent(AddStepEventInput(s, v, StepStage.EndStep, None, None))(using xa, ().asInstanceOf) // shhh
               d1 <- services.executionDigestService.selectOne(o, Md5Hash.Zero)(using xa)
             yield d0.isDefined && d1.isEmpty
 

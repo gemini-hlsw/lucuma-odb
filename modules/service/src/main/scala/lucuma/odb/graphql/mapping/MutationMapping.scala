@@ -55,6 +55,7 @@ import lucuma.odb.graphql.predicate.ExecutionEventPredicates
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.instances.given
 import lucuma.odb.json.all.query.given
+import lucuma.odb.json.ghost.query.given
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.SuperUserAccess
@@ -72,6 +73,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     List(
       AddConditionsEntry,
       AddDatasetEvent,
+      AddEventBatch,
       AddProgramUser,
       AddSequenceEvent,
       AddSlewEvent,
@@ -102,11 +104,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordIgrins2Visit,
       RecordVisit,
       RedeemUserInvitation,
+      RefreshArchiveDuplication,
       ReplaceFlamingos2Sequence,
       ReplaceGmosNorthSequence,
       ReplaceGmosSouthSequence,
       ReplaceIgrins2Sequence,
       ReplaceGnirsSequence,
+      ReplaceGhostSequence,
       ResetAcquisition,
       RevokeUserInvitation,
       SetAllocations,
@@ -366,6 +370,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                   child
                 )
 
+  private lazy val RefreshArchiveDuplication: MutationField =
+    MutationField("refreshArchiveDuplication", RefreshArchiveDuplicationInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        selectForUpdate(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            checked.foldWithId(OdbError.InvalidArgument().asFailureF): (_, oid) =>
+              // A GOA failure is reported as the snapshot's ERROR state, not as
+              // a failed mutation, so only a rejected refresh fails here.
+              archiveDuplicationSearchService.refresh(oid).nestMap: _ =>
+                Filter(Predicates.refreshArchiveDuplicationResult.observation.id.eql(oid), child)
+
   private lazy val ResetAcquisition: MutationField =
     MutationField("resetAcquisition", ResetAcquisitionInput.Binding): (input, child) =>
       services.useNonTransactionally:
@@ -568,6 +583,18 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                 .nestMap: s =>
                   Json.obj("sequence" -> s.compile.toList.asJson)
 
+  private lazy val ReplaceGhostSequence =
+    MutationField.json("replaceGhostSequence", ReplaceSequenceInput.ReplaceGhostBinding): input =>
+      services
+        .useNonTransactionally(selectForUpdate(input))
+        .flatMap: res =>
+          res.flatTraverse: checked =>
+            services.useTransactionally:
+              sequenceService
+                .replaceGhostSequence(checked)
+                .nestMap: s =>
+                  Json.obj("sequence" -> s.compile.toList.asJson)
+
   private lazy val LinkUser =
     MutationField("linkUser", LinkUserInput.Binding): (input, child) =>
       services.useTransactionally:
@@ -628,6 +655,20 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     addEvent("addStepEvent", AddStepEventInput.Binding, Predicates.stepEvent) { input =>
       executionEventService.insertStepEvent(input)
     }
+
+  private lazy val AddEventBatch: MutationField =
+    MutationField("addEventBatch", AddEventBatchInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireServiceAccess:
+          executionEventService.insertEvents(input).map: rIds =>
+            rIds.flatMap: ids =>
+              mutationResultSubquery(
+                predicate       = Predicates.executionEvent.id.in(ids),
+                order           = OrderSelection[ExecutionEvent.Id](ExecutionEventType / "id"),
+                limit           = None,
+                collectionField = "events",
+                child           = child
+              )
 
   private def recordVisit(
     response:  F[Result[Visit.Id]],

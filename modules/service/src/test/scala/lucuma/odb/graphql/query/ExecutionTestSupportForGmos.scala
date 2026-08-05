@@ -245,7 +245,10 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
             wavelength { nanometers }
           }
           filter
-          fpu { builtin }
+          fpu {
+            builtin
+            customMask { slitWidth }
+          }
           centralWavelength { nanometers }
         }
         stepConfig {
@@ -380,7 +383,12 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         }},
         "filter": ${gn.filter},
         "fpu": ${gn.fpu.fold(Json.Null) { fpu =>
-          json"""{ "builtin": ${fpu.builtin.map(_.value)} }"""
+          json"""
+            {
+              "builtin": ${fpu.builtin.map(_.value)},
+              "customMask": ${fpu.custom.map(c => json"""{ "slitWidth": ${c.slitWidth} }""")}
+            }
+          """
         }},
         "centralWavelength": ${gn.centralWavelength.fold(Json.Null) { cw =>
           json"""

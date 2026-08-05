@@ -86,6 +86,7 @@ import lucuma.odb.syntax.result.*
 import lucuma.odb.util.Codecs.*
 import monocle.Focus
 import monocle.Lens
+import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
 import skunk.implicits.*
@@ -310,6 +311,10 @@ object GuideService {
           (Site.GS, ObservingModeType.GmosSouthImaging, filters.map(_.filter.wavelength).maximum)
         case mode: gmos.longslit.Config.GmosSouth             =>
           (Site.GS, ObservingModeType.GmosSouthLongSlit, mode.centralWavelength)
+        case mode: gmos.mos.Config.GmosNorth                  =>
+          (Site.GN, ObservingModeType.GmosNorthMos, mode.centralWavelength)
+        case mode: gmos.mos.Config.GmosSouth                  =>
+          (Site.GS, ObservingModeType.GmosSouthMos, mode.centralWavelength)
         case gnirs.imaging.Config(filters = filters)          =>
           (Site.GN, ObservingModeType.GnirsImaging, filters.map(_.filter.centralWavelength).maximum)
         case mode: gnirs.spectroscopy.Config                  =>
@@ -691,23 +696,25 @@ object GuideService {
         angles:        NonEmptyList[Angle],
         candidates:    NonEmptyList[GuideStarCandidate],
         trackType:     TrackType
-      ): Option[AgsAnalysis.Usable] =
-        genInfo.agsParamsFor(trackType).flatMap: params =>
-          Ags
-            .agsAnalysis(obsInfo.constraints,
-                        wavelength,
-                        baseCoords,
-                        scienceCoords,
-                        blindOffset,
-                        angles,
-                        genInfo.acqOffsets,
-                        genInfo.sciOffsets,
-                        params,
-                        candidates.toList
+      ): F[Option[AgsAnalysis.Usable]] =
+        genInfo.agsParamsFor(trackType).flatTraverse: params =>
+          val result =
+            Ags.agsAnalysis(obsInfo.constraints,
+                            wavelength,
+                            baseCoords,
+                            scienceCoords,
+                            blindOffset,
+                            angles,
+                            genInfo.acqOffsets,
+                            genInfo.sciOffsets,
+                            params,
+                            candidates.toList
             )
-            ._1
-            .sortUsablePositions
-            .headOption
+          T.currentSpanOrNoop
+            .flatMap: span =>
+              span.addAttributes(Attribute("ags.mode", params.mode)) *>
+                span.addAttributes(result.stats.toSpanAttributes*)
+            .as(result.sortUsablePositions.headOption)
 
       def buildAvailabilityAndCache(
         pid:             Program.Id,
@@ -965,7 +972,7 @@ object GuideService {
                               .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
-          optUsable      = chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType)
+          optUsable      <- ResultT.liftF(chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType))
           tgts           = original.map(x => (x._2.id, x._1)).toList.toMap
           env            <- ResultT.fromResult(
                              optUsable

@@ -10,6 +10,8 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.util.Timestamp
+import lucuma.core.util.TimestampInterval
 
 class datasets extends OdbSuite with DatasetSetupOperations with ExecutionTestSupportForGmos {
   val mode = ObservingModeType.GmosNorthLongSlit
@@ -379,6 +381,86 @@ class datasets extends OdbSuite with DatasetSetupOperations with ExecutionTestSu
           _ <- addDatasetEventAs(serviceUser, did0, DatasetStage.EndWrite)
           _ <- addDatasetEventAs(serviceUser, did1, DatasetStage.StartExpose)
           _ <- expect(pi, q, e)
+        yield ()
+
+      case _ =>
+        sys.error("Expected 1 step, 3 datasets.")
+    }
+
+  test("program selection"):
+    recordDatasetsWithProgram(mode, pi, serviceUser, 37, 1, 3).flatMap {
+      case (pid, _, _) =>
+
+        val q = s"""
+          query {
+            datasets(WHERE: { program: { id: { EQ: "$pid" } } }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        val e = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(List(
+              "N18630101S0038.fits",
+              "N18630101S0039.fits",
+              "N18630101S0040.fits"
+            ).map(f => Json.obj("filename" -> f.asJson)))
+          )
+        ).asRight
+
+        expect(pi, q, e)
+    }
+
+  test("start and end selection"):
+    recordDatasetsWithProgram(mode, pi, serviceUser, 40, 1, 3).flatMap {
+      case (pid, _, List((_, List(did0, did1, _)))) =>
+
+        // Every query is restricted to this program so that the datasets recorded
+        // by the other tests (some of which have an interval) don't interfere.
+        def q(where: String): String = s"""
+          query {
+            datasets(WHERE: {
+              program: { id: { EQ: "$pid" } }
+              $where
+            }) {
+              hasMore
+              matches {
+                filename
+              }
+            }
+          }
+        """
+
+        def e(filenames: String*) = Json.obj(
+          "datasets" -> Json.obj(
+            "hasMore" -> Json.False,
+            "matches" -> Json.fromValues(
+              filenames.toList.map(f => Json.obj("filename" -> f.asJson))
+            )
+          )
+        ).asRight
+
+        val t = (s: String) => Timestamp.FromString.getOption(s).get
+
+        for
+          _ <- setInterval(serviceUser, did0, TimestampInterval.between(t("2025-07-30T23:00:00Z"), t("2025-07-30T23:00:10Z")))
+          _ <- setInterval(serviceUser, did1, TimestampInterval.between(t("2025-07-30T23:10:00Z"), t("2025-07-30T23:10:10Z")))
+
+          // The third dataset has no interval at all, so only IS_NULL matches it.
+          _ <- expect(pi, q("""start: { GTE: "2025-07-30T23:05:00Z" }"""), e("N18630101S0042.fits"))
+          _ <- expect(pi, q("""end: { LT: "2025-07-30T23:05:00Z" }"""),    e("N18630101S0041.fits"))
+          _ <- expect(
+                 pi,
+                 q("""start: { GTE: "2025-07-30T23:00:00Z" } end: { LTE: "2025-07-30T23:10:10Z" }"""),
+                 e("N18630101S0041.fits", "N18630101S0042.fits")
+               )
+          _ <- expect(pi, q("""start: { IS_NULL: true  }"""), e("N18630101S0043.fits"))
+          _ <- expect(pi, q("""end:   { IS_NULL: false }"""), e("N18630101S0041.fits", "N18630101S0042.fits"))
         yield ()
 
       case _ =>

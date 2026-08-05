@@ -14,13 +14,12 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Program
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.IntegrationTime
-import lucuma.odb.util.Codecs.core_timestamp
-import lucuma.odb.util.Codecs.dataset_id
 import skunk.codec.temporal.timestamptz
 import skunk.syntax.all.*
 
@@ -34,19 +33,6 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
     )
 
   val mode = ObservingModeType.GmosNorthLongSlit
-
-  def setInterval(did: Dataset.Id, interval: TimestampInterval): IO[Unit] =
-    withServices(serviceUser): srv =>
-      srv.transactionally:
-        srv.session.execute(
-          sql"""
-            UPDATE t_dataset
-               SET c_start_time = $core_timestamp,
-                   c_end_time   = $core_timestamp
-             WHERE c_dataset_id = $dataset_id
-          """.command
-        )(interval.start, interval.end, did)
-    .void
 
   test("Basic DatasetChronicleEntry Mapping"):
     for
@@ -68,7 +54,7 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       did <- recordDatasetAs(serviceUser, sid, vid, "N18630703S0001.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
-      _   <- setInterval(did, TimestampInterval.between(t0, t1))
+      _   <- setInterval(serviceUser, did, TimestampInterval.between(t0, t1))
       _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
 
       _   <- expect(
@@ -277,6 +263,9 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
     query(user = staff, query = q).void
 
   def setup(index: Int): IO[Dataset.Id] =
+    setupWithProgram(index).map(_._2)
+
+  def setupWithProgram(index: Int): IO[(Program.Id, Dataset.Id)] =
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithUsPi(pi)
@@ -296,10 +285,10 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
       did <- recordDatasetAs(serviceUser, sid, vid, f"N18630703S$index%04d.fits")
       t0   = Timestamp.FromString.getOption("2025-07-30T23:00:00Z").get
       t1   = Timestamp.FromString.getOption("2025-07-30T23:00:10Z").get
-      _   <- setInterval(did, TimestampInterval.between(t0, t1))
+      _   <- setInterval(serviceUser, did, TimestampInterval.between(t0, t1))
       _   <- updateDatasets(staff, DatasetQaState.Pass, List(did))
       _   <- comment("foo", List(did))
-    yield did
+    yield (pid, did)
 
   test("WHERE user"):
     setup(3).flatMap: did =>
@@ -490,6 +479,93 @@ class datasetChronicleEntries extends OdbSuite with DatasetSetupOperations with 
           }
         """.asRight
       )
+
+  test("WHERE program"):
+    for
+      (pid, did) <- setupWithProgram(9)
+      _          <- expect(
+        staff,
+        s"""
+          query {
+            datasetChronicleEntries(WHERE: {
+              program: { id: { EQ: "$pid" } }
+            }) {
+              hasMore
+              matches {
+                operation
+                dataset { id }
+                modInterval
+                modQaState
+                modComment
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "datasetChronicleEntries": {
+              "hasMore": false,
+              "matches": [
+                {
+                  "operation":   "INSERT",
+                  "dataset":     { "id": $did },
+                  "modInterval": false,
+                  "modQaState":  false,
+                  "modComment":  false
+                },
+                {
+                  "operation":   "UPDATE",
+                  "dataset":     { "id": $did },
+                  "modInterval": true,
+                  "modQaState":  false,
+                  "modComment":  false
+                },
+                {
+                  "operation":   "UPDATE",
+                  "dataset":     { "id": $did },
+                  "modInterval": false,
+                  "modQaState":  true,
+                  "modComment":  false
+                },
+                {
+                  "operation":   "UPDATE",
+                  "dataset":     { "id": $did },
+                  "modInterval": false,
+                  "modQaState":  false,
+                  "modComment":  true
+                }
+              ]
+            }
+          }
+        """.asRight
+      )
+
+      // The same dataset is excluded when the program doesn't match.
+      _          <- expect(
+        staff,
+        s"""
+          query {
+            datasetChronicleEntries(WHERE: {
+              dataset: { EQ: "$did" }
+              program: { id: { NEQ: "$pid" } }
+            }) {
+              hasMore
+              matches {
+                dataset { id }
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "datasetChronicleEntries": {
+              "hasMore": false,
+              "matches": []
+            }
+          }
+        """.asRight
+      )
+    yield ()
 
   test("can read timestamp"):
     currentTimestamp.flatMap: t =>

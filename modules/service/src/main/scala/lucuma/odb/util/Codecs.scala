@@ -54,6 +54,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.core.util.Uid
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -309,6 +310,9 @@ trait Codecs {
   val execution_event_type: Codec[ExecutionEventType] =
     enumerated(Type("e_execution_event_type"))
 
+  val execution_requirement: Codec[ExecutionRequirement] =
+    enumerated(Type("e_execution_requirement"))
+
   val execution_state: Codec[ExecutionState] =
     enumerated(Type("e_execution_state"))
 
@@ -361,6 +365,9 @@ trait Codecs {
 
   val gender: Codec[Gender] =
     enumerated(Type("e_gender"))
+
+  val archive_duplication_state: Codec[ArchiveDuplication.State] =
+    enumerated(Type("e_archive_duplication_state"))
 
   val guide_state: Codec[StepGuideState] =
     enumerated(Type("e_guide_state"))
@@ -738,6 +745,10 @@ trait Codecs {
 
   val text_nonempty: Codec[NonEmptyString] =
     text.eimap(NonEmptyString.from)(_.value)
+
+  /** A `text[]` column read as `List[String]`, for array-valued provenance such as GOA query URLs. */
+  val text_list: Codec[List[String]] =
+    _text.imap(_.toList)(Arr(_*))
 
   val varchar_nonempty: Codec[NonEmptyString] =
     varchar.eimap(NonEmptyString.from)(_.value)

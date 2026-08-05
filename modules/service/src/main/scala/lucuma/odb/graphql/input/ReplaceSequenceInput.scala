@@ -9,6 +9,7 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
+import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
@@ -53,3 +54,6 @@ object ReplaceSequenceInput:
 
   val ReplaceGnirsBinding: Matcher[ReplaceSequenceInput[GnirsDynamicConfig]] =
     binding(AtomInput.GnirsBinding)
+
+  val ReplaceGhostBinding: Matcher[ReplaceSequenceInput[GhostDynamicConfig]] =
+    binding(AtomInput.GhostBinding)

@@ -137,6 +137,7 @@ export MAILGUN_API_KEY="dummy"
 export MAILGUN_DOMAIN="dummy.mailgun.org"
 export MAILGUN_WEBHOOK_SIGNING_KEY="dummy"
 export INVITATION_SENDER_EMAIL="noreply@example.com"
+export PROPOSAL_EMAIL_DEFAULT="noreply@example.com"
 export EXPLORE_URL="http://localhost:3000"
 export ODB_DOMAIN="localhost"
 

@@ -90,6 +90,15 @@ object GnirsSequenceService:
           $gnirs_dynamic
       """.command
 
+    def insertDynamics(rows: List[(Step.Id, GnirsDynamicConfig)]): Command[rows.type] =
+      val enc = (step_id *: gnirs_dynamic).values.list(rows)
+      sql"""
+        INSERT INTO t_gnirs_dynamic (
+          c_step_id,
+          #${encodeColumns(none, GnirsDynamicColumns)}
+        ) VALUES $enc
+      """.command
+
     val InsertStatic: Query[(Observation.Id, GnirsStaticConfig), Long] =
       sql"""
         INSERT INTO t_gnirs_static (

@@ -16,6 +16,7 @@ http {
     "https://explore-test.gemini.edu"     off;
     "https://explore-dev.lucuma.xyz"      off;
     "https://local.lucuma.xyz:8080"       off;
+    "https://local.lucuma.xyz:8081"       off;
     "https://local.gemini.edu:8080"       off;
   }
 
@@ -26,6 +27,7 @@ http {
     "https://explore-test.gemini.edu"     $http_origin;
     "https://explore-dev.lucuma.xyz"      $http_origin;
     "https://local.lucuma.xyz:8080"       $http_origin;
+    "https://local.lucuma.xyz:8081"       $http_origin;
     "https://local.gemini.edu:8080"       $http_origin;
   }
 

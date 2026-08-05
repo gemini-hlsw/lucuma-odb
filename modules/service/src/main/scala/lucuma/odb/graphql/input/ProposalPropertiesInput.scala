@@ -5,6 +5,7 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
 import grackle.syntax.*
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
@@ -69,6 +70,11 @@ object ProposalPropertiesInput {
         .orElse(keck.map(_.partnerSplits))
         .orElse(subaru.map(_.partnerSplits))
         .getOrElse(Nullable.Absent)
+
+    // The edited exchange partner.  Only a Gemini queue or classical proposal can
+    // have one; the external variants always leave it null.
+    def exchangePartner: Nullable[ExchangePartner] =
+      gemini.map(_.exchangePartner).getOrElse(Nullable.Absent)
 
     // True when the edit specifies a proposal-type variant.
     def hasType: Boolean =

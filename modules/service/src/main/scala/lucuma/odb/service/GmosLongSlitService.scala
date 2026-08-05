@@ -27,9 +27,9 @@ import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
-import lucuma.odb.sequence.gmos.longslit.Config.Common
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth
+import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
 import skunk.*

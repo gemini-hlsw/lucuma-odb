@@ -105,6 +105,10 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
               value = "noreply@gemini.edu";
             }
             {
+              name = "PROPOSAL_EMAIL_DEFAULT";
+              value = "noreply@gemini.edu";
+            }
+            {
               name = "EXPLORE_URL";
               value = "https://explore-dev.lucuma.xyz";
             }

@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 import _root_.skunk.AppliedFragment
 import _root_.skunk.Session
+import cats.ApplicativeThrow
 import cats.Monoid
 import cats.Parallel
 import cats.effect.*
@@ -18,12 +19,14 @@ import grackle.QueryCompiler.SelectElaborator
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
 import lucuma.catalog.clients.GaiaClient
+import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.User
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.mapping.*
+import lucuma.odb.graphql.schema.SchemaStitcher
 import lucuma.odb.graphql.topic.ConfigurationRequestTopic
 import lucuma.odb.graphql.topic.DatasetTopic
 import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
@@ -39,7 +42,6 @@ import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.DomainCodec
 import org.http4s.client.Client
-import org.tpolecat.sourcepos.SourcePos
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.otel4s.Attribute
@@ -49,7 +51,6 @@ import java.nio.file.Files
 import java.nio.file.Path as NIOPath
 import scala.concurrent.duration.*
 import scala.io.AnsiColor
-import scala.io.Source
 
 object OdbMapping {
 
@@ -88,38 +89,32 @@ object OdbMapping {
       .map(_.millis)
       .getOrElse(5.seconds)
 
-  // Loads a GraphQL file from the classpath, relative to this Class.
-  def unsafeLoadSchema(fileName: String): Schema = {
-    val stream = getClass.getResourceAsStream(fileName)
-    val src  = Source.fromInputStream(stream, "UTF-8")
-    try Schema(src.getLines().mkString("\n")).toEither.fold(x => sys.error(s"Invalid schema: $fileName: ${x.toList.mkString(", ")}"), identity)
-    finally src.close()
-  }
-
   private implicit def monoidPartialFunction[A, B]: Monoid[PartialFunction[A, B]] =
     Monoid.instance(PartialFunction.empty, _ orElse _)
 
   def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory as LF, SecureRandom}](
-    database:      Resource[F, Session[F]],
-    monitor0:      SkunkMonitor[F],
-    user0:         User,
-    topics0:       Topics[F],
-    gaiaClient0:   GaiaClient[F],
-    itcClient0:    ItcClient[F],
-    commitHash0:   CommitHash,
-    goaUsers0:     Set[User.Id],
-    tec:           TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient0:   Client[F],
+    database:        Resource[F, Session[F]],
+    monitor0:        SkunkMonitor[F],
+    user0:           User,
+    topics0:         Topics[F],
+    gaiaClient0:     GaiaClient[F],
+    itcClient0:      ItcClient[F],
+    commitHash0:     CommitHash,
+    goaUsers0:       Set[User.Id],
+    tec:             TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient0:     Client[F],
     horizonsClient0: HorizonsClient[F],
-    emailConfig0:  Config.Email,
-    allowSub:      Boolean = true,        // Are submappings (recursive calls) allowed?
-    schema0:       Option[Schema] = None, // If we happen to have a schema we can pass it and avoid more parsing
-    shouldValidate:Boolean = true,        // should we validatate the TypeMappings?
+    goaClient0:      GoaClient[F],
+    emailConfig0:    Config.Email,
+    schema0:         Schema,
+    allowSub:        Boolean = true,        // Are submappings (recursive calls) allowed?
+    shouldValidate:  Boolean = true,        // should we validatate the TypeMappings?
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
           with AddConditionsEntryResultMapping[F]
           with AddDatasetEventResultMapping[F]
+          with AddEventBatchResultMapping[F]
           with AddProgramUserResultMapping[F]
           with AddSequenceEventResultMapping[F]
           with AddSlewEventResultMapping[F]
@@ -150,6 +145,7 @@ object OdbMapping {
           with ConfigurationConditionsMapping[F]
           with ConfigurationGmosImagingMappings[F]
           with ConfigurationGmosLongSlitMappings[F]
+          with ConfigurationGmosMosMappings[F]
           with ConfigurationMapping[F]
           with ConfigurationRequestMapping[F]
           with ConfigurationRequestEditMapping[F]
@@ -200,6 +196,7 @@ object OdbMapping {
           with Igrins2LongSlitMapping[F]
           with GnirsImagingMapping[F]
           with GnirsSpectroscopyMapping[F]
+          with ArchiveDuplicationMapping[F]
           with GnirsDynamicMapping[F]
           with GnirsAcquisitionMirrorOutMapping[F]
           with GnirsStaticMapping[F]
@@ -215,6 +212,7 @@ object OdbMapping {
           with GmosImagingFilterMapping[F]
           with GmosImagingMapping[F]
           with GmosLongSlitMapping[F]
+          with GmosMosMapping[F]
           with GmosNorthStaticMapping[F]
           with GmosSouthStaticMapping[F]
           with GoaPropertiesMapping[F]
@@ -265,6 +263,7 @@ object OdbMapping {
           with RecordDatasetResultMapping[F]
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
+          with RefreshArchiveDuplicationResultMapping[F]
           with RegionMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -326,8 +325,7 @@ object OdbMapping {
               .copy(terseError = false)
 
           // Our schema
-          val schema: Schema =
-            schema0.getOrElse(unsafeLoadSchema("OdbSchema.graphql"))
+          val schema: Schema = schema0
 
           // Our services and resources needed by various mappings.
           override val commitHash = commitHash0
@@ -357,9 +355,10 @@ object OdbMapping {
                     tec,
                     httpClient0,
                     horizonsClient0,
+                    goaClient0,
                     emailConfig0,
+                    schema,
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
-                    Some(schema),           // don't re-parse the schema
                     shouldValidate = false  // already validated
                   ),
                 emailConfig0,
@@ -370,7 +369,8 @@ object OdbMapping {
                 gaiaClient0,
                 S3FileService.noop[F],
                 horizonsClient0,
-                TelluricTargetsClient.noop[F]
+                TelluricTargetsClient.noop[F],
+                goaClient0
               )(session)
 
           def mkTypeMappings(ms: List[TypeMapping]): TypeMappings =
@@ -383,6 +383,7 @@ object OdbMapping {
               List[TypeMapping](
                 AddConditionsEntryResultMapping,
                 AddDatasetEventResultMapping,
+                AddEventBatchResultMapping,
                 AddProgramUserResultMapping,
                 AddSequenceEventResultMapping,
                 AddSlewEventResultMapping,
@@ -457,6 +458,8 @@ object OdbMapping {
                 GoaPropertiesMapping,
                 GroupMapping,
                 GroupEditMapping,
+                ArchiveDuplicationMapping,
+                ArchiveMatchMapping,
                 GroupElementMapping,
                 Igrins2LongSlitMapping,
                 Igrins2StaticMapping,
@@ -517,6 +520,7 @@ object OdbMapping {
                 RecordIgrins2VisitResultMapping,
                 RecordVisitResultMapping,
                 RedeemUserInvitationResultMapping,
+                RefreshArchiveDuplicationResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 SchedulingConstraintsMapping,
@@ -603,6 +607,9 @@ object OdbMapping {
                 ConfigurationGmosSouthImagingMappings,
                 ConfigurationGmosNorthLongSlitMappings,
                 ConfigurationGmosSouthLongSlitMappings,
+                ConfigurationGmosNorthMosMappings,
+                ConfigurationGmosSouthMosMappings,
+                GmosMosMappings,
                 ConfigurationObservingModeMappings,
                 ConfigurationTargetMappings,
                 ConfigurationVisitorMappings,
@@ -666,6 +673,8 @@ object OdbMapping {
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
                 GmosSouthLongSlitElaborator,
+                GmosMosElaborator,
+                ArchiveDuplicationElaborator,
                 GroupElaborator,
                 MutationElaborator,
                 ObservationElaborator,
@@ -779,31 +788,25 @@ object OdbMapping {
         }
 
   /**
-    * The full ODB schema. This is the schema exposed for introspection (see
-    * `IntrospectionMapping`).
-    */
-  def introspectionSchema: Schema =
-    unsafeLoadSchema("OdbSchema.graphql")
-
-  /**
    * A reduced mapping for use with the Obscalc service.  Obscalc computes the
    * observation workflow, which makes a GraphQL call which in turn requires
    * a `Services` instance that has a mapping.  This mapping ignores
    * subscriptions.
    */
   def forObscalc[F[_]: Async: Parallel: Tracer: Logger: LoggerFactory: SecureRandom](
-    database:    Resource[F, Session[F]],
-    monitor:     SkunkMonitor[F],
-    user:        User,
-    goaUsers:    Set[User.Id],
-    gaiaClient:  GaiaClient[F],
-    itcClient:   ItcClient[F],
-    commitHash:  CommitHash,
-    tec:         TimeEstimateCalculatorImplementation.ForInstrumentMode,
-    httpClient:  Client[F],
+    database:       Resource[F, Session[F]],
+    monitor:        SkunkMonitor[F],
+    user:           User,
+    goaUsers:       Set[User.Id],
+    gaiaClient:     GaiaClient[F],
+    itcClient:      ItcClient[F],
+    commitHash:     CommitHash,
+    tec:            TimeEstimateCalculatorImplementation.ForInstrumentMode,
+    httpClient:     Client[F],
     horizonsClient: HorizonsClient[F],
-    emailConfig: Config.Email,
-    schema:      Option[Schema] = None // If we happen to have a schema we can pass it and avoid more parsing
+    goaClient:      GoaClient[F],
+    emailConfig:    Config.Email,
+    schema:         Schema
   ): Mapping[F] =
 
     apply(
@@ -818,10 +821,14 @@ object OdbMapping {
       tec,
       httpClient,
       horizonsClient,
+      goaClient,
       emailConfig,
-      allowSub = false,
       schema,
+      allowSub = false,
       shouldValidate = false, // seems to cause overflow from time to time
     )
 
+
+  def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
+    SchemaStitcher.load("lucuma/odb/graphql/OdbSchema.graphql")
 }

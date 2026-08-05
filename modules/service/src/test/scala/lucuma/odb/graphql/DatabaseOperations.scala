@@ -1148,8 +1148,13 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosNorthLongSlit |
-           ObservingModeType.GmosSouthLongSlit =>
-        """{
+           ObservingModeType.GmosSouthLongSlit |
+           ObservingModeType.GmosNorthMos      |
+           ObservingModeType.GmosSouthMos      =>
+        val focalPlane = observingMode match
+          case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos => "MULTIPLE_SLIT"
+          case _                                                              => "SINGLE_SLIT"
+        s"""{
             exposureTimeMode: {
               signalToNoise: {
                 value: 100.0
@@ -1160,7 +1165,7 @@ trait DatabaseOperations { this: OdbSuite =>
               wavelength: { nanometers: 500 }
               resolution: 100
               wavelengthCoverage: { nanometers: 20 }
-              focalPlane: SINGLE_SLIT
+              focalPlane: $focalPlane
               focalPlaneAngle: { microarcseconds: 0 }
             }
           }"""
@@ -1309,6 +1314,8 @@ trait DatabaseOperations { this: OdbSuite =>
             fpu: LONG_SLIT_2
           }
         }"""
+      case ObservingModeType.Flamingos2Mos =>
+        """{}"""
       case ObservingModeType.GmosNorthImaging =>
         """{
           gmosNorthImaging: {
@@ -1323,7 +1330,16 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosNorthMos =>
-        """{}"""
+        """{
+          gmosNorthMos: {
+            grating: R831_G5302
+            filter: R_PRIME
+            customMask: {
+              slitWidth: CUSTOM_WIDTH_0_50
+            }
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
       case ObservingModeType.GmosSouthImaging =>
         """{
           gmosSouthImaging: {
@@ -1356,7 +1372,16 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.GmosSouthMos =>
-        """{}"""
+        """{
+          gmosSouthMos: {
+            grating: B1200_G5321
+            filter: R_PRIME
+            customMask: {
+              slitWidth: CUSTOM_WIDTH_0_50
+            }
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
       case ObservingModeType.GnirsImaging =>
         s"""{
           gnirsImaging: {
@@ -2865,8 +2890,9 @@ trait DatabaseOperations { this: OdbSuite =>
               partnerLink: {
                 ${
                   partnerLink match
-                    case PartnerLink.HasGeminiPartner(gp) => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
-                    case _                                => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
+                    case PartnerLink.HasGeminiPartner(gp)   => s"geminiPartner: ${gp.tag.toScreamingSnakeCase}"
+                    case PartnerLink.HasExchangePartner(xp) => s"exchangePartner: ${xp.tag.toScreamingSnakeCase}"
+                    case _                                  => s"linkType: ${partnerLink.linkType.tag.toScreamingSnakeCase}"
                 }
               }
               $preferred
@@ -3005,6 +3031,29 @@ trait DatabaseOperations { this: OdbSuite =>
     val query = sql"select c_status from t_email where c_email_id = $email_id".query(email_status)
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(id)))
+  }
+
+  // The recipients of all the emails sent for a program, in address order.
+  def getEmailRecipients(pid: Program.Id): IO[List[EmailAddress]] = {
+    val query =
+      sql"select c_recipient_email from t_email where c_program_id = $program_id order by c_recipient_email"
+        .query(email_address)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.stream(pid, chunkSize = 1024).compile.toList))
+  }
+
+  // The subject, text and html of the emails sent to a recipient for a program.
+  def getEmailMessages(pid: Program.Id, recipient: EmailAddress): IO[List[(String, String, Option[String])]] = {
+    val query =
+      sql"""
+        select c_subject, c_text_message, c_html_message
+        from t_email
+        where c_program_id = $program_id and c_recipient_email = $email_address
+        order by c_original_time
+      """.query(text_nonempty *: text_nonempty *: text_nonempty.opt)
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.stream((pid, recipient), chunkSize = 1024).compile.toList))
+      .map(_.map((s, t, h) => (s.value, t.value, h.map(_.value))))
   }
 
   def getEmailStatusesByAddress(address: NonEmptyString): IO[List[EmailStatus]] = {
@@ -4667,6 +4716,26 @@ trait DatabaseOperations { this: OdbSuite =>
   |*****************************************************************************************************************
   |""".stripMargin
   )
+
+  /**
+   * Re-runs the Archive Duplication Search, returning the resulting
+   * `archiveDuplication` payload with the requested fields selected.
+   */
+  def refreshArchiveDuplicationAs(
+    user:   User,
+    oid:    Observation.Id,
+    fields: String = "state matchCount saturated error"
+  ): IO[Json] =
+    query(
+      user  = user,
+      query = s"""
+        mutation {
+          refreshArchiveDuplication(input: { observationId: ${oid.asJson} }) {
+            archiveDuplication { $fields }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("refreshArchiveDuplication", "archiveDuplication").focus.get)
 
   def setIsSplittableAs(
     user:         User,

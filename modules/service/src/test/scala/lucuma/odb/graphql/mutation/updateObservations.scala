@@ -4598,7 +4598,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     )
 
   test("igrins2 SVC: an out-of-range explicit exposure is rejected on update"):
-    val boundsError = "Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s."
+    val boundsError = "Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 1.63 s and 600 s."
     multiUpdateTest(pi,
       List(
         ("observingMode: { igrins2LongSlit: { svc: { explicitExposure: { seconds: 1.0 } } } }",
@@ -5118,3 +5118,84 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       oid <- createObservationAs(pi, pid)
       _   <- updateObservation(pi, oid, update, query, expected)
     yield ()
+
+  test("scheduling: update executionRequirement"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          executionRequirement: NO_SPLITTING
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            executionRequirement
+            isSplittable
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "executionRequirement": "NO_SPLITTING",
+                  "isSplittable": false
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: executionRequirement UNINTERRUPTIBLE implies not splittable"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          executionRequirement: UNINTERRUPTIBLE
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            executionRequirement
+            isSplittable
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "isSplittable": false
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: executionRequirement and isSplittable are mutually exclusive"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          executionRequirement: NO_SPLITTING
+          isSplittable: false
+        }
+      """,
+      query = """
+        observations {
+          id
+        }
+      """,
+      expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `executionRequirement` and the deprecated `isSplittable` may be specified.".asLeft
+    )

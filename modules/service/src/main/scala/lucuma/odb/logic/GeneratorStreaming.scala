@@ -96,6 +96,15 @@ sealed trait GeneratorStreaming[F[_]]:
   ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
 
 
+  def selectOrGenerateGmosNorthMos(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
+
+  def generateGmosNorthMos(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
+
+
   def selectOrGenerateGmosSouthImaging(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
@@ -110,6 +119,14 @@ sealed trait GeneratorStreaming[F[_]]:
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
 
   def generateGmosSouthLongSlit(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
+
+  def selectOrGenerateGmosSouthMos(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
+
+  def generateGmosSouthMos(
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
 
@@ -437,6 +454,28 @@ object GeneratorStreaming:
         yield res).value
 
 
+      override def selectOrGenerateGmosNorthMos(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+        selectOrGenerate(
+          lucuma.odb.sequence.gmos.InitialConfigs.GmosNorthStatic,
+          sequenceService.selectGmosNorthSequence(context.oid, _, _),
+          generateGmosNorthMos(context)
+        )
+
+      override def generateGmosNorthMos(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+        import lucuma.odb.sequence.gmos.mos.Mos
+        (for
+          cfg <- extractMode(ObservingMode.GmosNorthMosName, context)(_.asGmosNorthMos)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
+          rol  = context.params.calibrationRole
+          gen <- EitherT(Mos.gmosNorth(context.oid, calculator.gmosNorthStep, context.namespace, exp.gmosNorth, cfg, sci, rol))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+
       override def selectOrGenerateGmosSouthImaging(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
@@ -480,5 +519,26 @@ object GeneratorStreaming:
           sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT(LongSlit.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, exp.gmosSouth, cfg, acq, sci, rol))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+      override def selectOrGenerateGmosSouthMos(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
+        selectOrGenerate(
+          lucuma.odb.sequence.gmos.InitialConfigs.GmosSouthStatic,
+          sequenceService.selectGmosSouthSequence(context.oid, _, _),
+          generateGmosSouthMos(context)
+        )
+
+      override def generateGmosSouthMos(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
+        import lucuma.odb.sequence.gmos.mos.Mos
+        (for
+          cfg <- extractMode(ObservingMode.GmosSouthMosName, context)(_.asGmosSouthMos)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
+          rol  = context.params.calibrationRole
+          gen <- EitherT(Mos.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, exp.gmosSouth, cfg, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value

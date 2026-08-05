@@ -2980,11 +2980,11 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
         )
 
   private val igrins2SvcExposureBoundsError =
-    List("Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 3.08 s and 600 s.")
+    List("Argument 'input.SET.observingMode.igrins2LongSlit.svc' is invalid: SVC exposure time must be between 1.63 s and 600 s.")
 
   test("[igrins2] SVC exposure out of bounds is rejected on create"):
     createProgramAs(pi).flatMap: pid =>
-      // below the 3.08s minimum
+      // below the 1.63s minimum
       expect(
         pi,
         createObsWithIgrins2SvcQuery(pid, "svc: { explicitExposure: { seconds: 1.0 } }"),
@@ -3129,5 +3129,74 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           js.hcursor
             .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
             .require[Boolean]
+
+  test("[general] created observation should have specified executionRequirement"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                schedulingConstraints: {
+                  executionRequirement: UNINTERRUPTIBLE
+                }
+              }
+            }) {
+              observation {
+                schedulingConstraints {
+                  executionRequirement
+                  isSplittable
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "isSplittable": false
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("[general] created observation should default to UNCONSTRAINED executionRequirement"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                schedulingConstraints {
+                  executionRequirement
+                  isSplittable
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNCONSTRAINED",
+                  "isSplittable": true
+                }
+              }
+            }
+          }
+        """.asRight
+      )
 
 }

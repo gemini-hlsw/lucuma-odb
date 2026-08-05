@@ -121,6 +121,7 @@ object configurationrequest:
     given Encoder[ObservingMode] = m =>
       Json.obj(
         "flamingos2LongSlit" -> Json.Null, // one of these will be replaced below
+        "flamingos2Mos"      -> Json.Null, // one of these will be replaced below
         "ghostIfu"           -> Json.Null, // one of these will be replaced below
         "gmosNorthImaging"   -> Json.Null, // one of these will be replaced below
         "gmosNorthLongSlit"  -> Json.Null, // one of these will be replaced below
@@ -134,6 +135,7 @@ object configurationrequest:
         "visitor"            -> Json.Null,  // one of these will be replaced below
         m match
           case Flamingos2LongSlit(disperser)         => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
+          case Flamingos2Mos(disperser)              => "flamingos2Mos"      -> Json.obj("disperser" -> disperser.asJson)
           case GhostIfu                              => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
           case GmosNorthImaging(filter)              => "gmosNorthImaging"   -> Json.obj("filter" -> filter.asJson)
           case GmosNorthLongSlit(grating)            => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)

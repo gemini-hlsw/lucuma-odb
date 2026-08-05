@@ -118,6 +118,15 @@ object Flamingos2SequenceService:
           $flamingos_2_dynamic
       """.command
 
+    def insertDynamics(rows: List[(Step.Id, Flamingos2DynamicConfig)]): Command[rows.type] =
+      val enc = (step_id *: flamingos_2_dynamic).values.list(rows)
+      sql"""
+        INSERT INTO t_flamingos_2_dynamic (
+          c_step_id,
+          #${encodeColumns(none, Flamingos2DynamicColumns)}
+        ) VALUES $enc
+      """.command
+
     val InsertStatic: Query[(Observation.Id, Flamingos2StaticConfig), Long] =
       sql"""
         INSERT INTO t_flamingos_2_static (

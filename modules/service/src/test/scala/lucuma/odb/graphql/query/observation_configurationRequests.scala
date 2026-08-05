@@ -129,6 +129,7 @@ class observation_configurationRequests
       case _: ExchangeObservingModeType         => IO.unit
       case ObservingModeType.Flamingos2Imaging  => IO.unit
       case ObservingModeType.Flamingos2LongSlit => Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200HK)
+      case ObservingModeType.Flamingos2Mos      => IO.unit
       case ObservingModeType.GhostIfu           => Mutation.forGhostIfu(user, oid, GhostResolutionMode.Standard)
       case ObservingModeType.GmosNorthLongSlit  => Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B480_G5309)
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.CaT, GmosNorthFilter.DS920))
@@ -146,6 +147,7 @@ class observation_configurationRequests
       case _: ExchangeObservingModeType         => IO.unit
       case ObservingModeType.Flamingos2Imaging  => IO.unit
       case ObservingModeType.Flamingos2LongSlit => IO.unit // no changes are compatible
+      case ObservingModeType.Flamingos2Mos      => IO.unit
       case ObservingModeType.GhostIfu           => IO.unit
       case ObservingModeType.GmosNorthLongSlit  => IO.unit // no changes are compatible
       case ObservingModeType.GmosNorthImaging   => Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.DS920)) // subset of original, ok
@@ -163,6 +165,7 @@ class observation_configurationRequests
       case _: ExchangeObservingModeType         => None
       case ObservingModeType.Flamingos2Imaging  => None
       case ObservingModeType.Flamingos2LongSlit => Some(Mutation.forFlamingos2LongSlit(user, oid, Flamingos2Disperser.R1200JH))
+      case ObservingModeType.Flamingos2Mos      => None
       case ObservingModeType.GhostIfu           => None
       case ObservingModeType.GmosNorthLongSlit  => Some(Mutation.forGmosNorthLongSlit(user, oid, GmosNorthGrating.B1200_G5301))
       case ObservingModeType.GmosNorthImaging   => None // Mutation.forGmosNorthImaging(user, oid, List(GmosNorthFilter.GG455, GmosNorthFilter.GPrime_GG455))
@@ -247,13 +250,14 @@ class observation_configurationRequests
           case e: ExchangeObservingModeType         => createExchangeModeObservationAs(pi, pid, e, tid)
           case ObservingModeType.Flamingos2Imaging  => IO.raiseError(new RuntimeException("Flamingos2 imaging not supported yet"))
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+          case ObservingModeType.Flamingos2Mos      => IO.raiseError(new RuntimeException("Flamingos2 mos not supported yet"))
           case ObservingModeType.GhostIfu           => createGhostIfuObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)
-          case ObservingModeType.GmosNorthMos       => IO.raiseError(new RuntimeException("Gmos North MOS not supported yet"))
+          case ObservingModeType.GmosNorthMos       => createObservationAs(pi, pid, ObservingModeType.GmosNorthMos.some, tid)
           case ObservingModeType.GmosSouthLongSlit  => createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosSouthImaging   => createGmosSouthImagingObservationAs(pi, pid, tid)
-          case ObservingModeType.GmosSouthMos       => IO.raiseError(new RuntimeException("Gmos South MOS not supported yet"))
+          case ObservingModeType.GmosSouthMos       => createObservationAs(pi, pid, ObservingModeType.GmosSouthMos.some, tid)
           case ObservingModeType.GnirsImaging       => IO.raiseError(new RuntimeException("GNIRS imaging not supported yet"))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.raiseError(new RuntimeException("GNIRS not supported yet"))
           case ObservingModeType.Igrins2LongSlit    => createIgrins2LongSlitObservationAs(pi, pid, tid)

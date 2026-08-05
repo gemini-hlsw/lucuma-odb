@@ -12,6 +12,13 @@ input AddDatasetEventInput {
   datasetStage: DatasetStage!
 
   """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  clientTime: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
   failure.
@@ -41,6 +48,13 @@ input AddSequenceEventInput {
   command: SequenceCommand!
 
   """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  clientTime: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
   failure.
@@ -58,6 +72,13 @@ type AddSequenceEventResult {
 input AddSlewEventInput {
   observationId: ObservationId!
   slewStage: SlewStage!
+
+  """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  clientTime: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -80,6 +101,13 @@ input AddStepEventInput {
   stepStage: StepStage!
 
   """
+  Time the event occurred, if the client wishes to supply it.  When omitted, the
+  time the event is received by the ODB is used instead.  A supplied time that
+  falls outside the visit's expected timeframe is rejected.
+  """
+  clientTime: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the event is created and is used to enable problem-free retry in the case of
   failure.
@@ -91,6 +119,46 @@ input AddStepEventInput {
 type AddStepEventResult {
   "The new step event that was added."
   event: StepEvent!
+}
+
+"""
+A single event within an 'addEventBatch'.  Exactly one of the fields must be
+set, identifying the event type.  Unlike the singular mutations, every event in
+a batch must supply both a 'clientTime' and an 'idempotencyKey' (see
+'addEventBatch').
+"""
+input AddEventBatchEntryInput {
+  dataset:  AddDatasetEventInput
+  sequence: AddSequenceEventInput
+  slew:     AddSlewEventInput
+  step:     AddStepEventInput
+}
+
+"""
+Input to the 'addEventBatch' mutation, recording a batch of execution events in a
+single request.
+
+Because a batch shares one database transaction, its events would otherwise all
+receive the same recorded time; every event must therefore supply its own
+'clientTime' (the mutation fails otherwise).  Every event must also supply a
+distinct 'idempotencyKey' so the batch can be retried safely.  All events must
+belong to the same observation.
+"""
+input AddEventBatchInput {
+  events: [AddEventBatchEntryInput!]!
+}
+
+"The result of adding a batch of events."
+type AddEventBatchResult {
+  "The new events that were added, in the order they were recorded."
+  events: [ExecutionEvent!]!
+
+  """
+  `true` when the batch contained more events than were returned (the default
+  maximum is 1000).  All submitted events are recorded regardless; only the
+  returned list is truncated.
+  """
+  hasMore: Boolean!
 }
 
 """
@@ -167,8 +235,22 @@ type AtomEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received"
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -1898,11 +1980,16 @@ type GmosCustomMask {
 }
 
 """
-GMOS custom mask input parameters
+GMOS custom mask input parameters.
+
+Skipping `customMask` leaves the existing mask untouched while supplying it
+replaces the mask outright, `slitWidth` must be resent even when only the
+attachment changes.
 """
 input GmosCustomMaskInput {
   """
   The MOS mask attachment id, or null if the mask has not yet been defined.
+  Null is the normal state before the mask is attached in Phase 2.
   """
   attachmentId: AttachmentId
 
@@ -1950,6 +2037,22 @@ enum GmosCustomSlitWidth {
   GmosCustomSlitWidth CustomWidth_5_00
   """
   CUSTOM_WIDTH_5_00
+}
+
+"""
+GMOS MOS acquisition type: whether the acquisition image is taken with the
+mask in or out the light path.
+"""
+enum GmosMosAcquisitionType {
+  """
+  Acquisition image taken through the mask, imaging its alignment holes.
+  """
+  MASK_IN
+
+  """
+  Acquisition image taken without the mask in the light path.
+  """
+  MASK_OUT
 }
 
 """
@@ -2929,6 +3032,154 @@ input GmosSouthLongSlitInput {
 }
 
 """
+Edit or create GMOS North MOS advanced configuration
+"""
+input GmosNorthMosInput {
+  """
+  The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  grating: GmosNorthGrating
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: GmosNorthFilter
+
+  """
+  The custom mask through which the observation is taken.  Supply it complete or
+  skip it altogether.
+  """
+  customMask: GmosCustomMaskInput
+
+  """
+  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  centralWavelength: WavelengthInput
+
+  """
+  Whether the acquisition image is taken with the mask in or out the light path.
+  If not specified on creation, defaults to MASK_IN.  It cannot be unset with a null value.
+  """
+  acquisitionType: GmosMosAcquisitionType
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitXBin: GmosBinning
+
+  """
+  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitYBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+
+  """
+  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWavelengthDithers: [WavelengthDitherInput!]
+
+  """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+}
+
+"""
+Edit or create GMOS South MOS advanced configuration
+"""
+input GmosSouthMosInput {
+  """
+  The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  grating: GmosSouthGrating
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: GmosSouthFilter
+
+  """
+  The custom mask through which the observation is taken.  Supply it complete or
+  skip it altogether.
+  """
+  customMask: GmosCustomMaskInput
+
+  """
+  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  centralWavelength: WavelengthInput
+
+  """
+  Whether the acquisition image is taken with the mask in or out the light path.
+  If not specified on creation, defaults to MASK_IN.  It cannot be unset with a null value.
+  """
+  acquisitionType: GmosMosAcquisitionType
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitXBin: GmosBinning
+
+  """
+  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitYBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+
+  """
+  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWavelengthDithers: [WavelengthDitherInput!]
+
+  """
+  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitOffsets: [OffsetComponentInput!]
+
+}
+
+"""
 Imaging filters combine an actual filter with an exposure time mode.
 """
 type GmosSouthImagingFilter {
@@ -3328,6 +3579,17 @@ type Mutation {
   ): AddStepEventResult!
 
   """
+  Records a batch of execution events (of any type) for a single observation in
+  one request, reducing the per-event round trips that recording a sequence would
+  otherwise incur.  Every event must supply its own 'clientTime' and a distinct
+  'idempotencyKey'; the events are recorded in the order given.  The batch is
+  atomic -- if any event is rejected, none are recorded.
+  """
+  addEventBatch(
+    input: AddEventBatchInput!
+  ): AddEventBatchResult!
+
+  """
   Adds a new time accounting correction for a particular observation.  Note
   that time accounting corrections are additive and cannot be adjusted or
   deleted except via a future correction.  For example, to undo the impact
@@ -3555,6 +3817,25 @@ type Mutation {
   replaceGnirsSequence(
     input: ReplaceGnirsSequenceInput!
   ): ReplaceGnirsSequenceResult!
+
+  """
+  Replaces the remaining steps in an execution sequence with the provided
+  sequence.  Previously executed (or even partially executed) steps are not
+  deleted.  Any ongoing steps are abandoned.
+  """
+  replaceGhostSequence(
+    input: ReplaceGhostSequenceInput!
+  ): ReplaceGhostSequenceResult!
+
+  """
+  Re-runs the Archive Duplication Search for an observation, replacing its
+  stored result with what the Gemini Observatory Archive holds now.
+
+  Rejected once the observation's proposal has been submitted.
+  """
+  refreshArchiveDuplication(
+    input: RefreshArchiveDuplicationInput!
+  ): RefreshArchiveDuplicationResult!
 
   """
   Resets the acquisition sequence to start from the initial step regardless of
@@ -3849,6 +4130,32 @@ input ConfigurationRequestProperties {
 }
 
 """
+Controls how the Scheduler may treat an observation once it is running or
+planned.  The values form a chain of increasing restriction: each withdraws one
+freedom from the scheduler relative to the previous.
+"""
+enum ExecutionRequirement {
+  """
+  Normal: the science sequence may be divided into discrete segments (i.e.
+  "atoms") scheduled in order across separate visits, and a running visit may be
+  interrupted.
+  """
+  UNCONSTRAINED
+
+  """
+  The science sequence must complete within a single visit (it may not be split
+  across visits), but a running visit may still be interrupted.
+  """
+  NO_SPLITTING
+
+  """
+  The science sequence must run start-to-finish within a single, uninterrupted
+  visit.
+  """
+  UNINTERRUPTIBLE
+}
+
+"""
 Configuration that controls how and when the Scheduler may plan execution of an
 observation, including whether it can be split across multiple visits and any
 timing constraints.
@@ -3856,12 +4163,19 @@ timing constraints.
 input SchedulingConstraintsInput {
 
   """
-  Controls whether the observation may be split across multiple visits. When
-  true (default), the scheduler may divide the science sequence into discrete
-  segments (i.e. "atoms") scheduled in order across separate visits. When false,
-  the entire science sequence must complete within a single uninterrupted visit.
+  Controls how the Scheduler may treat this observation once it is running or
+  planned.  Defaults to `UNCONSTRAINED`.  This field is mutually exclusive with
+  the deprecated `isSplittable`; supplying both is an error.
   """
-  isSplittable: Boolean = true
+  executionRequirement: ExecutionRequirement
+
+  """
+  Controls whether the observation may be split across multiple visits. When
+  true, the scheduler may divide the science sequence into discrete segments
+  (i.e. "atoms") scheduled in order across separate visits. When false, the
+  entire science sequence must complete within a single uninterrupted visit.
+  """
+  isSplittable: Boolean @deprecated(reason: "Use `executionRequirement` instead (`true` maps to `UNCONSTRAINED`, `false` to `NO_SPLITTING`). (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.
@@ -3882,12 +4196,18 @@ timing constraints.
 type SchedulingConstraints {
 
   """
+  Controls how the Scheduler may treat this observation once it is running or
+  planned.
+  """
+  executionRequirement: ExecutionRequirement!
+
+  """
   Controls whether the observation may be split across multiple visits. When
   true, the scheduler may divide the science sequence into discrete segments
   (i.e. "atoms") scheduled in order across separate visits. When false, the
   entire science sequence must complete within a single uninterrupted visit.
   """
-  isSplittable: Boolean!
+  isSplittable: Boolean! @deprecated(reason: "Use `executionRequirement` instead; this is `true` exactly when `executionRequirement` is `UNCONSTRAINED`. (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.  If
@@ -5174,6 +5494,13 @@ input RecordVisitInput {
   observationId: ObservationId!
 
   """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  clientTime: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the visit is created and is used to enable problem-free retry in the case of
   failure.
@@ -5194,6 +5521,13 @@ Input parameters for creating a new GmosNorthVisit
 input RecordGmosNorthVisitInput {
   observationId: ObservationId!
   gmosNorth: GmosNorthStaticInput!
+
+  """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -5221,6 +5555,13 @@ input RecordGmosSouthVisitInput {
   gmosSouth: GmosSouthStaticInput!
 
   """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the visit is created and is used to enable problem-free retry in the case of
   failure.
@@ -5236,6 +5577,26 @@ type RecordGmosSouthVisitResult {
   The newly added visit record itself.
   """
   visit: Visit!
+}
+
+"""
+Input parameters for re-running the Archive Duplication Search.  Select one of
+`observationId` or `observationReference`.
+"""
+input RefreshArchiveDuplicationInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+}
+
+"""
+The result of re-running the Archive Duplication Search.
+"""
+type RefreshArchiveDuplicationResult {
+  "The search result as it now stands."
+  archiveDuplication: ArchiveDuplication!
+
+  "The observation that was searched."
+  observation: Observation!
 }
 
 """
@@ -5336,6 +5697,11 @@ input ObservingModeInput @oneOf {
   gmosNorthLongSlit: GmosNorthLongSlitInput
 
   """
+  The gmosNorthMos field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gmosNorthMos: GmosNorthMosInput
+
+  """
   The gmosSouthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthImaging: GmosSouthImagingInput
@@ -5344,6 +5710,11 @@ input ObservingModeInput @oneOf {
   The gmosSouthLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosSouthLongSlit: GmosSouthLongSlitInput
+
+  """
+  The gmosSouthMos field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gmosSouthMos: GmosSouthMosInput
 
   """
   The gnirsImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -7566,6 +7937,11 @@ enum ObservingModeType {
   GMOS_NORTH_LONG_SLIT
 
   """
+  ObservingModeType GmosNorthMos
+  """
+  GMOS_NORTH_MOS
+
+  """
   ObservingModeType GmosSouthImaging
   """
   GMOS_SOUTH_IMAGING
@@ -7574,6 +7950,11 @@ enum ObservingModeType {
   ObservingModeType GmosSouthLongSlit
   """
   GMOS_SOUTH_LONG_SLIT
+
+  """
+  ObservingModeType GmosSouthMos
+  """
+  GMOS_SOUTH_MOS
 
   """
   ObservingModeType GnirsImaging
@@ -7952,6 +8333,11 @@ input WhereDatasetChronicleEntry {
   dataset: WhereOrderDatasetId
 
   """
+  Limits the results to the program associated with the dataset.
+  """
+  program: WhereProgram
+
+  """
   Add this item to match only when a dataset id is or isn't updated.
   """
   modDatasetId: WhereBoolean
@@ -8027,8 +8413,22 @@ type DatasetEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -8399,8 +8799,22 @@ interface ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -8603,6 +9017,13 @@ input RecordFlamingos2VisitInput {
   flamingos2:    Flamingos2StaticInput!
 
   """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
+
+  """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
   the visit is created and is used to enable problem-free retry in the case of
   failure.
@@ -8643,6 +9064,13 @@ Input parameters for creating a new IGRINS-2 Visit
 input RecordIgrins2VisitInput {
   observationId: ObservationId!
   igrins2:       Igrins2StaticInput!
+
+  """
+  Time the visit was created, if the client wishes to supply it.  When omitted,
+  the time the visit is recorded by the ODB is used instead.  A supplied time
+  outside the acceptable range is rejected.
+  """
+  time: Timestamp
 
   """
   Idempotency key, if any.  The IdempotencyKey may be provided by clients when
@@ -12361,6 +12789,370 @@ type GmosSouthLongSlit {
 }
 
 """
+GMOS North MOS mode
+"""
+type GmosNorthMos {
+
+  """
+  GMOS North Grating
+  """
+  grating: GmosNorthGrating!
+
+  """
+  GMOS North Filter
+  """
+  filter: GmosNorthFilter
+
+  """
+  The custom mask through which the observation is taken.  Its `attachmentId`
+  is null until the mask has been designed, which normally happens in Phase 2.
+  """
+  customMask: GmosCustomMask!
+
+  """
+  The central wavelength.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  Whether the acquisition image is taken with the mask in or out the light path.
+  """
+  acquisitionType: GmosMosAcquisitionType!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning, calculated from the custom mask's slit width, the
+  target source profile and the image quality.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """
+  Default GMOS Y-Binning, capped at TWO to keep adequate spatial sampling for
+  object identification along the mask.
+  """
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it overrides the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  Q offsets, either explicitly specified in explicitOffsets or else taken from
+  defaultOffsets.
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosNorthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosNorthFilter
+
+  """
+  The custom mask slit width as it was initially selected.  See
+  `customMask.slitWidth` for the width that will be used in the observation.
+  The mask attachment has no initial counterpart; it is expected to arrive
+  after the mode is created.
+  """
+  initialSlitWidth: GmosCustomSlitWidth!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+}
+
+"""
+GMOS South MOS mode
+"""
+type GmosSouthMos {
+
+  """
+  GMOS South Grating
+  """
+  grating: GmosSouthGrating!
+
+  """
+  GMOS South Filter
+  """
+  filter: GmosSouthFilter
+
+  """
+  The custom mask through which the observation is taken.  Its `attachmentId`
+  is null until the mask has been designed, which normally happens in Phase 2.
+  """
+  customMask: GmosCustomMask!
+
+  """
+  The central wavelength.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  Whether the acquisition image is taken with the mask in or out the light path.
+  """
+  acquisitionType: GmosMosAcquisitionType!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning, calculated from the custom mask's slit width, the
+  target source profile and the image quality.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """
+  Default GMOS Y-Binning, capped at TWO to keep adequate spatial sampling for
+  object identification along the mask.
+  """
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it overrides the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  Q offsets, either explicitly specified in explicitOffsets or else taken from
+  defaultOffsets.
+  """
+  offsets: [OffsetQ!]!
+
+  """
+  Default offsets.
+  """
+  defaultOffsets: [OffsetQ!]!
+
+  """
+  Optional explicitly specified q offsets. If set it overrides the default.
+  """
+  explicitOffsets: [OffsetQ!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosSouthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosSouthFilter
+
+  """
+  The custom mask slit width as it was initially selected.  See
+  `customMask.slitWidth` for the width that will be used in the observation.
+  The mask attachment has no initial counterpart; it is expected to arrive
+  after the mode is created.
+  """
+  initialSlitWidth: GmosCustomSlitWidth!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+}
+
+"""
 GMOS South Imaging mode
 """
 type GmosSouthImaging {
@@ -13804,6 +14596,224 @@ type Observation {
   """
   workflow: CalculatedObservationWorkflow
 
+  """
+  Result of the Archive Duplication Search: what the Gemini Observatory Archive
+  held around this observation's pointing.
+  """
+  archiveDuplication: ArchiveDuplication!
+
+}
+
+"The outcome of the most recent Archive Duplication Search attempt."
+enum ArchiveDuplicationState {
+
+  "The search has never been run for this observation."
+  NOT_CHECKED
+
+  """
+  The search ran, but this observation is one the archive cannot be asked about:
+  an instrument it does not know, or no resolvable pointing and no usable target
+  name.  Re-running will report the same thing until the observation changes.
+  """
+  NOT_APPLICABLE
+
+  "The search ran and the reported matches are its result."
+  CHECKED
+
+  """
+  The most recent attempt failed.  Any previously found matches are still
+  reported, so a GOA outage leaves the last good snapshot readable.
+  """
+  ERROR
+
+}
+
+"""
+One archived file matched by an Archive Duplication Search.
+
+The fields are the archive's own record of the file, assembled from its FITS
+headers, so which of them are populated varies by instrument and by era.
+Every nullable field here is null when the archive does not report a value for that
+file; where absence means something more specific than that, the field says so.
+fields are typed where possible.
+"""
+type ArchiveMatch {
+
+  """
+  Archive file name, e.g. S20240101S0001.fits.  Always present, and unique.
+  """
+  name: String!
+
+  "Dataset label the file was recorded under, e.g. GN-2019A-Q-101-11-001."
+  dataLabel: String
+
+  """
+  Coordinates the file was taken at.  Null when the archive records no pointing
+  for the file.
+  """
+  coordinates: Coordinates
+
+  """
+  Archive instrument name, e.g. GMOS-N.  Always present, and always one of the
+  instruments the search queried.
+  """
+  instrumentString: String!
+
+  """
+  `instrumentString` as an `Instrument`, or null where the archive names an
+  instrument GPP has no case for.
+  """
+  instrument: Instrument
+
+  """
+  Observation type as the archive reports it.  Always present, and in practice
+  always OBJECT
+  """
+  observationType: String!
+
+  """
+  Observation class as the archive reports it, e.g. science.  This is the
+  legacy GOA class.
+  """
+  observeClassString: String
+
+  """
+  `observeClassString` as an `ObserveClass`, or null where the archive's class
+  has no faithful GPP equivalent.
+  """
+  observeClass: ObserveClass
+
+  """
+  Quality assessment the file was given, e.g. Pass or Usable.
+  """
+  qaStateString: String
+
+  """
+  `qaStateString` as a `DatasetQaState`, or null where the archive settled on
+  no assessment (`Undefined`, or the retired transient `CHECK`).  PASS and
+  USABLE are what the search expects to see. FAIL may appear though GOA queries
+  should not return FAIL.
+  """
+  qaState: DatasetQaState
+
+  "UT date and time the file was taken."
+  utDateTime: Timestamp
+
+  """
+  Date the file's proprietary period ends and it becomes publicly available.
+  May be in the future.
+  """
+  releaseDate: Date
+
+  """
+  Program reference as the archive reports it.  The archive holds both OCS- and
+  GPP-era data, so this may be a GPP program reference or an OCS one.
+  """
+  programReference: String
+
+  """
+  Observation reference as the archive reports it.  A GPP observation reference
+  or an OCS one, e.g. GN-2019A-Q-101-11, for the same reason as
+  `programReference`.
+  """
+  observationReference: String
+
+  """
+  Target name recorded for the file.  Free text as the observer entered it.
+  """
+  objectName: String
+
+  "Exposure time of the file."
+  exposure: TimeSpan
+
+  """
+  Name of the dispersing element in the beam, e.g. B600.  Null for an imaging
+  frame, which has none.
+  """
+  disperser: String
+
+  "Name of the filter in the beam, e.g. g_G0301.  Null when there was none."
+  filter: String
+
+  """
+  Central wavelength the file was taken at.  Null for a frame with no
+  dispersing element.
+  """
+  wavelength: Wavelength
+
+  "Airmass the file was taken at, a dimensionless ratio starting at 1 at zenith."
+  airmass: BigDecimal
+
+  "Telescope azimuth the file was taken at."
+  azimuth: Angle
+
+  "Telescope elevation above the horizon the file was taken at."
+  elevation: Angle
+
+  """
+  Angular separation between this file's pointing and the search center,
+  telling a match on the target apart from one merely nearby in the field.
+  Null when the search ran by target name rather than coordinates, or when the
+  file itself has no pointing.
+  """
+  distance: Angle
+
+}
+
+"""
+Archive Duplication Search result for an observation, as of the last time the
+search was run.
+
+When `state` is ERROR only `error` describes the failed attempt.  A failure
+leaves the previously found results in place rather than discarding them, so
+`matchCount`, `matches`, `lastCheckedAt` and the search area still
+describe the last search that succeeded, and `lastCheckedAt` says when that was.
+"""
+type ArchiveDuplication {
+
+  state: ArchiveDuplicationState!
+
+  """
+  Number of matching archive files.  Counted per file rather than per archived
+  observation, to stay consistent with the PIT.  A floor rather than an exact
+  figure when `saturated`, and the count from the last successful search rather
+  than from the most recent attempt when `state` is ERROR.
+  """
+  matchCount: NonNegInt!
+
+  """
+  Whether a constituent query came back filled to the archive's hard cap of 500
+  records.  When true `matchCount` is a floor and should be rendered as "500+".
+  """
+  saturated: Boolean!
+
+  """
+  When the reported matches were gathered.  Null exactly when `state` is
+  NOT_CHECKED, since every other state follows an attempt.
+  """
+  lastCheckedAt: Timestamp
+
+  "Why the most recent attempt failed.  Set when `state` is ERROR."
+  error: NonEmptyString
+
+  "Coordinates searched around, for a sidereal pointing."
+  searchCoordinates: Coordinates
+
+  "Target name searched for, for a non-sidereal pointing."
+  searchTargetName: NonEmptyString
+
+  "Radius searched around the search center, half the observation's field of view."
+  searchRadius: Angle
+
+  """
+  The GOA query URLs the snapshot was gathered from, one per fan-out query the
+  search ran. Empty when the search could not be run or has never been run.
+  """
+  queryUrls: [String!]!
+
+  "The matched archive files, ordered by file name."
+  matches: [ArchiveMatch!]!
+
 }
 
 enum ExecutionState {
@@ -13857,6 +14867,8 @@ type ConfigurationObservingMode {
   mode: ObservingModeType!
   gmosNorthLongSlit: ConfigurationGmosNorthLongSlit
   gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
+  gmosNorthMos: ConfigurationGmosNorthMos
+  gmosSouthMos: ConfigurationGmosSouthMos
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
@@ -13876,6 +14888,14 @@ type ConfigurationGmosNorthLongSlit {
 }
 
 type ConfigurationGmosSouthLongSlit {
+  grating: GmosSouthGrating!
+}
+
+type ConfigurationGmosNorthMos {
+  grating: GmosNorthGrating!
+}
+
+type ConfigurationGmosSouthMos {
   grating: GmosSouthGrating!
 }
 
@@ -15188,6 +16208,11 @@ type ObservingMode {
   gmosNorthLongSlit: GmosNorthLongSlit
 
   """
+  GMOS North MOS mode
+  """
+  gmosNorthMos: GmosNorthMos
+
+  """
   GMOS South Imaging mode
   """
   gmosSouthImaging: GmosSouthImaging
@@ -15196,6 +16221,11 @@ type ObservingMode {
   GMOS South Long Slit mode
   """
   gmosSouthLongSlit: GmosSouthLongSlit
+
+  """
+  GMOS South MOS mode
+  """
+  gmosSouthMos: GmosSouthMos
 
   """
   GNIRS Imaging mode
@@ -15462,8 +16492,22 @@ type SequenceEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -15609,8 +16653,22 @@ type SlewEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received."
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -16559,8 +17617,22 @@ type StepEvent implements ExecutionEvent {
   "Observation whose execution produced this event."
   observation: Observation!
 
-  "Time at which this event was received"
-  received: Timestamp!
+  "Time at which this event was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  received: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  Client-supplied event time, if provided.
+  """
+  clientTime: Timestamp
+
+  """
+  Time we associate with this event.  This is the client-supplied event time when
+  one was provided, otherwise the time the event was recorded (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Event type."
   eventType: ExecutionEventType!
@@ -17716,8 +18788,23 @@ type Visit {
   "Observation associated with this visit."
   observation: Observation!
 
-  "Created by Observe at time."
-  created: Timestamp!
+  "Time at which this visit was recorded in the database."
+  recordedTime: Timestamp!
+
+  "Deprecated alias for `recordedTime`."
+  created: Timestamp! @deprecated(reason: "Use `recordedTime` instead.")
+
+  """
+  The client-suplied creation time, if one was supplied.
+  """
+  clientTime: Timestamp
+
+  """
+  Time we associate with this visit.  This is the client-supplied creation time
+  when one was provided (by the slew or recordVisit that opened the visit),
+  otherwise the time it was recorded in the database (see `recordedTime`).
+  """
+  effectiveTime: Timestamp!
 
   "Site of the visit."
   site: Site!
@@ -18155,6 +19242,9 @@ input WhereDataset {
   "Matches all datasets associated with the observation."
   observation: WhereObservation
 
+  "Matches all datasets associated with the program."
+  program: WhereProgram
+
   "Matches all datasets associated with the step."
   stepId: WhereEqStepId
 
@@ -18176,6 +19266,18 @@ input WhereDataset {
   recieved.
   """
   isWritten: WhereBoolean
+
+  """
+  Matches the start of the dataset time interval, which is not defined until the
+  dataset collection has started.
+  """
+  start: WhereOptionOrderTimestamp
+
+  """
+  Matches the end of the dataset time interval, which is not defined until the
+  dataset collection has finished.
+  """
+  end: WhereOptionOrderTimestamp
 }
 
 input WhereDatasetReference {
@@ -19683,6 +20785,59 @@ input WhereOrderTimestamp {
 
   """
   Matches if the property is ordered before or equal (<=) the supplied value.
+  """
+  LTE: Timestamp
+}
+
+"""
+Filters on equality or order comparisons of an optional timestamp property.  All
+supplied criteria must match, but usually only one is selected.  Note that a
+property which is not defined matches nothing but `IS_NULL: true`.
+"""
+input WhereOptionOrderTimestamp {
+  """
+  When `true`, matches if the timestamp is not defined.  When `false` matches if
+  the timestamp is defined.
+  """
+  IS_NULL: Boolean
+
+  """
+  Matches if the timestamp is exactly the supplied value.
+  """
+  EQ: Timestamp
+
+  """
+  Matches if the timestamp is not the supplied value.
+  """
+  NEQ: Timestamp
+
+  """
+  Matches if the timestamp is any of the supplied options.
+  """
+  IN: [Timestamp!]
+
+  """
+  Matches if the timestamp is none of the supplied values.
+  """
+  NIN: [Timestamp!]
+
+  """
+  Matches if the timestamp is ordered after (>) the supplied value.
+  """
+  GT: Timestamp
+
+  """
+  Matches if the timestamp is ordered before (<) the supplied value.
+  """
+  LT: Timestamp
+
+  """
+  Matches if the timestamp is ordered after or equal (>=) the supplied value.
+  """
+  GTE: Timestamp
+
+  """
+  Matches if the timestamp is ordered before or equal (<=) the supplied value.
   """
   LTE: Timestamp
 }
@@ -21278,6 +22433,39 @@ input GnirsAtomInput {
 }
 
 """
+GHOST detector configuration input for a single step.
+"""
+input GhostDetectorInput {
+  exposureTime: TimeSpanInput!
+  exposureCount: PosInt!
+  binning: GhostBinning!
+  readMode: GhostReadMode!
+}
+
+"""
+GHOST dynamic step configuration input.
+"""
+input GhostDynamicInput {
+  red: GhostDetectorInput!
+  blue: GhostDetectorInput!
+  ifu1FiberAgitator: GhostIfu1FiberAgitator!
+  ifu2FiberAgitator: GhostIfu2FiberAgitator!
+}
+
+input GhostStepInput {
+  instrumentConfig: GhostDynamicInput!
+  breakpoint: Breakpoint
+  stepConfig: StepConfigInput!
+  telescopeConfig: TelescopeConfigInput
+  observeClass: ObserveClass!
+}
+
+input GhostAtomInput {
+  description: NonEmptyString
+  steps: [GhostStepInput!]!
+}
+
+"""
 Replace Flamingos 2 sequence input.  Select the observation using one of the
 observation ID or the observation reference.  If both are provided, they must
 refer to the same observation.
@@ -21415,4 +22603,32 @@ sequence.
 """
 type ReplaceGnirsSequenceResult {
   sequence: [GnirsAtom!]!
+}
+
+"""
+Replace GHOST sequence input.  Select the observation using one of the
+observation ID or the observation reference.  If both are provided, they must
+refer to the same observation.
+"""
+input ReplaceGhostSequenceInput {
+  observationId: ObservationId
+  observationReference: ObservationReferenceLabel
+
+  "Specifies which sequence should be replaced."
+  sequenceType: SequenceType!
+
+  """
+  The new sequence.  Any unexecuted steps are deleted and replaced with the
+  provided sequence.  Steps that were previously executed, or for which at least
+  one execution event was received, are preserved.
+  """
+  sequence: [GhostAtomInput!]
+}
+
+"""
+The result of a replace sequence mutation, consisting of the newly inserted
+sequence.
+"""
+type ReplaceGhostSequenceResult {
+  sequence: [GhostAtom!]!
 }

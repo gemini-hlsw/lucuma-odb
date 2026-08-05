@@ -30,6 +30,8 @@ import lucuma.core.util.TimestampInterval
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.input.AddDatasetEventInput
+import lucuma.odb.graphql.input.AddEventBatchEntryInput
+import lucuma.odb.graphql.input.AddEventBatchInput
 import lucuma.odb.graphql.input.AddSequenceEventInput
 import lucuma.odb.graphql.input.AddSlewEventInput
 import lucuma.odb.graphql.input.AddStepEventInput
@@ -70,6 +72,10 @@ trait ExecutionEventService[F[_]]:
     input: AddStepEventInput
   )(using Transaction[F], Services.ServiceAccess): F[Result[ExecutionEvent.Id]]
 
+  def insertEvents(
+    input: AddEventBatchInput
+  )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]]
+
   def selectSequenceEvents(
     oid: Observation.Id
   ): Stream[F, SequenceEvent]
@@ -78,6 +84,11 @@ object ExecutionEventService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): ExecutionEventService[F] =
     new ExecutionEventService[F]:
+
+      // Raised by the check_execution_event_client_time trigger when a client
+      // supplies an event time outside the visit's expected timeframe.
+      private val invalidEventTime: OdbError =
+        OdbError.InvalidArgument("The supplied event time is outside the visit's expected timeframe.".some)
 
       override def atomRange(
         atomId: Atom.Id
@@ -106,6 +117,7 @@ object ExecutionEventService:
             .option(Statements.InsertDatasetEvent)(input)
             .map(_.toResult(invalidDataset.asProblem))
             .recoverWith:
+              case ClientTimeError()               => invalidEventTime.asFailureF
               case SqlState.ForeignKeyViolation(_) => invalidDataset.asFailureF
 
         // Best-effort to set the dataset time accordingly.  This can fail (leaving the timestamps
@@ -145,7 +157,9 @@ object ExecutionEventService:
             .option(Statements.InsertSequenceEvent)(input)
             .map(_.toResult(invalidVisit.asProblem))
             .recoverWith:
-              case SqlState.ForeignKeyViolation(_)                                        =>
+              case ClientTimeError()               =>
+                invalidEventTime.asFailureF
+              case SqlState.ForeignKeyViolation(_) =>
                 invalidVisit.asFailureF
 
         ResultT(insert)
@@ -160,9 +174,11 @@ object ExecutionEventService:
           session
             .unique(Statements.InsertSlewEvent)(v, input)
             .map(_.success)
+            .recoverWith:
+              case ClientTimeError() => invalidEventTime.asFailureF
 
         (for
-          v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none))
+          v <- ResultT(visitService.lookupOrInsertForSlew(input.observationId, none, input.clientTime))
           e <- ResultT(insert(v))
           (eid, _) = e
         yield eid).value
@@ -182,12 +198,58 @@ object ExecutionEventService:
             .option(Statements.InsertStepEvent)(input)
             .map(_.toResult(invalidStep.asProblem))
             .recoverWith:
+              case ClientTimeError()               => invalidEventTime.asFailureF
               case SqlState.CheckViolation(_)      => invalidVisit.asFailureF
               case SqlState.ForeignKeyViolation(_) => invalidStep.asFailureF
 
         ResultT(insert)
           .map((eid, _) => eid)
           .value
+
+      override def insertEvents(
+        input: AddEventBatchInput
+      )(using Transaction[F], Services.ServiceAccess): F[Result[List[ExecutionEvent.Id]]] =
+
+        // Resolves the distinct observations referenced by a batch of ids, running
+        // nothing when the list is empty (an empty IN-list is invalid SQL).  Ids
+        // that don't resolve simply contribute no observation here; the per-event
+        // insert below still rejects them with a precise not-found error.
+        def distinctObservations[A](ids: List[A], stmt: Int => Query[List[A], Observation.Id]): F[List[Observation.Id]] =
+          if ids.isEmpty then List.empty.pure
+          else session.execute(stmt(ids.size))(ids)
+
+        // Batches are scoped to a single observation: every event insert takes the
+        // observation's execution mutex, so a multi-observation batch would take
+        // several in array order and could deadlock against a concurrent batch
+        // taking them in another order.  One observation means one mutex per batch.
+        // Resolve them a kind at a time (one round trip each) rather than per event.
+        val requireSingleObservation: F[Result[Unit]] =
+          val datasetIds = input.events.collect { case AddEventBatchEntryInput.Dataset(v)  => v.datasetId }
+          val stepIds    = input.events.collect { case AddEventBatchEntryInput.Step(v)     => v.stepId }
+          val visitIds   = input.events.collect { case AddEventBatchEntryInput.Sequence(v) => v.visitId }
+          val slewOids   = input.events.collect { case AddEventBatchEntryInput.Slew(v)     => v.observationId }
+          for
+            d <- distinctObservations(datasetIds.distinct, Statements.SelectDatasetObservations)
+            s <- distinctObservations(stepIds.distinct,    Statements.SelectStepObservations)
+            v <- distinctObservations(visitIds.distinct,   Statements.SelectVisitObservations)
+          yield
+            if (d ++ s ++ v ++ slewOids).distinct.sizeIs <= 1 then ().success
+            else OdbError.InvalidArgument("All events in a batch must belong to the same observation.".some).asFailure
+
+        def insertOne(e: AddEventBatchEntryInput): F[Result[ExecutionEvent.Id]] =
+          e match
+            case AddEventBatchEntryInput.Dataset(v)  => insertDatasetEvent(v)
+            case AddEventBatchEntryInput.Sequence(v) => insertSequenceEvent(v)
+            case AddEventBatchEntryInput.Slew(v)     => insertSlewEvent(v)
+            case AddEventBatchEntryInput.Step(v)     => insertStepEvent(v)
+
+        // Insert in array order (that order is the events' arrival order, which the
+        // step-execution state machine depends on).  One transaction makes the
+        // batch atomic, so a failure rolls the whole thing back.
+        (for
+          _   <- ResultT(requireSingleObservation)
+          ids <- input.events.traverse(e => ResultT(insertOne(e)))
+        yield ids.toList).value
 
       override def selectSequenceEvents(
         oid: Observation.Id
@@ -201,11 +263,37 @@ object ExecutionEventService:
         TimestampInterval.between(min, max)
       }
 
+    // Observation-resolution queries, used to enforce that an addEventBatch is
+    // scoped to a single observation.  Each resolves the distinct observations
+    // referenced by a whole batch's worth of ids in a single round trip.
+
+    def SelectDatasetObservations(count: Int): Query[List[Dataset.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT c_observation_id
+        FROM t_dataset
+        WHERE c_dataset_id IN (${dataset_id.values.list(count)})
+      """.query(observation_id)
+
+    def SelectStepObservations(count: Int): Query[List[Step.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT a.c_observation_id
+        FROM t_step s
+        INNER JOIN t_atom a ON a.c_atom_id = s.c_atom_id
+        WHERE s.c_step_id IN (${step_id.values.list(count)})
+      """.query(observation_id)
+
+    def SelectVisitObservations(count: Int): Query[List[Visit.Id], Observation.Id] =
+      sql"""
+        SELECT DISTINCT c_observation_id
+        FROM t_visit
+        WHERE c_visit_id IN (${visit_id.values.list(count)})
+      """.query(observation_id)
+
     val SelectAtomRange: Query[Atom.Id, Option[TimestampInterval]] =
       sql"""
         SELECT
-          MIN(e.c_received),
-          MAX(e.c_received)
+          MIN(e.c_effective_time),
+          MAX(e.c_effective_time)
         FROM
           t_execution_event e
         INNER JOIN t_step s ON
@@ -217,8 +305,8 @@ object ExecutionEventService:
     val SelectStepRange: Query[Step.Id, Option[TimestampInterval]] =
       sql"""
         SELECT
-          MIN(c_received),
-          MAX(c_received)
+          MIN(c_effective_time),
+          MAX(c_effective_time)
         FROM
           t_execution_event
         WHERE
@@ -228,8 +316,8 @@ object ExecutionEventService:
     val SelectVisitRange: Query[Visit.Id, Option[TimestampInterval]] =
       sql"""
         SELECT
-          MIN(c_received),
-          MAX(c_received)
+          MIN(c_effective_time),
+          MAX(c_effective_time)
         FROM
           t_execution_event
         WHERE
@@ -247,6 +335,7 @@ object ExecutionEventService:
           c_step_id,
           c_dataset_id,
           c_dataset_stage,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -258,6 +347,7 @@ object ExecutionEventService:
           d.c_step_id,
           $dataset_id,
           $dataset_stage,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_dataset d
@@ -271,10 +361,10 @@ object ExecutionEventService:
           SET c_idempotency_key = EXCLUDED.c_idempotency_key
         RETURNING
           c_execution_event_id,
-          c_received,
+          c_effective_time,
           xmax = 0 AS inserted
       """.query(execution_event_id *: core_timestamp *: bool)
-         .contramap(in => (in.datasetId, in.datasetStage, in.idempotencyKey, in.datasetId))
+         .contramap(in => (in.datasetId, in.datasetStage, in.clientTime, in.idempotencyKey, in.datasetId))
 
     val InsertSequenceEvent: Query[AddSequenceEventInput, (Id, Boolean)] =
       sql"""
@@ -284,6 +374,7 @@ object ExecutionEventService:
           c_observation_id,
           c_visit_id,
           c_sequence_command,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -292,6 +383,7 @@ object ExecutionEventService:
           v.c_observation_id,
           $visit_id,
           $sequence_command,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_visit v
@@ -305,7 +397,7 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap(in => (in.visitId, in.command, in.idempotencyKey, in.visitId))
+         .contramap(in => (in.visitId, in.command, in.clientTime, in.idempotencyKey, in.visitId))
 
     val InsertSlewEvent: Query[(Visit.Id, AddSlewEventInput), (Id, Boolean)] =
       sql"""
@@ -315,6 +407,7 @@ object ExecutionEventService:
           c_observation_id,
           c_visit_id,
           c_slew_stage,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -323,6 +416,7 @@ object ExecutionEventService:
           v.c_observation_id,
           $visit_id,
           $slew_stage,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_visit v
@@ -336,7 +430,7 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap((v, in) => (v, in.slewStage, in.idempotencyKey, v))
+         .contramap((v, in) => (v, in.slewStage, in.clientTime, in.idempotencyKey, v))
 
     val InsertStepEvent: Query[AddStepEventInput, (Id, Boolean)] =
       sql"""
@@ -348,6 +442,7 @@ object ExecutionEventService:
           c_atom_id,
           c_step_id,
           c_step_stage,
+          c_client_time,
           c_idempotency_key
         )
         SELECT
@@ -358,6 +453,7 @@ object ExecutionEventService:
           s.c_atom_id,
           $step_id,
           $step_stage,
+          ${core_timestamp.opt},
           ${idempotency_key.opt}
         FROM
           t_step s
@@ -373,13 +469,13 @@ object ExecutionEventService:
           c_execution_event_id,
           xmax = 0 AS inserted
       """.query(execution_event_id *: bool)
-         .contramap(in => (in.visitId, in.stepId, in.stepStage, in.idempotencyKey, in.stepId))
+         .contramap(in => (in.visitId, in.stepId, in.stepStage, in.clientTime, in.idempotencyKey, in.stepId))
 
     val SelectSequenceEvents: Query[Observation.Id, ExecutionEvent.SequenceEvent] =
       sql"""
         SELECT
           c_execution_event_id,
-          c_received,
+          c_recorded_time,
           c_observation_id,
           c_visit_id,
           c_idempotency_key,
@@ -390,7 +486,7 @@ object ExecutionEventService:
           c_observation_id = $observation_id AND
           c_sequence_command IS NOT NULL
         ORDER BY
-          c_received
+          c_effective_time, c_execution_event_id
       """.query((
         execution_event_id  *:
         core_timestamp      *:

@@ -44,7 +44,7 @@ object LongSlit:
     instantiate(
       static,
       Acquisition.gmosNorth(observationId, estimator, static, namespace, config, acquisitionItc, calRole),
-      Science.gmosNorth(observationId, estimator, static, namespace, expander, config, scienceItc, calRole)
+      spectroscopy.Science.gmosNorth(observationId, estimator, static, namespace, expander, ObservingMode.GmosNorthLongSlitName, config, scienceItc, calRole)
     )
 
   def gmosSouth[F[_]: Monad](
@@ -61,7 +61,7 @@ object LongSlit:
     instantiate(
       static,
       Acquisition.gmosSouth(observationId, estimator, static, namespace, config, acquisitionItc, calRole),
-      Science.gmosSouth(observationId, estimator, static, namespace, expander, config, scienceItc, calRole)
+      spectroscopy.Science.gmosSouth(observationId, estimator, static, namespace, expander, ObservingMode.GmosSouthLongSlitName, config, scienceItc, calRole)
     )
 
 end LongSlit

@@ -16,6 +16,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
+import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -46,6 +47,7 @@ import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.util.CalculationState
 import lucuma.core.util.IdempotencyKey
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.DatabaseOperation
@@ -109,6 +111,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[ExchangePartner](ExchangePartnerType),
       LeafMapping[ExecutionEvent.Id](ExecutionEventIdType),
       LeafMapping[ExecutionEventType](ExecutionEventTypeType),
+      LeafMapping[ExecutionRequirement](ExecutionRequirementType),
       LeafMapping[ExecutionState](ExecutionStateType),
       LeafMapping[Existence](ExistenceType),
       LeafMapping[Extinction](ExtinctionType),
@@ -141,6 +144,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
       LeafMapping[ImagingVariantType](ImagingVariantTypeType),
       LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
+      LeafMapping[GmosMosAcquisitionType](GmosMosAcquisitionTypeType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),
       LeafMapping[GmosNorthFilter](GmosNorthFilterType),
@@ -164,6 +168,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GnirsCamera](GnirsCameraType),
       LeafMapping[GnirsReadMode](GnirsReadModeType),
       LeafMapping[GnirsWellDepth](GnirsWellDepthType),
+      LeafMapping[ArchiveDuplication.State](ArchiveDuplicationStateType),
       LeafMapping[Group.Id](GroupIdType),
       LeafMapping[GuideProbe](GuideProbeType),
       LeafMapping[StepGuideState](GuideStateType),

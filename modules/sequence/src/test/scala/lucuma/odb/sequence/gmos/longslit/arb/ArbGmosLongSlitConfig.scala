@@ -58,7 +58,7 @@ object ArbGmosLongSlitConfig:
         er <- arbitrary[Option[GmosLongSlitAcquisitionRoi]]
       yield AcquisitionConfig.GmosSouth(e, df, ef, dr, er)
 
-  given Arbitrary[Config.Common] =
+  given Arbitrary[spectroscopy.Config.Common] =
     Arbitrary:
       for
         w  <- arbitrary[Wavelength]
@@ -72,7 +72,7 @@ object ArbGmosLongSlitConfig:
         r  <- arbitrary[Option[GmosRoi]]
         d  <- arbitrary[Option[List[WavelengthDither]]]
         s  <- arbitrary[Option[List[Q]]]
-      yield Config.Common(
+      yield spectroscopy.Config.Common(
         w,
         e,
         dx,
@@ -92,7 +92,7 @@ object ArbGmosLongSlitConfig:
         g <- arbitrary[GmosNorthGrating]
         f <- arbitrary[Option[GmosNorthFilter]]
         u <- arbitrary[GmosNorthFpu]
-        c <- arbitrary[Config.Common]
+        c <- arbitrary[spectroscopy.Config.Common]
         a <- arbitrary[AcquisitionConfig.GmosNorth]
       yield Config.GmosNorth(g, f, u, c, a)
 
@@ -102,6 +102,6 @@ object ArbGmosLongSlitConfig:
         g <- arbitrary[GmosSouthGrating]
         f <- arbitrary[Option[GmosSouthFilter]]
         u <- arbitrary[GmosSouthFpu]
-        c <- arbitrary[Config.Common]
+        c <- arbitrary[spectroscopy.Config.Common]
         a <- arbitrary[AcquisitionConfig.GmosSouth]
       yield Config.GmosSouth(g, f, u, c, a)

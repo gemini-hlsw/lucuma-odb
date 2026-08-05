@@ -412,7 +412,7 @@ object TimeAccountingService {
       sql"""
         SELECT
           c_site,
-          c_created
+          c_effective_time
         FROM
           t_visit
         WHERE
@@ -435,7 +435,7 @@ object TimeAccountingService {
     val SelectEvents: Query[(ObserveClass, Visit.Id), TimeAccounting.Event] =
       sql"""
         SELECT
-          e.c_received,
+          e.c_effective_time,
           e.c_visit_id,
           COALESCE(s.c_observe_class, $obs_class),
           e.c_atom_id,
@@ -446,7 +446,7 @@ object TimeAccountingService {
         WHERE
           e.c_visit_id = $visit_id
         ORDER BY
-          e.c_received
+          e.c_effective_time, e.c_execution_event_id
       """.query(codec.event)
 
     val SelectChargeableOverlap: Query[Visit.Id, (Timestamp, Observation.Id)] =

@@ -21,8 +21,6 @@ trait ProposalView[F[_]] extends BaseMapping[F]:
     // those rows, so the placeholder is never rendered or discriminated upon.
     val ScienceSubtype  = col("c_gemini_science_subtype", science_subtype)
 
-    val Title           = col("c_title",    text_nonempty.opt)
-    val Abstract        = col("c_abstract", text_nonempty.opt)
     val Category        = col("c_category", tag.opt)
 
     val TooActivation   = col("c_too_activation", too_activation)
