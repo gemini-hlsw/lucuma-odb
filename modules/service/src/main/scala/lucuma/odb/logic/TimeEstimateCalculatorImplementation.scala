@@ -105,6 +105,15 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.GmosNorthLongslitMaxVisit.time
       )
 
+    lazy val gmosNorthMosSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.GmosNorthMosSetup.time,
+          ctx.enums.TimeEstimate.GmosNorthReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.GmosNorthMosMaxVisit.time
+      )
+
     lazy val gmosSouthImagingSetup: SetupTimeEstimateCalculator =
       setupCalculatorfromEstimation(
         SetupTime(
@@ -121,6 +130,15 @@ object TimeEstimateCalculatorImplementation:
           ctx.enums.TimeEstimate.GmosSouthReacquisition.time
         ),
         ctx.enums.TimeEstimate.GmosSouthLongslitMaxVisit.time
+      )
+
+    lazy val gmosSouthMosSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.GmosSouthMosSetup.time,
+          ctx.enums.TimeEstimate.GmosSouthReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.GmosSouthMosMaxVisit.time
       )
 
     lazy val igrins2LongSlitSetup: SetupTimeEstimateCalculator =
