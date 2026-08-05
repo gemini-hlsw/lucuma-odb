@@ -986,6 +986,26 @@ trait DatabaseOperations { this: OdbSuite =>
       .liftTo[IO]
     }
 
+  def configurationRequestsWhere(user: User, where: String): IO[List[ConfigurationRequest.Id]] =
+    query(
+      user,
+      s"""
+         query {
+          configurationRequests(WHERE: { $where }) {
+            matches {
+              id
+            }
+          }
+        }
+      """
+    ).flatMap { json =>
+      json.hcursor.downFields("configurationRequests", "matches").values.toList.flatten.traverse { json =>
+        json.hcursor.downField("id").as[ConfigurationRequest.Id]
+      }
+      .leftMap(f => new RuntimeException(f.message))
+      .liftTo[IO]
+    }
+
   def setObservationExistence(
     user: User,
     oid:  Observation.Id,
