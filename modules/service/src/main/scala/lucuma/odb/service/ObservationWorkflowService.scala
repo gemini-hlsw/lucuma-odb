@@ -69,9 +69,9 @@ import Services.Syntax.*
 
 sealed trait ObservationWorkflowService[F[_]] {
 
-  def getWorkflowsAndModes(
+  def getWorkflowsModesAndRoles(
     oids: List[Observation.Id]
-  )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType])]]]
+  )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]]
 
   def getWorkflows(
     oids: List[Observation.Id]
@@ -99,7 +99,7 @@ sealed trait ObservationWorkflowService[F[_]] {
   )(using Transaction[F]): F[Result[ObservationWorkflow]]
 
   def setWorkflowState(
-    input: AccessControl.CheckedWithId[(Option[ObservingModeType], ObservationWorkflow, ObservationWorkflowState), Observation.Id]
+    input: AccessControl.CheckedWithId[(Option[ObservingModeType], Option[CalibrationRole], ObservationWorkflow, ObservationWorkflowState), Observation.Id]
   )(using NoTransaction[F]): F[Result[ObservationWorkflow]]
 
   def filterState(
@@ -121,26 +121,26 @@ sealed trait ObservationWorkflowService[F[_]] {
 
 /* Validation Info Record */
 case class ObservationValidationInfo(
-  pid:                Program.Id,
-  tpe:                ProgramType,
-  oid:                Observation.Id,
-  observingMode:      Option[ObservingModeType],
-  coordinates:        Option[Coordinates],  // explicit base, or coordinates at CFP midpoint, if any
-  explicitBase:       Option[Coordinates],
-  role:               Option[CalibrationRole],
-  userState:          Option[ObservationWorkflowService.UserState],
+  pid:                    Program.Id,
+  tpe:                    ProgramType,
+  oid:                    Observation.Id,
+  observingMode:          Option[ObservingModeType],
+  coordinates:            Option[Coordinates],  // explicit base, or coordinates at CFP midpoint, if any
+  explicitBase:           Option[Coordinates],
+  calibrationRole:        Option[CalibrationRole],
+  userState:              Option[ObservationWorkflowService.UserState],
   declaredExecutionState: Option[DeclaredExecutionState],
-  proposalStatus:     ProposalStatus,
-  cfpid:              Option[CallForProposals.Id],
-  scienceBand:        Option[ScienceBand],
-  asterism:           List[Target],
-  associatedUserState:Option[ObservationWorkflowService.UserState], // state of science obs if this is a per-observation calibration (telluric or daytime pinhole)
-  generatorParams:    Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
-  cfpInfo:            Option[CfpInfo] = None,
-  programAllocations: Option[NonEmptyList[ScienceBand]] = None,
-  otherConfigErrors:  List[String] = Nil,
-  keckInstrument:     Option[KeckInstrument] = None,   // set for exchange_keck observations
-  subaruInstrument:   Option[SubaruInstrument] = None  // set for exchange_subaru observations
+  proposalStatus:         ProposalStatus,
+  cfpid:                  Option[CallForProposals.Id],
+  scienceBand:            Option[ScienceBand],
+  asterism:               List[Target],
+  associatedUserState:    Option[ObservationWorkflowService.UserState], // state of science obs if this is a per-observation calibration (telluric or daytime pinhole)
+  generatorParams:        Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
+  cfpInfo:                Option[CfpInfo] = None,
+  programAllocations:     Option[NonEmptyList[ScienceBand]] = None,
+  otherConfigErrors:      List[String] = Nil,
+  keckInstrument:         Option[KeckInstrument] = None,   // set for exchange_keck observations
+  subaruInstrument:       Option[SubaruInstrument] = None  // set for exchange_subaru observations
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -152,7 +152,10 @@ case class ObservationValidationInfo(
   def effectiveUserState: Option[UserState] =
     // Per-observation calibrations (tellurics, daytime pinhole flats) inherit
     // their science observation's user state.
-    if role.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedUserState
+    // A telluric could be declined however, thus it can carrie its own Inactive state,
+    // which overrides that inheritance.
+    if calibrationRole.contains(CalibrationRole.Telluric) && userState.contains(ObservationWorkflowState.Inactive) then Some(ObservationWorkflowState.Inactive)
+    else if calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedUserState
     else userState
 
   /* Has the proposal been accepted? */
@@ -474,7 +477,7 @@ object ObservationWorkflowService {
             case ObservationValidationCode.ConfigurationRequestPending => 7
 
         val validationStatus: ValidationState =
-          if info.role.isDefined then Defined // Calibrations are immediately Defined
+          if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined
           else codes.minOption.fold(Defined):
             case ObservationValidationCode.CallForProposalsError            |
                   ObservationValidationCode.ConfigurationError               |
@@ -504,7 +507,16 @@ object ObservationWorkflowService {
           info.isVisitor && user.role.access >= Access.Staff
 
         val allowedTransitions: List[ObservationWorkflowState] =
-          if (info.role.exists(ObsExtract.PerObservationCalibrationRoles.contains) && state <= Ready) then Nil
+          if info.calibrationRole.contains(CalibrationRole.Telluric) && state <= Ready then
+            // A telluric may be declined (set to Inactive)
+            state match
+              case Inactive =>
+                if info.userState.contains(Inactive)
+                then List(info.associatedUserState.getOrElse(validationStatus))
+                else Nil
+              case _ =>
+                List(Inactive)
+          else if (info.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) && state <= Ready) then Nil
           else state match
             case Inactive   => List(executionState.getOrElse(validationStatus))
             case Undefined  => List(Inactive)
@@ -527,7 +539,7 @@ object ObservationWorkflowService {
 
         type Validator = ObservationValidationInfo => ObservationValidationMap
 
-        val (cals, other)         = infos.partition(_._2.role.isDefined)
+        val (cals, other)         = infos.partition(_._2.calibrationRole.isDefined)
         val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
 
         // Here are our simple validators
@@ -535,9 +547,9 @@ object ObservationWorkflowService {
         val generatorValidator: Validator = info =>
           if info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else info.generatorParams.foldMap:
-            case Left(error)                                                                   => ObservationValidationMap.singleton(error.toObsValidation)
-            case Right(GeneratorParams(ItcInputDerivation.Incomplete(m), _, _, _, _, _, _, _)) => ObservationValidationMap.singleton(m.toObsValidation)
-            case Right(ps)                                                                     => ObservationValidationMap.empty
+            case Left(error)                                                         => ObservationValidationMap.singleton(error.toObsValidation)
+            case Right(GeneratorParams(itcInput = ItcInputDerivation.Incomplete(m))) => ObservationValidationMap.singleton(m.toObsValidation)
+            case Right(ps)                                                           => ObservationValidationMap.empty
 
         val cfpInstrumentValidator: Validator = info =>
           info.cfpInfo.foldMap: cfp =>
@@ -676,14 +688,14 @@ object ObservationWorkflowService {
       override def getWorkflows(
         oids: List[Observation.Id]
       )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]] =
-        ResultT(getWorkflowsAndModes(oids))
+        ResultT(getWorkflowsModesAndRoles(oids))
           .map: m =>
             m.view.mapValues(p => p._1).toMap
           .value
 
-      override def getWorkflowsAndModes(
+      override def getWorkflowsModesAndRoles(
         oids: List[Observation.Id]
-      )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType])]]] =
+      )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]] =
 
         // Data obtained from the database, requiring a transaction.
         val select: F[Result[(
@@ -708,7 +720,7 @@ object ObservationWorkflowService {
           withModes =
             workflows.map:
               case (oid, wf) =>
-                oid -> (wf, infos.get(oid).flatMap(_.observingMode))
+                oid -> (wf, infos.get(oid).flatMap(_.observingMode), infos.get(oid).flatMap(_.calibrationRole))
         yield withModes).value
 
       override def getWorkflow(
@@ -752,10 +764,10 @@ object ObservationWorkflowService {
           case _ => false
 
       override def setWorkflowState(
-        input: AccessControl.CheckedWithId[(Option[ObservingModeType], ObservationWorkflow, ObservationWorkflowState), Observation.Id]
+        input: AccessControl.CheckedWithId[(Option[ObservingModeType], Option[CalibrationRole], ObservationWorkflow, ObservationWorkflowState), Observation.Id]
       )(using NoTransaction[F]): F[Result[ObservationWorkflow]] =
         input.foldWithId(OdbError.InvalidArgument().asFailureF):
-          case ((mode, w, state), oid) =>
+          case ((mode, calibrationRole, w, state), oid) =>
             (
               if w.state === state then ResultT.success(w)
               else ResultT:
@@ -796,6 +808,12 @@ object ObservationWorkflowService {
                     // Same for everyone
                     case (Ongoing, Completed) =>
                       updateDeclaredState(oid, Some(Completed))
+                        .as(Result(w.copy(state = state)))
+
+                    // Reinstating a declined telluric clears its override so it
+                    // resumes inheriting its science observation's state.
+                    case (Inactive, Ready) if calibrationRole.contains(CalibrationRole.Telluric) =>
+                      updateUserState(oid, None)
                         .as(Result(w.copy(state = state)))
 
                     // Same for everyone; note that this needs to be the last case
