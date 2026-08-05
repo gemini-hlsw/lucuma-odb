@@ -15,6 +15,7 @@ import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import skunk.Transaction
+
 import Services.Syntax.*
 
 type ObservationValidator = ObservationValidationInfo => ObservationValidationMap

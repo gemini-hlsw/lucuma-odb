@@ -7,12 +7,12 @@ import cats.Order.*
 import cats.data.NonEmptyChain
 import cats.syntax.all.*
 import lucuma.core.enums.ObservationValidationCode
+import lucuma.core.enums.ObservationValidationCode.Severity
 import lucuma.core.model.ObservationValidation
 import lucuma.core.util.NewType
+import lucuma.odb.data as isEmpty
 
 import scala.collection.immutable.SortedMap
-import lucuma.odb.{data => isEmpty}
-import lucuma.core.enums.ObservationValidationCode.Severity
 
 object ObservationValidationMap extends NewType[SortedMap[ObservationValidationCode, NonEmptyChain[String]]]:
   def empty: ObservationValidationMap = ObservationValidationMap(SortedMap.empty[ObservationValidationCode, NonEmptyChain[String]])
