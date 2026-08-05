@@ -267,6 +267,7 @@ object CalcMain extends MainParams:
       _          <- Resource.eval(pool.use: s =>
                       Services.asSuperUser(UserService.fromSession(s).canonicalizeUser(user))
                     )
+      schema     <- Resource.eval(OdbMapping.loadSchema[F])
       mapping     = (s: Session[F]) =>
                       OdbMapping.forObscalc(
                         Resource.pure(s),
@@ -280,7 +281,8 @@ object CalcMain extends MainParams:
                         http,
                         horizonsClient,
                         GoaClient.noop[F],
-                        c.email
+                        c.email,
+                        schema
                       )
       o          <- runObscalcDaemon(
                       c.database.maxObscalcConnections,

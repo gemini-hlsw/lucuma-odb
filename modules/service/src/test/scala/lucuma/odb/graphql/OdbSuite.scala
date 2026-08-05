@@ -464,7 +464,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       goa <- Resource.eval(goaClient)
-      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig)
+      schema <- Resource.eval(OdbMapping.loadSchema[IO])
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
     } yield map
 
   protected def trace: Resource[IO, Trace[IO]] =
@@ -844,9 +845,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         db   <- FMain.databasePoolResource[IO](databaseConfig)
         enm  <- db.evalMap(Enums.load)
         ptc  <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
-      yield (db, ptc)
+        schema <- Resource.eval(OdbMapping.loadSchema[IO])
+      yield (db, ptc, schema)
 
-    res.use: (db, ptc) =>
+    res.use: (db, ptc, schema) =>
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
@@ -859,7 +861,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         httpClient,
         horizonsClient,
         GoaClient.noop[IO],
-        emailConfig
+        emailConfig,
+        schema
       )
       db.use: s =>
         given services: Services[IO] = Services.forUser(u, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, TelluricTargetsClient.noop[IO], GoaClient.noop[IO])(s)

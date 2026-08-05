@@ -19,6 +19,15 @@ private object SchemaStitcherMacros:
   inline def fromResources(name: String) =
     ${ SchemaStitcherMacros.fromResourcesImpl('name) }
 
+  private val chunkSize = 16384
+
+  /** Splits `s` into constants small enough for the constant pool and rejoins them at runtime. */
+  private def stringExpr(s: String)(using Quotes): Expr[String] =
+    if s.length <= chunkSize then Expr(s)
+    else
+      val chunks = Expr.ofSeq(s.grouped(chunkSize).toSeq.map(Expr(_)))
+      '{ $chunks.mkString }
+
   /**
    * Macro to do some compile time checking for the schema. It will:
    *   - Check that the resource exists
@@ -55,7 +64,7 @@ private object SchemaStitcherMacros:
       schemaSource
     ).build match
       case Result.Success(schema) =>
-        val strSchema = Expr(schema.toString)
+        val strSchema = stringExpr(schema.toString)
         '{ SchemaStitcher.pure($strSchema) }
 
       case Result.Warning(problems, schema) =>
@@ -64,7 +73,7 @@ private object SchemaStitcherMacros:
             s"Loaded schema '${location}' with problems:${lineSeparator}${problems.map(_.toString).mkString_(lineSeparator).indent(4)}",
             x
           )
-        val strSchema = Expr(schema.toString)
+        val strSchema = stringExpr(schema.toString)
         '{ SchemaStitcher.pure($strSchema) }
 
       case Result.Failure(problems) =>
