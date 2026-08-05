@@ -3103,6 +3103,33 @@ input GmosNorthMosInput {
   """
   explicitOffsets: [OffsetComponentInput!]
 
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosNorthMosAcquisitionInput
+
+}
+
+"""
+Parameters that override MOS acquisition defaults.  MOS acquisition is always
+Full Frame, so (unlike long slit) there is no ROI to configure.
+"""
+input GmosNorthMosAcquisitionInput {
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitFilter: GmosNorthFilter
+
+  """
+  Exposure time mode for the acquisition sequence.  MOS acquisition must be
+  Time & Count; a signal-to-noise mode is rejected.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
 }
 
 """
@@ -3176,6 +3203,33 @@ input GmosSouthMosInput {
   The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitOffsets: [OffsetComponentInput!]
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosSouthMosAcquisitionInput
+
+}
+
+"""
+Parameters that override MOS acquisition defaults.  MOS acquisition is always
+Full Frame, so (unlike long slit) there is no ROI to configure.
+"""
+input GmosSouthMosAcquisitionInput {
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitFilter: GmosSouthFilter
+
+  """
+  Exposure time mode for the acquisition sequence.  MOS acquisition must be
+  Time & Count; a signal-to-noise mode is rejected.
+  """
+  exposureTimeMode: ExposureTimeModeInput
 
 }
 
@@ -12789,6 +12843,38 @@ type GmosSouthLongSlit {
 }
 
 """
+GMOS North MOS acquisition parameters.  MOS acquisition is always Full Frame,
+so there is no ROI to configure (unlike long slit).
+"""
+type GmosNorthMosAcquisition {
+
+  """
+  The GMOS North filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosNorthFilter!
+
+  """
+  The GMOS North filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosNorthFilter!
+
+  """
+  An explicitly specified GMOS North filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosNorthFilter
+
+  """
+  The exposure time mode for the acquisition sequence.  MOS acquisition must be
+  Time & Count; there is no acquisition ITC pass to solve a signal-to-noise one.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
 GMOS North MOS mode
 """
 type GmosNorthMos {
@@ -12968,6 +13054,43 @@ type GmosNorthMos {
   field for the wavelength that will be used in the observation.
   """
   initialCentralWavelength: Wavelength!
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosNorthMosAcquisition!
+}
+
+"""
+GMOS South MOS acquisition parameters.  MOS acquisition is always Full Frame,
+so there is no ROI to configure (unlike long slit).
+"""
+type GmosSouthMosAcquisition {
+
+  """
+  The GMOS South filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosSouthFilter!
+
+  """
+  The GMOS South filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosSouthFilter!
+
+  """
+  An explicitly specified GMOS South filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosSouthFilter
+
+  """
+  The exposure time mode for the acquisition sequence.  MOS acquisition must be
+  Time & Count; there is no acquisition ITC pass to solve a signal-to-noise one.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
 }
 
 """
@@ -13150,6 +13273,11 @@ type GmosSouthMos {
   field for the wavelength that will be used in the observation.
   """
   initialCentralWavelength: Wavelength!
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosSouthMosAcquisition!
 }
 
 """

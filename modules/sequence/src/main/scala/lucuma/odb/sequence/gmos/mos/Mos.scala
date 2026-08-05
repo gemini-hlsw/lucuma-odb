@@ -6,9 +6,8 @@ package gmos
 package mos
 
 import cats.Monad
-import cats.syntax.functor.*
+import cats.data.EitherT
 import fs2.Pure
-import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig
@@ -28,10 +27,14 @@ import java.util.UUID
 object Mos:
 
   private def instantiate[F[_]: Monad, S, D](
-    static:  S,
-    science: F[Either[OdbError, SequenceGenerator[D]]]
+    static:      S,
+    acquisition: Either[OdbError, SequenceGenerator[D]],
+    science:     F[Either[OdbError, SequenceGenerator[D]]]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, S, D]]] =
-    science.map(_.map(s => StreamingExecutionConfig(static, Stream.empty, s.generate)))
+    (for
+      a <- EitherT.fromEither(acquisition)
+      s <- EitherT(science)
+    yield StreamingExecutionConfig(static, a.generate, s.generate)).value
 
   def gmosNorth[F[_]: Monad](
     observationId: Observation.Id,
@@ -45,6 +48,7 @@ object Mos:
     val static = InitialConfigs.GmosNorthStatic
     instantiate(
       static,
+      Acquisition.gmosNorth(observationId, estimator, static, namespace, config, calRole),
       spectroscopy.Science.gmosNorth(observationId, estimator, static, namespace, expander, ObservingMode.GmosNorthMosName, config, scienceItc, calRole)
     )
 
@@ -60,6 +64,7 @@ object Mos:
     val static = InitialConfigs.GmosSouthStatic
     instantiate(
       static,
+      Acquisition.gmosSouth(observationId, estimator, static, namespace, config, calRole),
       spectroscopy.Science.gmosSouth(observationId, estimator, static, namespace, expander, ObservingMode.GmosSouthMosName, config, scienceItc, calRole)
     )
 

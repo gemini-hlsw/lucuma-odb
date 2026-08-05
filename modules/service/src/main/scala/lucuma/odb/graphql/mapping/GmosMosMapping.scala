@@ -16,8 +16,10 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
+import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
@@ -116,6 +118,17 @@ trait GmosMosMapping[F[_]]
       SqlField("attachmentId", GmosSouthMosView.Common.MaskAttachmentId)
     )
 
+  lazy val GmosNorthMosAcquisitionMapping: ObjectMapping =
+    ObjectMapping(GmosNorthMosAcquisitionType)(
+      SqlField("observationId", GmosNorthMosView.Common.ObservationId, key = true, hidden = true),
+
+      explicitOrElseDefault[GmosNorthFilter]("filter", "explicitFilter", "defaultFilter"),
+      SqlField("defaultFilter",  GmosNorthMosView.AcquisitionFilterDefault),
+      SqlField("explicitFilter", GmosNorthMosView.AcquisitionFilter),
+
+      SqlObject("exposureTimeMode", Join(GmosNorthMosView.Common.ObservationId, ExposureTimeModeView.ObservationId))
+    )
+
   lazy val GmosNorthMosMapping: ObjectMapping =
 
     import GmosMosMapping.*
@@ -134,6 +147,7 @@ trait GmosMosMapping[F[_]]
       SqlObject("centralWavelength"),
       SqlField("acquisitionType", GmosNorthMosView.Common.AcquisitionType),
       SqlObject("exposureTimeMode", Join(GmosNorthMosView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("acquisition"),
 
       common.xBin,
       common.defaultXBin,
@@ -192,6 +206,17 @@ trait GmosMosMapping[F[_]]
       SqlObject("initialCentralWavelength")
     )
 
+  lazy val GmosSouthMosAcquisitionMapping: ObjectMapping =
+    ObjectMapping(GmosSouthMosAcquisitionType)(
+      SqlField("observationId", GmosSouthMosView.Common.ObservationId, key = true, hidden = true),
+
+      explicitOrElseDefault[GmosSouthFilter]("filter", "explicitFilter", "defaultFilter"),
+      SqlField("defaultFilter",  GmosSouthMosView.AcquisitionFilterDefault),
+      SqlField("explicitFilter", GmosSouthMosView.AcquisitionFilter),
+
+      SqlObject("exposureTimeMode", Join(GmosSouthMosView.Common.ObservationId, ExposureTimeModeView.ObservationId))
+    )
+
   lazy val GmosSouthMosMapping: ObjectMapping =
 
     import GmosMosMapping.*
@@ -210,6 +235,7 @@ trait GmosMosMapping[F[_]]
       SqlObject("centralWavelength"),
       SqlField("acquisitionType", GmosSouthMosView.Common.AcquisitionType),
       SqlObject("exposureTimeMode", Join(GmosSouthMosView.Common.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("acquisition"),
 
       common.xBin,
       common.defaultXBin,
@@ -267,9 +293,17 @@ trait GmosMosMapping[F[_]]
     )
 
   lazy val GmosMosElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (GmosNorthMosAcquisitionType, "exposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(Filter(Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition), child))
+
     case (GmosNorthMosType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(Filter(Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science), child))
+
+    case (GmosSouthMosAcquisitionType, "exposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(Filter(Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition), child))
 
     case (GmosSouthMosType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
@@ -279,8 +313,10 @@ trait GmosMosMapping[F[_]]
     List(
       GmosNorthMosMapping,
       GmosNorthMosCustomMaskMapping,
+      GmosNorthMosAcquisitionMapping,
       GmosSouthMosMapping,
-      GmosSouthMosCustomMaskMapping
+      GmosSouthMosCustomMaskMapping,
+      GmosSouthMosAcquisitionMapping
     )
 }
 

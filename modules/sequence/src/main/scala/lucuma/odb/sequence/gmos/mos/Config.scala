@@ -48,6 +48,9 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
    */
   def acquisitionType: GmosMosAcquisitionType
 
+  /** Acquisition configuration: exposure time mode and filter. */
+  def acquisition: AcquisitionConfig[L]
+
   override def fpuMask: GmosFpuMask[U] =
     customMask
 
@@ -90,6 +93,7 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
       out.writeInt(d.toPicometers.value)
     spatialOffsets.foreach: o =>
       out.writeLong(o.toAngle.toMicroarcseconds)
+    out.write(acquisition.hashBytes)
 
     out.close()
     bao.toByteArray
@@ -101,6 +105,7 @@ object Config:
     filter:          Option[GmosNorthFilter],
     customMask:      GmosFpuMask.Custom,
     acquisitionType: GmosMosAcquisitionType,
+    acquisition:     AcquisitionConfig.GmosNorth,
     common:          Common
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
@@ -124,6 +129,7 @@ object Config:
     filter:          Option[GmosSouthFilter],
     customMask:      GmosFpuMask.Custom,
     acquisitionType: GmosMosAcquisitionType,
+    acquisition:     AcquisitionConfig.GmosSouth,
     common:          Common
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
 

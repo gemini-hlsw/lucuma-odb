@@ -7,14 +7,8 @@ package longslit
 
 import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
-import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.order.*
-import cats.syntax.traverse.*
-import eu.timepit.refined.*
-import eu.timepit.refined.types.string.NonEmptyString
-import fs2.Pure
-import fs2.Stream
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosGratingOrder
@@ -32,7 +26,6 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
@@ -43,6 +36,8 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
+import lucuma.odb.sequence.gmos.spectroscopy.AcquisitionAtoms
+import lucuma.odb.sequence.gmos.spectroscopy.AcquisitionSteps
 import lucuma.odb.sequence.util.AtomBuilder
 
 import java.util.UUID
@@ -55,6 +50,9 @@ object Acquisition:
   val MaxExpTimeLastStep = 360.secondTimeSpan
 
   val RepeatingAtomCount: Int = 10
+
+  private val ModeName: String =
+    "GMOS Long Slit"
 
   def filter[L](acqFilters: NonEmptyList[L], λ: Wavelength, wavelength: L => Wavelength): L =
     acqFilters.toList.minBy(filter => λ.diff(wavelength(filter)).abs)
@@ -71,11 +69,12 @@ object Acquisition:
     p10:  ProtoStep[D],
     slit: ProtoStep[D]
   ):
-    val initialAtom: NonEmptyList[ProtoStep[D]] =
-      NonEmptyList.of(ccd2, p10, slit.withBreakpoint)
-
-    val repeatingAtom: NonEmptyList[ProtoStep[D]] =
-      NonEmptyList.of(slit)
+    /** The step grouping, without the breakpoint (placed by `AcquisitionAtoms`). */
+    def acquisitionSteps: AcquisitionSteps[D] =
+      AcquisitionSteps(
+        NonEmptyList.of(ccd2, p10, slit),
+        NonEmptyList.of(slit)
+      )
 
   private sealed trait StepComputer[D, G, L, U] extends GmosSequenceState[D, G, L, U]:
 
@@ -131,41 +130,6 @@ object Acquisition:
 
   end StepComputer
 
-  private class Generator[D](
-    builder: AtomBuilder[D],
-    steps:   Steps[D]
-  ) extends SequenceGenerator[D]:
-
-    override val generate: Stream[Pure, Atom[D]] =
-      (for
-        a0 <- builder.build(NonEmptyString.unapply("Initial Acquisition"), 0, 0, steps.initialAtom)
-        as <- (1 to RepeatingAtomCount).toList.traverse: aix =>
-                builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, steps.repeatingAtom)
-      yield Stream.emits(a0 :: as)).runA(StepTimeEstimateCalculator.Last.empty[D]).value
-
-  private def instantiate[D, G, L, U](
-    oid:         Observation.Id,
-    stepComp:    StepComputer[D, G, L, U],
-    time:        Either[OdbError, IntegrationTime],
-    calRole:     Option[CalibrationRole],
-    atomBuilder: AtomBuilder[D],
-    config:      Config[G, L, U],
-  ): Either[OdbError, SequenceGenerator[D]] =
-    calRole match
-      case Some(CalibrationRole.Twilight) =>
-        SequenceGenerator.empty.asRight
-      case _                              =>
-        time
-          .filterOrElse(
-            _.exposureTime.toNonNegMicroseconds.value > 0,
-            OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: GMOS Long Slit acquisition requires a positive exposure time.".some)
-          )
-          .map: t =>
-             new Generator(
-               atomBuilder,
-               stepComp.compute(config.acquisition, config.fpu, t.exposureTime)
-             )
-
   def gmosNorth(
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[StaticConfig.GmosNorth, GmosNorth],
@@ -175,13 +139,14 @@ object Acquisition:
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): Either[OdbError, SequenceGenerator[GmosNorth]] =
-    instantiate(
+    AcquisitionAtoms.instantiate(
       observationId,
-      StepComputer.North,
       time,
       calRole,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-      config
+      ModeName,
+      t => StepComputer.North.compute(config.acquisition, config.fpu, t).acquisitionSteps,
+      RepeatingAtomCount
     )
 
   def gmosSouth(
@@ -193,13 +158,14 @@ object Acquisition:
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): Either[OdbError, SequenceGenerator[GmosSouth]] =
-    instantiate(
+    AcquisitionAtoms.instantiate(
       observationId,
-      StepComputer.South,
       time,
       calRole,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Acquisition),
-      config
+      ModeName,
+      t => StepComputer.South.compute(config.acquisition, config.fpu, t).acquisitionSteps,
+      RepeatingAtomCount
     )
 
 end Acquisition

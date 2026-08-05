@@ -464,8 +464,9 @@ object GeneratorParamsService {
               sciMode  = sciMode
             ).asRight
 
-          // MOS has no acquisition sequence yet, so it takes the science-only
-          case gnm @ gmos.mos.Config.GmosNorth(g, f, m, _, c) =>
+          // MOS runs no acquisition ITC pass (its acquisition is sized by a
+          // stated Time & Count exposure time), so it takes the science-only
+          case gnm @ gmos.mos.Config.GmosNorth(g, f, m, _, _, c) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,
@@ -485,7 +486,7 @@ object GeneratorParamsService {
 
             GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.executionRequirement.isSplittable).asRight
 
-          case gsm @ gmos.mos.Config.GmosSouth(g, f, m, _, c) =>
+          case gsm @ gmos.mos.Config.GmosSouth(g, f, m, _, _, c) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,

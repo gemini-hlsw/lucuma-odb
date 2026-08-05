@@ -92,6 +92,11 @@ class MosLongSlitSequencesSuite extends FunSuite:
       Filter,
       GmosFpuMask.Custom(ToBeDefined, SlitWidth),
       GmosMosAcquisitionType.MaskOut,
+      mos.AcquisitionConfig.GmosNorth(
+        ExposureTimeMode.TimeAndCountMode(30.secondTimeSpan, PosInt.unsafeFrom(10), Wavelength.fromIntNanometers(500).get),
+        GmosNorthFilter.GPrime,
+        none
+      ),
       common
     )
 
