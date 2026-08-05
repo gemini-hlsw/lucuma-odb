@@ -48,7 +48,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
    */
   def acquisitionType: GmosMosAcquisitionType
 
-  /** Acquisition configuration: exposure time mode and filter. */
   def acquisition: AcquisitionConfig[L]
 
   override def fpuMask: GmosFpuMask[U] =

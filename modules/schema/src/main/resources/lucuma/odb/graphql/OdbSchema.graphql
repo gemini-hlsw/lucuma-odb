@@ -12843,8 +12843,7 @@ type GmosSouthLongSlit {
 }
 
 """
-GMOS North MOS acquisition parameters.  MOS acquisition is always Full Frame,
-so there is no ROI to configure (unlike long slit).
+GMOS North MOS acquisition parameters.  MOS acquisition is always Full Frame
 """
 type GmosNorthMosAcquisition {
 
@@ -12868,7 +12867,7 @@ type GmosNorthMosAcquisition {
 
   """
   The exposure time mode for the acquisition sequence.  MOS acquisition must be
-  Time & Count; there is no acquisition ITC pass to solve a signal-to-noise one.
+  Time & Count.
   """
   exposureTimeMode: ExposureTimeMode!
 

@@ -3,7 +3,6 @@
 
 package lucuma.odb.sequence.gmos.mos
 
-import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.Breakpoint
@@ -104,11 +103,8 @@ class AcquisitionSuite extends FunSuite:
   private def fpuOf(s: Step[DynamicConfig.GmosNorth]): Option[GmosFpuMask[GmosNorthFpu]] =
     s.instrumentConfig.fpu
 
-  private def isMasked(s: Step[DynamicConfig.GmosNorth]): Boolean =
-    s.instrumentConfig.readout.xBin === GmosXBinning.One
-
-  private def isField(s: Step[DynamicConfig.GmosNorth]): Boolean =
-    s.instrumentConfig.readout.xBin === GmosXBinning.Two
+  private val CustomMask: GmosFpuMask[GmosNorthFpu] =
+    GmosFpuMask.Custom(ToBeDefined, SlitWidth)
 
   test("MaskIn: initial atom is a single through-mask step with a breakpoint, then count-1 repeats"):
     val atoms = generate(config(GmosMosAcquisitionType.MaskIn))
@@ -117,7 +113,7 @@ class AcquisitionSuite extends FunSuite:
     assertEquals(atoms.head.steps.length, 1)
     val initial = atoms.head.steps.head
     assertEquals(initial.breakpoint, Breakpoint.Enabled)
-    assert(fpuOf(initial).contains(GmosFpuMask.Custom(ToBeDefined, SlitWidth)), s"through-mask step carries the custom mask, got ${fpuOf(initial)}")
+    assert(fpuOf(initial).contains(CustomMask), s"through-mask step carries the custom mask, got ${fpuOf(initial)}")
 
     val repeats = atoms.tail
     assert(repeats.nonEmpty)
@@ -132,10 +128,8 @@ class AcquisitionSuite extends FunSuite:
     assertEquals(atoms.head.steps.length, 2)
     val field  = atoms.head.steps.head
     val masked = atoms.head.steps.last
-    assert(isField(field))
-    assertEquals(field.instrumentConfig.fpu, none)
-    assert(isMasked(masked))
-    assert(fpuOf(masked).contains(GmosFpuMask.Custom(ToBeDefined, SlitWidth)))
+    assertEquals(fpuOf(field), none, "the field step is taken without the mask")
+    assert(fpuOf(masked).contains(CustomMask), "the second step is taken through the mask")
     assertEquals(masked.breakpoint, Breakpoint.Enabled)
     assertEquals(field.breakpoint, Breakpoint.Disabled)
 
@@ -160,13 +154,21 @@ class AcquisitionSuite extends FunSuite:
   test("through-mask steps are 1x1; the unmasked field step is 2x2"):
     val atoms = generate(config(GmosMosAcquisitionType.MaskOut))
 
-    atoms.flatMap(_.steps.toList).filter(isMasked).foreach: s =>
+    // Under MaskOut the first step of the initial atom is the field image and
+    // every other step in the sequence is taken through the mask.
+    val steps = atoms.flatMap(_.steps.toList)
+    val field = steps.head
+    val masked = steps.tail
+
+    assertEquals(fpuOf(field), none)
+    assertEquals(field.instrumentConfig.readout.xBin, GmosXBinning.Two)
+    assertEquals(field.instrumentConfig.readout.yBin, GmosYBinning.Two)
+
+    assert(masked.nonEmpty)
+    masked.foreach: s =>
+      assert(fpuOf(s).contains(CustomMask))
       assertEquals(s.instrumentConfig.readout.xBin, GmosXBinning.One)
       assertEquals(s.instrumentConfig.readout.yBin, GmosYBinning.One)
-
-    atoms.flatMap(_.steps.toList).filter(isField).foreach: s =>
-      assertEquals(s.instrumentConfig.readout.xBin, GmosXBinning.Two)
-      assertEquals(s.instrumentConfig.readout.yBin, GmosYBinning.Two)
 
   test("exposure time is the stated time, verbatim"):
     val atoms = generate(config(GmosMosAcquisitionType.MaskIn, acqConfig(45)))
@@ -187,11 +189,6 @@ class AcquisitionSuite extends FunSuite:
     val atoms = generate(config(GmosMosAcquisitionType.MaskOut, acq1))
     assertEquals(atoms.length, 1)
     assertEquals(atoms.head.steps.length, 2)
-
-  test("a MOS observation with no Mask Attachment still generates"):
-    val atoms = generate(config(GmosMosAcquisitionType.MaskIn))
-    assert(atoms.nonEmpty)
-    assert(fpuOf(atoms.head.steps.head).exists(_.isInstanceOf[GmosFpuMask.Custom]))
 
   test("a Twilight calibration generates an empty acquisition"):
     val atoms = generate(config(GmosMosAcquisitionType.MaskIn), calRole = CalibrationRole.Twilight.some)

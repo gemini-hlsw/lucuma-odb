@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.gmos.mos
 
 import cats.Eq
+import cats.derived.*
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.ExposureTimeMode
@@ -15,11 +16,6 @@ import java.io.DataOutputStream
 
 /**
  * Configuration for the GMOS MOS acquisition.
- *
- * MOS acquisition is always Full Frame (slitlets span the whole field, so any
- * smaller readout would silently discard them), so — unlike long slit — there is
- * no ROI to configure.  The two things a MOS acquisition carries are its
- * exposure time mode (which must be Time & Count; see ADR 0002) and its filter.
  *
  * The default filter is the acquisition filter nearest the central wavelength;
  * it is computed in the database view and passed in here.
@@ -54,30 +50,10 @@ object AcquisitionConfig:
     exposureTimeMode: ExposureTimeMode,
     defaultFilter:    GmosNorthFilter,
     explicitFilter:   Option[GmosNorthFilter]
-  ) extends AcquisitionConfig[GmosNorthFilter]
-
-  object GmosNorth:
-
-    given Eq[GmosNorth] =
-      Eq.by: a =>
-        (
-          a.exposureTimeMode,
-          a.defaultFilter,
-          a.explicitFilter
-        )
+  ) extends AcquisitionConfig[GmosNorthFilter] derives Eq
 
   final case class GmosSouth(
     exposureTimeMode: ExposureTimeMode,
     defaultFilter:    GmosSouthFilter,
     explicitFilter:   Option[GmosSouthFilter]
-  ) extends AcquisitionConfig[GmosSouthFilter]
-
-  object GmosSouth:
-
-    given Eq[GmosSouth] =
-      Eq.by: a =>
-        (
-          a.exposureTimeMode,
-          a.defaultFilter,
-          a.explicitFilter
-        )
+  ) extends AcquisitionConfig[GmosSouthFilter] derives Eq

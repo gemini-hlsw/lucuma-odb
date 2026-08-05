@@ -1,11 +1,7 @@
 -- GMOS MOS gains an acquisition configuration: an optional explicit
--- acquisition filter (with a wavelength-derived default, exactly as long slit
--- has) and an acquisition exposure time mode.  The latter is always Time &
--- Count because there is no acquisition ITC pass for MOS (see ADR 0002), so MOS
--- moves out of the IGRINS-2 "science row only" bucket and now requires exactly
--- one acquisition row and one science row.
+-- acquisition filter  and an acquisition exposure time mode.
 
--- The acquisition filter column, mirroring long slit.
+-- The acquisition filter column.
 ALTER TABLE t_gmos_north_mos
   ADD COLUMN c_acquisition_filter d_tag REFERENCES t_gmos_north_filter(c_tag);
 
@@ -55,9 +51,7 @@ ON t_gmos_south_mos
 FOR EACH ROW
 EXECUTE FUNCTION check_gmos_acquisition_filter_is_valid('t_gmos_south_filter');
 
--- MOS now requires one acquisition and one science exposure time mode, and the
--- acquisition mode must be Time & Count (no acquisition ITC pass exists to solve
--- a signal-to-noise one).
+-- MOS requires an acquisition etm of type T&C
 CREATE OR REPLACE FUNCTION check_etm_consistent()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -122,27 +116,6 @@ BEGIN
       WHEN obs_mode = 'ghost_ifu' THEN
         IF sci_count <> 2 THEN
           RAISE EXCEPTION 'Observation % with mode % must have two science exposure time modes (red and blue camera)', obs_id, obs_mode;
-        END IF;
-
-      WHEN obs_mode IN ('gmos_north_mos', 'gmos_south_mos') THEN
-        IF acq_count <> 1 THEN
-          RAISE EXCEPTION 'Observation % with mode % must have an acquisition exposure time mode', obs_id, obs_mode;
-        END IF;
-
-        IF sci_count <> 1 THEN
-          RAISE EXCEPTION 'Observation % with mode % must have exactly one science exposure time mode', obs_id, obs_mode;
-        END IF;
-
-        -- The acquisition mode must be Time & Count: there is no acquisition ITC
-        -- pass to solve a signal-to-noise one.
-        IF NOT EXISTS (
-          SELECT 1
-            FROM t_exposure_time_mode e
-           WHERE e.c_observation_id = obs_id
-             AND e.c_role = 'acquisition'
-             AND e.c_exposure_time_mode = 'time_and_count'
-        ) THEN
-          RAISE EXCEPTION 'Observation % with mode % must have a Time & Count acquisition exposure time mode', obs_id, obs_mode;
         END IF;
 
       WHEN obs_mode = 'igrins_2_long_slit' THEN

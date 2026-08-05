@@ -9,10 +9,8 @@ import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.either.*
 import cats.syntax.option.*
-import cats.syntax.order.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosGratingOrder
 import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthFilter
@@ -35,7 +33,6 @@ import lucuma.core.model.sequence.gmos.DynamicConfig.GmosSouth
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
@@ -49,25 +46,18 @@ import java.util.UUID
 /**
  * GMOS MOS acquisition sequence generation.
  *
- * Unlike long slit, a MOS acquisition does not run an ITC pass: its exposure
- * time is read verbatim from a Time & Count acquisition exposure time mode, and
- * the count sets the number of through-mask images.  See ADR 0002 for the
- * reasoning and the accepted trade-offs.
- *
  * The shape is chosen by the observation's [[acquisitionType]]:
  *
  *  - `MaskIn` (default): one through-mask step.
  *  - `MaskOut`: an unmasked field step followed by a through-mask step.
  *
- * Either way the initial atom carries the breakpoint on its last (through-mask)
- * step, followed by `count - 1` copies of a single through-mask atom.  Both
- * steps are Full Frame (slitlets span the whole field), take the acquisition
- * filter and the stated exposure time unmodified, and carry no grating and no
- * offset.  The unmasked step is 2x2 with no FPU; the through-mask step is 1x1
+ * Both steps are Full Frame, take the acquisition filter and the stated
+ * exposure time unmodified, and carry no grating and no offset.
+ *
+ * The unmasked step is 2x2 with no FPU, the through-mask step is 1x1
  * through the Custom Mask.
  */
 object Acquisition:
-  val FastReadModeLimit: TimeSpan = 60.secTimeSpan
 
   private val ModeName: String =
     "GMOS MOS"
@@ -96,7 +86,7 @@ object Acquisition:
       acquisitionType: GmosMosAcquisitionType,
       exposureTime:   TimeSpan
     ): Acquisition.Steps[D] =
-      val readMode = if exposureTime <= FastReadModeLimit then GmosAmpReadMode.Fast else GmosAmpReadMode.Slow
+      val readMode = AcquisitionAtoms.readMode(exposureTime)
       val filter   = acqConfig.filter
 
       eval:
@@ -148,9 +138,7 @@ object Acquisition:
 
   end StepComputer
 
-  // The acquisition ETM must be Time & Count: there is no ITC pass to solve a
-  // signal-to-noise one.  This is a defensive read; the invariant is enforced
-  // upstream in the consistency check and the MOS input.
+  // The acquisition ETM must be Time & Count
   private def timeAndCount(
     oid:  Observation.Id,
     etm:  ExposureTimeMode

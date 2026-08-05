@@ -355,6 +355,86 @@ class createObservation_GmosMos extends OdbSuite:
              """.asRight)
     yield ()
 
+  test("an explicit acquisition filter round-trips"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- create(pid, tid, """
+               gmosNorthMos: {
+                 grating: R831_G5302
+                 customMask: { slitWidth: CUSTOM_WIDTH_1_00 }
+                 centralWavelength: { nanometers: 500 }
+                 acquisition: { explicitFilter: I_PRIME }
+               }
+             """)
+      _   <- expect(pi, s"""
+               query {
+                 observation(observationId: "$oid") {
+                   observingMode {
+                     gmosNorthMos {
+                       acquisition { filter explicitFilter }
+                     }
+                   }
+                 }
+               }
+             """, json"""
+               {
+                 "observation": {
+                   "observingMode": {
+                     "gmosNorthMos": {
+                       "acquisition": {
+                         "filter": "I_PRIME",
+                         "explicitFilter": "I_PRIME"
+                       }
+                     }
+                   }
+                 }
+               }
+             """.asRight)
+    yield ()
+
+  private def expectRejectedAcquisitionFilter(
+    mode:    String,
+    grating: String,
+    filter:  String,
+    allowed: String
+  ): IO[Unit] =
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- expect(
+               user = pi,
+               query = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: {
+                         $mode: {
+                           grating: $grating
+                           customMask: { slitWidth: CUSTOM_WIDTH_1_00 }
+                           centralWavelength: { nanometers: 500 }
+                           acquisition: { explicitFilter: $filter }
+                         }
+                       }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = List(s"Argument 'input.SET.observingMode.$mode.acquisition' is invalid: 'explicitFilter' must contain one of: $allowed").asLeft
+             )
+    yield ()
+
+  test("a non-acquisition explicit filter is rejected (North)"):
+    expectRejectedAcquisitionFilter("gmosNorthMos", "R831_G5302", "GG455", "G_PRIME, R_PRIME, I_PRIME")
+
+  test("a non-acquisition explicit filter is rejected (South)"):
+    expectRejectedAcquisitionFilter("gmosSouthMos", "B1200_G5321", "GG455", "U_PRIME, G_PRIME, R_PRIME, I_PRIME")
+
   test("defaults come from the grating and the custom mask"):
     setup(northMode).flatMap: (_, oid) =>
       expect(pi, s"""

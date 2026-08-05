@@ -46,7 +46,6 @@ object Acquisition:
   val AcquisitionSN: SignalToNoise =
     SignalToNoise.FromBigDecimalExact.getOption(10).get
 
-  val FastReadModeLimit  = 60.secTimeSpan
   val MaxExpTimeLastStep = 360.secondTimeSpan
 
   val RepeatingAtomCount: Int = 10
@@ -69,7 +68,6 @@ object Acquisition:
     p10:  ProtoStep[D],
     slit: ProtoStep[D]
   ):
-    /** The step grouping, without the breakpoint (placed by `AcquisitionAtoms`). */
     def acquisitionSteps: AcquisitionSteps[D] =
       AcquisitionSteps(
         NonEmptyList.of(ccd2, p10, slit),
@@ -90,7 +88,7 @@ object Acquisition:
         Acquisition.MaxExpTimeLastStep min
           TimeSpan.unsafeFromMicroseconds(exposureTime.toMicroseconds * 3)
 
-      val readMode = if exposureTime <= FastReadModeLimit then GmosAmpReadMode.Fast else GmosAmpReadMode.Slow
+      val readMode = AcquisitionAtoms.readMode(exposureTime)
 
       eval:
         for
@@ -118,6 +116,7 @@ object Acquisition:
         yield Acquisition.Steps(s0, s1, s2)
 
     end compute
+
   end StepComputer
 
   private object StepComputer:

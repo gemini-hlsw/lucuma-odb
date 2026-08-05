@@ -6,7 +6,6 @@ package input
 
 import cats.Eq
 import cats.derived.*
-import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -28,7 +27,6 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -38,11 +36,12 @@ import lucuma.odb.graphql.binding.*
  * Create and edit inputs for the GMOS North/South MOS observing mode.
  *
  * The shape follows GMOS Long Slit, with the builtin FPU replaced by a custom
- * mask.  MOS carries an acquisition configuration (filter and a Time & Count
- * exposure time mode) like long slit, but without the ROI — MOS acquisition is
- * always Full Frame.
+ * mask.
+ *
+ * MOS carries an acquisition configuration like long slit, but without the ROI 
+ * MOS acquisition is always Full Frame.
  */
-object GmosMosInput:
+object GmosMosInput extends AcquisitionFilterCheck:
 
   private def requireTimeAndCount(site: Site, etm: ExposureTimeMode): Result[ExposureTimeMode] =
     val siteName = site match
@@ -68,11 +67,7 @@ object GmosMosInput:
           GmosNorthFilterBinding.Nullable("explicitFilter", rFilter),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
-          rFilter.flatMap: n =>
-            n.traverse: f =>
-              if GmosNorthFilter.acquisition.toList.contains(f) then Result(f)
-              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosNorthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
-          ,
+          acquisitionFilter(GmosNorthFilter.acquisition, rFilter),
           rExposureTimeMode.flatMap(_.traverse(requireTimeAndCount(Site.GN, _)))
         ).parMapN(apply)
 
@@ -90,11 +85,7 @@ object GmosMosInput:
           GmosSouthFilterBinding.Nullable("explicitFilter", rFilter),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
-          rFilter.flatMap: n =>
-            n.traverse: f =>
-              if GmosSouthFilter.acquisition.toList.contains(f) then Result(f)
-              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosSouthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
-          ,
+          acquisitionFilter(GmosSouthFilter.acquisition, rFilter),
           rExposureTimeMode.flatMap(_.traverse(requireTimeAndCount(Site.GS, _)))
         ).parMapN(apply)
 

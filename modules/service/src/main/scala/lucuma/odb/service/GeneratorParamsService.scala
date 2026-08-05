@@ -464,8 +464,6 @@ object GeneratorParamsService {
               sciMode  = sciMode
             ).asRight
 
-          // MOS runs no acquisition ITC pass (its acquisition is sized by a
-          // stated Time & Count exposure time), so it takes the science-only
           case gnm @ gmos.mos.Config.GmosNorth(g, f, m, _, _, c) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.exposureTimeMode,

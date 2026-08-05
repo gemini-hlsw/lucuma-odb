@@ -40,6 +40,7 @@ import lucuma.odb.sequence.gmos.mos.Config.GmosSouth
 import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.refined.*
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
@@ -104,9 +105,9 @@ object GmosMosService {
   val MaskAttachmentViolationMessage: String =
     "The MOS mask attachment must exist, be of type 'mos_mask', and belong to the same program as the observation."
 
-  /** Default MOS acquisition exposure time mode: Time & Count, 30 seconds, count 10. */
-  val DefaultAcquisitionCount: PosInt = PosInt.unsafeFrom(10)
+  private val DefaultAcquisitionCount: PosInt = 10.refined
 
+  /** Default MOS acquisition exposure time mode: Time & Count, 30 seconds, count 10. */
   def defaultAcquisitionExposureTimeMode(at: Wavelength): ExposureTimeMode =
     ExposureTimeMode.TimeAndCountMode(30.secondTimeSpan, DefaultAcquisitionCount, at)
 
@@ -121,13 +122,13 @@ object GmosMosService {
       val north_acquisition: Decoder[AcquisitionConfig.GmosNorth] =
         (exposure_time_mode     *: // acquisition exposure time mode
          gmos_north_filter      *: // default acquisition filter
-         gmos_north_filter.opt      // explicit acquisition filter (if any)
+         gmos_north_filter.opt     // explicit acquisition filter
         ).to[AcquisitionConfig.GmosNorth]
 
       val south_acquisition: Decoder[AcquisitionConfig.GmosSouth] =
         (exposure_time_mode     *: // acquisition exposure time mode
          gmos_south_filter      *: // default acquisition filter
-         gmos_south_filter.opt      // explicit acquisition filter (if any)
+         gmos_south_filter.opt     // explicit acquisition filter
         ).to[AcquisitionConfig.GmosSouth]
 
       val common: Decoder[Common] =

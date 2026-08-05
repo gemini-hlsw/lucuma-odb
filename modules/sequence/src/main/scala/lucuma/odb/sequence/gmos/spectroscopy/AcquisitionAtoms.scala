@@ -8,13 +8,16 @@ package spectroscopy
 import cats.data.NonEmptyList
 import cats.syntax.either.*
 import cats.syntax.option.*
+import cats.syntax.order.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
@@ -22,10 +25,13 @@ import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.util.AtomBuilder
 
 /**
- * The step grouping for an acquisition sequence: an initial atom (which carries
- * the breakpoint on its last step) and a single repeating atom, emitted `count`
- * times.  The steps themselves are mode-specific and supplied by the caller;
- * the breakpoint is placed by [[AcquisitionAtoms]], not by the steps.
+ * The step grouping for an acquisition sequence: an initial atom and a single
+ * repeating atom, emitted `count` times.
+ *
+ * The initial step carries a breakpoint on its last step.
+ *
+ * The steps themselves are mode-specific and the breakpoint is placed by
+ * [[AcquisitionAtoms]], not by the steps.
  */
 final case class AcquisitionSteps[D](
   initial:   NonEmptyList[ProtoStep[D]],
@@ -33,17 +39,18 @@ final case class AcquisitionSteps[D](
 )
 
 /**
- * Shared scaffolding for GMOS acquisition sequence generation.  Everything that
- * is not step *content* lives here: building atoms, naming the initial atom and
- * the repeating one, placing the breakpoint on the last step of the initial
- * atom, emitting a repeating tail of a given length, returning an empty
- * sequence for a Twilight calibration, and refusing to generate without a
- * positive exposure time.
+ * Shared GMOS acquisition sequence generation methods.
  *
- * Both GMOS long slit and GMOS MOS acquisition call this; they differ only in
- * the steps they compute and (for MOS) the repeat count.
+ * Both GMOS long slit and MOS acquisition call this. They differ only in
+ * the steps they compute and the repeat count.
  */
 object AcquisitionAtoms:
+
+  val FastReadModeLimit: TimeSpan = 60.secTimeSpan
+
+  /** The amp read mode an acquisition step of the given exposure time reads out at. */
+  def readMode(exposureTime: TimeSpan): GmosAmpReadMode =
+    if exposureTime <= FastReadModeLimit then GmosAmpReadMode.Fast else GmosAmpReadMode.Slow
 
   private val InitialAtomName: Option[NonEmptyString] =
     NonEmptyString.unapply("Initial Acquisition")
@@ -51,8 +58,7 @@ object AcquisitionAtoms:
   private val RepeatingAtomName: Option[NonEmptyString] =
     NonEmptyString.unapply("Fine Adjustments")
 
-  /** Places a breakpoint on the last step, leaving the others untouched. */
-  private def withBreakpointOnLast[D](
+  private def breakpointOnLastSep[D](
     steps: NonEmptyList[ProtoStep[D]]
   ): NonEmptyList[ProtoStep[D]] =
     NonEmptyList.fromListUnsafe(steps.init :+ steps.last.withBreakpoint)
@@ -66,7 +72,7 @@ object AcquisitionAtoms:
     steps:       AcquisitionSteps[D],
     repeatCount: Int
   ): Stream[Pure, Atom[D]] =
-    val initial = withBreakpointOnLast(steps.initial)
+    val initial = breakpointOnLastSep(steps.initial)
     (for
       a0 <- builder.build(InitialAtomName, 0, 0, initial)
       as <- (1 to repeatCount).toList.traverse: aix =>
