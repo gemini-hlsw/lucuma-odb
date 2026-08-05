@@ -11,6 +11,8 @@ import lucuma.core.model.ObservationValidation
 import lucuma.core.util.NewType
 
 import scala.collection.immutable.SortedMap
+import lucuma.odb.{data => isEmpty}
+import lucuma.core.enums.ObservationValidationCode.Severity
 
 object ObservationValidationMap extends NewType[SortedMap[ObservationValidationCode, NonEmptyChain[String]]]:
   def empty: ObservationValidationMap = ObservationValidationMap(SortedMap.empty[ObservationValidationCode, NonEmptyChain[String]])
@@ -32,6 +34,10 @@ object ObservationValidationMap extends NewType[SortedMap[ObservationValidationC
           case Some(nec) => Some(nec |+| msgs)
         }
       )
+      
+    /** True if there are no fatal codes in the map. */
+    def nonFatal: Boolean =
+      !m.value.keySet.exists(_.severity == Severity.Fatal)
 
     def toList: List[ObservationValidation] = m.value.toList.map(ObservationValidation.apply)
 

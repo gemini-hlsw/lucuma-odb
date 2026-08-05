@@ -26,17 +26,21 @@ object ObservationValidator:
     itcFor: Observation.Id => Option[Itc]
   )(using Transaction[F], Services[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
 
-    val (cals, other)         = infos.partition(_._2.role.isDefined)
-    val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
+    // Partition observations into cals, engineering, and science
+    val (cals, other)  = infos.partition(_._2.role.isDefined)
+    val (eng, science) = other.partition(!_._2.tpe.hasProposal)
 
     // Here are our many simple validators
     import validator.*
 
     // Here are our composed validators
 
+    // For now calibration and engineering obs have no validators
     val calibrationValidator, engValidator: ObservationValidator = _ =>
       ObservationValidationMap.empty
 
+    // Science is broken into two stages. Any errors here mean there's no point
+    // validating ITC and acquisition.
     val scienceValidator1: ObservationValidator =
       generatorValidator       |+|
       cfpInstrumentValidator   |+|
@@ -46,13 +50,14 @@ object ObservationValidator:
       ghostVMagnitudeValidator |+|
       otherConfigErrorValidator
 
+    // Only checked if stage 1 above succeeds.
     val scienceValidator2: ObservationValidator =
       itcValidator(itcFor) |+| acquisitionValidator(itcFor)
 
     // And our validation results
 
     val engResults: Map[Observation.Id, ObservationValidationMap] =
-      nonScience.view.mapValues(engValidator).toMap
+      eng.view.mapValues(engValidator).toMap
 
     val calibrationResults: Map[Observation.Id, ObservationValidationMap] =
       cals.view.mapValues(calibrationValidator).toMap
@@ -63,7 +68,7 @@ object ObservationValidator:
     val scienceResults2: Map[Observation.Id, ObservationValidationMap] =
       science
         .view
-        .filterKeys(k => scienceResults1.get(k).forall(_.isEmpty)) // ensure there are no warnigs in stage 1
+        .filterKeys(k => scienceResults1.get(k).forall(_.nonFatal)) // ensure there are no errors in stage 1
         .mapValues(scienceValidator2)
         .toMap
 
@@ -72,7 +77,7 @@ object ObservationValidator:
 
     val toCheck: List[ObservationValidationInfo] =
       science.values.toList.filter: info =>
-        info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(_.isEmpty)
+        info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(_.nonFatal)
 
     val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
       NonEmptyList
