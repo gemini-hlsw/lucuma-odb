@@ -38,6 +38,8 @@ trait GmosMosView[F[_]] extends BaseMapping[F]:
 
     val Grating: ColumnRef        = col("c_grating", gmos_north_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_north_filter.opt)
+    val AcquisitionFilter         = col("c_acquisition_filter", gmos_north_filter.opt)
+    val AcquisitionFilterDefault  = col("c_acquisition_filter_default", gmos_north_filter)
 
     val InitialGrating: ColumnRef = col("c_initial_grating", gmos_north_grating)
     val InitialFilter: ColumnRef  = col("c_initial_filter", gmos_north_filter.opt)
@@ -48,6 +50,8 @@ trait GmosMosView[F[_]] extends BaseMapping[F]:
 
     val Grating: ColumnRef        = col("c_grating", gmos_south_grating)
     val Filter: ColumnRef         = col("c_filter", gmos_south_filter.opt)
+    val AcquisitionFilter         = col("c_acquisition_filter", gmos_south_filter.opt)
+    val AcquisitionFilterDefault  = col("c_acquisition_filter_default", gmos_south_filter)
 
     val InitialGrating: ColumnRef = col("c_initial_grating", gmos_south_grating)
     val InitialFilter: ColumnRef  = col("c_initial_filter", gmos_south_filter.opt)

@@ -7,6 +7,7 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.AttachmentType
@@ -29,14 +30,17 @@ import lucuma.core.model.MaskDefinition
 import lucuma.core.model.Observation
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
+import lucuma.odb.sequence.gmos.mos.AcquisitionConfig
 import lucuma.odb.sequence.gmos.mos.Config.GmosNorth
 import lucuma.odb.sequence.gmos.mos.Config.GmosSouth
 import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GmosCodecs.*
+import lucuma.refined.*
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
@@ -101,6 +105,12 @@ object GmosMosService {
   val MaskAttachmentViolationMessage: String =
     "The MOS mask attachment must exist, be of type 'mos_mask', and belong to the same program as the observation."
 
+  private val DefaultAcquisitionCount: PosInt = 10.refined
+
+  /** Default MOS acquisition exposure time mode: Time & Count, 30 seconds, count 10. */
+  def defaultAcquisitionExposureTimeMode(at: Wavelength): ExposureTimeMode =
+    ExposureTimeMode.TimeAndCountMode(30.secondTimeSpan, DefaultAcquisitionCount, at)
+
   def instantiate[F[_]: Concurrent](using Services[F]): GmosMosService[F] =
 
     new GmosMosService[F] {
@@ -108,6 +118,18 @@ object GmosMosService {
       val custom_mask: Decoder[GmosFpuMask.Custom] =
         (gmos_custom_slit_width *: attachment_id.opt).map: (w, oid) =>
           GmosFpuMask.Custom(oid.fold[MaskDefinition](ToBeDefined)(Defined(_)), w)
+
+      val north_acquisition: Decoder[AcquisitionConfig.GmosNorth] =
+        (exposure_time_mode     *: // acquisition exposure time mode
+         gmos_north_filter      *: // default acquisition filter
+         gmos_north_filter.opt     // explicit acquisition filter
+        ).to[AcquisitionConfig.GmosNorth]
+
+      val south_acquisition: Decoder[AcquisitionConfig.GmosSouth] =
+        (exposure_time_mode     *: // acquisition exposure time mode
+         gmos_south_filter      *: // default acquisition filter
+         gmos_south_filter.opt     // explicit acquisition filter
+        ).to[AcquisitionConfig.GmosSouth]
 
       val common: Decoder[Common] =
         (wavelength_pm          *:   // centralWavelength
@@ -144,6 +166,7 @@ object GmosMosService {
          gmos_north_filter.opt    *:
          custom_mask              *:
          gmos_mos_acquisition_type *:
+         north_acquisition        *:
          common
         ).to[GmosNorth]
 
@@ -152,6 +175,7 @@ object GmosMosService {
          gmos_south_filter.opt    *:
          custom_mask              *:
          gmos_mos_acquisition_type *:
+         south_acquisition        *:
          common
         ).to[GmosSouth]
 
@@ -182,16 +206,22 @@ object GmosMosService {
           case SqlState.ForeignKeyViolation(e) if e.constraintName.exists(_.contains("mask_attachment_fkey")) =>
             Result.failure(MaskAttachmentViolationMessage)
 
-      // MOS has no acquisition sequence, so it has no acquisition exposure time mode
+      private def acquisitionEtm(
+        explicit: Option[ExposureTimeMode],
+        at:       Wavelength
+      ): ExposureTimeMode =
+        explicit.getOrElse(defaultAcquisitionExposureTimeMode(at))
+
       private def insert(
         name:  String,
         input: GmosMosInput.Create[?, ?],
+        acq:   ExposureTimeMode,
         req:   Option[ExposureTimeMode],
         which: List[Observation.Id],
         stmt:  Observation.Id => AppliedFragment
       )(using Transaction[F]): F[Result[Unit]] =
         (for
-          _ <- ResultT(exposureTimeModeService.insertScienceOnlyWithDefaults(name, input.common.exposureTimeMode, req, which).map(_.void))
+          _ <- ResultT(exposureTimeModeService.insertOneWithDefaults(name, acq.some, input.common.exposureTimeMode, req, which).map(_.void))
           _ <- ResultT(translateMaskViolation(which.traverse(oid => session.exec(stmt(oid))).void))
         yield ()).value
 
@@ -200,14 +230,28 @@ object GmosMosService {
         req:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        insert("GMOS North MOS", input, req, which, Statements.insertGmosNorthMos(_, input))
+        insert(
+          "GMOS North MOS",
+          input,
+          acquisitionEtm(input.acquisition.flatMap(_.exposureTimeMode), input.common.centralWavelength),
+          req,
+          which,
+          Statements.insertGmosNorthMos(_, input)
+        )
 
       override def insertSouth(
         input: GmosMosInput.Create.South,
         req:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        insert("GMOS South MOS", input, req, which, Statements.insertGmosSouthMos(_, input))
+        insert(
+          "GMOS South MOS",
+          input,
+          acquisitionEtm(input.acquisition.flatMap(_.exposureTimeMode), input.common.centralWavelength),
+          req,
+          which,
+          Statements.insertGmosSouthMos(_, input)
+        )
 
       override def deleteNorth(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.deleteGmosNorthMos(which).fold(Applicative[F].unit)(session.exec)
@@ -216,18 +260,26 @@ object GmosMosService {
         Statements.deleteGmosSouthMos(which).fold(Applicative[F].unit)(session.exec)
 
       private def updateExposureTimeMode(
+        acq:   Option[ExposureTimeMode],
         sci:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        sci.fold(().pure[F]): e =>
-          services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e)
+
+        def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
+          etm.fold(().pure[F]): e =>
+            services.exposureTimeModeService.updateMany(which, role, e)
+
+        for
+          _ <- update(acq, ExposureTimeModeRole.Acquisition)
+          _ <- update(sci, ExposureTimeModeRole.Science)
+        yield ()
 
       override def updateNorth(
         SET:   GmosMosInput.Edit.North,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         for
-          _ <- updateExposureTimeMode(SET.common.exposureTimeMode, which)
+          _ <- updateExposureTimeMode(SET.acquisition.flatMap(_.exposureTimeMode), SET.common.exposureTimeMode, which)
           r <- translateMaskViolation(Statements.updateGmosNorthMos(SET, which).fold(Applicative[F].unit)(session.exec))
         yield r
 
@@ -236,7 +288,7 @@ object GmosMosService {
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         for
-          _ <- updateExposureTimeMode(SET.common.exposureTimeMode, which)
+          _ <- updateExposureTimeMode(SET.acquisition.flatMap(_.exposureTimeMode), SET.common.exposureTimeMode, which)
           r <- translateMaskViolation(Statements.updateGmosSouthMos(SET, which).fold(Applicative[F].unit)(session.exec))
         yield r
 
@@ -268,6 +320,13 @@ object GmosMosService {
           m.c_slit_width,
           m.c_mask_attachment_id,
           m.c_acquisition_type,
+          acq.c_exposure_time_mode,
+          acq.c_signal_to_noise_at,
+          acq.c_signal_to_noise,
+          acq.c_exposure_time,
+          acq.c_exposure_count,
+          m.c_acquisition_filter_default,
+          m.c_acquisition_filter,
           m.c_central_wavelength,
           sci.c_exposure_time_mode,
           sci.c_signal_to_noise_at,
@@ -285,6 +344,9 @@ object GmosMosService {
           m.c_offsets
         FROM
           #$table m
+        LEFT JOIN t_exposure_time_mode acq
+           ON acq.c_observation_id = m.c_observation_id
+          AND acq.c_role = 'acquisition'
         LEFT JOIN t_exposure_time_mode sci
            ON sci.c_observation_id = m.c_observation_id
           AND sci.c_role = 'science'
@@ -313,6 +375,7 @@ object GmosMosService {
       GmosCustomSlitWidth,
       Option[Attachment.Id],
       GmosMosAcquisitionType,
+      Option[GmosNorthFilter],
       Wavelength,
       Option[GmosXBinning],
       Option[GmosYBinning],
@@ -336,6 +399,7 @@ object GmosMosService {
           c_mask_attachment_id,
           c_mask_attachment_type,
           c_acquisition_type,
+          c_acquisition_filter,
           c_central_wavelength,
           c_xbin,
           c_ybin,
@@ -358,6 +422,7 @@ object GmosMosService {
           ${attachment_id.opt},
           ${attachment_type.opt},
           $gmos_mos_acquisition_type,
+          ${gmos_north_filter.opt},
           $wavelength_pm,
           ${gmos_binning.opt},
           ${gmos_binning.opt},
@@ -372,8 +437,8 @@ object GmosMosService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, sw, a, at, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
-         o, g, l, sw, a, a.as(AttachmentType.MosMask), at, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
+       """.contramap { (o, g, l, sw, a, at, af, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
+         o, g, l, sw, a, a.as(AttachmentType.MosMask), at, af, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
        )}
 
     def insertGmosNorthMos(
@@ -387,6 +452,7 @@ object GmosMosService {
         input.customMask.slitWidth,
         maskAttachmentId(input.customMask),
         input.acquisitionType,
+        input.acquisition.flatMap(_.filter.toOption),
         input.common.centralWavelength,
         input.common.explicitXBin,
         input.common.explicitYBin,
@@ -408,6 +474,7 @@ object GmosMosService {
       GmosCustomSlitWidth,
       Option[Attachment.Id],
       GmosMosAcquisitionType,
+      Option[GmosSouthFilter],
       Wavelength,
       Option[GmosXBinning],
       Option[GmosYBinning],
@@ -431,6 +498,7 @@ object GmosMosService {
           c_mask_attachment_id,
           c_mask_attachment_type,
           c_acquisition_type,
+          c_acquisition_filter,
           c_central_wavelength,
           c_xbin,
           c_ybin,
@@ -453,6 +521,7 @@ object GmosMosService {
           ${attachment_id.opt},
           ${attachment_type.opt},
           $gmos_mos_acquisition_type,
+          ${gmos_south_filter.opt},
           $wavelength_pm,
           ${gmos_binning.opt},
           ${gmos_binning.opt},
@@ -467,8 +536,8 @@ object GmosMosService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, sw, a, at, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
-         o, g, l, sw, a, a.as(AttachmentType.MosMask), at, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
+       """.contramap { (o, g, l, sw, a, at, af, w, x, y, r, n, i, wd, so, ig, il, isw, iw) => (
+         o, g, l, sw, a, a.as(AttachmentType.MosMask), at, af, w, x.map(_.value), y.map(_.value), r, n, i, wd, so, ig, il, isw, iw, o
        )}
 
     def insertGmosSouthMos(
@@ -482,6 +551,7 @@ object GmosMosService {
         input.customMask.slitWidth,
         maskAttachmentId(input.customMask),
         input.acquisitionType,
+        input.acquisition.flatMap(_.filter.toOption),
         input.common.centralWavelength,
         input.common.explicitXBin,
         input.common.explicitYBin,
@@ -562,12 +632,14 @@ object GmosMosService {
       val upGrating         = sql"c_grating         = $gmos_north_grating"
       val upFilter          = sql"c_filter          = ${gmos_north_filter.opt}"
       val upAcquisitionType = sql"c_acquisition_type = $gmos_mos_acquisition_type"
+      val upAcqFilter       = sql"c_acquisition_filter = ${gmos_north_filter.opt}"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
-          input.acquisitionType.map(upAcquisitionType)
+          input.acquisitionType.map(upAcquisitionType),
+          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter)
         ).flatten ++ input.customMask.toList.flatMap(customMaskUpdates) ++ commonUpdates(input.common)
 
       NonEmptyList.fromList(ups)
@@ -592,12 +664,14 @@ object GmosMosService {
       val upGrating         = sql"c_grating         = $gmos_south_grating"
       val upFilter          = sql"c_filter          = ${gmos_south_filter.opt}"
       val upAcquisitionType = sql"c_acquisition_type = $gmos_mos_acquisition_type"
+      val upAcqFilter       = sql"c_acquisition_filter = ${gmos_south_filter.opt}"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
-          input.acquisitionType.map(upAcquisitionType)
+          input.acquisitionType.map(upAcquisitionType),
+          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter)
         ).flatten ++ input.customMask.toList.flatMap(customMaskUpdates) ++ commonUpdates(input.common)
 
       NonEmptyList.fromList(ups)
@@ -631,6 +705,7 @@ object GmosMosService {
         c_mask_attachment_id,
         c_mask_attachment_type,
         c_acquisition_type,
+        c_acquisition_filter,
         c_central_wavelength,
         c_xbin,
         c_ybin,
@@ -654,6 +729,7 @@ object GmosMosService {
         c_mask_attachment_id,
         c_mask_attachment_type,
         c_acquisition_type,
+        c_acquisition_filter,
         c_central_wavelength,
         c_xbin,
         c_ybin,

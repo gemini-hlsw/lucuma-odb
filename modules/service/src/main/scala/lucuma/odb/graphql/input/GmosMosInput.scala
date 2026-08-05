@@ -6,7 +6,9 @@ package input
 
 import cats.Eq
 import cats.derived.*
+import cats.syntax.option.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -26,15 +28,66 @@ import lucuma.core.math.WavelengthDither
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.Nullable
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 
 /**
  * Create and edit inputs for the GMOS North/South MOS observing mode.
  *
  * The shape follows GMOS Long Slit, with the builtin FPU replaced by a custom
- * mask and with no acquisition configuration.
+ * mask.
+ *
+ * MOS carries an acquisition configuration like long slit, but without the ROI 
+ * MOS acquisition is always Full Frame.
  */
-object GmosMosInput:
+object GmosMosInput extends AcquisitionFilterCheck:
+
+  private def requireTimeAndCount(site: Site, etm: ExposureTimeMode): Result[ExposureTimeMode] =
+    val siteName = site match
+      case Site.GN => "North"
+      case Site.GS => "South"
+
+    etm match
+      case ExposureTimeMode.TimeAndCountMode(_, _, _) => Result(etm)
+      case _                                           =>
+        OdbError.InvalidArgument(s"A GMOS $siteName MOS acquisition exposure time mode must be Time & Count.".some).asFailure
+
+  final case class NorthAcquisition(
+    filter:           Nullable[GmosNorthFilter],
+    exposureTimeMode: Option[ExposureTimeMode]
+  ):
+    def updatesAcquisition: Boolean =
+      filter.isDefined || exposureTimeMode.isDefined
+
+  object NorthAcquisition:
+    val Binding: Matcher[NorthAcquisition] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          GmosNorthFilterBinding.Nullable("explicitFilter", rFilter),
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
+        ) => (
+          acquisitionFilter(GmosNorthFilter.acquisition, rFilter),
+          rExposureTimeMode.flatMap(_.traverse(requireTimeAndCount(Site.GN, _)))
+        ).parMapN(apply)
+
+  final case class SouthAcquisition(
+    filter:           Nullable[GmosSouthFilter],
+    exposureTimeMode: Option[ExposureTimeMode]
+  ):
+    def updatesAcquisition: Boolean =
+      filter.isDefined || exposureTimeMode.isDefined
+
+  object SouthAcquisition:
+    val Binding: Matcher[SouthAcquisition] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          GmosSouthFilterBinding.Nullable("explicitFilter", rFilter),
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
+        ) => (
+          acquisitionFilter(GmosSouthFilter.acquisition, rFilter),
+          rExposureTimeMode.flatMap(_.traverse(requireTimeAndCount(Site.GS, _)))
+        ).parMapN(apply)
 
   sealed trait Create[G, F]:
     def grating:         G
@@ -69,6 +122,7 @@ object GmosMosInput:
       filter:          Option[GmosNorthFilter],
       customMask:      GmosFpuMask.Custom,
       acquisitionType: GmosMosAcquisitionType,
+      acquisition:     Option[NorthAcquisition],
       common:          Common
     ) extends Create[GmosNorthGrating, GmosNorthFilter]:
       def observingModeType: ObservingModeType =
@@ -78,14 +132,15 @@ object GmosMosInput:
 
       val Binding: Matcher[North] =
         NorthData.rmap:
-          case (grating, filter, customMask, acquisitionType, common) =>
-            Edit.North(grating, filter, customMask, acquisitionType, common).toCreate
+          case (grating, filter, customMask, acquisitionType, acquisition, common) =>
+            Edit.North(grating, filter, customMask, acquisitionType, acquisition, common).toCreate
 
     final case class South(
       grating:         GmosSouthGrating,
       filter:          Option[GmosSouthFilter],
       customMask:      GmosFpuMask.Custom,
       acquisitionType: GmosMosAcquisitionType,
+      acquisition:     Option[SouthAcquisition],
       common:          Common
     ) extends Create[GmosSouthGrating, GmosSouthFilter]:
       def observingModeType: ObservingModeType =
@@ -95,8 +150,8 @@ object GmosMosInput:
 
       val Binding: Matcher[South] =
         SouthData.rmap:
-          case (grating, filter, customMask, acquisitionType, common) =>
-            Edit.South(grating, filter, customMask, acquisitionType, common).toCreate
+          case (grating, filter, customMask, acquisitionType, acquisition, common) =>
+            Edit.South(grating, filter, customMask, acquisitionType, acquisition, common).toCreate
 
   object Edit:
 
@@ -149,6 +204,7 @@ object GmosMosInput:
       filter:          Nullable[GmosNorthFilter],
       customMask:      Option[GmosFpuMask.Custom],
       acquisitionType: Option[GmosMosAcquisitionType],
+      acquisition:     Option[NorthAcquisition],
       common:          Edit.Common
     ) derives Eq:
 
@@ -160,20 +216,21 @@ object GmosMosInput:
           g <- required(Site.GN, grating, "grating")
           m <- required(Site.GN, customMask, "customMask")
           c <- common.toCreate(Site.GN)
-        yield Create.North(g, filter.toOption, m, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), c)
+        yield Create.North(g, filter.toOption, m, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, c)
 
     object North:
 
       val Binding: Matcher[North] =
         NorthData.rmap:
-          case (grating, filter, customMask, acquisitionType, common) =>
-            Result(North(grating, filter, customMask, acquisitionType, common))
+          case (grating, filter, customMask, acquisitionType, acquisition, common) =>
+            Result(North(grating, filter, customMask, acquisitionType, acquisition, common))
 
     final case class South(
       grating:         Option[GmosSouthGrating],
       filter:          Nullable[GmosSouthFilter],
       customMask:      Option[GmosFpuMask.Custom],
       acquisitionType: Option[GmosMosAcquisitionType],
+      acquisition:     Option[SouthAcquisition],
       common:          Edit.Common
     ) derives Eq:
 
@@ -185,20 +242,21 @@ object GmosMosInput:
           g <- required(Site.GS, grating, "grating")
           m <- required(Site.GS, customMask, "customMask")
           c <- common.toCreate(Site.GS)
-        yield Create.South(g, filter.toOption, m, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), c)
+        yield Create.South(g, filter.toOption, m, acquisitionType.getOrElse(GmosMosAcquisitionType.MaskIn), acquisition, c)
 
     object South:
 
       val Binding: Matcher[South] =
         SouthData.rmap:
-          case (grating, filter, customMask, acquisitionType, common) =>
-            Result(South(grating, filter, customMask, acquisitionType, common))
+          case (grating, filter, customMask, acquisitionType, acquisition, common) =>
+            Result(South(grating, filter, customMask, acquisitionType, acquisition, common))
 
   private val NorthData: Matcher[(
     Option[GmosNorthGrating],
     Nullable[GmosNorthFilter],
     Option[GmosFpuMask.Custom],
     Option[GmosMosAcquisitionType],
+    Option[NorthAcquisition],
     Edit.Common
   )] =
     ObjectFieldsBinding.rmap:
@@ -215,12 +273,14 @@ object GmosMosInput:
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets)
+        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
+        NorthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
         rFilter,
         rCustomMask,
         rAcquisitionType,
+        rAcquisition,
         (
           rCentralWavelength,
           rExposureTimeMode,
@@ -239,6 +299,7 @@ object GmosMosInput:
     Nullable[GmosSouthFilter],
     Option[GmosFpuMask.Custom],
     Option[GmosMosAcquisitionType],
+    Option[SouthAcquisition],
     Edit.Common
   )] =
     ObjectFieldsBinding.rmap:
@@ -255,12 +316,14 @@ object GmosMosInput:
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets)
+        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
+        SouthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
         rFilter,
         rCustomMask,
         rAcquisitionType,
+        rAcquisition,
         (
           rCentralWavelength,
           rExposureTimeMode,

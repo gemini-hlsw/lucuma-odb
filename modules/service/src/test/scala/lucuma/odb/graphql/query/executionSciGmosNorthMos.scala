@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.model.Observation
@@ -64,7 +65,7 @@ class executionSciGmosNorthMos extends ExecutionTestSupportForGmos:
           ).asRight
       )
 
-  test("there is no acquisition sequence"):
+  test("there is an acquisition sequence"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -75,13 +76,167 @@ class executionSciGmosNorthMos extends ExecutionTestSupportForGmos:
     setup.flatMap: oid =>
       expect(
         user     = pi,
-        query    = gmosNorthAcquisitionQuery(oid),
+        query    = s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gmosNorth {
+                acquisition {
+                  nextAtom {
+                    description
+                    steps {
+                      instrumentConfig {
+                        exposure { seconds }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
         expected =
-          Json.obj(
-            "executionConfig" -> Json.obj(
-              "gmosNorth" -> Json.obj(
-                "acquisition" -> Json.Null
-              )
-            )
-          ).asRight
+          json"""
+            {
+              "executionConfig": {
+                "gmosNorth": {
+                  "acquisition": {
+                    "nextAtom": {
+                      "description": "Initial Acquisition",
+                      "steps": [
+                        {
+                          "instrumentConfig": {
+                            "exposure": { "seconds": 30.000000 }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
       )
+
+  private def acquisitionConfigQuery(o: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$o") {
+          observingMode {
+            gmosNorthMos {
+              acquisition {
+                filter
+                defaultFilter
+                explicitFilter
+                exposureTimeMode {
+                  timeAndCount { time { seconds } count }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("acquisition defaults to Time & Count, 30 s, count 10, with a wavelength-derived filter"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthMosObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = acquisitionConfigQuery(oid),
+        expected =
+          json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthMos": {
+                    "acquisition": {
+                      "filter": "G_PRIME",
+                      "defaultFilter": "G_PRIME",
+                      "explicitFilter": null,
+                      "exposureTimeMode": {
+                        "timeAndCount": { "time": { "seconds": 30.000000 }, "count": 10 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+
+  test("an explicit acquisition filter overrides the default"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), s"""
+               gmosNorthMos: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 customMask: { slitWidth: CUSTOM_WIDTH_0_50 }
+                 centralWavelength: { nanometers: 500 }
+                 explicitYBin: TWO
+                 acquisition: { explicitFilter: I_PRIME }
+               }
+             """)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = acquisitionConfigQuery(oid),
+        expected =
+          json"""
+            {
+              "observation": {
+                "observingMode": {
+                  "gmosNorthMos": {
+                    "acquisition": {
+                      "filter": "I_PRIME",
+                      "defaultFilter": "G_PRIME",
+                      "explicitFilter": "I_PRIME",
+                      "exposureTimeMode": {
+                        "timeAndCount": { "time": { "seconds": 30.000000 }, "count": 10 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight
+      )
+
+  test("a signal-to-noise MOS acquisition exposure time mode is rejected"):
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(pi, p)
+      _ <- expect(
+             user  = pi,
+             query = createObservationWithModeQuery(p, List(t), s"""
+               gmosNorthMos: {
+                 grating: R831_G5302
+                 filter: R_PRIME
+                 customMask: { slitWidth: CUSTOM_WIDTH_0_50 }
+                 centralWavelength: { nanometers: 500 }
+                 explicitYBin: TWO
+                 acquisition: {
+                   exposureTimeMode: {
+                     signalToNoise: {
+                       value: 10
+                       at: { nanometers: 500 }
+                     }
+                   }
+                 }
+               }
+             """),
+             expected = List(
+               "Argument 'input.SET.observingMode.gmosNorthMos.acquisition' is invalid: A GMOS North MOS acquisition exposure time mode must be Time & Count."
+             ).asLeft
+           )
+    yield ()

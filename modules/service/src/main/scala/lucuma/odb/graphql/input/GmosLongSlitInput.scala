@@ -44,7 +44,7 @@ import lucuma.odb.graphql.binding.*
 
 import scala.util.Try
 
-object GmosLongSlitInput:
+object GmosLongSlitInput extends AcquisitionFilterCheck:
 
   val AllowedGNFPUs: Set[GmosNorthFpu] =
     GmosNorthFpu.values.filter(_.fpuType === GmosFpuType.LongSlit).toSet
@@ -94,11 +94,7 @@ object GmosLongSlitInput:
           GmosLongSlitAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
-          rFilter.flatMap: n =>
-            n.traverse: f =>
-              if GmosNorthFilter.acquisition.toList.contains(f) then f.success
-              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosNorthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
-          ,
+          acquisitionFilter(GmosNorthFilter.acquisition, rFilter),
           rRoi,
           rExposureTimeMode
         ).parMapN(apply)
@@ -120,11 +116,7 @@ object GmosLongSlitInput:
           GmosLongSlitAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
-          rFilter.flatMap: n =>
-            n.traverse: f =>
-              if GmosSouthFilter.acquisition.toList.contains(f) then f.success
-              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GmosSouthFilter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
-          ,
+          acquisitionFilter(GmosSouthFilter.acquisition, rFilter),
           rRoi,
           rExposureTimeMode
         ).parMapN(apply)
