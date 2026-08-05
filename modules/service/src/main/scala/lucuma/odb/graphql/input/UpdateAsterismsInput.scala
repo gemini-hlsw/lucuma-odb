@@ -35,7 +35,7 @@ final case class UpdateAsterismsInput(
 
 object UpdateAsterismsInput {
 
-  def binding(path: Path): Matcher[UpdateAsterismsInput] = {
+  def binding(path: Path)(using serverDate: java.time.LocalDate): Matcher[UpdateAsterismsInput] = {
     val WhereObservationBinding = WhereObservation.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

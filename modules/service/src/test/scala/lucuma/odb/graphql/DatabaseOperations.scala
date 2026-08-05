@@ -297,6 +297,26 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  def setProgramActiveAs(user: User, pid: Program.Id, activeStart: LocalDate, activeEnd: LocalDate): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                activeStart: "${activeStart.toString}"
+                activeEnd:   "${activeEnd.toString}"
+              }
+              WHERE: { id: { EQ: ${pid.asJson} } }
+            }
+          ) {
+            programs { id }
+          }
+        }
+      """
+    ).void
+
   def createProgramWithPiAffiliation(
     pi: User,
     piPartnerLink: PartnerLink,
@@ -1001,6 +1021,26 @@ trait DatabaseOperations { this: OdbSuite =>
     ).flatMap { json =>
       json.hcursor.downFields("configurationRequests", "matches").values.toList.flatten.traverse { json =>
         json.hcursor.downField("id").as[ConfigurationRequest.Id]
+      }
+      .leftMap(f => new RuntimeException(f.message))
+      .liftTo[IO]
+    }
+
+  def programsWhere(user: User, where: String): IO[List[Program.Id]] =
+    query(
+      user,
+      s"""
+         query {
+          programs(WHERE: { $where }) {
+            matches {
+              id
+            }
+          }
+        }
+      """
+    ).flatMap { json =>
+      json.hcursor.downFields("programs", "matches").values.toList.flatten.traverse { json =>
+        json.hcursor.downField("id").as[Program.Id]
       }
       .leftMap(f => new RuntimeException(f.message))
       .liftTo[IO]

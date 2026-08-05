@@ -20,7 +20,7 @@ case class UpdateObservationsTimesInput(
 
 object UpdateObservationsTimesInput {
 
-  def binding(path: Path): Matcher[UpdateObservationsTimesInput] = {
+  def binding(path: Path)(using serverDate: java.time.LocalDate): Matcher[UpdateObservationsTimesInput] = {
     val WhereObservationBinding = WhereObservation.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

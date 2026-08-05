@@ -7,6 +7,7 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import java.time.LocalDate
 import lucuma.core.model.ProgramNote
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.binding.WhereBoolean
@@ -16,7 +17,7 @@ import lucuma.odb.graphql.binding.WhereString
 
 object WhereProgramNote {
 
-  def binding(path: Path): Matcher[Predicate] = {
+  def binding(path: Path)(using serverDate: LocalDate): Matcher[Predicate] = {
     val WhereOrderProgramNoteId      = WhereOrder.binding[ProgramNote.Id](path / "id", ProgramNoteIdBinding)
     val WhereProgramBinding          = WhereProgram.binding(path / "program")
     val WhereTitleBinding            = WhereString.binding(path / "title")

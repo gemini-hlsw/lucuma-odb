@@ -17,7 +17,7 @@ case class UpdateConfigurationRequestsInput(
 
 object UpdateConfigurationRequestsInput {
 
-  def binding(path: Path) = {
+  def binding(path: Path)(using serverDate: java.time.LocalDate) = {
     val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

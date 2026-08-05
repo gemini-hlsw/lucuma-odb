@@ -9,6 +9,7 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import java.time.LocalDate
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.ProgramUser
@@ -26,7 +27,7 @@ object WhereProgramUser {
    * @param onlyRole set to restrict to a particular role even if the "role"
    *                 field is not set
    */
-  def binding(path: Path, onlyRole: Option[ProgramUserRole] = None): Matcher[Predicate] =
+  def binding(path: Path, onlyRole: Option[ProgramUserRole] = None)(using serverDate: LocalDate): Matcher[Predicate] =
 
     val WhereOrderProgramUserId       = WhereOrder.binding[ProgramUser.Id](path / "id", ProgramUserIdBinding)
     lazy val WhereProgramBinding      = WhereProgram.binding(path / "program")

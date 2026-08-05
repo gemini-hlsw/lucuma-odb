@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Path
 import grackle.Predicate
+import java.time.LocalDate
 import lucuma.odb.graphql.binding.*
 
 case class UpdateProgramsInput(
@@ -20,7 +21,7 @@ case class UpdateProgramsInput(
 
 object UpdateProgramsInput {
 
-  def binding(path: Path) = {
+  def binding(path: Path)(using serverDate: LocalDate) = {
     val WhereProgramBinding = WhereProgram.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

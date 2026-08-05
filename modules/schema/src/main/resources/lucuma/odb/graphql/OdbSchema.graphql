@@ -22537,6 +22537,12 @@ input WhereProgram {
 
   "Matches the active period end."
   activeEnd: WhereOrderDate
+
+  """
+  When true, matches programs whose active period `[activeStart, activeEnd]` contains the
+  server's current date; when false, matches the complement. Evaluated server-side.
+  """
+  isActive: Boolean
 }
 
 input WhereProgramReference {

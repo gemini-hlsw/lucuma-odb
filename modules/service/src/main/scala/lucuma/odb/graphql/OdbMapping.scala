@@ -112,6 +112,7 @@ object OdbMapping {
     schema0:         Schema,
     allowSub:        Boolean = true,        // Are submappings (recursive calls) allowed?
     shouldValidate:  Boolean = true,        // should we validatate the TypeMappings?
+    serverDate0:     java.time.LocalDate = java.time.LocalDate.now(),
   ): Mapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
@@ -342,6 +343,7 @@ object OdbMapping {
           override val gaiaClient = gaiaClient0
           override val itcClient = itcClient0
           override val user: User = user0
+          override val serverDate: java.time.LocalDate = serverDate0
           override val topics: Topics[F] = topics0
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
@@ -368,7 +370,8 @@ object OdbMapping {
                     emailConfig0,
                     schema,
                     false,                  // don't allow further sub-mappings; only one level of recursion is allowed
-                    shouldValidate = false  // already validated
+                    shouldValidate = false, // already validated
+                    serverDate0             // inherit the parent request's server date
                   ),
                 emailConfig0,
                 commitHash,
