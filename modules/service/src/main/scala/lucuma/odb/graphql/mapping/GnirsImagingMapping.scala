@@ -9,15 +9,22 @@ import grackle.Query.Filter
 import grackle.Query.OrderBy
 import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
+import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
+import io.circe.Json
+import io.circe.syntax.*
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsWellDepth
+import lucuma.core.math.Angle
+import lucuma.core.math.Offset
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
+import lucuma.odb.json.offset.query.given
 
 trait GnirsImagingMapping[F[_]]
   extends GnirsImagingView[F]
@@ -69,6 +76,36 @@ trait GnirsImagingMapping[F[_]]
       SqlObject("preImaging")
     )
 
+  lazy val GnirsImagingAcquisitionMapping: ObjectMapping =
+    ObjectMapping(GnirsImagingAcquisitionType)(
+
+      SqlField("observationId", GnirsImagingView.ObservationId, key = true, hidden = true),
+
+      SqlField("explicitAcquisitionType", GnirsImagingView.AcqType),
+      SqlField("coadds",                  GnirsImagingView.AcqCoadds),
+
+      // Acquisition filter: explicit override only. The effective/default filter is
+      // determined in code (the first science filter) at sequence-generation time.
+      SqlField("explicitFilter", GnirsImagingView.AcqFilter),
+
+      SqlField("acqSkyOffPRaw", GnirsImagingView.AcqSkyOffsetP, hidden = true),
+      SqlField("acqSkyOffQRaw", GnirsImagingView.AcqSkyOffsetQ, hidden = true),
+
+      CursorFieldJson("skyOffset",
+        cursor =>
+          for
+            p <- cursor.field("acqSkyOffPRaw", None).flatMap(_.as[Option[Angle]])
+            q <- cursor.field("acqSkyOffQRaw", None).flatMap(_.as[Option[Angle]])
+          yield (p, q) match
+            case (Some(pa), Some(qa)) =>
+              Offset(Offset.P(pa), Offset.Q(qa)).asJson
+            case _ => Json.Null,
+        List("acqSkyOffPRaw", "acqSkyOffQRaw")
+      ),
+
+      SqlObject("exposureTimeMode", Join(GnirsImagingView.ObservationId, ExposureTimeModeView.ObservationId)),
+    )
+
   lazy val GnirsImagingMapping: ObjectMapping =
     ObjectMapping(GnirsImagingType)(
       SqlField("observationId", GnirsImagingView.ObservationId, key = true, hidden = true),
@@ -85,7 +122,9 @@ trait GnirsImagingMapping[F[_]]
 
       explicitOrElseDefault[GnirsWellDepth]("wellDepth", "explicitWellDepth", "defaultWellDepth"),
       SqlField("defaultWellDepth",  GnirsImagingView.WellDepthDefault),
-      SqlField("explicitWellDepth", GnirsImagingView.WellDepth)
+      SqlField("explicitWellDepth", GnirsImagingView.WellDepth),
+
+      SqlObject("acquisition")
     )
 
   // Order filters predictably and limit to either "current" or "initial".
@@ -111,6 +150,15 @@ trait GnirsImagingMapping[F[_]]
         ObservingModeRowVersion.Initial
       )
 
+    case (GnirsImagingAcquisitionType, "exposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(
+          Filter(
+            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition),
+            child
+          )
+        )
+
   lazy val GnirsImagingMappings: List[TypeMapping] =
     List(
       GnirsImagingFilterMapping,
@@ -118,6 +166,7 @@ trait GnirsImagingMapping[F[_]]
       GnirsInterleavedImagingMapping,
       GnirsPreImagingMapping,
       GnirsImagingVariantMapping,
+      GnirsImagingAcquisitionMapping,
       GnirsImagingMapping
     )
 }

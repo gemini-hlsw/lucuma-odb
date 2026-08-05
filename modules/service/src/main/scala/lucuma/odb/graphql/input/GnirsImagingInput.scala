@@ -43,13 +43,18 @@ object GnirsImagingInput extends ImagingFilterCheck:
 
   val DefaultCoadds: PosInt = 1.refined
 
+  // The acquisition customization input is shared with the other GNIRS modes.
+  type AcquisitionInput = GnirsAcquisitionInput
+  val AcquisitionInput = GnirsAcquisitionInput
+
   case class Create(
     filters:           NonEmptyList[GnirsImagingFilterInput],
     camera:            GnirsCamera,
-    coadds:            PosInt                 = DefaultCoadds,
-    explicitReadMode:  Option[GnirsReadMode]  = None,
-    explicitWellDepth: Option[GnirsWellDepth] = None,
-    variant:           ImagingVariantInput    = DefaultVariant
+    coadds:            PosInt                   = DefaultCoadds,
+    explicitReadMode:  Option[GnirsReadMode]    = None,
+    explicitWellDepth: Option[GnirsWellDepth]   = None,
+    variant:           ImagingVariantInput      = DefaultVariant,
+    acquisition:       Option[AcquisitionInput] = None
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.GnirsImaging
@@ -64,7 +69,8 @@ object GnirsImagingInput extends ImagingFilterCheck:
           GnirsCameraBinding.Option("camera", rCamera),
           PosIntBinding.Option("coadds", rCoadds),
           GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
-          GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth)
+          GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
+          AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
           (
             rVariant,
@@ -72,10 +78,11 @@ object GnirsImagingInput extends ImagingFilterCheck:
             rCamera,
             rCoadds,
             rReadMode,
-            rWellDepth
-          ).parTupled.flatMap: (variant, filters, camera, coadds, readMode, wellDepth) =>
+            rWellDepth,
+            rAcq
+          ).parTupled.flatMap: (variant, filters, camera, coadds, readMode, wellDepth, acq) =>
             camera.fold(OdbError.InvalidArgument("A 'camera' is required on creation.".some).asFailure): c =>
-              Create(filters, c, coadds.getOrElse(DefaultCoadds), readMode, wellDepth, variant.getOrElse(DefaultVariant)).success
+              Create(filters, c, coadds.getOrElse(DefaultCoadds), readMode, wellDepth, variant.getOrElse(DefaultVariant), acq).success
 
   end Create
 
@@ -85,10 +92,13 @@ object GnirsImagingInput extends ImagingFilterCheck:
     coadds:            Option[PosInt],
     explicitReadMode:  Nullable[GnirsReadMode],
     explicitWellDepth: Nullable[GnirsWellDepth],
-    variant:           Option[ImagingVariantInput]
+    variant:           Option[ImagingVariantInput],
+    acquisition:       Option[AcquisitionInput]
   ):
     val observingModeType: ObservingModeType =
       ObservingModeType.GnirsImaging
+
+    def updatesAcquisition: Boolean = acquisition.isDefined
 
     def toCreate: Result[Create] =
       (
@@ -101,7 +111,8 @@ object GnirsImagingInput extends ImagingFilterCheck:
           coadds.getOrElse(DefaultCoadds),
           explicitReadMode.toOption,
           explicitWellDepth.toOption,
-          variant.getOrElse(DefaultVariant)
+          variant.getOrElse(DefaultVariant),
+          acquisition
         )
 
   object Edit:
@@ -114,7 +125,8 @@ object GnirsImagingInput extends ImagingFilterCheck:
           GnirsCameraBinding.Option("camera", rCamera),
           PosIntBinding.Option("coadds", rCoadds),
           GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
-          GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth)
+          GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
+          AcquisitionInput.Binding.Option("acquisition", rAcq)
         ) =>
           (
             rVariant,
@@ -122,9 +134,10 @@ object GnirsImagingInput extends ImagingFilterCheck:
             rCamera,
             rCoadds,
             rReadMode,
-            rWellDepth
-          ).parMapN: (variant, filters, camera, coadds, readMode, wellDepth) =>
-            Edit(filters, camera, coadds, readMode, wellDepth, variant)
+            rWellDepth,
+            rAcq
+          ).parMapN: (variant, filters, camera, coadds, readMode, wellDepth, acq) =>
+            Edit(filters, camera, coadds, readMode, wellDepth, variant, acq)
 
   end Edit
 

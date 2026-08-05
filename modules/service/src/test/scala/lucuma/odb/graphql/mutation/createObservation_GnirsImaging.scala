@@ -59,6 +59,16 @@ class createObservation_GnirsImaging extends OdbSuite:
                     wellDepth
                     defaultWellDepth
                     explicitWellDepth
+                    acquisition {
+                      explicitAcquisitionType
+                      coadds
+                      explicitFilter
+                      skyOffset { p { arcseconds } q { arcseconds } }
+                      exposureTimeMode {
+                        signalToNoise { value at { nanometers } }
+                        timeAndCount { time { seconds } count at { nanometers } }
+                      }
+                    }
                   }
                 }
               }
@@ -86,7 +96,181 @@ class createObservation_GnirsImaging extends OdbSuite:
                     "explicitReadMode": "BRIGHT",
                     "wellDepth": "SHALLOW",
                     "defaultWellDepth": "SHALLOW",
-                    "explicitWellDepth": null
+                    "explicitWellDepth": null,
+                    "acquisition": {
+                      "explicitAcquisitionType": null,
+                      "coadds": 1,
+                      "explicitFilter": null,
+                      "skyOffset": null,
+                      "exposureTimeMode": {
+                        "signalToNoise": {
+                          "value": 10.000,
+                          "at": { "nanometers": 1250.000 }
+                        },
+                        "timeAndCount": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+
+  /** Creates a GNIRS imaging observation with the given acquisition input block. */
+  private def createWithAcquisition(acquisition: String, selection: String) =
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).map: tid =>
+        s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                targetEnvironment: {
+                  asterism: [${tid.asJson}]
+                }
+                scienceRequirements: {
+                  exposureTimeMode: {
+                    signalToNoise: {
+                      value: 100.0
+                      at: { nanometers: 1250.0 }
+                    }
+                  }
+                }
+                observingMode: {
+                  gnirsImaging: {
+                    camera: SHORT_BLUE
+                    filters: [ { filter: J } ]
+                    acquisition: $acquisition
+                  }
+                }
+              }
+            }) {
+              observation {
+                observingMode {
+                  gnirsImaging {
+                    acquisition { $selection }
+                  }
+                }
+              }
+            }
+          }
+        """
+
+  test("create GNIRS imaging with acquisition skyOffset — round-trips"):
+    createWithAcquisition(
+      """{
+        explicitAcquisitionType: FAINT
+        skyOffset: { p: { arcseconds: 1.5 }, q: { arcseconds: -2.5 } }
+      }""",
+      "explicitAcquisitionType skyOffset { p { arcseconds } q { arcseconds } }"
+    ).flatMap: q =>
+      expect(pi, q,
+        json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gnirsImaging": {
+                    "acquisition": {
+                      "explicitAcquisitionType": "FAINT",
+                      "skyOffset": {
+                        "p": { "arcseconds": 1.500000 },
+                        "q": { "arcseconds": -2.500000 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+
+  test("create GNIRS imaging with an explicit acquisition filter"):
+    createWithAcquisition("{ explicitFilter: ORDER4 }", "explicitFilter").flatMap: q =>
+      expect(pi, q,
+        json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gnirsImaging": {
+                    "acquisition": { "explicitFilter": "ORDER4" }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+
+  test("create GNIRS imaging with an explicit acquisition exposure time mode and coadds"):
+    createWithAcquisition(
+      """{
+        exposureTimeMode: {
+          timeAndCount: { time: { seconds: 12.0 }, count: 1, at: { nanometers: 1250.0 } }
+        }
+        coadds: 4
+      }""",
+      "coadds exposureTimeMode { timeAndCount { time { seconds } count at { nanometers } } }"
+    ).flatMap: q =>
+      expect(pi, q,
+        json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gnirsImaging": {
+                    "acquisition": {
+                      "coadds": 4,
+                      "exposureTimeMode": {
+                        "timeAndCount": {
+                          "time": { "seconds": 12.000000 },
+                          "count": 1,
+                          "at": { "nanometers": 1250.000 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight)
+
+  test("create GNIRS imaging rejects a non-acquisition explicit filter"):
+    createWithAcquisition("{ explicitFilter: Y }", "explicitFilter").flatMap: q =>
+      expect(pi, q,
+        List("Argument 'input.SET.observingMode.gnirsImaging.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER6, ORDER5, ORDER4, H2, ORDER3, PAH").asLeft)
+
+  test("create GNIRS imaging rejects a sky offset without FAINT acquisition type"):
+    createWithAcquisition(
+      """{
+        explicitAcquisitionType: BRIGHT
+        skyOffset: { p: { arcseconds: 1.5 }, q: { arcseconds: -2.5 } }
+      }""",
+      "explicitAcquisitionType"
+    ).flatMap: q =>
+      expect(pi, q,
+        List("Argument 'input.SET.observingMode.gnirsImaging.acquisition' is invalid: 'skyOffset' is only valid when 'explicitAcquisitionType' is FAINT.").asLeft)
+
+  test("create GNIRS imaging rejects FAINT acquisition type without a sky offset"):
+    createWithAcquisition("{ explicitAcquisitionType: FAINT }", "explicitAcquisitionType").flatMap: q =>
+      expect(pi, q,
+        List("Argument 'input.SET.observingMode.gnirsImaging.acquisition' is invalid: 'explicitAcquisitionType' FAINT requires a 'skyOffset'.").asLeft)
+
+  test("create GNIRS imaging with an explicit BRIGHT acquisition type and no sky offset"):
+    createWithAcquisition("{ explicitAcquisitionType: BRIGHT }", "explicitAcquisitionType skyOffset { p { arcseconds } }").flatMap: q =>
+      expect(pi, q,
+        json"""
+          {
+            "createObservation": {
+              "observation": {
+                "observingMode": {
+                  "gnirsImaging": {
+                    "acquisition": {
+                      "explicitAcquisitionType": "BRIGHT",
+                      "skyOffset": null
+                    }
                   }
                 }
               }

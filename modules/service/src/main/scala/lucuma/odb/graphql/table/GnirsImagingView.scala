@@ -31,6 +31,13 @@ trait GnirsImagingView[F[_]] extends BaseMapping[F]:
     val WellDepth: ColumnRef        = col("c_well_depth", gnirs_well_depth.opt)
     val WellDepthDefault: ColumnRef = col("c_well_depth_default", gnirs_well_depth)
 
+    // Acquisition config (ETM stored in t_exposure_time_mode via c_role = 'acquisition')
+    val AcqType: ColumnRef       = col("c_acq_type", gnirs_acquisition_type.opt)
+    val AcqCoadds: ColumnRef     = col("c_acq_coadds", int4_pos)
+    val AcqFilter: ColumnRef     = col("c_acq_filter", gnirs_filter.opt)
+    val AcqSkyOffsetP: ColumnRef = col("c_acq_sky_offset_p", angle_µas.opt)
+    val AcqSkyOffsetQ: ColumnRef = col("c_acq_sky_offset_q", angle_µas.opt)
+
     object Sky:
       val Count: ColumnRef = col("c_sky_count", int4_nonneg)
 

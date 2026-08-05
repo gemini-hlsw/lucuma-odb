@@ -11003,6 +11003,27 @@ input GnirsImagingFilterInput {
 }
 
 """
+GNIRS Imaging acquisition customization.  Every field overrides an otherwise
+automatic choice.
+"""
+type GnirsImagingAcquisition {
+
+  exposureTimeMode: ExposureTimeMode!
+
+  coadds: PosInt!
+
+  "An explicitly specified acquisition type.  When null, the type is determined by the ITC brightness classification at sequence-generation time."
+  explicitAcquisitionType: GnirsAcquisitionType
+
+  "An explicitly specified acquisition filter. When null, the filter is determined automatically from the acquisition mode and the first science filter at sequence-generation time."
+  explicitFilter: GnirsFilter
+
+  "The sky offset of the field image, which doubles as the sky frame.  Set only when the acquisition type is FAINT."
+  skyOffset: Offset
+
+}
+
+"""
 GNIRS Imaging mode.  Keyhole imaging fixes the FPU (acquisition keyhole), the
 decker (acquisition) and the acquisition mirror (in), so none of them appears
 here.
@@ -11056,6 +11077,22 @@ type GnirsImaging {
   """
   defaultWellDepth: GnirsWellDepth!
 
+  """
+  Acquisition customization.
+  """
+  acquisition: GnirsImagingAcquisition!
+
+}
+
+"""
+GNIRS Imaging acquisition customization input.
+"""
+input GnirsImagingAcquisitionInput {
+  explicitFilter: GnirsFilter
+  explicitAcquisitionType: GnirsAcquisitionType
+  coadds: PosInt
+  skyOffset: OffsetInput
+  exposureTimeMode: ExposureTimeModeInput
 }
 
 """
@@ -11095,6 +11132,11 @@ input GnirsImagingInput {
   The explicitWellDepth field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitWellDepth: GnirsWellDepth
+
+  """
+  Acquisition customization.
+  """
+  acquisition: GnirsImagingAcquisitionInput
 
 }
 

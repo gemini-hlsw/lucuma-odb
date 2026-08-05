@@ -67,8 +67,8 @@ object Acquisition:
 
   private val SingleCoadd: PosInt = 1.refined
 
-  /** The default Faint-mode sky offset when the acquisition mode is auto-resolved. */
-  private def defaultFaintSkyOffset(fpu: GnirsFpu.Spectroscopy): Offset =
+  /** The default Faint-mode sky offset for a spectroscopy FPU. */
+  def defaultFaintSkyOffset(fpu: GnirsFpu.Spectroscopy): Offset =
     fpu match
       case GnirsFpu.Spectroscopy.Slit(_) => GnirsAcquisitionMode.Faint.DefaultSlitSkyOffset
       case GnirsFpu.Spectroscopy.Ifu(_)  => GnirsAcquisitionMode.Faint.DefaultIfuSkyOffset
@@ -376,7 +376,7 @@ object Acquisition:
                      )
         mode       = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedAcqType)
         selFilter <- config.acquisition
-                       .selectedFilter(mode, config.centralWavelength)
+                       .selectedFilter(mode, GnirsFilter.fromAcquisitionWavelength(config.centralWavelength))
                        .leftMap(sequenceError)
       yield (t, mode, selFilter)
 

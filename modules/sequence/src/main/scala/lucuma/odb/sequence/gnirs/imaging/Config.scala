@@ -12,6 +12,7 @@ import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
+import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.syntax.all.*
 
@@ -30,7 +31,8 @@ case class Config(
   coadds:            PosInt,
   explicitReadMode:  Option[GnirsReadMode],
   defaultWellDepth:  GnirsWellDepth,
-  explicitWellDepth: Option[GnirsWellDepth]
+  explicitWellDepth: Option[GnirsWellDepth],
+  acquisition:       AcquisitionConfig
 ) derives Eq:
 
   def wellDepth: GnirsWellDepth =
@@ -50,6 +52,8 @@ case class Config(
     out.write(coadds.value.hashBytes)
     out.writeChars(explicitReadMode.fold("")(_.tag))
     out.writeChars(wellDepth.tag)
+
+    out.write(acquisition.hashBytes)
 
     out.close()
     bao.toByteArray

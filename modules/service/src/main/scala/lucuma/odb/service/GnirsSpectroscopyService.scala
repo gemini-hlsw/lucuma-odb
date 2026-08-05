@@ -38,7 +38,8 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsSpectroscopyInput
-import lucuma.odb.sequence.gnirs.spectroscopy.AcquisitionConfig
+import lucuma.odb.sequence.gnirs.AcquisitionConfig
+import lucuma.odb.sequence.gnirs.spectroscopy.Acquisition
 import lucuma.odb.sequence.gnirs.spectroscopy.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GnirsCodecs.*
@@ -141,8 +142,10 @@ object GnirsSpectroscopyService:
                         // Explicit acquisition mode (None => AUTO); the sky offset is
                         // present only for an explicit FAINT type (DB CHECK enforced) and
                         // is carried inside the Faint mode. The filter override is separate.
-                        val acqSkyOffset: Option[Offset] =
-                          (acqSkyOffP, acqSkyOffQ).mapN((p, q) => Offset(Offset.P(p), Offset.Q(q)))
+                        val acqSkyOffset: Offset =
+                          (acqSkyOffP, acqSkyOffQ)
+                            .mapN((p, q) => Offset(Offset.P(p), Offset.Q(q)))
+                            .getOrElse(Acquisition.defaultFaintSkyOffset(fpu))
                         val explicitAcqMode: Option[GnirsAcquisitionMode] =
                           acqType.map(GnirsAcquisitionMode.forTypeAndOffset(_, acqSkyOffset))
                         val acq = AcquisitionConfig(explicitAcqMode, acqFilterExp, acqEtm, acqCoaddsP)
