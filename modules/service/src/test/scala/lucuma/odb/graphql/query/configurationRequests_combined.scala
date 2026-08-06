@@ -10,6 +10,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+
 import java.time.LocalDate
 
 // SC-9240 integration capstone: the destination query composes all four filters

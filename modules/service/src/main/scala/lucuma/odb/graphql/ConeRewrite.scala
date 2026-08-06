@@ -25,16 +25,31 @@ import lucuma.odb.graphql.binding.BigDecimalBinding
 import lucuma.odb.graphql.binding.LongBinding
 import lucuma.odb.graphql.binding.StringBinding
 
-/** Pre-compilation rewrite that resolves the `WhereConfigurationRequest.targetCoordinates`
- *  cone filter out of band: the cone is parsed from the (untyped) WHERE value, the
- *  matching `ConfigurationRequest.Id`s are computed by a supplied effect, and the
- *  `targetCoordinates` field is replaced with `id: { IN: [...] }` so that grackle
- *  compiles the whole WHERE as a single fully-pushable SQL statement.
+/** Resolves the `WhereConfigurationRequest.targetCoordinates` cone filter by rewriting
+ *  the query after it is parsed but before grackle compiles it:
  *
- *  Resolved out of band because the candidate lookup is an `F` effect that grackle's
- *  elaborator (a pure `StateT[Result, ElabState, *]`) cannot run.
+ *  {{{
+ *  parse ──▶ UntypedOperation ──▶ compile ──▶ Query ──▶ execute ──▶ Json
+ *                    │
+ *                    └── rewriteCones: targetCoordinates ⟶ id: { IN: [...] }
+ *  }}}
+ *
+ *  At that point the query is still untyped -- `UntypedSelect` nodes carrying raw
+ *  `Value` arguments -- so the cone is read straight off the WHERE value (see the
+ *  hand-written `CoordinatesInput` / `AngleInput` parsing below, which stands in for
+ *  the `Matcher` bindings that have not run yet). The matching `ConfigurationRequest.Id`s
+ *  are computed by a supplied effect and substituted for the `targetCoordinates` field,
+ *  leaving grackle an ordinary WHERE that compiles to a single fully-pushable SQL
+ *  statement.
+ *
+ *  This is deliberately not grackle elaboration, which would be the natural home for
+ *  turning a WHERE input into a predicate: elaboration runs during compilation as a pure
+ *  `StateT[Result, ElabState, *]` and so cannot perform the `F` candidate lookup.
+ *
+ *  Driven by `GraphQLRoutes`, which re-parses the document, applies this rewrite, and
+ *  compiles the result.
  */
-object ConeElaboration:
+object ConeRewrite:
 
   private val ConfigurationRequestsField = "configurationRequests"
   private val WhereArg                   = "WHERE"

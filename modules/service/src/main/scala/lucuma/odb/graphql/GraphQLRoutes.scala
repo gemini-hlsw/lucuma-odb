@@ -179,12 +179,12 @@ object GraphQLRoutes {
                                       untypedOp match
                                         case None => F.pure(Result.failure(s"No operation named '$operationName'"))
                                         case Some(op) =>
-                                          ConeElaboration.rewriteCones(op.query) { (center, distance) =>
+                                          ConeRewrite.rewriteCones(op.query) { (center, distance) =>
                                             map.asInstanceOf[ConfigurationRequestMapping[F]].coneCandidates(center, distance)
                                           }.flatMap {
                                             case r if r.isFailure => F.pure(r.asInstanceOf[Result[Json]])
                                             case r =>
-                                              val recompiled = map.compiler.compileOperation(ConeElaboration.withQuery(op, r.toOption.get), None, frags)
+                                              val recompiled = map.compiler.compileOperation(ConeRewrite.withQuery(op, r.toOption.get), None, frags)
                                               recompiled.toOption match
                                                 case None         => F.pure(recompiled.asInstanceOf[Result[Json]])
                                                 case Some(compiled) => runQuery(compiled)

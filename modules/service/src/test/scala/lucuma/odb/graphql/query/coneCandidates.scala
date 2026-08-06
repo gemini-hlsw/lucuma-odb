@@ -6,10 +6,10 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.math.Angle
 import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Coordinates
+import lucuma.core.model.ConfigurationRequest
 
 // Direct service-level test for the SC-9240 cone (angular-distance) search.
 // Expected matches are computed independently with lucuma-core's exact

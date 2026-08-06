@@ -45,7 +45,8 @@ import lucuma.odb.util.GnirsCodecs.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
-import skunk.codec.numeric.{float8, int8}
+import skunk.codec.numeric.float8
+import skunk.codec.numeric.int8
 import skunk.data.Arr
 import skunk.syntax.all.*
 

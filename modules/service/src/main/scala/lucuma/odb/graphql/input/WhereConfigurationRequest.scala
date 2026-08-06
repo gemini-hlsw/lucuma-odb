@@ -52,7 +52,7 @@ object WhereConfigurationRequest {
 
     val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
 
-    // `targetCoordinates` is resolved out of band (see ConeElaboration / GraphQLRoutes):
+    // `targetCoordinates` is resolved out of band (see ConeRewrite / GraphQLRoutes):
     // the binding accepts it here so compilation succeeds, producing no predicate.
     val TargetCoordinatesBinding: Matcher[Unit] = _ => Right(())
 
