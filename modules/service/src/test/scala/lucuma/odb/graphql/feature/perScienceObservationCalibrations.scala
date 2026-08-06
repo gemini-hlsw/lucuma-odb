@@ -64,7 +64,10 @@ import lucuma.odb.json.wavelength.decoder.given
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
+import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.user_state
 import lucuma.refined.*
+import skunk.syntax.all.*
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -2401,3 +2404,84 @@ class perScienceObservationCalibrations
       assert(!pinExists,   "daytime pinhole should be deleted")
       assert(!telExists,   "telluric should be deleted")
     }
+
+  // --- Telluric decline / reinstate ---
+
+  // Reads c_workflow_user_state directly
+  private def obsUserStateTag(oid: Observation.Id): IO[Option[String]] =
+    session.use(
+      _.option(sql"""
+        SELECT c_workflow_user_state::text
+        FROM t_observation
+        WHERE c_observation_id = ${observation_id}
+      """.query(skunk.codec.all.text.opt))(oid)
+    ).map(_.flatten)
+
+  private def attemptSetObservationWorkflowState(
+    user: User, oid: Observation.Id, state: ObservationWorkflowState
+  ): IO[Either[Throwable, ObservationWorkflowState]] =
+    setObservationWorkflowState(user, oid, state).attempt
+
+  // Bypasses workflow validation to place an observation in a given user state;
+  // used to put a science observation in `Ready` so its telluric inherits it.
+  private def forceObsUserState(oid: Observation.Id, us: Option[lucuma.odb.service.ObservationWorkflowService.UserState]): IO[Unit] =
+    session.use(_.execute(sql"""
+      UPDATE t_observation
+      SET c_workflow_user_state = ${user_state.opt}
+      WHERE c_observation_id = ${observation_id}
+    """.command)(us, oid)).void
+
+  test("A telluric can be declined and reinstated while its science obs is Defined"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      telluric <- selectTelluricObservationFor(oid).map(_.get)
+      before   <- obsUserStateTag(telluric)
+      s1       <- setObservationWorkflowState(pi, telluric, ObservationWorkflowState.Inactive)
+      u1       <- obsUserStateTag(telluric)
+      sci      <- obsUserStateTag(oid)
+      s2       <- setObservationWorkflowState(pi, telluric, ObservationWorkflowState.Defined)
+      u2       <- obsUserStateTag(telluric)
+    yield
+      assertEquals(before, None)
+      assertEquals(s1, ObservationWorkflowState.Inactive)
+      assertEquals(u1, Some("inactive"))
+      assertEquals(sci, None)             // declining the telluric leaves its science obs untouched
+      assertEquals(s2, ObservationWorkflowState.Defined)
+      assertEquals(u2, None)              // reinstate clears the override
+
+  test("Reinstating a declined telluric to Ready clears the override rather than pinning it"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      telluric <- selectTelluricObservationFor(oid).map(_.get)
+      // Put the science obs in Ready so the telluric inherits it.
+      _        <- forceObsUserState(oid, Some(ObservationWorkflowState.Ready))
+      s1       <- setObservationWorkflowState(pi, telluric, ObservationWorkflowState.Inactive)
+      u1       <- obsUserStateTag(telluric)
+      s2       <- setObservationWorkflowState(pi, telluric, ObservationWorkflowState.Ready)
+      u2       <- obsUserStateTag(telluric)
+    yield
+      assertEquals(s1, ObservationWorkflowState.Inactive)
+      assertEquals(u1, Some("inactive"))
+      assertEquals(s2, ObservationWorkflowState.Ready)
+      assertEquals(u2, None)
+
+  test("Only tellurics can be declined, not daytime pinholes"):
+    for
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      result <- attemptSetObservationWorkflowState(pi, pinOid, ObservationWorkflowState.Inactive)
+    yield
+      assert(result.isLeft, "a daytime pinhole must not be declinable")

@@ -15,6 +15,7 @@ import grackle.Query.*
 import grackle.Result
 import grackle.ResultT
 import grackle.Type
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SequenceType
@@ -738,16 +739,16 @@ trait AccessControl[F[_]] extends Predicates[F] {
       .value
 
 
-  def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(Option[ObservingModeType], ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
+  def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(Option[ObservingModeType], Option[CalibrationRole], ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
     verifyWritable(input.observationId) >>
     Services.asSuperUser:
-      observationWorkflowService.getWorkflowsAndModes(List(input.observationId))
+      observationWorkflowService.getWorkflowsModesAndRoles(List(input.observationId))
         .map: res =>
           res.map(_(input.observationId)).flatMap:
-            case (w, om) =>
+            case (w, om, calibrationRole) =>
               if w.state === input.state || w.validTransitions.contains(input.state)
               then
-                Result(AccessControl.unchecked((om, w, input.state), input.observationId, observation_id))
+                Result(AccessControl.unchecked((om, calibrationRole, w, input.state), input.observationId, observation_id))
               else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
 
   def selectForUpdate[D](
