@@ -15,6 +15,8 @@ import grackle.Result
 import grackle.ResultT
 import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
+import lucuma.core.math.Angle
+import lucuma.core.math.Coordinates
 import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ProgramView
@@ -38,6 +40,12 @@ trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with
       SqlObject("configuration"),
       EffectField("applicableObservations", applicableObservationsHandler, List("id"))
     )
+
+  /** Selects the ids of configuration requests whose target reference coordinates
+   *  lie within `distance` of `center` (exact great-circle). Used by the
+   *  `targetCoordinates` cone WHERE rewrite. */
+  def coneCandidates(center: Coordinates, distance: Angle): F[Result[List[ConfigurationRequest.Id]]] =
+    services.use(_.configurationService.coneCandidates(center, distance))
 
   val applicableObservationsHandler: EffectHandler[F] = pairs =>
 
