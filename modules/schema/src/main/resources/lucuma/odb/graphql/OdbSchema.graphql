@@ -20712,6 +20712,22 @@ input WhereConfigurationRequest {
   Matches the configuration's observing mode type, if any.
   """
   observingModeType: WhereOptionEqObservingModeType
+
+  """
+  Matches if the configuration's target reference coordinates lie within the
+  angular `distance` of `center` (exact great-circle). Resolved out of band.
+  """
+  targetCoordinates: WhereCone
+}
+
+"""
+A reusable cone (angular-distance) match over a sky position.
+"""
+input WhereCone {
+  center: CoordinatesInput!
+
+  "Maximum angular separation between `center` and the target reference coords."
+  distance: AngleInput!
 }
 
 input WhereObservationReference {

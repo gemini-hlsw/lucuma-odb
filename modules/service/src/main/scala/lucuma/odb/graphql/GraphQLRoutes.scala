@@ -23,6 +23,7 @@ import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.graphql.mapping.ConfigurationRequestMapping
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
@@ -126,29 +127,68 @@ object GraphQLRoutes {
                                     document:      String,
                                     operationName: Option[String]
                                   ): F[Result[Json]] =
-                                    T.spanBuilder("graphql-query")
-                                      .withSpanKind(SpanKind.Server)
-                                      .build
-                                      .use: span =>
-                                        F.timed(
-                                          super.query(request, document, operationName).retryOnInvalidCursorName
-                                            .handleError(Result.InternalError.apply)
-                                            .flatTap {
-                                              case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                              case _                       => debug(user, s"Query (success).")
-                                            }
-                                        ).flatMap: (elapsed, result) =>
-                                          val slow = elapsed > OdbMapping.slowQueryThreshold
-                                          val markSlow =
-                                            span.addAttribute(Attribute("graphql.slow_query", true)).whenA(slow)
-                                          val dumpGql: F[Unit] =
-                                            OdbMapping.dumpDir.filter(_ => slow).map: dir =>
-                                              F.blocking:
-                                                val hash = Integer.toHexString(document.hashCode)
-                                                val path = NIOPath.of(dir, s"odb-query-$hash.gql")
-                                                if !Files.exists(path) then {Files.writeString(path, document);()}
-                                            .getOrElse(F.unit)
-                                          markSlow *> dumpGql.as(result)
+
+                                    def runQuery(req: Operation): F[Result[Json]] =
+                                      T.spanBuilder("graphql-query")
+                                        .withSpanKind(SpanKind.Server)
+                                        .build
+                                        .use: span =>
+                                          F.timed(
+                                            super.query(req, document, operationName).retryOnInvalidCursorName
+                                              .handleError(Result.InternalError.apply)
+                                              .flatTap {
+                                                case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                                case _                       => debug(user, s"Query (success).")
+                                              }
+                                          ).flatMap: (elapsed, result) =>
+                                            val slow = elapsed > OdbMapping.slowQueryThreshold
+                                            val markSlow =
+                                              span.addAttribute(Attribute("graphql.slow_query", true)).whenA(slow)
+                                            val dumpGql: F[Unit] =
+                                              OdbMapping.dumpDir.filter(_ => slow).map: dir =>
+                                                F.blocking:
+                                                  val hash = Integer.toHexString(document.hashCode)
+                                                  val path = NIOPath.of(dir, s"odb-query-$hash.gql")
+                                                  if !Files.exists(path) then {Files.writeString(path, document);()}
+                                              .getOrElse(F.unit)
+                                            markSlow *> dumpGql.as(result)
+
+                                    // SC-9240: `targetCoordinates` cone filters are resolved out of
+                                    // band. Compilation (which is pure, in `parse`) cannot run the F
+                                    // candidate lookup, so when the document carries a cone we
+                                    // re-parse it, compute the candidate ids, inject `id IN (...)`,
+                                    // re-compile, and execute -- yielding a single fully-pushable
+                                    // SQL statement.
+                                    if !document.contains("targetCoordinates") then runQuery(request)
+                                    else resolveConeQuery(document, operationName, runQuery)
+
+                                  // Re-resolves a `configurationRequests` query whose WHERE has a
+                                  // `targetCoordinates` cone, recompiling with `id IN (...)`.
+                                  def resolveConeQuery(
+                                    document:      String,
+                                    operationName: Option[String],
+                                    runQuery:      Operation => F[Result[Json]]
+                                  ): F[Result[Json]] =
+                                    val parsed = grackle.QueryParser(map.graphQLParser).parseText(document)
+                                    if parsed.isFailure then F.pure(parsed.asInstanceOf[Result[Json]])
+                                    else
+                                      val (ops, frags) = parsed.toOption.get
+                                      val untypedOp = operationName match
+                                        case None    => ops.find(_.name.isEmpty).orElse(ops.headOption)
+                                        case Some(n) => ops.find(_.name.contains(n))
+                                      untypedOp match
+                                        case None => F.pure(Result.failure(s"No operation named '$operationName'"))
+                                        case Some(op) =>
+                                          ConeElaboration.rewriteCones(op.query) { (center, distance) =>
+                                            map.asInstanceOf[ConfigurationRequestMapping[F]].coneCandidates(center, distance)
+                                          }.flatMap {
+                                            case r if r.isFailure => F.pure(r.asInstanceOf[Result[Json]])
+                                            case r =>
+                                              val recompiled = map.compiler.compileOperation(ConeElaboration.withQuery(op, r.toOption.get), None, frags)
+                                              recompiled.toOption match
+                                                case None         => F.pure(recompiled.asInstanceOf[Result[Json]])
+                                                case Some(compiled) => runQuery(compiled)
+                                          }
 
                                   override def subscribe(
                                     request:       Operation,

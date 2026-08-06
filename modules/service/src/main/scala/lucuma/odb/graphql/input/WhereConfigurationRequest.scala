@@ -53,6 +53,10 @@ object WhereConfigurationRequest {
 
     val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
 
+    // `targetCoordinates` is resolved out of band (see ConeElaboration / GraphQLRoutes):
+    // the binding accepts it here so compilation succeeds, producing no predicate.
+    val TargetCoordinatesBinding: Matcher[Unit] = _ => Right(())
+
     lazy val WhereObservationBinding = binding(path) // lazy self-reference
     ObjectFieldsBinding.rmap {
       case List(
@@ -67,9 +71,10 @@ object WhereConfigurationRequest {
         WhereCreatedAtBinding.Option("createdAt", rCreatedAt),
         WhereUpdatedAtBinding.Option("updatedAt", rUpdatedAt),
         ObservingModeTypeBinding.Option("observingModeType", rObservingModeType),
+        TargetCoordinatesBinding.Option("targetCoordinates", rTargetCoordinates),
       ) =>
-        (rAND, rOR, rNOT, rId, rStatus, rProgram, rJustification, rFeedback, rCreatedAt, rUpdatedAt, rObservingModeType).parMapN {
-          (AND, OR, NOT, id, status, program, justification, feedback, createdAt, updatedAt, observingModeType) =>
+        (rAND, rOR, rNOT, rId, rStatus, rProgram, rJustification, rFeedback, rCreatedAt, rUpdatedAt, rObservingModeType, rTargetCoordinates).parMapN {
+          (AND, OR, NOT, id, status, program, justification, feedback, createdAt, updatedAt, observingModeType, targetCoordinates) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -82,6 +87,7 @@ object WhereConfigurationRequest {
               createdAt,
               updatedAt,
               observingModeType,
+              targetCoordinates.flatMap(_ => Option.empty[Predicate]),
             ).flatten)
         }
     }
