@@ -16,6 +16,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.PerSite
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EducationalStatus
@@ -296,6 +297,23 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def setConfigurationRequestStatusAs(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateConfigurationRequests(
+            input: {
+              SET: { status: ${status.tag.toUpperCase} }
+              WHERE: { id: { EQ: ${rid.asJson} } }
+            }
+          ) {
+            requests { id }
+          }
+        }
+      """
+    ).void
 
   def setProgramActiveAs(user: User, pid: Program.Id, activeStart: LocalDate, activeEnd: LocalDate): IO[Unit] =
     query(
