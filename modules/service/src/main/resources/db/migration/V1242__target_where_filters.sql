@@ -1,8 +1,8 @@
--- SC-9240: schema support for the target-based WHERE filters.
+-- schema support for the target-based WHERE filters.
 
 -- B-tree indexes on configuration-request reference coordinates, to support
 -- fast cone (angular-distance) searches via bounding-box prefiltering on the
--- int8 microarcsecond columns. Pure-SQL trig; no PostGIS.
+-- int8 microarcsecond columns.
 CREATE INDEX IF NOT EXISTS ix_configuration_request_reference_ra
   ON t_configuration_request (c_reference_ra);
 
@@ -10,10 +10,8 @@ CREATE INDEX IF NOT EXISTS ix_configuration_request_reference_dec
   ON t_configuration_request (c_reference_dec);
 
 -- Computed `c_is_active` on v_program, true when the current UTC date falls
--- within the program's [c_active_start, c_active_end] window. Evaluated in SQL
--- so the filter pushes down and uses transaction-start time (CURRENT_DATE
--- semantics) rather than an application clock. Both bounds are NOT NULL, so
--- the expression is total.
+-- within the program's [c_active_start, c_active_end] window.
+-- Evaluated in SQL so the filter pushes down and uses transaction-start time.
 CREATE OR REPLACE VIEW v_program AS
   SELECT
     p.*,

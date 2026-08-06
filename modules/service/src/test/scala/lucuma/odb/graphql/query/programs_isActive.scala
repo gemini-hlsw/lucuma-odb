@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import io.circe.syntax.*
+
 import java.time.LocalDate
 
 class programs_isActive extends OdbSuite {
