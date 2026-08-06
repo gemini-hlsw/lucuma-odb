@@ -58,6 +58,8 @@ import lucuma.odb.data.Extinction
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TooTrigger
+import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.data.UserType
 
 import java.time.LocalDate
@@ -235,6 +237,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[Timestamp](TimestampType),
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[ToOActivation](ToOActivationType),
+      LeafMapping[TooTrigger.Id](TooTriggerIdType),
+      LeafMapping[TooTriggerStatus](TooTriggerStatusType),
       LeafMapping[Long](TransactionIdType),
       LeafMapping[User.Id](UserIdType),
       LeafMapping[String](UserInvitationKeyType),

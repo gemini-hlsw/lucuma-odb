@@ -48,6 +48,7 @@ import lucuma.odb.Config
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asFailureF
+import lucuma.odb.data.TooTrigger
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 import lucuma.odb.graphql.predicate.DatasetPredicates
@@ -92,6 +93,10 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       CreateProgramNote,
       CreateProposal,
       CreateTarget,
+      RequestTooTrigger,
+      WithdrawTooTrigger,
+      AcceptTooTrigger,
+      DenyTooTrigger,
       CreateUserInvitation,
       DeleteProgramUser,
       DeleteProposal,
@@ -469,6 +474,60 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
             case other =>
               programNoteService.createNote(other).nestMap: nid =>
                 Unique(Filter(Predicates.programNote.id.eql(nid), child))
+
+  // ToO trigger workflow authorization (provisional): anyone who can read the
+  // program may request; anyone who can write to the program may withdraw; staff
+  // accept or deny.  Program scoping is via `isVisibleTo` (request) and
+  // `isWritableBy` (withdraw); state preconditions are enforced in TooTriggerService.
+  // Further checks (that the observation is a ToO observation, that the program
+  // allows it, etc.) will be added later.
+  private lazy val RequestTooTrigger =
+    MutationField("requestTooTrigger", RequestTooTriggerInput.Binding): (input, child) =>
+      services.useTransactionally:
+        (for
+          oid   <- ResultT(Services.asSuperUser(observationService.resolveOid(input.observationId, input.observationRef)))
+          which <- ResultT.fromResult(idSelectFromPredicate(
+                     ObservationType,
+                     and(List(
+                       Predicates.observation.id.eql(oid),
+                       Predicates.observation.program.isVisibleTo(user)
+                     ))
+                   ))
+          tid   <- ResultT(tooTriggerService.request(which))
+        yield Unique(Filter(Predicates.tooTrigger.id.eql(tid), child))).value
+
+  private lazy val WithdrawTooTrigger =
+    MutationField("withdrawTooTrigger", WithdrawTooTriggerInput.Binding): (input, child) =>
+      services.useTransactionally:
+        idSelectFromPredicate(
+          TooTriggerType,
+          and(List(
+            Predicates.tooTrigger.id.eql(input.tooTriggerId),
+            Predicates.tooTrigger.observation.program.isWritableBy(user)
+          ))
+        ).flatTraverse: which =>
+          tooTriggerService.withdraw(which, input.reason).map:
+            case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
+            case None      =>
+              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be withdrawn (not found, not writable, or not in a withdrawable state).")).asFailure
+
+  private lazy val AcceptTooTrigger =
+    MutationField("acceptTooTrigger", AcceptTooTriggerInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireStaffAccess:
+          tooTriggerService.accept(input.tooTriggerId).map:
+            case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
+            case None      =>
+              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be accepted (not found or not in the Requested state).")).asFailure
+
+  private lazy val DenyTooTrigger =
+    MutationField("denyTooTrigger", DenyTooTriggerInput.Binding): (input, child) =>
+      services.useTransactionally:
+        requireStaffAccess:
+          tooTriggerService.deny(input.tooTriggerId, input.reason).map:
+            case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
+            case None      =>
+              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be denied (not found or not in the Requested state).")).asFailure
 
   private lazy val CreateProposal =
     MutationField("createProposal", CreateProposalInput.Binding): (input, child) =>

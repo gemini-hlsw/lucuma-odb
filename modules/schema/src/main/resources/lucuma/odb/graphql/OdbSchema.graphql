@@ -3730,6 +3730,29 @@ type Mutation {
   createProgramNote(input: CreateProgramNoteInput!): CreateProgramNoteResult!
 
   """
+  Requests a new Target-of-Opportunity trigger for an observation.  Allowed for
+  anyone who can read the program.
+  """
+  requestTooTrigger(input: RequestTooTriggerInput!): RequestTooTriggerResult!
+
+  """
+  Withdraws a Target-of-Opportunity trigger.  Allowed for anyone who can write
+  to the program, while REQUESTED, or while ACCEPTED and the observation is not
+  yet ongoing.
+  """
+  withdrawTooTrigger(input: WithdrawTooTriggerInput!): WithdrawTooTriggerResult!
+
+  """
+  Accepts a REQUESTED Target-of-Opportunity trigger (staff).
+  """
+  acceptTooTrigger(input: AcceptTooTriggerInput!): AcceptTooTriggerResult!
+
+  """
+  Denies a REQUESTED Target-of-Opportunity trigger (staff).
+  """
+  denyTooTrigger(input: DenyTooTriggerInput!): DenyTooTriggerResult!
+
+  """
   Creates a new proposal according to the provided properties
   """
   createProposal(
@@ -6411,6 +6434,12 @@ type Subscription {
   ): ConfigurationRequestEdit!
 
   executionEventAdded(input: ExecutionEventAddedInput): ExecutionEventAdded!
+
+  """
+  Subscribe to Target-of-Opportunity trigger edits (creation and lifecycle
+  transitions) for observations in programs the caller can read.
+  """
+  tooTriggerEdit(input: TooTriggerEditInput): TooTriggerEdit!
 
 }
 
@@ -15062,6 +15091,320 @@ enum ConfigurationRequestStatus {
   WITHDRAWN
 }
 
+scalar TooTriggerId
+
+"""
+Lifecycle status of a Target-of-Opportunity trigger.  REQUESTED is the only
+non-terminal state; ACCEPTED, DENIED and WITHDRAWN are all terminal.  A re-attempt
+is a new trigger, never a transition out of a terminal state.
+"""
+enum TooTriggerStatus {
+  REQUESTED
+  ACCEPTED
+  DENIED
+  WITHDRAWN
+}
+
+"""
+A Target-of-Opportunity trigger edit event: a trigger creation or lifecycle
+transition, delivered via the `tooTriggerEdit` subscription.
+"""
+type TooTriggerEdit {
+  """
+  Type of edit.
+  """
+  editType: EditType!
+
+  """
+  The id of the edited trigger.
+  """
+  tooTriggerId: TooTriggerId!
+
+  """
+  The edited trigger.  Never null, since triggers are not deleted.
+  """
+  value: TooTrigger!
+
+  """
+  The observation the trigger is for.
+  """
+  observation: Observation!
+}
+
+input TooTriggerEditInput {
+  """
+  If provided, only edits for triggers in this program are delivered.
+  """
+  programId: ProgramId
+
+  """
+  If provided, only edits for triggers on this observation are delivered.
+  """
+  observationId: ObservationId
+
+  """
+  If provided, only edits for this specific trigger are delivered.
+  """
+  tooTriggerId: TooTriggerId
+}
+
+"""
+A Target-of-Opportunity trigger: a per-attempt record of a request to activate a
+ToO observation, together with its lifecycle status.
+"""
+type TooTrigger {
+  "This trigger's unique id."
+  id: TooTriggerId!
+
+  "The observation this trigger is for."
+  observation: Observation!
+
+  "The trigger's lifecycle status."
+  status: TooTriggerStatus!
+
+  "Reason accompanying a terminal transition (e.g. a denial or withdrawal), if any."
+  resolutionReason: NonEmptyString
+
+  "When the trigger was requested (created)."
+  requestedAt: Timestamp!
+
+  "The user who requested the trigger, if known."
+  requestedBy: User
+
+  "When the trigger was last modified."
+  updatedAt: Timestamp!
+}
+
+input RequestTooTriggerInput {
+  "The observation to request a trigger for.  Provide this or `observationReference`."
+  observationId: ObservationId
+
+  "A reference to the observation to request a trigger for.  Provide this or `observationId`."
+  observationReference: ObservationReference
+}
+
+type RequestTooTriggerResult {
+  "The requested trigger."
+  tooTrigger: TooTrigger!
+}
+
+type WithdrawTooTriggerResult {
+  "The withdrawn trigger."
+  tooTrigger: TooTrigger!
+}
+
+type AcceptTooTriggerResult {
+  "The accepted trigger."
+  tooTrigger: TooTrigger!
+}
+
+type DenyTooTriggerResult {
+  "The denied trigger."
+  tooTrigger: TooTrigger!
+}
+
+input WithdrawTooTriggerInput {
+  "The trigger to withdraw."
+  tooTriggerId: TooTriggerId!
+
+  "Optional reason recorded with the withdrawal."
+  reason: NonEmptyString
+}
+
+input AcceptTooTriggerInput {
+  "The trigger to accept."
+  tooTriggerId: TooTriggerId!
+}
+
+input DenyTooTriggerInput {
+  "The trigger to deny."
+  tooTriggerId: TooTriggerId!
+
+  "Optional reason recorded with the denial."
+  reason: NonEmptyString
+}
+
+"""
+The matching triggers, limited to a maximum of 1000 entries.
+"""
+type TooTriggerSelectResult {
+  "Matching triggers up to the return size limit of 1000."
+  matches: [TooTrigger!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
+}
+
+"""
+Filters on equality or order comparisons of the TooTriggerId property.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOrderTooTriggerId {
+  "Matches if the property is exactly the supplied value."
+  EQ: TooTriggerId
+
+  "Matches if the property is not the supplied value."
+  NEQ: TooTriggerId
+
+  "Matches if the property value is any of the supplied options."
+  IN: [TooTriggerId!]
+
+  "Matches if the property value is none of the supplied values."
+  NIN: [TooTriggerId!]
+
+  "Matches if the property is ordered after (>) the supplied value."
+  GT: TooTriggerId
+
+  "Matches if the property is ordered before (<) the supplied value."
+  LT: TooTriggerId
+
+  "Matches if the property is ordered after or equal (>=) the supplied value."
+  GTE: TooTriggerId
+
+  "Matches if the property is ordered before or equal (<=) the supplied value."
+  LTE: TooTriggerId
+}
+
+"""
+Filters on equality or order comparisons of the TooTriggerStatus property.  Order
+follows the lifecycle declaration: REQUESTED < ACCEPTED < DENIED < WITHDRAWN, so
+`GTE: REQUESTED` matches every status.
+"""
+input WhereOrderTooTriggerStatus {
+  "Matches if the property is exactly the supplied value."
+  EQ: TooTriggerStatus
+
+  "Matches if the property is not the supplied value."
+  NEQ: TooTriggerStatus
+
+  "Matches if the property value is any of the supplied options."
+  IN: [TooTriggerStatus!]
+
+  "Matches if the property value is none of the supplied values."
+  NIN: [TooTriggerStatus!]
+
+  "Matches if the property is ordered after (>) the supplied value."
+  GT: TooTriggerStatus
+
+  "Matches if the property is ordered before (<) the supplied value."
+  LT: TooTriggerStatus
+
+  "Matches if the property is ordered after or equal (>=) the supplied value."
+  GTE: TooTriggerStatus
+
+  "Matches if the property is ordered before or equal (<=) the supplied value."
+  LTE: TooTriggerStatus
+}
+
+input WhereTooTrigger {
+  "A list of nested trigger filters that all must match."
+  AND: [WhereTooTrigger!]
+
+  "A list of nested trigger filters where any one match causes the group to match."
+  OR: [WhereTooTrigger!]
+
+  "A nested trigger filter that must not match."
+  NOT: WhereTooTrigger
+
+  "Matches the trigger id."
+  id: WhereOrderTooTriggerId
+
+  "Matches the observation id."
+  observationId: WhereOrderObservationId
+
+  "Matches the program id (e.g. all triggers for one or more programs)."
+  programId: WhereOrderProgramId
+
+  "Matches the trigger status."
+  status: WhereOrderTooTriggerStatus
+
+  "Matches the request (creation) time."
+  requestedAt: WhereOrderTimestamp
+
+  "Matches the requesting user."
+  requestedBy: WhereUser
+
+  "Matches the last-modification time."
+  updatedAt: WhereOrderTimestamp
+}
+
+"""
+A single entry in the Target-of-Opportunity trigger chronicle: one transaction's
+worth of change to a trigger (its creation or a lifecycle transition).
+"""
+type TooTriggerChronicleEntry {
+  id: ChronicleId!
+  transactionId: TransactionId!
+
+  "The user who performed the insertion or update, if known."
+  user: User
+
+  "When the update happened."
+  timestamp: Timestamp!
+
+  "The database operation that was performed."
+  operation: DatabaseOperation!
+
+  "The trigger that was inserted or updated."
+  tooTrigger: TooTrigger!
+
+  modObservationId: Boolean!
+  modProgramId: Boolean!
+  modStatus: Boolean!
+  modResolutionReason: Boolean!
+
+  newObservationId: ObservationId
+  newProgramId: ProgramId
+  newStatus: TooTriggerStatus
+  newResolutionReason: NonEmptyString
+}
+
+"""
+Allows filtering of TooTriggerChronicleEntry (see Query -> tooTriggerChronicleEntries)
+based on a number of criteria.
+"""
+input WhereTooTriggerChronicleEntry {
+  "A list of nested filters that all must match."
+  AND: [WhereTooTriggerChronicleEntry!]
+
+  "A list of nested filters where any one match causes the group to match."
+  OR: [WhereTooTriggerChronicleEntry!]
+
+  "A nested filter that must not match."
+  NOT: WhereTooTriggerChronicleEntry
+
+  "Matches the chronicle entry id."
+  id: WhereOrderChronicleId
+
+  "Matches the acting user."
+  user: WhereUser
+
+  "Matches the database operation."
+  operation: WhereEqDatabaseOperation
+
+  "Matches the transaction timestamp."
+  timestamp: WhereOrderTimestamp
+
+  "Matches the trigger id."
+  tooTrigger: WhereOrderTooTriggerId
+
+  modObservationId: WhereBoolean
+  modProgramId: WhereBoolean
+  modStatus: WhereBoolean
+  modResolutionReason: WhereBoolean
+}
+
+"""
+The matching trigger chronicle entries, limited to a maximum of 1000 entries.
+"""
+type TooTriggerChronicleEntrySelectResult {
+  "Matching entries up to the return size limit of 1000."
+  matches: [TooTriggerChronicleEntry!]!
+
+  "`true` when there were additional matches that were not returned."
+  hasMore: Boolean!
+}
+
 type ConfigurationRequest {
   id: ConfigurationRequestId!
   program: Program!
@@ -16130,6 +16473,33 @@ type Query {
     "Set to true to include deleted values."
     includeDeleted: Boolean! = false
   ): ProgramNoteSelectResult!
+
+  "Selects the Target-of-Opportunity trigger with the given id, if found and readable."
+  tooTrigger(tooTriggerId: TooTriggerId!): TooTrigger
+
+  "Selects all Target-of-Opportunity triggers matching the optional WHERE, readable by the caller."
+  tooTriggers(
+    "Filters the selected triggers."
+    WHERE: WhereTooTrigger
+
+    "Starts the result set at (or after, if no exact match) the given trigger id."
+    OFFSET: TooTriggerId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): TooTriggerSelectResult!
+
+  "Selects Target-of-Opportunity trigger chronicle (audit) entries, readable by the caller."
+  tooTriggerChronicleEntries(
+    "Filters the selection of chronicle entries."
+    WHERE: WhereTooTriggerChronicleEntry
+
+    "Starts the result set at (or after, if not existent) the given id."
+    OFFSET: ChronicleId
+
+    "Limits the result to at most this number of matches (but never more than 1000)."
+    LIMIT: NonNegInt
+  ): TooTriggerChronicleEntrySelectResult!
 
   """
   Selects the first `LIMIT` matching program users based on the provided `WHERE`

@@ -121,6 +121,7 @@ object StartupDiagnostics:
           checkPostgresEnum(timing_window_end_type),
           checkPostgresEnum(timing_window_inclusion),
           checkPostgresEnum(too_activation),
+          checkPostgresEnum(too_trigger_status),
           checkPostgresEnum(user_invitation_status),
           {
             // Hack, sorry. ObservationWorkflowService.UserState is an enum in the db but a union type here.

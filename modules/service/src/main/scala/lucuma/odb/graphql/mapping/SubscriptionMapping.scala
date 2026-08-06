@@ -33,6 +33,7 @@ import lucuma.odb.graphql.input.ObscalcUpdateInput
 import lucuma.odb.graphql.input.ObservationEditInput
 import lucuma.odb.graphql.input.ProgramEditInput
 import lucuma.odb.graphql.input.TargetEditInput
+import lucuma.odb.graphql.input.TooTriggerEditInput
 import lucuma.odb.graphql.mapping.ResultMapping.mapSomeFields
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.instances.given
@@ -56,7 +57,8 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
       ObservationEdit,
       ProgramEdit,
       TargetEdit,
-      ConfigurationRequestEdit
+      ConfigurationRequestEdit,
+      TooTriggerEdit
     )
 
   lazy val SubscriptionMapping =
@@ -246,6 +248,30 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
                         c
                       )
                     )
+              )
+            )
+          )
+        }
+    }
+
+  private val TooTriggerEdit =
+    SubscriptionField("tooTriggerEdit", TooTriggerEditInput.Binding.Option) { (input, child) =>
+      topics
+        .tooTrigger
+        .subscribe(1024)
+        .filter { e =>
+          e.canRead(user) &&
+          input.flatMap(_.programId).forall(_ === e.programId) &&
+          input.flatMap(_.observationId).forall(_ === e.observationId) &&
+          input.flatMap(_.tooTriggerId).forall(_ === e.triggerId)
+        }
+        .map { e =>
+          Result(
+            Environment(
+              Env("editType" -> e.editType),
+              Filter(
+                Predicates.tooTriggerEdit.tooTriggerId.eql(e.triggerId),
+                child
               )
             )
           )

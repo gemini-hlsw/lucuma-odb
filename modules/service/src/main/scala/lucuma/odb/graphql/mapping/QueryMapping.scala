@@ -42,6 +42,7 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.TooTrigger
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.WhereCallForProposals
 import lucuma.odb.graphql.input.WhereConfigurationRequest
@@ -55,6 +56,8 @@ import lucuma.odb.graphql.input.WhereProgramNote
 import lucuma.odb.graphql.input.WhereProgramUser
 import lucuma.odb.graphql.input.WhereSpectroscopyConfigOption
 import lucuma.odb.graphql.input.WhereTarget
+import lucuma.odb.graphql.input.WhereTooTrigger
+import lucuma.odb.graphql.input.WhereTooTriggerChronicleEntry
 import lucuma.odb.graphql.predicate.DatasetPredicates
 import lucuma.odb.graphql.predicate.ObservationPredicates
 import lucuma.odb.graphql.predicate.Predicates
@@ -104,6 +107,9 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("programNote"),
       SqlObject("programNotes"),
       SqlObject("programUsers"),
+      SqlObject("tooTrigger"),
+      SqlObject("tooTriggers"),
+      SqlObject("tooTriggerChronicleEntries"),
       SqlObject("spectroscopyConfigOptions"),
       SqlObject("imagingConfigOptions"),
       SqlObject("target"),
@@ -134,6 +140,9 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ProgramNote,
       ProgramNotes,
       ProgramUsers,
+      TooTrigger_,
+      TooTriggers,
+      TooTriggerChronicleEntries,
       SpectroscopyConfigOptions,
       Target,
       TargetGroup,
@@ -726,6 +735,77 @@ trait QueryMapping[F[_]] extends Predicates[F] {
                 )),
                 offset = None,
                 limit = Some(limit + 1), // Select one extra row here.
+                child = q
+              )
+    }
+
+  private lazy val TooTrigger_ : PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val TooTriggerIdBinding = gidBinding[TooTrigger.Id]("too trigger")
+    {
+      case (QueryType, "tooTrigger", List(
+        TooTriggerIdBinding("tooTriggerId", rId)
+      )) =>
+        Elab.transformChild: child =>
+          rId.map: tid =>
+            Unique(Filter(And(
+              Predicates.tooTrigger.id.eql(tid),
+              Predicates.tooTrigger.observation.program.isVisibleTo(user)
+            ), child))
+    }
+
+  private lazy val TooTriggers: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereTooTriggerBinding = WhereTooTrigger.binding(Path.from(TooTriggerType))
+    val TooTriggerIdBinding    = gidBinding[TooTrigger.Id]("too trigger")
+    {
+      case (QueryType, "tooTriggers", List(
+        WhereTooTriggerBinding.Option("WHERE", rWHERE),
+        TooTriggerIdBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      )) =>
+        Elab.transformChild: child =>
+          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit): q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(
+                  and(List(
+                    OFFSET.map(Predicates.tooTrigger.id.gtEql).getOrElse(True),
+                    Predicates.tooTrigger.observation.program.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))
+                ),
+                oss = Some(List(
+                  OrderSelection[TooTrigger.Id](TooTriggerType / "id")
+                )),
+                offset = None,
+                limit = Some(limit + 1),
+                child = q
+              )
+    }
+
+  private lazy val TooTriggerChronicleEntries: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    val WhereTooTriggerChronicleEntryBinding = WhereTooTriggerChronicleEntry.binding(Path.from(TooTriggerChronicleEntryType))
+    {
+      case (QueryType, "tooTriggerChronicleEntries", List(
+        WhereTooTriggerChronicleEntryBinding.Option("WHERE", rWHERE),
+        LongBinding.Option("OFFSET", rOFFSET),
+        NonNegIntBinding.Option("LIMIT", rLIMIT)
+      )) =>
+        Elab.transformChild: child =>
+          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
+            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+            ResultMapping.selectResult(child, limit): q =>
+              FilterOrderByOffsetLimit(
+                pred = Some(and(List(
+                  OFFSET.map(Predicates.tooTriggerChronicleEntry.id.gtEql).getOrElse(True),
+                  Predicates.tooTriggerChronicleEntry.tooTrigger.observation.program.isVisibleTo(user),
+                  WHERE.getOrElse(True)
+                ))),
+                oss = Some(List(
+                  OrderSelection[Long](TooTriggerChronicleEntryType / "id")
+                )),
+                offset = None,
+                limit = Some(limit + 1),
                 child = q
               )
     }
