@@ -42,12 +42,38 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
       case InstrumentMode.GnirsImaging(ExposureTimeMode.SignalToNoiseMode(sn, _), filter, _, _, _, _, _)
           if sn === AcquisitionClassificationSignalToNoise =>
         filter match
-          case GnirsFilter.J  => IntegrationTime(2.secTimeSpan,  3.refined).some
-          case GnirsFilter.K  => IntegrationTime(30.secTimeSpan, 1.refined).some
-          case GnirsFilter.Y  => IntegrationTime(300.msTimeSpan, 1.refined).some
-          case GnirsFilter.H2 => IntegrationTime(2.secTimeSpan,  3.refined).some
-          case _              => none
+          case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined).some
+          case GnirsFilter.K      => IntegrationTime(30.secTimeSpan, 1.refined).some
+          case GnirsFilter.Y      => IntegrationTime(300.msTimeSpan, 1.refined).some
+          case GnirsFilter.H2     => IntegrationTime(2.secTimeSpan,  3.refined).some
+          case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined).some
+          case _                  => none
+      // Time-and-count echoes the user's request, as the real ITC does.
+      case InstrumentMode.GnirsImaging(ExposureTimeMode.TimeAndCountMode(time, count, _), _, _, _, _, _, _) =>
+        IntegrationTime(time, count).some
       case _ => none
+
+  /** Applies an acquisition customization block to a GNIRS imaging observation. */
+  private def setImagingAcquisition(oid: Observation.Id, acquisition: String): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsImaging: {
+                  acquisition: $acquisition
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
 
   private val AcqStepsQuery: String =
     s"""
@@ -180,4 +206,63 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.J, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
     val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "LONG_BLUE")
     imagingObs("LONG_BLUE", "J").flatMap: oid =>
+      expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+
+  test("An explicit BRIGHT type overrides the Faint classification"):
+    // First filter K would classify as Faint (30s), but the explicit type wins: the field
+    // image reverts to the fixed keyhole exposure at (10,0) with a single coadd.
+    val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "SHORT_BLUE")
+    imagingObs("SHORT_BLUE", "K").flatMap: oid =>
+      setImagingAcquisition(oid, "{ explicitAcquisitionType: BRIGHT }") *>
+      expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+
+  test("An explicit FAINT type uses the configured sky offset for the field image"):
+    // First filter J would classify as Bright, but the explicit FAINT type puts the field
+    // image at the configured sky offset with the ITC exposure and coadds.
+    val field                     = acqStep(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE", 0, 5, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE")
+    imagingObs("SHORT_BLUE", "J").flatMap: oid =>
+      setImagingAcquisition(oid,
+        """{
+          explicitAcquisitionType: FAINT
+          skyOffset: { p: { arcseconds: 0.0 }, q: { arcseconds: 5.0 } }
+        }"""
+      ) *>
+      expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+
+  test("An explicit acquisition filter replaces the first science filter"):
+    // The science filter is J, but the acquisition images through Order4 — both in the
+    // ITC call (5s => Bright) and in the generated steps.
+    val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(5.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE")
+    imagingObs("SHORT_BLUE", "J").flatMap: oid =>
+      setImagingAcquisition(oid, "{ explicitFilter: ORDER4 }") *>
+      expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+
+  test("An explicit acquisition filter is kept even for a Very Bright classification"):
+    // Y classifies as Very Bright, which would normally image the target through H2. An
+    // explicit filter overrides that; only the field image stays on H (Order4).
+    val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(5.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE")
+    imagingObs("SHORT_BLUE", "Y").flatMap: oid =>
+      setImagingAcquisition(oid, "{ explicitAcquisitionType: VERY_BRIGHT, explicitFilter: ORDER4 }") *>
+      expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+
+  test("Acquisition coadds come from the acquisition config in time-and-count mode"):
+    // In time-and-count mode the ITC echoes the requested exposure and the explicit
+    // coadds size the steps (rather than the ITC exposure count).
+    val field                     = acqStep(4.secTimeSpan, 5, GnirsFilter.J, "SHORT_BLUE", 0, 10, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(4.secTimeSpan, 5, GnirsFilter.J, "SHORT_BLUE")
+    imagingObs("SHORT_BLUE", "J").flatMap: oid =>
+      setImagingAcquisition(oid,
+        """{
+          explicitAcquisitionType: FAINT
+          skyOffset: { p: { arcseconds: 0.0 }, q: { arcseconds: 10.0 } }
+          exposureTimeMode: {
+            timeAndCount: { time: { seconds: 4.0 }, count: 1, at: { nanometers: 1250.0 } }
+          }
+          coadds: 5
+        }"""
+      ) *>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)

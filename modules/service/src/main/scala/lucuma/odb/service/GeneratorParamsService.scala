@@ -367,32 +367,41 @@ object GeneratorParamsService {
               )
 
             // The acquisition images the field in the first (wavelength-ordered) science
-            // filter to classify the target brightness at the classification S/N; the
-            // two-pass acquisition ITC then resolves the type (Very Bright / Bright /
-            // Faint) and re-images through H2 for Very Bright.  Fully auto, so it always
-            // classifies (`gnirsAcqAutoClassify = true`).
+            // filter — or in the explicitly chosen acquisition filter — to classify the
+            // target brightness; the two-pass acquisition ITC then resolves the type
+            // (Very Bright / Bright / Faint) and re-images through H2 for Very Bright.
             val firstFilter: GnirsFilter =
               given Order[GnirsFilter] = ImagingSequence.wavelengthOrder(gnm.variant)(_.centralWavelength)
               fs.map(_.filter).sorted.head
+
+            val acqFilter: GnirsFilter =
+              gnm.acquisition.explicitFilter.getOrElse(firstFilter)
 
             val acquisition =
               ImagingParameters(
                 obsParams.constraints.toInput,
                 InstrumentMode.GnirsImaging(
-                  exposureTimeMode = ExposureTimeMode.SignalToNoiseMode(gnirs.AcquisitionClassificationSignalToNoise, firstFilter.centralWavelength),
-                  filter           = firstFilter,
+                  exposureTimeMode = gnm.acquisition.exposureTimeMode,
+                  filter           = acqFilter,
                   camera           = gnm.camera,
                   readMode         = GnirsReadMode.Bright,
                   wellDepth        = gnm.wellDepth,
-                  coadds           = gnm.coadds
+                  coadds           = gnm.acquisition.coadds
                 )
               )
+
+            // Two-pass acquisition ITC whenever the acquisition mode and filter are both
+            // auto: only then does the resolved filter depend on the ITC-derived
+            // brightness classification (Very Bright → H2), creating the circularity.
+            val acqAutoClassify: Boolean =
+              gnm.acquisition.explicitAcqMode.isEmpty &&
+              gnm.acquisition.explicitFilter.isEmpty
 
             val itcInput =
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, gnirsAcqAutoClassify = true))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, gnirsAcqAutoClassify = acqAutoClassify))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 

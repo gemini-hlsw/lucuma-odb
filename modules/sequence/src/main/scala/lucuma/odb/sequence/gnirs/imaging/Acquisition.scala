@@ -10,6 +10,7 @@ import cats.Order
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.applicative.*
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -54,12 +55,17 @@ import java.util.UUID
  *
  *   - Very Bright: offset (10,0) field image in H (Order4) with the fixed per-camera
  *     exposure, then an on-target (0,0) image in the narrow-band H2 with the ITC exposure.
- *   - Bright: offset (10,0) field image in the first science filter with the fixed
+ *   - Bright: offset (10,0) field image in the selected filter with the fixed
  *     per-camera exposure, then an on-target (0,0) image in the same filter with the ITC
  *     exposure.
- *   - Faint: offset (0,10) field image (for keyhole measurement and sky subtraction) and
- *     an on-target (0,0) image, both in the first science filter, both with the ITC
+ *   - Faint: sky-offset field image (for keyhole measurement and sky subtraction) and
+ *     an on-target (0,0) image, both in the selected filter, both with the ITC
  *     exposure.
+ *
+ * The brightness classification, the selected filter, the coadds and the Faint sky offset
+ * may all be customized (see [[AcquisitionConfig]]); when they are not, they default to
+ * the ITC classification, the first science filter, the ITC exposure count and
+ * `GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset` respectively.
  *
  * As with spectroscopy, an "Initial Acquisition" atom (field image + on-target image) is
  * followed by [[RepeatingAtomCount]] "Fine Adjustments" atoms, each a single on-target image.
@@ -85,36 +91,28 @@ object Acquisition:
   private object StepComputer extends GnirsSequenceState:
 
     def compute(
-      camera:      GnirsCamera,
-      acqType:     GnirsAcquisitionType,
-      firstFilter: GnirsFilter,
-      time:        IntegrationTime
+      camera:         GnirsCamera,
+      mode:           GnirsAcquisitionMode,
+      selectedFilter: GnirsFilter,
+      acqCoadds:      PosInt,
+      time:           IntegrationTime
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
-      // In S/N mode the ITC exposure count is the acquisition coadds.
-      val acqCoadds: PosInt         = time.exposureCount
       // The fixed per-camera keyhole exposure (short 3s, long 15s).
       val camExposureTime: TimeSpan = keyholeExposureTime(camera)
 
       // The field/keyhole image: filter, exposure and coadds depend on the brightness type.
       // Very Bright / Bright use the fixed camera exposure and a single coadd; Faint uses the
-      // ITC exposure and coadds (it doubles as a sky frame). The offset is (0,10) for Faint,
-      // else (10,0).
+      // acquisition exposure and coadds (it doubles as a sky frame, so it is taken at the
+      // sky offset rather than at the keyhole offset).
       val (fieldFilter, fieldExposureTime, fieldCoadds, fieldOffset): (GnirsFilter, TimeSpan, PosInt, Offset) =
-        acqType match
-          case GnirsAcquisitionType.VeryBright =>
+        mode match
+          case GnirsAcquisitionMode.VeryBright =>
             (GnirsFilter.Order4, camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
-          case GnirsAcquisitionType.Bright     =>
-            (firstFilter,        camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
-          case GnirsAcquisitionType.Faint      =>
-            (firstFilter,        acqExposureTime, acqCoadds,   Offset(Offset.P(0.arcsec),  Offset.Q(10.arcsec)))
-
-      // The on-target image always uses the ITC exposure and coadds. Very Bright images
-      // through H2 (its exposure comes from the H2 ITC pass); the others use the first filter.
-      val onTargetFilter: GnirsFilter =
-        acqType match
-          case GnirsAcquisitionType.VeryBright => GnirsFilter.H2
-          case _                               => firstFilter
+          case GnirsAcquisitionMode.Bright     =>
+            (selectedFilter,     camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
+          case GnirsAcquisitionMode.Faint(sky) =>
+            (selectedFilter,     acqExposureTime, acqCoadds,   sky)
 
       eval:
         for
@@ -130,11 +128,14 @@ object Acquisition:
                             fpu               = GnirsFpu.Other(GnirsFpuOther.Acquisition)
                           )
           fieldImage <- scienceStep(TelescopeConfig(fieldOffset, Disabled), ObserveClass.Acquisition)
+          // The on-target image always uses the acquisition exposure and coadds, through
+          // the selected filter (H2 for Very Bright, whose exposure comes from the H2 ITC
+          // pass, unless the filter was explicitly overridden).
           _          <- State.modify[GnirsDynamicConfig]:
                           _.copy(
                             exposure = acqExposureTime,
                             coadds   = acqCoadds,
-                            filter   = onTargetFilter,
+                            filter   = selectedFilter,
                             readMode = GnirsReadMode.forExposureTime(acqExposureTime)
                           )
           onTarget   <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
@@ -173,17 +174,21 @@ object Acquisition:
 
     // The first filter in the sequence: the wavelength-first filter under the variant's
     // ordering — the same ordering GeneratorParamsService used for the ITC classification.
+    // It is the automatic acquisition filter when none was explicitly chosen.
     given Order[GnirsFilter] = ImagingSequence.wavelengthOrder(config.variant)(_.centralWavelength)
     val firstFilter: GnirsFilter = config.filters.map(_.filter).sorted.head
 
     (for
-      t <- time.filterOrElse(
-             _.exposureTime.toNonNegMicroseconds.value > 0,
-             sequenceError("GNIRS Imaging requires a positive acquisition exposure time.")
-           )
+      t         <- time.filterOrElse(
+                     _.exposureTime.toNonNegMicroseconds.value > 0,
+                     sequenceError("GNIRS Imaging requires a positive acquisition exposure time.")
+                   )
+      mode       = config.acquisition.resolvedMode(t, GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset, pinnedAcqType)
+      selFilter <- config.acquisition
+                     .selectedFilter(mode, Right(firstFilter))
+                     .leftMap(sequenceError)
     yield
-      val acqType: GnirsAcquisitionType =
-        pinnedAcqType.getOrElse(GnirsAcquisitionMode.defaultFor(t.exposureTime, t.exposureCount).acquisitionType)
-      val steps: Steps = StepComputer.compute(config.camera, acqType, firstFilter, t)
+      val coadds: PosInt = config.acquisition.resolvedCoadds(t)
+      val steps: Steps   = StepComputer.compute(config.camera, mode, selFilter, coadds, t)
       Generator(builder, steps.initialAtom, steps.repeatingAtom): SequenceGenerator[GnirsDynamicConfig]
     ).pure[F]

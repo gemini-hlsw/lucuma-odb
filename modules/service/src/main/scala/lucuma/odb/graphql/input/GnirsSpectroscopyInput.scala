@@ -5,15 +5,10 @@ package lucuma.odb.graphql
 package input
 
 import cats.data.NonEmptyList
-import cats.syntax.foldable.*
-import cats.syntax.option.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import cats.syntax.unorderedFoldable.*
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
-import grackle.syntax.*
-import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -24,7 +19,6 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.math.Offset
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
@@ -32,10 +26,7 @@ import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsFpu
-import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
-import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.binding.*
 
 object GnirsSpectroscopyInput:
@@ -113,50 +104,9 @@ object GnirsSpectroscopyInput:
               )(Result(_))
             .map(Value(fpu, _))
 
-  case class AcquisitionInput(
-    explicitFilter:   Nullable[GnirsFilter], // Nullable to allow clearing to the computed default
-    explicitAcqType:  Nullable[GnirsAcquisitionType], // Nullable to allow clearing to automatic
-    coadds:           Option[PosInt],
-    skyOffset:        Option[Offset],
-    exposureTimeMode: Option[ExposureTimeMode]
-  )
-
-  object AcquisitionInput:
-
-    // A sky offset is valid exactly when the explicit acquisition type is FAINT:
-    // FAINT requires one, and any other explicit type (or clearing to AUTO) forbids
-    // it. This must hold within a single input; the DB also enforces it on the row.
-    private def validateSkyOffset(a: AcquisitionInput): Result[AcquisitionInput] =
-      val explicitlyFaint = a.explicitAcqType match
-        case Nullable.NonNull(GnirsAcquisitionType.Faint) => true
-        case _                                            => false
-      (a.skyOffset.isDefined, explicitlyFaint) match
-        case (true, false) =>
-          OdbError.InvalidArgument("'skyOffset' is only valid when 'explicitAcquisitionType' is FAINT.".some).asFailure
-        case (false, true) =>
-          OdbError.InvalidArgument("'explicitAcquisitionType' FAINT requires a 'skyOffset'.".some).asFailure
-        case _             =>
-          Result(a)
-
-    val Binding: Matcher[AcquisitionInput] =
-      ObjectFieldsBinding.rmap:
-        case List(
-          GnirsFilterBinding.Nullable("explicitFilter", rFilter),
-          GnirsAcquisitionTypeBinding.Nullable("explicitAcquisitionType", rAcqType),
-          PosIntBinding.Option("coadds", rCoadds),
-          OffsetInput.Binding.Option("skyOffset", rSkyOffset),
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)
-        ) =>
-          (
-            rFilter.flatMap: n =>
-              n.traverse: f =>
-                if GnirsFilter.AcquisitionFilters.contains_(f) then f.success
-                else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GnirsFilter.AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
-            ,
-            rAcqType, rCoadds, rSkyOffset, rEtm
-          ).parMapN(AcquisitionInput.apply)
-           .map(a => a.copy(coadds = coaddsForEtm(a.exposureTimeMode, a.coadds)))
-           .flatMap(validateSkyOffset)
+  // The acquisition customization input is shared with the other GNIRS modes.
+  type AcquisitionInput = GnirsAcquisitionInput
+  val AcquisitionInput = GnirsAcquisitionInput
 
   case class Create(
     exposureTimeMode: Option[ExposureTimeMode],

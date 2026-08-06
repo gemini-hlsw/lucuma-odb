@@ -252,7 +252,8 @@ When writing a `Fragment` / `encoder` for an INSERT that maps to a table with `c
 | Mode | Acquisition config | Acquisition ETM | Science ETM |
 |---|---|---|---|
 | GMOS North/South LongSlit, Flamingos-2 LongSlit | (none inline; comes from observation/defaults) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
-| GNIRS LongSlit | Inline columns in `t_gnirs_long_slit`: `c_acq_type`, `c_acq_coadds`, `c_acq_filter`, `c_acq_sky_offset_p`, `c_acq_sky_offset_q` (the two components together form a single `Option[Offset]` sky offset, enforced by a both-or-neither CHECK) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
+| GNIRS Spectroscopy (long slit + IFU) | Inline columns in `t_gnirs_spectroscopy`: `c_acq_type`, `c_acq_coadds`, `c_acq_filter`, `c_acq_sky_offset_p`, `c_acq_sky_offset_q` (the two components together form a single `Option[Offset]` sky offset, enforced by a both-or-neither CHECK) | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science) |
+| GNIRS Imaging | Same five inline columns in `t_gnirs_imaging`. Unlike the other imaging modes its acquisition ETM is user-editable, so `GnirsImagingService.update` uses `ImagingStatements.deleteCurrentScienceFiltersAndEtms` (not `deleteCurrentFiltersAndEtms`) to keep the acquisition ETM alive across a filter edit. | `t_exposure_time_mode` (role=acquisition) | `t_exposure_time_mode` (role=science), one per filter |
 | IGRINS-2 LongSlit | Inline SVC (Slit-Viewing Camera) columns in `t_igrins_2_long_slit`: `c_save_svc_images`, `c_svc_exposure`, `c_svc_telescope_configs`. No acquisition sequence when SVC images aren't saved. | — | `t_exposure_time_mode` (role=science) |
 | GHOST IFU | — | — | Two rows (red + blue) in `t_exposure_time_mode` |
 

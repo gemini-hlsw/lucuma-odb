@@ -150,6 +150,32 @@ object ImagingStatements:
       ObservingModeRowVersion.Current
     )
 
+  /**
+   * Deletes only the current science exposure time modes (and, by cascade, the filters
+   * that reference them), leaving the acquisition exposure time mode in place. Used by
+   * modes whose acquisition ETM is user-editable and so must survive a filter edit.
+   */
+  def deleteCurrentScienceFiltersAndEtms(
+    filterTableName: String,
+    which:           NonEmptyList[Observation.Id]
+  ): AppliedFragment =
+    // deletion cascades to the filters
+    sql"""
+      DELETE FROM t_exposure_time_mode m
+        WHERE m.c_observation_id IN ${observation_id.list(which.length).values}
+        AND m.c_role = $exposure_time_mode_role
+        AND EXISTS (
+          SELECT 1
+          FROM #$filterTableName f
+          WHERE f.c_exposure_time_mode_id = m.c_exposure_time_mode_id
+            AND f.c_version = ${observing_mode_row_version}
+        )
+    """.apply(
+      which.toList,
+      ExposureTimeModeRole.Science,
+      ObservingModeRowVersion.Current
+    )
+
   def insertFilters[L](
     filterTableName: String,
     filterCodec:     Codec[L],

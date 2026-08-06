@@ -17,10 +17,13 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ImagingVariantType
 import lucuma.core.enums.WavelengthOrder
+import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.odb.data.ExposureTimeModeId
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.TelescopeConfigGeneratorRole
@@ -28,6 +31,7 @@ import lucuma.odb.graphql.input.GnirsImagingInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.gnirs.imaging.Config
 import lucuma.odb.sequence.gnirs.imaging.Filter
 import lucuma.odb.sequence.imaging.Variant
@@ -36,6 +40,7 @@ import lucuma.odb.util.GnirsCodecs.*
 import monocle.Optional
 import skunk.*
 import skunk.codec.numeric.int4
+import skunk.codec.numeric.int8
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -106,7 +111,8 @@ object GnirsImagingService:
                 mf.coadds,
                 mf.explicitReadMode,
                 mf.defaultWellDepth,
-                mf.explicitWellDepth
+                mf.explicitWellDepth,
+                mf.acquisition
               )
             }.toMap
 
@@ -147,8 +153,9 @@ object GnirsImagingService:
             for
               _   <- ResultT.liftF(session.exec(Statements.insert(input, oids)))
 
-              // Resolve the etms for acquisition and science
-              r   <- ResultT(services.exposureTimeModeService.resolve("GNIRS Imaging", none, input.filters.map(f => (f.filter, f.exposureTimeMode)), reqEtm, which))
+              // Resolve the etms for acquisition and science. An explicit acquisition ETM
+              // wins; otherwise it is derived from the first science ETM.
+              r   <- ResultT(services.exposureTimeModeService.resolve("GNIRS Imaging", input.acquisition.flatMap(_.exposureTimeMode), input.filters.map(f => (f.filter, f.exposureTimeMode)), reqEtm, which))
 
               ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               ini  = stripAcquisition(ids)
@@ -188,17 +195,22 @@ object GnirsImagingService:
                     void" WHERE "                                              |+|
                     observationIdIn(oids)
 
-          // Replace the current filters and their ETMs
+          // Replace the current filters and their science ETMs. The acquisition ETM is
+          // user-editable, so unlike the other imaging modes it is left in place here and
+          // only changed when the input asks for it.
           val filterUpdates =
             SET.filters.fold(ResultT.unit): fs =>
               for
-                _   <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentFiltersAndEtms(GnirsImagingService.FilterTableName, oids)))
-                // Insert the acquisition and science filters (current / mutable version)
+                _   <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentScienceFiltersAndEtms(GnirsImagingService.FilterTableName, oids)))
+                // Insert the science filters (current / mutable version)
                 r   <- ResultT(services.exposureTimeModeService.resolve("GNIRS Imaging", none, fs.map(f => (f.filter, f.exposureTimeMode)), none, which))
-                ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
-                cur  = stripAcquisition(ids)
+                cur <- ResultT.liftF(services.exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
                 _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
               yield ()
+
+          val acqEtmUpdate =
+            SET.acquisition.flatMap(_.exposureTimeMode).fold(().pure[F]): e =>
+              services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Acquisition, e)
 
           def updateOffsetForRole(
             input:   Nullable[TelescopeConfigGeneratorInput],
@@ -230,6 +242,7 @@ object GnirsImagingService:
             _ <- ResultT.liftF(offsetUpdates)
             _ <- ResultT.liftF(modeUpdates)
             _ <- filterUpdates
+            _ <- ResultT.liftF(acqEtmUpdate)
           yield ()).value
 
       override def clone(
@@ -250,15 +263,37 @@ object GnirsImagingService:
       coadds:            PosInt,
       explicitReadMode:  Option[GnirsReadMode],
       defaultWellDepth:  GnirsWellDepth,
-      explicitWellDepth: Option[GnirsWellDepth]
+      explicitWellDepth: Option[GnirsWellDepth],
+      acquisition:       AcquisitionConfig
     )
+
+    // Inline acquisition columns plus the acquisition ETM joined from
+    // t_exposure_time_mode. The sky offset is present only for an explicit FAINT type
+    // (DB CHECK enforced) and is carried inside the Faint mode; the filter override is
+    // separate.
+    val acquisition: Decoder[AcquisitionConfig] =
+      (gnirs_acquisition_type.opt *: // c_acq_type (None => AUTO mode)
+       int4_pos                   *: // c_acq_coadds
+       gnirs_filter.opt           *: // c_acq_filter (explicit override; None => first science filter)
+       angle_µas.opt              *: // c_acq_sky_offset_p
+       angle_µas.opt              *: // c_acq_sky_offset_q
+       exposure_time_mode            // acquisition ETM
+      ).map: (acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, acqEtm) =>
+        val acqSkyOffset: Offset =
+          (acqSkyOffP, acqSkyOffQ)
+            .mapN((p, q) => Offset(Offset.P(p), Offset.Q(q)))
+            .getOrElse(GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset)
+        val explicitAcqMode: Option[GnirsAcquisitionMode] =
+          acqType.map(GnirsAcquisitionMode.forTypeAndOffset(_, acqSkyOffset))
+        AcquisitionConfig(explicitAcqMode, acqFilter, acqEtm, acqCoadds)
 
     val modeFields: Decoder[ModeFields] =
       (gnirs_camera         *:
        int4_pos             *:
        gnirs_read_mode.opt  *:
        gnirs_well_depth     *:
-       gnirs_well_depth.opt
+       gnirs_well_depth.opt *:
+       acquisition
       ).to[ModeFields]
 
     val configFields: Decoder[(NonEmptyList[Filter], Variant.Fields, ModeFields)] =
@@ -305,15 +340,31 @@ object GnirsImagingService:
           v.c_coadds,
           v.c_read_mode,
           v.c_well_depth_default,
-          v.c_well_depth
+          v.c_well_depth,
+          v.c_acq_type,
+          v.c_acq_coadds,
+          v.c_acq_filter,
+          v.c_acq_sky_offset_p,
+          v.c_acq_sky_offset_q,
+          acq.c_exposure_time_mode,
+          acq.c_signal_to_noise_at,
+          acq.c_signal_to_noise,
+          acq.c_exposure_time,
+          acq.c_exposure_count
         FROM v_gnirs_imaging v
         JOIN aggregated_filters af ON af.c_observation_id = v.c_observation_id
+        JOIN t_exposure_time_mode acq
+          ON acq.c_observation_id = v.c_observation_id AND acq.c_role = 'acquisition'
       """(Void)
 
     def insert(
       input: GnirsImagingInput.Create,
       which: NonEmptyList[Observation.Id]
     ): AppliedFragment =
+      // The sky offset is stored only for an explicit FAINT acquisition type; the input
+      // binding already rejects any other combination.
+      val acqSkyOffset: Option[Offset] = input.acquisition.flatMap(_.skyOffset)
+
       val modeEntries =
         which.map: oid =>
           sql"""(
@@ -323,6 +374,11 @@ object GnirsImagingService:
             $int4,
             ${gnirs_read_mode.opt},
             ${gnirs_well_depth.opt},
+            ${gnirs_acquisition_type.opt},
+            $int4,
+            ${gnirs_filter.opt},
+            ${angle_µas.opt},
+            ${angle_µas.opt},
             $imaging_variant,
             $wavelength_order,
             $int4_nonneg,
@@ -337,6 +393,11 @@ object GnirsImagingService:
             input.coadds.value,
             input.explicitReadMode,
             input.explicitWellDepth,
+            input.acquisition.flatMap(_.explicitAcqType.toOption),
+            input.acquisition.flatMap(_.coadds).getOrElse(GnirsImagingInput.DefaultCoadds).value,
+            input.acquisition.flatMap(_.explicitFilter.toOption),
+            acqSkyOffset.map(_.p.toAngle),
+            acqSkyOffset.map(_.q.toAngle),
             input.variant.variantType,
             ImagingVariantInput.order.getOption(input.variant).flatten.getOrElse(WavelengthOrder.Increasing),
             ImagingVariantInput.skyCount.getOption(input.variant).flatten.getOrElse(NonNegInt.MinValue),
@@ -354,6 +415,11 @@ object GnirsImagingService:
           c_coadds,
           c_read_mode,
           c_well_depth,
+          c_acq_type,
+          c_acq_coadds,
+          c_acq_filter,
+          c_acq_sky_offset_p,
+          c_acq_sky_offset_q,
           #${ImagingStatements.variantColumns()}
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
@@ -374,12 +440,41 @@ object GnirsImagingService:
       val upCoadds    = sql"c_coadds     = $int4"
       val upReadMode  = sql"c_read_mode  = ${gnirs_read_mode.opt}"
       val upWellDepth = sql"c_well_depth = ${gnirs_well_depth.opt}"
+
+      // Acquisition inline (non-ETM) column updates
+      val upAcqType    = sql"c_acq_type         = ${gnirs_acquisition_type.opt}"
+      val upAcqCoadds  = sql"c_acq_coadds       = $int4_pos"
+      val upAcqFilter  = sql"c_acq_filter       = ${gnirs_filter.opt}"
+      val upAcqSkyOffP = sql"c_acq_sky_offset_p = ${int8.opt}"
+      val upAcqSkyOffQ = sql"c_acq_sky_offset_q = ${int8.opt}"
+
+      // The acquisition type and sky offset are coupled: input validation guarantees a
+      // sky offset is present iff the explicit type is FAINT, so whenever the type is
+      // (re)set we rewrite the offset columns too — the provided offset for FAINT, NULL
+      // otherwise. When the type is left unchanged we touch neither.
+      val acqUpdates: List[AppliedFragment] =
+        input.acquisition.toList.flatMap: acq =>
+          val typeAndOffset: List[AppliedFragment] =
+            acq.explicitAcqType.toOptionOption match
+              case Some(tOpt) =>
+                List(
+                  upAcqType(tOpt),
+                  upAcqSkyOffP(acq.skyOffset.map(o => Angle.microarcseconds.get(o.p.toAngle))),
+                  upAcqSkyOffQ(acq.skyOffset.map(o => Angle.microarcseconds.get(o.q.toAngle)))
+                )
+              case None       =>
+                Nil
+          List(
+            acq.coadds.map(upAcqCoadds),
+            acq.explicitFilter.toOptionOption.map(upAcqFilter)
+          ).flatten ++ typeAndOffset
+
       List(
         input.camera.map(upCamera),
         input.coadds.map(c => upCoadds(c.value)),
         input.explicitReadMode.toOptionOption.map(upReadMode),
         input.explicitWellDepth.toOptionOption.map(upWellDepth)
-      ).flatten
+      ).flatten ++ acqUpdates
 
     def clone(
       originalId: Observation.Id,
@@ -393,6 +488,11 @@ object GnirsImagingService:
           c_coadds,
           c_read_mode,
           c_well_depth,
+          c_acq_type,
+          c_acq_coadds,
+          c_acq_filter,
+          c_acq_sky_offset_p,
+          c_acq_sky_offset_q,
           #${ImagingStatements.variantColumns()}
         )
         SELECT
@@ -402,6 +502,11 @@ object GnirsImagingService:
           c_coadds,
           c_read_mode,
           c_well_depth,
+          c_acq_type,
+          c_acq_coadds,
+          c_acq_filter,
+          c_acq_sky_offset_p,
+          c_acq_sky_offset_q,
           #${ImagingStatements.variantColumns()}
         FROM #${GnirsImagingService.ModeTableName}
         WHERE c_observation_id = $observation_id

@@ -88,6 +88,283 @@ class updateObservations_GnirsImaging extends OdbSuite with UpdateObservationsOp
 
     oneUpdateTest(pi, update, query, expected)
 
+  // Sets a GNIRS imaging mode with a J science filter and an S/N science ETM at 1250nm.
+  private val setGnirsImaging = """
+    scienceRequirements: {
+      exposureTimeMode: {
+        signalToNoise: {
+          value: 100.0
+          at: { nanometers: 1250.0 }
+        }
+      }
+    }
+    observingMode: {
+      gnirsImaging: {
+        camera: SHORT_BLUE
+        filters: [ { filter: J } ]
+      }
+    }
+  """
+
+  private val acquisitionQuery = """
+    observations {
+      observingMode {
+        gnirsImaging {
+          acquisition {
+            explicitAcquisitionType
+            explicitFilter
+            coadds
+            skyOffset { p { arcseconds } q { arcseconds } }
+            exposureTimeMode {
+              signalToNoise { value at { nanometers } }
+              timeAndCount { time { seconds } count at { nanometers } }
+            }
+          }
+        }
+      }
+    }
+  """
+
+  private def acquisitionExpected(acquisition: io.circe.Json) =
+    json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gnirsImaging": { "acquisition": $acquisition }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+  test("observing mode: update GNIRS imaging acquisition type and sky offset"):
+    val update = """
+      observingMode: {
+        gnirsImaging: {
+          acquisition: {
+            explicitAcquisitionType: FAINT
+            skyOffset: { p: { arcseconds: 0.0 }, q: { arcseconds: 12.0 } }
+          }
+        }
+      }
+    """
+
+    multiUpdateTest(pi,
+      List(
+        (setGnirsImaging, acquisitionQuery, acquisitionExpected(json"""
+          {
+            "explicitAcquisitionType": null,
+            "explicitFilter": null,
+            "coadds": 1,
+            "skyOffset": null,
+            "exposureTimeMode": {
+              "signalToNoise": { "value": 10.000, "at": { "nanometers": 1250.000 } },
+              "timeAndCount": null
+            }
+          }
+        """)),
+        (update, acquisitionQuery, acquisitionExpected(json"""
+          {
+            "explicitAcquisitionType": "FAINT",
+            "explicitFilter": null,
+            "coadds": 1,
+            "skyOffset": {
+              "p": { "arcseconds": 0.000000 },
+              "q": { "arcseconds": 12.000000 }
+            },
+            "exposureTimeMode": {
+              "signalToNoise": { "value": 10.000, "at": { "nanometers": 1250.000 } },
+              "timeAndCount": null
+            }
+          }
+        """))
+      )
+    )
+
+  test("observing mode: clearing the GNIRS imaging acquisition type clears the sky offset"):
+    val setFaint = """
+      observingMode: {
+        gnirsImaging: {
+          acquisition: {
+            explicitAcquisitionType: FAINT
+            skyOffset: { p: { arcseconds: 0.0 }, q: { arcseconds: 12.0 } }
+          }
+        }
+      }
+    """
+
+    val clear = """
+      observingMode: {
+        gnirsImaging: {
+          acquisition: { explicitAcquisitionType: null }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gnirsImaging {
+            acquisition {
+              explicitAcquisitionType
+              skyOffset { p { arcseconds } q { arcseconds } }
+            }
+          }
+        }
+      }
+    """
+
+    multiUpdateTest(pi,
+      List(
+        (setGnirsImaging, query, acquisitionExpected(json"""
+          { "explicitAcquisitionType": null, "skyOffset": null }
+        """)),
+        (setFaint, query, acquisitionExpected(json"""
+          {
+            "explicitAcquisitionType": "FAINT",
+            "skyOffset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 12.000000 } }
+          }
+        """)),
+        (clear, query, acquisitionExpected(json"""
+          { "explicitAcquisitionType": null, "skyOffset": null }
+        """))
+      )
+    )
+
+  test("observing mode: update GNIRS imaging acquisition filter and exposure time mode"):
+    val update = """
+      observingMode: {
+        gnirsImaging: {
+          acquisition: {
+            explicitFilter: H2
+            exposureTimeMode: {
+              timeAndCount: { time: { seconds: 8.0 }, count: 1, at: { nanometers: 1250.0 } }
+            }
+            coadds: 3
+          }
+        }
+      }
+    """
+
+    multiUpdateTest(pi,
+      List(
+        (setGnirsImaging, acquisitionQuery, acquisitionExpected(json"""
+          {
+            "explicitAcquisitionType": null,
+            "explicitFilter": null,
+            "coadds": 1,
+            "skyOffset": null,
+            "exposureTimeMode": {
+              "signalToNoise": { "value": 10.000, "at": { "nanometers": 1250.000 } },
+              "timeAndCount": null
+            }
+          }
+        """)),
+        (update, acquisitionQuery, acquisitionExpected(json"""
+          {
+            "explicitAcquisitionType": null,
+            "explicitFilter": "H2",
+            "coadds": 3,
+            "skyOffset": null,
+            "exposureTimeMode": {
+              "signalToNoise": null,
+              "timeAndCount": {
+                "time": { "seconds": 8.000000 },
+                "count": 1,
+                "at": { "nanometers": 1250.000 }
+              }
+            }
+          }
+        """))
+      )
+    )
+
+  test("observing mode: editing the GNIRS imaging filters preserves the acquisition ETM"):
+    val setWithAcqEtm = """
+      scienceRequirements: {
+        exposureTimeMode: {
+          signalToNoise: {
+            value: 100.0
+            at: { nanometers: 1250.0 }
+          }
+        }
+      }
+      observingMode: {
+        gnirsImaging: {
+          camera: SHORT_BLUE
+          filters: [ { filter: J } ]
+          acquisition: {
+            exposureTimeMode: {
+              timeAndCount: { time: { seconds: 8.0 }, count: 1, at: { nanometers: 1250.0 } }
+            }
+            coadds: 3
+          }
+        }
+      }
+    """
+
+    // Replacing the filter list must not reset the acquisition ETM back to its default.
+    val editFilters = """
+      observingMode: {
+        gnirsImaging: {
+          filters: [ { filter: K }, { filter: ORDER4 } ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gnirsImaging {
+            filters { filter }
+            acquisition {
+              coadds
+              exposureTimeMode {
+                timeAndCount { time { seconds } count at { nanometers } }
+              }
+            }
+          }
+        }
+      }
+    """
+
+    def expected(filters: io.circe.Json) =
+      json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "observingMode": {
+                  "gnirsImaging": {
+                    "filters": $filters,
+                    "acquisition": {
+                      "coadds": 3,
+                      "exposureTimeMode": {
+                        "timeAndCount": {
+                          "time": { "seconds": 8.000000 },
+                          "count": 1,
+                          "at": { "nanometers": 1250.000 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (setWithAcqEtm, query, expected(json"""[ { "filter": "J" } ]""")),
+        (editFilters, query, expected(json"""[ { "filter": "ORDER4" }, { "filter": "K" } ]"""))
+      )
+    )
+
   test("observing mode: update existing GNIRS imaging offsets"):
 
     val update0 = """
