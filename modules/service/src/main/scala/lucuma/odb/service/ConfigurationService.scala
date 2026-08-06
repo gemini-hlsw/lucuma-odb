@@ -17,6 +17,8 @@ import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
+import lucuma.core.math.Angle
+import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
@@ -43,6 +45,7 @@ import lucuma.odb.util.GnirsCodecs.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
+import skunk.codec.numeric.{float8, int8}
 import skunk.data.Arr
 import skunk.syntax.all.*
 
@@ -58,6 +61,11 @@ trait ConfigurationService[F[_]] {
 
   /** Selects observations relevant to the given configuration requests, if any. The resulting map will contain every passed request id. */
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
+
+  /** Selects the ids of configuration requests whose target reference coordinates
+   *  lie within `distance` of `center` (exact great-circle match). Pure-SQL trig
+   *  on the int8 microarcsecond columns; no PostGIS. */
+  def coneCandidates(center: Coordinates, distance: Angle): F[Result[List[ConfigurationRequest.Id]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
@@ -102,6 +110,11 @@ object ConfigurationService {
       override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
+
+      override def coneCandidates(center: Coordinates, distance: Angle): F[Result[List[ConfigurationRequest.Id]]] =
+        val af = Statements.coneCandidates(center, distance)
+        session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
+          pq.stream(af.argument, 1024).compile.toList.map(Result(_))
 
       override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
         val doUpdate = impl.updateRequests(SET, where).value
@@ -1507,6 +1520,44 @@ object ConfigurationService {
         where c_program_id = $program_id
         returning c_configuration_request_id
       """.query(configuration_request_id)
+
+    /** AppliedFragment yielding the ids of configuration requests whose target
+     *  reference coordinates lie within `distance` of `center`. A wrap-aware
+     *  bounding-box prefilter on the int8 microarcsecond columns (index-friendly)
+     *  is followed by an exact great-circle trim (dot-product form). The dec
+     *  column uses lucuma-core's angle encoding, which is safe here because the
+     *  exact trim relies on sin/cos (2π-periodic). No PostGIS. */
+    def coneCandidates(center: Coordinates, distance: Angle): AppliedFragment =
+      val FullCircle    = 1296000000000L // 360° in µas
+      val µasPerDegree  = 3600000000.0
+      val dec0ang       = center.dec.toAngle.toMicroarcseconds
+      val ra0           = center.ra.toAngle.toMicroarcseconds
+      val radius        = distance.toMicroarcseconds
+      val dec0rad       = center.dec.toRadians
+      val ra0rad        = ra0.toDouble / µasPerDegree * math.Pi / 180.0
+      val radiusRad     = radius.toDouble / µasPerDegree * math.Pi / 180.0
+      val sinDec0       = math.sin(dec0rad)
+      val cosDec0       = math.cos(dec0rad)
+      val cosRadius     = math.cos(radiusRad)
+      // Pole case: the cone contains a celestial pole, so every RA can match.
+      val pole          = math.abs(dec0rad) + radiusRad >= math.Pi / 2
+      val dra           = if pole then FullCircle else math.min(FullCircle, (radius.toDouble / math.cos(dec0rad)).toLong)
+      val decLo         = dec0ang - radius
+      val decHi         = dec0ang + radius
+      val raLo          = ra0 - dra
+      val raHi          = ra0 + dra
+
+      void"select c_configuration_request_id from v_configuration_request" |+|
+      void" where (c_reference_dec between " |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi) |+|
+      void" or c_reference_dec >= "           |+| sql"$int8".apply(decLo + FullCircle) |+|
+      void" or c_reference_dec <= "           |+| sql"$int8".apply(decHi - FullCircle) |+| void")" |+|
+      void" and (c_reference_ra between "     |+| sql"$int8".apply(raLo)  |+| void" and " |+| sql"$int8".apply(raHi) |+|
+      void" or c_reference_ra >= "            |+| sql"$int8".apply(raLo + FullCircle) |+|
+      void" or c_reference_ra <= "            |+| sql"$int8".apply(raHi - FullCircle) |+| void")" |+|
+      void" and sin(radians(c_reference_dec / 3600000000.0)) * "  |+| sql"$float8".apply(sinDec0) |+|
+      void" + cos(radians(c_reference_dec / 3600000000.0)) * "  |+| sql"$float8".apply(cosDec0) |+|
+      void" * cos(radians(c_reference_ra / 3600000000.0) - "    |+| sql"$float8".apply(ra0rad)  |+|
+      void") >= "                                   |+| sql"$float8".apply(cosRadius)
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =
