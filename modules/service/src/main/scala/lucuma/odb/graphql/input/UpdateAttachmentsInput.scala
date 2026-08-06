@@ -19,7 +19,7 @@ case class UpdateAttachmentsInput(
 
 object UpdateAttachmentsInput {
 
-  def binding(path: Path)(using serverDate: java.time.LocalDate): Matcher[UpdateAttachmentsInput] = {
+  def binding(path: Path): Matcher[UpdateAttachmentsInput] = {
     val WhereAttachmentBinding = WhereAttachment.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

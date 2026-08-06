@@ -14,9 +14,9 @@ class programs_isActive extends OdbSuite {
   val validUsers = List(pi, staff)
 
   // `isActive` matches programs whose `[activeStart, activeEnd]` window contains
-  // the server's current date (evaluated server-side, threaded request-scoped).
-  // The server date is `LocalDate.now()`, so the fixtures bracket it explicitly
-  // to keep the test clock-robust. Only staff may set the active period.
+  // the current UTC date, computed by the `c_is_active` column on `v_program`.
+  // The fixtures bracket today generously so the test is robust against the
+  // local-vs-UTC date boundary. Only staff may set the active period.
   test("filter programs on isActive"):
     val today = LocalDate.now()
     for

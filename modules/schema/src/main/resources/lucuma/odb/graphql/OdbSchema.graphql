@@ -15949,6 +15949,12 @@ type Program {
   active: DateInterval!
 
   """
+  Whether the program is currently active, i.e. whether the current UTC date
+  falls within the `active` period (inclusive of both bounds).
+  """
+  isActive: Boolean!
+
+  """
   Proposal status of the program
   """
   proposalStatus: ProposalStatus!
@@ -22525,7 +22531,8 @@ input WhereProgram {
 
   """
   When true, matches programs whose active period `[activeStart, activeEnd]` contains the
-  server's current date; when false, matches the complement. Evaluated server-side.
+  current UTC date; when false, matches the complement. Evaluated in the database, so the
+  date is taken at transaction start.
   """
   isActive: Boolean
 }

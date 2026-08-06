@@ -20,7 +20,7 @@ final case class UpdateTargetsInput(
 
 object UpdateTargetsInput {
 
-  def binding(path: Path)(using serverDate: java.time.LocalDate): Matcher[UpdateTargetsInput] = {
+  def binding(path: Path): Matcher[UpdateTargetsInput] = {
     val WhereTargetBinding = WhereTarget.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

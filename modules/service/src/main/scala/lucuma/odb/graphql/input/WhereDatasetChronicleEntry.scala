@@ -7,7 +7,6 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import java.time.LocalDate
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.DatabaseOperation
@@ -18,7 +17,7 @@ import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereDatasetChronicleEntry:
 
-  def binding(path: Path)(using serverDate: LocalDate): Matcher[Predicate] =
+  def binding(path: Path): Matcher[Predicate] =
 
     val WhereOrderChronicleId    = WhereOrder.binding[Long](path / "id", LongBinding)
     val WhereUserBinding         = WhereUser.binding(path / "user")
