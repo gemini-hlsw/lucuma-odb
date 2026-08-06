@@ -1873,6 +1873,42 @@ trait DatabaseOperations { this: OdbSuite =>
   ): IO[Target.Id] =
     createSiderealTargetAs(user, pid, name, sourceProfile)
 
+  def createSiderealTargetAtAs(
+    user:       User,
+    pid:        Program.Id,
+    raHours:    String,
+    decDegrees: String,
+    name:       String = "T"
+  ): IO[Target.Id] =
+    query(
+      user,
+      s"""
+        mutation {
+          createTarget(
+            input: {
+              programId: ${pid.asJson}
+              SET: {
+                name: "$name"
+                sidereal: {
+                  ra: { hours: "$raHours" }
+                  dec: { degrees: "$decDegrees" }
+                  epoch: "J2000.000"
+                  radialVelocity: { kilometersPerSecond: 0.0 }
+                }
+                $DefaultSourceProfile
+              }
+            }
+          ) {
+            target { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor.downField("createTarget").downField("target").downField("id").as[Target.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
   def createSiderealTargetAs(
     user: User,
     pid:  Program.Id,
