@@ -9,7 +9,6 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import java.time.LocalDate
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.odb.graphql.binding.*
@@ -20,7 +19,7 @@ import lucuma.odb.graphql.binding.WhereString
 
 object WhereAttachment {
 
-  def binding(path: Path)(using serverDate: LocalDate): Matcher[Predicate] = {
+  def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderAttachmentId = WhereOrder.binding[Attachment.Id](path / "id", AttachmentIdBinding)
     val WhereFileNameBinding   = WhereString.binding(path / "fileName")
     val WhereMaskNameBinding   = WhereOptionString.binding(path / "maskName")

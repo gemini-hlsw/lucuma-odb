@@ -9,7 +9,6 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import java.time.LocalDate
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProgramUserRole
@@ -23,7 +22,7 @@ import org.typelevel.cats.time.given
 
 object WhereProgram {
 
-  def binding(path: Path)(using serverDate: LocalDate): Matcher[Predicate] = {
+  def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderProgramId          = WhereOrder.binding[Program.Id](path / "id", ProgramIdBinding)
     val WhereNameBinding             = WhereOptionString.binding(path / "name")
     val WhereTypeBinding             = WhereEq.binding[ProgramType](path / "type", ProgramTypeBinding)
@@ -56,14 +55,6 @@ object WhereProgram {
       ) =>
           (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole, rStart, rEnd, rIsActive).parMapN {
             (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib, start, end, isActive) =>
-              // `isActive` is resolved against the server's current date
-              // (threaded request-scoped, like `user`): the program's
-              // `[activeStart, activeEnd]` window must contain it. Standard
-              // pushable predicates over the existing date columns.
-              val activeWindow = and(List(
-                LtEql(path / "active" / "start", Const(serverDate)),
-                GtEql(path / "active" / "end",   Const(serverDate))
-              ))
               and(List(
                 AND.map(and),
                 OR.map(or),
@@ -78,7 +69,7 @@ object WhereProgram {
                 calib,
                 start,
                 end,
-                isActive.map(if _ then activeWindow else Not(activeWindow))
+                isActive.map(b => Eql(path / "isActive", Const(b)))
               ).flatten)
         }
     }

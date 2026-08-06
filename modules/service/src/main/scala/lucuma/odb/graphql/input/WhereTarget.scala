@@ -9,7 +9,6 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import java.time.LocalDate
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.model.Target
@@ -21,7 +20,7 @@ import lucuma.odb.graphql.binding.WhereString
 
 object WhereTarget {
 
-  def binding(path: Path)(using serverDate: LocalDate): Matcher[Predicate] = {
+  def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderTargetIdBinding   = WhereOrder.binding[Target.Id](path / "id", TargetIdBinding)
     val WhereProgramBinding         = WhereProgram.binding(path / "program")
     val WhereNameBinding            = WhereString.binding(path / "name")

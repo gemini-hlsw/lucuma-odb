@@ -19,7 +19,7 @@ case class UpdateProgramUsersInput(
 
 object UpdateProgramUsersInput {
 
-  def binding(path: Path)(using serverDate: java.time.LocalDate): Matcher[UpdateProgramUsersInput] =
+  def binding(path: Path): Matcher[UpdateProgramUsersInput] =
     val WhereProgramUsersBinding = WhereProgramUser.binding(path)
     ObjectFieldsBinding.rmap {
       case List(

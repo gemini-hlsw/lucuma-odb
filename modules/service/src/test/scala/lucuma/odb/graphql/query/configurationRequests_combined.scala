@@ -5,7 +5,6 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
-import cats.syntax.all.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ConfigurationRequest

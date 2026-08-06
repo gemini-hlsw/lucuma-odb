@@ -9,7 +9,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import java.time.LocalDate
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
@@ -25,7 +24,7 @@ import lucuma.odb.graphql.binding.WhereString
 
 object WhereDataset {
 
-  def binding(path: Path)(using serverDate: LocalDate): Matcher[Predicate] = {
+  def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderDatasetIdBinding = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
     val WhereObservationBinding    = WhereObservation.binding(path / "observation")
     val WhereProgramBinding        = WhereProgram.binding(path / "observation" / "program")

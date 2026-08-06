@@ -24,7 +24,7 @@ import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereExecutionEvent {
 
-  def binding(path: Path)(using serverDate: java.time.LocalDate): Matcher[Predicate] = {
+  def binding(path: Path): Matcher[Predicate] = {
     val WhereExecutionEventIdBinding   = WhereOrder.binding[ExecutionEvent.Id](path / "id", ExecutionEventIdBinding)
     val WhereVisitIdBinding            = WhereEq.binding[Visit.Id](path / "visit" / "id", VisitIdBinding)
     val WhereObservationBinding        = WhereObservation.binding(path / "observation")

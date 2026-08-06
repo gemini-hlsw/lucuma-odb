@@ -9,7 +9,6 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import java.time.LocalDate
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
@@ -26,7 +25,7 @@ import lucuma.odb.syntax.instrument.*
 
 object WhereObservation {
 
-  def binding(path: Path)(using serverDate: LocalDate): Matcher[Predicate] = {
+  def binding(path: Path): Matcher[Predicate] = {
 
     // Site filters are defined in terms of the observation's instrument.
     // For example, a site of GN means that the observation's instrument must be
