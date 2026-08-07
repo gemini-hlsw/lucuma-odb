@@ -43,6 +43,43 @@ trait ReplaceGmosNorthSequenceOps extends ReplaceSequenceOps:
           }
     """
 
+  def mosStepInput(filter: GmosNorthFilter): String =
+    s"""
+          {
+            instrumentConfig: {
+              exposure: {
+                seconds: 20
+              }
+              readout: {
+                xBin: ONE
+                yBin: ONE
+                ampCount: TWELVE
+                ampGain: LOW
+                ampReadMode: SLOW
+              }
+              dtax: ZERO
+              roi: FULL_FRAME
+              gratingConfig: {
+                grating: R831_G5302
+                order: ZERO
+                wavelength: {
+                  nanometers: 500.0
+                }
+              }
+              filter: ${filter.tag.toScreamingSnakeCase}
+              fpu: {
+                customMask: {
+                  slitWidth: CUSTOM_WIDTH_0_50
+                }
+              }
+            }
+            stepConfig: {
+              science: true
+            }
+            observeClass: SCIENCE
+          }
+    """
+
   def imagingStepInput(filter: GmosNorthFilter): String =
     s"""
           {

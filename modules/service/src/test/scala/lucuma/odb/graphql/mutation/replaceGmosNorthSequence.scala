@@ -9,10 +9,13 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.model.Observation
+import lucuma.core.model.ToBeDefined
+import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.sequence.data.UnsplittableAtom
 
 class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with ReplaceGmosNorthSequenceOps:
@@ -93,6 +96,30 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
         i0 <- query(pi, mutation(Instrument.GmosNorth, in)).map(mutationOutput(Instrument.GmosNorth, _))
         i1 <- scienceSequenceIds(pi, o).map(_.toList)
       yield i0 === i1
+
+  test("Matches execution config (after first visit) - MOS"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthMosObservationAs(pi, p, List(t))
+        _ <- recordVisitAs(serviceUser, o)
+      yield o
+
+    for
+      o  <- setup
+      in  = input(o, SequenceType.Science, atomInput("Foo", mosStepInput(GmosNorthFilter.GPrime)))
+      i0 <- query(pi, mutation(Instrument.GmosNorth, in)).map(mutationOutput(Instrument.GmosNorth, _))
+      i1 <- scienceSequenceIds(pi, o).map(_.toList)
+      _   = assert(i0 === i1, s"replace output $i0 did not match materialized ids $i1")
+      gn <- generateGmosNorthOrFail(pi, o)
+      fpu = gn.executionConfig.science.map(_.nextAtom.steps.head.instrumentConfig.fpu)
+      _   = assertEquals(
+              fpu,
+              Some(Some(GmosFpuMask.Custom(ToBeDefined, GmosCustomSlitWidth.CustomWidth_0_50))),
+              s"materialized science step did not carry the custom mask fpu, got $fpu"
+            )
+    yield ()
 
   test("mutating imaging observation"):
     val setup: IO[Observation.Id] =
