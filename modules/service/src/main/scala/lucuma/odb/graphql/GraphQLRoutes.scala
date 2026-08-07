@@ -23,7 +23,6 @@ import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.graphql.mapping.ConfigurationRequestMapping
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
@@ -160,35 +159,12 @@ object GraphQLRoutes {
                                     // re-compile, and execute -- yielding a single fully-pushable
                                     // SQL statement.
                                     if !document.contains("targetCoordinates") then runQuery(request)
-                                    else resolveConeQuery(document, operationName, runQuery)
-
-                                  // Re-resolves a `configurationRequests` query whose WHERE has a
-                                  // `targetCoordinates` cone, recompiling with `id IN (...)`.
-                                  def resolveConeQuery(
-                                    document:      String,
-                                    operationName: Option[String],
-                                    runQuery:      Operation => F[Result[Json]]
-                                  ): F[Result[Json]] =
-                                    val parsed = grackle.QueryParser(map.graphQLParser).parseText(document)
-                                    if parsed.isFailure then F.pure(parsed.asInstanceOf[Result[Json]])
                                     else
-                                      val (ops, frags) = parsed.toOption.get
-                                      val untypedOp = operationName match
-                                        case None    => ops.find(_.name.isEmpty).orElse(ops.headOption)
-                                        case Some(n) => ops.find(_.name.contains(n))
-                                      untypedOp match
-                                        case None => F.pure(Result.failure(s"No operation named '$operationName'"))
-                                        case Some(op) =>
-                                          ConeRewrite.rewriteCones(op.query) { (center, distance) =>
-                                            map.asInstanceOf[ConfigurationRequestMapping[F]].coneCandidates(center, distance)
-                                          }.flatMap {
-                                            case r if r.isFailure => F.pure(r.asInstanceOf[Result[Json]])
-                                            case r =>
-                                              val recompiled = map.compiler.compileOperation(ConeRewrite.withQuery(op, r.toOption.get), None, frags)
-                                              recompiled.toOption match
-                                                case None         => F.pure(recompiled.asInstanceOf[Result[Json]])
-                                                case Some(compiled) => runQuery(compiled)
-                                          }
+                                      ConeRewrite.resolveOperation(map, document, operationName).flatMap:
+                                        case Result.Success(op)      => runQuery(op)
+                                        case Result.Warning(_, op)   => runQuery(op)
+                                        case f: Result.Failure       => F.pure(f)
+                                        case e: Result.InternalError => F.pure(e)
 
                                   override def subscribe(
                                     request:       Operation,

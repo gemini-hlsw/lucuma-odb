@@ -29,12 +29,14 @@ import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import fs2.io.net.tls.TLSContext
 import fs2.text.utf8
+import grackle.Env
 import grackle.Mapping
 import grackle.Result
 import grackle.Result.Failure
 import grackle.Result.Success
 import grackle.Result.Warning
 import grackle.skunk.SkunkMonitor
+import grackle.sql.SqlStatsMonitor.SqlStats
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
@@ -467,6 +469,41 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       schema <- Resource.eval(OdbMapping.loadSchema[IO])
       map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
     } yield map
+
+  /**
+   * Runs `document` as `user` against a dedicated mapping whose monitor records every SQL
+   * statement issued, applying the `targetCoordinates` cone rewrite exactly as
+   * `GraphQLRoutes` does. Yields the response JSON and the statements that produced it, so
+   * a test can assert not just the result but how many queries it took.
+   */
+  def queryWithSqlStats(user: User, document: String): IO[(Json, List[SqlStats])] =
+    import Tracer.Implicits.noop
+    import Meter.Implicits.noop
+    val res =
+      for {
+        db     <- FMain.databasePoolResource[IO](databaseConfig)
+        mon    <- Resource.eval(SkunkMonitor.statsMonitor[IO])
+        top    <- OdbMapping.Topics(db)
+        enm    <- db.evalMap(Enums.load)
+        ptc    <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
+        goa    <- Resource.eval(goaClient)
+        schema <- Resource.eval(OdbMapping.loadSchema[IO])
+        map     = OdbMapping(db, mon, user, top, gaiaClient, itcClient, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
+      } yield (map, mon)
+
+    res.use: (map, mon) =>
+      for {
+        op   <- ConeRewrite.resolveOperation(map, document, none).flatMap:
+                  case Success(o)       => IO.pure(o)
+                  case Warning(_, o)    => IO.pure(o)
+                  case f: Failure       => IO.raiseError(new RuntimeException(f.problems.toList.mkString("; ")))
+                  case e: Result.InternalError => IO.raiseError(e.error)
+        // The monitor sees only grackle-mapped SQL, so the cone candidate lookup that
+        // `resolveOperation` just ran is deliberately not counted; drop anything else.
+        _    <- mon.take
+        json <- map.interpreter.run(op.query, op.rootTpe, Env.empty).evalMap(map.mkResponse).compile.lastOrError
+        sts  <- mon.take
+      } yield (json, sts)
 
   protected def trace: Resource[IO, Trace[IO]] =
     Resource.pure(Trace.Implicits.noop)

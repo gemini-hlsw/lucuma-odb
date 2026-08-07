@@ -5,11 +5,14 @@ package lucuma.odb.graphql
 
 import cats.Monad
 import cats.syntax.all.*
+import grackle.Mapping
+import grackle.Operation
 import grackle.Query
 import grackle.Query.Binding
 import grackle.Query.Environment
 import grackle.Query.Group
 import grackle.Query.UntypedSelect
+import grackle.QueryParser
 import grackle.Result
 import grackle.Value
 import grackle.Value.ObjectValue
@@ -24,6 +27,7 @@ import lucuma.odb.graphql.binding.AngleBinding
 import lucuma.odb.graphql.binding.BigDecimalBinding
 import lucuma.odb.graphql.binding.LongBinding
 import lucuma.odb.graphql.binding.StringBinding
+import lucuma.odb.graphql.mapping.ConfigurationRequestMapping
 
 /** Resolves the `WhereConfigurationRequest.targetCoordinates` cone filter by rewriting
  *  the query after it is parsed but before grackle compiles it:
@@ -46,8 +50,9 @@ import lucuma.odb.graphql.binding.StringBinding
  *  turning a WHERE input into a predicate: elaboration runs during compilation as a pure
  *  `StateT[Result, ElabState, *]` and so cannot perform the `F` candidate lookup.
  *
- *  Driven by `GraphQLRoutes`, which re-parses the document, applies this rewrite, and
- *  compiles the result.
+ *  `resolveOperation` is the entry point, wrapping the whole parse/rewrite/compile path;
+ *  `GraphQLRoutes` calls it for documents that mention `targetCoordinates` and runs the
+ *  `Operation` it yields.
  */
 object ConeRewrite:
 
@@ -56,19 +61,34 @@ object ConeRewrite:
   private val TargetCoordinatesField     = "targetCoordinates"
   private val IdField                    = "id"
 
+  /** Parses `document`, rewrites any `targetCoordinates` cone in it, and compiles the
+   *  result, yielding an `Operation` ready to run. This is the whole out-of-band path;
+   *  `GraphQLRoutes` calls it when a document mentions `targetCoordinates`.
+   */
+  def resolveOperation[F[_]: Monad](
+    mapping:       Mapping[F] & ConfigurationRequestMapping[F],
+    document:      String,
+    operationName: Option[String]
+  ): F[Result[Operation]] =
+    QueryParser(mapping.graphQLParser).parseText(document).flatTraverse: (ops, frags) =>
+      val untypedOp = operationName match
+        case None    => ops.find(_.name.isEmpty).orElse(ops.headOption)
+        case Some(n) => ops.find(_.name.contains(n))
+      untypedOp match
+        case None     => Result.failure(s"No operation named '${operationName.orEmpty}'").pure[F].widen
+        case Some(op) =>
+          rewriteCones(op.query)(mapping.coneCandidates).map: r =>
+            r.flatMap(q => mapping.compiler.compileOperation(withQuery(op, q), None, frags))
+
   /** Rewrite every `configurationRequests` selection in `query` whose WHERE has a
    *  `targetCoordinates` cone, replacing it with `id IN (candidateIds)`. */
   def rewriteCones[F[_]: Monad](
     query:  Query
   )(compute: (Coordinates, Angle) => F[Result[List[ConfigurationRequest.Id]]]): F[Result[Query]] =
-    val cones  = collectCones(query).distinct
-    val parsed = cones.traverse(v => Result.fromEither(parseCone(v)))
-    if parsed.isFailure then Monad[F].pure(parsed.asInstanceOf[Result[Query]])
-    else
-      val coordAngles = parsed.toOption.get
-      coordAngles.traverse { case (c, d) => compute(c, d) }.map { rs =>
+    val cones = collectCones(query).distinct
+    cones.traverse(v => Result.fromEither(parseCone(v))).flatTraverse: coordAngles =>
+      coordAngles.traverse { case (c, d) => compute(c, d) }.map: rs =>
         rs.sequence.map { idsList => inject(query, cones.zip(idsList).toMap) }
-      }
 
   // --- pure tree walks ---
 
