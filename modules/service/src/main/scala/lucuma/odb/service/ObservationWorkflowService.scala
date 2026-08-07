@@ -178,7 +178,26 @@ case class ObservationValidationInfo(
   def site: Option[Site] =
     instrument.map(_.site)
 
-  def isOpportunity: Boolean =
+  /**
+   * Is this a Target-of-Opportunity observation -- one that waits for an alert
+   * rather than for the queue?  Setting such an observation `Ready` is what
+   * requests its trigger.
+   *
+   * Independent of [[hasTooTarget]]: this is about the observation's declared
+   * urgency, not about whether its target has been found yet.
+   */
+  def isTooObservation: Boolean =
+    tooActivation =!= TooActivation.None
+
+  /**
+   * Does the asterism still hold an opportunity target -- the placeholder that
+   * stands in for a Target of Opportunity until the real one is identified?
+   *
+   * Independent of [[isTooObservation]]: a placeholder is only coherent in an
+   * observation that declares a ToO activation, and only until the alert
+   * arrives, but neither implies the other.
+   */
+  def hasTooTarget: Boolean =
     asterism.exists:
       case t: Target.Opportunity => true
       case _ => false
@@ -241,6 +260,12 @@ object ObservationWorkflowService {
     def tooActivationExceedsCeiling(obs: TooActivation, ceiling: TooActivation): String =
       s"Target of Opportunity activation ${obs.tag.toScreamingSnakeCase} exceeds the maximum " +
       s"${ceiling.tag.toScreamingSnakeCase} allowed by the proposal."
+
+    val OpportunityTargetRequiresActivation =
+      "An observation with a Target of Opportunity placeholder must set a ToO activation other than NONE."
+
+    val OpportunityTargetNotResolved =
+      "Replace the Target of Opportunity placeholder with the actual target coordinates."
 
     def exchangeObservatoryMismatch(modeObs: Observatory, cfpObs: Observatory): String =
       s"Exchange observation requires a $modeObs Call for Proposals, but the proposal's observatory is $cfpObs."
@@ -544,7 +569,7 @@ object ObservationWorkflowService {
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
               List(Inactive) ++
-                Option.when((!info.isExchange) && (!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
+                Option.when((!info.isExchange) && (!info.hasTooTarget) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
@@ -622,6 +647,26 @@ object ObservationWorkflowService {
               ObservationValidation.tooActivationUnapproved:
                 Messages.tooActivationExceedsCeiling(info.tooActivation, info.tooCeiling.get)
 
+        // An opportunity target is a placeholder standing in for a target that
+        // has not been found yet, so it makes sense only in an observation that
+        // declares itself a Target of Opportunity, and only until the alert
+        // arrives.  Either way the observation is internally inconsistent rather
+        // than merely unapproved, so this is a ConfigurationError -- Undefined,
+        // which also suppresses a stored Ready.
+        //
+        // The second case is a backstop.  A placeholder already blocks the
+        // Defined -> Ready transition, so a trigger cannot be requested for one,
+        // but the asterism can still be edited afterwards (Ready is in
+        // preExecutionSet) and a Ready ToO with no coordinates is worse than a
+        // loud error.
+        val opportunityTargetValidator: Validator = info =>
+          if !info.hasTooTarget then ObservationValidationMap.empty
+          else if !info.isTooObservation then
+            ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.OpportunityTargetRequiresActivation))
+          else if info.effectiveUserState.contains(Ready) then
+            ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.OpportunityTargetNotResolved))
+          else ObservationValidationMap.empty
+
         val itcValidator: Validator = info =>
           if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
@@ -656,13 +701,14 @@ object ObservationWorkflowService {
           ObservationValidationMap.empty
 
         val scienceValidator1: Validator =
-          generatorValidator       |+|
-          cfpInstrumentValidator   |+|
-          exchangeValidator        |+|
-          cfpRaDecValidator        |+|
-          bandValidator            |+|
-          ghostVMagnitudeValidator |+|
-          tooActivationValidator   |+|
+          generatorValidator         |+|
+          cfpInstrumentValidator     |+|
+          exchangeValidator          |+|
+          cfpRaDecValidator          |+|
+          bandValidator              |+|
+          ghostVMagnitudeValidator   |+|
+          tooActivationValidator     |+|
+          opportunityTargetValidator |+|
           otherConfigErrors
 
         val scienceValidator2: Validator =

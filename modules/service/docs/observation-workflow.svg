@@ -5,16 +5,17 @@
   format other than this file — edit the coordinates directly. See
   "Regenerating the diagram" in observation-workflow-states.md.
 
-  Layout grid: the four panels share one set of column positions so equivalent
+  Layout grid: the five panels share one set of column positions so equivalent
   states line up vertically across panels.
 
     Undefined 250   Unapproved 430   Defined 610   Ready 900   Ongoing 1130   Completed 1350
 
   Panel bands (y):  Phase 1  16-206     Phase 2  230-660
-                    Calibrations (program-level)  690-920
-                    Calibrations (per-observation)  945-1200
+                    Phase 2 (Target of Opportunity)  690-980
+                    Calibrations (program-level)  1010-1240
+                    Calibrations (per-observation)  1265-1520
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1520 1220" width="1520" height="1220" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1520 1540" width="1520" height="1540" font-family="Helvetica, Arial, sans-serif">
   <defs>
     <marker id="ab-e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#111111"/>
@@ -62,7 +63,7 @@
     .grpbox { fill:none; stroke:#bbbbbb; stroke-width:1.2; }
   </style>
 
-  <rect x="0" y="0" width="1520" height="1220" fill="#ffffff"/>
+  <rect x="0" y="0" width="1520" height="1540" fill="#ffffff"/>
 
   <!-- ===================== Phase 1 ===================== -->
   <rect class="cont" x="20" y="16" width="760" height="190" rx="14"/>
@@ -179,84 +180,149 @@
 
   <text class="foot" x="40" y="634">Ongoing and Completed cannot be deactivated — Inactive is reachable only from Undefined, Unapproved, Defined and Ready.</text>
 
+  <!-- ============ Phase 2: Target of Opportunity ============ -->
+  <rect class="cont" x="20" y="690" width="1480" height="290" rx="14"/>
+  <text class="phase" x="40" y="716">Phase 2 — Target of Opportunity (tooActivation ≠ NONE)</text>
+
+  <rect class="inact" x="256" y="738" width="100" height="30"/>
+  <text class="si" x="306" y="758">Inactive</text>
+  <line class="black" x1="306" y1="772" x2="306" y2="798" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <rect class="box" x="250" y="802" width="112" height="36"/>
+  <text class="st" x="306" y="825">Undefined</text>
+
+  <line class="blue" x1="366" y1="820" x2="606" y2="820" marker-end="url(#au-e)" marker-start="url(#au-s)"/>
+  <text class="el" x="486" y="800">configuration becomes</text>
+  <text class="el" x="486" y="813">valid / invalid</text>
+
+  <rect class="inact" x="616" y="738" width="100" height="30"/>
+  <text class="si" x="666" y="758">Inactive</text>
+  <line class="black" x1="666" y1="772" x2="666" y2="798" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <rect class="box" x="610" y="802" width="112" height="36"/>
+  <text class="st" x="666" y="825">Defined</text>
+
+  <!-- The one edge that differs from a normal observation: it is the trigger. -->
+  <line class="black" x1="726" y1="820" x2="896" y2="820" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <text class="el" x="811" y="790">PI sets Ready — requests</text>
+  <text class="el" x="811" y="803">/ clears it — withdraws</text>
+  <text class="note" x="811" y="840">needs an accepted proposal,</text>
+  <text class="note" x="811" y="853">no placeholder target</text>
+
+  <rect class="inact" x="906" y="738" width="100" height="30"/>
+  <text class="si" x="956" y="758">Inactive</text>
+  <line class="black" x1="956" y1="772" x2="956" y2="798" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <text class="note" x="1042" y="757">also withdraws</text>
+  <rect class="box" x="900" y="802" width="112" height="36"/>
+  <text class="st" x="956" y="825">Ready</text>
+
+  <line class="blue" x1="1014" y1="820" x2="1126" y2="820" marker-end="url(#au-e)"/>
+  <text class="note" x="1070" y="808">observation started</text>
+
+  <rect class="box" x="1130" y="802" width="112" height="36"/>
+  <text class="st" x="1186" y="825">Ongoing</text>
+
+  <line class="blue" x1="1246" y1="820" x2="1346" y2="820" marker-end="url(#au-e)"/>
+  <text class="note" x="1296" y="808">sequence complete</text>
+
+  <rect class="box" x="1350" y="802" width="112" height="36"/>
+  <text class="st" x="1406" y="825">Completed</text>
+
+  <!-- Observer declines: records a reason and clears Ready. -->
+  <path class="red" d="M930,838 L930,872 L700,872 L700,842" marker-end="url(#ar-e)"/>
+  <text class="el" x="815" y="886">observer declines — clears Ready</text>
+
+  <!-- The trigger row, mirroring the state above it. -->
+  <text class="grp" x="40" y="928">t_too_trigger</text>
+  <line class="cont" x1="666" y1="838" x2="666" y2="906"/>
+  <line class="cont" x1="956" y1="838" x2="956" y2="906"/>
+
+  <rect class="locked" x="560" y="906" width="212" height="40"/>
+  <text class="si" x="666" y="922">no live trigger</text>
+  <text class="sub" x="666" y="936">past WITHDRAWN / DECLINED rows persist</text>
+
+  <rect class="locked" x="900" y="906" width="562" height="40"/>
+  <text class="si" x="1181" y="922">one REQUESTED row</text>
+  <text class="sub" x="1181" y="936">persists through execution — no approval step, no separate withdrawal</text>
+
+  <text class="foot" x="40" y="968">Setting Ready is the trigger request; the database keeps the row in step, so the state and the trigger cannot disagree. Unapproved, and the routes in and out of it, behave exactly as in Phase 2 above.</text>
+
   <!-- ============ Calibrations: program-level ============ -->
-  <rect class="cont" x="20" y="690" width="1480" height="230" rx="14"/>
-  <text class="phase" x="40" y="716">Program-level calibrations (Photometric, SpectroPhotometric, Twilight)</text>
+  <rect class="cont" x="20" y="1010" width="1480" height="230" rx="14"/>
+  <text class="phase" x="40" y="1036">Program-level calibrations (Photometric, SpectroPhotometric, Twilight)</text>
 
-  <circle cx="380" cy="830" r="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
-  <line class="blue" x1="392" y1="830" x2="606" y2="830" marker-end="url(#au-e)"/>
-  <text class="el" x="499" y="810">calibration created —</text>
-  <text class="el" x="499" y="823">validation is skipped</text>
+  <circle cx="380" cy="1150" r="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+  <line class="blue" x1="392" y1="1150" x2="606" y2="1150" marker-end="url(#au-e)"/>
+  <text class="el" x="499" y="1130">calibration created —</text>
+  <text class="el" x="499" y="1143">validation is skipped</text>
 
-  <rect class="inact" x="616" y="747" width="100" height="30"/>
-  <text class="si" x="666" y="767">Inactive</text>
-  <line class="black" x1="666" y1="781" x2="666" y2="808" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
-  <rect class="box" x="610" y="812" width="112" height="36"/>
-  <text class="st" x="666" y="835">Defined</text>
+  <rect class="inact" x="616" y="1067" width="100" height="30"/>
+  <text class="si" x="666" y="1087">Inactive</text>
+  <line class="black" x1="666" y1="1101" x2="666" y2="1128" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <rect class="box" x="610" y="1132" width="112" height="36"/>
+  <text class="st" x="666" y="1155">Defined</text>
 
-  <line class="black" x1="726" y1="830" x2="896" y2="830" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
-  <text class="el" x="811" y="807">verified / reopened</text>
-  <text class="note" x="811" y="848">no proposal gate</text>
+  <line class="black" x1="726" y1="1150" x2="896" y2="1150" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <text class="el" x="811" y="1127">verified / reopened</text>
+  <text class="note" x="811" y="1168">no proposal gate</text>
 
-  <rect class="inact" x="906" y="747" width="100" height="30"/>
-  <text class="si" x="956" y="767">Inactive</text>
-  <line class="black" x1="956" y1="781" x2="956" y2="808" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
-  <rect class="box" x="900" y="812" width="112" height="36"/>
-  <text class="st" x="956" y="835">Ready</text>
+  <rect class="inact" x="906" y="1067" width="100" height="30"/>
+  <text class="si" x="956" y="1087">Inactive</text>
+  <line class="black" x1="956" y1="1101" x2="956" y2="1128" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <rect class="box" x="900" y="1132" width="112" height="36"/>
+  <text class="st" x="956" y="1155">Ready</text>
 
-  <line class="blue" x1="1014" y1="818" x2="1126" y2="818" marker-end="url(#au-e)"/>
-  <text class="note" x="1070" y="806">observation started</text>
-  <line class="black" x1="1014" y1="844" x2="1126" y2="844" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
-  <text class="note" x="1070" y="862">staff, visitor modes</text>
+  <line class="blue" x1="1014" y1="1138" x2="1126" y2="1138" marker-end="url(#au-e)"/>
+  <text class="note" x="1070" y="1126">observation started</text>
+  <line class="black" x1="1014" y1="1164" x2="1126" y2="1164" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <text class="note" x="1070" y="1182">staff, visitor modes</text>
 
-  <rect class="box" x="1130" y="812" width="112" height="36"/>
-  <text class="st" x="1186" y="835">Ongoing</text>
+  <rect class="box" x="1130" y="1132" width="112" height="36"/>
+  <text class="st" x="1186" y="1155">Ongoing</text>
 
-  <line class="blue" x1="1246" y1="818" x2="1346" y2="818" marker-end="url(#au-e)"/>
-  <text class="note" x="1296" y="806">sequence complete</text>
-  <line class="black" x1="1246" y1="844" x2="1346" y2="844" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
-  <text class="note" x="1296" y="862">declare complete / reopen</text>
+  <line class="blue" x1="1246" y1="1138" x2="1346" y2="1138" marker-end="url(#au-e)"/>
+  <text class="note" x="1296" y="1126">sequence complete</text>
+  <line class="black" x1="1246" y1="1164" x2="1346" y2="1164" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <text class="note" x="1296" y="1182">declare complete / reopen</text>
 
-  <rect class="box" x="1350" y="812" width="112" height="36"/>
-  <text class="st" x="1406" y="835">Completed</text>
+  <rect class="box" x="1350" y="1132" width="112" height="36"/>
+  <text class="st" x="1406" y="1155">Completed</text>
 
-  <text class="foot" x="40" y="898">Undefined and Unapproved are unreachable: validationStatus is pinned to Defined, which is both the entry point and the floor.</text>
+  <text class="foot" x="40" y="1218">Undefined and Unapproved are unreachable: validationStatus is pinned to Defined, which is both the entry point and the floor.</text>
 
   <!-- ============ Calibrations: per-observation ============ -->
-  <rect class="cont" x="20" y="945" width="1480" height="255" rx="14"/>
-  <text class="phase" x="40" y="971">Per-observation calibrations — inherit their science observation's user state</text>
+  <rect class="cont" x="20" y="1265" width="1480" height="255" rx="14"/>
+  <text class="phase" x="40" y="1291">Per-observation calibrations — inherit their science observation's user state</text>
 
-  <rect class="grpbox" x="40" y="990" width="900" height="192" rx="8"/>
-  <text class="grp" x="58" y="1012">Telluric</text>
+  <rect class="grpbox" x="40" y="1310" width="900" height="192" rx="8"/>
+  <text class="grp" x="58" y="1332">Telluric</text>
 
-  <rect class="box" x="90" y="1040" width="220" height="44"/>
-  <text class="st" x="200" y="1058">Defined / Ready</text>
-  <text class="sub" x="200" y="1074">inherited from science obs</text>
+  <rect class="box" x="90" y="1360" width="220" height="44"/>
+  <text class="st" x="200" y="1378">Defined / Ready</text>
+  <text class="sub" x="200" y="1394">inherited from science obs</text>
 
-  <line class="black" x1="314" y1="1052" x2="516" y2="1052" marker-end="url(#ab-e)"/>
-  <text class="el" x="415" y="1040">PI declines</text>
-  <line class="black" x1="516" y1="1074" x2="314" y2="1074" marker-end="url(#ab-e)"/>
-  <text class="el" x="415" y="1092">PI reinstates — override cleared</text>
+  <line class="black" x1="314" y1="1372" x2="516" y2="1372" marker-end="url(#ab-e)"/>
+  <text class="el" x="415" y="1360">PI declines</text>
+  <line class="black" x1="516" y1="1394" x2="314" y2="1394" marker-end="url(#ab-e)"/>
+  <text class="el" x="415" y="1412">PI reinstates — override cleared</text>
 
-  <rect class="box" x="520" y="1040" width="220" height="44"/>
-  <text class="st" x="630" y="1058">Inactive</text>
-  <text class="sub" x="630" y="1074">its own override is set</text>
+  <rect class="box" x="520" y="1360" width="220" height="44"/>
+  <text class="st" x="630" y="1378">Inactive</text>
+  <text class="sub" x="630" y="1394">its own override is set</text>
 
-  <rect class="locked" x="90" y="1120" width="220" height="40"/>
-  <text class="si" x="200" y="1136">Inactive</text>
-  <text class="sub" x="200" y="1150">inherited only — no transitions</text>
-  <line class="blue" x1="200" y1="1120" x2="200" y2="1088" marker-end="url(#au-e)"/>
-  <text class="els" x="216" y="1110">science obs reactivated</text>
+  <rect class="locked" x="90" y="1440" width="220" height="40"/>
+  <text class="si" x="200" y="1456">Inactive</text>
+  <text class="sub" x="200" y="1470">inherited only — no transitions</text>
+  <line class="blue" x1="200" y1="1440" x2="200" y2="1408" marker-end="url(#au-e)"/>
+  <text class="els" x="216" y="1430">science obs reactivated</text>
 
-  <text class="foot" x="770" y="1136">Declining is offered only</text>
-  <text class="foot" x="770" y="1152">while state ≤ Ready.</text>
+  <text class="foot" x="770" y="1456">Declining is offered only</text>
+  <text class="foot" x="770" y="1472">while state ≤ Ready.</text>
 
-  <rect class="grpbox" x="970" y="990" width="490" height="192" rx="8"/>
-  <text class="grp" x="988" y="1012">DaytimePinhole</text>
+  <rect class="grpbox" x="970" y="1310" width="490" height="192" rx="8"/>
+  <text class="grp" x="988" y="1332">DaytimePinhole</text>
 
-  <rect class="locked" x="1010" y="1040" width="410" height="44"/>
-  <text class="si" x="1215" y="1058">Defined / Ready / Inactive</text>
-  <text class="sub" x="1215" y="1074">inherited — no transitions of its own</text>
-  <text class="foot" x="1010" y="1130">allowedTransitions is always empty</text>
-  <text class="foot" x="1010" y="1146">while state ≤ Ready.</text>
+  <rect class="locked" x="1010" y="1360" width="410" height="44"/>
+  <text class="si" x="1215" y="1378">Defined / Ready / Inactive</text>
+  <text class="sub" x="1215" y="1394">inherited — no transitions of its own</text>
+  <text class="foot" x="1010" y="1450">allowedTransitions is always empty</text>
+  <text class="foot" x="1010" y="1466">while state ≤ Ready.</text>
 </svg>

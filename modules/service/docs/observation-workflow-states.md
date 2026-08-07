@@ -11,9 +11,9 @@ a staff denial.
 
 ![Observation workflow states](observation-workflow.svg)
 
-The four panels are, top to bottom: science observations in a proposal, science
-observations in a program, program-level calibrations, and per-observation
-calibrations. Each is described below.
+The five panels are, top to bottom: science observations in a proposal, science
+observations in a program, Targets of Opportunity, program-level calibrations,
+and per-observation calibrations. Each is described below.
 
 ## Main lifecycle
 
@@ -40,6 +40,50 @@ lives entirely in `ConfigurationRequestStatus` — so each direction between
 a request that was merely *pending* changes the validation code but not the
 state — the observation stays `Unapproved` — so the red edge specifically means
 revoking an approval, not the everyday act of rejecting a request.
+
+## Targets of Opportunity
+
+An observation whose `tooActivation` is anything but `NONE` waits for an alert
+rather than for the queue. It has **no extra states or transitions** — what makes
+it different is that its `Ready` state means "trigger this now", and a row in
+`t_too_trigger` records that.
+
+The trigger is derived from the state, not the other way around. A database
+trigger on `t_observation` (`too_trigger_track_ready`, V1246) watches
+`c_workflow_user_state` and `c_too_activation` together:
+
+| Change | Effect |
+|---|---|
+| becomes `ready` while activation ≠ `NONE` | inserts a `REQUESTED` trigger |
+| leaves `ready`, or activation drops to `NONE` | marks the live trigger `WITHDRAWN` |
+
+So `Defined -> Ready` is the request and `Ready -> Defined` is the withdrawal,
+both using the ordinary `setObservationWorkflowState` mutation and its ordinary
+authorization. There is no `requestTooTrigger`. Because `Defined -> Ready`
+already requires an accepted proposal and forbids an opportunity asterism, a
+trigger cannot be raised for an unapproved program or for an observation still
+holding a placeholder target.
+
+Note that `Inactive` and `Ready` share one column, so marking a triggered
+observation inactive **withdraws its trigger**; returning it to `Ready` requests
+a new one. That is intended — inactive means "do not observe this".
+
+The one observer-side action is `declineTooTrigger` (staff), which records a
+reason and clears the observation's `Ready` state, returning it to `Defined`.
+The service sets the status *before* clearing the state so the database trigger
+finds no `REQUESTED` row to withdraw and the decision, with its reason, is what
+survives in the history.
+
+There is deliberately no per-trigger approval: the proposal's ToO activation
+ceiling, frozen at acceptance (V1245), is the authorization. Nor is there a
+status meaning "executing" — the workflow already forbids leaving `Ongoing` for
+`Defined`, so a live trigger cannot be withdrawn out from under a running
+observation.
+
+An opportunity target is a placeholder for a target not yet found, so it is a
+`ConfigurationError` (hence `Undefined`) both when the observation declares no
+ToO activation and when the observation has been set `Ready` — the latter a
+backstop against swapping a placeholder back in after triggering.
 
 ## Calibrations
 
@@ -105,7 +149,7 @@ independent sources, in this precedence order:
 | Kind | Members | Where it comes from |
 |---|---|---|
 | `ExecutionState` | `Ongoing`, `Completed` | `c_declared_execution_state`, else the generator's execution state |
-| `UserState` | `Inactive`, `Ready` | `c_workflow_user_state` |
+| `UserState` | `Inactive`, `Ready` | `c_workflow_user_state` — for a ToO observation, `Ready` also maintains a row in `t_too_trigger` |
 | `ValidationState` | `Undefined`, `Unapproved`, `Defined` | validation codes computed from the observation |
 
 Execution wins over user state, which wins over validation — except that a
@@ -121,7 +165,7 @@ gap), and auto-layout engines will not reproduce that.
 
 To change it, edit the SVG directly. The header comment lists the shared column
 positions and the per-panel `y` bands; keeping equivalent states on the same
-column is what makes the four panels comparable at a glance.
+column is what makes the panels comparable at a glance.
 
 To preview a change on macOS:
 
@@ -129,10 +173,21 @@ To preview a change on macOS:
 qlmanage -t -s 1520 -o /tmp docs/observation-workflow.svg   # writes /tmp/observation-workflow.svg.png
 ```
 
-`qlmanage` crops to a square rather than fitting, so on a wide diagram it will
-cut off the right-hand side. To see the whole thing, temporarily pad the
-`viewBox`/`height` to a square (`0 0 1520 1520`) in a scratch copy, or just open
-the file in a browser, which honours the real aspect ratio.
+`qlmanage` crops to a square rather than fitting, so part of the diagram is cut
+off either way. To see the whole thing, temporarily pad the `viewBox`/`width` to
+a square (`0 0 1540 1540`) in a scratch copy, or just open the file in a browser,
+which honours the real aspect ratio.
 
-When adding a panel, extend the root `viewBox` and `height` to match; everything
-else is absolute coordinates and will stay where it is.
+When adding a panel, extend the root `viewBox`, `height` and the background
+`<rect>` to match. Appending at the bottom leaves every existing coordinate
+alone. Inserting one in the middle — as the Target of Opportunity panel was,
+to keep it next to the Phase 2 panel it varies — means shifting every panel
+below it. That is mechanical, because the calibration panels use only
+`y`/`y1`/`y2`/`cy` attributes and no `path` data:
+
+```bash
+perl -pi -e 'if ($. >= 182 && $. <= 262) { s/\b(y|y1|y2|cy)="(\d+)"/$1 . "=\"" . ($2+320) . "\""/ge }' observation-workflow.svg
+```
+
+Check the line range and the offset first, and re-render afterwards — a panel
+that uses `path d="…"` coordinates would need those edited by hand as well.
