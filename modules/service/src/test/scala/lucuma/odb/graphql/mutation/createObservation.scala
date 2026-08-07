@@ -3130,7 +3130,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
             .require[Boolean]
 
-  test("[general] created observation should have specified executionRequirement"):
+  test("[general] created observation should have specified explicitExecutionRequirement"):
     createProgramAs(pi).flatMap: pid =>
       expect(
         user  = pi,
@@ -3140,7 +3140,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
               programId: ${pid.asJson}
               SET: {
                 schedulingConstraints: {
-                  executionRequirement: UNINTERRUPTIBLE
+                  explicitExecutionRequirement: UNINTERRUPTIBLE
                 }
               }
             }) {

@@ -5119,18 +5119,20 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       _   <- updateObservation(pi, oid, update, query, expected)
     yield ()
 
-  test("scheduling: update executionRequirement"):
+  test("scheduling: set explicitExecutionRequirement"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
-          executionRequirement: NO_SPLITTING
+          explicitExecutionRequirement: NO_SPLITTING
         }
       """,
       query = """
         observations {
           schedulingConstraints {
             executionRequirement
+            defaultExecutionRequirement
+            explicitExecutionRequirement
             isSplittable
           }
         }
@@ -5142,6 +5144,8 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
               {
                 "schedulingConstraints": {
                   "executionRequirement": "NO_SPLITTING",
+                  "defaultExecutionRequirement": "UNCONSTRAINED",
+                  "explicitExecutionRequirement": "NO_SPLITTING",
                   "isSplittable": false
                 }
               }
@@ -5151,12 +5155,46 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """.asRight
     )
 
-  test("scheduling: executionRequirement UNINTERRUPTIBLE implies not splittable"):
+  test("scheduling: with nothing explicit, the default applies"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
-          executionRequirement: UNINTERRUPTIBLE
+          tooActivation: NONE
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            executionRequirement
+            defaultExecutionRequirement
+            explicitExecutionRequirement
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNCONSTRAINED",
+                  "defaultExecutionRequirement": "UNCONSTRAINED",
+                  "explicitExecutionRequirement": null
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: explicitExecutionRequirement UNINTERRUPTIBLE implies not splittable"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          explicitExecutionRequirement: UNINTERRUPTIBLE
         }
       """,
       query = """
@@ -5183,12 +5221,154 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """.asRight
     )
 
-  test("scheduling: executionRequirement and isSplittable are mutually exclusive"):
+  test("scheduling: RAPID tooActivation raises the default, leaving the explicit value intact"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
-          executionRequirement: NO_SPLITTING
+          tooActivation: RAPID
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            tooActivation
+            executionRequirement
+            defaultExecutionRequirement
+            explicitExecutionRequirement
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "tooActivation": "RAPID",
+                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "defaultExecutionRequirement": "UNINTERRUPTIBLE",
+                  "explicitExecutionRequirement": null
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: an explicit requirement below the ToO default does not loosen it"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          tooActivation: INTERRUPTING
+          explicitExecutionRequirement: UNCONSTRAINED
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            executionRequirement
+            defaultExecutionRequirement
+            explicitExecutionRequirement
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "defaultExecutionRequirement": "UNINTERRUPTIBLE",
+                  "explicitExecutionRequirement": "UNCONSTRAINED"
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: STANDARD tooActivation leaves the execution requirement alone"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          tooActivation: STANDARD
+          explicitExecutionRequirement: NO_SPLITTING
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            tooActivation
+            executionRequirement
+            defaultExecutionRequirement
+            explicitExecutionRequirement
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "tooActivation": "STANDARD",
+                  "executionRequirement": "NO_SPLITTING",
+                  "defaultExecutionRequirement": "UNCONSTRAINED",
+                  "explicitExecutionRequirement": "NO_SPLITTING"
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: lowering tooActivation restores the explicit execution requirement"):
+    multiUpdateTest(
+      user = pi,
+      updates = List(
+        (
+          """schedulingConstraints: { tooActivation: INTERRUPTING, explicitExecutionRequirement: NO_SPLITTING }""",
+          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
+          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"UNINTERRUPTIBLE","explicitExecutionRequirement":"NO_SPLITTING"}}]}}""".asRight
+        ),
+        (
+          """schedulingConstraints: { tooActivation: STANDARD }""",
+          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
+          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"NO_SPLITTING","explicitExecutionRequirement":"NO_SPLITTING"}}]}}""".asRight
+        )
+      )
+    )
+
+  test("scheduling: explicitExecutionRequirement can be unset with null"):
+    multiUpdateTest(
+      user = pi,
+      updates = List(
+        (
+          """schedulingConstraints: { explicitExecutionRequirement: UNINTERRUPTIBLE }""",
+          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
+          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"UNINTERRUPTIBLE","explicitExecutionRequirement":"UNINTERRUPTIBLE"}}]}}""".asRight
+        ),
+        (
+          """schedulingConstraints: { explicitExecutionRequirement: null }""",
+          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
+          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"UNCONSTRAINED","explicitExecutionRequirement":null}}]}}""".asRight
+        )
+      )
+    )
+
+  test("scheduling: explicitExecutionRequirement and isSplittable are mutually exclusive"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          explicitExecutionRequirement: NO_SPLITTING
           isSplittable: false
         }
       """,
@@ -5197,5 +5377,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           id
         }
       """,
-      expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `executionRequirement` and the deprecated `isSplittable` may be specified.".asLeft
+      expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `explicitExecutionRequirement` and the deprecated `isSplittable` may be specified.".asLeft
     )
+

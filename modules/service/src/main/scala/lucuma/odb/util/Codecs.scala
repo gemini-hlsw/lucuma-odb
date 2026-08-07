@@ -785,7 +785,7 @@ trait Codecs {
   val timing_window_inclusion: Codec[TimingWindowInclusion] =
     enumerated(Type("e_timing_window_inclusion"))
 
-  val too_activation: Codec[ToOActivation] =
+  val too_activation: Codec[TooActivation] =
     enumerated(Type("e_too_activation"))
 
   val consider_for_band_3: Codec[ConsiderForBand3] =

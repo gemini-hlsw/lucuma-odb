@@ -23,6 +23,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapability
+import lucuma.core.enums.TooActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -540,7 +541,7 @@ object ObservationService {
 
                 // If we are trying to edit this observation to make it unsplittable,
                 // then ensure that any existing materialized sequence is compatible.
-                isSplittable = SET.scheduling.toOption.forall(_.executionRequirement.forall(_.isSplittable))
+                isSplittable = !SET.scheduling.toOption.exists(_.makesUnsplittable)
                 _ <- if isSplittable then ResultT.unit else validateUnsplittableStoredSequence
 
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
@@ -761,7 +762,8 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           calibrationRole,
-          SET.scheduling.flatMap(_.executionRequirement).getOrElse(ExecutionRequirement.Unconstrained)
+          SET.scheduling.flatMap(_.tooActivation).getOrElse(TooActivation.None),
+          SET.scheduling.flatMap(_.explicitExecutionRequirement.toOption)
         )
       }
 
@@ -783,7 +785,8 @@ object ObservationService {
       useBlindOffset:      Boolean,
       blindOffsetType:     BlindOffsetType,
       calibrationRole:     Option[CalibrationRole],
-      executionRequirement: ExecutionRequirement
+      tooActivation:       TooActivation,
+      executionRequirement: Option[ExecutionRequirement]
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -828,6 +831,7 @@ object ObservationService {
            useBlindOffset                                                                                                         ,
            blindOffsetType                                                                                                        ,
            calibrationRole                                                                                                        ,
+           tooActivation                                                                                                          ,
            executionRequirement
         )
       }
@@ -875,7 +879,8 @@ object ObservationService {
       Boolean                          ,
       BlindOffsetType                  ,
       Option[CalibrationRole]          ,
-      ExecutionRequirement
+      TooActivation                    ,
+      Option[ExecutionRequirement]
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -913,6 +918,7 @@ object ObservationService {
           c_use_blind_offset,
           c_blind_offset_type,
           c_calibration_role,
+          c_too_activation,
           c_execution_requirement
         )
         SELECT
@@ -950,7 +956,8 @@ object ObservationService {
           $bool,
           $blind_offset_type,
           ${calibration_role.opt},
-          $execution_requirement
+          $too_activation,
+          ${execution_requirement.opt}
       """
 
     def selectObservingModes(
@@ -1100,7 +1107,8 @@ object ObservationService {
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
-      val upExecutionReq      = sql"c_execution_requirement = $execution_requirement"
+      val upExecutionReq      = sql"c_execution_requirement = ${execution_requirement.opt}"
+      val upTooActivation     = sql"c_too_activation = $too_activation"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1109,7 +1117,8 @@ object ObservationService {
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
-          SET.scheduling.fold(ExecutionRequirement.Unconstrained.some, none, _.executionRequirement).map(upExecutionReq)
+          SET.scheduling.fold(Option(none[ExecutionRequirement]), none, _.explicitExecutionRequirement.foldPresent(identity)).map(upExecutionReq),
+          SET.scheduling.fold(TooActivation.None.some, none, _.tooActivation).map(upTooActivation)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1231,6 +1240,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
+          c_too_activation,
           c_execution_requirement
         )
         SELECT
@@ -1268,6 +1278,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
+          c_too_activation,
           c_execution_requirement
       FROM t_observation
       WHERE c_observation_id = $observation_id
@@ -1337,10 +1348,12 @@ object ObservationService {
          WHERE c_observation_id = $observation_id
       """.query(instrument)
 
+    // Reads the view's derived flag so that the default and the ToO floor are
+    // both accounted for, rather than re-deriving them here.
     val SelectIsSplittable: Query[Observation.Id, Boolean] =
       sql"""
-        SELECT (c_execution_requirement = 'unconstrained')
-          FROM t_observation
+        SELECT c_is_splittable
+          FROM v_observation
          WHERE c_observation_id = $observation_id
       """.query(bool)
 

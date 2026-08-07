@@ -654,7 +654,7 @@ trait DatabaseOperations { this: OdbSuite =>
       cid.some,
       s"""
         queue: {
-          toOActivation: NONE
+          explicitTooActivationCeiling: NONE
           minPercentTime: 0
           considerForBand3: DO_NOT_CONSIDER
         }
@@ -668,7 +668,7 @@ trait DatabaseOperations { this: OdbSuite =>
       cid.some,
       s"""
         demoScience: {
-          toOActivation: NONE
+          explicitTooActivationCeiling: NONE
           minPercentTime: 0
         }
       """.some
@@ -3305,7 +3305,7 @@ trait DatabaseOperations { this: OdbSuite =>
               category: COSMOLOGY
               gemini: {
                 fastTurnaround: {
-                  toOActivation: NONE
+                  explicitTooActivationCeiling: NONE
                   minPercentTime: 50
                   $additionalFields
                 }
@@ -3318,7 +3318,7 @@ trait DatabaseOperations { this: OdbSuite =>
             gemini {
               scienceSubtype
               ... on FastTurnaround {
-                toOActivation
+                tooActivationCeiling
                 minPercentTime
                 reviewer {
                   id
@@ -3348,7 +3348,7 @@ trait DatabaseOperations { this: OdbSuite =>
               "category": "COSMOLOGY",
               "gemini": {
                 "scienceSubtype": "FAST_TURNAROUND",
-                "toOActivation": "NONE",
+                "tooActivationCeiling": "NONE",
                 "minPercentTime": 50,
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor
@@ -3374,7 +3374,7 @@ trait DatabaseOperations { this: OdbSuite =>
               category: COSMOLOGY
               gemini: {
                 fastTurnaround: {
-                  toOActivation: NONE
+                  explicitTooActivationCeiling: NONE
                   minPercentTime: 50
                   reviewerId: "$userId"
                   mentorId: "$userId"
@@ -3420,7 +3420,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 category: COSMOLOGY
                 gemini: {
                   fastTurnaround: {
-                    toOActivation: NONE
+                    explicitTooActivationCeiling: NONE
                     minPercentTime: 50
                     $additionalFields
                   }
@@ -3471,7 +3471,7 @@ trait DatabaseOperations { this: OdbSuite =>
             gemini {
               scienceSubtype
               ... on FastTurnaround {
-                toOActivation
+                tooActivationCeiling
                 minPercentTime
                 reviewer {
                   id
@@ -3500,7 +3500,7 @@ trait DatabaseOperations { this: OdbSuite =>
             "proposal": {
               "gemini": {
                 "scienceSubtype": "FAST_TURNAROUND",
-                "toOActivation": "NONE",
+                "tooActivationCeiling": "NONE",
                 "minPercentTime": 50,
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor

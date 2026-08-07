@@ -13,6 +13,7 @@ trait BaseMapping[F[_]]
      with CirceMappingLike[F] {
 
   // TODO: auto-generate this
+  lazy val AcceptTooTriggerResultType              = schema.ref("AcceptTooTriggerResult")
   lazy val AddConditionsEntryResultType            = schema.ref("AddConditionsEntryResult")
   lazy val AddDatasetEventResultType               = schema.ref("AddDatasetEventResult")
   lazy val AddEventBatchResultType                 = schema.ref("AddEventBatchResult")
@@ -123,6 +124,7 @@ trait BaseMapping[F[_]]
   lazy val DeleteProposalResultType                = schema.ref("DeleteProposalResult")
   lazy val DeleteSequenceResultType                = schema.ref("DeleteSequenceResult")
   lazy val DemoScienceType                         = schema.ref("DemoScience")
+  lazy val DenyTooTriggerResultType                = schema.ref("DenyTooTriggerResult")
   lazy val DirectorsTimeType                       = schema.ref("DirectorsTime")
   lazy val DmsStringType                           = schema.ref("DmsString")
   lazy val EditTypeType                            = schema.ref("EditType")
@@ -376,6 +378,7 @@ trait BaseMapping[F[_]]
   lazy val ReplaceFlamingos2SequenceResultType     = schema.ref("ReplaceFlamingos2SequenceResult")
   lazy val ReplaceGmosNorthSequenceResultType      = schema.ref("ReplaceGmosNorthSequenceResult")
   lazy val ReplaceGmosSouthSequenceResultType      = schema.ref("ReplaceGmosSouthSequenceResult")
+  lazy val RequestTooTriggerResultType             = schema.ref("RequestTooTriggerResult")
   lazy val ResetAcquisitionResultType              = schema.ref("ResetAcquisitionResult")
   lazy val RevokeUserInvitationResultType          = schema.ref("RevokeUserInvitationResult")
   lazy val RightAscensionType                      = schema.ref("RightAscension")
@@ -463,17 +466,13 @@ trait BaseMapping[F[_]]
   lazy val TimingWindowInclusionType               = schema.ref("TimingWindowInclusion")
   lazy val TimingWindowRepeatType                  = schema.ref("TimingWindowRepeat")
   lazy val TimingWindowType                        = schema.ref("TimingWindow")
-  lazy val ToOActivationType                       = schema.ref("ToOActivation")
+  lazy val TooActivationType                       = schema.ref("TooActivation")
   lazy val TooTriggerType                          = schema.ref("TooTrigger")
-  lazy val TooTriggerChronicleEntryType            = schema.ref("TooTriggerChronicleEntry")
   lazy val TooTriggerChronicleEntrySelectResultType = schema.ref("TooTriggerChronicleEntrySelectResult")
+  lazy val TooTriggerChronicleEntryType            = schema.ref("TooTriggerChronicleEntry")
   lazy val TooTriggerEditType                      = schema.ref("TooTriggerEdit")
-  lazy val RequestTooTriggerResultType             = schema.ref("RequestTooTriggerResult")
-  lazy val WithdrawTooTriggerResultType            = schema.ref("WithdrawTooTriggerResult")
-  lazy val AcceptTooTriggerResultType              = schema.ref("AcceptTooTriggerResult")
-  lazy val DenyTooTriggerResultType                = schema.ref("DenyTooTriggerResult")
-  lazy val TooTriggerSelectResultType              = schema.ref("TooTriggerSelectResult")
   lazy val TooTriggerIdType                        = schema.ref("TooTriggerId")
+  lazy val TooTriggerSelectResultType              = schema.ref("TooTriggerSelectResult")
   lazy val TooTriggerStatusType                    = schema.ref("TooTriggerStatus")
   lazy val TransactionIdType                       = schema.ref("TransactionId")
   lazy val UniformTelescopeConfigGeneratorType     = schema.ref("UniformTelescopeConfigGenerator")
@@ -506,5 +505,6 @@ trait BaseMapping[F[_]]
   lazy val WaterVaporType                          = schema.ref("WaterVapor")
   lazy val WavelengthOrderType                     = schema.ref("WavelengthOrder")
   lazy val WavelengthType                          = schema.ref("Wavelength")
+  lazy val WithdrawTooTriggerResultType            = schema.ref("WithdrawTooTriggerResult")
 
 }
