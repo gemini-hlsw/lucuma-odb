@@ -15222,7 +15222,7 @@ input RequestTooTriggerInput {
   observationId: ObservationId
 
   "A reference to the observation to request a trigger for.  Provide this or `observationId`."
-  observationReference: ObservationReference
+  observationReference: ObservationReferenceLabel
 }
 
 type RequestTooTriggerResult {
