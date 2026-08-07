@@ -41,6 +41,46 @@ class SchemaStitcherTest extends FunSuite {
     }
   }
 
+  test("SchemaStitcher should find imports on indented lines") {
+    val src    = SchemaSource.fromStringMap(
+      Map(
+        Path("indented.graphql") -> """
+          |  #import TypeA from "schema2.graphql"
+          |
+          |type Query {
+          |  query1: TypeA!
+          |}
+        """.stripMargin,
+        Path("schema2.graphql")  -> schema2
+      )
+    )
+    val result = SchemaStitcher(Path("indented.graphql"), src).build
+    result match {
+      case Success(s) => assert(s.types.exists(_.name == "TypeA"), "indented import was not resolved")
+      case other      => fail(s"Error creating schema: $other")
+    }
+  }
+
+  test("SchemaStitcher should build a schema with no imports") {
+    val result = SchemaStitcher(Path("noImportSchema.graphql"), schemaResolver).build
+    (result, Schema(noImportSchema)) match {
+      case (Success(a), Success(b)) => assertEquals(a.toString, b.toString)
+      case other                    => fail(s"Error creating schema: $other")
+    }
+  }
+
+  test("SchemaStitcher should keep unreferenced types when there are no imports") {
+    SchemaStitcher(Path("noImportSchema.graphql"), schemaResolver).build match {
+      case Success(s) =>
+        assert(s.types.exists(_.name == "Unreferenced"), "unreferenced type was dropped")
+        assertEquals(
+          s.types.find(_.name == "TypeD").flatMap(_.description),
+          Some("A described type.")
+        )
+      case other      => fail(s"Error creating schema: $other")
+    }
+  }
+
 }
 
 object SchemaStitcherTest {
@@ -70,6 +110,21 @@ object SchemaStitcherTest {
     |
     |type TypeX {
     |  attr0: [TypeA]!
+    |}
+  """.stripMargin
+
+  val noImportSchema: String = """
+    |"A described type."
+    |type TypeD {
+    |  attr0: Int!
+    |}
+    |
+    |type Unreferenced {
+    |  attr0: Boolean!
+    |}
+    |
+    |type Query {
+    |  query1: TypeD!
     |}
   """.stripMargin
 
@@ -117,9 +172,10 @@ object SchemaStitcherTest {
 
   val schemaResolver: SchemaSource = SchemaSource.fromStringMap(
     Map(
-      Path("baseSchema.graphql") -> baseSchema,
-      Path("schema1.graphql")    -> schema1,
-      Path("schema2.graphql")    -> schema2
+      Path("baseSchema.graphql")     -> baseSchema,
+      Path("noImportSchema.graphql") -> noImportSchema,
+      Path("schema1.graphql")        -> schema1,
+      Path("schema2.graphql")        -> schema2
     )
   )
 
