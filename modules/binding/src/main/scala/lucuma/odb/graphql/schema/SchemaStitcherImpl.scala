@@ -21,6 +21,7 @@ private class SchemaStitcherImpl private[schema] (
 ) extends SchemaStitcher {
 
   // Process to build the schema:
+  // 0. If the root schema has no imports there is nothing to stitch, so it becomes the schema text as-is.
   // 1. Build a schema dependency tree starting with the root schema.
   // 2. Recursively collapse the tree into a List, with dependencies first
   // 3. Merge all elements referencing the same schema. Only the left-most one is left, and its type list is replaced
@@ -29,11 +30,21 @@ private class SchemaStitcherImpl private[schema] (
   //    the string.
   // 5. Build the Schema instance
   override def build(using SourcePos): Result[Schema] =
-    dependenciesTree(List.empty, root)
-      .map(x => collapseToList(AllElements, x))
-      .map(x => merge(x, List.empty))
-      .map(_.map(_.asString).mkString(lineSeparator))
-      .flatMap(Schema(_))
+    Result
+      .catchNonFatal(source.resolve(root))
+      .flatMap: src =>
+        importsIn(src) match
+          case Nil     => Schema(src.mkString(lineSeparator))
+          case imports =>
+            dependenciesTree(List.empty, root, src, imports)
+              .map(x => collapseToList(AllElements, x))
+              .map(x => merge(x, List.empty))
+              .map(_.map(_.asString).mkString(lineSeparator))
+              .flatMap(Schema(_))
+
+  // An import statement always starts with '#', so only those lines are worth handing to the parser.
+  private def importsIn(src: List[String]): List[(Elements, Path)] =
+    src.filter(_.stripLeading.startsWith("#")).flatMap(importLineParser.parse(_).toOption.map(_._2))
 
   def dependenciesTree(pathToRoot: List[Path], schemaName: Path): Result[DependencyNode] =
     if pathToRoot.contains(schemaName) then
@@ -41,13 +52,17 @@ private class SchemaStitcherImpl private[schema] (
     else
       Result
         .catchNonFatal(source.resolve(schemaName))
-        .flatMap: ll =>
-          ll
-            .map(importLineParser.parse)
-            .traverseCollect:
-              case Right((_, (els, path))) =>
-                dependenciesTree(pathToRoot :+ schemaName, path).map((els, _))
-            .map(DependencyNode(schemaName, ll, _))
+        .flatMap(src => dependenciesTree(pathToRoot, schemaName, src, importsIn(src)))
+
+  private def dependenciesTree(
+    pathToRoot: List[Path],
+    schemaName: Path,
+    src:        List[String],
+    imports:    List[(Elements, Path)]
+  ): Result[DependencyNode] =
+    imports
+      .traverse((els, path) => dependenciesTree(pathToRoot :+ schemaName, path).map((els, _)))
+      .map(DependencyNode(schemaName, src, _))
 
   def collapseToList(els: Elements, node: DependencyNode): List[SchemaNode] =
     node.dependencies.flatMap { case (s, n) => collapseToList(s, n) } :+ SchemaNode(
