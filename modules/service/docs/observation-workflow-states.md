@@ -41,6 +41,52 @@ a request that was merely *pending* changes the validation code but not the
 state — the observation stays `Unapproved` — so the red edge specifically means
 revoking an approval, not the everyday act of rejecting a request.
 
+## Targets of Opportunity
+
+An observation whose `tooActivation` is anything but `NONE` waits for an alert
+rather than for the queue, and its `Ready` state works differently from every
+other observation's: it is **derived from an accepted ToO trigger**, not stored
+in `c_workflow_user_state`.
+
+| Trigger | Observation |
+|---|---|
+| none, or `DENIED` / `WITHDRAWN` | at most `Defined` |
+| `ACCEPTED` | `Ready`, provided validation is otherwise clean |
+
+Consequences, all of which fall out of deriving rather than storing:
+
+- `Defined -> Ready` and `Ready -> Defined` are **not** offered in
+  `allowedTransitions` for a ToO observation, for any role. Accepting or
+  withdrawing the trigger is the only lever. Offering `Ready` would write a user
+  state that the ToO branch of `isReady` never reads, so the mutation would
+  report success and change nothing.
+- Validation still outranks the trigger. A ToO observation edited into an
+  invalid state drops out of `Ready` exactly like any other, because
+  `userStatus` checks `validationStatus` before consulting the trigger at all.
+- `Inactive` still overrides, and clearing it returns the observation to `Ready`
+  if the trigger is still accepted — see `stateWithoutInactive`. Marking a ToO
+  observation inactive is not a withdrawal.
+
+`requestTooTrigger` refuses unless the observation declares a non-`NONE`
+activation, holds no opportunity placeholder in its asterism, and is in state
+exactly `Defined`. That last check reads the *cached* state from
+`t_obscalc.c_workflow_state`: it is a guard on a human action rather than the
+thing enforcing the invariant, so agreeing with what the UI is displaying is
+worth more than a fresh computation. Even a stale `Defined` cannot produce a
+wrongly-`Ready` observation, because validation is recomputed when the trigger
+is accepted.
+
+Withdrawal is allowed while the trigger is `REQUESTED` or `ACCEPTED`, up until
+the observation begins executing — acceptance is not the point of no return, the
+first non-slew execution event is. That is read live from
+`v_observation.c_execution_state`, not from the obscalc cache.
+
+An opportunity target is a placeholder for a target not yet found, so it is a
+`ConfigurationError` (hence `Undefined`) both when the observation declares no
+ToO activation and when its trigger has already been accepted — the latter
+being a backstop against swapping a placeholder back in after the observation
+has gone `Ready`.
+
 ## Calibrations
 
 Two rules apply to **every** calibration role, whatever its kind:
@@ -87,7 +133,8 @@ apply only while `state <= Ready`; once execution begins the generic rules resum
 
 | Transition | Requires |
 |---|---|
-| `Defined -> Ready` | not an exchange observation, not a target of opportunity, and (proposal accepted or program has no proposal — `hasProposal` is true only for `Science`, `Keck`, `Subaru`) |
+| `Defined -> Ready` | not an exchange observation, no opportunity target, not a ToO observation (those go `Ready` via an accepted trigger instead), and (proposal accepted or program has no proposal — `hasProposal` is true only for `Science`, `Keck`, `Subaru`) |
+| `Ready -> Defined` | not a ToO observation; withdraw the trigger instead |
 | `Ready -> Ongoing`, `Ongoing -> Ready` | visitor observing mode **and** staff access or above |
 | `Completed -> Ongoing` | execution state was explicitly declared complete, not naturally complete |
 | `Telluric -> Inactive` | calibration role is `Telluric` and `state <= Ready` |
@@ -105,7 +152,7 @@ independent sources, in this precedence order:
 | Kind | Members | Where it comes from |
 |---|---|---|
 | `ExecutionState` | `Ongoing`, `Completed` | `c_declared_execution_state`, else the generator's execution state |
-| `UserState` | `Inactive`, `Ready` | `c_workflow_user_state` |
+| `UserState` | `Inactive`, `Ready` | `c_workflow_user_state` — except that a ToO observation's `Ready` comes from an accepted row in `t_too_trigger` instead |
 | `ValidationState` | `Undefined`, `Unapproved`, `Defined` | validation codes computed from the observation |
 
 Execution wins over user state, which wins over validation — except that a

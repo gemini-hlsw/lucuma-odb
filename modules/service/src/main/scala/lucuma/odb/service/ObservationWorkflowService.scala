@@ -134,6 +134,7 @@ case class ObservationValidationInfo(
   proposalStatus:         ProposalStatus,
   tooActivation:          TooActivation,
   tooCeiling:             Option[TooActivation], // effective proposal ceiling; None when the program has no proposal
+  tooAccepted:            Boolean,
   cfpid:                  Option[CallForProposals.Id],
   scienceBand:            Option[ScienceBand],
   asterism:               List[Target],
@@ -174,6 +175,22 @@ case class ObservationValidationInfo(
    */
   def exceedsTooCeiling: Boolean =
     tooCeiling.exists(tooActivation > _)
+
+  /**
+   * Is this a Target-of-Opportunity observation -- one that waits for an alert
+   * rather than for the queue?  Such an observation cannot become `Ready` on the
+   * strength of its definition alone; it needs an accepted trigger.
+   */
+  def isToo: Boolean =
+    tooActivation =!= TooActivation.None
+
+  /**
+   * Is this a ToO observation whose trigger has been accepted?  `tooAccepted`
+   * alone records only that an accepted trigger row exists; it takes a non-NONE
+   * activation for that to mean anything.
+   */
+  def isTriggered: Boolean =
+    isToo && tooAccepted
 
   def site: Option[Site] =
     instrument.map(_.site)
@@ -241,6 +258,12 @@ object ObservationWorkflowService {
     def tooActivationExceedsCeiling(obs: TooActivation, ceiling: TooActivation): String =
       s"Target of Opportunity activation ${obs.tag.toScreamingSnakeCase} exceeds the maximum " +
       s"${ceiling.tag.toScreamingSnakeCase} allowed by the proposal."
+
+    val OpportunityTargetRequiresActivation =
+      "An observation with a Target of Opportunity placeholder must set a ToO activation other than NONE."
+
+    val OpportunityTargetNotResolved =
+      "Replace the Target of Opportunity placeholder with the actual target coordinates."
 
     def exchangeObservatoryMismatch(modeObs: Observatory, cfpObs: Observatory): String =
       s"Exchange observation requires a $modeObs Call for Proposals, but the proposal's observatory is $cfpObs."
@@ -506,14 +529,31 @@ object ObservationWorkflowService {
                   ObservationValidationCode.ConfigurationRequestPending      |
                   ObservationValidationCode.TooActivationUnapproved          => Unapproved
 
+        // For a Target of Opportunity, Ready is not a stored user state: it is
+        // derived from the trigger.  Accepting a trigger makes the observation
+        // Ready and withdrawing it returns the observation to Defined, with no
+        // way to break the correspondence by hand.  Everything else keeps
+        // reading Ready out of c_workflow_user_state as before.
+        def isReady: Boolean =
+          if info.isToo then info.tooAccepted
+          else info.effectiveUserState.contains(Ready)
+
         def userStatus(validationStatus: ValidationState): Option[UserState] =
-          info.effectiveUserState.flatMap:
-            case Inactive => Some(Inactive)       // Inactive overrides validation errors
-            case Ready    =>
-              validationStatus match              // Validation errors override Ready
-                case Undefined  => None
-                case Unapproved => None
-                case Defined    => Some(Ready)
+          if info.effectiveUserState.contains(Inactive) then Some(Inactive) // Inactive overrides validation errors
+          else
+            validationStatus match                                         // Validation errors override Ready
+              case Undefined  => None
+              case Unapproved => None
+              case Defined    => Option.when(isReady)(Ready)
+
+        // The state this observation returns to when its Inactive override is
+        // cleared.  A triggered ToO comes back as Ready, since nothing about the
+        // trigger changed while the observation sat Inactive.
+        val stateWithoutInactive: ObservationWorkflowState =
+          executionState.getOrElse:
+            validationStatus match
+              case Defined if isReady => Ready
+              case v                  => v
 
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
         val state: ObservationWorkflowState =
@@ -537,15 +577,26 @@ object ObservationWorkflowService {
                 List(Inactive)
           else if (info.calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) && state <= Ready) then Nil
           else state match
-            case Inactive   => List(executionState.getOrElse(validationStatus))
+            case Inactive   => List(stateWithoutInactive)
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
             case Defined    =>
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
+              //
+              // A ToO observation becomes Ready by having its trigger accepted,
+              // never by hand: offering Ready here would write a user state that
+              // the ToO branch of `isReady` does not consult, so the mutation
+              // would report success and change nothing.
               List(Inactive) ++
-                Option.when((!info.isExchange) && (!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
-            case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
+                Option.when((!info.isExchange) && (!info.isOpportunity) && (!info.isToo) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
+            case Ready      =>
+              // `validationStatus` here is always Defined -- an observation
+              // cannot be Ready unless validation was clean -- so this is the
+              // "un-ready it" transition.  For a ToO that would clear a user
+              // state that was never set and recompute straight back to Ready;
+              // withdrawing the trigger is the lever that actually works.
+              List(Inactive) ++ Option.when(!info.isToo)(validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
@@ -622,6 +673,25 @@ object ObservationWorkflowService {
               ObservationValidation.tooActivationUnapproved:
                 Messages.tooActivationExceedsCeiling(info.tooActivation, info.tooCeiling.get)
 
+        // An opportunity target is a placeholder standing in for a target that
+        // has not been found yet, so it makes sense only in an observation that
+        // declares itself a Target of Opportunity and only until the alert
+        // arrives.  Either way the observation is internally inconsistent rather
+        // than merely unapproved, so this is a ConfigurationError -- Undefined,
+        // which also suppresses the Ready derived from the trigger below.
+        //
+        // The second case is a backstop.  requestTooTrigger already refuses an
+        // observation holding a placeholder, but the asterism can still be
+        // edited afterwards (Ready is in preExecutionSet), and a Ready ToO with
+        // no coordinates is worse than a loud error.
+        val opportunityTargetValidator: Validator = info =>
+          if !info.isOpportunity then ObservationValidationMap.empty
+          else if !info.isToo then
+            ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.OpportunityTargetRequiresActivation))
+          else if info.isTriggered then
+            ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.OpportunityTargetNotResolved))
+          else ObservationValidationMap.empty
+
         val itcValidator: Validator = info =>
           if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
           else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
@@ -656,13 +726,14 @@ object ObservationWorkflowService {
           ObservationValidationMap.empty
 
         val scienceValidator1: Validator =
-          generatorValidator       |+|
-          cfpInstrumentValidator   |+|
-          exchangeValidator        |+|
-          cfpRaDecValidator        |+|
-          bandValidator            |+|
-          ghostVMagnitudeValidator |+|
-          tooActivationValidator   |+|
+          generatorValidator         |+|
+          cfpInstrumentValidator     |+|
+          exchangeValidator          |+|
+          cfpRaDecValidator          |+|
+          bandValidator              |+|
+          ghostVMagnitudeValidator   |+|
+          tooActivationValidator     |+|
+          opportunityTargetValidator |+|
           otherConfigErrors
 
         val scienceValidator2: Validator =
@@ -937,6 +1008,15 @@ object ObservationWorkflowService {
           p.c_proposal_status,
           o.c_too_activation,
           x.c_too_activation_effective,
+          -- An accepted trigger is what makes a ToO observation Ready.  Phrased
+          -- as EXISTS rather than a join so it cannot multiply rows, whatever
+          -- the trigger history looks like.
+          EXISTS (
+            SELECT 1
+            FROM t_too_trigger tt
+            WHERE tt.c_observation_id = o.c_observation_id
+              AND tt.c_status = 'accepted'
+          ),
           x.c_cfp_id,
           o.c_science_band,
           s.c_workflow_user_state
@@ -952,10 +1032,10 @@ object ObservationWorkflowService {
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: too_activation *: too_activation.opt *: cfp_id.opt *: science_band.opt *: user_state.opt)
+      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: too_activation *: too_activation.opt *: bool *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, ceil, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, ceil, cfp, sci, Nil, state2)
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, ceil, trig, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, ceil, trig, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

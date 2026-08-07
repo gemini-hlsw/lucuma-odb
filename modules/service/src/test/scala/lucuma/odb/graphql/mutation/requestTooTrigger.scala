@@ -10,7 +10,7 @@ import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 
-class requestTooTrigger extends OdbSuite {
+class requestTooTrigger extends OdbSuite with TooTriggerSetupOperations {
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(2, 32)
@@ -34,8 +34,7 @@ class requestTooTrigger extends OdbSuite {
     )
 
   test("request a trigger and select its mapped fields") {
-    createProgramAs(pi).flatMap { pid =>
-      createObservationAs(pi, pid).flatMap { oid =>
+    createTooObservationAs(pi, staff).flatMap { (_, oid) =>
         expect(
           user  = pi,
           query = s"""
@@ -65,14 +64,12 @@ class requestTooTrigger extends OdbSuite {
             }
           """)
         )
-      }
     }
   }
 
   test("requested trigger can be read back via the tooTrigger query") {
     for
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid)
+      (pid, oid) <- createTooObservationAs(pi, staff)
       rid <- requestTooTrigger(pi, oid, "id").map(_.hcursor.downFields("requestTooTrigger", "tooTrigger", "id").require[String])
       _   <- expect(
                user  = pi,
@@ -100,8 +97,7 @@ class requestTooTrigger extends OdbSuite {
 
   test("staff can accept a requested trigger") {
     for
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid)
+      (pid, oid) <- createTooObservationAs(pi, staff)
       rid <- requestTooTrigger(pi, oid, "id").map(_.hcursor.downFields("requestTooTrigger", "tooTrigger", "id").require[String])
       _   <- expect(
                user  = staff,

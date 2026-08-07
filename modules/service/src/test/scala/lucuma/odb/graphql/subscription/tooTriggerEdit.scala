@@ -15,7 +15,7 @@ import lucuma.odb.data.EditType
 
 import scala.concurrent.duration.*
 
-class tooTriggerEdit extends OdbSuite with SubscriptionUtils:
+class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetupOperations:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(2, 32)
@@ -78,8 +78,7 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils:
         mutations =
           Right(
             for
-              pid <- createProgramAs(pi)
-              oid <- createObservationAs(pi, pid)
+              (pid, oid) <- createTooObservationAs(pi, staff)
               _   <- oidRef.complete(oid)
               rid <- requestTooTrigger(pi, oid)
               _   <- ridRef.complete(rid)

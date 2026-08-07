@@ -509,7 +509,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
           tooTriggerService.withdraw(which, input.reason).map:
             case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
             case None      =>
-              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be withdrawn (not found, not writable, or not in a withdrawable state).")).asFailure
+              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be withdrawn (not found, not writable, already resolved, or its observation has begun executing).")).asFailure
 
   private lazy val AcceptTooTrigger =
     MutationField("acceptTooTrigger", AcceptTooTriggerInput.Binding): (input, child) =>

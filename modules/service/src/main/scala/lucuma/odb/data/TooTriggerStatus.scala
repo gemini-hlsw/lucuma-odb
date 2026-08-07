@@ -6,14 +6,23 @@ package lucuma.odb.data
 import lucuma.core.util.Enumerated
 
 /**
- * Lifecycle status of a Target-of-Opportunity trigger.  `Requested` is the only
- * non-terminal state; `Accepted`, `Denied` and `Withdrawn` are all terminal.  A
- * re-attempt is a new trigger, never a transition out of a terminal state.
+ * Lifecycle status of a Target-of-Opportunity trigger.
  *
- * This deliberately excludes observation-level concerns.  `Accepted` is terminal
- * regardless of whether the observation ultimately executes, and there is no
- * `Expired` state -- expiration is a function of the observation's timing window,
- * which lives on the observation's own workflow, not here.
+ * An `Accepted` trigger is what puts its observation into the `Ready` workflow
+ * state, and it stays accepted for as long as that holds.  It is not terminal:
+ * it may still be withdrawn right up until the observation begins executing,
+ * which is the actual point of no return.  `Denied` and `Withdrawn` are
+ * terminal, and for the purpose of requesting again are equivalent to never
+ * having been triggered at all -- a re-attempt is a new trigger, never a
+ * transition out of a terminal state.  At most one trigger per observation may
+ * be `Requested` or `Accepted` at a time.
+ *
+ * This deliberately excludes observation-level concerns.  There is no status
+ * meaning "execution has begun": that is already computed from the observation's
+ * execution events, and a second copy here would be one more thing to keep in
+ * step for no gain.  Nor is there an `Expired` status -- expiration is a
+ * function of the observation's timing window, which lives on the observation's
+ * own workflow.
  *
  * Defined here in the odb project for now; move to lucuma-core once the design
  * settles.

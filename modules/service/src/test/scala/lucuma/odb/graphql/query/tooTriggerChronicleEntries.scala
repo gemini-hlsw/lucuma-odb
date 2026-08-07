@@ -10,7 +10,7 @@ import io.circe.literal.*
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 
-class tooTriggerChronicleEntries extends OdbSuite:
+class tooTriggerChronicleEntries extends OdbSuite with TooTriggerSetupOperations:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(2, 32)
@@ -43,8 +43,7 @@ class tooTriggerChronicleEntries extends OdbSuite:
 
   test("request then accept generates two chronicle entries"):
     for
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid)
+      (pid, oid) <- createTooObservationAs(pi, staff)
       rid <- requestTooTrigger(pi, oid)
       _   <- acceptTooTrigger(staff, rid)
       _   <- expect(
