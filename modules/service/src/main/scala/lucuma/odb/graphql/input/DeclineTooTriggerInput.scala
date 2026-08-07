@@ -4,18 +4,24 @@
 package lucuma.odb.graphql
 package input
 
+import cats.syntax.parallel.*
+import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.graphql.binding.*
 
-case class AcceptTooTriggerInput(tooTriggerId: TooTrigger.Id)
+case class DeclineTooTriggerInput(
+  tooTriggerId: TooTrigger.Id,
+  reason:       Option[NonEmptyString]
+)
 
-object AcceptTooTriggerInput:
+object DeclineTooTriggerInput:
 
   private val TooTriggerIdBinding = gidBinding[TooTrigger.Id]("too trigger")
 
-  val Binding: Matcher[AcceptTooTriggerInput] =
+  val Binding: Matcher[DeclineTooTriggerInput] =
     ObjectFieldsBinding.rmap:
       case List(
-        TooTriggerIdBinding("tooTriggerId", rId)
+        TooTriggerIdBinding("tooTriggerId", rId),
+        NonEmptyStringBinding.Option("reason", rReason)
       ) =>
-        rId.map(apply)
+        (rId, rReason).parMapN(apply)

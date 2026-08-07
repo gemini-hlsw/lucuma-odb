@@ -3730,27 +3730,15 @@ type Mutation {
   createProgramNote(input: CreateProgramNoteInput!): CreateProgramNoteResult!
 
   """
-  Requests a new Target-of-Opportunity trigger for an observation.  Allowed for
-  anyone who can read the program.
-  """
-  requestTooTrigger(input: RequestTooTriggerInput!): RequestTooTriggerResult!
+  Declines a REQUESTED Target-of-Opportunity trigger (staff), recording that it
+  was seen and passed over.  This also clears the observation's READY state, so
+  the observation returns to DEFINED.
 
+  There is no corresponding mutation to request or withdraw a trigger: a trigger
+  is requested by setting a Target-of-Opportunity observation to READY via
+  `setObservationWorkflowState`, and withdrawn by clearing that state.
   """
-  Withdraws a Target-of-Opportunity trigger.  Allowed for anyone who can write
-  to the program, while REQUESTED, or while ACCEPTED and the observation is not
-  yet ongoing.
-  """
-  withdrawTooTrigger(input: WithdrawTooTriggerInput!): WithdrawTooTriggerResult!
-
-  """
-  Accepts a REQUESTED Target-of-Opportunity trigger (staff).
-  """
-  acceptTooTrigger(input: AcceptTooTriggerInput!): AcceptTooTriggerResult!
-
-  """
-  Denies a REQUESTED Target-of-Opportunity trigger (staff).
-  """
-  denyTooTrigger(input: DenyTooTriggerInput!): DenyTooTriggerResult!
+  declineTooTrigger(input: DeclineTooTriggerInput!): DeclineTooTriggerResult!
 
   """
   Creates a new proposal according to the provided properties
@@ -15319,14 +15307,16 @@ enum ConfigurationRequestStatus {
 scalar TooTriggerId
 
 """
-Lifecycle status of a Target-of-Opportunity trigger.  REQUESTED is the only
-non-terminal state; ACCEPTED, DENIED and WITHDRAWN are all terminal.  A re-attempt
-is a new trigger, never a transition out of a terminal state.
+Lifecycle status of a Target-of-Opportunity trigger.  A trigger is REQUESTED
+while its observation carries the READY workflow state, and WITHDRAWN when that
+state is cleared; DECLINED records that an observer saw it and chose not to
+observe.  Both terminal statuses are equivalent to never having been triggered:
+setting the observation READY again produces a new trigger, never a transition
+out of a terminal state.
 """
 enum TooTriggerStatus {
   REQUESTED
-  ACCEPTED
-  DENIED
+  DECLINED
   WITHDRAWN
 }
 
@@ -15400,52 +15390,16 @@ type TooTrigger {
   updatedAt: Timestamp!
 }
 
-input RequestTooTriggerInput {
-  "The observation to request a trigger for.  Provide this or `observationReference`."
-  observationId: ObservationId
-
-  "A reference to the observation to request a trigger for.  Provide this or `observationId`."
-  observationReference: ObservationReferenceLabel
-}
-
-type RequestTooTriggerResult {
-  "The requested trigger."
+type DeclineTooTriggerResult {
+  "The declined trigger."
   tooTrigger: TooTrigger!
 }
 
-type WithdrawTooTriggerResult {
-  "The withdrawn trigger."
-  tooTrigger: TooTrigger!
-}
-
-type AcceptTooTriggerResult {
-  "The accepted trigger."
-  tooTrigger: TooTrigger!
-}
-
-type DenyTooTriggerResult {
-  "The denied trigger."
-  tooTrigger: TooTrigger!
-}
-
-input WithdrawTooTriggerInput {
-  "The trigger to withdraw."
+input DeclineTooTriggerInput {
+  "The trigger to decline."
   tooTriggerId: TooTriggerId!
 
-  "Optional reason recorded with the withdrawal."
-  reason: NonEmptyString
-}
-
-input AcceptTooTriggerInput {
-  "The trigger to accept."
-  tooTriggerId: TooTriggerId!
-}
-
-input DenyTooTriggerInput {
-  "The trigger to deny."
-  tooTriggerId: TooTriggerId!
-
-  "Optional reason recorded with the denial."
+  "Optional reason recorded with the decision."
   reason: NonEmptyString
 }
 
