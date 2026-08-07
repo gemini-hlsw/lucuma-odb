@@ -43,19 +43,16 @@ revoking an approval, not the everyday act of rejecting a request.
 
 ## Targets of Opportunity
 
-An observation whose `tooActivation` is anything but `NONE` waits for an alert
-rather than for the queue. It has **no extra states or transitions** — what makes
-it different is that its `Ready` state means "trigger this now", and a row in
-`t_too_trigger` records that.
+A ToO observation (i.e., an observation with a `tooActivation` other than `NONE`)
+is "triggered" when its workflow state becomes `Ready`. In other words, a new
+row is inserted in `t_too_trigger` to record the trigger timestamp and current
+trigger state. A _database_ trigger on `t_observation` (`too_trigger_track_ready`,
+V1246) watches `c_workflow_user_state` and `c_too_activation` together:
 
-The trigger is derived from the state, not the other way around. A database
-trigger on `t_observation` (`too_trigger_track_ready`, V1246) watches
-`c_workflow_user_state` and `c_too_activation` together:
-
-| Change | Effect |
-|---|---|
-| becomes `ready` while activation ≠ `NONE` | inserts a `REQUESTED` trigger |
-| leaves `ready`, or activation drops to `NONE` | marks the live trigger `WITHDRAWN` |
+| Change | Effect                                              |
+|---|-----------------------------------------------------|
+| becomes `ready` while activation ≠ `NONE` | inserts a `REQUESTED` trigger in t_too_trigger      |
+| leaves `ready`, or activation drops to `NONE` | marks the live trigger `WITHDRAWN` in t_too_trigger |
 
 So `Defined -> Ready` is the request and `Ready -> Defined` is the withdrawal,
 both using the ordinary `setObservationWorkflowState` mutation and its ordinary
@@ -71,8 +68,8 @@ a new one. That is intended — inactive means "do not observe this".
 The one observer-side action is `declineTooTrigger` (staff), which records a
 reason and clears the observation's `Ready` state, returning it to `Defined`.
 The service sets the status *before* clearing the state so the database trigger
-finds no `REQUESTED` row to withdraw and the decision, with its reason, is what
-survives in the history.
+finds no `REQUESTED` row in `t_too_trigger` to withdraw and the decision, with
+its reason, is what survives in the history.
 
 There is deliberately no per-trigger approval: the proposal's ToO activation
 ceiling, frozen at acceptance (V1245), is the authorization. Nor is there a
