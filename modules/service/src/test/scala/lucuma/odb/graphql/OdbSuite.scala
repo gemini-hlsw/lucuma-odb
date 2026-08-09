@@ -472,11 +472,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   /**
    * Runs `document` as `user` against a dedicated mapping whose monitor records every SQL
-   * statement issued, applying the `targetCoordinates` cone rewrite exactly as
-   * `GraphQLRoutes` does. Yields the response JSON and the statements that produced it, so
-   * a test can assert not just the result but how many queries it took.
+   * statement issued, compiling and then resolving cone filters exactly as `GraphQLRoutes`
+   * does. Yields the response JSON and the statements that produced it, so a test can
+   * assert not just the result but how many queries it took.
    */
-  def queryWithSqlStats(user: User, document: String): IO[(Json, List[SqlStats])] =
+  def queryWithSqlStats(user: User, document: String, variables: Option[JsonObject] = None): IO[(Json, List[SqlStats])] =
     import Tracer.Implicits.noop
     import Meter.Implicits.noop
     val res =
@@ -491,17 +491,21 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         map     = OdbMapping(db, mon, user, top, gaiaClient, itcClient, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
       } yield (map, mon)
 
+    def orRaise[A](r: Result[A]): IO[A] =
+      r match
+        case Success(a)              => IO.pure(a)
+        case Warning(_, a)           => IO.pure(a)
+        case f: Failure              => IO.raiseError(new RuntimeException(f.problems.toList.mkString("; ")))
+        case e: Result.InternalError => IO.raiseError(e.error)
+
     res.use: (map, mon) =>
       for {
-        op   <- ConeRewrite.resolveOperation(map, document, none).flatMap:
-                  case Success(o)       => IO.pure(o)
-                  case Warning(_, o)    => IO.pure(o)
-                  case f: Failure       => IO.raiseError(new RuntimeException(f.problems.toList.mkString("; ")))
-                  case e: Result.InternalError => IO.raiseError(e.error)
+        op   <- orRaise(map.compiler.compile(document, none, variables.map(_.toJson), reportUnused = false))
+        qry  <- ConeFilter.resolve(op.query)(map.coneCandidates).flatMap(orRaise)
         // The monitor sees only grackle-mapped SQL, so the cone candidate lookup that
-        // `resolveOperation` just ran is deliberately not counted; drop anything else.
+        // `resolve` just ran is deliberately not counted; drop anything else.
         _    <- mon.take
-        json <- map.interpreter.run(op.query, op.rootTpe, Env.empty).evalMap(map.mkResponse).compile.lastOrError
+        json <- map.interpreter.run(qry, op.rootTpe, Env.empty).evalMap(map.mkResponse).compile.lastOrError
         sts  <- mon.take
       } yield (json, sts)
 

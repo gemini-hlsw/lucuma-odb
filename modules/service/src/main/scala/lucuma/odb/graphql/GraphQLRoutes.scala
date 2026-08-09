@@ -152,19 +152,16 @@ object GraphQLRoutes {
                                               .getOrElse(F.unit)
                                             markSlow *> dumpGql.as(result)
 
-                                    // SC-9240: `targetCoordinates` cone filters are resolved out of
-                                    // band. Compilation (which is pure, in `parse`) cannot run the F
-                                    // candidate lookup, so when the document carries a cone we
-                                    // re-parse it, compute the candidate ids, inject `id IN (...)`,
-                                    // re-compile, and execute -- yielding a single fully-pushable
-                                    // SQL statement.
-                                    if !document.contains("targetCoordinates") then runQuery(request)
-                                    else
-                                      ConeRewrite.resolveOperation(map, document, operationName).flatMap:
-                                        case Result.Success(op)      => runQuery(op)
-                                        case Result.Warning(_, op)   => runQuery(op)
-                                        case f: Result.Failure       => F.pure(f)
-                                        case e: Result.InternalError => F.pure(e)
+                                    // SC-9240: elaboration turns a `targetCoordinates` cone into a
+                                    // placeholder predicate, because the candidate lookup it needs
+                                    // is an F effect. Resolve those to `id IN (...)` here, where we
+                                    // are in F, so the whole WHERE pushes down to one SQL statement.
+                                    // Queries without a cone are returned untouched.
+                                    ConeFilter.resolve(request.query)(map.coneCandidates).flatMap:
+                                      case Result.Success(q)       => runQuery(request.copy(query = q))
+                                      case Result.Warning(_, q)    => runQuery(request.copy(query = q))
+                                      case f: Result.Failure       => F.pure(f)
+                                      case e: Result.InternalError => F.pure(e)
 
                                   override def subscribe(
                                     request:       Operation,

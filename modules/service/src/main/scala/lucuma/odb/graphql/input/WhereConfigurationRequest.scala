@@ -52,9 +52,15 @@ object WhereConfigurationRequest {
 
     val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
 
-    // `targetCoordinates` is resolved out of band (see ConeRewrite / GraphQLRoutes):
-    // the binding accepts it here so compilation succeeds, producing no predicate.
-    val TargetCoordinatesBinding: Matcher[Unit] = _ => Right(())
+    // The cone's candidate lookup is an effect the elaborator cannot run, so this yields a
+    // placeholder that `ConeFilter.resolve` swaps for `id IN (…)` before execution. Parsing
+    // it as an ordinary binding means variables and fragments are already resolved here.
+    val TargetCoordinatesBinding: Matcher[Predicate] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          CoordinatesInput.Create.Binding("center", rCenter),
+          AngleInput.Binding("distance", rDistance)
+        ) => (rCenter, rDistance).parMapN(ConePredicate(path / "id", _, _))
 
     lazy val WhereObservationBinding = binding(path) // lazy self-reference
     ObjectFieldsBinding.rmap {
@@ -86,7 +92,7 @@ object WhereConfigurationRequest {
               createdAt,
               updatedAt,
               observingModeType,
-              targetCoordinates.flatMap(_ => Option.empty[Predicate]),
+              targetCoordinates,
             ).flatten)
         }
     }
