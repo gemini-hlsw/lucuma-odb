@@ -377,6 +377,56 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ImagingResult)
     }
 
+  test("GMOS North MOS with oiwfs"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthMosObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = MOSResult)
+    }
+
+  test("GMOS South MOS with oiwfs"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosSouthMosObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = MOSResult)
+    }
+
+  test("GMOS North MOS with pwfs2"):
+    val setup: IO[Observation.Id] =
+      for {
+        p   <- createProgramAs(pi)
+        eph  = createNonsiderealEphemeris
+        t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
+        o   <- createGmosNorthMosObservationAs(pi, p, List(t))
+        _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2MosResult)
+    }
+
+  test("GMOS South MOS with pwfs2"):
+    val setup: IO[Observation.Id] =
+      for {
+        p   <- createProgramAs(pi)
+        eph  = createNonsiderealEphemeris
+        t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
+        o   <- createGmosSouthMosObservationAs(pi, p, List(t))
+        _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      } yield o
+    setup.flatMap { oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2MosResult)
+    }
+
   // Twilight calibrations have no guide stars: AGS is skipped and an empty
   // guide environment is returned.  The position angle comes from the
   // observation's (default, unbounded) position angle constraint.
