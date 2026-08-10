@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import io.circe.syntax.*
 import lucuma.core.model.Observation
@@ -200,6 +201,66 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       }
     """
 
+  /**
+   * An opportunity target is a placeholder for a Target of Opportunity, so an
+   * observation holding one is only coherent if it declares a ToO activation
+   * other than NONE (otherwise the workflow flags it `Undefined`) and its
+   * proposal allows that much disruption (otherwise `Unapproved`).  Fixtures
+   * built from an opportunity target are not trying to exercise either rule, so
+   * make the whole configuration consistent for them.
+   *
+   * The ceiling has to be written directly: it is normally derived from the
+   * program's observations and frozen when the proposal is accepted, and several
+   * fixtures accept the proposal before the observation exists, which would
+   * freeze it at NONE.  Same spirit as `approveConfigurationRequestHack`.
+   */
+  private def setTooActivationForOpportunityTargets(
+    user: User,
+    oid:  Observation.Id,
+    tids: List[Target.Id]
+  ): IO[Unit] =
+    import skunk.syntax.all.*
+    import skunk.codec.numeric.int8
+    import lucuma.odb.util.Codecs.nel
+    import lucuma.odb.util.Codecs.observation_id
+    import lucuma.odb.util.Codecs.target_id
+
+    def hasOpportunityTarget(tns: NonEmptyList[Target.Id]): IO[Boolean] =
+      val enc = target_id.nel(tns)
+      session.use: s =>
+        s.prepareR(sql"SELECT count(*) FROM t_target WHERE c_type = 'opportunity' AND c_target_id IN ($enc)".query(int8))
+          .use(_.unique(tns).map(_ > 0L))
+
+    val raiseCeiling: IO[Unit] =
+      session.use: s =>
+        s.prepareR(
+          sql"""
+            UPDATE t_proposal
+            SET c_too_activation = 'rapid'
+            WHERE c_program_id = (
+              SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id
+            )
+          """.command
+        ).use(_.execute(oid).void)
+
+    val setActivation: IO[Unit] =
+      query(
+        user,
+        s"""
+          mutation {
+            updateObservations(input: {
+              SET: { schedulingConstraints: { tooActivation: RAPID } }
+              WHERE: { id: { EQ: ${oid.asJson} } }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      ).void
+
+    NonEmptyList.fromList(tids).fold(IO.unit): tns =>
+      hasOpportunityTarget(tns).flatMap(IO.whenA(_)(setActivation *> raiseCeiling))
+
   def createObservationWithModeAs(
     user:         User,
     pid:          Program.Id,
@@ -211,7 +272,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       query = createObservationWithModeQuery(pid, tids, mode),
     ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }
+    }.flatTap(setTooActivationForOpportunityTargets(user, _, tids))
 
   def createObservationWithNoModeAs(
     user:         User,

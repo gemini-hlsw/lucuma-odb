@@ -203,7 +203,7 @@ class observation_workflow
         ).asRight
       )
 
-  testWithTargetTypes("no observing mode"): (_, mkTarget) =>
+  testWithTargetTypes("no observing mode"): (tt, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
         pid <- createProgramAs(pi)
@@ -211,6 +211,14 @@ class observation_workflow
         oid <- createObservationAs(pi, pid, tid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
+
+    // This observation has no observing mode to attach a ToO activation to, so
+    // an opportunity placeholder here is a second, independent configuration
+    // problem rather than something the fixture can set up around.
+    val moreMessages: List[String] =
+      tt match
+        case TargetType.Opportunity => List(ObservationWorkflowService.Messages.OpportunityTargetRequiresActivation)
+        case _                      => Nil
 
     setup.flatMap: oid =>
       expect(
@@ -222,7 +230,7 @@ class observation_workflow
             ObservationWorkflow(
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
-              List(ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "observing mode")))
+              List(ObservationValidation.configuration(ObservationService.MissingDataMsg(none, "observing mode"), moreMessages*))
             )
           )
         ).asRight

@@ -6,48 +6,51 @@ package query
 
 import cats.effect.IO
 import cats.syntax.either.*
+import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 
-class tooTriggerChronicleEntries extends OdbSuite:
+class tooTriggerChronicleEntries extends OdbSuite with TooTriggerSetupOperations:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(2, 32)
 
   val validUsers = List(pi, staff)
 
-  private def requestTooTrigger(user: User, oid: Observation.Id): IO[String] =
+  private def liveTriggerId(oid: Observation.Id): IO[String] =
     query(
-      user  = user,
-      query = s"""
-        mutation {
-          requestTooTrigger(input: { observationId: "$oid" }) {
-            tooTrigger { id }
+      pi,
+      s"""
+        query {
+          tooTriggers(WHERE: { observationId: { EQ: ${oid.asJson} }, status: { EQ: REQUESTED } }) {
+            matches { id }
           }
         }
       """
-    ).map(_.hcursor.downFields("requestTooTrigger", "tooTrigger", "id").require[String])
+    ).map(_.hcursor.downFields("tooTriggers", "matches").require[List[Json]].head.hcursor.downField("id").require[String])
 
-  private def acceptTooTrigger(user: User, rid: String): IO[Unit] =
+  private def declineTooTrigger(user: User, rid: String, reason: String): IO[Unit] =
     query(
       user  = user,
       query = s"""
         mutation {
-          acceptTooTrigger(input: { tooTriggerId: "$rid" }) {
+          declineTooTrigger(input: { tooTriggerId: "$rid", reason: "$reason" }) {
             tooTrigger { id }
           }
         }
       """
     ).void
 
-  test("request then accept generates two chronicle entries"):
+  test("triggering then declining generates two chronicle entries"):
     for
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid)
-      rid <- requestTooTrigger(pi, oid)
-      _   <- acceptTooTrigger(staff, rid)
-      _   <- expect(
+      (pid, oid) <- createTooObservationAs(pi, staff)
+      _          <- setTooWorkflowState(pi, oid, ObservationWorkflowState.Ready)
+      rid        <- liveTriggerId(oid)
+      _          <- declineTooTrigger(staff, rid, "too faint")
+      _          <- expect(
         staff,
         s"""
           query {
@@ -93,11 +96,11 @@ class tooTriggerChronicleEntries extends OdbSuite:
                   "modObservationId":     false,
                   "modProgramId":         false,
                   "modStatus":            true,
-                  "modResolutionReason":  false,
+                  "modResolutionReason":  true,
                   "newObservationId":     null,
                   "newProgramId":         null,
-                  "newStatus":            "ACCEPTED",
-                  "newResolutionReason":  null
+                  "newStatus":            "DECLINED",
+                  "newResolutionReason":  "too faint"
                 }
               ]
             }
