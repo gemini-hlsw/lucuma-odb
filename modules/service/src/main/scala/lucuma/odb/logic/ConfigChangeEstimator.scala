@@ -4,6 +4,7 @@
 package lucuma.odb.logic
 
 import cats.Eq
+import cats.syntax.apply.*
 import cats.syntax.eq.*
 import cats.syntax.functorFilter.*
 import lucuma.core.math.Angle
@@ -13,7 +14,9 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.ghost.GhostDynamicConfig
 import lucuma.core.model.sequence.gmos.DynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMirrorMode
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
+import lucuma.core.model.sequence.gnirs.GnirsGratingWavelength
 import lucuma.core.model.sequence.igrins2.Igrins2DynamicConfig
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.sequence.StepTimeEstimateCalculator
@@ -99,12 +102,27 @@ object ConfigChangeEstimator:
           past: StepTimeEstimateCalculator.Last[GnirsDynamicConfig],
           present: ProtoStep[GnirsDynamicConfig]
         ): List[Option[ConfigChangeEstimate]] =
-          // GNIRS in OCS does not declare any mechanism-change overheads (no
-          // CONFIG_CHANGE entries in InstGNIRS.calc, unlike GMOS / Flamingos-2
-          // / NIRI / GSAOI / GPI / NICI).  We match that here.  If a future
-          // requirement adds GNIRS mechanism costs, add them per-mechanism —
-          // the base trait still applies the generic offset + gcal overheads.
-          Nil
+          // GNIRS in OCS declares no mechanism-change overheads (no CONFIG_CHANGE
+          // entries in InstGNIRS.calc, unlike GMOS / Flamingos-2 / NIRI / GSAOI /
+          // GPI / NICI), so the filter, FPU, camera, decker and prism are all
+          // free here.  The exception is the central wavelength: an observation
+          // may take spectra at several, and the grating turret moves each time
+          // the sequence changes between them.
+          //
+          // Only a genuine wavelength change counts: both steps must have the
+          // mirror out, and their grating settings must differ.  Moving the
+          // mirror in and out during acquisition is not a wavelength change, so
+          // it is deliberately not charged here -- which a plain `check` on the
+          // wavelength would do, since it reads as None with the mirror in.
+          def wavelengthOf(d: GnirsDynamicConfig): Option[GnirsGratingWavelength] =
+            GnirsAcquisitionMirrorMode.out.getOption(d.acquisitionMirror).map(_.wavelength)
+
+          val changed: Boolean =
+            (past.step.flatMap(s => wavelengthOf(s.value)), wavelengthOf(present.value))
+              .mapN(_ =!= _)
+              .getOrElse(false)
+
+          List(Option.when(changed)(enums.TimeEstimate.GnirsWavelength.toConfigChange))
 
     private def gcal[D](past: StepTimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
       val scienceFold = Option.unless(past.step.exists(_.stepConfig.usesGcalUnit) === present.stepConfig.usesGcalUnit)(
