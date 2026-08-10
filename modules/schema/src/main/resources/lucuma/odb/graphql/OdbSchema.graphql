@@ -7767,6 +7767,13 @@ type Attachment {
   id: AttachmentId!
   attachmentType: AttachmentType!
   fileName: NonEmptyString!
+
+  """
+  The identifier of the physical mask plate this attachment describes, derived
+  from the attachment itself and not settable.  Null when the attachment is not
+  a MOS_MASK, always present when it is.
+  """
+  maskName: NonEmptyString
   description: NonEmptyString
   checked: Boolean!
   fileSize: Long!
@@ -19810,6 +19817,11 @@ input WhereAttachment {
   Matches the attachment file name.
   """
   fileName: WhereString
+
+  """
+  Matches the mask name, which is null for attachments that are not MOS masks.
+  """
+  maskName: WhereOptionString
 
   """
   Matches the description.
