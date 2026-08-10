@@ -36,7 +36,7 @@ class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmen
   val mar10_2024 = "2024-03-10T00:00:00Z"
 
   val emptyStart   = "2995-10-31T00:00:00Z"
-  val emptyEnd     = "2995-12-31T01:00:00Z" 
+  val emptyEnd     = "2995-12-31T01:00:00Z"
 
   val earlyAngles = List(160, 170, 180, 190, 200, 250, 260, 270, 280, 290, 300, 310)
   val laterAngles = earlyAngles.filter(_ =!= 250)
@@ -292,6 +292,43 @@ class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmen
     }
   }
 
+  val earlyAnglesMosImaging = List(160, 170, 180, 190, 200, 250, 260, 270, 280, 290, 300, 310, 320)
+  val laterAnglesMosImaging = earlyAnglesMosImaging.filter(_ =!= 250)
+
+  test("successfully obtain guide availability - GMOS North Mos") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthMosObservationAs(pi, p, List(t))
+      } yield o
+    val periods = List(
+      makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAnglesMosImaging),
+      makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAnglesMosImaging)
+    )
+    val expected = availabilityResult("V1647 Orionis", periods).asRight
+    setup.flatMap { oid =>
+      expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected)
+    }
+  }
+
+  test("successfully obtain guide availability - GMOS North Imaging") {
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthImagingObservationAs(pi, p, t)
+      } yield o
+    val periods = List(
+      makeAvailabilityPeriod(oct31_2023, feb01_2024, earlyAnglesMosImaging),
+      makeAvailabilityPeriod(feb01_2024, feb28_2024, laterAnglesMosImaging)
+    )
+    val expected = availabilityResult("V1647 Orionis", periods).asRight
+    setup.flatMap { oid =>
+      expect(pi, guideAvailabilityQuery(oid, oct31_2023, feb28_2024), expected = expected)
+    }
+  }
+
   test("no science targets") {
     val setup: IO[Observation.Id] =
       for {
@@ -312,7 +349,7 @@ class guideAvailability extends ExecutionTestSupportForGmos with GuideEnvironmen
         o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
       } yield o
 
-    
+
 
     val periods = List(
       makeAvailabilityPeriod(emptyStart, emptyEnd, List.empty)
