@@ -15,6 +15,7 @@ import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Coordinates
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Program
+import lucuma.odb.data.OdbError
 
 // GraphQL-level tests for the SC-9240 `targetCoordinates` cone WHERE filter. Geometry is
 // checked against lucuma-core's exact `angularDistance`; the rest cover how the cone
@@ -167,6 +168,26 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
              )
       got <- ids(res)
     yield assertEquals(got, List(near))
+
+  // The update mutation shares this WHERE input but builds its Filter at execution time,
+  // where ConeFilter cannot reach it. Rejecting is the point: silently dropping the cone
+  // would make the mutation update every request in the program.
+  test("cone is rejected by the update mutation"):
+    for
+      (pid, _, _) <- coneSetup
+      err <- expectOdbError(
+               user = pi,
+               query = s"""
+                 mutation {
+                   updateConfigurationRequests(input: {
+                     SET: { status: APPROVED },
+                     WHERE: { program: { id: { EQ: "$pid" } }, $ConeText }
+                   }) { requests { id } }
+                 }
+               """,
+               expected = { case OdbError.InvalidArgument(Some(m)) if m.contains("targetCoordinates") => () }
+             )
+    yield err
 
   test("cone under OR keeps its position"):
     for

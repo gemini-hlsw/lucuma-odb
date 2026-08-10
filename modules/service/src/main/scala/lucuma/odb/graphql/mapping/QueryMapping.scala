@@ -574,7 +574,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   }
 
   private lazy val ConfigurationRequests: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(Path.from(ConfigurationRequestType))
+    val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(Path.from(ConfigurationRequestType), allowCone = true)
     {
       case (QueryType, "configurationRequests", List(
         WhereConfigurationRequestsBinding.Option("WHERE", rWHERE),

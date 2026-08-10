@@ -35,8 +35,12 @@ import lucuma.core.model.ConfigurationRequest
  *  ids are known. Produced by the WHERE binding during elaboration and replaced by
  *  `ConeFilter.resolve` with `In(idPath, candidateIds)` before the query is executed.
  *
- *  Never evaluated: reaching `apply` means a cone escaped resolution, which is a bug
- *  rather than a user error, so it reports an internal error instead of a silent `true`.
+ *  Should not be evaluated: reaching `apply` means a cone escaped resolution, which is a
+ *  bug rather than a user error, so it reports an internal error instead of a silent
+ *  `true`. Escaping is possible -- resolution only sees predicates reachable in the
+ *  compiled query tree, so a cone held anywhere else (in an `Env`, or under the `Effect`
+ *  and `Component` nodes the walk does not enter) would survive to here. The WHERE
+ *  binding's `allowCone` flag is what keeps that from happening.
  */
 case class ConePredicate(idPath: Path, center: Coordinates, distance: Angle) extends Predicate:
   def apply(c: Cursor): Result[Boolean] = Result.internalError("Unresolved targetCoordinates cone.")
@@ -52,15 +56,20 @@ case class ConePredicate(idPath: Path, center: Coordinates, distance: Angle) ext
  *      cone ⟶ ConePredicate    ConePredicate ⟶ id IN (…)
  *  }}}
  *
- *  Splitting it this way lets grackle do everything it is good at first: variables are
- *  substituted, fragments are spread and the input is validated by the ordinary
- *  `WhereCone` binding, so the cone arrives here as parsed `Coordinates` and `Angle`
- *  whether it was written inline or passed as a variable. Resolution then happens in `F`,
- *  where the candidate lookup can run, and substitutes the ids *in place*, so a cone
- *  nested under `AND` / `OR` / `NOT` keeps its position and meaning. What grackle finally
- *  executes is an ordinary WHERE that pushes down to a single SQL statement.
+ *  Splitting it this way lets grackle do the parsing first: variables are substituted and
+ *  the input is validated by the ordinary `WhereCone` binding, so the cone arrives here as
+ *  parsed `Coordinates` and `Angle` whether it was written inline or passed as a variable.
+ *  Resolution then happens in `F`, where the candidate lookup can run, and substitutes the
+ *  ids *in place*, so a cone nested under `AND` / `OR` / `NOT` keeps its position and
+ *  meaning. What grackle finally executes is an ordinary WHERE that pushes down to a
+ *  single SQL statement.
  *
- *  Driven by `GraphQLRoutes`, which resolves every compiled query before running it.
+ *  Driven by `GraphQLRoutes`, which resolves each compiled operation before running it.
+ *  That reaches every cone the `configurationRequests` query can produce, because its
+ *  WHERE becomes a `Filter` in the compiled query. It would *not* reach one in the
+ *  `updateConfigurationRequests` mutation, which keeps its bound input in an `Env` and
+ *  builds the `Filter` at execution time -- so that mutation's WHERE binding refuses
+ *  `targetCoordinates` outright (see `WhereConfigurationRequest.binding`).
  */
 object ConeFilter:
 

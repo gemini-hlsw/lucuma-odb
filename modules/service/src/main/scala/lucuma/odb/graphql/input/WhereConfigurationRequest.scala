@@ -19,7 +19,17 @@ import lucuma.odb.graphql.binding.WhereOrder
 
 object WhereConfigurationRequest {
 
-  def binding(path: Path): Matcher[Predicate] = {
+  /** The WHERE input shared by the `configurationRequests` query and the
+   *  `updateConfigurationRequests` mutation.
+   *
+   *  `allowCone` says whether `targetCoordinates` may be used. A cone elaborates to a
+   *  `ConePredicate` that `ConeFilter` resolves by walking the compiled query, so it only
+   *  works where the predicate ends up in the query tree. The mutation instead stashes its
+   *  bound input in an `Env` and builds the `Filter` at execution time, out of reach of
+   *  that walk, so it passes `false` and a cone is rejected with an error rather than
+   *  being silently dropped.
+   */
+  def binding(path: Path, allowCone: Boolean): Matcher[Predicate] = {
     val WhereOrderConfigurationRequestId = WhereOrder.binding(path / "id", ConfigurationRequestIdBinding)
     val WhereStatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ConfigurationRequestStatus])
     val WhereProgramBinding = WhereProgram.binding(path / "program")
@@ -54,15 +64,18 @@ object WhereConfigurationRequest {
 
     // The cone's candidate lookup is an effect the elaborator cannot run, so this yields a
     // placeholder that `ConeFilter.resolve` swaps for `id IN (…)` before execution. Parsing
-    // it as an ordinary binding means variables and fragments are already resolved here.
+    // it as an ordinary binding means variables are already substituted here.
     val TargetCoordinatesBinding: Matcher[Predicate] =
-      ObjectFieldsBinding.rmap:
-        case List(
-          CoordinatesInput.Create.Binding("center", rCenter),
-          AngleInput.Binding("distance", rDistance)
-        ) => (rCenter, rDistance).parMapN(ConePredicate(path / "id", _, _))
+      if !allowCone then
+        _ => Left("`targetCoordinates` is only supported when querying configuration requests.")
+      else
+        ObjectFieldsBinding.rmap:
+          case List(
+            CoordinatesInput.Create.Binding("center", rCenter),
+            AngleInput.Binding("distance", rDistance)
+          ) => (rCenter, rDistance).parMapN(ConePredicate(path / "id", _, _))
 
-    lazy val WhereObservationBinding = binding(path) // lazy self-reference
+    lazy val WhereObservationBinding = binding(path, allowCone) // lazy self-reference
     ObjectFieldsBinding.rmap {
       case List(
         WhereObservationBinding.List.Option("AND", rAND),
