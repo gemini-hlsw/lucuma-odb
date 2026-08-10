@@ -25,11 +25,13 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.Region
 import lucuma.core.math.RightAscension
+import lucuma.core.model.Access
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
@@ -46,6 +48,7 @@ import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.float8
+import skunk.codec.numeric.int4
 import skunk.codec.numeric.int8
 import skunk.data.Arr
 import skunk.syntax.all.*
@@ -64,9 +67,12 @@ trait ConfigurationService[F[_]] {
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
 
   /** Selects the ids of configuration requests whose target reference coordinates
-   *  lie within `distance` of `center` (exact great-circle match). Pure-SQL trig
-   *  on the int8 microarcsecond columns; no PostGIS. */
-  def coneCandidates(center: Coordinates, distance: Angle): F[Result[List[ConfigurationRequest.Id]]]
+   *  lie within `distance` of `center` (exact great-circle match), restricted to
+   *  programs visible to the current user. Pure-SQL trig on the int8
+   *  microarcsecond columns; no PostGIS. Fails when more than `max` requests
+   *  match: the caller injects every id into a rewritten query, so the list
+   *  bounds both the heap and the generated statement. */
+  def coneCandidates(center: Coordinates, distance: Angle, max: Int = ConfigurationService.MaxConeCandidates): F[Result[List[ConfigurationRequest.Id]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
@@ -86,6 +92,9 @@ trait ConfigurationService[F[_]] {
 }
 
 object ConfigurationService {
+
+  /** Cap on `coneCandidates` matches; see its scaladoc. */
+  val MaxConeCandidates: Int = 10000
 
   extension [A](self: Result[A]) def suppressWarnings: Result[A] =
     self match
@@ -112,10 +121,13 @@ object ConfigurationService {
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
 
-      override def coneCandidates(center: Coordinates, distance: Angle): F[Result[List[ConfigurationRequest.Id]]] =
-        val af = Statements.coneCandidates(center, distance)
+      override def coneCandidates(center: Coordinates, distance: Angle, max: Int): F[Result[List[ConfigurationRequest.Id]]] =
+        val af = Statements.coneCandidates(user, center, distance, max)
         session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
-          pq.stream(af.argument, 1024).compile.toList.map(Result(_))
+          pq.stream(af.argument, 1024).compile.toList.map: ids =>
+            if ids.sizeIs > max then
+              OdbError.InvalidArgument(s"targetCoordinates matches more than $max configuration requests; narrow the cone.".some).asFailure
+            else Result(ids)
 
       override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
         val doUpdate = impl.updateRequests(SET, where).value
@@ -1527,8 +1539,11 @@ object ConfigurationService {
      *  bounding-box prefilter on the int8 microarcsecond columns (index-friendly)
      *  is followed by an exact great-circle trim (dot-product form). The dec
      *  column uses lucuma-core's angle encoding, which is safe here because the
-     *  exact trim relies on sin/cos (2π-periodic). No PostGIS. */
-    def coneCandidates(center: Coordinates, distance: Angle): AppliedFragment =
+     *  exact trim relies on sin/cos (2π-periodic). No PostGIS.
+     *
+     *  Scoped to programs visible to `user` and capped at `max + 1` rows (one
+     *  over, so the caller can tell "at the cap" from "over it"). */
+    def coneCandidates(user: User, center: Coordinates, distance: Angle, max: Int): AppliedFragment =
       val FullCircle    = 1296000000000L // 360° in µas
       val µasPerDegree  = 3600000000.0
       val dec0ang       = center.dec.toAngle.toMicroarcseconds
@@ -1556,6 +1571,19 @@ object ConfigurationService {
       val raLo          = ra0 - dra
       val raHi          = ra0 + dra
 
+      // Mirrors ProgramPredicates.isVisibleTo, the predicate the `configurationRequests`
+      // query applies in its outer WHERE: guests and PIs see a program they are linked
+      // to (any role); staff and above see everything (NGO visibility is unimplemented
+      // there, so NGO stays unscoped). The candidates are a prefilter, so this must
+      // never be narrower than the outer predicate -- anything dropped here is lost.
+      val visibility: AppliedFragment =
+        user.role.access match
+          case Access.Guest | Access.Pi =>
+            void" and exists (select 1 from t_program_user pu" |+|
+            void" where pu.c_program_id = v_configuration_request.c_program_id" |+|
+            void" and pu.c_user_id = " |+| sql"$user_id".apply(user.id) |+| void")"
+          case _ => AppliedFragment.empty
+
       void"select c_configuration_request_id from v_configuration_request" |+|
       void" where (c_reference_dec between " |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi) |+|
       void" or c_reference_dec >= "           |+| sql"$int8".apply(decLo + FullCircle) |+|
@@ -1566,7 +1594,9 @@ object ConfigurationService {
       void" and sin(radians(c_reference_dec / 3600000000.0)) * "  |+| sql"$float8".apply(sinDec0) |+|
       void" + cos(radians(c_reference_dec / 3600000000.0)) * "  |+| sql"$float8".apply(cosDec0) |+|
       void" * cos(radians(c_reference_ra / 3600000000.0) - "    |+| sql"$float8".apply(ra0rad)  |+|
-      void") >= "                                   |+| sql"$float8".apply(cosRadius)
+      void") >= "                                   |+| sql"$float8".apply(cosRadius) |+|
+      visibility |+|
+      void" limit " |+| sql"$int4".apply(max + 1)
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =

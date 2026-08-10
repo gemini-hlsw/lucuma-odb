@@ -6,10 +6,12 @@ package query
 
 import cats.effect.IO
 import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.math.Angle
 import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Coordinates
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.User
 
 // Direct service-level test for the SC-9240 cone (angular-distance) search.
 // Expected matches are computed independently with lucuma-core's exact
@@ -19,7 +21,8 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations {
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val admin = TestUsers.Standard.admin(2, 31)
-  val validUsers = List(pi, admin)
+  val pi2   = TestUsers.Standard.pi(3, 32)
+  val validUsers = List(pi, admin, pi2)
 
   private def coord(raHours: Double, decDegrees: Double): Coordinates =
     Coordinates.unsafeFromRadians(raHours * math.Pi / 12.0, decDegrees * math.Pi / 180.0)
@@ -44,11 +47,11 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations {
     (2.9333,  54.27),  // 29.42° from (0h, +45°); ΔRA 44.0° > 42.4° small-angle box
   )
 
-  private def assertCone(seeded: List[(ConfigurationRequest.Id, Coordinates)])(center: Coordinates, distance: Angle): IO[Unit] =
+  private def assertCone(seeded: List[(ConfigurationRequest.Id, Coordinates)], as: User = pi)(center: Coordinates, distance: Angle): IO[Unit] =
     val expected = seeded.collect {
       case (cid, c) if center.angularDistance(c).toMicroarcseconds <= distance.toMicroarcseconds => cid
     }.toSet
-    withServices(pi): svc =>
+    withServices(as): svc =>
       svc.configurationService.coneCandidates(center, distance)
         .flatMap(_.get.map(_.toSet))
         .map(actual => assertEquals(actual, expected))
@@ -76,6 +79,21 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations {
         yield (cid, coord(rah, decd))
       }
       _      <- cones.traverse_ { case (c, d) => assertCone(seeded)(c, d) }
+
+      // Candidates are scoped by program visibility: staff-and-above are unscoped,
+      // while a PI with no link to the program gets nothing.
+      wide    = (coord(0.0, 10.0), deg(25.0))
+      _      <- assertCone(seeded, as = admin)(wide._1, wide._2)
+      _      <- withServices(pi2): svc =>
+                  svc.configurationService.coneCandidates(wide._1, wide._2)
+                    .flatMap(_.get)
+                    .map(ids => assertEquals(ids, Nil, clue = "unlinked PI sees no candidates"))
+
+      // More matches than `max` is a loud failure, not a truncation.
+      _      <- withServices(pi): svc =>
+                  svc.configurationService.coneCandidates(wide._1, wide._2, max = 1).map:
+                    case Result.Failure(ps) => assert(ps.exists(_.message.contains("narrow the cone")), clue = ps)
+                    case other              => fail(s"expected a failure, got: $other")
     yield ()
 
 }

@@ -128,40 +128,45 @@ object GraphQLRoutes {
                                   ): F[Result[Json]] =
 
                                     def runQuery(req: Operation): F[Result[Json]] =
-                                      T.spanBuilder("graphql-query")
-                                        .withSpanKind(SpanKind.Server)
-                                        .build
-                                        .use: span =>
-                                          F.timed(
-                                            super.query(req, document, operationName).retryOnInvalidCursorName
-                                              .handleError(Result.InternalError.apply)
-                                              .flatTap {
-                                                case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                                case _                       => debug(user, s"Query (success).")
-                                              }
-                                          ).flatMap: (elapsed, result) =>
-                                            val slow = elapsed > OdbMapping.slowQueryThreshold
-                                            val markSlow =
-                                              span.addAttribute(Attribute("graphql.slow_query", true)).whenA(slow)
-                                            val dumpGql: F[Unit] =
-                                              OdbMapping.dumpDir.filter(_ => slow).map: dir =>
-                                                F.blocking:
-                                                  val hash = Integer.toHexString(document.hashCode)
-                                                  val path = NIOPath.of(dir, s"odb-query-$hash.gql")
-                                                  if !Files.exists(path) then {Files.writeString(path, document);()}
-                                              .getOrElse(F.unit)
-                                            markSlow *> dumpGql.as(result)
+                                      super.query(req, document, operationName).retryOnInvalidCursorName
 
                                     // SC-9240: elaboration turns a `targetCoordinates` cone into a
                                     // placeholder predicate, because the candidate lookup it needs
                                     // is an F effect. Resolve those to `id IN (...)` here, where we
                                     // are in F, so the whole WHERE pushes down to one SQL statement.
                                     // Queries without a cone are returned untouched.
-                                    ConeFilter.resolve(request.query)(map.coneCandidates).flatMap:
-                                      case Result.Success(q)       => runQuery(request.copy(query = q))
-                                      case Result.Warning(_, q)    => runQuery(request.copy(query = q))
-                                      case f: Result.Failure       => F.pure(f)
-                                      case e: Result.InternalError => F.pure(e)
+                                    def resolveAndRun: F[Result[Json]] =
+                                      ConeFilter.resolve(request.query)(map.coneCandidates).flatMap:
+                                        case Result.Success(q)       => runQuery(request.copy(query = q))
+                                        case Result.Warning(ps, q)   => runQuery(request.copy(query = q)).map(r => Result.Warning(ps, ()).flatMap(_ => r))
+                                        case f: Result.Failure       => F.pure(f)
+                                        case e: Result.InternalError => F.pure(e)
+
+                                    // The cone resolution runs inside the span and the timer, so a
+                                    // slow candidate lookup is visible to the slow-query marking.
+                                    T.spanBuilder("graphql-query")
+                                      .withSpanKind(SpanKind.Server)
+                                      .build
+                                      .use: span =>
+                                        F.timed(
+                                          resolveAndRun
+                                            .handleError(Result.InternalError.apply)
+                                            .flatTap {
+                                              case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                                              case _                       => debug(user, s"Query (success).")
+                                            }
+                                        ).flatMap: (elapsed, result) =>
+                                          val slow = elapsed > OdbMapping.slowQueryThreshold
+                                          val markSlow =
+                                            span.addAttribute(Attribute("graphql.slow_query", true)).whenA(slow)
+                                          val dumpGql: F[Unit] =
+                                            OdbMapping.dumpDir.filter(_ => slow).map: dir =>
+                                              F.blocking:
+                                                val hash = Integer.toHexString(document.hashCode)
+                                                val path = NIOPath.of(dir, s"odb-query-$hash.gql")
+                                                if !Files.exists(path) then {Files.writeString(path, document);()}
+                                            .getOrElse(F.unit)
+                                          markSlow *> dumpGql.as(result)
 
                                   override def subscribe(
                                     request:       Operation,
