@@ -37,6 +37,11 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations {
     (12.0,  89.0),   // near the north pole
     (0.0,  -10.0),   // south of origin
     (23.98, 10.0),   // just west of RA 0 (tight seam)
+    // Regressions for the RA prefilter half-width, asin(sin r / cos dec0): each is
+    // inside its cone but outside the small-angle r / cos dec0 box, so an
+    // undershooting prefilter loses it. Neither cone takes the pole shortcut.
+    (15.7057, 88.959), // 0.9996° from (12h, +88.9°); ΔRA 55.6° > 52.1° small-angle box
+    (2.9333,  54.27),  // 29.42° from (0h, +45°); ΔRA 44.0° > 42.4° small-angle box
   )
 
   private def assertCone(seeded: List[(ConfigurationRequest.Id, Coordinates)])(center: Coordinates, distance: Angle): IO[Unit] =
@@ -56,6 +61,8 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations {
       (coord(6.0, 40.0),  deg(1.0)),
       (coord(0.0, -10.0), deg(30.0)),
       (coord(0.0, 10.0),  deg(0.1)),
+      (coord(12.0, 88.9), deg(1.0)),  // high-dec, just inside the pole guard (88.9 + 1 < 90)
+      (coord(0.0, 45.0),  deg(30.0)), // mid-dec wide cone
     )
     for
       cfpid  <- createGeminiCallForProposalsAs(admin)

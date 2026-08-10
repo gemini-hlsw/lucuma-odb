@@ -1542,7 +1542,15 @@ object ConfigurationService {
       val cosRadius     = math.cos(radiusRad)
       // Pole case: the cone contains a celestial pole, so every RA can match.
       val pole          = math.abs(dec0rad) + radiusRad >= math.Pi / 2
-      val dra           = if pole then FullCircle else math.min(FullCircle, (radius.toDouble / math.cos(dec0rad)).toLong)
+      // Exact RA half-width of the cone, asin(sin r / cos dec0). The small-angle form
+      // r / cos dec0 undershoots it (by ~13° for a 1° cone at dec 88.9°), and the box is
+      // a prefilter, so an undershoot silently loses matches. Non-pole implies the asin
+      // argument < 1; the min guards the float boundary. ceil so rounding never shrinks.
+      val dra           =
+        if pole then FullCircle
+        else
+          val sinDra = math.min(1.0, math.sin(radiusRad) / cosDec0)
+          math.min(FullCircle, math.ceil(math.toDegrees(math.asin(sinDra)) * µasPerDegree).toLong)
       val decLo         = dec0ang - radius
       val decHi         = dec0ang + radius
       val raLo          = ra0 - dra
