@@ -2680,13 +2680,13 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
 
   // The mask attachment is a two-column (id + type) composite-FK reference.
   private def insertMosMaskAttachment(pid: Program.Id, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String), Attachment.Id] =
+    val q: Query[(Program.Id, String, String), Attachment.Id] =
       sql"""
-        INSERT INTO t_attachment (c_program_id, c_attachment_type, c_file_name, c_file_size, c_remote_path)
-        VALUES ($program_id, 'mos_mask', $text, 42, 'unused')
+        INSERT INTO t_attachment (c_program_id, c_attachment_type, c_file_name, c_file_size, c_remote_path, c_mask_name)
+        VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName))
+    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix(".fits")))
 
   private def readMaskColumns(
     table: String,

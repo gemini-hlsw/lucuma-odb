@@ -29,19 +29,20 @@ trait CustomMaskOps extends ReplaceSequenceOps:
   // Insert a mos_mask attachment directly rather than going through the file
   // service and S3, so the setup depends only on the database.
   protected def insertMosMaskAttachment(pid: Program.Id, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String), Attachment.Id] =
+    val q: Query[(Program.Id, String, String), Attachment.Id] =
       sql"""
         INSERT INTO t_attachment (
           c_program_id,
           c_attachment_type,
           c_file_name,
           c_file_size,
-          c_remote_path
+          c_remote_path,
+          c_mask_name
         )
-        VALUES ($program_id, 'mos_mask', $text, 42, 'unused')
+        VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName))
+    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix(".fits")))
 
   protected def gmosStep(customMask: String): String =
     s"""

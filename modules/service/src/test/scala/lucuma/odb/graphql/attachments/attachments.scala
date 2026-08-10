@@ -91,9 +91,10 @@ class attachments extends AttachmentsSuite {
   }
 
   // TODO: science, team and custom_sed file tests
-  val mosMask1A         = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful")
-  val mosMask1B         = TestAttachment("file1.fits", "mos_mask", None, "New contents")
-  val mosMask2          = TestAttachment("file2.fits", "mos_mask", "Masked".some, "Zorro")
+  val mosMask1A         = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful", maskName = "file1".some)
+  val mosMask1B         = TestAttachment("file1.fits", "mos_mask", None, "New contents", maskName = "file1".some)
+  val mosMask1Upper     = TestAttachment("file1.FITS", "mos_mask", "Shouty".some, "Also hopeful", maskName = "file1".some)
+  val mosMask2          = TestAttachment("file2.fits", "mos_mask", "Masked".some, "Zorro", maskName = "file2".some)
   val finderPNG         = TestAttachment("different.png", "finder", "Unmatching file name".some, "Something different")
   val finderJPG         = TestAttachment("finder.jpg", "finder", "jpg file".some, "A finder JPG file")
   val preImaging        = TestAttachment("pi.fits", "pre_imaging", none, "A pre imaging file")
@@ -845,4 +846,83 @@ class attachments extends AttachmentsSuite {
                )
     } yield ()
   }
+
+  test("mask name ignores the case of the extension"):
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, mosMask1Upper).toAttachmentId
+      _   <- assertAttachmentsGql(pi, pid, (aid, mosMask1Upper))
+    } yield ()
+
+  test("insert with duplicate mask name is a BadRequest"):
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      _   <- insertAttachment(pi, pid, mosMask1Upper)
+               .withExpectation(Status.BadRequest, AttachmentFileService.duplicateMaskNameMsg(NonEmptyString.unsafeFrom("file1")))
+      _   <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
+    } yield ()
+
+  test("the same mask name in a different program is accepted"):
+    for {
+      pid1 <- createProgramAs(pi)
+      pid2 <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid1, mosMask1A).toAttachmentId
+      aid2 <- insertAttachment(pi, pid2, mosMask1A).toAttachmentId
+      _    <- assertAttachmentsGql(pi, pid1, (aid1, mosMask1A))
+      _    <- assertAttachmentsGql(pi, pid2, (aid2, mosMask1A))
+    } yield ()
+
+  test("update with duplicate mask name is a BadRequest"):
+    for {
+      pid  <- createProgramAs(pi)
+      aid1 <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2 <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      _    <- updateAttachment(pi, aid2, mosMask1Upper)
+                .withExpectation(Status.BadRequest, AttachmentFileService.duplicateMaskNameMsg(NonEmptyString.unsafeFrom("file1")))
+      _    <- assertAttachmentsGql(pi, pid, (aid1, mosMask1A), (aid2, mosMask2))
+      _    <- getAttachment(pi, aid2).expectBody(mosMask2.content)
+    } yield ()
+
+  test("update attachments metadata: by mask name"):
+    for {
+      pid   <- createProgramAs(pi)
+      _     <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, mosMask2).toAttachmentId
+      _     <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      newTa2 = mosMask2.copy(description = "Found".some)
+      _     <- updateAttachmentsGql(pi,
+                                    WHERE = s"""{ maskName: { EQ: "file2" }, program: { id: { EQ: "$pid" } } }""",
+                                    SET = """{ description: "Found" }""",
+                                    (aid2, newTa2)
+               )
+    } yield ()
+
+  test("update attachments metadata: by null mask name"):
+    for {
+      pid   <- createProgramAs(pi)
+      _     <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      aid2  <- insertAttachment(pi, pid, finderPNG).toAttachmentId
+      aid3  <- insertAttachment(pi, pid, preImaging).toAttachmentId
+      newTa2 = finderPNG.copy(description = "Not a mask".some)
+      newTa3 = preImaging.copy(description = "Not a mask".some)
+      _     <- updateAttachmentsGql(pi,
+                                    WHERE = s"""{ maskName: { IS_NULL: true }, program: { id: { EQ: "$pid" } } }""",
+                                    SET = """{ description: "Not a mask" }""",
+                                    (aid2, newTa2),
+                                    (aid3, newTa3)
+               )
+    } yield ()
+
+  test("updateAttachments cannot set the mask name"):
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      _   <- updateAttachmentsGql(pi,
+                                  WHERE = s"""{ id: { EQ: "$aid" }}""",
+                                  SET = """{ maskName: "whatever" }""",
+                                  List("Unknown field(s) 'maskName' for input object value of type AttachmentPropertiesInput in field 'updateAttachments' of type 'Mutation'").asLeft
+             )
+    } yield ()
+
 }
