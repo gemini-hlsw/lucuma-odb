@@ -480,6 +480,7 @@ object OdbMapping {
                 Igrins2StaticMapping,
                 GnirsSpectroscopyAcquisitionMapping,
                 GnirsSpectroscopyMapping,
+                GnirsSpectroscopyWavelengthMapping,
                 GnirsSlitMapping,
                 GnirsIfuMapping,
                 GnirsDynamicMapping,

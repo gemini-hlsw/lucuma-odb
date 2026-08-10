@@ -276,7 +276,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthMos       => gmosMosService.cloneSouth(origOid, newOid)
             case ObservingModeType.GnirsImaging       => gnirsImagingService.clone(origOid, newOid, etms)
-            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid)
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
             case _: VisitorObservingModeType          => visitorService.clone(origOid, newOid)
 

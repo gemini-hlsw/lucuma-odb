@@ -136,6 +136,53 @@ object ItcInput:
         )
 
   /**
+   * GNIRS spectroscopy takes spectra at one or more central wavelengths, each a
+   * separate configuration with its own exposure time mode and coadds, and so
+   * its own ITC calculation.  The acquisition is still a single pass.
+   *
+   * This is the spectroscopy analogue of [[Imaging]]'s per-filter fan out; the
+   * other spectroscopy modes have exactly one science configuration and use
+   * [[Spectroscopy]].
+   */
+  case class GnirsSpectroscopy(
+    acquisition:           ImagingParameters,
+    science:               NonEmptyList[SpectroscopyParameters],
+    targets:               NonEmptyList[TargetDefinition],
+    blindOffset:           Option[TargetDefinition],
+    signalToNoiseTargetId: Option[Target.Id],
+    gnirsAcqAutoClassify:  Boolean = false
+  ) extends ItcInput derives Eq:
+
+    def acquisitionTargets: NonEmptyList[TargetDefinition] =
+      blindOffset.fold(targets)(NonEmptyList.one)
+
+    def acquisitionInput: ImagingInput =
+      ImagingInput(acquisition, acquisitionTargets.map(_.input))
+
+    def scienceInput: NonEmptyList[SpectroscopyInput] =
+      science.map(SpectroscopyInput(_, targets.map(_.input)))
+
+  object GnirsSpectroscopy:
+    given HashBytes[GnirsSpectroscopy] with
+      def hashBytes(a: GnirsSpectroscopy): Array[Byte] =
+        val bld = ArrayBuilder.make[Byte]
+        bld.addAll(a.acquisition.hashBytes)
+        // Every science configuration must contribute: two observations that
+        // differ only in an extra central wavelength must not share a cache key.
+        a.science.toList.foreach: params =>
+          bld.addAll(params.hashBytes)
+        bld.addAll(hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets)))
+        bld.addAll(a.signalToNoiseTargetId.hashBytes)
+        bld.addAll(a.gnirsAcqAutoClassify.hashBytes)
+        bld.result()
+
+  val gnirsSpectroscopy: Prism[ItcInput, ItcInput.GnirsSpectroscopy] =
+    Prism[ItcInput, ItcInput.GnirsSpectroscopy] {
+      case s: ItcInput.GnirsSpectroscopy => s.some
+      case _                             => none
+    }(identity)
+
+  /**
     * ItcInput for spectroscopy, for instruments where GPP does not manage
     * acquisition (IGRINS2, GHOST).
     */
@@ -173,12 +220,14 @@ object ItcInput:
     Eq.instance:
       case (n0: Imaging,                 n1: Imaging)                 => n0 === n1
       case (n0: Spectroscopy,            n1: Spectroscopy)            => n0 === n1
+      case (n0: GnirsSpectroscopy,       n1: GnirsSpectroscopy)       => n0 === n1
       case (n0: ScienceOnlySpectroscopy, n1: ScienceOnlySpectroscopy) => n0 === n1
       case _                                                          => false
 
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _, _, _, _)            => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _, _, _)    => in.hashBytes
-        case in @ ScienceOnlySpectroscopy(_, _, _)  => in.hashBytes
+        case in @ Imaging(_, _, _, _, _)              => in.hashBytes
+        case in @ Spectroscopy(_, _, _, _, _, _)      => in.hashBytes
+        case in @ GnirsSpectroscopy(_, _, _, _, _, _) => in.hashBytes
+        case in @ ScienceOnlySpectroscopy(_, _, _)    => in.hashBytes

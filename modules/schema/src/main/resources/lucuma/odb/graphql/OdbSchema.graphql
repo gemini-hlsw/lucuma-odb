@@ -11332,11 +11332,48 @@ type GnirsSpectroscopyAcquisition {
 }
 
 """
+A GNIRS spectroscopy science configuration: a central wavelength together with
+the exposure time mode and coadds that apply at that wavelength.
+"""
+type GnirsSpectroscopyWavelength {
+
+  centralWavelength: Wavelength!
+
+  """
+  Exposure time mode for this central wavelength.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  coadds: PosInt!
+
+}
+
+"""
+Defines a GNIRS spectroscopy central wavelength to use along with its exposure
+time mode and coadds.
+"""
+input GnirsSpectroscopyWavelengthInput {
+
+  centralWavelength: WavelengthInput!
+
+  """
+  Exposure time mode for this central wavelength.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  Coadds for this central wavelength.  Defaults to 1 when not specified.
+  """
+  coadds: PosInt
+
+}
+
+"""
 GNIRS Spectroscopy mode (long slit or IFU, distinguished by the FPU).
 """
 type GnirsSpectroscopy {
-
-  exposureTimeMode: ExposureTimeMode!
 
   grating: GnirsGrating!
   explicitGrating: GnirsGrating
@@ -11346,8 +11383,18 @@ type GnirsSpectroscopy {
   explicitPrism: GnirsPrism
   initialPrism: GnirsPrism!
 
-  centralWavelength: Wavelength!
-  initialCentralWavelength: Wavelength!
+  """
+  The central wavelengths at which spectra are taken, in increasing wavelength
+  order.  Each one is a separate configuration with its own exposure time mode,
+  coadds, ITC calculation and calibrations.
+  """
+  centralWavelengths: [GnirsSpectroscopyWavelength!]!
+
+  """
+  The central wavelengths as they were configured when the observing mode was
+  created.
+  """
+  initialCentralWavelengths: [GnirsSpectroscopyWavelength!]!
 
   camera: GnirsCamera!
   initialCamera: GnirsCamera!
@@ -11366,8 +11413,6 @@ type GnirsSpectroscopy {
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
-
-  coadds: PosInt!
 
   decker: GnirsDecker!
   explicitDecker: GnirsDecker
@@ -11482,9 +11527,12 @@ Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
 """
 input GnirsSpectroscopyInput {
 
-  exposureTimeMode: ExposureTimeModeInput
-
-  coadds: PosInt
+  """
+  The central wavelengths at which spectra are taken.  Required on create, and
+  must contain at least one entry with no duplicated wavelength.  When given on
+  edit, it replaces the existing list wholesale.
+  """
+  centralWavelengths: [GnirsSpectroscopyWavelengthInput!]
 
   filter: GnirsFilter
 
@@ -11499,8 +11547,6 @@ input GnirsSpectroscopyInput {
   grating: GnirsGrating
 
   prism: GnirsPrism
-
-  centralWavelength: WavelengthInput
 
   explicitDecker: GnirsDecker
 
@@ -14509,6 +14555,15 @@ type ItcGnirsImagingResultSet {
 }
 
 """
+Combines a GNIRS spectroscopy central wavelength with an `ItcResultSet`. In
+other words, ITC results for all targets but a single central wavelength.
+"""
+type ItcGnirsSpectroscopyResultSet {
+  centralWavelength: Wavelength!
+  results:           ItcResultSet!
+}
+
+"""
 ITC results for a particular observation, including relevant instrument
 configurations and targets.  There are specific instances for each `ItcType`.
 """
@@ -14561,6 +14616,16 @@ GNIRS imaging ITC results.  Here each filter is paired with its result set.
 type ItcGnirsImaging implements Itc {
   itcType: ItcType!
   gnirsImagingScience: [ItcGnirsImagingResultSet!]!
+}
+
+"""
+GNIRS spectroscopy ITC results.  Each central wavelength is a separate
+configuration and is paired with its own result set.
+"""
+type ItcGnirsSpectroscopy implements Itc {
+  itcType: ItcType!
+  acquisition: ItcResultSet!
+  gnirsSpectroscopyScience: [ItcGnirsSpectroscopyResultSet!]!
 }
 
 """

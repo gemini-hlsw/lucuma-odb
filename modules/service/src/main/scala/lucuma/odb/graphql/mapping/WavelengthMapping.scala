@@ -88,6 +88,12 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(StepRecordType / "gmosSouth" / "gratingConfig" / "wavelength", GmosSouthDynamicTable.Grating.Wavelength, GmosSouthDynamicTable.Id),
       wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),
       wavelengthMappingAtPath(VisitorType / "centralWavelength", VisitorTable.CentralWavelength, VisitorTable.ObservationId),
-      wavelengthMappingAtPath(GnirsSpectroscopyType / "centralWavelength",        GnirsSpectroscopyView.CentralWavelengthEffective, GnirsSpectroscopyView.ObservationId),
-      wavelengthMappingAtPath(GnirsSpectroscopyType / "initialCentralWavelength", GnirsSpectroscopyView.InitialCentralWavelength,   GnirsSpectroscopyView.ObservationId),
+      wavelengthMappingAtPath(
+        GnirsSpectroscopyWavelengthType / "centralWavelength",
+        GnirsSpectroscopyWavelengthTable.CentralWavelength,
+        // The child table's primary key: one wavelength object per row.
+        GnirsSpectroscopyWavelengthTable.ObservationId,
+        GnirsSpectroscopyWavelengthTable.CentralWavelength,
+        GnirsSpectroscopyWavelengthTable.Version
+      ),
     )

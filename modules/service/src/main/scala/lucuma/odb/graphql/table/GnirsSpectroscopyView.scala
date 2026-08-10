@@ -17,13 +17,10 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
 
     val Grating: ColumnRef           = col("c_grating", gnirs_grating.opt)
     val Prism: ColumnRef             = col("c_prism", gnirs_prism.opt)
-    // Central wavelength override (nullable); effective falls back to the initial value.
-    val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm.opt)
 
     // Initial acquisition mirror (always set, always Out)
     val InitialGrating: ColumnRef           = col("c_initial_grating", gnirs_grating)
     val InitialPrism: ColumnRef             = col("c_initial_prism", gnirs_prism)
-    val InitialCentralWavelength: ColumnRef = col("c_initial_central_wavelength", wavelength_pm)
 
     // Camera
     val Camera: ColumnRef           = col("c_camera", gnirs_camera)
@@ -48,9 +45,6 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
     // Filter
     val Filter: ColumnRef           = col("c_filter", gnirs_filter)
     val InitialFilter: ColumnRef    = col("c_initial_filter", gnirs_filter)
-
-    // Coadds
-    val Coadds: ColumnRef           = col("c_coadds", int4_pos)
 
     // Explicit overrides (nullable)
     val ExplicitDecker: ColumnRef   = col("c_decker", gnirs_decker.opt)
@@ -82,10 +76,20 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
     val DefaultWellDepth: ColumnRef        = col("c_well_depth_default", gnirs_well_depth)
     val WellDepthEffective: ColumnRef      = col("c_well_depth_effective", gnirs_well_depth)
 
-    // Effective grating/prism/central wavelength: COALESCE(explicit, initial)
+    // Effective grating/prism: COALESCE(explicit, initial)
     val GratingEffective: ColumnRef           = col("c_grating_effective", gnirs_grating)
     val PrismEffective: ColumnRef             = col("c_prism_effective", gnirs_prism)
-    val CentralWavelengthEffective: ColumnRef = col("c_central_wavelength_effective", wavelength_pm)
 
     // Telluric type (stored as jsonb)
     val TelluricType: ColumnRef     = col("c_telluric_type", jsonb)
+
+  /**
+   * The central wavelengths, one row per wavelength per row version.  Each row
+   * owns its own exposure time mode row in t_exposure_time_mode.
+   */
+  object GnirsSpectroscopyWavelengthTable extends TableDef("t_gnirs_spectroscopy_wavelength"):
+    val ObservationId: ColumnRef     = col("c_observation_id", observation_id)
+    val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm)
+    val Version: ColumnRef           = col("c_version", observing_mode_row_version)
+    val Coadds: ColumnRef            = col("c_coadds", int4_pos)
+    val ExposureTimeModeId: ColumnRef = col("c_exposure_time_mode_id", exposure_time_mode_id)

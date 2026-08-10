@@ -2281,8 +2281,12 @@ class perScienceObservationCalibrations
                   camera: SHORT_BLUE
                   slit: { fpu: LONG_SLIT_0_30 }
                   filter: ORDER3
-                  centralWavelength: { nanometers: 1650 }
-                  exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 1650 }
+                      exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
+                    }
+                  ]
                 }
               }
               constraintSet: { imageQuality: POINT_EIGHT }

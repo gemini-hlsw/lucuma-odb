@@ -41,6 +41,7 @@ trait Predicates[F[_]] extends BaseMapping[F]:
     val gmosNorthStep                   = StepPredicates(Path.from(GmosNorthStepType))
     val gmosSouthImagingFilter          = GmosImagingFilterPredicates(Path.from(GmosSouthImagingFilterType))
     val gnirsImagingFilter              = GmosImagingFilterPredicates(Path.from(GnirsImagingFilterType))
+    val gnirsSpectroscopyWavelength     = GmosImagingFilterPredicates(Path.from(GnirsSpectroscopyWavelengthType))
     val gmosSouthStep                   = StepPredicates(Path.from(GmosSouthStepType))
     val group                           = GroupPredicates(Path.from(GroupType))
     val groupEdit                       = GroupEditPredicates(Path.from(GroupEditType))

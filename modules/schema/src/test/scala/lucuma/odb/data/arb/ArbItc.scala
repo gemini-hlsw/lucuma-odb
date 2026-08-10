@@ -135,6 +135,18 @@ trait ArbItc:
     Cogen[List[(GnirsFilter, Zipper[ItcResult])]].contramap: a =>
       a.science.toNel.toList
 
+  given Arbitrary[ItcScience.GnirsSpectroscopy] =
+    Arbitrary:
+      for
+        w0 <- arbitrary[Wavelength]
+        ws <- Gen.listOf(arbitrary[Wavelength]).map(ws => (w0 :: ws).distinct)
+        zs <- Gen.listOfN(ws.size, arbitrary[Zipper[ItcResult]])
+      yield ItcScience.GnirsSpectroscopy(NonEmptyList.fromListUnsafe(ws.zip(zs)).toNem)
+
+  given Cogen[ItcScience.GnirsSpectroscopy] =
+    Cogen[List[(Wavelength, Zipper[ItcResult])]].contramap: a =>
+      a.science.toNel.toList
+
   given Arbitrary[ItcScience.Spectroscopy] =
     Arbitrary:
       arbitrary[Zipper[ItcResult]].map(ItcScience.Spectroscopy.apply)
@@ -150,19 +162,21 @@ trait ArbItc:
         arbitrary[ItcScience.GmosNorthImaging],
         arbitrary[ItcScience.GmosSouthImaging],
         arbitrary[ItcScience.GnirsImaging],
+        arbitrary[ItcScience.GnirsSpectroscopy],
         arbitrary[ItcScience.Spectroscopy]
       )
 
   given Cogen[ItcScience] =
     Cogen[
-      Either[ItcScience.Spectroscopy, Either[ItcScience.GmosNorthImaging, Either[ItcScience.GmosSouthImaging, Either[ItcScience.GnirsImaging, Either[ItcScience.GhostIfu, ItcScience.Flamingos2Imaging]]]]]
+      Either[ItcScience.Spectroscopy, Either[ItcScience.GnirsSpectroscopy, Either[ItcScience.GmosNorthImaging, Either[ItcScience.GmosSouthImaging, Either[ItcScience.GnirsImaging, Either[ItcScience.GhostIfu, ItcScience.Flamingos2Imaging]]]]]]
     ].contramap:
       case a: ItcScience.Spectroscopy      => Left(a)
-      case a: ItcScience.GmosNorthImaging  => Right(Left(a))
-      case a: ItcScience.GmosSouthImaging  => Right(Right(Left(a)))
-      case a: ItcScience.GnirsImaging      => Right(Right(Right(Left(a))))
-      case a: ItcScience.GhostIfu          => Right(Right(Right(Right(Left(a)))))
-      case a: ItcScience.Flamingos2Imaging => Right(Right(Right(Right(Right(a)))))
+      case a: ItcScience.GnirsSpectroscopy => Right(Left(a))
+      case a: ItcScience.GmosNorthImaging  => Right(Right(Left(a)))
+      case a: ItcScience.GmosSouthImaging  => Right(Right(Right(Left(a))))
+      case a: ItcScience.GnirsImaging      => Right(Right(Right(Right(Left(a)))))
+      case a: ItcScience.GhostIfu          => Right(Right(Right(Right(Right(Left(a))))))
+      case a: ItcScience.Flamingos2Imaging => Right(Right(Right(Right(Right(Right(a))))))
 
   given Arbitrary[ItcAcquisition.Available] =
     Arbitrary:
