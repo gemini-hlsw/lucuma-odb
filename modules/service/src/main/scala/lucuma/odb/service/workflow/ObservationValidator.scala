@@ -5,8 +5,8 @@ package lucuma.odb.service
 package workflow
 
 import cats.Applicative
+import cats.Functor
 import cats.Monoid
-import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.implicits.*
 import grackle.ResultT
@@ -29,6 +29,22 @@ object ObservationValidator:
     def empty = _ => ObservationValidationMap.empty
     def combine(x: ObservationValidator, y: ObservationValidator): ObservationValidator = a => x(a) |+| y(a)
 
+  private def validateConfigurations[F[_]: Functor](
+    infos: NonEmptyList[ObservationValidationInfo]
+  )(using Services[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
+    ResultT(configurationService.selectRequests(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
+      rs.view
+        .map:
+          case ((_, oid), lst) =>
+            oid -> {
+              val m = ObservationValidationMap.empty
+              if lst.isEmpty then m.add(ObservationValidation.configurationRequestNotRequested)
+              else if lst.exists(_.status === ConfigurationRequestStatus.Approved) then m
+              else if lst.forall(_.status === ConfigurationRequestStatus.Denied) then m.add(ObservationValidation.configurationRequestDenied)
+              else m.add(ObservationValidation.configurationRequestPending)
+            }
+        .toMap
+
   def validate[F[_]: Applicative](
     infos:  Map[Observation.Id, ObservationValidationInfo],
     itcFor: Observation.Id => Option[Itc]
@@ -37,28 +53,8 @@ object ObservationValidator:
     val (cals, other)         = infos.partition(_._2.calibrationRole.isDefined)
     val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
 
-    def validateConfigurations(infos: NonEmptyList[ObservationValidationInfo]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-      ResultT(configurationService.selectRequests(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
-        rs.view
-          .map:
-            case ((_, oid), lst) =>
-              oid -> {
-                val m = ObservationValidationMap.empty
-                if lst.isEmpty then m.add(ObservationValidation.configurationRequestNotRequested)
-                else if lst.exists(_.status === ConfigurationRequestStatus.Approved) then m
-                else if lst.forall(_.status === ConfigurationRequestStatus.Denied) then m.add(ObservationValidation.configurationRequestDenied)
-                else m.add(ObservationValidation.configurationRequestPending)
-              }
-          .toMap
-
     // Here are our simple validators
     import validator.*
-
-
-    val otherConfigErrors: ObservationValidator = info =>
-      NonEmptyChain.fromSeq(info.otherConfigErrors) match
-        case None       => ObservationValidationMap.empty
-        case Some(errs) => ObservationValidationMap.singleton(ObservationValidation(ObservationValidationCode.ConfigurationError, errs))
 
     // Here are our composed validators
 
@@ -74,7 +70,7 @@ object ObservationValidator:
       GhostVMagnitudeValidator   |+|
       TooActivationValidator     |+|
       OpportunityTargetValidator |+|
-      otherConfigErrors
+      OtherConfigErrorValidator
 
     val scienceValidator2: ObservationValidator =
       ItcValidator(itcFor) |+| AcquisitionValidator(itcFor)

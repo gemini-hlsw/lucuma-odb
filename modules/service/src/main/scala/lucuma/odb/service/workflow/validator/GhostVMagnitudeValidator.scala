@@ -5,10 +5,10 @@ package lucuma.odb.service
 package workflow
 package validator
 
+import lucuma.core.enums.Band
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
-import lucuma.core.enums.Band
 
 // V magnitudes are used by Observe to set the GHOST slit viewing
 // camera exposure time, so every target in a GHOST observation needs one.
