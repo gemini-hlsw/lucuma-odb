@@ -4,6 +4,8 @@
 package lucuma.odb.service
 package workflow
 
+import cats.Applicative
+import cats.Monoid
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.implicits.*
@@ -11,7 +13,6 @@ import grackle.ResultT
 import lucuma.core.enums.Band
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ExchangeObservingModeType
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Observatory
@@ -25,11 +26,9 @@ import lucuma.core.syntax.string.*
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ObservationValidationMap
-import ObservationWorkflowState.*
 
+import ObservationWorkflowState.*
 import Services.Syntax.*
-import cats.Applicative
-import cats.Monoid
 
 trait ObservationValidator extends (ObservationValidationInfo => ObservationValidationMap):
   def apply(info: ObservationValidationInfo): ObservationValidationMap
@@ -44,9 +43,6 @@ object ObservationValidator:
   object Messages {
 
     val CoordinatesOutOfRange = "Base coordinates out of Call for Proposals limits."
-
-    def invalidInstrument(instr: Instrument): String =
-      s"Instrument $instr not part of Call for Proposals."
 
     def invalidScienceBand(b: ScienceBand): String =
       s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
@@ -74,7 +70,6 @@ object ObservationValidator:
     infos:  Map[Observation.Id, ObservationValidationInfo],
     itcFor: Observation.Id => Option[Itc]
   )(using Services[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
-    import validator.*
 
     val (cals, other)         = infos.partition(_._2.calibrationRole.isDefined)
     val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
@@ -94,13 +89,7 @@ object ObservationValidator:
           .toMap
 
     // Here are our simple validators
-
-    val cfpInstrumentValidator: ObservationValidator = info =>
-      info.cfpInfo.foldMap: cfp =>
-        if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
-        else info.instrument.foldMap: inst =>
-          if cfp.instruments.contains(inst) then ObservationValidationMap.empty
-          else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidInstrument(inst)))
+    import validator.*
 
     // Exchange observations must match the proposal's observatory, and (when
     // the call restricts instruments) use one of its allowed exchange instruments.
@@ -202,7 +191,7 @@ object ObservationValidator:
 
     val scienceValidator1: ObservationValidator =
       GeneratorValidator         |+|
-      cfpInstrumentValidator     |+|
+      CfpInstrumentValidator     |+|
       exchangeValidator          |+|
       cfpRaDecValidator          |+|
       bandValidator              |+|
