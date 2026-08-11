@@ -569,3 +569,77 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
             )
           ).asRight
       )
+
+  test("[gnirs] a central wavelength change costs the configured overhead"):
+    // The sequence is sci(2200), cal(2200), sci(2300), cal(2300).  The grating
+    // turret moves exactly once, entering the 2300 nm segment, so that segment's
+    // first step should carry a GNIRS Wavelength config change and no other step
+    // should.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- query(
+                 pi,
+                 s"""
+                   mutation {
+                     updateObservations(input: {
+                       SET: {
+                         observingMode: {
+                           gnirsSpectroscopy: {
+                             centralWavelengths: [
+                               {
+                                 centralWavelength: { nanometers: 2200 }
+                                 exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } } }
+                               }
+                               {
+                                 centralWavelength: { nanometers: 2300 }
+                                 exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2300 } } }
+                               }
+                             ]
+                           }
+                         }
+                       }
+                       WHERE: { id: { EQ: "$oid" } }
+                     }) { observations { id } }
+                   }
+                 """
+               ).void
+      yield oid
+
+    setup.flatMap: oid =>
+      query(
+        pi,
+        s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gnirs {
+                science {
+                  nextAtom { steps { estimate { configChange { all { name estimate { seconds } } } } } }
+                  possibleFuture { steps { estimate { configChange { all { name estimate { seconds } } } } } }
+                }
+              }
+            }
+          }
+        """
+      ).map: json =>
+        val changes: List[(String, BigDecimal)] =
+          json.hcursor
+            .downField("executionConfig").downField("gnirs").downField("science")
+            .focus
+            .toList
+            .flatMap: sci =>
+              val atoms = sci.hcursor.downField("nextAtom").focus.toList ++
+                          sci.hcursor.downField("possibleFuture").values.toList.flatten
+              atoms.flatMap: atom =>
+                atom.hcursor.downField("steps").values.toList.flatten.flatMap: step =>
+                  step.hcursor
+                    .downField("estimate").downField("configChange").downField("all")
+                    .values.toList.flatten
+                    .flatMap: c =>
+                      (for
+                        n <- c.hcursor.downField("name").as[String].toOption
+                        v <- c.hcursor.downField("estimate").downField("seconds").as[BigDecimal].toOption
+                      yield (n, v)).toList
+
+        val wavelengthChanges = changes.filter(_._1 == "GNIRS Wavelength")
+        assertEquals(wavelengthChanges.map(_._2), List(BigDecimal("10.000000")))

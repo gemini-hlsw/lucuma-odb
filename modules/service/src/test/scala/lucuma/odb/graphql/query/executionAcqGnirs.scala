@@ -568,3 +568,60 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
             s"Could not generate a sequence for $oid: PAH acquisition filter cannot be used with short camera"
           ).asLeft
         )
+
+  test("[gnirs] the acquisition filter change costs the configured overhead"):
+    // A spectroscopy acquisition images the slit and then the field, and the two
+    // do not always use the same filter: the slit image falls back to H (Order4)
+    // for filters that have no short-camera entry of their own, so an H2
+    // acquisition moves the wheel even though the science sequence stays on one
+    // filter.  (With the default Order3 the two coincide and nothing is charged,
+    // which is why this picks H2 explicitly.)
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+        _ <- setAcquisitionFilter(o, "H2")
+      yield o
+
+    setup.flatMap: oid =>
+      query(
+        pi,
+        s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gnirs {
+                acquisition {
+                  nextAtom { steps { instrumentConfig { filter } estimate { configChange { all { name estimate { seconds } } } } } }
+                }
+              }
+            }
+          }
+        """
+      ).map: json =>
+        val steps =
+          json.hcursor
+            .downField("executionConfig").downField("gnirs").downField("acquisition")
+            .downField("nextAtom").downField("steps")
+            .values.toList.flatten
+
+        val filters: List[String] =
+          steps.flatMap(_.hcursor.downField("instrumentConfig").downField("filter").as[String].toOption)
+
+        val filterChanges: List[BigDecimal] =
+          steps.flatMap: step =>
+            step.hcursor
+              .downField("estimate").downField("configChange").downField("all")
+              .values.toList.flatten
+              .flatMap: c =>
+                (for
+                  n <- c.hcursor.downField("name").as[String].toOption
+                  v <- c.hcursor.downField("estimate").downField("seconds").as[BigDecimal].toOption
+                  if n == "GNIRS Filter"
+                yield v).toList
+
+        // The acquisition really does change filter, and each change is charged.
+        assertEquals(filterChanges.size, filters.zip(filters.tail).count(_ != _))
+        assert(filterChanges.nonEmpty, s"expected a filter change in the acquisition; filters were $filters")
+        assert(filterChanges.forall(_ == BigDecimal("10.000000")), s"unexpected costs: $filterChanges")
