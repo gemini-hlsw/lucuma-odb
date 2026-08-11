@@ -15,11 +15,9 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.StandardRole.*
-import lucuma.core.syntax.string.*
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ObservationValidationMap
@@ -38,9 +36,6 @@ object ObservationValidator:
 
   /* Validation Messages */
   object Messages {
-    def tooActivationExceedsCeiling(obs: TooActivation, ceiling: TooActivation): String =
-      s"Target of Opportunity activation ${obs.tag.toScreamingSnakeCase} exceeds the maximum " +
-      s"${ceiling.tag.toScreamingSnakeCase} allowed by the proposal."
 
     val OpportunityTargetRequiresActivation =
       "An observation with a Target of Opportunity placeholder must set a ToO activation other than NONE."
@@ -77,16 +72,6 @@ object ObservationValidator:
     import validator.*
 
 
-    // The Target-of-Opportunity ceiling.  This is an authorization failure
-    // rather than a misconfiguration, so it maps to Unapproved -- the
-    // observation cannot advance to Ready until the activation is lowered or
-    // the proposal's ceiling is raised.
-    val tooActivationValidator: ObservationValidator = info =>
-      if !info.exceedsTooCeiling then ObservationValidationMap.empty
-      else
-        ObservationValidationMap.singleton:
-          ObservationValidation.tooActivationUnapproved:
-            Messages.tooActivationExceedsCeiling(info.tooActivation, info.tooCeiling.get)
 
     // An opportunity target is a placeholder standing in for a target that
     // has not been found yet, so it makes sense only in an observation that
@@ -148,7 +133,7 @@ object ObservationValidator:
       CfpRaDecValidator          |+|
       BandValidator              |+|
       ghostVMagnitudeValidator   |+|
-      tooActivationValidator     |+|
+      TooActivationValidator     |+|
       opportunityTargetValidator |+|
       otherConfigErrors
 
