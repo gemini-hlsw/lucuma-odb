@@ -67,10 +67,6 @@ object ObservationValidator:
 
 
 
-    val itcValidator: ObservationValidator = info =>
-      if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
-      else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
-
     // An acquisition-capable mode whose acquisition ITC could not be produced
     // (a cached deterministic failure) carries an ItcError.  Pre-execution this
     // maps to Undefined and blocks Ready; during execution the frozen snapshot
@@ -112,7 +108,7 @@ object ObservationValidator:
       otherConfigErrors
 
     val scienceValidator2: ObservationValidator =
-      itcValidator |+| acquisitionValidator
+      ItcValidator(itcFor) |+| acquisitionValidator
 
     // And our validation results
 
