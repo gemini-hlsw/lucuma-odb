@@ -23,6 +23,9 @@ trait ConeSearchFixture:
     coords("00:00:00 -10:00:00"), // south of origin
   )
 
+  /** filter a list of (A, Coordinates) pairs to those within a given distance of a center coordinate.
+   *  using lucuma-core's `angularDistance` method.
+   */
   def within[A](seeded: List[(A, Coordinates)])(center: Coordinates, distance: Angle): Set[A] =
     seeded.collect {
       case (a, c) if center.angularDistance(c).toMicroarcseconds <= distance.toMicroarcseconds => a

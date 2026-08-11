@@ -18,9 +18,9 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.TestCoordinates.coords
 
 import java.time.LocalDateTime
-import lucuma.odb.TestCoordinates.coords
 
 class basePosition extends OdbSuite:
 

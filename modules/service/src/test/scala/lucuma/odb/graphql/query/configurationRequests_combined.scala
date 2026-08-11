@@ -17,16 +17,14 @@ import lucuma.core.model.Target
 
 import java.time.LocalDate
 
-// SC-9240 integration capstone: the destination query composes all four filters
-// (status = APPROVED, program.isActive, observingModeType IN [...], targetCoordinates
-// cone) and returns their exact intersection. The cone is injected as `id IN (...)`
-// and the other filters are pushable, so the whole WHERE compiles as one SQL
-// statement; LIMIT/OFFSET paginate cleanly over the exact result.
+// The destination query: all four filters in one WHERE, returning their exact intersection.
 //
-// Configuration requests are canonicalized by configuration, so each fixture
-// request has a distinct (observing mode, target) configuration to keep their ids
-// distinct; each non-matching one differs from the match in exactly one axis.
-class configurationRequests_combined extends OdbSuite with ObservingModeSetupOperations with ConeSearchFixture {
+// The fixture is built one-axis-off -- two matches, then a decoy per filter that differs from
+// a match in that filter alone -- so whichever filter breaks, the decoy that leaks names it.
+//
+// Requests are canonicalized by configuration, so each needs a distinct (mode, target) pair
+// to get a distinct id.
+class configurationRequests_combined extends OdbSuite with ObservingModeSetupOperations with ConeSearchFixture:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val admin = TestUsers.Standard.admin(2, 31)
@@ -41,7 +39,7 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
       cid <- createConfigurationRequestAs(pi, oid)
     yield cid
 
-  // The headline destination filter: approved, active program, GMOS-N long slit, within 5° of 00h +10°.
+  // Approved, active program, GMOS-N long slit, within 5° (18000") of (0h, +10°).
   private val Where =
     """status: { EQ: APPROVED }, program: { isActive: true }, observingModeType: { IN: [ GMOS_NORTH_LONG_SLIT ] }, targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { arcseconds: 18000 } }"""
 
@@ -55,7 +53,8 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
       }
     """
 
-  // Takes the `data` payload (what `query` yields; `queryWithSqlStats` yields a full response).
+  // Takes the `data` payload, which is what `query` yields; `queryWithSqlStats` yields the
+  // whole response, so its caller has to unwrap `data` first.
   private def idsAndHasMore(data: Json): IO[(List[ConfigurationRequest.Id], Boolean)] =
     val c = data.hcursor.downField("configurationRequests")
     (for
@@ -68,7 +67,7 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
   private def page(args: String): IO[(List[ConfigurationRequest.Id], Boolean)] =
     query(pi, destinationQuery(args)).flatMap(idsAndHasMore)
 
-  test("destination query: status + isActive + observingModeType + cone compose exactly"):
+  test("destination query: status + isActive + observingModeType + cone compose"):
     val today = LocalDate.now()
     for
       cfpid <- createGeminiCallForProposalsAs(admin)
@@ -81,33 +80,29 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
       _           <- addProposal(pi, pidInactive, Some(cfpid), None)
       _           <- setProgramActiveAs(staff, pidInactive, today.plusDays(100), today.plusDays(200))
 
-      // Distinct targets so each configuration request gets a distinct id.
-      tAtCenter <- createSiderealTargetAtAs(pi, pidActive, coords("00:00:00 +10:00:00"))   // at the cone center
-      tNear     <- createSiderealTargetAtAs(pi, pidActive, coords("00:06:00 +10:00:00"))   // ~1.5° off, still in the cone
-      tNear2    <- createSiderealTargetAtAs(pi, pidActive, coords("00:12:00 +10:00:00"))   // ~3° off, still in the cone
-      tFar      <- createSiderealTargetAtAs(pi, pidActive, coords("06:00:00 +40:00:00"))   // far outside the cone
+      tAtCenter <- createSiderealTargetAtAs(pi, pidActive, coords("00:00:00 +10:00:00"))   // cone center
+      tNear     <- createSiderealTargetAtAs(pi, pidActive, coords("00:06:00 +10:00:00"))   // ~1.5°, in the cone
+      tNear2    <- createSiderealTargetAtAs(pi, pidActive, coords("00:12:00 +10:00:00"))   // ~3°, in the cone
+      tFar      <- createSiderealTargetAtAs(pi, pidActive, coords("06:00:00 +40:00:00"))   // outside the cone
       tInactive <- createSiderealTargetAtAs(pi, pidInactive, coords("00:00:00 +10:00:00")) // inactive program
 
-      // The matches: approved, GMOS-North-Long-Slit, active program, inside the cone.
-      // Two of them, so LIMIT/OFFSET paging over the filtered set is meaningful.
+      // Two matches, so paging over the filtered set below is meaningful.
       cidMatch     <- requestAs(pidActive, ObservingModeType.GmosNorthLongSlit, tAtCenter)
       _            <- setConfigurationRequestStatusAs(staff, cidMatch, ConfigurationRequestStatus.Approved)
 
       cidMatch2    <- requestAs(pidActive, ObservingModeType.GmosNorthLongSlit, tNear2)
       _            <- setConfigurationRequestStatusAs(staff, cidMatch2, ConfigurationRequestStatus.Approved)
 
-      // Wrong observing mode (otherwise identical).
+      // The decoys. Each is a match except for the one filter named.
+
       cidWrongMode <- requestAs(pidActive, ObservingModeType.GmosSouthLongSlit, tAtCenter)
       _            <- setConfigurationRequestStatusAs(staff, cidWrongMode, ConfigurationRequestStatus.Approved)
 
-      // Wrong status (right mode, in cone, active -- only status excludes it).
-      cidWrongStatus <- requestAs(pidActive, ObservingModeType.GmosNorthLongSlit, tNear) // default Requested
+      cidWrongStatus <- requestAs(pidActive, ObservingModeType.GmosNorthLongSlit, tNear) // left Requested
 
-      // Out of the cone (otherwise identical).
       cidOutOfCone <- requestAs(pidActive, ObservingModeType.GmosNorthLongSlit, tFar)
       _            <- setConfigurationRequestStatusAs(staff, cidOutOfCone, ConfigurationRequestStatus.Approved)
 
-      // Inactive program (otherwise identical).
       cidInactiveProg <- requestAs(pidInactive, ObservingModeType.GmosNorthLongSlit, tInactive)
       _               <- setConfigurationRequestStatusAs(staff, cidInactiveProg, ConfigurationRequestStatus.Approved)
 
@@ -115,27 +110,24 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
 
       matched <- configurationRequestsWhere(pi, Where)
 
-      // Pagination over the filtered set: OFFSET is inclusive, ordering is by id ascending.
+      // Paging runs over the filtered set, which only holds if the cone is part of the WHERE.
+      // OFFSET is inclusive and matches are ordered by id.
       first  <- page(", LIMIT: 1")
       second <- page(s", OFFSET: ${expected(1).asJson}, LIMIT: 1")
       whole  <- page(", LIMIT: 1000")
 
-      // Whitebox: the same query against a stats-collecting mapping, to count statements.
+      // The same query again, through a mapping that records the SQL it issues.
       (resp, stats) <- queryWithSqlStats(pi, destinationQuery(""))
       pushed        <- idsAndHasMore(resp.hcursor.downField("data").focus.getOrElse(Json.Null))
     yield
-      // Only the approved, GMOS-North-Long-Slit, active-program requests in the cone match.
       assertEquals(matched.toSet, expected.toSet)
 
       assertEquals(first,  (List(expected(0)), true),  clue = "first page")
       assertEquals(second, (List(expected(1)), false), clue = "second page")
       assertEquals(whole,  (expected, false),          clue = "unpaginated")
 
-      // The cone is injected as `id IN (...)`, so status / isActive / observingModeType /
-      // id / visibility all push down into a single statement -- no per-row Scala
-      // evaluation. (The cone candidate lookup itself runs before compilation and is not
-      // counted here; see `queryWithSqlStats`.)
+      // Once the cone becomes `id IN (...)` every filter is pushable, so the whole query is
+      // one statement with nothing evaluated per row in Scala.
       assertEquals(pushed._1.toSet, expected.toSet)
+      // Verify we use a single SQL statement
       assertEquals(stats.length, 1, clue = stats.map(_.normalize.sql))
-
-}

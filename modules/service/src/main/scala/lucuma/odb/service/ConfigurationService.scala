@@ -1595,6 +1595,15 @@ object ConfigurationService {
 
       val µasPerDeg: AppliedFragment = sql"$float8".apply(µasPerDegree)
 
+      // The assembled statement, in outline:
+      //
+      //   select c_configuration_request_id from v_configuration_request
+      //    where <dec in [decLo, decHi], or in either wrapped image of it>   -- box prefilter,
+      //      and <ra  in [raLo,  raHi ], or in either wrapped image of it>   -- index-friendly
+      //      and <spherical law of cosines: cos(separation) >= cos(radius)>  -- exact trim
+      //      and <program visible to user>                                   -- see above
+      //    limit max + 1                                                     -- one over, to detect
+      //
       void"select c_configuration_request_id from v_configuration_request"                                              |+|
       void" where (c_reference_dec between "    |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi) |+|
       void" or c_reference_dec >= "             |+| sql"$int8".apply(decLo + FullCircle)                                |+|

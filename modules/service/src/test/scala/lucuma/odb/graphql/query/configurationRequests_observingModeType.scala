@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package query
 
-class configurationRequests_observingModeType extends OdbSuite with ObservingModeSetupOperations {
+class configurationRequests_observingModeType extends OdbSuite with ObservingModeSetupOperations:
 
   val pi       = TestUsers.Standard.pi(1, 30)
   val admin    = TestUsers.Standard.admin(2, 31)
@@ -13,9 +13,6 @@ class configurationRequests_observingModeType extends OdbSuite with ObservingMod
   // A configuration request inherits the observing mode of the observation it is
   // created from, and belongs to the program's proposal workflow, so the program
   // needs a proposal in a call for proposals before requests can be created.
-  // A request requires a complete configuration (observing mode + a target with
-  // reference coordinates), so every request has a non-null observing mode;
-  // `IS_NULL: true` therefore matches none.
   test("filter configuration requests on observingModeType"):
     for
       cfpid <- createGeminiCallForProposalsAs(admin)
@@ -44,5 +41,3 @@ class configurationRequests_observingModeType extends OdbSuite with ObservingMod
       assertEquals(nin,     List(cid3))
       assertEquals(isNull,  Nil)
       assertEquals(notNull, List(cid1, cid2, cid3))
-
-}

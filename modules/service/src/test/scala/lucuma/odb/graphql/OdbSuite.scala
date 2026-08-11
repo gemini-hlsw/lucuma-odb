@@ -473,8 +473,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   /**
    * Runs `document` as `user` against a dedicated mapping whose monitor records every SQL
    * statement issued, compiling and then resolving cone filters exactly as `GraphQLRoutes`
-   * does. Yields the response JSON and the statements that produced it, so a test can
-   * assert not just the result but how many queries it took.
+   * does.
+   * Yields the response JSON and the statements that produced it, so a test can assert not just 
+   * the result but how many queries it took.
    */
   def queryWithSqlStats(user: User, document: String, variables: Option[JsonObject] = None): IO[(Json, List[SqlStats])] =
     import Tracer.Implicits.noop
@@ -502,8 +503,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       for {
         op   <- orRaise(map.compiler.compile(document, none, variables.map(_.toJson), reportUnused = false))
         qry  <- ConeFilter.resolve(op.query)(map.coneCandidates).flatMap(orRaise)
-        // The monitor sees only grackle-mapped SQL, so the cone candidate lookup that
-        // `resolve` just ran is deliberately not counted; drop anything else.
         _    <- mon.take
         json <- map.interpreter.run(qry, op.rootTpe, Env.empty).evalMap(map.mkResponse).compile.lastOrError
         sts  <- mon.take

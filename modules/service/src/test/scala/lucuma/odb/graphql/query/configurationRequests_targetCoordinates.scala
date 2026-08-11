@@ -16,10 +16,12 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 
-// GraphQL-level tests for the SC-9240 `targetCoordinates` cone WHERE filter. Geometry is
-// checked against lucuma-core's exact `angularDistance` (see ConeSearchFixture); the rest
-// cover how the cone survives compilation, since it is elaborated to a placeholder
-// predicate and resolved afterwards (see ConeFilter).
+// GraphQL-level tests for the `targetCoordinates` cone WHERE filter
+//
+// Care is taken to consider several scenarios on how the targetCoordinates filters could be
+// passed along, inline, in variables,etc
+//
+// The SQL itself is covered at the service level by coneCandidates.
 class configurationRequests_targetCoordinates extends OdbSuite with ObservingModeSetupOperations with ConeSearchFixture {
 
   val pi    = TestUsers.Standard.pi(1, 30)
@@ -42,26 +44,18 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
         requestAt(pid, c).map(cid => (cid, c))
       }
 
-      // 5° cone at (0h, +10°): matches the center target; excludes the in-box-but-
-      // outside-circle target, the seam target, and everything far.
+      // 5° at (0h, +10°): the center target only. The offset target sits in the bounding box
+      // but outside the circle, so it leaks unless the exact trim runs.
       small   <- configurationRequestsWhere(pi, s"""program: { id: { EQ: "$pid" } }, targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { arcseconds: 18000 } }""")
-      // 20° cone at (0h, +10°): now also reaches across the seam.
+      // 21° at the same center: wide enough to wrap across RA 0 and pick up the seam target.
       seam    <- configurationRequestsWhere(pi, s"""program: { id: { EQ: "$pid" } }, targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { arcseconds: 75600 } }""")
-      // small cone at the pole target.
+      // 2° at the near-pole target, where the RA box has to open up.
       pole    <- configurationRequestsWhere(pi, s"""program: { id: { EQ: "$pid" } }, targetCoordinates: { center: { ra: { hours: "12.0" }, dec: { degrees: "89.0" } }, distance: { arcseconds: 7200 } }""")
     yield
       val center = coords("00:00:00 +10:00:00")
       assertEquals(small.toSet, within(seeded)(center, 5.degrees))
       assertEquals(seam.toSet,  within(seeded)(center, 21.degrees))
       assertEquals(pole.toSet,  within(seeded)(coords("12:00:00 +89:00:00"), 2.degrees))
-
-  // --- how the cone survives compilation ---
-  //
-  // The cone is elaborated to a placeholder predicate and resolved afterwards, so grackle
-  // substitutes variables and spreads fragments before it is ever parsed. These are the
-  // shapes an earlier document-rewriting version got wrong: it looked for the literal
-  // string `targetCoordinates` in the query text, so a cone arriving by variable was
-  // silently ignored and unrelated variables were dropped on recompile.
 
   // One request inside the 5° cone at (0h, +10°) and one well outside it.
   private def coneSetup: IO[(Program.Id, ConfigurationRequest.Id, ConfigurationRequest.Id)] =
@@ -81,12 +75,14 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       .leftMap(f => new RuntimeException(f.message))
       .liftTo[IO]
 
+  // A 5° cone at (0h, +10°) as a JSON variable value
   private val ConeJson: Json =
     json"""{
       "center": { "ra": { "hours": "0.0" }, "dec": { "degrees": "10.0" } },
       "distance": { "arcseconds": 18000 }
     }"""
 
+  // A 5° cone at (0h, +10°) as inline GraphQL.
   private val ConeText: String =
     """targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { arcseconds: 18000 } }"""
 
@@ -151,9 +147,7 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       got <- ids(res)
     yield assertEquals(got, List(near))
 
-  // The update mutation shares this WHERE input but builds its Filter at execution time,
-  // where ConeFilter cannot reach it. Rejecting is the point: silently dropping the cone
-  // would make the mutation update every request in the program.
+  // The mutation shares this WHERE input, but rejects taking a cone filter.
   test("cone is rejected by the update mutation"):
     for
       (pid, _, _) <- coneSetup
@@ -174,8 +168,6 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
   test("cone under OR keeps its position"):
     for
       (pid, near, far) <- coneSetup
-      // The other arm selects the request *outside* the cone, so hoisting the cone up to
-      // a top-level conjunct would wrongly drop it. Both arms must survive.
       res <- query(
                pi,
                s"""query {
