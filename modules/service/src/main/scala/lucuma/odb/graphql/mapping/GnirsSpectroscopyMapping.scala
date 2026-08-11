@@ -66,16 +66,16 @@ trait GnirsSpectroscopyMapping[F[_]]
    * there.  Keyed on (observation, wavelength, version) to match the table's
    * primary key.
    */
-  lazy val GnirsSpectroscopyWavelengthMapping: ObjectMapping =
-    ObjectMapping(GnirsSpectroscopyWavelengthType)(
-      SqlField("observationId",     GnirsSpectroscopyWavelengthTable.ObservationId, key = true, hidden = true),
+  lazy val GnirsCentralWavelengthConfigMapping: ObjectMapping =
+    ObjectMapping(GnirsCentralWavelengthConfigType)(
+      SqlField("observationId",     GnirsCentralWavelengthConfigTable.ObservationId, key = true, hidden = true),
       // `centralWavelength` is an object in the schema (see WavelengthMapping), so the
       // key is a hidden field on the same column.  It doubles as the sort key.
-      SqlField("centralWavelengthKey", GnirsSpectroscopyWavelengthTable.CentralWavelength, key = true, hidden = true),
-      SqlField("version",           GnirsSpectroscopyWavelengthTable.Version, key = true, hidden = true),
+      SqlField("centralWavelengthKey", GnirsCentralWavelengthConfigTable.CentralWavelength, key = true, hidden = true),
+      SqlField("version",           GnirsCentralWavelengthConfigTable.Version, key = true, hidden = true),
       SqlObject("centralWavelength"),
-      SqlField("coadds",            GnirsSpectroscopyWavelengthTable.Coadds),
-      SqlObject("exposureTimeMode", Join(GnirsSpectroscopyWavelengthTable.ExposureTimeModeId, ExposureTimeModeView.Id))
+      SqlField("coadds",            GnirsCentralWavelengthConfigTable.Coadds),
+      SqlObject("exposureTimeMode", Join(GnirsCentralWavelengthConfigTable.ExposureTimeModeId, ExposureTimeModeView.Id))
     )
 
   lazy val GnirsSpectroscopyMapping: ObjectMapping =
@@ -95,8 +95,8 @@ trait GnirsSpectroscopyMapping[F[_]]
 
       // Central wavelengths: one child row each, in the "current" and "initial"
       // row versions respectively (see the elaborator below).
-      SqlObject("centralWavelengths",        Join(GnirsSpectroscopyView.ObservationId, GnirsSpectroscopyWavelengthTable.ObservationId)),
-      SqlObject("initialCentralWavelengths", Join(GnirsSpectroscopyView.ObservationId, GnirsSpectroscopyWavelengthTable.ObservationId)),
+      SqlObject("centralWavelengths",        Join(GnirsSpectroscopyView.ObservationId, GnirsCentralWavelengthConfigTable.ObservationId)),
+      SqlObject("initialCentralWavelengths", Join(GnirsSpectroscopyView.ObservationId, GnirsCentralWavelengthConfigTable.ObservationId)),
 
       // Camera + Filter
       SqlField("camera",        GnirsSpectroscopyView.Camera),
@@ -184,7 +184,7 @@ trait GnirsSpectroscopyMapping[F[_]]
   private def wavelengthElaborator(v: ObservingModeRowVersion): Elab[Unit] =
     Elab.transformChild: child =>
       OrderBy(
-        OrderSelections(List(OrderSelection[Wavelength](GnirsSpectroscopyWavelengthType / "centralWavelengthKey"))),
+        OrderSelections(List(OrderSelection[Wavelength](GnirsCentralWavelengthConfigType / "centralWavelengthKey"))),
         Filter(Predicates.gnirsSpectroscopyWavelength.version.eql(v), child)
       )
 

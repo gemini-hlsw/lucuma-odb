@@ -30,7 +30,7 @@ case class Config(
   fpu:                     GnirsFpu.Spectroscopy,
   prism:                   GnirsPrism,
   grating:                 GnirsGrating,
-  wavelengths:             NonEmptyList[ScienceWavelength],
+  wavelengths:             NonEmptyList[CentralWavelengthConfig],
   camera:                  GnirsCamera,
   focus:                   GnirsFocus,
   explicitReadMode:        Option[GnirsReadMode],
@@ -47,7 +47,7 @@ case class Config(
    * HR-IFU alignment flat.  Wavelengths are stored in increasing order, so this
    * is the shortest.
    */
-  def primaryWavelength: ScienceWavelength =
+  def primaryWavelength: CentralWavelengthConfig =
     wavelengths.head
 
   def primaryCentralWavelength: Wavelength =

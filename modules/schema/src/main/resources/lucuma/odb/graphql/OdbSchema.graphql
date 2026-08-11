@@ -11335,7 +11335,7 @@ type GnirsSpectroscopyAcquisition {
 A GNIRS spectroscopy science configuration: a central wavelength together with
 the exposure time mode and coadds that apply at that wavelength.
 """
-type GnirsSpectroscopyWavelength {
+type GnirsCentralWavelengthConfig {
 
   centralWavelength: Wavelength!
 
@@ -11353,7 +11353,7 @@ type GnirsSpectroscopyWavelength {
 Defines a GNIRS spectroscopy central wavelength to use along with its exposure
 time mode and coadds.
 """
-input GnirsSpectroscopyWavelengthInput {
+input GnirsCentralWavelengthConfigInput {
 
   centralWavelength: WavelengthInput!
 
@@ -11388,13 +11388,13 @@ type GnirsSpectroscopy {
   order.  Each one is a separate configuration with its own exposure time mode,
   coadds, ITC calculation and calibrations.
   """
-  centralWavelengths: [GnirsSpectroscopyWavelength!]!
+  centralWavelengths: [GnirsCentralWavelengthConfig!]!
 
   """
   The central wavelengths as they were configured when the observing mode was
   created.
   """
-  initialCentralWavelengths: [GnirsSpectroscopyWavelength!]!
+  initialCentralWavelengths: [GnirsCentralWavelengthConfig!]!
 
   camera: GnirsCamera!
   initialCamera: GnirsCamera!
@@ -11532,7 +11532,7 @@ input GnirsSpectroscopyInput {
   must contain at least one entry with no duplicated wavelength.  When given on
   edit, it replaces the existing list wholesale.
   """
-  centralWavelengths: [GnirsSpectroscopyWavelengthInput!]
+  centralWavelengths: [GnirsCentralWavelengthConfigInput!]
 
   filter: GnirsFilter
 

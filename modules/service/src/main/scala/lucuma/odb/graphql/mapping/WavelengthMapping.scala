@@ -89,11 +89,11 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(TimeAndCountExposureTimeModeType / "at", ExposureTimeModeView.TimeAndCount.At, ExposureTimeModeView.TimeAndCount.SyntheticId),
       wavelengthMappingAtPath(VisitorType / "centralWavelength", VisitorTable.CentralWavelength, VisitorTable.ObservationId),
       wavelengthMappingAtPath(
-        GnirsSpectroscopyWavelengthType / "centralWavelength",
-        GnirsSpectroscopyWavelengthTable.CentralWavelength,
+        GnirsCentralWavelengthConfigType / "centralWavelength",
+        GnirsCentralWavelengthConfigTable.CentralWavelength,
         // The child table's primary key: one wavelength object per row.
-        GnirsSpectroscopyWavelengthTable.ObservationId,
-        GnirsSpectroscopyWavelengthTable.CentralWavelength,
-        GnirsSpectroscopyWavelengthTable.Version
+        GnirsCentralWavelengthConfigTable.ObservationId,
+        GnirsCentralWavelengthConfigTable.CentralWavelength,
+        GnirsCentralWavelengthConfigTable.Version
       ),
     )

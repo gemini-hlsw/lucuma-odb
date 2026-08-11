@@ -5,7 +5,7 @@
 -- t_gnirs_spectroscopy moves to a child table with one row per wavelength,
 -- modeled after t_gnirs_imaging_filter.
 
-CREATE TABLE t_gnirs_spectroscopy_wavelength (
+CREATE TABLE t_gnirs_central_wavelength_config (
   c_observation_id        d_observation_id             NOT NULL,
   c_central_wavelength    d_wavelength_pm              NOT NULL,
   c_version               e_observing_mode_row_version NOT NULL DEFAULT 'current',
@@ -14,7 +14,7 @@ CREATE TABLE t_gnirs_spectroscopy_wavelength (
   c_role                  e_exposure_time_mode_role    NOT NULL DEFAULT 'science' CHECK (c_role = 'science'),
 
   PRIMARY KEY (c_observation_id, c_central_wavelength, c_version),
-  CONSTRAINT t_gnirs_spectroscopy_wavelength_unique_exposure_time_mode_id
+  CONSTRAINT t_gnirs_central_wavelength_config_unique_exposure_time_mode_id
     UNIQUE (c_exposure_time_mode_id),
   FOREIGN KEY (c_observation_id)
     REFERENCES t_gnirs_spectroscopy(c_observation_id) ON DELETE CASCADE,
@@ -23,13 +23,13 @@ CREATE TABLE t_gnirs_spectroscopy_wavelength (
     ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
 );
 
-COMMENT ON TABLE t_gnirs_spectroscopy_wavelength IS
+COMMENT ON TABLE t_gnirs_central_wavelength_config IS
   'GNIRS spectroscopy central wavelengths, each with its own exposure time mode and coadds';
 
 -- Backfill.  Existing observations have exactly one science ETM, which becomes the
 -- 'current' row's ETM.  The 'initial' row needs its own ETM (the unique constraint
 -- above allows an ETM to back only one wavelength row), so clone it.
-INSERT INTO t_gnirs_spectroscopy_wavelength (
+INSERT INTO t_gnirs_central_wavelength_config (
   c_observation_id,
   c_central_wavelength,
   c_version,
@@ -71,7 +71,7 @@ WITH cloned AS (
    AND m.c_role = 'science'::e_exposure_time_mode_role
   RETURNING c_exposure_time_mode_id, c_observation_id
 )
-INSERT INTO t_gnirs_spectroscopy_wavelength (
+INSERT INTO t_gnirs_central_wavelength_config (
   c_observation_id,
   c_central_wavelength,
   c_version,

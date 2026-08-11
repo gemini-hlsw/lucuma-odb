@@ -31,13 +31,13 @@ object GnirsSpectroscopyInput:
 
   /**
    * Validates a central wavelength list: at least one entry, no duplicated
-   * wavelength (each one backs a distinct row in t_gnirs_spectroscopy_wavelength),
+   * wavelength (each one backs a distinct row in t_gnirs_central_wavelength_config),
    * returned sorted by increasing wavelength, which is the order the sequence
    * executes them in.
    */
   private def resolveWavelengths(
-    ws: List[GnirsSpectroscopyWavelengthInput]
-  ): Result[NonEmptyList[GnirsSpectroscopyWavelengthInput]] =
+    ws: List[GnirsCentralWavelengthConfigInput]
+  ): Result[NonEmptyList[GnirsCentralWavelengthConfigInput]] =
     val duplicates = ws.groupBy(_.centralWavelength).filter(_._2.sizeIs > 1).keys.toList
     if duplicates.nonEmpty then
       Matcher.validationFailure:
@@ -116,7 +116,7 @@ object GnirsSpectroscopyInput:
   val AcquisitionInput = GnirsAcquisitionInput
 
   case class Create(
-    centralWavelengths: NonEmptyList[GnirsSpectroscopyWavelengthInput],
+    centralWavelengths: NonEmptyList[GnirsCentralWavelengthConfigInput],
     filter:           GnirsFilter,
     fpu:              GnirsFpu.Spectroscopy,
     camera:           GnirsCamera,
@@ -142,7 +142,7 @@ object GnirsSpectroscopyInput:
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(
-          GnirsSpectroscopyWavelengthInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
+          GnirsCentralWavelengthConfigInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
           GnirsFilterBinding("filter", rFilter),
           GnirsSlitInput.Binding.Option("slit", rSlit),
           GnirsIfuInput.Binding.Option("ifu", rIfu),
@@ -174,7 +174,7 @@ object GnirsSpectroscopyInput:
                        telluricType.getOrElse(TelluricType.Hot))
 
   case class Edit(
-    centralWavelengths:        Option[NonEmptyList[GnirsSpectroscopyWavelengthInput]],
+    centralWavelengths:        Option[NonEmptyList[GnirsCentralWavelengthConfigInput]],
     filter:                    Option[GnirsFilter],
     fpu:                       Option[GnirsFpu.Spectroscopy],
     camera:                    Option[GnirsCamera],
@@ -222,7 +222,7 @@ object GnirsSpectroscopyInput:
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
-          GnirsSpectroscopyWavelengthInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
+          GnirsCentralWavelengthConfigInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
           GnirsFilterBinding.Option("filter", rFilter),
           GnirsSlitInput.Binding.Option("slit", rSlit),
           GnirsIfuInput.Binding.Option("ifu", rIfu),

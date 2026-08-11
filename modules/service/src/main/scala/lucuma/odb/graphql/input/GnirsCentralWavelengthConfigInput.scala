@@ -15,15 +15,15 @@ import lucuma.odb.graphql.binding.*
  * exposure time mode and coadds that apply there.  A missing exposure time mode
  * falls back to the observation's requirements; missing coadds default to 1.
  */
-case class GnirsSpectroscopyWavelengthInput(
+case class GnirsCentralWavelengthConfigInput(
   centralWavelength: Wavelength,
   exposureTimeMode:  Option[ExposureTimeMode],
   coadds:            Option[PosInt]
 )
 
-object GnirsSpectroscopyWavelengthInput:
+object GnirsCentralWavelengthConfigInput:
 
-  val Binding: Matcher[GnirsSpectroscopyWavelengthInput] =
+  val Binding: Matcher[GnirsCentralWavelengthConfigInput] =
     ObjectFieldsBinding.rmap:
       case List(
         WavelengthInput.Binding("centralWavelength", rCentralWavelength),
@@ -31,7 +31,7 @@ object GnirsSpectroscopyWavelengthInput:
         PosIntBinding.Option("coadds", rCoadds)
       ) =>
         (rCentralWavelength, rEtm, rCoadds).parMapN: (w, etm, coadds) =>
-          GnirsSpectroscopyWavelengthInput(w, etm, GnirsSpectroscopyWavelengthInput.coaddsForEtm(etm, coadds))
+          GnirsCentralWavelengthConfigInput(w, etm, GnirsCentralWavelengthConfigInput.coaddsForEtm(etm, coadds))
 
   /**
    * Signal-to-noise exposure time mode does not support coadds.  When the ETM is

@@ -83,7 +83,7 @@ object Science:
 
   /** `cals` holds the flat, the arc or both; empty for telluric sequences. */
   case class StepDefinition(
-    wavelength:   ScienceWavelength,
+    wavelength:   CentralWavelengthConfig,
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
@@ -102,7 +102,7 @@ object Science:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
-      wavelength:   ScienceWavelength,
+      wavelength:   CentralWavelengthConfig,
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
@@ -127,7 +127,7 @@ object Science:
 
       def apply(
         config:  Config,
-        sw:      ScienceWavelength,
+        sw:      CentralWavelengthConfig,
         time:    IntegrationTime,
         calRole: Option[CalibrationRole]
       ): PreDef =
@@ -177,7 +177,7 @@ object Science:
 
     def compute[F[_]: Monad](
       config:   Config,
-      sw:       ScienceWavelength,
+      sw:       CentralWavelengthConfig,
       time:     IntegrationTime,
       static:   GnirsStaticConfig,
       expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
@@ -191,7 +191,7 @@ object Science:
      */
     def computeAll[F[_]: Monad](
       config:   Config,
-      times:    NonEmptyList[(ScienceWavelength, IntegrationTime)],
+      times:    NonEmptyList[(CentralWavelengthConfig, IntegrationTime)],
       static:   GnirsStaticConfig,
       expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
       calRole:  Option[CalibrationRole]
@@ -315,7 +315,7 @@ object Science:
   private def definitionError(oid: Observation.Id, msg: String): OdbError =
     OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
-  private def nm(sw: ScienceWavelength): String =
+  private def nm(sw: CentralWavelengthConfig): String =
     f"${sw.centralWavelength.toNanometers.value.value.toDouble}%.0f nm"
 
   /**
@@ -324,17 +324,17 @@ object Science:
    * unchanged), suffixed with the wavelength when it has several, so the
    * observer can tell the segments apart.
    */
-  private def atomTitle(base: NonEmptyString, sw: ScienceWavelength, multi: Boolean): NonEmptyString =
+  private def atomTitle(base: NonEmptyString, sw: CentralWavelengthConfig, multi: Boolean): NonEmptyString =
     if multi then NonEmptyString.unsafeFrom(s"${base.value} (${nm(sw)})") else base
 
   // "GNIRS Spectroscopy" rather than "Long Slit": this generator serves the IFU too.
   private def zeroExposureTime(oid: Observation.Id): OdbError =
     definitionError(oid, "GNIRS Spectroscopy requires a positive exposure time.")
 
-  private def missingItcResult(oid: Observation.Id, sw: ScienceWavelength): OdbError =
+  private def missingItcResult(oid: Observation.Id, sw: CentralWavelengthConfig): OdbError =
     definitionError(oid, s"No ITC result for central wavelength ${nm(sw)}.")
 
-  private def exposureTimeTooLong(oid: Observation.Id, sw: ScienceWavelength, estimate: TimeSpan): OdbError =
+  private def exposureTimeTooLong(oid: Observation.Id, sw: CentralWavelengthConfig, estimate: TimeSpan): OdbError =
     definitionError(oid, s"Estimated science cycle time (${estimate.toMinutes} minutes) at ${nm(sw)} for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.")
 
   /**
@@ -357,7 +357,7 @@ object Science:
     // the grating angle, so a single flat is only valid for one setting: take one
     // per distinct central wavelength.  These are DayCal and so cost no program
     // time.
-    def flat(sw: ScienceWavelength): ProtoStep[GnirsDynamicConfig] =
+    def flat(sw: CentralWavelengthConfig): ProtoStep[GnirsDynamicConfig] =
       SeqState.eval:
         for
           _ <- State.modify[GnirsDynamicConfig]: dyn =>
@@ -378,7 +378,7 @@ object Science:
           f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
         yield f
 
-    val distinctWavelengths: NonEmptyList[ScienceWavelength] =
+    val distinctWavelengths: NonEmptyList[CentralWavelengthConfig] =
       NonEmptyList.fromListUnsafe(config.wavelengths.toList.distinctBy(_.centralWavelength))
 
     val multi: Boolean = distinctWavelengths.length > 1
@@ -427,7 +427,7 @@ object Science:
     // Pair each configured wavelength with its ITC result, in configuration
     // order.  A wavelength with no result is a programming error upstream, not
     // something to silently drop.
-    val pairs: EitherT[F, OdbError, NonEmptyList[(ScienceWavelength, IntegrationTime)]] =
+    val pairs: EitherT[F, OdbError, NonEmptyList[(CentralWavelengthConfig, IntegrationTime)]] =
       EitherT.fromEither:
         times.flatMap: m =>
           config.wavelengths.traverse: sw =>

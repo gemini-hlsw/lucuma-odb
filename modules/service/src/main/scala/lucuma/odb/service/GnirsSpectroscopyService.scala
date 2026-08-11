@@ -39,12 +39,12 @@ import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.telescopeConfigs.*
+import lucuma.odb.graphql.input.GnirsCentralWavelengthConfigInput
 import lucuma.odb.graphql.input.GnirsSpectroscopyInput
-import lucuma.odb.graphql.input.GnirsSpectroscopyWavelengthInput
 import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Acquisition
+import lucuma.odb.sequence.gnirs.spectroscopy.CentralWavelengthConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Config
-import lucuma.odb.sequence.gnirs.spectroscopy.ScienceWavelength
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import skunk.*
@@ -84,7 +84,7 @@ object GnirsSpectroscopyService:
 
   private val DefaultCoadds: PosInt = PosInt.unsafeFrom(1)
 
-  val WavelengthTableName: String = "t_gnirs_spectroscopy_wavelength"
+  val CentralWavelengthConfigTableName: String = "t_gnirs_central_wavelength_config"
 
   def instantiate[F[_]: {Concurrent as F, Services}]: GnirsSpectroscopyService[F] =
 
@@ -95,7 +95,7 @@ object GnirsSpectroscopyService:
        * yields carries only that row's wavelength; `select` groups the rows per
        * observation and replaces `wavelengths` with the full list.
        */
-      val gnirsLS: Decoder[(ScienceWavelength, Config)] = (
+      val gnirsLS: Decoder[(CentralWavelengthConfig, Config)] = (
         // The row's central wavelength, its science ETM (joined via the row's FK)
         // and its coadds.
         wavelength_pm                    *: // c_central_wavelength
@@ -169,7 +169,7 @@ object GnirsSpectroscopyService:
                         val acq = AcquisitionConfig(explicitAcqMode, acqFilterExp, acqEtm, acqCoaddsP)
                         val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
-                        val sw = ScienceWavelength(centralWav, sciEtm, coaddsP)
+                        val sw = CentralWavelengthConfig(centralWav, sciEtm, coaddsP)
                         (sw,
                          Config(
                           filter,
@@ -212,7 +212,7 @@ object GnirsSpectroscopyService:
        * child rows can be written from the resolved result.
        */
       private def resolveKey(
-        w: GnirsSpectroscopyWavelengthInput
+        w: GnirsCentralWavelengthConfigInput
       ): (Wavelength, Option[ExposureTimeMode]) =
         (w.centralWavelength, w.exposureTimeMode)
 
@@ -222,7 +222,7 @@ object GnirsSpectroscopyService:
         m.view.mapValues(_._2).toMap
 
       private def insertWavelengths(
-        input:   NonEmptyList[GnirsSpectroscopyWavelengthInput],
+        input:   NonEmptyList[GnirsCentralWavelengthConfigInput],
         etms:    Map[Observation.Id, NonEmptyList[(Wavelength, ExposureTimeModeId)]],
         version: ObservingModeRowVersion
       ): F[Unit] =
@@ -276,7 +276,7 @@ object GnirsSpectroscopyService:
       )(using Transaction[F]): ResultT[F, Unit] =
         SET.centralWavelengths.fold(ResultT.unit): ws =>
           for
-            _   <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentScienceFiltersAndEtms(WavelengthTableName, oids)))
+            _   <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentScienceFiltersAndEtms(CentralWavelengthConfigTableName, oids)))
             r   <- ResultT(exposureTimeModeService.resolve("GNIRS Spectroscopy", none, ws.map(resolveKey), none, which))
             cur <- ResultT.liftF(exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
             _   <- ResultT.liftF(insertWavelengths(ws, cur, ObservingModeRowVersion.Current))
@@ -371,7 +371,7 @@ object GnirsSpectroscopyService:
           acq.c_exposure_count,
           ls.c_telluric_type
         FROM v_gnirs_spectroscopy ls
-        JOIN t_gnirs_spectroscopy_wavelength w
+        JOIN t_gnirs_central_wavelength_config w
            ON w.c_observation_id = ls.c_observation_id
           AND w.c_version = 'current'
         JOIN t_exposure_time_mode sci
@@ -695,7 +695,7 @@ object GnirsSpectroscopyService:
     ): AppliedFragment =
       val insertInto: AppliedFragment =
         void"""
-          INSERT INTO t_gnirs_spectroscopy_wavelength (
+          INSERT INTO t_gnirs_central_wavelength_config (
             c_observation_id,
             c_central_wavelength,
             c_version,
@@ -732,7 +732,7 @@ object GnirsSpectroscopyService:
               ARRAY[${exposure_time_mode_id.list(etms.length)}]
             ) AS map(old_exposure_time_mode_id, new_exposure_time_mode_id)
         )
-        INSERT INTO t_gnirs_spectroscopy_wavelength (
+        INSERT INTO t_gnirs_central_wavelength_config (
           c_observation_id,
           c_central_wavelength,
           c_version,
@@ -747,7 +747,7 @@ object GnirsSpectroscopyService:
           w.c_coadds,
           e.new_exposure_time_mode_id,
           w.c_role
-        FROM t_gnirs_spectroscopy_wavelength w
+        FROM t_gnirs_central_wavelength_config w
         JOIN etm_map e ON e.old_exposure_time_mode_id = w.c_exposure_time_mode_id
         WHERE w.c_observation_id = $observation_id
       """.apply(etms.map(_._1), etms.map(_._2), newId, originalId)

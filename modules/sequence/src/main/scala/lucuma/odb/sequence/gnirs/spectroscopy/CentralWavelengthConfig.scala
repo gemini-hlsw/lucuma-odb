@@ -18,16 +18,16 @@ import lucuma.odb.sequence.util.HashBytes
  * a separate ITC calculation and a separate block of science steps with its own
  * flats and arcs.
  */
-case class ScienceWavelength(
+case class CentralWavelengthConfig(
   centralWavelength: Wavelength,
   exposureTimeMode:  ExposureTimeMode,
   coadds:            PosInt
 ) derives Eq
 
-object ScienceWavelength:
+object CentralWavelengthConfig:
 
-  given HashBytes[ScienceWavelength] with
-    def hashBytes(a: ScienceWavelength): Array[Byte] =
+  given HashBytes[CentralWavelengthConfig] with
+    def hashBytes(a: CentralWavelengthConfig): Array[Byte] =
       Array.concat(
         a.centralWavelength.hashBytes,
         a.exposureTimeMode.hashBytes,

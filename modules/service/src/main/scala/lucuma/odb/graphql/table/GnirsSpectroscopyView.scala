@@ -87,7 +87,7 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
    * The central wavelengths, one row per wavelength per row version.  Each row
    * owns its own exposure time mode row in t_exposure_time_mode.
    */
-  object GnirsSpectroscopyWavelengthTable extends TableDef("t_gnirs_spectroscopy_wavelength"):
+  object GnirsCentralWavelengthConfigTable extends TableDef("t_gnirs_central_wavelength_config"):
     val ObservationId: ColumnRef     = col("c_observation_id", observation_id)
     val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm)
     val Version: ColumnRef           = col("c_version", observing_mode_row_version)
