@@ -18,17 +18,15 @@ import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.binding.WhereOptionString
 import lucuma.odb.graphql.binding.WhereOrder
 
-object WhereConfigurationRequest {
+object WhereConfigurationRequest:
 
   /** The WHERE input shared by the `configurationRequests` query and the
    *  `updateConfigurationRequests` mutation.
    *
-   *  `allowCone` says whether `targetCoordinates` may be used. A cone elaborates to a
+   *  @param `allowCone` says whether `targetCoordinates` may be used. A cone elaborates to a
    *  `ConePredicate` that `ConeFilter` resolves by walking the compiled query, so it only
-   *  works where the predicate ends up in the query tree. The mutation instead stashes its
-   *  bound input in an `Env` and builds the `Filter` at execution time, out of reach of
-   *  that walk, so it passes `false` and a cone is rejected with an error rather than
-   *  being silently dropped.
+   *  works where the predicate ends up in the query tree. Thus it is only usable on queries,
+   *  not mutations.
    */
   def binding(path: Path, allowCone: Boolean): Matcher[Predicate] = {
     val WhereOrderConfigurationRequestId = WhereOrder.binding(path / "id", ConfigurationRequestIdBinding)
@@ -74,7 +72,7 @@ object WhereConfigurationRequest {
           case List(
             CoordinatesInput.Create.Binding("center", rCenter),
             AngleInput.Binding("distance", rDistance)
-          ) => (rCenter, rDistance).parMapN((c, d) => ConePredicate(path / "id", Cone(c, d)))
+          ) => (rCenter, rDistance).parMapN((c, d) => ConeFilter.ConePredicate(path / "id", Cone(c, d)))
 
     lazy val WhereObservationBinding = binding(path, allowCone) // lazy self-reference
     ObjectFieldsBinding.rmap {
@@ -111,5 +109,3 @@ object WhereConfigurationRequest {
         }
     }
   }
-
-}

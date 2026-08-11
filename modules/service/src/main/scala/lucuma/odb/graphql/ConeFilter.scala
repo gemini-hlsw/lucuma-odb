@@ -30,41 +30,40 @@ import grackle.Term
 import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.data.Cone
 
-/** Stands in for a `WhereConfigurationRequest.targetCoordinates` cone until the matching
- *  ids are known. Produced by the WHERE binding during elaboration and replaced by
- *  `ConeFilter.resolve` with `In(idPath, candidateIds)` before the query is executed.
- *
- *  Should not be evaluated: reaching `apply` means a cone escaped resolution, which is a
- *  bug rather than a user error, so it reports an internal error instead of a silent
- *  `true`. Escaping is possible -- resolution only sees predicates reachable in the
- *  compiled query tree, so a cone held anywhere else (in an `Env`, or under the `Effect`
- *  and `Component` nodes the walk does not enter) would survive to here. The WHERE
- *  binding's `allowCone` flag is what keeps that from happening.
- */
-case class ConePredicate(idPath: Path, cone: Cone) extends Predicate:
-  def apply(c: Cursor): Result[Boolean] = Result.internalError("Unresolved targetCoordinates cone.")
-  def children: List[Term[?]]           = Nil
-
 /** Resolves `targetCoordinates` cone filters, which grackle cannot evaluate on its own:
  *  finding the configuration requests inside a cone is an `F` effect, and the elaborator
  *  that turns a WHERE input into a predicate is a pure `StateT[Result, ElabState, *]`.
  *
  *  {{{
- *  parse ──▶ compile ──▶ Query ──▶ resolve ──▶ Query ──▶ execute ──▶ Json
- *               │                     │                      │
- *      cone ⟶ ConePredicate   SQL 1: candidate lookup   SQL 2: main query,
- *                            ConePredicate ⟶ id IN (…)  one pushable statement
+ *  request with a targetCoordinates cone
+ *    │ parse, substitute variables
+ *    ▼
+ *  WhereConfigurationRequest binding ──(mutation: allowCone = false)──▶ InvalidArgument
+ *    │ query: allowCone = true
+ *    ▼
+ *  compiled Query with a ConePredicate placeholder in its WHERE tree
+ *    │
+ *    ▼
+ *  ConeFilter.resolve, in F ──(no cones)──▶ query untouched
+ *    │ per distinct cone
+ *    ▼
+ *  ConfigurationService.coneCandidates:                                   [SQL 1]
+ *  box prefilter (indexed), exact great-circle trim, visibility, limit max+1
+ *    │ ids                  ──(over the cap)──▶ fail: narrow the cone
+ *    ▼
+ *  ConePredicate ⟶ id IN (ids), in place; an empty list compiles to false
+ *    │
+ *    ▼
+ *  grackle executes: the whole WHERE pushable, a single SQL statement     [SQL 2]
  *  }}}
  *
  *  Splitting it this way lets grackle do the parsing first: variables are substituted and
  *  the input is validated by the ordinary `WhereCone` binding, so the cone arrives here as
  *  a parsed `Cone` whether it was written inline or passed as a variable. Resolution then
- *  happens in `F`, where the candidate lookup (SQL phase 1, see
- *  `ConfigurationService.coneCandidates`) can run, and substitutes the ids *in place*, so
- *  a cone nested under `AND` / `OR` / `NOT` keeps its position and meaning. What grackle
- *  finally executes is an ordinary WHERE that pushes down to a single SQL statement
- *  (phase 2). An empty candidate list compiles to `false`, so a cone matching nothing is
- *  a cheap empty result.
+ *  happens in `F`, where the candidate lookup (SQL 1) can run, and substitutes the ids
+ *  *in place*, so a cone nested under `AND` / `OR` / `NOT` keeps its position and meaning.
+ *  What grackle finally executes is an ordinary WHERE that pushes down to a single SQL
+ *  statement (SQL 2).
  *
  *  Driven by `GraphQLRoutes`, which resolves each compiled operation before running it.
  *  That reaches every cone the `configurationRequests` query can produce, because its
@@ -74,6 +73,18 @@ case class ConePredicate(idPath: Path, cone: Cone) extends Predicate:
  *  `targetCoordinates` outright (see `WhereConfigurationRequest.binding`).
  */
 object ConeFilter:
+  /** Placeholder for a `WhereConfigurationRequest.targetCoordinates` cone: created by the
+   *  WHERE binding, swapped for `In(idPath, candidateIds)` by `ConeFilter.resolve` before
+   *  execution.
+   *
+   *  Evaluating it means the swap was missed: `resolve` only walks the compiled query
+   *  tree, so a cone stored anywhere else (an `Env`, an `Effect`/`Component` child) would
+   *  escape it. `apply` fails loudly rather than silently matching, and the binding's
+   *  `allowCone` flag keeps cones out of those unreachable spots.
+   */
+  case class ConePredicate(idPath: Path, cone: Cone) extends Predicate:
+    def apply(c: Cursor): Result[Boolean] = Result.internalError("Unresolved targetCoordinates cone.")
+    def children: List[Term[?]]           = Nil
 
   /** Replaces each `ConePredicate` in `query` with the ids `compute` finds for its cone.
    *  Queries without cones -- nearly all of them -- are returned untouched.

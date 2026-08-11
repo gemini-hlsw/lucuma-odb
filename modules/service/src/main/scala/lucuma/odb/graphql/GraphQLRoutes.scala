@@ -142,8 +142,6 @@ object GraphQLRoutes {
                                         case f: Result.Failure       => F.pure(f)
                                         case e: Result.InternalError => F.pure(e)
 
-                                    // The cone resolution runs inside the span and the timer, so a
-                                    // slow candidate lookup is visible to the slow-query marking.
                                     T.spanBuilder("graphql-query")
                                       .withSpanKind(SpanKind.Server)
                                       .build

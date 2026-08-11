@@ -8,7 +8,7 @@ import io.circe.syntax.*
 
 import java.time.LocalDate
 
-class programs_isActive extends OdbSuite {
+class programs_isActive extends OdbSuite:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(2, 31)
@@ -16,8 +16,6 @@ class programs_isActive extends OdbSuite {
 
   // `isActive` matches programs whose `[activeStart, activeEnd]` window contains
   // the current UTC date, computed by the `c_is_active` column on `v_program`.
-  // The fixtures bracket today generously so the test is robust against the
-  // local-vs-UTC date boundary. Only staff may set the active period.
   test("filter programs on isActive"):
     val today = LocalDate.now()
     for
@@ -33,5 +31,3 @@ class programs_isActive extends OdbSuite {
       assertEquals(active, List(pidActive))
       assertEquals(inactive, List(pidInactive))
       assertEquals(omit.toSet, Set(pidActive, pidInactive))
-
-}
