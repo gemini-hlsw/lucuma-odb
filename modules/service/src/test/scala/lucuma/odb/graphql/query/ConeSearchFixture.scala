@@ -8,11 +8,18 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Coordinates
 import lucuma.odb.TestCoordinates
+import lucuma.odb.data.Cone
 
 // Shared geometry utilities for cone-search tests
 trait ConeSearchFixture:
 
   export TestCoordinates.coords
+
+  /** Builds a `Cone` from literals; `Cone.from` returns `Option` and a test literal
+   *  out of range should just blow up.
+   */
+  def cone(center: Coordinates, distance: Angle): Cone =
+    Cone.from(center, distance).get
 
   val basePositions: List[Coordinates] = List(
     coords("00:00:00 +10:00:00"), // near origin

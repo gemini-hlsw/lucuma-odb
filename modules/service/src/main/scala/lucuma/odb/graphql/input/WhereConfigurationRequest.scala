@@ -9,6 +9,7 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import grackle.Result
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ConfigurationRequest
@@ -54,7 +55,10 @@ object WhereConfigurationRequest:
           case List(
             CoordinatesInput.Create.Binding("center", rCenter),
             AngleInput.Binding("distance", rDistance)
-          ) => (rCenter, rDistance).parMapN((c, d) => ConeFilter.ConePredicate(path / "id", Cone(c, d)))
+          ) => (rCenter, rDistance).parTupled.flatMap: (c, d) =>
+            Cone.from(c, d) match
+              case Some(cone) => Result(ConeFilter.ConePredicate(path / "id", cone))
+              case None       => Matcher.validationFailure("The `distance` must be an angle between 0° and 180°.")
 
     lazy val WhereObservationBinding = binding(path, allowCone) // lazy self-reference
     ObjectFieldsBinding.rmap {

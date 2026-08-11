@@ -20763,7 +20763,7 @@ A cone (angular-distance) match over a sky position.
 input WhereCone {
   center: CoordinatesInput!
 
-  "Maximum angular separation between `center` and the target reference coords."
+  "Maximum angular separation between `center` and the target reference coords. Must be between 0° and 180°."
   distance: AngleInput!
 }
 

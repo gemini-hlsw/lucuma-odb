@@ -74,13 +74,13 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
 
   test("general geometry: box prefilter, exact trim, and the RA seam"):
     val cones: List[Cone] = List(
-      Cone(coords("00:00:00 +10:00:00"), 5.degrees),   // the in-box-outside-circle target
+      cone(coords("00:00:00 +10:00:00"), 5.degrees),   // the in-box-outside-circle target
                                                        // leaks unless the trim runs
-      Cone(coords("00:00:00 +10:00:00"), 25.degrees),  // wide enough to wrap across RA 0
-      Cone(coords("00:00:00 +10:00:00"), 6.arcmin),    // the center target alone
-      Cone(coords("12:00:00 +89:00:00"), 5.degrees),
-      Cone(coords("06:00:00 +40:00:00"), 1.degrees),   // away from the origin cluster
-      Cone(coords("00:00:00 -10:00:00"), 30.degrees),  // southern hemisphere
+      cone(coords("00:00:00 +10:00:00"), 25.degrees),  // wide enough to wrap across RA 0
+      cone(coords("00:00:00 +10:00:00"), 6.arcmin),    // the center target alone
+      cone(coords("12:00:00 +89:00:00"), 5.degrees),
+      cone(coords("06:00:00 +40:00:00"), 1.degrees),   // away from the origin cluster
+      cone(coords("00:00:00 -10:00:00"), 30.degrees),  // southern hemisphere
     )
     for
       seeded <- seed(piGeneral, tightSeam :: basePositions)
@@ -92,12 +92,12 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
       // Centered on a pole, where cos(dec0) is 0: the pole branch must short-circuit before
       // the asin half-width divides by it. The dec box also runs past +/-90 into the angle
       // encoding's wrap.
-      Cone(coords("00:00:00 +90:00:00"), 2.degrees),  // reaches (12h, +89°) too
-      Cone(coords("00:00:00 +90:00:00"), 30.arcmin),  // only the pole itself
-      Cone(coords("12:00:00 -90:00:00"), 2.degrees),  // same, south
+      cone(coords("00:00:00 +90:00:00"), 2.degrees),  // reaches (12h, +89°) too
+      cone(coords("00:00:00 +90:00:00"), 30.arcmin),  // only the pole itself
+      cone(coords("12:00:00 -90:00:00"), 2.degrees),  // same, south
       // 1° from the pole target but on the far side in RA, so an RA box that did not open up
       // near the pole would lose it.
-      Cone(coords("19:13:00 +89:00:00"), 2.degrees),
+      cone(coords("19:13:00 +89:00:00"), 2.degrees),
     )
     for
       seeded <- seed(piPole, exactPoles ++ basePositions)
@@ -106,15 +106,15 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
 
   test("RA prefilter half-width is the exact asin bound, not the small-angle one"):
     val cones: List[Cone] = List(
-      Cone(coords("12:00:00 +88:54:00"), 1.degrees),  // just inside the pole guard (88.9 + 1 < 90)
-      Cone(coords("00:00:00 +45:00:00"), 30.degrees), // mid dec, wide
+      cone(coords("12:00:00 +88:54:00"), 1.degrees),  // just inside the pole guard (88.9 + 1 < 90)
+      cone(coords("00:00:00 +45:00:00"), 30.degrees), // mid dec, wide
     )
     for
       seeded <- seed(piHalfWidth, halfWidthRegressions ++ basePositions)
       _      <- cones.traverse_(assertCone(seeded, piHalfWidth))
     yield ()
 
-  private val wide: Cone = Cone(coords("00:00:00 +10:00:00"), 25.degrees)
+  private val wide: Cone = cone(coords("00:00:00 +10:00:00"), 25.degrees)
 
   private val nearWide: List[Coordinates] =
     List(coords("00:00:00 +10:00:00"), coords("00:30:00 +14:00:00"))

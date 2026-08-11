@@ -165,6 +165,20 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
              )
     yield err
 
+  // A separation cannot exceed 180°.
+  test("cone distance outside [0°, 180°] is rejected"):
+    def reject(distance: String): IO[Unit] =
+      expectOdbError(
+        user = pi,
+        query = s"""query {
+            configurationRequests(WHERE: { targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { degrees: "$distance" } } }) {
+              matches { id }
+            }
+          }""",
+        expected = { case OdbError.InvalidArgument(Some(m)) if m.contains("distance") => () }
+      )
+    reject("200.0") *> reject("-10.0")
+
   test("cone under OR keeps its position"):
     for
       (pid, near, far) <- coneSetup
