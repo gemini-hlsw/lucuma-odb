@@ -43,7 +43,9 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.Attributes
+import org.typelevel.otel4s.trace.SpanFinalizer
 import org.typelevel.otel4s.trace.SpanKind
+import org.typelevel.otel4s.trace.StatusCode
 import org.typelevel.otel4s.trace.Tracer
 import skunk.Session
 import skunk.SqlState
@@ -56,6 +58,14 @@ object GraphQLRoutes {
 
   given Order[Authorization] =
     Order.by(Header[Authorization].value)
+
+  /** Finalization strategy for GraphQL *subscription* spans: a client disconnect (cancellation) is
+    * a normal lifecycle event, not an error.
+    */
+  private val subscriptionFinalizer: SpanFinalizer.Strategy = {
+    case Resource.ExitCase.Errored(e) =>
+      SpanFinalizer.recordException(e) |+| SpanFinalizer.setStatus(StatusCode.Error)
+  }
 
   /**
    * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
@@ -176,6 +186,7 @@ object GraphQLRoutes {
                                     val spanResource =
                                       T.spanBuilder("graphql-subscription")
                                         .withSpanKind(SpanKind.Server)
+                                        .modifyState(_.withFinalizationStrategy(subscriptionFinalizer))
                                         .build
                                         .resource
                                     Stream.resource(spanResource).flatMap: res =>
