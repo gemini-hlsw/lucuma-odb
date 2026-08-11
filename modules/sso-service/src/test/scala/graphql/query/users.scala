@@ -154,6 +154,196 @@ class users extends GraphQLSuite with SsoSuite with Fixture with OrcidIdGenerato
         """
     )
 
+  test("Staff can see many users (filter for orcid id)."):
+    setup >>
+    AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+      query =
+        s"""
+          query {
+            users(
+              WHERE: {
+                orcidId: {
+                  EQ: "${BobOrcidId.value}"
+                }
+              }
+            ) {
+              matches {
+                id
+                orcidId
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "data" : {
+              "users" : {
+                "matches" : [
+                  {
+                    "id" : "u-103",
+                    "orcidId" : ${BobOrcidId}
+                  }
+                ]
+              }
+            }
+          }
+        """
+    )
+
+  test("Staff can see many users (filter for orcid id in uri form)."):
+    setup >>
+    AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+      query =
+        s"""
+          query {
+            users(
+              WHERE: {
+                orcidId: {
+                  EQ: "${BobOrcidId.uri}"
+                }
+              }
+            ) {
+              matches {
+                id
+                orcidId
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "data" : {
+              "users" : {
+                "matches" : [
+                  {
+                    "id" : "u-103",
+                    "orcidId" : ${BobOrcidId}
+                  }
+                ]
+              }
+            }
+          }
+        """
+    )
+
+  test("Staff can see many users (filter for orcid id in a list)."):
+    setup >>
+    AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+      query =
+        s"""
+          query {
+            users(
+              WHERE: {
+                orcidId: {
+                  IN: ["${AliceOrcidId.value}", "${BobOrcidId.value}"]
+                }
+              }
+            ) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "data" : {
+              "users" : {
+                "matches" : [
+                  { "id" : "u-101" },
+                  { "id" : "u-103" }
+                ]
+              }
+            }
+          }
+        """
+    )
+
+  test("Staff can see many users (filter for missing orcid id)."):
+    setup >>
+    AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+      query =
+        """
+          query {
+            users(
+              WHERE: {
+                orcidId: {
+                  IS_NULL: true
+                }
+              }
+            ) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "data" : {
+              "users" : {
+                "matches" : [
+                  { "id" : "u-100" }
+                ]
+              }
+            }
+          }
+        """
+    )
+
+  test("Staff can see many users (filter for orcid id with LIKE)."):
+    setup >>
+    AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
+      query =
+        s"""
+          query {
+            users(
+              WHERE: {
+                orcidId: {
+                  LIKE: "%${BobOrcidId.value.takeRight(4)}"
+                }
+              }
+            ) {
+              matches {
+                id
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "data" : {
+              "users" : {
+                "matches" : [
+                  { "id" : "u-103" }
+                ]
+              }
+            }
+          }
+        """
+    )
+
+  test("An invalid orcid id filter is rejected."):
+    setup >>
+    AsBob.withRoleRequest(RoleRequest.Staff).query(
+      """
+        query {
+          users(
+            WHERE: {
+              orcidId: {
+                EQ: "not-an-orcid-id"
+              }
+            }
+          ) {
+            matches {
+              id
+            }
+          }
+        }
+      """
+    ).map: json =>
+      assert(json.hcursor.downField("errors").focus.exists(_.spaces2.contains("Invalid ORCID id")), json.spaces2)
+
   test("Andy issue ('exceeded maximum input value depth')."):
     setup >>
     AsBob.withRoleRequest(RoleRequest.Staff).expectQuery(
