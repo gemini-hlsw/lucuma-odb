@@ -40,8 +40,6 @@ object ObservationValidator:
   /* Validation Messages */
   object Messages {
 
-    val CoordinatesOutOfRange = "Base coordinates out of Call for Proposals limits."
-
     def invalidScienceBand(b: ScienceBand): String =
       s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
 
@@ -84,14 +82,6 @@ object ObservationValidator:
     import validator.*
 
 
-
-    val cfpRaDecValidator: ObservationValidator = info =>
-      info.cfpInfo.foldMap: cfp =>
-        info.site.foldMap: site =>
-          info.coordinates.foldMap: coords =>
-            val ok = cfp.limits.siteLimits(site).inLimits(coords)
-            if ok then ObservationValidationMap.empty
-            else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
 
     val bandValidator: ObservationValidator = info =>
       (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
@@ -166,7 +156,7 @@ object ObservationValidator:
       GeneratorValidator         |+|
       CfpInstrumentValidator     |+|
       ExchangeValidator          |+|
-      cfpRaDecValidator          |+|
+      CfpRaDecValidator          |+|
       bandValidator              |+|
       ghostVMagnitudeValidator   |+|
       tooActivationValidator     |+|
