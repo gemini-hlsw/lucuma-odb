@@ -46,7 +46,7 @@ case class GeneratorContext(
       md5.update(z.focus.value.exposureTime.hashBytes)
       md5.update(z.focus.value.exposureCount.hashBytes)
 
-    def addImagingResultSet[A: HashBytes](kv: (A, Zipper[ItcResult])): Unit =
+    def addKeyedResultSet[A: HashBytes](kv: (A, Zipper[ItcResult])): Unit =
       md5.update(kv._1.hashBytes)
       addResultSet(kv._2)
 
@@ -54,16 +54,18 @@ case class GeneratorContext(
     itcRes.foreach: itc =>
       itc.science match
         case ItcScience.Flamingos2Imaging(m) =>
-          m.toNel.toList.foreach(addImagingResultSet)
+          m.toNel.toList.foreach(addKeyedResultSet)
         case ItcScience.GhostIfu(r, b)       =>
           addResultSet(r)
           addResultSet(b)
         case ItcScience.GmosNorthImaging(m)  =>
-          m.toNel.toList.foreach(addImagingResultSet)
+          m.toNel.toList.foreach(addKeyedResultSet)
         case ItcScience.GmosSouthImaging(m)  =>
-          m.toNel.toList.foreach(addImagingResultSet)
+          m.toNel.toList.foreach(addKeyedResultSet)
         case ItcScience.GnirsImaging(m)      =>
-          m.toNel.toList.foreach(addImagingResultSet)
+          m.toNel.toList.foreach(addKeyedResultSet)
+        case ItcScience.GnirsSpectroscopy(m) =>
+          m.toNel.toList.foreach(addKeyedResultSet)
         case ItcScience.Spectroscopy(sci)    =>
           addResultSet(sci)
 

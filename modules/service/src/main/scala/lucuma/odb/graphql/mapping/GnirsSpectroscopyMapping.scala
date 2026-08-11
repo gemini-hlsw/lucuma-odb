@@ -6,6 +6,9 @@ package mapping
 
 import grackle.Query.Binding
 import grackle.Query.Filter
+import grackle.Query.OrderBy
+import grackle.Query.OrderSelection
+import grackle.Query.OrderSelections
 import grackle.Query.Unique
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
@@ -14,7 +17,9 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
+import lucuma.core.math.Wavelength
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
 import lucuma.odb.json.offset.query.given
@@ -56,12 +61,27 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlObject("exposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
     )
 
+  /**
+   * One central wavelength with the exposure time mode and coadds that apply
+   * there.  Keyed on (observation, wavelength, version) to match the table's
+   * primary key.
+   */
+  lazy val GnirsCentralWavelengthConfigMapping: ObjectMapping =
+    ObjectMapping(GnirsCentralWavelengthConfigType)(
+      SqlField("observationId",     GnirsCentralWavelengthConfigTable.ObservationId, key = true, hidden = true),
+      // `centralWavelength` is an object in the schema (see WavelengthMapping), so the
+      // key is a hidden field on the same column.  It doubles as the sort key.
+      SqlField("centralWavelengthKey", GnirsCentralWavelengthConfigTable.CentralWavelength, key = true, hidden = true),
+      SqlField("version",           GnirsCentralWavelengthConfigTable.Version, key = true, hidden = true),
+      SqlObject("centralWavelength"),
+      SqlField("coadds",            GnirsCentralWavelengthConfigTable.Coadds),
+      SqlObject("exposureTimeMode", Join(GnirsCentralWavelengthConfigTable.ExposureTimeModeId, ExposureTimeModeView.Id))
+    )
+
   lazy val GnirsSpectroscopyMapping: ObjectMapping =
     ObjectMapping(GnirsSpectroscopyType)(
 
       SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
-
-      SqlObject("exposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
 
       // Grating: effective = COALESCE(explicit, initial)
       SqlField("grating",        GnirsSpectroscopyView.GratingEffective),
@@ -73,11 +93,12 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlField("explicitPrism",  GnirsSpectroscopyView.Prism),
       SqlField("initialPrism",   GnirsSpectroscopyView.InitialPrism),
 
-      // Central wavelength: required stored value + initial snapshot
-      SqlObject("centralWavelength"),
-      SqlObject("initialCentralWavelength"),
+      // Central wavelengths: one child row each, in the "current" and "initial"
+      // row versions respectively (see the elaborator below).
+      SqlObject("centralWavelengths",        Join(GnirsSpectroscopyView.ObservationId, GnirsCentralWavelengthConfigTable.ObservationId)),
+      SqlObject("initialCentralWavelengths", Join(GnirsSpectroscopyView.ObservationId, GnirsCentralWavelengthConfigTable.ObservationId)),
 
-      // Camera + Filter + Wavelength
+      // Camera + Filter
       SqlField("camera",        GnirsSpectroscopyView.Camera),
       SqlField("initialCamera", GnirsSpectroscopyView.InitialCamera),
       // FPU + telescope configs are grouped, by variant, into the slit / ifu
@@ -87,7 +108,6 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlObject("ifu"),
       SqlField("filter",        GnirsSpectroscopyView.Filter),
       SqlField("initialFilter", GnirsSpectroscopyView.InitialFilter),
-      SqlField("coadds",        GnirsSpectroscopyView.Coadds),
 
       // Decker: effective (DB-computed COALESCE), default, explicit
       SqlField("decker",         GnirsSpectroscopyView.DeckerEffective),
@@ -159,15 +179,21 @@ trait GnirsSpectroscopyMapping[F[_]]
       ),
     )
 
+  // Order the central wavelengths by increasing wavelength -- the order the
+  // sequence executes them in -- and limit to one row version.
+  private def wavelengthElaborator(v: ObservingModeRowVersion): Elab[Unit] =
+    Elab.transformChild: child =>
+      OrderBy(
+        OrderSelections(List(OrderSelection[Wavelength](GnirsCentralWavelengthConfigType / "centralWavelengthKey"))),
+        Filter(Predicates.gnirsSpectroscopyWavelength.version.eql(v), child)
+      )
+
   lazy val GnirsSpectroscopyElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (GnirsSpectroscopyType, "exposureTimeMode", Nil) =>
-      Elab.transformChild: child =>
-        Unique(
-          Filter(
-            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Science),
-            child
-          )
-        )
+    case (GnirsSpectroscopyType, "centralWavelengths", Nil) =>
+      wavelengthElaborator(ObservingModeRowVersion.Current)
+
+    case (GnirsSpectroscopyType, "initialCentralWavelengths", Nil) =>
+      wavelengthElaborator(ObservingModeRowVersion.Initial)
 
     case (GnirsSpectroscopyAcquisitionType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>

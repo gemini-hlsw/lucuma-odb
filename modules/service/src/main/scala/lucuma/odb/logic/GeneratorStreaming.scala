@@ -4,6 +4,7 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
+import cats.data.NonEmptyMap
 import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.either.*
@@ -14,6 +15,7 @@ import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.SequenceType
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as Flamingos2Dynamic
@@ -184,6 +186,17 @@ object GeneratorStreaming:
       ItcScience.spectroscopy.getOption(i.science)
         .toRight(OdbError.InvalidObservation(oid, s"Expecting a spectroscopy ITC result for this observation".some))
         .map(_.science.focus.value)
+
+  // Science integration times for a GNIRS spectroscopy observation, one per
+  // central wavelength.
+  def gnirsSpectroscopyScienceTimes(
+    oid: Observation.Id,
+    itc: Either[OdbError, Itc]
+  ): Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]] =
+    itc.flatMap: i =>
+      ItcScience.gnirsSpectroscopy.getOption(i.science)
+        .toRight(OdbError.InvalidObservation(oid, s"Expecting a GNIRS spectroscopy ITC result for this observation".some))
+        .map(_.science.map(_.focus.value))
 
   // Acquisition integration time for a mode that has an acquisition sequence.  A
   // Failed acquisition (a cached deterministic ITC failure) or a NotApplicable
@@ -377,7 +390,7 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GnirsSpectroscopyName, context)(_.asGnirsSpectroscopy)
           acq  = acquisitionTime(context.oid, context.itcRes)
           typ  = gnirsAcqType(context.itcRes)
-          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
+          sci  = gnirsSpectroscopyScienceTimes(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT(Spectroscopy.instantiate(context.oid, calculator.gnirsStep, context.namespace, exp.gnirs, cfg, acq, typ, sci, rol))
           res <- collapseIfNecessary(context, gen)

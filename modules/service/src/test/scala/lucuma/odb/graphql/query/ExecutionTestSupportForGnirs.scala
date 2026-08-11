@@ -213,8 +213,12 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       """
     ).void
 
-  /** Replace the science TimeAndCount ETM on a GNIRS LongSlit observation. */
-  def setScienceTimeAndCount(oid: Observation.Id, seconds: BigDecimal, count: Int, atNm: BigDecimal): IO[Unit] =
+  /**
+   * Replace the science TimeAndCount ETM on a GNIRS LongSlit observation.  The
+   * ETM is per central wavelength, so the wavelength must be given too; it
+   * defaults to the 2200 nm the test observations are created with.
+   */
+  def setScienceTimeAndCount(oid: Observation.Id, seconds: BigDecimal, count: Int, atNm: BigDecimal, centralNm: BigDecimal = BigDecimal(2200)): IO[Unit] =
     query(
       pi,
       s"""
@@ -223,13 +227,18 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
             SET: {
               observingMode: {
                 gnirsSpectroscopy: {
-                  exposureTimeMode: {
-                    timeAndCount: {
-                      time:  { seconds: $seconds }
-                      count: $count
-                      at:    { nanometers: $atNm }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: $centralNm }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time:  { seconds: $seconds }
+                          count: $count
+                          at:    { nanometers: $atNm }
+                        }
+                      }
                     }
-                  }
+                  ]
                 }
               }
             }
@@ -254,7 +263,18 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                   camera: LONG_BLUE
                   explicitGrating: D10
                   slit: { fpu: LONG_SLIT_0_20 }
-                  centralWavelength: { nanometers: 3300 }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 3300 }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time: { seconds: 30.0 }
+                          count: 3
+                          at: { nanometers: 3300 }
+                        }
+                      }
+                    }
+                  ]
                   explicitWellDepth: DEEP
                 }
               }
@@ -284,7 +304,18 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                   explicitGrating: D111
                   explicitPrism: LXD
                   slit: { fpu: LONG_SLIT_0_675 }
-                  centralWavelength: { nanometers: 1600 }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 1600 }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time: { seconds: 30.0 }
+                          count: 3
+                          at: { nanometers: 1600 }
+                        }
+                      }
+                    }
+                  ]
                   explicitWellDepth: SHALLOW
                 }
               }

@@ -63,6 +63,24 @@ trait ArbItcInput:
         sn
       )
 
+  given Arbitrary[ItcInput.GnirsSpectroscopy] =
+    Arbitrary:
+      for
+        acq <- arbitrary[ImagingParameters]
+        wc  <- Gen.choose(1, 4)
+        sci <- Gen.listOfN(wc, arbitrary[SpectroscopyParameters])
+        ct  <- Gen.choose(1, 10)
+        ts  <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
+        bo  <- Gen.option(genTargetDefinition(ct + 1L))
+        sn  <- Gen.option(Gen.oneOf(ts.map(_.targetId)))
+      yield ItcInput.GnirsSpectroscopy(
+        acq,
+        NonEmptyList.fromListUnsafe(sci),
+        NonEmptyList.fromListUnsafe(ts),
+        bo,
+        sn
+      )
+
   given Arbitrary[ItcInput.ScienceOnlySpectroscopy] =
     Arbitrary:
       for
@@ -81,6 +99,7 @@ trait ArbItcInput:
       Gen.oneOf(
         arbitrary[ItcInput.Imaging],
         arbitrary[ItcInput.Spectroscopy],
+        arbitrary[ItcInput.GnirsSpectroscopy],
         arbitrary[ItcInput.ScienceOnlySpectroscopy]
       )
 
