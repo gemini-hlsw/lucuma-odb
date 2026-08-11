@@ -17,7 +17,6 @@ import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
-import lucuma.core.math.Angle
 import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
@@ -32,6 +31,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.odb.data.Cone
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
@@ -67,12 +67,12 @@ trait ConfigurationService[F[_]] {
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
 
   /** Selects the ids of configuration requests whose target reference coordinates
-   *  lie within `distance` of `center` (exact great-circle match), restricted to
-   *  programs visible to the current user. Pure-SQL trig on the int8
-   *  microarcsecond columns; no PostGIS. Fails when more than `max` requests
-   *  match: the caller injects every id into a rewritten query, so the list
-   *  bounds both the heap and the generated statement. */
-  def coneCandidates(center: Coordinates, distance: Angle, max: Int = ConfigurationService.MaxConeCandidates): F[Result[List[ConfigurationRequest.Id]]]
+   *  lie within `cone` (exact great-circle match), restricted to programs visible
+   *  to the current user. Pure-SQL trig on the int8 microarcsecond columns; no
+   *  PostGIS. Fails when more than `max` requests match: the caller injects every
+   *  id into a rewritten query, so the list bounds both the heap and the
+   *  generated statement. */
+  def coneCandidates(cone: Cone, max: Int = ConfigurationService.MaxConeCandidates): F[Result[List[ConfigurationRequest.Id]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
@@ -121,8 +121,8 @@ object ConfigurationService {
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
 
-      override def coneCandidates(center: Coordinates, distance: Angle, max: Int): F[Result[List[ConfigurationRequest.Id]]] =
-        val af = Statements.coneCandidates(user, center, distance, max)
+      override def coneCandidates(cone: Cone, max: Int): F[Result[List[ConfigurationRequest.Id]]] =
+        val af = Statements.coneCandidates(user, cone, max)
         session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
           pq.stream(af.argument, 1024).compile.toList.map: ids =>
             if ids.sizeIs > max then
@@ -1543,13 +1543,13 @@ object ConfigurationService {
      *
      *  Scoped to programs visible to `user` and capped at `max + 1` rows (one
      *  over, so the caller can tell "at the cap" from "over it"). */
-    def coneCandidates(user: User, center: Coordinates, distance: Angle, max: Int): AppliedFragment =
+    def coneCandidates(user: User, cone: Cone, max: Int): AppliedFragment =
       val FullCircle    = 1296000000000L // 360° in µas
       val µasPerDegree  = 3600000000.0
-      val dec0ang       = center.dec.toAngle.toMicroarcseconds
-      val ra0           = center.ra.toAngle.toMicroarcseconds
-      val radius        = distance.toMicroarcseconds
-      val dec0rad       = center.dec.toRadians
+      val dec0ang       = cone.center.dec.toAngle.toMicroarcseconds
+      val ra0           = cone.center.ra.toAngle.toMicroarcseconds
+      val radius        = cone.distance.toMicroarcseconds
+      val dec0rad       = cone.center.dec.toRadians
       val ra0rad        = ra0.toDouble / µasPerDegree * math.Pi / 180.0
       val radiusRad     = radius.toDouble / µasPerDegree * math.Pi / 180.0
       val sinDec0       = math.sin(dec0rad)
@@ -1584,6 +1584,8 @@ object ConfigurationService {
             void" and pu.c_user_id = " |+| sql"$user_id".apply(user.id) |+| void")"
           case _ => AppliedFragment.empty
 
+      val µasPerDeg: AppliedFragment = sql"$float8".apply(µasPerDegree)
+
       void"select c_configuration_request_id from v_configuration_request" |+|
       void" where (c_reference_dec between " |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi) |+|
       void" or c_reference_dec >= "           |+| sql"$int8".apply(decLo + FullCircle) |+|
@@ -1591,10 +1593,10 @@ object ConfigurationService {
       void" and (c_reference_ra between "     |+| sql"$int8".apply(raLo)  |+| void" and " |+| sql"$int8".apply(raHi) |+|
       void" or c_reference_ra >= "            |+| sql"$int8".apply(raLo + FullCircle) |+|
       void" or c_reference_ra <= "            |+| sql"$int8".apply(raHi - FullCircle) |+| void")" |+|
-      void" and sin(radians(c_reference_dec / 3600000000.0)) * "  |+| sql"$float8".apply(sinDec0) |+|
-      void" + cos(radians(c_reference_dec / 3600000000.0)) * "  |+| sql"$float8".apply(cosDec0) |+|
-      void" * cos(radians(c_reference_ra / 3600000000.0) - "    |+| sql"$float8".apply(ra0rad)  |+|
-      void") >= "                                   |+| sql"$float8".apply(cosRadius) |+|
+      void" and sin(radians(c_reference_dec / " |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(sinDec0) |+|
+      void" + cos(radians(c_reference_dec / "   |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(cosDec0) |+|
+      void" * cos(radians(c_reference_ra / "    |+| µasPerDeg |+| void") - "  |+| sql"$float8".apply(ra0rad)  |+|
+      void") >= "                               |+| sql"$float8".apply(cosRadius) |+|
       visibility |+|
       void" limit " |+| sql"$int4".apply(max + 1)
 

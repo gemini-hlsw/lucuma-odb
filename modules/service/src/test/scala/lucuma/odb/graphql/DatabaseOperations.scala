@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
+import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.refined.*
@@ -41,6 +42,8 @@ import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Ephemeris
@@ -1004,12 +1007,12 @@ trait DatabaseOperations { this: OdbSuite =>
         """
     ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
-  def observationsWhere(user: User, where: String): IO[List[Observation.Id]] =
+  private def idsWhere[A: Decoder](user: User, field: String, where: String): IO[List[A]] =
     query(
       user,
       s"""
          query {
-          observations(WHERE: { $where }) {
+          $field(WHERE: { $where }) {
             matches {
               id
             }
@@ -1017,52 +1020,21 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       """
     ).flatMap { json =>
-      json.hcursor.downFields("observations", "matches").values.toList.flatten.traverse { json =>
-        json.hcursor.downField("id").as[Observation.Id]
+      json.hcursor.downFields(field, "matches").values.toList.flatten.traverse { json =>
+        json.hcursor.downField("id").as[A]
       }
       .leftMap(f => new RuntimeException(f.message))
       .liftTo[IO]
     }
+
+  def observationsWhere(user: User, where: String): IO[List[Observation.Id]] =
+    idsWhere[Observation.Id](user, "observations", where)
 
   def configurationRequestsWhere(user: User, where: String): IO[List[ConfigurationRequest.Id]] =
-    query(
-      user,
-      s"""
-         query {
-          configurationRequests(WHERE: { $where }) {
-            matches {
-              id
-            }
-          }
-        }
-      """
-    ).flatMap { json =>
-      json.hcursor.downFields("configurationRequests", "matches").values.toList.flatten.traverse { json =>
-        json.hcursor.downField("id").as[ConfigurationRequest.Id]
-      }
-      .leftMap(f => new RuntimeException(f.message))
-      .liftTo[IO]
-    }
+    idsWhere[ConfigurationRequest.Id](user, "configurationRequests", where)
 
   def programsWhere(user: User, where: String): IO[List[Program.Id]] =
-    query(
-      user,
-      s"""
-         query {
-          programs(WHERE: { $where }) {
-            matches {
-              id
-            }
-          }
-        }
-      """
-    ).flatMap { json =>
-      json.hcursor.downFields("programs", "matches").values.toList.flatten.traverse { json =>
-        json.hcursor.downField("id").as[Program.Id]
-      }
-      .leftMap(f => new RuntimeException(f.message))
-      .liftTo[IO]
-    }
+    idsWhere[Program.Id](user, "programs", where)
 
   def setObservationExistence(
     user: User,
@@ -1908,11 +1880,10 @@ trait DatabaseOperations { this: OdbSuite =>
     createSiderealTargetAs(user, pid, name, sourceProfile)
 
   def createSiderealTargetAtAs(
-    user:       User,
-    pid:        Program.Id,
-    raHours:    String,
-    decDegrees: String,
-    name:       String = "T"
+    user:   User,
+    pid:    Program.Id,
+    coords: Coordinates,
+    name:   String = "T"
   ): IO[Target.Id] =
     query(
       user,
@@ -1924,8 +1895,8 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 name: "$name"
                 sidereal: {
-                  ra: { hours: "$raHours" }
-                  dec: { degrees: "$decDegrees" }
+                  ra: { hms: "${RightAscension.fromStringHMS.reverseGet(coords.ra)}" }
+                  dec: { dms: "${Declination.fromStringSignedDMS.reverseGet(coords.dec)}" }
                   epoch: "J2000.000"
                   radialVelocity: { kilometersPerSecond: 0.0 }
                 }

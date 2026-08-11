@@ -26,7 +26,7 @@ import java.time.LocalDate
 // Configuration requests are canonicalized by configuration, so each fixture
 // request has a distinct (observing mode, target) configuration to keep their ids
 // distinct; each non-matching one differs from the match in exactly one axis.
-class configurationRequests_combined extends OdbSuite with ObservingModeSetupOperations {
+class configurationRequests_combined extends OdbSuite with ObservingModeSetupOperations with ConeSearchFixture {
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val admin = TestUsers.Standard.admin(2, 31)
@@ -82,11 +82,11 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
       _           <- setProgramActiveAs(staff, pidInactive, today.plusDays(100), today.plusDays(200))
 
       // Distinct targets so each configuration request gets a distinct id.
-      tAtCenter <- createSiderealTargetAtAs(pi, pidActive, "0.0",  "10.0")  // at the cone center
-      tNear     <- createSiderealTargetAtAs(pi, pidActive, "0.1",  "10.0")  // ~1.5° off, still in the cone
-      tNear2    <- createSiderealTargetAtAs(pi, pidActive, "0.2",  "10.0")  // ~3° off, still in the cone
-      tFar      <- createSiderealTargetAtAs(pi, pidActive, "6.0",  "40.0")  // far outside the cone
-      tInactive <- createSiderealTargetAtAs(pi, pidInactive, "0.0", "10.0") // inactive program
+      tAtCenter <- createSiderealTargetAtAs(pi, pidActive, coord(0.0, 10.0))   // at the cone center
+      tNear     <- createSiderealTargetAtAs(pi, pidActive, coord(0.1, 10.0))   // ~1.5° off, still in the cone
+      tNear2    <- createSiderealTargetAtAs(pi, pidActive, coord(0.2, 10.0))   // ~3° off, still in the cone
+      tFar      <- createSiderealTargetAtAs(pi, pidActive, coord(6.0, 40.0))   // far outside the cone
+      tInactive <- createSiderealTargetAtAs(pi, pidInactive, coord(0.0, 10.0)) // inactive program
 
       // The matches: approved, GMOS-North-Long-Slit, active program, inside the cone.
       // Two of them, so LIMIT/OFFSET paging over the filtered set is meaningful.

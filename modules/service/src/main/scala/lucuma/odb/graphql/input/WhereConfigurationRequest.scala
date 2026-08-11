@@ -13,6 +13,7 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.Cone
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.binding.WhereOptionString
 import lucuma.odb.graphql.binding.WhereOrder
@@ -73,7 +74,7 @@ object WhereConfigurationRequest {
           case List(
             CoordinatesInput.Create.Binding("center", rCenter),
             AngleInput.Binding("distance", rDistance)
-          ) => (rCenter, rDistance).parMapN(ConePredicate(path / "id", _, _))
+          ) => (rCenter, rDistance).parMapN((c, d) => ConePredicate(path / "id", Cone(c, d)))
 
     lazy val WhereObservationBinding = binding(path, allowCone) // lazy self-reference
     ObjectFieldsBinding.rmap {

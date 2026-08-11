@@ -20758,7 +20758,7 @@ input WhereConfigurationRequest {
 }
 
 """
-A reusable cone (angular-distance) match over a sky position.
+A cone (angular-distance) match over a sky position.
 """
 input WhereCone {
   center: CoordinatesInput!

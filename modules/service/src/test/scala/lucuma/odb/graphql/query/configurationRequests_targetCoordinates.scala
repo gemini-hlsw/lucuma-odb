@@ -10,38 +10,24 @@ import io.circe.Json
 import io.circe.JsonObject
 import io.circe.literal.*
 import io.circe.syntax.*
-import lucuma.core.math.Angle
-import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Coordinates
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 
 // GraphQL-level tests for the SC-9240 `targetCoordinates` cone WHERE filter. Geometry is
-// checked against lucuma-core's exact `angularDistance`; the rest cover how the cone
-// survives compilation, since it is elaborated to a placeholder predicate and resolved
-// afterwards (see ConeFilter).
-class configurationRequests_targetCoordinates extends OdbSuite with ObservingModeSetupOperations {
+// checked against lucuma-core's exact `angularDistance` (see ConeSearchFixture); the rest
+// cover how the cone survives compilation, since it is elaborated to a placeholder
+// predicate and resolved afterwards (see ConeFilter).
+class configurationRequests_targetCoordinates extends OdbSuite with ObservingModeSetupOperations with ConeSearchFixture {
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val admin = TestUsers.Standard.admin(2, 31)
   val validUsers = List(pi, admin)
 
-  private def coord(raHours: Double, decDegrees: Double): Coordinates =
-    Coordinates.unsafeFromRadians(raHours * math.Pi / 12.0, decDegrees * math.Pi / 180.0)
-
-  private val positions: List[(Double, Double)] = List(
-    (0.0,  10.0),   // at the first cone's center
-    (6.0,  40.0),   // far away
-    (23.0, 10.0),   // across the RA 0/2π seam
-    (0.5,  14.0),   // in-box but outside a small circle at the origin
-    (12.0, 89.0),   // near the north pole
-    (0.0, -10.0),   // south
-  )
-
-  private def requestAt(pid: Program.Id, ra: String, dec: String): IO[ConfigurationRequest.Id] =
+  private def requestAt(pid: Program.Id, coords: Coordinates): IO[ConfigurationRequest.Id] =
     for
-      tid <- createSiderealTargetAtAs(pi, pid, ra, dec)
+      tid <- createSiderealTargetAtAs(pi, pid, coords)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       cid <- createConfigurationRequestAs(pi, oid)
     yield cid
@@ -51,8 +37,9 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       cfpid  <- createGeminiCallForProposalsAs(admin)
       pid    <- createProgramAs(pi)
       _      <- addProposal(pi, pid, Some(cfpid), None)
-      seeded <- positions.traverse { case (rah, decd) =>
-        requestAt(pid, rah.toString, decd.toString).map(cid => (cid, coord(rah, decd)))
+      seeded <- basePositions.traverse { case (rah, decd) =>
+        val c = coord(rah, decd)
+        requestAt(pid, c).map(cid => (cid, c))
       }
 
       // 5° cone at (0h, +10°): matches the center target; excludes the in-box-but-
@@ -64,14 +51,9 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       pole    <- configurationRequestsWhere(pi, s"""program: { id: { EQ: "$pid" } }, targetCoordinates: { center: { ra: { hours: "12.0" }, dec: { degrees: "89.0" } }, distance: { arcseconds: 7200 } }""")
     yield
       val center = coord(0.0, 10.0)
-      def within(deg: Double): Set[?] =
-        seeded.collect { case (cid, x) if center.angularDistance(x).toMicroarcseconds <= Angle.fromDoubleDegrees(deg).toMicroarcseconds => cid }.toSet
-
-      assertEquals(small.toSet, within(5.0))
-      assertEquals(seam.toSet,  within(21.0))
-      val poleCenter = coord(12.0, 89.0)
-      val poleExpected = seeded.collect { case (cid, x) if poleCenter.angularDistance(x).toMicroarcseconds <= Angle.fromDoubleDegrees(2.0).toMicroarcseconds => cid }.toSet
-      assertEquals(pole.toSet, poleExpected)
+      assertEquals(small.toSet, within(seeded)(center, deg(5.0)))
+      assertEquals(seam.toSet,  within(seeded)(center, deg(21.0)))
+      assertEquals(pole.toSet,  within(seeded)(coord(12.0, 89.0), deg(2.0)))
 
   // --- how the cone survives compilation ---
   //
@@ -87,8 +69,8 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       cfpid <- createGeminiCallForProposalsAs(admin)
       pid   <- createProgramAs(pi)
       _     <- addProposal(pi, pid, Some(cfpid), None)
-      near  <- requestAt(pid, "0.0", "10.0")
-      far   <- requestAt(pid, "6.0", "40.0")
+      near  <- requestAt(pid, coord(0.0, 10.0))
+      far   <- requestAt(pid, coord(6.0, 40.0))
     yield (pid, near, far)
 
   private def ids(json: Json): IO[List[ConfigurationRequest.Id]] =

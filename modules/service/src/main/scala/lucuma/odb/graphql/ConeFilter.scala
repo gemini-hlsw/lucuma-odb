@@ -27,9 +27,8 @@ import grackle.Query.TransformCursor
 import grackle.Query.Unique
 import grackle.Result
 import grackle.Term
-import lucuma.core.math.Angle
-import lucuma.core.math.Coordinates
 import lucuma.core.model.ConfigurationRequest
+import lucuma.odb.data.Cone
 
 /** Stands in for a `WhereConfigurationRequest.targetCoordinates` cone until the matching
  *  ids are known. Produced by the WHERE binding during elaboration and replaced by
@@ -42,7 +41,7 @@ import lucuma.core.model.ConfigurationRequest
  *  and `Component` nodes the walk does not enter) would survive to here. The WHERE
  *  binding's `allowCone` flag is what keeps that from happening.
  */
-case class ConePredicate(idPath: Path, center: Coordinates, distance: Angle) extends Predicate:
+case class ConePredicate(idPath: Path, cone: Cone) extends Predicate:
   def apply(c: Cursor): Result[Boolean] = Result.internalError("Unresolved targetCoordinates cone.")
   def children: List[Term[?]]           = Nil
 
@@ -52,17 +51,20 @@ case class ConePredicate(idPath: Path, center: Coordinates, distance: Angle) ext
  *
  *  {{{
  *  parse ──▶ compile ──▶ Query ──▶ resolve ──▶ Query ──▶ execute ──▶ Json
- *               │                     │
- *      cone ⟶ ConePredicate    ConePredicate ⟶ id IN (…)
+ *               │                     │                      │
+ *      cone ⟶ ConePredicate   SQL 1: candidate lookup   SQL 2: main query,
+ *                            ConePredicate ⟶ id IN (…)  one pushable statement
  *  }}}
  *
  *  Splitting it this way lets grackle do the parsing first: variables are substituted and
  *  the input is validated by the ordinary `WhereCone` binding, so the cone arrives here as
- *  parsed `Coordinates` and `Angle` whether it was written inline or passed as a variable.
- *  Resolution then happens in `F`, where the candidate lookup can run, and substitutes the
- *  ids *in place*, so a cone nested under `AND` / `OR` / `NOT` keeps its position and
- *  meaning. What grackle finally executes is an ordinary WHERE that pushes down to a
- *  single SQL statement.
+ *  a parsed `Cone` whether it was written inline or passed as a variable. Resolution then
+ *  happens in `F`, where the candidate lookup (SQL phase 1, see
+ *  `ConfigurationService.coneCandidates`) can run, and substitutes the ids *in place*, so
+ *  a cone nested under `AND` / `OR` / `NOT` keeps its position and meaning. What grackle
+ *  finally executes is an ordinary WHERE that pushes down to a single SQL statement
+ *  (phase 2). An empty candidate list compiles to `false`, so a cone matching nothing is
+ *  a cheap empty result.
  *
  *  Driven by `GraphQLRoutes`, which resolves each compiled operation before running it.
  *  That reaches every cone the `configurationRequests` query can produce, because its
@@ -73,61 +75,52 @@ case class ConePredicate(idPath: Path, center: Coordinates, distance: Angle) ext
  */
 object ConeFilter:
 
-  /** Replaces each `ConePredicate` in `query` with the ids `compute` finds for it.
+  /** Replaces each `ConePredicate` in `query` with the ids `compute` finds for its cone.
    *  Queries without cones -- nearly all of them -- are returned untouched.
    */
   def resolve[F[_]: Monad](
     query: Query
-  )(compute: (Coordinates, Angle) => F[Result[List[ConfigurationRequest.Id]]]): F[Result[Query]] =
+  )(compute: Cone => F[Result[List[ConfigurationRequest.Id]]]): F[Result[Query]] =
     collect(query).distinct match
       case Nil   => Result.success(query).pure[F]
       case cones =>
-        cones.traverse(c => compute(c.center, c.distance)).map: rs =>
+        cones.traverse(c => compute(c.cone)).map: rs =>
           rs.sequence.map(ids => substitute(query, cones.zip(ids).toMap))
 
-  // --- collection ---
+  /** The one walk over the query tree: rewrites the predicate of every reachable
+   *  `Filter` node. Collection reuses it with a predicate-preserving `f` that records
+   *  what it sees, discarding the rebuilt query.
+   */
+  private def mapFilterPredicates(q: Query)(f: Predicate => Predicate): Query =
+    q match
+      case Filter(pred, child)       => Filter(f(pred), mapFilterPredicates(child)(f))
+      case Group(qs)                 => Group(qs.map(mapFilterPredicates(_)(f)))
+      case s: Select                 => s.copy(child = mapFilterPredicates(s.child)(f))
+      case Unique(child)             => Unique(mapFilterPredicates(child)(f))
+      case e: Environment            => e.copy(child = mapFilterPredicates(e.child)(f))
+      case Narrow(tpe, child)        => Narrow(tpe, mapFilterPredicates(child)(f))
+      case Limit(n, child)           => Limit(n, mapFilterPredicates(child)(f))
+      case Offset(n, child)          => Offset(n, mapFilterPredicates(child)(f))
+      case OrderBy(sels, child)      => OrderBy(sels, mapFilterPredicates(child)(f))
+      case Count(child)              => Count(mapFilterPredicates(child)(f))
+      case t: TransformCursor        => t.copy(child = mapFilterPredicates(t.child)(f))
+      case Introspect(schema, child) => Introspect(schema, mapFilterPredicates(child)(f))
+      case other                     => other
 
   private def collect(q: Query): List[ConePredicate] =
-    q match
-      case Filter(pred, child)       => collectPred(pred) ++ collect(child)
-      case Group(qs)                 => qs.flatMap(collect)
-      case s: Select                 => collect(s.child)
-      case Unique(child)             => collect(child)
-      case Environment(_, child)     => collect(child)
-      case Narrow(_, child)          => collect(child)
-      case Limit(_, child)           => collect(child)
-      case Offset(_, child)          => collect(child)
-      case OrderBy(_, child)         => collect(child)
-      case Count(child)              => collect(child)
-      case TransformCursor(_, child) => collect(child)
-      case Introspect(_, child)      => collect(child)
-      case _                         => Nil
-
-  private def collectPred(p: Predicate): List[ConePredicate] =
-    p.fold(List.empty[ConePredicate]): (acc, t) =>
-      t match
-        case c: ConePredicate => c :: acc
-        case _                => acc
-
-  // --- substitution ---
+    val found = List.newBuilder[ConePredicate]
+    mapFilterPredicates(q): p =>
+      found ++= p.fold(List.empty[ConePredicate]): (acc, t) =>
+        t match
+          case c: ConePredicate => c :: acc
+          case _                => acc
+      p
+    found.result()
 
   private type Ids = Map[ConePredicate, List[ConfigurationRequest.Id]]
 
   private def substitute(q: Query, ids: Ids): Query =
-    q match
-      case Filter(pred, child)       => Filter(substitutePred(pred, ids), substitute(child, ids))
-      case Group(qs)                 => Group(qs.map(substitute(_, ids)))
-      case s: Select                 => s.copy(child = substitute(s.child, ids))
-      case Unique(child)             => Unique(substitute(child, ids))
-      case e @ Environment(_, child) => e.copy(child = substitute(child, ids))
-      case Narrow(tpe, child)        => Narrow(tpe, substitute(child, ids))
-      case Limit(n, child)           => Limit(n, substitute(child, ids))
-      case Offset(n, child)          => Offset(n, substitute(child, ids))
-      case OrderBy(sels, child)      => OrderBy(sels, substitute(child, ids))
-      case Count(child)              => Count(substitute(child, ids))
-      case t @ TransformCursor(_, c) => t.copy(child = substitute(c, ids))
-      case Introspect(schema, child) => Introspect(schema, substitute(child, ids))
-      case other                     => other
+    mapFilterPredicates(q)(substitutePred(_, ids))
 
   private def substitutePred(p: Predicate, ids: Ids): Predicate =
     p match
