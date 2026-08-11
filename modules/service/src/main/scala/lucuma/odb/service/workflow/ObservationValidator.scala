@@ -15,7 +15,6 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
@@ -39,10 +38,6 @@ object ObservationValidator:
 
   /* Validation Messages */
   object Messages {
-
-    def invalidScienceBand(b: ScienceBand): String =
-      s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
-
     def tooActivationExceedsCeiling(obs: TooActivation, ceiling: TooActivation): String =
       s"Target of Opportunity activation ${obs.tag.toScreamingSnakeCase} exceeds the maximum " +
       s"${ceiling.tag.toScreamingSnakeCase} allowed by the proposal."
@@ -81,12 +76,6 @@ object ObservationValidator:
     // Here are our simple validators
     import validator.*
 
-
-
-    val bandValidator: ObservationValidator = info =>
-      (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
-        if bs.toList.contains(b) then ObservationValidationMap.empty
-        else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
 
     // The Target-of-Opportunity ceiling.  This is an authorization failure
     // rather than a misconfiguration, so it maps to Unapproved -- the
@@ -157,7 +146,7 @@ object ObservationValidator:
       CfpInstrumentValidator     |+|
       ExchangeValidator          |+|
       CfpRaDecValidator          |+|
-      bandValidator              |+|
+      BandValidator              |+|
       ghostVMagnitudeValidator   |+|
       tooActivationValidator     |+|
       opportunityTargetValidator |+|
