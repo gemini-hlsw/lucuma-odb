@@ -25,16 +25,20 @@ import lucuma.core.syntax.string.*
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ObservationValidationMap
-import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ItcInputDerivation
-import lucuma.odb.sequence.data.MissingParamSet
-import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
 import ObservationWorkflowState.*
 
 import Services.Syntax.*
 import cats.Applicative
+import cats.Monoid
+
+trait ObservationValidator extends (ObservationValidationInfo => ObservationValidationMap):
+  def apply(info: ObservationValidationInfo): ObservationValidationMap
 
 object ObservationValidator:
+
+  given Monoid[ObservationValidator]:
+    def empty = _ => ObservationValidationMap.empty
+    def combine(x: ObservationValidator, y: ObservationValidator): ObservationValidator = a => x(a) |+| y(a)
 
   /* Validation Messages */
   object Messages {
@@ -66,21 +70,11 @@ object ObservationValidator:
     val MissingVMagnitude = "Please add a V magnitude."
   }
 
-  extension (mp: MissingParamSet)
-    private def toObsValidation: ObservationValidation =
-      ObservationValidation.configuration(s"Missing ${mp.params.map(_.name).toList.intercalate(", ")}")
-
-  extension (ge: GeneratorParamsService.Error)
-    private def toObsValidation: ObservationValidation = ge match
-      case GenParamsError.MissingData(p) => p.toObsValidation
-      case _                             => ObservationValidation.configuration(ge.format)
-
   def validate[F[_]: Applicative](
     infos:  Map[Observation.Id, ObservationValidationInfo],
     itcFor: Observation.Id => Option[Itc]
   )(using Services[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
-
-    type Validator = ObservationValidationInfo => ObservationValidationMap
+    import validator.*
 
     val (cals, other)         = infos.partition(_._2.calibrationRole.isDefined)
     val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
@@ -101,14 +95,7 @@ object ObservationValidator:
 
     // Here are our simple validators
 
-    val generatorValidator: Validator = info =>
-      if info.isVisitor || info.isExchange then ObservationValidationMap.empty
-      else info.generatorParams.foldMap:
-        case Left(error)                                                         => ObservationValidationMap.singleton(error.toObsValidation)
-        case Right(GeneratorParams(itcInput = ItcInputDerivation.Incomplete(m))) => ObservationValidationMap.singleton(m.toObsValidation)
-        case Right(ps)                                                           => ObservationValidationMap.empty
-
-    val cfpInstrumentValidator: Validator = info =>
+    val cfpInstrumentValidator: ObservationValidator = info =>
       info.cfpInfo.foldMap: cfp =>
         if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
         else info.instrument.foldMap: inst =>
@@ -117,7 +104,7 @@ object ObservationValidator:
 
     // Exchange observations must match the proposal's observatory, and (when
     // the call restricts instruments) use one of its allowed exchange instruments.
-    val exchangeValidator: Validator = info =>
+    val exchangeValidator: ObservationValidator = info =>
       info.observingMode match
         case Some(e: ExchangeObservingModeType) =>
           info.cfpInfo.foldMap: cfp =>
@@ -136,7 +123,7 @@ object ObservationValidator:
                   else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(inst.tag)))
         case _ => ObservationValidationMap.empty
 
-    val cfpRaDecValidator: Validator = info =>
+    val cfpRaDecValidator: ObservationValidator = info =>
       info.cfpInfo.foldMap: cfp =>
         info.site.foldMap: site =>
           info.coordinates.foldMap: coords =>
@@ -144,7 +131,7 @@ object ObservationValidator:
             if ok then ObservationValidationMap.empty
             else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
 
-    val bandValidator: Validator = info =>
+    val bandValidator: ObservationValidator = info =>
       (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
         if bs.toList.contains(b) then ObservationValidationMap.empty
         else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
@@ -153,7 +140,7 @@ object ObservationValidator:
     // rather than a misconfiguration, so it maps to Unapproved -- the
     // observation cannot advance to Ready until the activation is lowered or
     // the proposal's ceiling is raised.
-    val tooActivationValidator: Validator = info =>
+    val tooActivationValidator: ObservationValidator = info =>
       if !info.exceedsTooCeiling then ObservationValidationMap.empty
       else
         ObservationValidationMap.singleton:
@@ -172,7 +159,7 @@ object ObservationValidator:
     // but the asterism can still be edited afterwards (Ready is in
     // preExecutionSet) and a Ready ToO with no coordinates is worse than a
     // loud error.
-    val opportunityTargetValidator: Validator = info =>
+    val opportunityTargetValidator: ObservationValidator = info =>
       if !info.hasTooTarget then ObservationValidationMap.empty
       else if !info.isTooObservation then
         ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.OpportunityTargetRequiresActivation))
@@ -180,7 +167,7 @@ object ObservationValidator:
         ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.OpportunityTargetNotResolved))
       else ObservationValidationMap.empty
 
-    val itcValidator: Validator = info =>
+    val itcValidator: ObservationValidator = info =>
       if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
       else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
 
@@ -189,7 +176,7 @@ object ObservationValidator:
     // maps to Undefined and blocks Ready; during execution the frozen snapshot
     // is present and execution-state dominance keeps the observation Ongoing,
     // so it is a non-blocking standing error there.
-    val acquisitionValidator: Validator = info =>
+    val acquisitionValidator: ObservationValidator = info =>
       if info.isVisitor then ObservationValidationMap.empty
       else itcFor(info.oid).foldMap:
         _.acquisition match
@@ -198,23 +185,23 @@ object ObservationValidator:
 
     // V magnitudes are used by Observe to set the GHOST slit viewing
     // camera exposure time, so every target in a GHOST observation needs one.
-    val ghostVMagnitudeValidator: Validator = info =>
+    val ghostVMagnitudeValidator: ObservationValidator = info =>
       if info.observingMode.contains(ObservingModeType.GhostIfu) && info.asterism.exists(!_.sourceProfile.hasBand(Band.V)) then
         ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.MissingVMagnitude))
       else ObservationValidationMap.empty
 
-    val otherConfigErrors: Validator = info =>
+    val otherConfigErrors: ObservationValidator = info =>
       NonEmptyChain.fromSeq(info.otherConfigErrors) match
         case None       => ObservationValidationMap.empty
         case Some(errs) => ObservationValidationMap.singleton(ObservationValidation(ObservationValidationCode.ConfigurationError, errs))
 
     // Here are our composed validators
 
-    val calibrationValidator, engValidator: Validator = _ =>
+    val calibrationValidator, engValidator: ObservationValidator = _ =>
       ObservationValidationMap.empty
 
-    val scienceValidator1: Validator =
-      generatorValidator         |+|
+    val scienceValidator1: ObservationValidator =
+      GeneratorValidator         |+|
       cfpInstrumentValidator     |+|
       exchangeValidator          |+|
       cfpRaDecValidator          |+|
@@ -224,7 +211,7 @@ object ObservationValidator:
       opportunityTargetValidator |+|
       otherConfigErrors
 
-    val scienceValidator2: Validator =
+    val scienceValidator2: ObservationValidator =
       itcValidator |+| acquisitionValidator
 
     // And our validation results
