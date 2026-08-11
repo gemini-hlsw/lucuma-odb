@@ -1551,11 +1551,8 @@ object ConfigurationService {
       val ra0           = cone.center.ra.toAngle.toMicroarcseconds
       val radius        = cone.distance.toMicroarcseconds
       val dec0rad       = cone.center.dec.toRadians
-      val ra0rad        = cone.center.ra.toRadians
       val radiusRad     = cone.distance.toDoubleRadians
-      val sinDec0       = cone.center.dec.toAngle.sin
       val cosDec0       = cone.center.dec.toAngle.cos
-      val cosRadius     = cone.distance.cos
       // The nearest pole is 90° - |dec0| away, so the cone reaches it when |dec0| + r >= 90°.
       // Then every meridian passes through the cone and no RA range can exclude anything.
       val pole          = math.abs(dec0rad) + radiusRad >= math.Pi / 2
@@ -1598,25 +1595,31 @@ object ConfigurationService {
       // The assembled statement, in outline:
       //
       //   select c_configuration_request_id from v_configuration_request
-      //    where <dec in [decLo, decHi], or in either wrapped image of it>   -- box prefilter,
-      //      and <ra  in [raLo,  raHi ], or in either wrapped image of it>   -- index-friendly
-      //      and <spherical law of cosines: cos(separation) >= cos(radius)>  -- exact trim
-      //      and <program visible to user>                                   -- see above
-      //    limit max + 1                                                     -- one over, to detect
+      //    where <dec in [decLo, decHi], or in either wrapped image of it>      -- box prefilter,
+      //      and <ra  in [raLo,  raHi ], or in either wrapped image of it>      -- index-friendly
+      //      and <haversine: sin²(sep/2) computed in PG <= sin²(radius/2)>      -- exact trim
+      //      and <program visible to user>                                      -- see above
+      //    limit max + 1                                                        -- one over, to detect
       //
-      void"select c_configuration_request_id from v_configuration_request"                                              |+|
-      void" where (c_reference_dec between "    |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi) |+|
-      void" or c_reference_dec >= "             |+| sql"$int8".apply(decLo + FullCircle)                                |+|
-      void" or c_reference_dec <= "             |+| sql"$int8".apply(decHi - FullCircle) |+| void")"                    |+|
-      void" and (c_reference_ra between "       |+| sql"$int8".apply(raLo)  |+| void" and " |+| sql"$int8".apply(raHi)  |+|
-      void" or c_reference_ra >= "              |+| sql"$int8".apply(raLo + FullCircle)                                 |+|
-      void" or c_reference_ra <= "              |+| sql"$int8".apply(raHi - FullCircle) |+| void")"                     |+|
-      void" and sin(radians(c_reference_dec / " |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(sinDec0)           |+|
-      void" + cos(radians(c_reference_dec / "   |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(cosDec0)           |+|
-      void" * cos(radians(c_reference_ra / "    |+| µasPerDeg |+| void") - "  |+| sql"$float8".apply(ra0rad)            |+|
-      void") >= "                               |+| sql"$float8".apply(cosRadius)                                       |+|
-      visibility                                                                                                        |+|
-      void" limit "                             |+| sql"$int4".apply(max + 1)
+      // The trim uses the haversine form rather than the spherical law of cosines
+      // (cos(sep) >= cos(radius)), which is ill-conditioned near sep = 0: cos is flat there,
+      // so with radius 0 even the center's own row can round below 1 and be excluded. The
+      // haversine is well-conditioned at small separations, an exact match gives an LHS of
+      // exactly 0 (integer µas differences are exact).
+      val dec0µas: AppliedFragment = sql"$int8".apply(dec0ang)
+      void"select c_configuration_request_id from v_configuration_request"                                                      |+|
+      void" where (c_reference_dec between "        |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi)     |+|
+      void" or c_reference_dec >= "                 |+| sql"$int8".apply(decLo + FullCircle)                                    |+|
+      void" or c_reference_dec <= "                 |+| sql"$int8".apply(decHi - FullCircle) |+| void")"                        |+|
+      void" and (c_reference_ra between "           |+| sql"$int8".apply(raLo)  |+| void" and " |+| sql"$int8".apply(raHi)      |+|
+      void" or c_reference_ra >= "                  |+| sql"$int8".apply(raLo + FullCircle)                                     |+|
+      void" or c_reference_ra <= "                  |+| sql"$int8".apply(raHi - FullCircle) |+| void")"                         |+|
+      void" and pow(sin(radians((c_reference_dec - " |+| dec0µas |+| void") / " |+| µasPerDeg |+| void") / 2), 2)"              |+|
+      void" + cos(radians(c_reference_dec / "       |+| µasPerDeg |+| void")) * cos(radians(" |+| dec0µas |+| void" / " |+| µasPerDeg |+| void"))" |+|
+      void" * pow(sin(radians((c_reference_ra - "   |+| sql"$int8".apply(ra0) |+| void") / " |+| µasPerDeg |+| void") / 2), 2)" |+|
+      void" <= pow(sin(radians("                    |+| sql"$int8".apply(radius) |+| void" / " |+| µasPerDeg |+| void") / 2), 2)" |+|
+      visibility                                                                                                                |+|
+      void" limit "                                 |+| sql"$int4".apply(max + 1)
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =

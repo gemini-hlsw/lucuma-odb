@@ -7,6 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.ConfigurationRequest
@@ -29,8 +30,9 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
   val piHalfWidth = TestUsers.Standard.pi(4, 33)
   val piOwner     = TestUsers.Standard.pi(5, 34)
   val piUnlinked  = TestUsers.Standard.pi(6, 35)
+  val piBoundary  = TestUsers.Standard.pi(7, 36)
 
-  val validUsers = List(admin, piGeneral, piPole, piHalfWidth, piOwner, piUnlinked)
+  val validUsers = List(admin, piGeneral, piPole, piHalfWidth, piOwner, piUnlinked, piBoundary)
 
   // 18' west of RA 0: even a small cone at the origin has to wrap to reach it.
   private val tightSeam: Coordinates =
@@ -112,6 +114,22 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
     for
       seeded <- seed(piHalfWidth, halfWidthRegressions ++ basePositions)
       _      <- cones.traverse_(assertCone(seeded, piHalfWidth))
+    yield ()
+
+  // The regression the haversine trim fixes: the law-of-cosines form is flat near zero
+  // separation, so a zero-radius cone could exclude its own center to float rounding.
+  test("zero-radius and exact-boundary cones are deterministic"):
+    val center   = coords("00:00:00 +10:00:00")
+    val onRim    = coords("00:00:00 +15:00:00") // exactly 5° north of center
+    val justOut  = coords("00:00:00 +15:00:01") // 1" past the rim
+    val cones: List[Cone] = List(
+      cone(center, Angle.Angle0),  // only the center itself
+      cone(center, 5.degrees),     // rim target sits exactly on the boundary: included
+      cone(onRim,  Angle.Angle0),  // zero-radius away from the seed cluster
+    )
+    for
+      seeded <- seed(piBoundary, List(center, onRim, justOut))
+      _      <- cones.traverse_(assertCone(seeded, piBoundary))
     yield ()
 
   private val wide: Cone = cone(coords("00:00:00 +10:00:00"), 25.degrees)
