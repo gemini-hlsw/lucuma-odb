@@ -10,10 +10,8 @@ import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
 import cats.implicits.*
 import grackle.ResultT
-import lucuma.core.enums.Band
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationValidationCode
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.StandardRole.*
@@ -30,13 +28,6 @@ object ObservationValidator:
   given Monoid[ObservationValidator]:
     def empty = _ => ObservationValidationMap.empty
     def combine(x: ObservationValidator, y: ObservationValidator): ObservationValidator = a => x(a) |+| y(a)
-
-  /* Validation Messages */
-  object Messages {
-
-
-    val MissingVMagnitude = "Please add a V magnitude."
-  }
 
   def validate[F[_]: Applicative](
     infos:  Map[Observation.Id, ObservationValidationInfo],
@@ -64,13 +55,6 @@ object ObservationValidator:
     import validator.*
 
 
-    // V magnitudes are used by Observe to set the GHOST slit viewing
-    // camera exposure time, so every target in a GHOST observation needs one.
-    val ghostVMagnitudeValidator: ObservationValidator = info =>
-      if info.observingMode.contains(ObservingModeType.GhostIfu) && info.asterism.exists(!_.sourceProfile.hasBand(Band.V)) then
-        ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.MissingVMagnitude))
-      else ObservationValidationMap.empty
-
     val otherConfigErrors: ObservationValidator = info =>
       NonEmptyChain.fromSeq(info.otherConfigErrors) match
         case None       => ObservationValidationMap.empty
@@ -87,7 +71,7 @@ object ObservationValidator:
       ExchangeValidator          |+|
       CfpRaDecValidator          |+|
       BandValidator              |+|
-      ghostVMagnitudeValidator   |+|
+      GhostVMagnitudeValidator   |+|
       TooActivationValidator     |+|
       OpportunityTargetValidator |+|
       otherConfigErrors

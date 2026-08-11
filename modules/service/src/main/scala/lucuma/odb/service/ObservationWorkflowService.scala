@@ -94,9 +94,6 @@ object ObservationWorkflowService {
   type ExecutionState  = Ongoing.type   | Completed.type
   type ValidationState = Undefined.type | Unapproved.type | Defined.type
 
-  @deprecated("remove this forwarder")
-  val Messages = ObservationValidator.Messages
-
   extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
     ws match
       case Inactive => Some(Inactive)
