@@ -32,8 +32,8 @@ import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.ObservationService
-import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.service.workflow.validator.CfpRaDecValidator
+import lucuma.odb.service.workflow.validator.OpportunityTargetValidator
 
 class observation_workflow
   extends ExecutionTestSupportForGmos
@@ -218,7 +218,7 @@ class observation_workflow
     // problem rather than something the fixture can set up around.
     val moreMessages: List[String] =
       tt match
-        case TargetType.Opportunity => List(ObservationWorkflowService.Messages.OpportunityTargetRequiresActivation)
+        case TargetType.Opportunity => List(OpportunityTargetValidator.OpportunityTargetRequiresActivation)
         case _                      => Nil
 
     setup.flatMap: oid =>
