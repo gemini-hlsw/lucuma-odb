@@ -15,6 +15,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.Cone
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereOptionEq
 import lucuma.odb.graphql.binding.WhereOptionString
 import lucuma.odb.graphql.binding.WhereOrder
 
@@ -40,26 +41,7 @@ object WhereConfigurationRequest:
     // A configuration request exposes its observing mode type nested under its
     // `configuration.observingMode`, so the predicate path is one segment deeper
     // than the equivalent field on `WhereObservation`.
-    def observingModeTypeBinding(binding: Matcher[ObservingModeType]): Matcher[Predicate] =
-      val modePath = path / "configuration" / "observingMode" / "mode"
-      ObjectFieldsBinding.rmap:
-        case List(
-          BooleanBinding.Option("IS_NULL", rIsNull),
-          binding.Option("EQ", rEQ),
-          binding.Option("NEQ", rNEQ),
-          binding.List.Option("IN", rIN),
-          binding.List.Option("NIN", rNIN)
-        ) =>
-          (rIsNull, rEQ, rNEQ, rIN, rNIN).parMapN: (isNull, EQ, NEQ, IN, NIN) =>
-            and(List(
-              isNull.map(IsNull(modePath, _)),
-              EQ.map(a => Eql(modePath, Const(a))),
-              NEQ.map(a => NEql(modePath, Const(a))),
-              IN.map(as => In(modePath, as)),
-              NIN.map(as => Not(In(modePath, as)))
-            ).flatten)
-
-    val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
+    val ObservingModeTypeBinding = WhereOptionEq.unwrappedBinding(path / "configuration" / "observingMode" / "mode", enumeratedBinding[ObservingModeType])
 
     // The cone's candidate lookup is an effect the elaborator cannot run, so this yields a
     // placeholder that `ConeFilter.resolve` swaps for `id IN (…)` before execution. Parsing

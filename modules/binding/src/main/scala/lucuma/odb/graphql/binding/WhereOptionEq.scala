@@ -49,6 +49,31 @@ object WhereOptionEq {
         }
     }
 
+  /** Like `binding`, but for a non-optional field reached through a nullable parent
+   *  object, so the leaf term is `A` rather than `Option[A]` (`IS_NULL` matches via
+   *  the absent parent).
+   */
+  def unwrappedBinding[A: Eq](path: Path, binding: Matcher[A]): Matcher[Predicate] =
+    ObjectFieldsBinding.rmap {
+      case List(
+        BooleanBinding.Option("IS_NULL", rIsNull),
+        binding.Option("EQ", rEQ),
+        binding.Option("NEQ", rNEQ),
+        binding.List.Option("IN", rIN),
+        binding.List.Option("NIN", rNIN)
+      ) =>
+        (rIsNull, rEQ, rNEQ, rIN, rNIN).parMapN {
+          (isNull, EQ, NEQ, IN, NIN) =>
+            and(List(
+              isNull.map(IsNull(path, _)),
+              EQ.map(a => Eql(path, Const(a))),
+              NEQ.map(a => NEql(path, Const(a))),
+              IN.map(as => In(path, as)),
+              NIN.map(as => Not(In(path, as)))
+            ).flatten)
+        }
+    }
+
   def inputBinding[A: Eq](binding: Matcher[A]): Matcher[WhereOptionEq[A]] =
     ObjectFieldsBinding.rmap:
       case List(

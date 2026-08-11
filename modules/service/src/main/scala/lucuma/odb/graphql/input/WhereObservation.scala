@@ -58,32 +58,13 @@ object WhereObservation {
               ).flatten)
           }
 
-    def observingModeTypeBinding(binding: Matcher[ObservingModeType]): Matcher[Predicate] =
-      val modePath = path / "observingMode" / "mode"
-      ObjectFieldsBinding.rmap:
-        case List(
-          BooleanBinding.Option("IS_NULL", rIsNull),
-          binding.Option("EQ", rEQ),
-          binding.Option("NEQ", rNEQ),
-          binding.List.Option("IN", rIN),
-          binding.List.Option("NIN", rNIN)
-        ) =>
-          (rIsNull, rEQ, rNEQ, rIN, rNIN).parMapN: (isNull, EQ, NEQ, IN, NIN) =>
-              and(List(
-                isNull.map(IsNull(modePath, _)),
-                EQ.map(a => Eql(modePath, Const(a))),
-                NEQ.map(a => NEql(modePath, Const(a))),
-                IN.map(as => In(modePath, as)),
-                NIN.map(as => Not(In(modePath, as)))
-              ).flatten)
-
     val SubtitleBinding = WhereOptionString.binding(path / "subtitle")
     val WhereOrderObservationIdBinding = WhereOrder.binding[Observation.Id](path / "id", ObservationIdBinding)
     val WhereReferenceBinding = WhereObservationReference.binding(path / "reference")
     val WhereProgramBinding = WhereProgram.binding(path / "program")
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
     val InstrumentBinding = WhereOptionEq.binding(path / "instrument", enumeratedBinding[Instrument])
-    val ObservingModeTypeBinding = observingModeTypeBinding(enumeratedBinding[ObservingModeType])
+    val ObservingModeTypeBinding = WhereOptionEq.unwrappedBinding(path / "observingMode" / "mode", enumeratedBinding[ObservingModeType])
     val SiteBinding = siteBinding(enumeratedBinding[Site])
     val WorkflowBinding = WhereCalculatedObservationWorkflow.binding(path / "workflow")
     val CalibrationRoleBinding = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
