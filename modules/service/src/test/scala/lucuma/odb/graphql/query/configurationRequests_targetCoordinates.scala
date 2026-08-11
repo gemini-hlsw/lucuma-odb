@@ -179,6 +179,22 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       )
     reject("200.0") *> reject("-10.0")
 
+  // Each distinct cone costs a candidate scan and can inject thousands of ids, so the
+  // count per operation is capped (ConeFilter.MaxConesPerOperation).
+  test("more than 5 distinct cones in one query is rejected"):
+    def coneOfRadius(degrees: Int): String =
+      s"""{ targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { degrees: "$degrees" } } }"""
+    def whereOr(n: Int): String =
+      s"""WHERE: { OR: [ ${(1 to n).map(coneOfRadius).mkString(", ")} ] }"""
+    for
+      _ <- expectOdbError(
+             user = pi,
+             query = s"query { configurationRequests(${whereOr(6)}) { matches { id } } }",
+             expected = { case OdbError.InvalidArgument(Some(m)) if m.contains("targetCoordinates") => () }
+           )
+      _ <- query(pi, s"query { configurationRequests(${whereOr(5)}) { matches { id } } }")
+    yield ()
+
   test("cone under OR keeps its position"):
     for
       (pid, near, far) <- coneSetup

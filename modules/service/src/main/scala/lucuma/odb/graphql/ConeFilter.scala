@@ -29,6 +29,8 @@ import grackle.Result
 import grackle.Term
 import lucuma.core.model.ConfigurationRequest
 import lucuma.odb.data.Cone
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.asFailure
 
 /** Resolves `targetCoordinates` cone filters, which grackle cannot evaluate on its own:
  *  finding the configuration requests inside a cone is an `F` effect, and the elaborator
@@ -86,6 +88,12 @@ object ConeFilter:
     def apply(c: Cursor): Result[Boolean] = Result.internalError("Unresolved targetCoordinates cone.")
     def children: List[Term[?]]           = Nil
 
+  /** Cap on distinct cones per operation. Each one costs a candidate scan and can inject
+   *  up to `ConfigurationService.MaxConeCandidates` ids into the final statement, so an
+   *  unbounded `OR` list would be a cheap amplification lever.
+   */
+  val MaxConesPerOperation: Int = 5
+
   /** Replaces each `ConePredicate` in `query` with the ids `compute` finds for its cone.
    *  Queries without cones -- nearly all of them -- are returned untouched.
    */
@@ -94,6 +102,9 @@ object ConeFilter:
   )(compute: Cone => F[Result[List[ConfigurationRequest.Id]]]): F[Result[Query]] =
     collect(query).distinct match
       case Nil   => Result.success(query).pure[F]
+      case cones if cones.sizeIs > MaxConesPerOperation =>
+        OdbError.InvalidArgument(s"A query may use at most $MaxConesPerOperation distinct targetCoordinates filters.".some)
+          .asFailure.pure[F]
       case cones =>
         cones.traverse(c => compute(c.cone)).map: rs =>
           rs.sequence.map(ids => substitute(query, cones.zip(ids).toMap))
