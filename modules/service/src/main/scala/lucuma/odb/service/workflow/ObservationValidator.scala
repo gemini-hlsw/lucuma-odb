@@ -18,7 +18,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.StandardRole.*
 import lucuma.odb.data.Itc
-import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ObservationValidationMap
 
 import Services.Syntax.*
@@ -65,20 +64,6 @@ object ObservationValidator:
     import validator.*
 
 
-
-
-    // An acquisition-capable mode whose acquisition ITC could not be produced
-    // (a cached deterministic failure) carries an ItcError.  Pre-execution this
-    // maps to Undefined and blocks Ready; during execution the frozen snapshot
-    // is present and execution-state dominance keeps the observation Ongoing,
-    // so it is a non-blocking standing error there.
-    val acquisitionValidator: ObservationValidator = info =>
-      if info.isVisitor then ObservationValidationMap.empty
-      else itcFor(info.oid).foldMap:
-        _.acquisition match
-          case ItcAcquisition.Failed(msg) => ObservationValidationMap.singleton(ObservationValidation.itc(msg))
-          case _                          => ObservationValidationMap.empty
-
     // V magnitudes are used by Observe to set the GHOST slit viewing
     // camera exposure time, so every target in a GHOST observation needs one.
     val ghostVMagnitudeValidator: ObservationValidator = info =>
@@ -108,7 +93,7 @@ object ObservationValidator:
       otherConfigErrors
 
     val scienceValidator2: ObservationValidator =
-      ItcValidator(itcFor) |+| acquisitionValidator
+      ItcValidator(itcFor) |+| AcquisitionValidator(itcFor)
 
     // And our validation results
 
