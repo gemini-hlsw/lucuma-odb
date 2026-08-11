@@ -7,26 +7,20 @@ package query
 import lucuma.core.math.Angle
 import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Coordinates
+import lucuma.odb.TestCoordinates
 
-// Shared geometry for the SC-9240 cone-search tests: position fixtures and the
-// expected-set reference, computed with lucuma-core's exact `angularDistance`.
+// Shared geometry utilities for cone-search tests
 trait ConeSearchFixture:
 
-  def coord(raHours: Double, decDegrees: Double): Coordinates =
-    Coordinates.unsafeFromRadians(raHours * math.Pi / 12.0, decDegrees * math.Pi / 180.0)
+  export TestCoordinates.coords
 
-  def deg(d: Double): Angle =
-    Angle.fromDoubleDegrees(d)
-
-  // (RA hours, Dec degrees) — chosen to exercise normal, seam, pole, and
-  // box-corner (in-box but out-of-circle) cases.
-  val basePositions: List[(Double, Double)] = List(
-    (0.0,   10.0),   // near origin
-    (6.0,   40.0),   // far away
-    (23.0,  10.0),   // RA 345°, across the 0/2π seam from the origin
-    (0.5,   14.0),   // offset; lands in-box but outside a small circle at the origin
-    (12.0,  89.0),   // near the north pole
-    (0.0,  -10.0),   // south of origin
+  val basePositions: List[Coordinates] = List(
+    coords("00:00:00 +10:00:00"), // near origin
+    coords("06:00:00 +40:00:00"), // far away
+    coords("23:00:00 +10:00:00"), // RA 345°, across the 0/2π seam from the origin
+    coords("00:30:00 +14:00:00"), // offset; lands in-box but outside a small circle at the origin
+    coords("12:00:00 +89:00:00"), // near the north pole
+    coords("00:00:00 -10:00:00"), // south of origin
   )
 
   def within[A](seeded: List[(A, Coordinates)])(center: Coordinates, distance: Angle): Set[A] =

@@ -11,6 +11,7 @@ import io.circe.JsonObject
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.math.Coordinates
+import lucuma.core.math.syntax.int.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
@@ -37,8 +38,7 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       cfpid  <- createGeminiCallForProposalsAs(admin)
       pid    <- createProgramAs(pi)
       _      <- addProposal(pi, pid, Some(cfpid), None)
-      seeded <- basePositions.traverse { case (rah, decd) =>
-        val c = coord(rah, decd)
+      seeded <- basePositions.traverse { c =>
         requestAt(pid, c).map(cid => (cid, c))
       }
 
@@ -50,10 +50,10 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       // small cone at the pole target.
       pole    <- configurationRequestsWhere(pi, s"""program: { id: { EQ: "$pid" } }, targetCoordinates: { center: { ra: { hours: "12.0" }, dec: { degrees: "89.0" } }, distance: { arcseconds: 7200 } }""")
     yield
-      val center = coord(0.0, 10.0)
-      assertEquals(small.toSet, within(seeded)(center, deg(5.0)))
-      assertEquals(seam.toSet,  within(seeded)(center, deg(21.0)))
-      assertEquals(pole.toSet,  within(seeded)(coord(12.0, 89.0), deg(2.0)))
+      val center = coords("00:00:00 +10:00:00")
+      assertEquals(small.toSet, within(seeded)(center, 5.degrees))
+      assertEquals(seam.toSet,  within(seeded)(center, 21.degrees))
+      assertEquals(pole.toSet,  within(seeded)(coords("12:00:00 +89:00:00"), 2.degrees))
 
   // --- how the cone survives compilation ---
   //
@@ -69,8 +69,8 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       cfpid <- createGeminiCallForProposalsAs(admin)
       pid   <- createProgramAs(pi)
       _     <- addProposal(pi, pid, Some(cfpid), None)
-      near  <- requestAt(pid, coord(0.0, 10.0))
-      far   <- requestAt(pid, coord(6.0, 40.0))
+      near  <- requestAt(pid, coords("00:00:00 +10:00:00"))
+      far   <- requestAt(pid, coords("06:00:00 +40:00:00"))
     yield (pid, near, far)
 
   private def ids(json: Json): IO[List[ConfigurationRequest.Id]] =

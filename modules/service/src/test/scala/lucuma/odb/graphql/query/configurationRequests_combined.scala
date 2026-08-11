@@ -82,11 +82,11 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
       _           <- setProgramActiveAs(staff, pidInactive, today.plusDays(100), today.plusDays(200))
 
       // Distinct targets so each configuration request gets a distinct id.
-      tAtCenter <- createSiderealTargetAtAs(pi, pidActive, coord(0.0, 10.0))   // at the cone center
-      tNear     <- createSiderealTargetAtAs(pi, pidActive, coord(0.1, 10.0))   // ~1.5° off, still in the cone
-      tNear2    <- createSiderealTargetAtAs(pi, pidActive, coord(0.2, 10.0))   // ~3° off, still in the cone
-      tFar      <- createSiderealTargetAtAs(pi, pidActive, coord(6.0, 40.0))   // far outside the cone
-      tInactive <- createSiderealTargetAtAs(pi, pidInactive, coord(0.0, 10.0)) // inactive program
+      tAtCenter <- createSiderealTargetAtAs(pi, pidActive, coords("00:00:00 +10:00:00"))   // at the cone center
+      tNear     <- createSiderealTargetAtAs(pi, pidActive, coords("00:06:00 +10:00:00"))   // ~1.5° off, still in the cone
+      tNear2    <- createSiderealTargetAtAs(pi, pidActive, coords("00:12:00 +10:00:00"))   // ~3° off, still in the cone
+      tFar      <- createSiderealTargetAtAs(pi, pidActive, coords("06:00:00 +40:00:00"))   // far outside the cone
+      tInactive <- createSiderealTargetAtAs(pi, pidInactive, coords("00:00:00 +10:00:00")) // inactive program
 
       // The matches: approved, GMOS-North-Long-Slit, active program, inside the cone.
       // Two of them, so LIMIT/OFFSET paging over the filtered set is meaningful.

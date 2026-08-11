@@ -6,14 +6,12 @@ package scheduler
 
 import cats.effect.IO
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.Gid
+import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.util.Codecs.*
 import org.http4s.*
@@ -164,7 +162,7 @@ class visibilityChanges extends SchedulerRoutesSuite with ExecutionTestSupportFo
       cursor    = before.plusMillis(1)
       (_,  b0) <- fetchVisibilityChanges(serviceUser, cursor)
       // A visibility-relevant edit re-stamps the target after the cursor.
-      _        <- updateTargetPropertiesAs(pi, t, Coordinates(RightAscension.fromDoubleDegrees(42.0), Declination.fromDoubleDegrees(17.0).get))
+      _        <- updateTargetPropertiesAs(pi, t, coords(42.0, 17.0))
       after    <- targetInvalidation(t)
       (st, b)  <- fetchVisibilityChanges(serviceUser, cursor)
     yield

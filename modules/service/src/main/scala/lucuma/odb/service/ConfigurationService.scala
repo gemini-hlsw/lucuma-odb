@@ -17,6 +17,9 @@ import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
+import lucuma.core.math.Angle.cos
+import lucuma.core.math.Angle.sin
+import lucuma.core.math.Angle.toDoubleRadians
 import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
@@ -67,11 +70,9 @@ trait ConfigurationService[F[_]] {
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
 
   /** Selects the ids of configuration requests whose target reference coordinates
-   *  lie within `cone` (exact great-circle match), restricted to programs visible
-   *  to the current user. Pure-SQL trig on the int8 microarcsecond columns; no
-   *  PostGIS. Fails when more than `max` requests match: the caller injects every
-   *  id into a rewritten query, so the list bounds both the heap and the
-   *  generated statement. */
+   *  lie within `cone` (exact great-circle match or angular distance), restricted to programs
+   *  visible to the current user. The caller injects every id into a rewritten query, so
+   *  the list bounds both the heap and the generated statement. */
   def coneCandidates(cone: Cone, max: Int = ConfigurationService.MaxConeCandidates): F[Result[List[ConfigurationRequest.Id]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
@@ -1535,36 +1536,44 @@ object ConfigurationService {
       """.query(configuration_request_id)
 
     /** AppliedFragment yielding the ids of configuration requests whose target
-     *  reference coordinates lie within `distance` of `center`. A wrap-aware
-     *  bounding-box prefilter on the int8 microarcsecond columns (index-friendly)
-     *  is followed by an exact great-circle trim (dot-product form). The dec
-     *  column uses lucuma-core's angle encoding, which is safe here because the
-     *  exact trim relies on sin/cos (2π-periodic). No PostGIS.
+     *  reference coordinates lie within `distance` of `center`.
      *
-     *  Scoped to programs visible to `user` and capped at `max + 1` rows (one
-     *  over, so the caller can tell "at the cap" from "over it"). */
+     *  A wrap-aware bounding-box prefilter on the int8 microarcsecond columns (index-friendly)
+     *  is followed by an exact great-circle trim. The dec column uses lucuma-core's
+     *  angle encoding, which is safe here because the exact trim relies on sin/cos (2π-periodic).
+     *
+     *  Scoped to programs visible to `user` and capped at `max + 1` rows */
     def coneCandidates(user: User, cone: Cone, max: Int): AppliedFragment =
+      // The columns are in microarcseconds, so all params are also in microarcseconds.
       val FullCircle    = 1296000000000L // 360° in µas
       val µasPerDegree  = 3600000000.0
       val dec0ang       = cone.center.dec.toAngle.toMicroarcseconds
       val ra0           = cone.center.ra.toAngle.toMicroarcseconds
       val radius        = cone.distance.toMicroarcseconds
       val dec0rad       = cone.center.dec.toRadians
-      val ra0rad        = ra0.toDouble / µasPerDegree * math.Pi / 180.0
-      val radiusRad     = radius.toDouble / µasPerDegree * math.Pi / 180.0
-      val sinDec0       = math.sin(dec0rad)
-      val cosDec0       = math.cos(dec0rad)
-      val cosRadius     = math.cos(radiusRad)
-      // Pole case: the cone contains a celestial pole, so every RA can match.
+      val ra0rad        = cone.center.ra.toRadians
+      val radiusRad     = cone.distance.toDoubleRadians
+      val sinDec0       = cone.center.dec.toAngle.sin
+      val cosDec0       = cone.center.dec.toAngle.cos
+      val cosRadius     = cone.distance.cos
+      // The nearest pole is 90° - |dec0| away, so the cone reaches it when |dec0| + r >= 90°.
+      // Then every meridian passes through the cone and no RA range can exclude anything.
       val pole          = math.abs(dec0rad) + radiusRad >= math.Pi / 2
-      // Exact RA half-width of the cone, asin(sin r / cos dec0). The small-angle form
-      // r / cos dec0 undershoots it (by ~13° for a 1° cone at dec 88.9°), and the box is
-      // a prefilter, so an undershoot silently loses matches. Non-pole implies the asin
-      // argument < 1; the min guards the float boundary. ceil so rounding never shrinks.
+      // Otherwise the cone spans dra either side of ra0, where sin(dra) = sin(r) / cos(dec0):
+      // meridians converge toward the poles, so the same cone covers more RA at higher dec.
+      //
+      // The small-angle form r / cos(dec0) is not good enough. It undershoots -- by ~13° for
+      // a 1° cone at dec 88.9° -- and since this box is only a prefilter, an undershoot
+      // silently drops rows that the exact trim below would have kept.
+      //
+      // asin needs an argument <= 1, which is exactly the non-pole condition above, so `min`
+      // is only absorbing float rounding at that boundary. `ceil` rounds the box outward for
+      // the same reason the exact half-width is used: too wide costs a little scan, too
+      // narrow loses matches.
       val dra           =
         if pole then FullCircle
         else
-          val sinDra = math.min(1.0, math.sin(radiusRad) / cosDec0)
+          val sinDra = math.min(1.0, cone.distance.sin / cosDec0)
           math.min(FullCircle, math.ceil(math.toDegrees(math.asin(sinDra)) * µasPerDegree).toLong)
       val decLo         = dec0ang - radius
       val decHi         = dec0ang + radius
@@ -1586,19 +1595,19 @@ object ConfigurationService {
 
       val µasPerDeg: AppliedFragment = sql"$float8".apply(µasPerDegree)
 
-      void"select c_configuration_request_id from v_configuration_request" |+|
-      void" where (c_reference_dec between " |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi) |+|
-      void" or c_reference_dec >= "           |+| sql"$int8".apply(decLo + FullCircle) |+|
-      void" or c_reference_dec <= "           |+| sql"$int8".apply(decHi - FullCircle) |+| void")" |+|
-      void" and (c_reference_ra between "     |+| sql"$int8".apply(raLo)  |+| void" and " |+| sql"$int8".apply(raHi) |+|
-      void" or c_reference_ra >= "            |+| sql"$int8".apply(raLo + FullCircle) |+|
-      void" or c_reference_ra <= "            |+| sql"$int8".apply(raHi - FullCircle) |+| void")" |+|
-      void" and sin(radians(c_reference_dec / " |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(sinDec0) |+|
-      void" + cos(radians(c_reference_dec / "   |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(cosDec0) |+|
-      void" * cos(radians(c_reference_ra / "    |+| µasPerDeg |+| void") - "  |+| sql"$float8".apply(ra0rad)  |+|
-      void") >= "                               |+| sql"$float8".apply(cosRadius) |+|
-      visibility |+|
-      void" limit " |+| sql"$int4".apply(max + 1)
+      void"select c_configuration_request_id from v_configuration_request"                                              |+|
+      void" where (c_reference_dec between "    |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi) |+|
+      void" or c_reference_dec >= "             |+| sql"$int8".apply(decLo + FullCircle)                                |+|
+      void" or c_reference_dec <= "             |+| sql"$int8".apply(decHi - FullCircle) |+| void")"                    |+|
+      void" and (c_reference_ra between "       |+| sql"$int8".apply(raLo)  |+| void" and " |+| sql"$int8".apply(raHi)  |+|
+      void" or c_reference_ra >= "              |+| sql"$int8".apply(raLo + FullCircle)                                 |+|
+      void" or c_reference_ra <= "              |+| sql"$int8".apply(raHi - FullCircle) |+| void")"                     |+|
+      void" and sin(radians(c_reference_dec / " |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(sinDec0)           |+|
+      void" + cos(radians(c_reference_dec / "   |+| µasPerDeg |+| void")) * " |+| sql"$float8".apply(cosDec0)           |+|
+      void" * cos(radians(c_reference_ra / "    |+| µasPerDeg |+| void") - "  |+| sql"$float8".apply(ra0rad)            |+|
+      void") >= "                               |+| sql"$float8".apply(cosRadius)                                       |+|
+      visibility                                                                                                        |+|
+      void" limit "                             |+| sql"$int4".apply(max + 1)
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =
