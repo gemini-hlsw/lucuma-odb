@@ -4,8 +4,11 @@
 package lucuma.odb.service
 package workflow
 
+import cats.*
 import cats.data.NonEmptyList
+import cats.effect.Concurrent
 import cats.implicits.*
+import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
@@ -13,6 +16,7 @@ import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProposalStatus
@@ -22,29 +26,28 @@ import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.TooActivation
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Coordinates
+import lucuma.core.model.CallCoordinatesLimits
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.util.DateInterval
 import lucuma.core.util.Timestamp
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.syntax.observingModeType.*
-import skunk.Transaction
-import lucuma.core.model.SiteCoordinatesLimits
-import lucuma.core.model.CallCoordinatesLimits
 import lucuma.odb.util.Codecs.*
-import Services.Syntax.*
-import cats.*
-import cats.effect.Concurrent
-import grackle.Result
-import skunk.{ Encoder, Query }
+import skunk.Encoder
+import skunk.Query
+import skunk.Transaction
 import skunk.syntax.all.*
-import lucuma.core.enums.Observatory
-import lucuma.core.util.DateInterval
+
 import java.time.Instant
+
+import Services.Syntax.*
 
 /* Validation Info Record */
 case class ObservationValidationInfo(
