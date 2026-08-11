@@ -251,3 +251,56 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     setup.flatMap: oid =>
       query(pi, gnirsAcquisitionQuery(oid)).map: json =>
         assert(json.hcursor.downFields("executionConfig", "gnirs", "acquisition").focus.exists(!_.isNull))
+
+  test("[gnirs] an imaging filter change costs the configured overhead"):
+    // Grouped imaging runs all of J then all of Order4, so the wheel moves once,
+    // entering the second filter's block.
+    val mode =
+      s"""
+        gnirsImaging: {
+          camera: SHORT_BLUE
+          variant: { grouped: { skyCount: 0 } }
+          filters: [ { filter: J }, { filter: ORDER4 } ]
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), mode)
+      yield o
+
+    setup.flatMap: oid =>
+      query(
+        pi,
+        s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gnirs {
+                science {
+                  nextAtom { steps { estimate { configChange { all { name estimate { seconds } } } } } }
+                  possibleFuture { steps { estimate { configChange { all { name estimate { seconds } } } } } }
+                }
+              }
+            }
+          }
+        """
+      ).map: json =>
+        val sci = json.hcursor.downField("executionConfig").downField("gnirs").downField("science")
+        val atoms = sci.downField("nextAtom").focus.toList ++
+                    sci.downField("possibleFuture").values.toList.flatten
+        val filterChanges =
+          atoms.flatMap: atom =>
+            atom.hcursor.downField("steps").values.toList.flatten.flatMap: step =>
+              step.hcursor
+                .downField("estimate").downField("configChange").downField("all")
+                .values.toList.flatten
+                .flatMap: c =>
+                  (for
+                    n <- c.hcursor.downField("name").as[String].toOption
+                    v <- c.hcursor.downField("estimate").downField("seconds").as[BigDecimal].toOption
+                    if n == "GNIRS Filter"
+                  yield v).toList
+
+        assertEquals(filterChanges, List(BigDecimal("10.000000")))

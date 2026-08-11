@@ -122,7 +122,14 @@ object ConfigChangeEstimator:
               .mapN(_ =!= _)
               .getOrElse(false)
 
-          List(Option.when(changed)(enums.TimeEstimate.GnirsWavelength.toConfigChange))
+          // The filter is a plain field, so the usual check applies.  It moves in
+          // imaging, whose science sequence steps through the configured filters,
+          // and in spectroscopy acquisition, which images the field and then the
+          // slit or IFU through different filters.
+          List(
+            Option.when(changed)(enums.TimeEstimate.GnirsWavelength.toConfigChange),
+            check(enums.TimeEstimate.GnirsFilter, past, present)(_.filter)
+          )
 
     private def gcal[D](past: StepTimeEstimateCalculator.Last[D], present: ProtoStep[D]): List[ConfigChangeEstimate] =
       val scienceFold = Option.unless(past.step.exists(_.stepConfig.usesGcalUnit) === present.stepConfig.usesGcalUnit)(
