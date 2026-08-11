@@ -10,7 +10,6 @@ import cats.Order.given
 import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.eq.*
-import cats.syntax.option.*
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ImagingInput
@@ -22,6 +21,7 @@ import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.util.HashBytes.given
 import monocle.Prism
+import monocle.macros.GenPrism
 
 import scala.collection.mutable.ArrayBuilder
 
@@ -177,10 +177,7 @@ object ItcInput:
         bld.result()
 
   val gnirsSpectroscopy: Prism[ItcInput, ItcInput.GnirsSpectroscopy] =
-    Prism[ItcInput, ItcInput.GnirsSpectroscopy] {
-      case s: ItcInput.GnirsSpectroscopy => s.some
-      case _                             => none
-    }(identity)
+    GenPrism[ItcInput, ItcInput.GnirsSpectroscopy]
 
   /**
     * ItcInput for spectroscopy, for instruments where GPP does not manage
@@ -205,16 +202,10 @@ object ItcInput:
         )
 
   val spectroscopy: Prism[ItcInput, ItcInput.Spectroscopy] =
-    Prism[ItcInput, ItcInput.Spectroscopy] {
-      case s: ItcInput.Spectroscopy => s.some
-      case _                        => none
-    }(identity)
+    GenPrism[ItcInput, ItcInput.Spectroscopy]
 
   val scienceOnlySpectroscopy: Prism[ItcInput, ItcInput.ScienceOnlySpectroscopy] =
-    Prism[ItcInput, ItcInput.ScienceOnlySpectroscopy] {
-      case s: ItcInput.ScienceOnlySpectroscopy => s.some
-      case _                                   => none
-    }(identity)
+    GenPrism[ItcInput, ItcInput.ScienceOnlySpectroscopy]
 
   given Eq[ItcInput] =
     Eq.instance:
