@@ -13,6 +13,10 @@ import lucuma.core.math.syntax.int.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.User
 import lucuma.odb.data.Cone
+import lucuma.odb.util.Codecs.configuration_request_id
+import lucuma.odb.util.Codecs.declination
+import lucuma.odb.util.Codecs.right_ascension
+import skunk.syntax.all.*
 
 // Service-level tests for the SC-9240 cone search: they call `coneCandidates` directly, so
 // only the SQL is under test.
@@ -116,20 +120,39 @@ class coneCandidates extends OdbSuite with ObservingModeSetupOperations with Con
       _      <- cones.traverse_(assertCone(seeded, piHalfWidth))
     yield ()
 
+  /** The reference coordinates actually stored for a request. The tracking pipeline that
+   *  fills them (`CompositeTracking` via `Coordinates.centerOf`) round-trips through
+   *  cartesian and truncates back to µas, so they can sit 1 µas off the seeded target --
+   *  exact-match tests must aim at these, not at the seed.
+   */
+  private def storedCoordinates(cid: ConfigurationRequest.Id): IO[Coordinates] =
+    withSession: s =>
+      s.unique(
+        sql"""select c_reference_ra, c_reference_dec from t_configuration_request
+              where c_configuration_request_id = $configuration_request_id"""
+          .query(right_ascension *: declination)
+      )(cid).map(Coordinates.apply.tupled)
+
   // The regression the haversine trim fixes: the law-of-cosines form is flat near zero
   // separation, so a zero-radius cone could exclude its own center to float rounding.
-  test("zero-radius and exact-boundary cones are deterministic"):
-    val center   = coords("00:00:00 +10:00:00")
-    val onRim    = coords("00:00:00 +15:00:00") // exactly 5° north of center
-    val justOut  = coords("00:00:00 +15:00:01") // 1" past the rim
-    val cones: List[Cone] = List(
-      cone(center, Angle.Angle0),  // only the center itself
-      cone(center, 5.degrees),     // rim target sits exactly on the boundary: included
-      cone(onRim,  Angle.Angle0),  // zero-radius away from the seed cluster
+  // Zero-radius cones aim at the *stored* coordinates (see `storedCoordinates`), and the
+  // boundary cones are 1 µas either side of the measured separation, so every assertion
+  // is deterministic at the data's own resolution.
+  test("zero-radius and one-µas-boundary cones are deterministic"):
+    val positions = List(
+      coords("00:00:00 +10:00:00"),
+      coords("00:00:00 +15:00:00"), // ~5° north of the first
     )
     for
-      seeded <- seed(piBoundary, List(center, onRim, justOut))
-      _      <- cones.traverse_(assertCone(seeded, piBoundary))
+      seeded <- seed(piBoundary, positions)
+      stored <- seeded.traverse((cid, _) => storedCoordinates(cid).tupleLeft(cid))
+      // A zero-radius cone on each stored position matches exactly that request.
+      _      <- stored.traverse_((_, c) => assertCone(stored, piBoundary)(cone(c, Angle.Angle0)))
+      // Straddle the measured separation by 1 µas: just-over includes the far request,
+      // just-under excludes it.
+      sep     = stored(0)._2.angularDistance(stored(1)._2)
+      _      <- assertCone(stored, piBoundary)(cone(stored(0)._2, sep + Angle.fromMicroarcseconds(1)))
+      _      <- assertCone(stored, piBoundary)(cone(stored(0)._2, sep - Angle.fromMicroarcseconds(1)))
     yield ()
 
   private val wide: Cone = cone(coords("00:00:00 +10:00:00"), 25.degrees)
