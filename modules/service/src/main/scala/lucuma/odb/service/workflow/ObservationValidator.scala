@@ -12,10 +12,8 @@ import cats.implicits.*
 import grackle.ResultT
 import lucuma.core.enums.Band
 import lucuma.core.enums.ConfigurationRequestStatus
-import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TooActivation
@@ -57,12 +55,6 @@ object ObservationValidator:
     val OpportunityTargetNotResolved =
       "Replace the Target of Opportunity placeholder with the actual target coordinates."
 
-    def exchangeObservatoryMismatch(modeObs: Observatory, cfpObs: Observatory): String =
-      s"Exchange observation requires a $modeObs Call for Proposals, but the proposal's observatory is $cfpObs."
-
-    def invalidExchangeInstrument(instr: String): String =
-      s"Instrument $instr is not part of the Call for Proposals."
-
     val MissingVMagnitude = "Please add a V magnitude."
   }
 
@@ -91,26 +83,7 @@ object ObservationValidator:
     // Here are our simple validators
     import validator.*
 
-    // Exchange observations must match the proposal's observatory, and (when
-    // the call restricts instruments) use one of its allowed exchange instruments.
-    val exchangeValidator: ObservationValidator = info =>
-      info.observingMode match
-        case Some(e: ExchangeObservingModeType) =>
-          info.cfpInfo.foldMap: cfp =>
-            if cfp.observatory =!= e.observatory then
-              ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.exchangeObservatoryMismatch(e.observatory, cfp.observatory)))
-            else e match
-              case ExchangeObservingModeType.ExchangeKeck =>
-                if cfp.keckInstruments.isEmpty then ObservationValidationMap.empty
-                else info.keckInstrument.foldMap: inst =>
-                  if cfp.keckInstruments.contains(inst) then ObservationValidationMap.empty
-                  else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(inst.tag)))
-              case ExchangeObservingModeType.ExchangeSubaru =>
-                if cfp.subaruInstruments.isEmpty then ObservationValidationMap.empty
-                else info.subaruInstrument.foldMap: inst =>
-                  if cfp.subaruInstruments.contains(inst) then ObservationValidationMap.empty
-                  else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(inst.tag)))
-        case _ => ObservationValidationMap.empty
+
 
     val cfpRaDecValidator: ObservationValidator = info =>
       info.cfpInfo.foldMap: cfp =>
@@ -192,7 +165,7 @@ object ObservationValidator:
     val scienceValidator1: ObservationValidator =
       GeneratorValidator         |+|
       CfpInstrumentValidator     |+|
-      exchangeValidator          |+|
+      ExchangeValidator          |+|
       cfpRaDecValidator          |+|
       bandValidator              |+|
       ghostVMagnitudeValidator   |+|
