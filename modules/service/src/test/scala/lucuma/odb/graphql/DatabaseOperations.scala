@@ -1401,14 +1401,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             slit: { fpu: LONG_SLIT_0_30 }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case ObservingModeType.GnirsIfu =>
@@ -1419,14 +1423,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case ObservingModeType.Igrins2LongSlit =>
@@ -1607,14 +1615,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             slit: { fpu: LONG_SLIT_0_30 }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case ObservingModeType.GnirsIfu =>
@@ -1625,14 +1637,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case v: VisitorObservingModeType =>

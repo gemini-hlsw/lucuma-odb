@@ -488,3 +488,84 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
             )
           ).asRight
       )
+
+  test("[gnirs] two central wavelengths -> round-robined segments, each with its own calibrations"):
+    // Each central wavelength is its own configuration, so it runs as a
+    // contiguous segment closed by its own flat + arc, and the segments are
+    // round-robined.  With one cycle needed at each, the whole sequence is
+    // sci(2200), cal(2200), sci(2300), cal(2300).
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- query(
+                 pi,
+                 s"""
+                   mutation {
+                     updateObservations(input: {
+                       SET: {
+                         observingMode: {
+                           gnirsSpectroscopy: {
+                             centralWavelengths: [
+                               {
+                                 centralWavelength: { nanometers: 2200 }
+                                 exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } } }
+                               }
+                               {
+                                 centralWavelength: { nanometers: 2300 }
+                                 exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2300 } } }
+                               }
+                             ]
+                           }
+                         }
+                       }
+                       WHERE: { id: { EQ: "$oid" } }
+                     }) {
+                       observations { id }
+                     }
+                   }
+                 """
+               ).void
+      yield oid
+
+    // With more than one wavelength the atom titles carry it, so the observer
+    // can tell the segments apart.
+    def titled(atom: Json, description: String): Json =
+      atom.deepMerge(Json.obj("description" -> description.asJson))
+
+    val snapshot2300: GnirsDynamicSnapshot =
+      DynamicSnapshot.copy(
+        centralWavelengthNm = BigDecimal("2300.000"),
+        mirrorWavelengthNm  = Some(BigDecimal("2300.000"))
+      )
+
+    setup.flatMap: oid =>
+      val sci2200 = titled(
+        gnirsExpectedScienceAtom(DynamicSnapshot, (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)),
+        "Science Cycle (2200 nm)"
+      )
+      val cal2200 = titled(calAtom(0, 2), "Nighttime Calibrations (2200 nm)")
+      val sci2300 = titled(
+        gnirsExpectedScienceAtom(snapshot2300, (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)),
+        "Science Cycle (2300 nm)"
+      )
+      val cal2300 = titled(
+        gnirsExpectedCalAtom(snapshot2300, 0, 2, 20.secondTimeSpan, 2, 1, 10.secondTimeSpan, 3, 1),
+        "Nighttime Calibrations (2300 nm)"
+      )
+
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom"       -> sci2200,
+                  "possibleFuture" -> List(cal2200, sci2300, cal2300).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )

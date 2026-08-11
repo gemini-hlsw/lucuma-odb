@@ -247,14 +247,14 @@ object Acquisition:
         for
           _ <- State.modify[GnirsDynamicConfig]: dyn =>
                  dyn.copy(
-                   coadds            = config.coadds,
+                   coadds            = config.primaryWavelength.coadds,
                    filter            = config.filter,
                    decker            = config.decker,
                    fpu               = config.fpu,
                    acquisitionMirror = GnirsAcquisitionMirrorMode.Out(
                                          config.prism,
                                          config.grating,
-                                         GnirsGratingWavelength(config.centralWavelength)
+                                         GnirsGratingWavelength(config.primaryCentralWavelength)
                                        ),
                    camera            = config.camera,
                    focus             = config.focus
@@ -376,7 +376,7 @@ object Acquisition:
                      )
         mode       = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedAcqType)
         selFilter <- config.acquisition
-                       .selectedFilter(mode, GnirsFilter.fromAcquisitionWavelength(config.centralWavelength))
+                       .selectedFilter(mode, GnirsFilter.fromAcquisitionWavelength(config.primaryCentralWavelength))
                        .leftMap(sequenceError)
       yield (t, mode, selFilter)
 

@@ -295,6 +295,41 @@ object GeneratorParamsService {
 
           GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.executionRequirement.isSplittable)
 
+        /**
+         * GNIRS spectroscopy takes spectra at one or more central wavelengths,
+         * each its own ITC calculation, so it gets a list of science modes where
+         * the other spectroscopy modes have exactly one.
+         */
+        def gnirsSpectroscopyGeneratorParams(
+          obsMode:              ObservingMode,
+          acqMode:              InstrumentMode,
+          sciModes:             NonEmptyList[InstrumentMode],
+          gnirsAcqAutoClassify: Boolean
+        ): GeneratorParams =
+
+          val consInput   = obsParams.constraints.toInput
+          val acquisition = ImagingParameters(consInput, acqMode)
+          val science     = sciModes.map(SpectroscopyParameters(consInput, _))
+
+          val itcInput    = (
+             obsParams.targets.traverse(itcTargetParams),
+             // the db guarantees at most one BO
+             obsParams.blindOffset.traverse(itcTargetParams)
+            ).mapN { case (regularTargetInputs, blindOffsetTargetInput) =>
+              ItcInput.GnirsSpectroscopy(
+                acquisition,
+                science,
+                regularTargetInputs,
+                blindOffsetTargetInput,
+                obsParams.signalToNoiseTargetId,
+                gnirsAcqAutoClassify
+              )
+            }
+            .leftMap(MissingParamSet.fromParams)
+            .toEither
+
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.executionRequirement.isSplittable)
+
         observingMode(obsParams.targets, config, obsParams.calibrationRole).flatMap:
 
           // Exchange Modes (no ITC, like visitors)
@@ -553,28 +588,34 @@ object GeneratorParamsService {
             for
               // Acquisition (imaging) filter for the ITC: the explicit acquisition
               // filter if set, otherwise the default for the spectroscopy wavelength.
+              // This must use the same wavelength as Acquisition.scala's filter
+              // selection, or the acquisition would be sized for a different filter
+              // than the sequence actually uses.
               acqFilter <- gn.acquisition.explicitFilter
-                             .fold(GnirsFilter.fromAcquisitionWavelength(gn.centralWavelength))(_.asRight[String])
+                             .fold(GnirsFilter.fromAcquisitionWavelength(gn.primaryCentralWavelength))(_.asRight[String])
                              .leftMap(msg => Error.MisconfiguredObservation(obsParams.observationId, msg))
             yield
-              val sciReadMode = gn.exposureTimeMode match
-                                  case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                    GnirsReadMode.Bright // In practice this will be ignored by the ITC, which derives the read mode itself in S/N mode
-                                  case ExposureTimeMode.TimeAndCountMode(time = time) =>
-                                    gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+              // One science mode per central wavelength: each is a separate
+              // configuration and so a separate ITC calculation.
+              val sciModes = gn.wavelengths.map: w =>
+                val sciReadMode = w.exposureTimeMode match
+                                    case ExposureTimeMode.SignalToNoiseMode(_, _) =>
+                                      GnirsReadMode.Bright // In practice this will be ignored by the ITC, which derives the read mode itself in S/N mode
+                                    case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                                      gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
 
-              val sciMode = InstrumentMode.GnirsSpectroscopy(
-                exposureTimeMode  = gn.exposureTimeMode,
-                centralWavelength = gn.centralWavelength,
-                filter            = gn.filter,
-                fpu               = gn.fpu,
-                prism             = gn.prism,
-                grating           = gn.grating,
-                camera            = gn.camera,
-                readMode          = sciReadMode,
-                wellDepth         = gn.wellDepth,
-                coadds            = gn.coadds
-              )
+                InstrumentMode.GnirsSpectroscopy(
+                  exposureTimeMode  = w.exposureTimeMode,
+                  centralWavelength = w.centralWavelength,
+                  filter            = gn.filter,
+                  fpu               = gn.fpu,
+                  prism             = gn.prism,
+                  grating           = gn.grating,
+                  camera            = gn.camera,
+                  readMode          = sciReadMode,
+                  wellDepth         = gn.wellDepth,
+                  coadds            = w.coadds
+                )
 
               // Two-pass acquisition ITC whenever the acquisition mode and filter are
               // both auto: only then does the resolved filter depend on the ITC-derived
@@ -585,7 +626,7 @@ object GeneratorParamsService {
                 gn.acquisition.explicitAcqMode.isEmpty &&
                 gn.acquisition.explicitFilter.isEmpty
 
-              spectroscopyGeneratorParams(
+              gnirsSpectroscopyGeneratorParams(
                 obsMode = gn,
                 acqMode = InstrumentMode.GnirsImaging(
                   exposureTimeMode = gn.acquisition.exposureTimeMode,
@@ -595,7 +636,7 @@ object GeneratorParamsService {
                   wellDepth        = gn.wellDepth,
                   coadds           = gn.acquisition.coadds
                 ),
-                sciMode = sciMode,
+                sciModes = sciModes,
                 gnirsAcqAutoClassify = acqAutoClassify
               )
 

@@ -4,10 +4,10 @@
 package lucuma.odb.graphql
 package input
 
+import cats.Order.given
 import cats.data.NonEmptyList
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
@@ -19,9 +19,7 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.math.Wavelength
 import lucuma.core.model.Access
-import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
@@ -31,15 +29,24 @@ import lucuma.odb.graphql.binding.*
 
 object GnirsSpectroscopyInput:
 
-  // Signal-to-noise exposure time mode does not support coadds. When the ETM is set to
-  // signal-to-noise, force coadds to 1 so a previously-set value doesn't linger.
-  private def coaddsForEtm(
-    etm:    Option[ExposureTimeMode],
-    coadds: Option[PosInt]
-  ): Option[PosInt] =
-    etm match
-      case Some(ExposureTimeMode.SignalToNoiseMode(_, _)) => PosInt.from(1).toOption
-      case _                                           => coadds
+  /**
+   * Validates a central wavelength list: at least one entry, no duplicated
+   * wavelength (each one backs a distinct row in t_gnirs_central_wavelength_config),
+   * returned sorted by increasing wavelength, which is the order the sequence
+   * executes them in.
+   */
+  private def resolveWavelengths(
+    ws: List[GnirsCentralWavelengthConfigInput]
+  ): Result[NonEmptyList[GnirsCentralWavelengthConfigInput]] =
+    val duplicates = ws.groupBy(_.centralWavelength).filter(_._2.sizeIs > 1).keys.toList
+    if duplicates.nonEmpty then
+      Matcher.validationFailure:
+        s"Duplicate central wavelengths are not allowed: ${duplicates.sorted.map(_.toNanometers.value.value).mkString(", ")} nm."
+    else
+      Result.fromOption(
+        NonEmptyList.fromList(ws.sortBy(_.centralWavelength)),
+        Matcher.validationProblem("At least one central wavelength must be specified for GNIRS spectroscopy observations.")
+      )
 
   // The observing mode type follows the FPU: the long slit and the IFU are persisted
   // in the same table but carry distinct ObservingModeType values.
@@ -109,14 +116,12 @@ object GnirsSpectroscopyInput:
   val AcquisitionInput = GnirsAcquisitionInput
 
   case class Create(
-    exposureTimeMode: Option[ExposureTimeMode],
-    coadds:           Option[PosInt],
+    centralWavelengths: NonEmptyList[GnirsCentralWavelengthConfigInput],
     filter:           GnirsFilter,
     fpu:              GnirsFpu.Spectroscopy,
     camera:           GnirsCamera,
     grating:          GnirsGrating,
     prism:            GnirsPrism,
-    centralWavelength:            Wavelength,
     explicitDecker:               Option[GnirsDecker]              = None,
     explicitGrating:              Option[GnirsGrating]             = None,
     explicitPrism:                Option[GnirsPrism]               = None,
@@ -137,15 +142,13 @@ object GnirsSpectroscopyInput:
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
-          PosIntBinding.Option("coadds", rCoadds),
+          GnirsCentralWavelengthConfigInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
           GnirsFilterBinding("filter", rFilter),
           GnirsSlitInput.Binding.Option("slit", rSlit),
           GnirsIfuInput.Binding.Option("ifu", rIfu),
           GnirsCameraBinding("camera", rCamera),
           GnirsGratingBinding("grating", rGrating),
           GnirsPrismBinding("prism", rPrism),
-          WavelengthInput.Binding("centralWavelength", rCentralWavelength),
           GnirsDeckerBinding.Option("explicitDecker", rDecker),
           GnirsGratingBinding.Option("explicitGrating", rExplGrating),
           GnirsPrismBinding.Option("explicitPrism", rExplPrism),
@@ -155,27 +158,28 @@ object GnirsSpectroscopyInput:
           AcquisitionInput.Binding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
-          (rEtm, rCoadds, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
-           rCentralWavelength, rDecker, rExplGrating, rExplPrism,
+          (rCentralWavelengths, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
+           rDecker, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parTupled.flatMap:
-            (etm, coadds, filter, slit, ifu, camera, grating, prism,
-             centralWavelength, decker, explGrating, explPrism,
+            (centralWavelengths, filter, slit, ifu, camera, grating, prism,
+             decker, explGrating, explPrism,
              focus, readMode, wellDepth, acq, telluricType) =>
-              resolveCreate(slit, ifu).map: (fpu, explTelescopeSlit, telescopeIfu) =>
-                Create(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
-                       centralWavelength, decker, explGrating, explPrism,
+              (resolveWavelengths(centralWavelengths.getOrElse(Nil)),
+               resolveCreate(slit, ifu)
+              ).parMapN: (ws, resolved) =>
+                val (fpu, explTelescopeSlit, telescopeIfu) = resolved
+                Create(ws, filter, fpu, camera, grating, prism,
+                       decker, explGrating, explPrism,
                        focus, readMode, wellDepth, explTelescopeSlit, telescopeIfu, acq,
                        telluricType.getOrElse(TelluricType.Hot))
 
   case class Edit(
-    exposureTimeMode:          Option[ExposureTimeMode],
-    coadds:                    Option[PosInt],
+    centralWavelengths:        Option[NonEmptyList[GnirsCentralWavelengthConfigInput]],
     filter:                    Option[GnirsFilter],
     fpu:                       Option[GnirsFpu.Spectroscopy],
     camera:                    Option[GnirsCamera],
     grating:                   Nullable[GnirsGrating],
     prism:                     Nullable[GnirsPrism],
-    centralWavelength:         Option[Wavelength],
     explicitDecker:            Nullable[GnirsDecker],
     explicitGrating:           Nullable[GnirsGrating],
     explicitPrism:             Nullable[GnirsPrism],
@@ -206,9 +210,9 @@ object GnirsSpectroscopyInput:
         c  <- required(camera, "camera")
         g  <- required(grating.toOption, "grating")
         p  <- required(prism.toOption, "prism")
-        w  <- required(centralWavelength, "centralWavelength")
-      yield Create(exposureTimeMode, coadds, f, u, c, g, p,
-                   w, explicitDecker.toOption,
+        ws <- required(centralWavelengths, "centralWavelengths")
+      yield Create(ws, f, u, c, g, p,
+                   explicitDecker.toOption,
                    explicitGrating.toOption, explicitPrism.toOption,
                    explicitFocusMotorSteps.toOption, explicitReadMode.toOption, explicitWellDepth.toOption,
                    explicitTelescopeConfigsSlit.toOption, telescopeConfigsIfu, acquisition,
@@ -218,15 +222,13 @@ object GnirsSpectroscopyInput:
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
         case List(
-          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm),
-          PosIntBinding.Option("coadds", rCoadds),
+          GnirsCentralWavelengthConfigInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
           GnirsFilterBinding.Option("filter", rFilter),
           GnirsSlitInput.Binding.Option("slit", rSlit),
           GnirsIfuInput.Binding.Option("ifu", rIfu),
           GnirsCameraBinding.Option("camera", rCamera),
           GnirsGratingBinding.Nullable("grating", rGrating),
           GnirsPrismBinding.Nullable("prism", rPrism),
-          WavelengthInput.Binding.Option("centralWavelength", rCentralWavelength),
           GnirsDeckerBinding.Nullable("explicitDecker", rDecker),
           GnirsGratingBinding.Nullable("explicitGrating", rExplGrating),
           GnirsPrismBinding.Nullable("explicitPrism", rExplPrism),
@@ -236,13 +238,16 @@ object GnirsSpectroscopyInput:
           AcquisitionInput.Binding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
-          (rEtm, rCoadds, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
-           rCentralWavelength, rDecker, rExplGrating, rExplPrism,
+          (rCentralWavelengths, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
+           rDecker, rExplGrating, rExplPrism,
            rFocus, rReadMode, rWellDepth, rAcq, rTelluricType).parTupled.flatMap:
-            (etm, coadds, filter, slit, ifu, camera, grating, prism,
-             centralWavelength, decker, explGrating, explPrism,
+            (centralWavelengths, filter, slit, ifu, camera, grating, prism,
+             decker, explGrating, explPrism,
              focus, readMode, wellDepth, acq, telluricType) =>
-              resolveEdit(slit, ifu).map: (fpu, explTelescopeSlit, telescopeIfu) =>
-                Edit(etm, coaddsForEtm(etm, coadds), filter, fpu, camera, grating, prism,
-                     centralWavelength, decker, explGrating, explPrism,
+              (centralWavelengths.traverse(resolveWavelengths),
+               resolveEdit(slit, ifu)
+              ).parMapN: (ws, resolved) =>
+                val (fpu, explTelescopeSlit, telescopeIfu) = resolved
+                Edit(ws, filter, fpu, camera, grating, prism,
+                     decker, explGrating, explPrism,
                      focus, readMode, wellDepth, explTelescopeSlit, telescopeIfu, acq, telluricType)
