@@ -9,13 +9,15 @@ import cats.effect.kernel.Deferred
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import io.circe.syntax.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 import lucuma.odb.data.EditType
 
 import scala.concurrent.duration.*
 
-class tooTriggerEdit extends OdbSuite with SubscriptionUtils:
+class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetupOperations:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val staff = TestUsers.Standard.staff(2, 32)
@@ -34,24 +36,24 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils:
       }
     """
 
-  private def requestTooTrigger(user: User, oid: Observation.Id): IO[String] =
+  private def liveTriggerId(oid: Observation.Id): IO[String] =
     query(
-      user  = user,
-      query = s"""
-        mutation {
-          requestTooTrigger(input: { observationId: "$oid" }) {
-            tooTrigger { id }
+      pi,
+      s"""
+        query {
+          tooTriggers(WHERE: { observationId: { EQ: ${oid.asJson} }, status: { EQ: REQUESTED } }) {
+            matches { id }
           }
         }
       """
-    ).map(_.hcursor.downFields("requestTooTrigger", "tooTrigger", "id").require[String])
+    ).map(_.hcursor.downFields("tooTriggers", "matches").require[List[Json]].head.hcursor.downField("id").require[String])
 
-  private def acceptTooTrigger(user: User, rid: String): IO[Unit] =
+  private def declineTooTrigger(user: User, rid: String): IO[Unit] =
     query(
       user  = user,
       query = s"""
         mutation {
-          acceptTooTrigger(input: { tooTriggerId: "$rid" }) {
+          declineTooTrigger(input: { tooTriggerId: "$rid" }) {
             tooTrigger { id }
           }
         }
@@ -70,7 +72,7 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils:
       }
     """
 
-  test("request then accept emits creation and update events"):
+  test("triggering then declining emits creation and update events"):
     (Deferred[IO, Observation.Id], Deferred[IO, String]).tupled.flatMap: (oidRef, ridRef) =>
       subscriptionExpectF(
         user      = pi,
@@ -78,19 +80,19 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils:
         mutations =
           Right(
             for
-              pid <- createProgramAs(pi)
-              oid <- createObservationAs(pi, pid)
-              _   <- oidRef.complete(oid)
-              rid <- requestTooTrigger(pi, oid)
-              _   <- ridRef.complete(rid)
-              _   <- IO.sleep(2.seconds) // give the client time to receive the event
-              _   <- acceptTooTrigger(staff, rid)
+              (_, oid) <- createTooObservationAs(pi, staff)
+              _        <- oidRef.complete(oid)
+              _        <- setTooWorkflowState(pi, oid, ObservationWorkflowState.Ready)
+              rid      <- liveTriggerId(oid)
+              _        <- ridRef.complete(rid)
+              _        <- IO.sleep(2.seconds) // give the client time to receive the event
+              _        <- declineTooTrigger(staff, rid)
             yield ()
           ),
         expectedF =
           (oidRef.get, ridRef.get).mapN: (oid, rid) =>
             List(
               tooTriggerEdit(EditType.Created, "REQUESTED", rid, oid),
-              tooTriggerEdit(EditType.Updated, "ACCEPTED",  rid, oid)
+              tooTriggerEdit(EditType.Updated, "DECLINED",  rid, oid)
             )
       )

@@ -69,6 +69,9 @@ object AttachmentFileService {
   val DuplicateFileNameMsg                         = "Duplicate file name"
   def duplicateTypeMsg(at: AttachmentType): String =
     s"Duplicate attachment type: Only one ${at.shortName} is allowed per program"
+  val DuplicateMaskNameMsg                         = "Duplicate mask name"
+  def duplicateMaskNameMsg(maskName: NonEmptyString): String =
+    s"$DuplicateMaskNameMsg: ${maskName.value}"
 
   sealed trait AttachmentException extends Exception {
     def asLeftT[F[_]: Applicative, A]: EitherT[F, AttachmentException, A] =
@@ -103,6 +106,11 @@ object AttachmentFileService {
       // does not contain the dot.
       def extName: Option[NonEmptyString] =
         NonEmptyString.from(Path(fileName.value.value).extName.drop(1).toLowerCase).toOption
+
+      // the whole name when there is no extension to strip.
+      def baseName: NonEmptyString =
+        val name = fileName.value.value
+        NonEmptyString.from(name.stripSuffix(Path(name).extName)).getOrElse(fileName.value)
   }
 
   extension [F[_], A](fe: F[Either[AttachmentException, A]])
@@ -142,6 +150,16 @@ object AttachmentFileService {
     }
   }
 
+  /**
+   * The mask name will be derived now from the file, removing the extension.
+   * In the future we should parse the fits file and read the name directly.
+   */
+  def deriveMaskName(
+    attachmentType: AttachmentType,
+    fileName:       FileName
+  ): Option[NonEmptyString] =
+    Option.when(attachmentType === AttachmentType.MosMask)(fileName.baseName)
+
   def checkForEmptyFile(fileSize: Long): Either[AttachmentException, Unit] =
     if (fileSize <= 0) InvalidRequest("File cannot be empty").asLeft
     else ().asRight
@@ -176,6 +194,7 @@ object AttachmentFileService {
       programId:      Program.Id,
       attachmentType: AttachmentType,
       fileName:       FileName,
+      maskName:       Option[NonEmptyString],
       description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
@@ -185,12 +204,15 @@ object AttachmentFileService {
           .unique(Statements.InsertAttachment)(programId,
                                                attachmentType,
                                                fileName.value,
+                                               maskName,
                                                description,
                                                fileSize,
                                                remotePath
           )
           .map(_.asRight)
           .recover {
+            case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_mask_name"))       =>
+              InvalidRequest(DuplicateMaskNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_file_name"))       =>
               InvalidRequest(DuplicateFileNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_attachment_type")) =>
@@ -202,6 +224,7 @@ object AttachmentFileService {
       programId:    Program.Id,
       attachmentId: Attachment.Id,
       fileName:     FileName,
+      maskName:     Option[NonEmptyString],
       description:  Option[NonEmptyString],
       fileSize:     Long,
       remotePath:   NonEmptyString
@@ -209,6 +232,7 @@ object AttachmentFileService {
       T.span("updateAttachment").surround {
         session
           .unique(Statements.UpdateAttachment)(fileName.value,
+                                               maskName,
                                                description,
                                                fileSize,
                                                remotePath,
@@ -220,6 +244,8 @@ object AttachmentFileService {
             else FileNotFound.asLeft
           )
           .recover {
+            case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_mask_name")) =>
+              InvalidRequest(DuplicateMaskNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_file_name")) =>
               InvalidRequest(DuplicateFileNameMsg).asLeft
           }
@@ -270,6 +296,23 @@ object AttachmentFileService {
         )
     }
 
+    def checkForDuplicateMaskName(
+      programId: Program.Id,
+      maskName:  Option[NonEmptyString],
+      oaid:      Option[Attachment.Id]
+    ): F[Either[AttachmentException, Unit]] =
+      maskName.fold(().asRight.pure) { mn =>
+        val af   = Statements.checkForDuplicateMaskName(programId, mn, oaid)
+        val stmt = af.fragment.query(bool)
+
+        session
+          .prepareR(stmt)
+          .use(pg =>
+            pg.option(af.argument)
+              .map(_.fold(().asRight)(_ => InvalidRequest(duplicateMaskNameMsg(mn)).asLeft))
+          )
+      }
+
     def getAttachmentTypeById(
       attachmentId: Attachment.Id
     ): F[Either[AttachmentException, AttachmentType]] =
@@ -286,9 +329,9 @@ object AttachmentFileService {
     def validateFileExtensionById(
       attachmentId: Attachment.Id,
       fileName:     FileName
-    ): F[Either[AttachmentException, Unit]] =
+    ): F[Either[AttachmentException, AttachmentType]] =
       getAttachmentTypeById(attachmentId)
-        .map(_.flatMap(at => checkExtension(fileName, at.fileExtensions)))
+        .map(_.flatMap(at => checkExtension(fileName, at.fileExtensions).as(at)))
 
     // This can only be an issue on insert
     def checkForDuplicateType(
@@ -332,15 +375,16 @@ object AttachmentFileService {
           (
             for {
               fn     <- FileName.fromString(fileName).liftF
-              _      <- services.transactionallyEitherT {
+              mn      = deriveMaskName(attachmentType, fn)
+              _      <- services.transactionallyEitherT:
                           checkAccess(user, programId, AccessRequired.Write, Forbidden) >>
                             validateFileExtensionByType(attachmentType, fn).liftF >>
                             checkForDuplicateType(programId, attachmentType).asEitherT >>
-                            checkForDuplicateName(programId, fn, none).asEitherT
-                        }
+                            checkForDuplicateName(programId, fn, none).asEitherT >>
+                            checkForDuplicateMaskName(programId, mn, none).asEitherT
               uuid   <- UUIDGen[F].randomUUID.right
               path    = Services.asSuperUser(filePath(programId, uuid, fn.value))
-            } yield (fn, path)
+            } yield (fn, mn, path)
           ).value
           .flatTap {
             // Up to this point, we haven't read the data yet.
@@ -350,14 +394,16 @@ object AttachmentFileService {
             // https://github.com/http4s/http4s/pull/7602
             case Left(_)  => data.compile.drain
             case _ => ().pure
-          }.asEitherT
-          .flatMap((fn, path) =>
+          }
+          .asEitherT
+          .flatMap((fn, mn, path) =>
             for {
               size   <- Services.asSuperUser(s3FileSvc.upload(path, data)).right
               _      <- checkForEmptyFile(size).liftF
               result <- insertAttachmentInDB(programId,
                                              attachmentType,
                                              fn,
+                                             mn,
                                              description,
                                              size,
                                              path
@@ -375,30 +421,34 @@ object AttachmentFileService {
       )(using NoTransaction[F]): F[Either[AttachmentException, Unit]] =
         (
           for {
-            fn      <- FileName.fromString(fileName).liftF
-            (pid, oldPath) <- services.transactionallyEitherT {
+            fn                 <- FileName.fromString(fileName).liftF
+            (pid, mn, oldPath) <- services.transactionallyEitherT {
                 for {
                   (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
-                  _              <- validateFileExtensionById(attachmentId, fn).asEitherT
+                  at             <- validateFileExtensionById(attachmentId, fn).asEitherT
+                  mn              = deriveMaskName(at, fn)
                   _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT
-                } yield (pid, oldPath)
+                  _              <- checkForDuplicateMaskName(pid, mn, attachmentId.some).asEitherT
+                } yield (pid, mn, oldPath)
               }
-            uuid           <- UUIDGen[F].randomUUID.right
-            newPath         = Services.asSuperUser(filePath(pid, uuid, fn.value))
-          } yield (fn, pid, oldPath, newPath)
+            uuid               <- UUIDGen[F].randomUUID.right
+            newPath            = Services.asSuperUser(filePath(pid, uuid, fn.value))
+          } yield (fn, mn, pid, oldPath, newPath)
         ).value
         .flatTap {
           // See comment in similar location in insertAttachment.
           case Left(_)  => data.compile.drain
           case _ => ().pure
-        }.asEitherT
-        .flatMap((fn, pid, oldPath, newPath) =>
+        }
+        .asEitherT
+        .flatMap((fn, mn, pid, oldPath, newPath) =>
           for {
             size    <- Services.asSuperUser(s3FileSvc.upload(newPath, data)).right
             _       <- checkForEmptyFile(size).liftF
             _       <- updateAttachmentInDB(pid,
                                             attachmentId,
                                             fn,
+                                            mn,
                                             description,
                                             size,
                                             newPath
@@ -441,7 +491,7 @@ object AttachmentFileService {
   object Statements {
 
     val InsertAttachment: Query[
-      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Long, NonEmptyString),
+      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Option[NonEmptyString], Long, NonEmptyString),
       Attachment.Id
     ] =
       sql"""
@@ -449,6 +499,7 @@ object AttachmentFileService {
           c_program_id,
           c_attachment_type,
           c_file_name,
+          c_mask_name,
           c_description,
           c_file_size,
           c_remote_path
@@ -458,18 +509,20 @@ object AttachmentFileService {
           $attachment_type,
           $text_nonempty,
           ${text_nonempty.opt},
+          ${text_nonempty.opt},
           $int8,
           $text_nonempty
         RETURNING c_attachment_id
       """.query(attachment_id)
 
     val UpdateAttachment: Query[
-      (NonEmptyString, Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
+      (NonEmptyString, Option[NonEmptyString], Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
       Boolean
     ] =
       sql"""
         UPDATE t_attachment
         SET c_file_name   = $text_nonempty,
+            c_mask_name   = ${text_nonempty.opt},
             c_description = ${text_nonempty.opt},
             c_checked     = false,
             c_file_size   = $int8,
@@ -495,6 +548,22 @@ object AttachmentFileService {
         FROM t_attachment
         WHERE c_program_id = $program_id AND c_file_name = $text_nonempty
       """.apply(programId, fileName) |+|
+        attachmentId.foldMap(aid => sql"""
+            AND c_attachment_id != $attachment_id
+          """.apply(aid))
+
+    def checkForDuplicateMaskName(
+      programId:    Program.Id,
+      maskName:     NonEmptyString,
+      attachmentId: Option[Attachment.Id]
+    ): AppliedFragment =
+      sql"""
+        SELECT true
+        FROM t_attachment
+        WHERE c_program_id      = $program_id
+          AND c_mask_name       = $text_nonempty
+          AND c_attachment_type = 'mos_mask'
+      """.apply(programId, maskName) |+|
         attachmentId.foldMap(aid => sql"""
             AND c_attachment_id != $attachment_id
           """.apply(aid))

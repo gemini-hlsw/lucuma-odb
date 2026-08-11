@@ -17,17 +17,24 @@ import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
+import lucuma.core.math.Angle.cos
+import lucuma.core.math.Angle.sin
+import lucuma.core.math.Angle.toDoubleRadians
+import lucuma.core.math.Angle.toMicroarcseconds
 import lucuma.core.math.Angular
 import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.Region
 import lucuma.core.math.RightAscension
+import lucuma.core.model.Access
 import lucuma.core.model.Configuration
 import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.data.Cone
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
@@ -43,6 +50,9 @@ import lucuma.odb.util.GnirsCodecs.*
 import skunk.AppliedFragment
 import skunk.Query
 import skunk.Transaction
+import skunk.codec.numeric.float8
+import skunk.codec.numeric.int4
+import skunk.codec.numeric.int8
 import skunk.data.Arr
 import skunk.syntax.all.*
 
@@ -58,6 +68,12 @@ trait ConfigurationService[F[_]] {
 
   /** Selects observations relevant to the given configuration requests, if any. The resulting map will contain every passed request id. */
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
+
+  /** Selects the ids of configuration requests whose target reference coordinates
+   *  lie within `cone` (exact great-circle match or angular distance), restricted to programs
+   *  visible to the current user. The caller injects every id into a rewritten query, so
+   *  the list bounds both the heap and the generated statement. */
+  def coneCandidates(cone: Cone, max: Int = ConfigurationService.MaxConeCandidates): F[Result[List[ConfigurationRequest.Id]]]
 
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
@@ -77,6 +93,9 @@ trait ConfigurationService[F[_]] {
 }
 
 object ConfigurationService {
+
+  /** Cap on `coneCandidates` matches; see its scaladoc. */
+  val MaxConeCandidates: Int = 10000
 
   extension [A](self: Result[A]) def suppressWarnings: Result[A] =
     self match
@@ -102,6 +121,14 @@ object ConfigurationService {
       override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
+
+      override def coneCandidates(cone: Cone, max: Int): F[Result[List[ConfigurationRequest.Id]]] =
+        val af = Statements.coneCandidates(user, cone, max)
+        session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
+          pq.stream(af.argument, 1024).compile.toList.map: ids =>
+            if ids.sizeIs > max then
+              OdbError.InvalidArgument(s"targetCoordinates matches more than $max configuration requests; narrow the cone.".some).asFailure
+            else Result(ids)
 
       override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
         val doUpdate = impl.updateRequests(SET, where).value
@@ -1507,6 +1534,92 @@ object ConfigurationService {
         where c_program_id = $program_id
         returning c_configuration_request_id
       """.query(configuration_request_id)
+
+    /** AppliedFragment yielding the ids of configuration requests whose target
+     *  reference coordinates lie within `distance` of `center`.
+     *
+     *  A wrap-aware bounding-box prefilter on the int8 microarcsecond columns (index-friendly)
+     *  is followed by an exact great-circle trim. The dec column uses lucuma-core's
+     *  angle encoding, which is safe here because the exact trim relies on sin/cos (2π-periodic).
+     *
+     *  Scoped to programs visible to `user` and capped at `max + 1` rows */
+    def coneCandidates(user: User, cone: Cone, max: Int): AppliedFragment =
+      // The columns are in microarcseconds, so all params are also in microarcseconds.
+      val FullCircle    = 1296000000000L // 360° in µas
+      val µasPerDegree  = 3600000000.0
+      val dec0ang       = cone.center.dec.toAngle.toMicroarcseconds
+      val ra0           = cone.center.ra.toAngle.toMicroarcseconds
+      val radius        = cone.distance.toMicroarcseconds
+      val dec0rad       = cone.center.dec.toRadians
+      val radiusRad     = cone.distance.toDoubleRadians
+      val cosDec0       = cone.center.dec.toAngle.cos
+      // The nearest pole is 90° - |dec0| away, so the cone reaches it when |dec0| + r >= 90°.
+      // Then every meridian passes through the cone and no RA range can exclude anything.
+      val pole          = math.abs(dec0rad) + radiusRad >= math.Pi / 2
+      // Otherwise the cone spans dra either side of ra0, where sin(dra) = sin(r) / cos(dec0):
+      // meridians converge toward the poles, so the same cone covers more RA at higher dec.
+      //
+      // The small-angle form r / cos(dec0) is not good enough. It undershoots -- by ~13° for
+      // a 1° cone at dec 88.9° -- and since this box is only a prefilter, an undershoot
+      // silently drops rows that the exact trim below would have kept.
+      //
+      // asin needs an argument <= 1, which is exactly the non-pole condition above, so `min`
+      // is only absorbing float rounding at that boundary. `ceil` rounds the box outward for
+      // the same reason the exact half-width is used: too wide costs a little scan, too
+      // narrow loses matches.
+      val dra           =
+        if pole then FullCircle
+        else
+          val sinDra = math.min(1.0, cone.distance.sin / cosDec0)
+          math.min(FullCircle, math.ceil(math.toDegrees(math.asin(sinDra)) * µasPerDegree).toLong)
+      val decLo         = dec0ang - radius
+      val decHi         = dec0ang + radius
+      val raLo          = ra0 - dra
+      val raHi          = ra0 + dra
+
+      // Mirrors ProgramPredicates.isVisibleTo, the predicate the `configurationRequests`
+      // query applies in its outer WHERE: guests and PIs see a program they are linked
+      // to (any role); staff and above see everything (NGO visibility is unimplemented
+      // there, so NGO stays unscoped). The candidates are a prefilter, so this must
+      // never be narrower than the outer predicate -- anything dropped here is lost.
+      val visibility: AppliedFragment =
+        user.role.access match
+          case Access.Guest | Access.Pi =>
+            void" and exists (select 1 from t_program_user pu" |+|
+            void" where pu.c_program_id = v_configuration_request.c_program_id" |+|
+            void" and pu.c_user_id = " |+| sql"$user_id".apply(user.id) |+| void")"
+          case _ => AppliedFragment.empty
+
+      val µasPerDeg: AppliedFragment = sql"$float8".apply(µasPerDegree)
+
+      // The assembled statement, in outline:
+      //
+      //   select c_configuration_request_id from v_configuration_request
+      //    where <dec in [decLo, decHi], or in either wrapped image of it>      -- box prefilter,
+      //      and <ra  in [raLo,  raHi ], or in either wrapped image of it>      -- index-friendly
+      //      and <haversine: sin²(sep/2) computed in PG <= sin²(radius/2)>      -- exact trim
+      //      and <program visible to user>                                      -- see above
+      //    limit max + 1                                                        -- one over, to detect
+      //
+      // The trim uses the haversine form rather than the spherical law of cosines
+      // (cos(sep) >= cos(radius)), which is ill-conditioned near sep = 0: cos is flat there,
+      // so with radius 0 even the center's own row can round below 1 and be excluded. The
+      // haversine is well-conditioned at small separations, an exact match gives an LHS of
+      // exactly 0 (integer µas differences are exact).
+      val dec0µas: AppliedFragment = sql"$int8".apply(dec0ang)
+      void"select c_configuration_request_id from v_configuration_request"                                                      |+|
+      void" where (c_reference_dec between "        |+| sql"$int8".apply(decLo) |+| void" and " |+| sql"$int8".apply(decHi)     |+|
+      void" or c_reference_dec >= "                 |+| sql"$int8".apply(decLo + FullCircle)                                    |+|
+      void" or c_reference_dec <= "                 |+| sql"$int8".apply(decHi - FullCircle) |+| void")"                        |+|
+      void" and (c_reference_ra between "           |+| sql"$int8".apply(raLo)  |+| void" and " |+| sql"$int8".apply(raHi)      |+|
+      void" or c_reference_ra >= "                  |+| sql"$int8".apply(raLo + FullCircle)                                     |+|
+      void" or c_reference_ra <= "                  |+| sql"$int8".apply(raHi - FullCircle) |+| void")"                         |+|
+      void" and pow(sin(radians((c_reference_dec - " |+| dec0µas |+| void") / " |+| µasPerDeg |+| void") / 2), 2)"              |+|
+      void" + cos(radians(c_reference_dec / "       |+| µasPerDeg |+| void")) * cos(radians(" |+| dec0µas |+| void" / " |+| µasPerDeg |+| void"))" |+|
+      void" * pow(sin(radians((c_reference_ra - "   |+| sql"$int8".apply(ra0) |+| void") / " |+| µasPerDeg |+| void") / 2), 2)" |+|
+      void" <= pow(sin(radians("                    |+| sql"$int8".apply(radius) |+| void" / " |+| µasPerDeg |+| void") / 2), 2)" |+|
+      visibility                                                                                                                |+|
+      void" limit "                                 |+| sql"$int4".apply(max + 1)
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =

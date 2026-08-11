@@ -126,12 +126,30 @@ object GraphQLRoutes {
                                     document:      String,
                                     operationName: Option[String]
                                   ): F[Result[Json]] =
+
+                                    def runQuery(req: Operation): F[Result[Json]] =
+                                      super.query(req, document, operationName).retryOnInvalidCursorName
+
+                                    // SC-9240: elaboration turns a `targetCoordinates` cone into a
+                                    // placeholder predicate, because the candidate lookup it needs
+                                    // is an F effect. Resolve those to `id IN (...)` here, where we
+                                    // are in F, so the whole WHERE pushes down to one SQL statement.
+                                    // Queries without a cone are returned untouched. The lookup
+                                    // streams through the same pooled sessions as the query itself,
+                                    // so it gets the same invalid-cursor retry.
+                                    def resolveAndRun: F[Result[Json]] =
+                                      ConeFilter.resolve(request.query)(map.coneCandidates).retryOnInvalidCursorName.flatMap:
+                                        case Result.Success(q)       => runQuery(request.copy(query = q))
+                                        case Result.Warning(ps, q)   => runQuery(request.copy(query = q)).map(r => Result.Warning(ps, ()).flatMap(_ => r))
+                                        case f: Result.Failure       => F.pure(f)
+                                        case e: Result.InternalError => F.pure(e)
+
                                     T.spanBuilder("graphql-query")
                                       .withSpanKind(SpanKind.Server)
                                       .build
                                       .use: span =>
                                         F.timed(
-                                          super.query(request, document, operationName).retryOnInvalidCursorName
+                                          resolveAndRun
                                             .handleError(Result.InternalError.apply)
                                             .flatTap {
                                               case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)

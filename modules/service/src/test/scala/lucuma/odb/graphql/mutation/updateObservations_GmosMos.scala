@@ -31,19 +31,21 @@ class updateObservations_GmosMos extends OdbSuite:
   lazy val validUsers: List[User] = List(pi)
 
   private def insertAttachment(pid: Program.Id, tpe: String, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String, String), Attachment.Id] =
+    val q: Query[(Program.Id, String, String, Option[String]), Attachment.Id] =
       sql"""
         INSERT INTO t_attachment (
           c_program_id,
           c_attachment_type,
           c_file_name,
           c_file_size,
-          c_remote_path
+          c_remote_path,
+          c_mask_name
         )
-        VALUES ($program_id, $text::e_attachment_type, $text, 42, 'unused')
+        VALUES ($program_id, $text::e_attachment_type, $text, 42, 'unused', ${text.opt})
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, tpe, fileName))
+    val maskName = Option.when(tpe === "mos_mask")(fileName.stripSuffix(".fits"))
+    withSession(_.unique(q)(pid, tpe, fileName, maskName))
 
   // The mask attachment is stored as two columns (id + type) pinned together
   // by a composite foreign key, and the type column is not exposed via GraphQL,

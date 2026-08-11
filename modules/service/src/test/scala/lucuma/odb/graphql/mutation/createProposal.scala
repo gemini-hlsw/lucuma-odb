@@ -44,7 +44,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on Queue {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     aeonMultiFacility
                     jwstSynergy
@@ -63,7 +63,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "QUEUE",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 100,
                   "aeonMultiFacility": false,
                   "jwstSynergy": false,
@@ -91,7 +91,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     demoScience: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 0
                     }
                   }
@@ -120,11 +120,11 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     demoScience: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 0
                     }
                     directorsTime: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 0
                     }
                   }
@@ -154,7 +154,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   callId: "c-123"
                   gemini: {
                     demoScience: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 0
                     }
                   }
@@ -184,7 +184,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   callId: "$cid"
                   gemini: {
                     demoScience: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 0
                     }
                   }
@@ -219,7 +219,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   callId: "$cid"
                   gemini: {
                     demoScience: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 0
                     }
                   }
@@ -275,7 +275,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
       _   <- addProposal(pi, pid, none,
                """
                  demoScience: {
-                   toOActivation: NONE
+                   explicitTooActivationCeiling: NONE
                    minPercentTime: 0
                  }
                """.some
@@ -500,7 +500,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     demoScience: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                     }
                   }
@@ -512,7 +512,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on DemoScience {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                   }
                 }
@@ -527,7 +527,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 50
                 }
               }
@@ -560,7 +560,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on DemoScience {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                   }
                 }
@@ -575,7 +575,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 100
                 }
               }
@@ -599,7 +599,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     directorsTime: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                     }
                   }
@@ -611,7 +611,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on DirectorsTime {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                   }
                 }
@@ -626,7 +626,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "DIRECTORS_TIME",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 50
                 }
               }
@@ -650,7 +650,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     fastTurnaround: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                     }
                   }
@@ -662,7 +662,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on FastTurnaround {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     reviewer {
                       id
@@ -681,7 +681,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "FAST_TURNAROUND",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 50,
                   "reviewer": null
                 }
@@ -715,7 +715,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on FastTurnaround {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                   }
                 }
@@ -730,7 +730,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "FAST_TURNAROUND",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 100
                 }
               }
@@ -757,7 +757,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     fastTurnaround: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 50
                       reviewerId: "$puId"
                     }
@@ -770,7 +770,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on FastTurnaround {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     reviewer {
                       id
@@ -789,7 +789,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category": "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "FAST_TURNAROUND",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 50,
                   "reviewer": {
                     "id": ${puId.toString},
@@ -817,7 +817,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     fastTurnaround: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 50
                       reviewerId: "pu-ffff-ffff-ffff-ffff"
                     }
@@ -849,7 +849,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     largeProgram: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                       minPercentTotalTime: 75
                       totalTime: { hours: 500.0 }
@@ -863,7 +863,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on LargeProgram {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     minPercentTotalTime
                     totalTime { hours }
@@ -880,7 +880,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "LARGE_PROGRAM",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 50,
                   "minPercentTotalTime": 75,
                   "totalTime": {
@@ -918,7 +918,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on LargeProgram {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     minPercentTotalTime
                     totalTime { hours }
@@ -935,7 +935,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "LARGE_PROGRAM",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 100,
                   "minPercentTotalTime": 100,
                   "totalTime": {
@@ -1049,7 +1049,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     queue: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                       partnerSplits: [
                         {
@@ -1071,7 +1071,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on Queue {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     partnerSplits {
                       partner
@@ -1090,7 +1090,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "QUEUE",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 50,
                   "partnerSplits": [
                     {
@@ -1124,7 +1124,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     systemVerification: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                     }
                   }
@@ -1136,7 +1136,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   scienceSubtype
                   ... on SystemVerification {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                   }
                 }
@@ -1151,7 +1151,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category" : "COSMOLOGY",
                 "gemini": {
                   "scienceSubtype": "SYSTEM_VERIFICATION",
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 50
                 }
               }
@@ -1174,7 +1174,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                       partnerSplits: [
                         {
@@ -1213,7 +1213,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                       partnerSplits: []
                     }
@@ -1243,7 +1243,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      toOActivation:  NONE
+                      explicitTooActivationCeiling:  NONE
                       minPercentTime: 50
                     }
                   }
@@ -1381,7 +1381,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     fastTurnaround: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 50
                     }
                   }
@@ -1570,7 +1570,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: COSMOLOGY
                   gemini: {
                     largeProgram: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       minPercentTotalTime: 90
                       totalTime: { hours: 120.0 }
@@ -1585,7 +1585,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 category
                 gemini {
                   ... on LargeProgram {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     minPercentTotalTime
                     totalTime { hours }
@@ -1603,7 +1603,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               "proposal": {
                 "category": "COSMOLOGY",
                 "gemini": {
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
                   "minPercentTotalTime": 90,
                   "totalTime": { "hours": 120.000000 },
@@ -1629,7 +1629,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   category: EXOPLANET_HOST_STAR
                   gemini: {
                     queue: {
-                      toOActivation: NONE
+                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
                       aeonMultiFacility: true
@@ -1645,7 +1645,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 category
                 gemini {
                   ... on Queue {
-                    toOActivation
+                    tooActivationCeiling
                     minPercentTime
                     aeonMultiFacility
                     jwstSynergy
@@ -1663,7 +1663,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
               "proposal": {
                 "category": "EXOPLANET_HOST_STAR",
                 "gemini": {
-                  "toOActivation": "NONE",
+                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
                   "aeonMultiFacility": true,
                   "jwstSynergy": true,

@@ -22,6 +22,7 @@ object WhereAttachment {
   def binding(path: Path): Matcher[Predicate] = {
     val WhereOrderAttachmentId = WhereOrder.binding[Attachment.Id](path / "id", AttachmentIdBinding)
     val WhereFileNameBinding   = WhereString.binding(path / "fileName")
+    val WhereMaskNameBinding   = WhereOptionString.binding(path / "maskName")
     val WhereDescriptionBinding   = WhereOptionString.binding(path / "description")
     val WhereAttachmentTypeBinding = WhereEq.binding(path / "attachmentType", enumeratedBinding[AttachmentType])
     val WhereProgramBinding = WhereProgram.binding(path / "program")
@@ -34,13 +35,14 @@ object WhereAttachment {
             WhereAttachmentBinding.Option("NOT", rNOT),
             WhereOrderAttachmentId.Option("id", rId),
             WhereFileNameBinding.Option("fileName", rFileName),
+            WhereMaskNameBinding.Option("maskName", rMaskName),
             WhereDescriptionBinding.Option("description", rDescription),
             WhereAttachmentTypeBinding.Option("attachmentType", rAttachmentType),
             BooleanBinding.Option("checked", rChecked),
             WhereProgramBinding.Option("program", rProgram)
           ) =>
-        (rAND, rOR, rNOT, rId, rFileName, rDescription, rAttachmentType, rChecked, rProgram).parMapN {
-          (AND, OR, NOT, id, name, desc, atType, checked, program) =>
+        (rAND, rOR, rNOT, rId, rFileName, rMaskName, rDescription, rAttachmentType, rChecked, rProgram).parMapN {
+          (AND, OR, NOT, id, name, maskName, desc, atType, checked, program) =>
             and(
               List(
                 AND.map(and),
@@ -48,6 +50,7 @@ object WhereAttachment {
                 NOT.map(Not(_)),
                 id,
                 name,
+                maskName,
                 desc,
                 atType,
                 checked.map(b => Eql(path / "checked", Const(b))),

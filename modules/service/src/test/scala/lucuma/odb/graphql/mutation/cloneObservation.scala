@@ -50,6 +50,10 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         skyBackground
       }
       schedulingConstraints {
+        tooActivation
+        executionRequirement
+        defaultExecutionRequirement
+        explicitExecutionRequirement
         isSplittable
         $TimingWindowsGraph
       }
@@ -383,6 +387,122 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       }
     }
   }
+
+  // The scheduling constraints are plain columns on t_observation, copied by the
+  // INSERT ... SELECT in Statements.cloneObservation.  The "same properties" test
+  // above compares them too, but only at their defaults -- these set values that
+  // differ from the defaults so a failure to copy would actually show up.
+  private val SchedulingGraph = """
+    {
+      schedulingConstraints {
+        tooActivation
+        executionRequirement
+        defaultExecutionRequirement
+        explicitExecutionRequirement
+        isSplittable
+      }
+    }
+  """
+
+  private def setScheduling(oid: Observation.Id, set: String): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: { schedulingConstraints: { $set } }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def cloneWith(oid: Observation.Id, set: Option[String] = None): IO[Json] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          cloneObservation(input: {
+            observationId: "$oid"
+            ${set.fold("")(s => s"SET: { schedulingConstraints: { $s } }")}
+          }) {
+            newObservation $SchedulingGraph
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("cloneObservation", "newObservation", "schedulingConstraints").require[Json])
+
+  test("clone copies tooActivation and the explicit execution requirement") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        for
+          // RAPID raises the default to UNINTERRUPTIBLE, so the explicit value
+          // (NO_SPLITTING) and the effective value differ -- which means a clone
+          // that merely recomputed defaults could not produce this result.
+          _ <- setScheduling(oid, "tooActivation: RAPID, explicitExecutionRequirement: NO_SPLITTING")
+          c <- cloneWith(oid)
+        yield assertEquals(
+          c,
+          json"""
+            {
+              "tooActivation": "RAPID",
+              "executionRequirement": "UNINTERRUPTIBLE",
+              "defaultExecutionRequirement": "UNINTERRUPTIBLE",
+              "explicitExecutionRequirement": "NO_SPLITTING",
+              "isSplittable": false
+            }
+          """
+        )
+      }
+    }
+  }
+
+  test("clone preserves an unset explicit execution requirement") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        for
+          _ <- setScheduling(oid, "tooActivation: STANDARD")
+          c <- cloneWith(oid)
+        yield assertEquals(
+          c,
+          json"""
+            {
+              "tooActivation": "STANDARD",
+              "executionRequirement": "UNCONSTRAINED",
+              "defaultExecutionRequirement": "UNCONSTRAINED",
+              "explicitExecutionRequirement": null,
+              "isSplittable": true
+            }
+          """
+        )
+      }
+    }
+  }
+
+  test("clone SET overrides the copied scheduling constraints") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        for
+          _ <- setScheduling(oid, "tooActivation: INTERRUPTING, explicitExecutionRequirement: UNINTERRUPTIBLE")
+          c <- cloneWith(oid, "tooActivation: STANDARD, explicitExecutionRequirement: NO_SPLITTING".some)
+        yield assertEquals(
+          c,
+          json"""
+            {
+              "tooActivation": "STANDARD",
+              "executionRequirement": "NO_SPLITTING",
+              "defaultExecutionRequirement": "UNCONSTRAINED",
+              "explicitExecutionRequirement": "NO_SPLITTING",
+              "isSplittable": false
+            }
+          """
+        )
+      }
+    }
+  }
+
 
   test("clones should have different ids") {
     createProgramAs(pi).flatMap { pid =>
@@ -2560,13 +2680,13 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
 
   // The mask attachment is a two-column (id + type) composite-FK reference.
   private def insertMosMaskAttachment(pid: Program.Id, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String), Attachment.Id] =
+    val q: Query[(Program.Id, String, String), Attachment.Id] =
       sql"""
-        INSERT INTO t_attachment (c_program_id, c_attachment_type, c_file_name, c_file_size, c_remote_path)
-        VALUES ($program_id, 'mos_mask', $text, 42, 'unused')
+        INSERT INTO t_attachment (c_program_id, c_attachment_type, c_file_name, c_file_size, c_remote_path, c_mask_name)
+        VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName))
+    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix(".fits")))
 
   private def readMaskColumns(
     table: String,

@@ -93,10 +93,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       CreateProgramNote,
       CreateProposal,
       CreateTarget,
-      RequestTooTrigger,
-      WithdrawTooTrigger,
-      AcceptTooTrigger,
-      DenyTooTrigger,
+      DeclineTooTrigger,
       CreateUserInvitation,
       DeleteProgramUser,
       DeleteProposal,
@@ -475,59 +472,23 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
               programNoteService.createNote(other).nestMap: nid =>
                 Unique(Filter(Predicates.programNote.id.eql(nid), child))
 
-  // ToO trigger workflow authorization (provisional): anyone who can read the
-  // program may request; anyone who can write to the program may withdraw; staff
-  // accept or deny.  Program scoping is via `isVisibleTo` (request) and
-  // `isWritableBy` (withdraw); state preconditions are enforced in TooTriggerService.
-  // Further checks (that the observation is a ToO observation, that the program
-  // allows it, etc.) will be added later.
-  private lazy val RequestTooTrigger =
-    MutationField("requestTooTrigger", RequestTooTriggerInput.Binding): (input, child) =>
-      services.useTransactionally:
-        (for
-          oid   <- ResultT(Services.asSuperUser(observationService.resolveOid(input.observationId, input.observationRef)))
-          which <- ResultT.fromResult(idSelectFromPredicate(
-                     ObservationType,
-                     and(List(
-                       Predicates.observation.id.eql(oid),
-                       Predicates.observation.program.isVisibleTo(user)
-                     ))
-                   ))
-          tid   <- ResultT(tooTriggerService.request(which))
-        yield Unique(Filter(Predicates.tooTrigger.id.eql(tid), child))).value
-
-  private lazy val WithdrawTooTrigger =
-    MutationField("withdrawTooTrigger", WithdrawTooTriggerInput.Binding): (input, child) =>
-      services.useTransactionally:
-        idSelectFromPredicate(
-          TooTriggerType,
-          and(List(
-            Predicates.tooTrigger.id.eql(input.tooTriggerId),
-            Predicates.tooTrigger.observation.program.isWritableBy(user)
-          ))
-        ).flatTraverse: which =>
-          tooTriggerService.withdraw(which, input.reason).map:
-            case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
-            case None      =>
-              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be withdrawn (not found, not writable, or not in a withdrawable state).")).asFailure
-
-  private lazy val AcceptTooTrigger =
-    MutationField("acceptTooTrigger", AcceptTooTriggerInput.Binding): (input, child) =>
+  // Requesting and withdrawing a ToO trigger are not mutations: a trigger is
+  // created when a ToO observation is set Ready and withdrawn when that state is
+  // cleared, both maintained by the database, so `setObservationWorkflowState`
+  // is the only lever and its own authorization applies.  Declining is the one
+  // observer-side action, and it is staff-gated.
+  private lazy val DeclineTooTrigger =
+    MutationField("declineTooTrigger", DeclineTooTriggerInput.Binding): (input, child) =>
       services.useTransactionally:
         requireStaffAccess:
-          tooTriggerService.accept(input.tooTriggerId).map:
-            case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
-            case None      =>
-              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be accepted (not found or not in the Requested state).")).asFailure
-
-  private lazy val DenyTooTrigger =
-    MutationField("denyTooTrigger", DenyTooTriggerInput.Binding): (input, child) =>
-      services.useTransactionally:
-        requireStaffAccess:
-          tooTriggerService.deny(input.tooTriggerId, input.reason).map:
-            case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
-            case None      =>
-              OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be denied (not found or not in the Requested state).")).asFailure
+          idSelectFromPredicate(
+            TooTriggerType,
+            Predicates.tooTrigger.id.eql(input.tooTriggerId)
+          ).flatTraverse: which =>
+            tooTriggerService.decline(which, input.reason).map:
+              case Some(tid) => Result(Unique(Filter(Predicates.tooTrigger.id.eql(tid), child)))
+              case None      =>
+                OdbError.InvalidArgument(Some(s"TooTrigger ${input.tooTriggerId} could not be declined (not found, or no longer requested).")).asFailure
 
   private lazy val CreateProposal =
     MutationField("createProposal", CreateProposalInput.Binding): (input, child) =>

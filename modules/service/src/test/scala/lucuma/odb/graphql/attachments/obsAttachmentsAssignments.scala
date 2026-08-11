@@ -128,7 +128,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
           }
         }
       """,
-      expected = 
+      expected =
         error.fold(
           Json.obj(
             "updateObservations" -> Json.obj(
@@ -167,10 +167,10 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
           }
         }
       """,
-      expected = 
+      expected =
           Json.obj(
             "updateObservations" -> Json.obj(
-              "observations" -> 
+              "observations" ->
                 oids.map(_ => input.expect).asJson
             )
           ).asRight
@@ -209,7 +209,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       expected = List(error).asLeft
     )
 
-  val mosMask = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful")
+  val mosMask = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful", maskName = "file1".some)
   val finder  = TestAttachment("file2.jpg", "finder", "jpg file".some, "A finder JPG file")
   val preImaging  = TestAttachment("preImaging.fits", "pre_imaging", none, "A pre imaging file")
   val science = TestAttachment("science.pdf", "science", none, "science file")

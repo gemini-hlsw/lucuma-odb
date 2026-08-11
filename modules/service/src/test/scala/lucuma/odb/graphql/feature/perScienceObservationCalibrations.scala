@@ -33,8 +33,6 @@ import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
@@ -53,6 +51,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
+import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
@@ -91,10 +90,7 @@ class perScienceObservationCalibrations
   val mockStarBefore = TelluricStar(
     id = "12345",
     spType = TelluricType.A0V,
-    coordinates = Coordinates(
-      RightAscension.fromDoubleDegrees(123.456),
-      Declination.fromDoubleDegrees(45.678).getOrElse(Declination.Zero)
-    ),
+    coordinates = coords(123.456, 45.678),
     distance = 100.5,
     hmag = 7.5,
     score = 0.95,
@@ -105,10 +101,7 @@ class perScienceObservationCalibrations
   val mockStarAfter = TelluricStar(
     id = "12346",
     spType = TelluricType.A0V,
-    coordinates = Coordinates(
-      RightAscension.fromDoubleDegrees(123.789),
-      Declination.fromDoubleDegrees(45.123).getOrElse(Declination.Zero)
-    ),
+    coordinates = coords(123.789, 45.123),
     distance = 98.2,
     hmag = 7.8,
     score = 0.92,
@@ -2281,8 +2274,12 @@ class perScienceObservationCalibrations
                   camera: SHORT_BLUE
                   slit: { fpu: LONG_SLIT_0_30 }
                   filter: ORDER3
-                  centralWavelength: { nanometers: 1650 }
-                  exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 1650 }
+                      exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
+                    }
+                  ]
                 }
               }
               constraintSet: { imageQuality: POINT_EIGHT }

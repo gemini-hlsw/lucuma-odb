@@ -16,6 +16,7 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Target
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
@@ -95,6 +96,19 @@ sealed trait ItcScience:
 
 object ItcScience:
 
+  /**
+   * Total exposure count across every keyed configuration (filter or central
+   * wavelength).  Saturates rather than overflowing: the value only feeds the
+   * sequence-size guard, which any saturated total will trip anyway.
+   */
+  private def sumExposureCounts[A](
+    science: NonEmptyMap[A, Zipper[ItcResult]]
+  ): PosInt =
+    PosInt.unsafeFrom:
+      science.foldLeft(0): (cnt, z) =>
+        val n = z.focus.value.exposureCount.value
+        if cnt > Int.MaxValue - n then Int.MaxValue else cnt + n
+
   // ITC result type discriminator.
   enum Type(val tag: String) derives Enumerated:
     case Flamingos2Imaging   extends Type("flamingos_2_imaging")
@@ -102,6 +116,7 @@ object ItcScience:
     case GmosNorthImaging    extends Type("gmos_north_imaging")
     case GmosSouthImaging    extends Type("gmos_south_imaging")
     case GnirsImaging        extends Type("gnirs_imaging")
+    case GnirsSpectroscopy   extends Type("gnirs_spectroscopy")
     case Spectroscopy        extends Type("spectroscopy")
 
   case class Flamingos2Imaging(
@@ -112,10 +127,7 @@ object ItcScience:
       Type.Flamingos2Imaging
 
     override def scienceExposureCount: PosInt =
-      PosInt.unsafeFrom:
-        science.foldLeft(0) { (cnt, z) =>
-          cnt + z.focus.value.exposureCount.value
-        }
+      sumExposureCounts(science)
 
   val flamingos2Imaging: Prism[ItcScience, Flamingos2Imaging] =
     GenPrism[ItcScience, Flamingos2Imaging]
@@ -149,10 +161,7 @@ object ItcScience:
       Type.GmosNorthImaging
 
     override def scienceExposureCount: PosInt =
-      PosInt.unsafeFrom:
-        science.foldLeft(0) { (cnt, z) =>
-          cnt + z.focus.value.exposureCount.value
-        }
+      sumExposureCounts(science)
 
   object GmosNorthImaging:
     given Eq[GmosNorthImaging] =
@@ -172,10 +181,7 @@ object ItcScience:
       Type.GmosSouthImaging
 
     override def scienceExposureCount: PosInt =
-      PosInt.unsafeFrom:
-        science.foldLeft(0) { (cnt, z) =>
-          cnt + z.focus.value.exposureCount.value
-        }
+      sumExposureCounts(science)
 
   object GmosSouthImaging:
     given Eq[GmosSouthImaging] =
@@ -195,10 +201,7 @@ object ItcScience:
       Type.GnirsImaging
 
     override def scienceExposureCount: PosInt =
-      PosInt.unsafeFrom:
-        science.foldLeft(0) { (cnt, z) =>
-          cnt + z.focus.value.exposureCount.value
-        }
+      sumExposureCounts(science)
 
   object GnirsImaging:
     given Eq[GnirsImaging] =
@@ -206,6 +209,27 @@ object ItcScience:
 
   val gnirsImaging: Prism[ItcScience, GnirsImaging] =
     GenPrism[ItcScience, GnirsImaging]
+
+  /**
+   * GNIRS spectroscopy results.  There are results per central wavelength, each
+   * a separate configuration with its own exposure time mode and coadds.
+   */
+  case class GnirsSpectroscopy(
+    science: NonEmptyMap[Wavelength, Zipper[ItcResult]]
+  ) extends ItcScience:
+
+    override def dataType: Type =
+      Type.GnirsSpectroscopy
+
+    override def scienceExposureCount: PosInt =
+      sumExposureCounts(science)
+
+  object GnirsSpectroscopy:
+    given Eq[GnirsSpectroscopy] =
+      Eq.by(_.science)
+
+  val gnirsSpectroscopy: Prism[ItcScience, GnirsSpectroscopy] =
+    GenPrism[ItcScience, GnirsSpectroscopy]
 
   /**
    * Spectroscopy science results, shared by every spectroscopy mode (whether or
@@ -240,6 +264,7 @@ object ItcScience:
       case (a: GmosNorthImaging,  b: GmosNorthImaging)  => a === b
       case (a: GmosSouthImaging,  b: GmosSouthImaging)  => a === b
       case (a: GnirsImaging,      b: GnirsImaging)      => a === b
+      case (a: GnirsSpectroscopy, b: GnirsSpectroscopy) => a === b
       case (a: Spectroscopy,      b: Spectroscopy)      => a === b
       case _                                            => false
 

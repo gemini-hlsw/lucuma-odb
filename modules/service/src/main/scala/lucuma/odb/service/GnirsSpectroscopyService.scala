@@ -33,13 +33,17 @@ import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStep
 import lucuma.core.model.sequence.gnirs.GnirsFocusMotorStepsValue
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.defaultIfuTelescopeConfigs
+import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.telescopeConfigs.*
+import lucuma.odb.graphql.input.GnirsCentralWavelengthConfigInput
 import lucuma.odb.graphql.input.GnirsSpectroscopyInput
 import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Acquisition
+import lucuma.odb.sequence.gnirs.spectroscopy.CentralWavelengthConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Config
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GnirsCodecs.*
@@ -67,32 +71,45 @@ trait GnirsSpectroscopyService[F[_]]:
     which: List[Observation.Id]
   )(using Transaction[F]): F[Result[Unit]]
 
-  def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit]
+  def clone(
+    originalId: Observation.Id,
+    newId:      Observation.Id,
+    etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+  )(using Transaction[F]): F[Unit]
 
   /** Reset `oid`'s configuration to telluric defaults (config-dependent slit offsets). */
   def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit]
 
 object GnirsSpectroscopyService:
 
+  private val DefaultCoadds: PosInt = PosInt.unsafeFrom(1)
+
+  val CentralWavelengthConfigTableName: String = "t_gnirs_central_wavelength_config"
+
   def instantiate[F[_]: {Concurrent as F, Services}]: GnirsSpectroscopyService[F] =
 
     new GnirsSpectroscopyService[F]:
 
-      val gnirsLS: Decoder[Config] = (
-        // Science ETM (joined from t_exposure_time_mode via FK)
+      /**
+       * Decodes one (observation, central wavelength) row.  The `Config` it
+       * yields carries only that row's wavelength; `select` groups the rows per
+       * observation and replaces `wavelengths` with the full list.
+       */
+      val gnirsLS: Decoder[(CentralWavelengthConfig, Config)] = (
+        // The row's central wavelength, its science ETM (joined via the row's FK)
+        // and its coadds.
+        wavelength_pm                    *: // c_central_wavelength
         exposure_time_mode               *:
-        // Effective grating/prism/wavelength for the acquisition configuration
+        int4                             *: // c_coadds
+        // Effective grating/prism for the acquisition configuration
         gnirs_grating                    *: // c_grating_effective
         gnirs_prism                      *: // c_prism_effective
-        wavelength_pm                    *: // c_central_wavelength_effective
         // Camera
         gnirs_camera                     *:
         // FPU (exactly one of slit / ifu)
         gnirs_fpu_spectroscopy           *:
         // Filter
         gnirs_filter                     *:
-        // Coadds
-        int4                             *:
         // Decker effective (DB-computed COALESCE)
         gnirs_decker                     *: // c_decker_effective
         // Read mode explicit override (None => compute from exposure time)
@@ -113,8 +130,9 @@ object GnirsSpectroscopyService:
         exposure_time_mode               *: // acquisition ETM
         telluric_type                       // c_telluric_type
       ).emap:
-        case (sciEtm *: gratingEff *: prismEff *: centralWavEff *:
-              camera *: fpu *: filter *: coadds *:
+        case (centralWav *: sciEtm *: coadds *:
+              gratingEff *: prismEff *:
+              camera *: fpu *: filter *:
               deckerEff *:
               readModeExp *:
               wellDepthEff *:
@@ -151,23 +169,24 @@ object GnirsSpectroscopyService:
                         val acq = AcquisitionConfig(explicitAcqMode, acqFilterExp, acqEtm, acqCoaddsP)
                         val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
-                        Config(
+                        val sw = CentralWavelengthConfig(centralWav, sciEtm, coaddsP)
+                        (sw,
+                         Config(
                           filter,
                           deckerEff,
                           fpu,
                           prismEff,
                           gratingEff,
-                          centralWavEff,
+                          NonEmptyList.one(sw),
                           camera,
                           focus,
                           readModeExp,
                           wellDepthEff,
-                          sciEtm,
-                          coaddsP,
                           resolvedTC,
                           acq,
                           telluricType
                           )
+                        )
               }
 
       override def select(
@@ -178,45 +197,97 @@ object GnirsSpectroscopyService:
           .fold(Map.empty.pure[F]): oids =>
             val af = Statements.selectGnirsSpectroscopy(oids)
             session.prepareR(af.fragment.query(observation_id *: gnirsLS)).use: pq =>
-              pq.stream(af.argument, chunkSize = 1024).compile.toList.map(_.toMap)
+              pq.stream(af.argument, chunkSize = 1024).compile.toList.map: rows =>
+                // One row per central wavelength, ordered by increasing wavelength.
+                // `groupBy` preserves that order within each group.
+                rows
+                  .groupBy(_._1)
+                  .flatMap: (oid, group) =>
+                    NonEmptyList.fromList(group.map(_._2)).map: ws =>
+                      oid -> group.head._3.copy(wavelengths = ws)
+                  .toMap
 
-      private def insertExposureTimeModes(
-        input: GnirsSpectroscopyInput.Create,
-        req:   Option[ExposureTimeMode],
-        which: List[Observation.Id]
-      )(using Transaction[F]): F[Result[Unit]] =
-        val acqEtm: Option[ExposureTimeMode] = input.acquisition.flatMap(_.exposureTimeMode)
-        exposureTimeModeService
-          .insertOneWithDefaults("GNIRS Spectroscopy", acqEtm, input.exposureTimeMode, req, which)
-          .map(_.void)
+      /**
+       * The ETM resolution key is the central wavelength; coadds ride along so the
+       * child rows can be written from the resolved result.
+       */
+      private def resolveKey(
+        w: GnirsCentralWavelengthConfigInput
+      ): (Wavelength, Option[ExposureTimeMode]) =
+        (w.centralWavelength, w.exposureTimeMode)
+
+      private def stripAcquisition[E](
+        m: Map[Observation.Id, (E, NonEmptyList[(Wavelength, E)])]
+      ): Map[Observation.Id, NonEmptyList[(Wavelength, E)]] =
+        m.view.mapValues(_._2).toMap
+
+      private def insertWavelengths(
+        input:   NonEmptyList[GnirsCentralWavelengthConfigInput],
+        etms:    Map[Observation.Id, NonEmptyList[(Wavelength, ExposureTimeModeId)]],
+        version: ObservingModeRowVersion
+      ): F[Unit] =
+        val coaddsFor: Map[Wavelength, PosInt] =
+          input.toList.map(w => w.centralWavelength -> w.coadds.getOrElse(DefaultCoadds)).toMap
+        NonEmptyList
+          .fromList:
+            etms.toList.flatMap: (oid, ws) =>
+              ws.toList.map: (wav, eid) =>
+                (oid, wav, coaddsFor.getOrElse(wav, DefaultCoadds), eid)
+          .traverse_ : rs =>
+            session.exec(Statements.insertWavelengths(rs, version))
 
       override def insert(
         input:  GnirsSpectroscopyInput.Create,
         req:    Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
+        val acqEtm: Option[ExposureTimeMode] = input.acquisition.flatMap(_.exposureTimeMode)
         (for
-          _ <- ResultT(insertExposureTimeModes(input, req, which))
-          _ <- ResultT.liftF:
-            which.traverse: oid =>
-              session.exec(Statements.insertGnirsSpectroscopy(oid, input))
-            .void
+          _   <- ResultT.liftF:
+                   which.traverse: oid =>
+                     session.exec(Statements.insertGnirsSpectroscopy(oid, input))
+                   .void
+
+          // Resolve the ETMs for acquisition and each central wavelength.  An explicit
+          // acquisition ETM wins; otherwise it is derived from the first science ETM.
+          r   <- ResultT(exposureTimeModeService.resolve("GNIRS Spectroscopy", acqEtm, input.centralWavelengths.map(resolveKey), req, which))
+
+          ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
+          _   <- ResultT.liftF(insertWavelengths(input.centralWavelengths, stripAcquisition(ids), ObservingModeRowVersion.Initial))
+
+          // The 'current' rows need their own ETM rows (each wavelength row backs
+          // exactly one ETM), so resolve the science side a second time.
+          cur <- ResultT.liftF(exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
+          _   <- ResultT.liftF(insertWavelengths(input.centralWavelengths, cur, ObservingModeRowVersion.Current))
         yield ()).value
 
       override def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
         Statements.deleteGnirs(which).fold(F.unit)(session.exec)
 
-      private def updateExposureTimeModes(
+      /**
+       * Replaces the current central wavelength rows and their science ETMs.  The
+       * acquisition ETM is user-editable here, so it is left in place and changed
+       * only when the input asks for it.
+       */
+      private def updateWavelengths(
+        SET:   GnirsSpectroscopyInput.Edit,
+        oids:  NonEmptyList[Observation.Id],
+        which: List[Observation.Id]
+      )(using Transaction[F]): ResultT[F, Unit] =
+        SET.centralWavelengths.fold(ResultT.unit): ws =>
+          for
+            _   <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentScienceFiltersAndEtms(CentralWavelengthConfigTableName, oids)))
+            r   <- ResultT(exposureTimeModeService.resolve("GNIRS Spectroscopy", none, ws.map(resolveKey), none, which))
+            cur <- ResultT.liftF(exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
+            _   <- ResultT.liftF(insertWavelengths(ws, cur, ObservingModeRowVersion.Current))
+          yield ()
+
+      private def updateAcquisitionExposureTimeMode(
         input: GnirsSpectroscopyInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        def update(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
-          etm.fold(().pure[F]): e =>
-            services.exposureTimeModeService.updateMany(which, role, e)
-        for
-          _ <- update(input.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition)
-          _ <- update(input.exposureTimeMode, ExposureTimeModeRole.Science)
-        yield ()
+        input.acquisition.flatMap(_.exposureTimeMode).fold(().pure[F]): e =>
+          services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Acquisition, e)
 
       // A NonNull telescope-config override of a specific kind must match the persisted FPU.
       // The input validates this against an edited FPU; when the FPU is unchanged we check the
@@ -244,14 +315,21 @@ object GnirsSpectroscopyService:
         SET:   GnirsSpectroscopyInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        (for
-          _ <- ResultT(validateTelescopeConfigKind(SET, which))
-          _ <- ResultT.liftF(updateExposureTimeModes(SET, which))
-          _ <- ResultT.liftF(Statements.updateGnirsSpectroscopy(SET, which).fold(F.unit)(session.exec))
-        yield ()).value
+        NonEmptyList.fromList(which).fold(Result.unit.pure[F]): oids =>
+          (for
+            _ <- ResultT(validateTelescopeConfigKind(SET, which))
+            _ <- ResultT.liftF(updateAcquisitionExposureTimeMode(SET, which))
+            _ <- updateWavelengths(SET, oids, which)
+            _ <- ResultT.liftF(Statements.updateGnirsSpectroscopy(SET, which).fold(F.unit)(session.exec))
+          yield ()).value
 
-      override def clone(originalId: Observation.Id, newId: Observation.Id)(using Transaction[F]): F[Unit] =
-        session.exec(Statements.cloneGnirs(originalId, newId))
+      override def clone(
+        originalId: Observation.Id,
+        newId:      Observation.Id,
+        etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+      )(using Transaction[F]): F[Unit] =
+        session.exec(Statements.cloneGnirs(originalId, newId)) *>
+          session.exec(Statements.cloneWavelengths(originalId, newId, etms)).unlessA(etms.isEmpty)
 
       override def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit] =
         session.exec(Statements.applyGnirsTelluricDefaults(oid))
@@ -262,19 +340,19 @@ object GnirsSpectroscopyService:
       sql"""
         SELECT
           ls.c_observation_id,
+          w.c_central_wavelength,
           sci.c_exposure_time_mode,
           sci.c_signal_to_noise_at,
           sci.c_signal_to_noise,
           sci.c_exposure_time,
           sci.c_exposure_count,
+          w.c_coadds,
           ls.c_grating_effective,
           ls.c_prism_effective,
-          ls.c_central_wavelength_effective,
           ls.c_camera,
           ls.c_fpu_slit,
           ls.c_fpu_ifu,
           ls.c_filter,
-          ls.c_coadds,
           ls.c_decker_effective,
           ls.c_read_mode,
           ls.c_well_depth_effective,
@@ -293,16 +371,18 @@ object GnirsSpectroscopyService:
           acq.c_exposure_count,
           ls.c_telluric_type
         FROM v_gnirs_spectroscopy ls
-        LEFT JOIN t_exposure_time_mode sci
-           ON sci.c_observation_id = ls.c_observation_id
-          AND sci.c_role = 'science'
+        JOIN t_gnirs_central_wavelength_config w
+           ON w.c_observation_id = ls.c_observation_id
+          AND w.c_version = 'current'
+        JOIN t_exposure_time_mode sci
+           ON sci.c_exposure_time_mode_id = w.c_exposure_time_mode_id
         LEFT JOIN t_exposure_time_mode acq
            ON acq.c_observation_id = ls.c_observation_id
           AND acq.c_role = 'acquisition'
       """(Void) |+|
       void"WHERE ls.c_observation_id IN (" |+|
         observationIds.map(sql"$observation_id").intercalate(void",") |+|
-      void")"
+      void") ORDER BY ls.c_observation_id, w.c_central_wavelength"
 
     // None => no explicit acquisition type; resolved from the exposure time at
     // sequence-generation time (mirrors read mode handling).
@@ -320,10 +400,6 @@ object GnirsSpectroscopyService:
       GnirsCamera,
       GnirsFpu.Spectroscopy,
       GnirsFilter,
-      // coadds
-      Int,
-      // central wavelength (required; stored as the initial value, override left NULL)
-      Wavelength,
       // explicit overrides (all nullable)
       Option[GnirsDecker],
       Option[GnirsGrating],   // explicit grating
@@ -357,10 +433,7 @@ object GnirsSpectroscopyService:
           c_initial_fpu_ifu,
           c_filter,
           c_initial_filter,
-          c_coadds,
           c_decker,
-          c_central_wavelength,
-          c_initial_central_wavelength,
           c_grating,
           c_prism,
           c_focus_motor_steps,
@@ -387,10 +460,7 @@ object GnirsSpectroscopyService:
           $gnirs_fpu_spectroscopy,
           $gnirs_filter,
           $gnirs_filter,
-          $int4,
           ${gnirs_decker.opt},
-          NULL,
-          $wavelength_pm,
           ${gnirs_grating.opt},
           ${gnirs_prism.opt},
           ${int4.opt},
@@ -407,14 +477,14 @@ object GnirsSpectroscopyService:
         FROM t_observation
         WHERE c_observation_id = $observation_id
       """.contramap {
-        (oid, obsModeType, initGrating, initPrism, camera, fpu, filter, coadds,
-         centralWav, decker, explGrating, explPrism, focus,
+        (oid, obsModeType, initGrating, initPrism, camera, fpu, filter,
+         decker, explGrating, explPrism, focus,
          readMode, wellDepth, slitMode, offsets,
          acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, telluricType) =>
           // fpu appears twice (current + initial); the spectroscopy codec expands each
           // into the (c_fpu_slit, c_fpu_ifu) column pair.
           (oid, obsModeType, initGrating, initPrism, camera, camera, fpu, fpu,
-           filter, filter, coadds, decker, centralWav,
+           filter, filter, decker,
            explGrating, explPrism, focus, readMode, wellDepth,
            slitMode, offsets,
            acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, telluricType, oid)
@@ -444,8 +514,6 @@ object GnirsSpectroscopyService:
         input.camera,
         input.fpu,
         input.filter,
-        input.coadds.map(_.value).getOrElse(1),
-        input.centralWavelength,
         input.explicitDecker,
         input.explicitGrating,
         input.explicitPrism,
@@ -471,7 +539,6 @@ object GnirsSpectroscopyService:
           void"WHERE " |+| observationIdIn(oids)
 
     private def gnirsUpdates(SET: GnirsSpectroscopyInput.Edit): Option[NonEmptyList[AppliedFragment]] =
-      val upCoadds       = sql"c_coadds             = ${int4_pos.opt}"
       val upFilter       = sql"c_filter             = ${gnirs_filter.opt}"
       // FPU edits set the matching column only. Switching kind (slit<->ifu) would also
       // require changing the observation's mode type, so it is not supported here: a
@@ -482,7 +549,6 @@ object GnirsSpectroscopyService:
           case GnirsFpu.Spectroscopy.Ifu(i)  => sql"c_fpu_ifu  = $gnirs_fpu_ifu".apply(i)
       val upCamera       = sql"c_camera             = ${gnirs_camera.opt}"
       val upDecker       = sql"c_decker             = ${gnirs_decker.opt}"
-      val upCentralWav   = sql"c_central_wavelength = $wavelength_pm"
       val upFocus        = sql"c_focus_motor_steps  = ${int4.opt}"
       val upReadMode     = sql"c_read_mode          = ${gnirs_read_mode.opt}"
       val upWellDepth    = sql"c_well_depth         = ${gnirs_well_depth.opt}"
@@ -537,12 +603,10 @@ object GnirsSpectroscopyService:
           ).flatten ++ typeAndOffset
 
       val ups: List[AppliedFragment] = List(
-        SET.coadds.map(c => upCoadds(Some(c))),
         SET.filter.map(f => upFilter(Some(f))),
         SET.fpu.map(fpuUpdates),
         SET.camera.map(c => upCamera(Some(c))),
         SET.explicitDecker.toOptionOption.map(upDecker),
-        SET.centralWavelength.map(upCentralWav),
         SET.explicitFocusMotorSteps.toOptionOption.map(upFocus),
         SET.explicitReadMode.toOptionOption.map(upReadMode),
         SET.explicitWellDepth.toOptionOption.map(upWellDepth),
@@ -595,12 +659,12 @@ object GnirsSpectroscopyService:
       sql"""
         INSERT INTO t_gnirs_spectroscopy (
           c_observation_id, c_program_id, c_observing_mode_type,
-          c_grating, c_prism, c_central_wavelength, c_initial_central_wavelength,
+          c_grating, c_prism,
           c_initial_grating, c_initial_prism,
           c_camera, c_initial_camera,
           c_fpu_slit, c_fpu_ifu, c_initial_fpu_slit, c_initial_fpu_ifu,
           c_filter, c_initial_filter,
-          c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
+          c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
           c_acq_type, c_acq_coadds, c_acq_filter,
           c_acq_sky_offset_p, c_acq_sky_offset_q,
@@ -610,12 +674,12 @@ object GnirsSpectroscopyService:
           $observation_id,
           (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
           c_observing_mode_type,
-          c_grating, c_prism, c_central_wavelength, c_initial_central_wavelength,
+          c_grating, c_prism,
           c_initial_grating, c_initial_prism,
           c_camera, c_initial_camera,
           c_fpu_slit, c_fpu_ifu, c_initial_fpu_slit, c_initial_fpu_ifu,
           c_filter, c_initial_filter,
-          c_coadds, c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
+          c_decker, c_focus_motor_steps, c_read_mode, c_well_depth,
           c_slit_offset_mode, c_telescope_configs,
           c_acq_type, c_acq_coadds, c_acq_filter,
           c_acq_sky_offset_p, c_acq_sky_offset_q,
@@ -623,3 +687,67 @@ object GnirsSpectroscopyService:
         FROM t_gnirs_spectroscopy
         WHERE c_observation_id = $observation_id
       """.apply(newId, newId, originalId)
+
+    /** Inserts the central wavelength rows for one row version. */
+    def insertWavelengths(
+      rows:    NonEmptyList[(Observation.Id, Wavelength, PosInt, ExposureTimeModeId)],
+      version: ObservingModeRowVersion
+    ): AppliedFragment =
+      val insertInto: AppliedFragment =
+        void"""
+          INSERT INTO t_gnirs_central_wavelength_config (
+            c_observation_id,
+            c_central_wavelength,
+            c_version,
+            c_coadds,
+            c_exposure_time_mode_id
+          ) VALUES
+        """
+
+      val values =
+        rows.map: (oid, wav, coadds, eid) =>
+          sql"($observation_id, $wavelength_pm, $observing_mode_row_version, $int4_pos, $exposure_time_mode_id)"(
+            oid, wav, version, coadds, eid
+          )
+
+      insertInto |+| values.intercalate(void", ")
+
+    /**
+     * Copies the central wavelength rows to a cloned observation, remapping each
+     * to its cloned exposure time mode row.
+     */
+    def cloneWavelengths(
+      originalId: Observation.Id,
+      newId:      Observation.Id,
+      etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+    ): AppliedFragment =
+      sql"""
+        WITH etm_map AS (
+          SELECT
+            old_exposure_time_mode_id,
+            new_exposure_time_mode_id
+          FROM
+            unnest(
+              ARRAY[${exposure_time_mode_id.list(etms.length)}],
+              ARRAY[${exposure_time_mode_id.list(etms.length)}]
+            ) AS map(old_exposure_time_mode_id, new_exposure_time_mode_id)
+        )
+        INSERT INTO t_gnirs_central_wavelength_config (
+          c_observation_id,
+          c_central_wavelength,
+          c_version,
+          c_coadds,
+          c_exposure_time_mode_id,
+          c_role
+        )
+        SELECT
+          $observation_id,
+          w.c_central_wavelength,
+          w.c_version,
+          w.c_coadds,
+          e.new_exposure_time_mode_id,
+          w.c_role
+        FROM t_gnirs_central_wavelength_config w
+        JOIN etm_map e ON e.old_exposure_time_mode_id = w.c_exposure_time_mode_id
+        WHERE w.c_observation_id = $observation_id
+      """.apply(etms.map(_._1), etms.map(_._2), newId, originalId)

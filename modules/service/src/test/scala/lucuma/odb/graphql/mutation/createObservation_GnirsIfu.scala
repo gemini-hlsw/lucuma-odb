@@ -40,14 +40,18 @@ class createObservation_GnirsIfu extends OdbSuite:
                         camera: SHORT_BLUE
                         ifu: { fpu: LOW_RESOLUTION }
                         filter: ORDER3
-                        centralWavelength: { nanometers: 2200 }
-                        exposureTimeMode: {
-                          timeAndCount: {
-                            time: { seconds: 30.0 }
-                            count: 3
-                            at: { nanometers: 2200 }
+                        centralWavelengths: [
+                          {
+                            centralWavelength: { nanometers: 2200 }
+                            exposureTimeMode: {
+                              timeAndCount: {
+                                time: { seconds: 30.0 }
+                                count: 3
+                                at: { nanometers: 2200 }
+                              }
+                            }
                           }
-                        }
+                        ]
                       }
                     }
                   }
@@ -119,7 +123,11 @@ class createObservation_GnirsIfu extends OdbSuite:
                         slit: { fpu: LONG_SLIT_0_30 }
                         ifu: { fpu: LOW_RESOLUTION }
                         filter: ORDER3
-                        centralWavelength: { nanometers: 2200 }
+                        centralWavelengths: [
+                          {
+                            centralWavelength: { nanometers: 2200 }
+                          }
+                        ]
                       }
                     }
                   }
@@ -157,10 +165,14 @@ class createObservation_GnirsIfu extends OdbSuite:
                         camera: SHORT_BLUE
                         ifu: { fpu: LOW_RESOLUTION }
                         filter: ORDER3
-                        centralWavelength: { nanometers: 2200 }
-                        exposureTimeMode: {
-                          timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }
-                        }
+                        centralWavelengths: [
+                          {
+                            centralWavelength: { nanometers: 2200 }
+                            exposureTimeMode: {
+                              timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }
+                            }
+                          }
+                        ]
                       }
                     }
                   }
@@ -227,7 +239,11 @@ class createObservation_GnirsIfu extends OdbSuite:
                         camera: SHORT_BLUE
                         ifu: { fpu: LOW_RESOLUTION }
                         filter: ORDER3
-                        centralWavelength: { nanometers: 2200 }
+                        centralWavelengths: [
+                          {
+                            centralWavelength: { nanometers: 2200 }
+                          }
+                        ]
                         slit: { explicitTelescopeConfigs: { toSky: [ { offset: { p: { arcseconds: 1 }, q: { arcseconds: 1 } }, guiding: ENABLED } ] } }
                       }
                     }

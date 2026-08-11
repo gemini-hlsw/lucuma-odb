@@ -34,6 +34,7 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -532,62 +533,76 @@ object ItcService {
                .flatMap(id => z.findFocus(_.targetId === id))
                .getOrElse(z)
 
-      sealed trait Imaging[A]:
+      /**
+       * A science result set keyed by something that varies per ITC call: the
+       * filter for imaging modes, the central wavelength for GNIRS spectroscopy.
+       */
+      sealed trait Keyed[A]:
         def pf: PartialFunction[InstrumentMode, A]
         def wrap(nem: NonEmptyMap[A, Zipper[ItcResult]]): ItcScience
 
-      object Imaging:
-        case object Flamingos2Imaging extends Imaging[Flamingos2Filter]:
+      object Keyed:
+        case object Flamingos2Imaging extends Keyed[Flamingos2Filter]:
           override def pf: PartialFunction[InstrumentMode, Flamingos2Filter] =
             case InstrumentMode.Flamingos2Imaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[Flamingos2Filter, Zipper[ItcResult]]): ItcScience =
             ItcScience.Flamingos2Imaging(nem)
 
-        case object GmosNorthImaging extends Imaging[GmosNorthFilter]:
+        case object GmosNorthImaging extends Keyed[GmosNorthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] =
             case InstrumentMode.GmosNorthImaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[ItcResult]]): ItcScience =
             ItcScience.GmosNorthImaging(nem)
 
-        case object GmosSouthImaging extends Imaging[GmosSouthFilter]:
+        case object GmosSouthImaging extends Keyed[GmosSouthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] =
                case InstrumentMode.GmosSouthImaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[ItcResult]]): ItcScience =
             ItcScience.GmosSouthImaging(nem)
 
-        case object GnirsImaging extends Imaging[GnirsFilter]:
+        case object GnirsImaging extends Keyed[GnirsFilter]:
           override def pf: PartialFunction[InstrumentMode, GnirsFilter] =
             case InstrumentMode.GnirsImaging(filter = f) => f
 
           override def wrap(nem: NonEmptyMap[GnirsFilter, Zipper[ItcResult]]): ItcScience =
             ItcScience.GnirsImaging(nem)
 
-      private def callRemoteImagingItc[A: Order](
-        oid:   Observation.Id,
-        input: ItcInput.Imaging,
-        im:    Imaging[A]
-      ): EitherT[F, OdbError, Itc] =
+        case object GnirsSpectroscopy extends Keyed[Wavelength]:
+          override def pf: PartialFunction[InstrumentMode, Wavelength] =
+            case InstrumentMode.GnirsSpectroscopy(centralWavelength = w) => w
 
-        def extractFilters(
+          override def wrap(nem: NonEmptyMap[Wavelength, Zipper[ItcResult]]): ItcScience =
+            ItcScience.GnirsSpectroscopy(nem)
+
+      private def callRemoteKeyedItc[A: Order, I](
+        oid:     Observation.Id,
+        modes:   NonEmptyList[InstrumentMode],
+        inputs:  NonEmptyList[I],
+        targets: NonEmptyList[ItcInput.TargetDefinition],
+        snTarget: Option[Target.Id],
+        im:      Keyed[A],
+        call:    I => F[ClientCalculationResult]
+      ): EitherT[F, OdbError, ItcScience] =
+
+        def extractKeys(
           remaining: List[InstrumentMode],
-          filters:   List[A]
+          keys:      List[A]
         ): Either[OdbError, NonEmptyList[A]] =
           remaining match
             case Nil    =>
               // remaining originally comes from a NonEmptyList
-              NonEmptyList.fromListUnsafe(filters.reverse).asRight
+              NonEmptyList.fromListUnsafe(keys.reverse).asRight
             case h :: t =>
-              if im.pf.isDefinedAt(h) then extractFilters(t, im.pf(h) :: filters)
+              if im.pf.isDefinedAt(h) then extractKeys(t, im.pf(h) :: keys)
               else OdbError.InvalidObservation(oid, s"Mixed instrument mode observations are not supported.".some).asLeft
 
+        // One ITC call per key, in parallel.
         val clientCalculationResults: F[Either[OdbError, NonEmptyList[ClientCalculationResult]]] =
-          input
-            .scienceInput
-            .parTraverse: in =>
-              client.imaging(in, useCache = false)
+          inputs
+            .parTraverse(call)
             .map(_.asRight)
             .handleErrorWith:
               case e: ResponseException[?] =>
@@ -596,10 +611,10 @@ object ItcService {
                 OdbError.RemoteServiceCallError(s"Error calling ITC service: ${t.getMessage}".some).asLeft.pure
 
         for
-          fs <- EitherT.fromEither(extractFilters(input.science.map(_.mode).toList, Nil))
+          fs <- EitherT.fromEither(extractKeys(modes.toList, Nil))
           cs <- EitherT(clientCalculationResults)
-          ts <- EitherT.fromEither(toTargetResults(input.targets, cs, input.signalToNoiseTargetId))
-        yield Itc(ItcAcquisition.NotApplicable, im.wrap(fs.zip(ts).toNem))
+          ts <- EitherT.fromEither(toTargetResults(targets, cs, snTarget))
+        yield im.wrap(fs.zip(ts).toNem)
 
 
       private def callRemoteItc(
@@ -646,20 +661,37 @@ object ItcService {
               )
             )
 
+        // Imaging modes have no acquisition ITC of their own (GNIRS folds one in
+        // below), so their keyed science result is the whole thing.
+        def imagingScience[A: Order](
+          oid: Observation.Id,
+          im:  ItcInput.Imaging,
+          k:   Keyed[A]
+        ): EitherT[F, OdbError, Itc] =
+          callRemoteKeyedItc(
+            oid,
+            im.science.map(_.mode),
+            im.scienceInput,
+            im.targets,
+            im.signalToNoiseTargetId,
+            k,
+            client.imaging(_, useCache = false)
+          ).map(Itc(ItcAcquisition.NotApplicable, _))
+
         def imaging(im: ItcInput.Imaging): EitherT[F, OdbError, Itc] =
           val science: EitherT[F, OdbError, Itc] =
             im.science.head.mode match
               case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
-                callRemoteImagingItc(oid, im, Imaging.Flamingos2Imaging)
+                imagingScience(oid, im, Keyed.Flamingos2Imaging)
 
               case InstrumentMode.GmosNorthImaging(_, _, _, _) =>
-                callRemoteImagingItc(oid, im, Imaging.GmosNorthImaging)
+                imagingScience(oid, im, Keyed.GmosNorthImaging)
 
               case InstrumentMode.GmosSouthImaging(_, _, _, _) =>
-                callRemoteImagingItc(oid, im, Imaging.GmosSouthImaging)
+                imagingScience(oid, im, Keyed.GmosSouthImaging)
 
               case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
-                callRemoteImagingItc(oid, im, Imaging.GnirsImaging)
+                imagingScience(oid, im, Keyed.GnirsImaging)
 
               case m                                     =>
                 EitherT.leftT:
@@ -682,6 +714,22 @@ object ItcService {
             acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
           yield Itc(acq, ItcScience.Spectroscopy(sci))
 
+        // GNIRS spectroscopy: one science call per central wavelength, plus the
+        // usual single acquisition pass (including the two-pass auto-classify).
+        def gnirsSpectroscopy(sp: ItcInput.GnirsSpectroscopy): EitherT[F, OdbError, Itc] =
+          for
+            sci <- callRemoteKeyedItc[Wavelength, SpectroscopyInput](
+                     oid,
+                     sp.science.map(_.mode),
+                     sp.scienceInput,
+                     sp.targets,
+                     sp.signalToNoiseTargetId,
+                     Keyed.GnirsSpectroscopy,
+                     client.spectroscopy(_, useCache = false)
+                   )
+            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
+          yield Itc(acq, sci)
+
         // Modes with no acquisition sequence: the science call is the whole result.
         def scienceOnlySpectroscopy(sp: ItcInput.ScienceOnlySpectroscopy): EitherT[F, OdbError, Itc] =
           for
@@ -694,6 +742,8 @@ object ItcService {
             imaging(im)
           case sp @ ItcInput.Spectroscopy(_, _, _, _, _, _) =>
             spectroscopy(sp)
+          case sp @ ItcInput.GnirsSpectroscopy(_, _, _, _, _, _) =>
+            gnirsSpectroscopy(sp)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets, _) =>
             ghost(gh, targets)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _, _) =>
@@ -751,6 +801,12 @@ object ItcService {
           .flatMap: params =>
             params.itcInput match
               case ItcInputDerivation.Ready(sp: ItcInput.Spectroscopy)           =>
+                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
+                  .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
+
+              // GNIRS spectroscopy has a single acquisition pass regardless of how
+              // many central wavelengths the science side has.
+              case ItcInputDerivation.Ready(sp: ItcInput.GnirsSpectroscopy)      =>
                 safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
                   .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 

@@ -3730,27 +3730,15 @@ type Mutation {
   createProgramNote(input: CreateProgramNoteInput!): CreateProgramNoteResult!
 
   """
-  Requests a new Target-of-Opportunity trigger for an observation.  Allowed for
-  anyone who can read the program.
-  """
-  requestTooTrigger(input: RequestTooTriggerInput!): RequestTooTriggerResult!
+  Declines a REQUESTED Target-of-Opportunity trigger (staff), recording that it
+  was seen and passed over.  This also clears the observation's READY state, so
+  the observation returns to DEFINED.
 
+  There is no corresponding mutation to request or withdraw a trigger: a trigger
+  is requested by setting a Target-of-Opportunity observation to READY via
+  `setObservationWorkflowState`, and withdrawn by clearing that state.
   """
-  Withdraws a Target-of-Opportunity trigger.  Allowed for anyone who can write
-  to the program, while REQUESTED, or while ACCEPTED and the observation is not
-  yet ongoing.
-  """
-  withdrawTooTrigger(input: WithdrawTooTriggerInput!): WithdrawTooTriggerResult!
-
-  """
-  Accepts a REQUESTED Target-of-Opportunity trigger (staff).
-  """
-  acceptTooTrigger(input: AcceptTooTriggerInput!): AcceptTooTriggerResult!
-
-  """
-  Denies a REQUESTED Target-of-Opportunity trigger (staff).
-  """
-  denyTooTrigger(input: DenyTooTriggerInput!): DenyTooTriggerResult!
+  declineTooTrigger(input: DeclineTooTriggerInput!): DeclineTooTriggerResult!
 
   """
   Creates a new proposal according to the provided properties
@@ -4240,11 +4228,26 @@ timing constraints.
 input SchedulingConstraintsInput {
 
   """
-  Controls how the Scheduler may treat this observation once it is running or
-  planned.  Defaults to `UNCONSTRAINED`.  This field is mutually exclusive with
-  the deprecated `isSplittable`; supplying both is an error.
+  Whether this observation is a Target of Opportunity, and how disruptive its
+  execution may be.  Defaults to `NONE` (not a ToO).  May not exceed the
+  ceiling established by the program's accepted proposal; an observation that
+  exceeds it is flagged and cannot become ready to execute.  `RAPID` and
+  `INTERRUPTING` additionally raise `defaultExecutionRequirement` to
+  `UNINTERRUPTIBLE`.
   """
-  executionRequirement: ExecutionRequirement
+  tooActivation: TooActivation
+
+  """
+  Controls how the Scheduler may treat this observation once it is running or
+  planned.  The explicitExecutionRequirement field may be unset by assigning a
+  null value, or ignored by skipping it altogether, in which case
+  `defaultExecutionRequirement` applies — which depends on `tooActivation`, and
+  is `UNINTERRUPTIBLE` rather than `UNCONSTRAINED` for a `RAPID` or
+  `INTERRUPTING` observation.  Note also that the default acts as a floor: an
+  explicit value more permissive than it has no effect.  This field is mutually
+  exclusive with the deprecated `isSplittable`; supplying both is an error.
+  """
+  explicitExecutionRequirement: ExecutionRequirement
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -4252,7 +4255,7 @@ input SchedulingConstraintsInput {
   (i.e. "atoms") scheduled in order across separate visits. When false, the
   entire science sequence must complete within a single uninterrupted visit.
   """
-  isSplittable: Boolean @deprecated(reason: "Use `executionRequirement` instead (`true` maps to `UNCONSTRAINED`, `false` to `NO_SPLITTING`). (Deprecated July 31, 2026)")
+  isSplittable: Boolean @deprecated(reason: "Use `explicitExecutionRequirement` instead (`true` maps to `UNCONSTRAINED`, `false` to `NO_SPLITTING`). (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.
@@ -4273,10 +4276,34 @@ timing constraints.
 type SchedulingConstraints {
 
   """
-  Controls how the Scheduler may treat this observation once it is running or
-  planned.
+  Whether this observation is a Target of Opportunity, and how disruptive its
+  execution may be.
+  """
+  tooActivation: TooActivation!
+
+  """
+  The execution requirement the Scheduler honors: the more restrictive of
+  `explicitExecutionRequirement` and `defaultExecutionRequirement`.  Note this
+  is not simply the explicit value falling back to the default — the default is
+  a floor, so an explicit value may tighten the requirement but never loosen it
+  below what the Target of Opportunity activation demands.
   """
   executionRequirement: ExecutionRequirement!
+
+  """
+  The execution requirement that applies when none is explicitly specified, and
+  the floor beneath the effective value.  `UNINTERRUPTIBLE` when `tooActivation`
+  is `RAPID` or `INTERRUPTING` — interrupting such an observation would defeat
+  the purpose of triggering it — and `UNCONSTRAINED` otherwise.
+  """
+  defaultExecutionRequirement: ExecutionRequirement!
+
+  """
+  The execution requirement explicitly requested for this observation, if any.
+  `executionRequirement` may still be more restrictive than this value, when
+  `defaultExecutionRequirement` is higher.
+  """
+  explicitExecutionRequirement: ExecutionRequirement
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -5013,10 +5040,31 @@ type DemoScience implements GeminiProposalType {
   scienceSubtype: ScienceSubtype!
 
   """
-  Whether (and how) the observations in this proposal are available for Target
-  of Opportunity triggering.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare: `explicitTooActivationCeiling` if set, otherwise
+  `defaultTooActivationCeiling`.  An observation exceeding it is flagged and
+  cannot become ready to execute.
   """
-  toOActivation: ToOActivation!
+  tooActivationCeiling: TooActivation!
+
+  """
+  The ceiling that applies when none is explicitly set: the most disruptive
+  activation among the program's own observations, capped by what this proposal
+  type permits.
+
+  Note this continues to track the observations after the proposal is accepted,
+  at which point it no longer has any effect -- acceptance freezes the ceiling
+  into `explicitTooActivationCeiling`, so that adding a more disruptive
+  observation can no longer raise the ceiling it is checked against.
+  """
+  defaultTooActivationCeiling: TooActivation!
+
+  """
+  The ceiling explicitly chosen for this proposal, if any: by the PI before
+  submission, or by staff during review.  Always set once the proposal has been
+  accepted, since acceptance freezes the effective ceiling into this field.
+  """
+  explicitTooActivationCeiling: TooActivation
 
   """
   Minimum percentage of observing time required to consider this proposal
@@ -5033,10 +5081,31 @@ type DirectorsTime implements GeminiProposalType {
   scienceSubtype: ScienceSubtype!
 
   """
-  Whether (and how) the observations in this proposal are available for Target
-  of Opportunity triggering.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare: `explicitTooActivationCeiling` if set, otherwise
+  `defaultTooActivationCeiling`.  An observation exceeding it is flagged and
+  cannot become ready to execute.
   """
-  toOActivation: ToOActivation!
+  tooActivationCeiling: TooActivation!
+
+  """
+  The ceiling that applies when none is explicitly set: the most disruptive
+  activation among the program's own observations, capped by what this proposal
+  type permits.
+
+  Note this continues to track the observations after the proposal is accepted,
+  at which point it no longer has any effect -- acceptance freezes the ceiling
+  into `explicitTooActivationCeiling`, so that adding a more disruptive
+  observation can no longer raise the ceiling it is checked against.
+  """
+  defaultTooActivationCeiling: TooActivation!
+
+  """
+  The ceiling explicitly chosen for this proposal, if any: by the PI before
+  submission, or by staff during review.  Always set once the proposal has been
+  accepted, since acceptance freezes the effective ceiling into this field.
+  """
+  explicitTooActivationCeiling: TooActivation
 
   """
   Minimum percentage of observing time required to consider this proposal
@@ -5053,10 +5122,31 @@ type FastTurnaround implements GeminiProposalType {
   scienceSubtype: ScienceSubtype!
 
   """
-  Whether (and how) the observations in this proposal are available for Target
-  of Opportunity triggering.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare: `explicitTooActivationCeiling` if set, otherwise
+  `defaultTooActivationCeiling`.  An observation exceeding it is flagged and
+  cannot become ready to execute.
   """
-  toOActivation: ToOActivation!
+  tooActivationCeiling: TooActivation!
+
+  """
+  The ceiling that applies when none is explicitly set: the most disruptive
+  activation among the program's own observations, capped by what this proposal
+  type permits.
+
+  Note this continues to track the observations after the proposal is accepted,
+  at which point it no longer has any effect -- acceptance freezes the ceiling
+  into `explicitTooActivationCeiling`, so that adding a more disruptive
+  observation can no longer raise the ceiling it is checked against.
+  """
+  defaultTooActivationCeiling: TooActivation!
+
+  """
+  The ceiling explicitly chosen for this proposal, if any: by the PI before
+  submission, or by staff during review.  Always set once the proposal has been
+  accepted, since acceptance freezes the effective ceiling into this field.
+  """
+  explicitTooActivationCeiling: TooActivation
 
   """
   Minimum percentage of observing time required to consider this proposal
@@ -5084,10 +5174,31 @@ type LargeProgram implements GeminiProposalType {
   scienceSubtype: ScienceSubtype!
 
   """
-  Whether (and how) the observations in this proposal are available for Target
-  of Opportunity triggering.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare: `explicitTooActivationCeiling` if set, otherwise
+  `defaultTooActivationCeiling`.  An observation exceeding it is flagged and
+  cannot become ready to execute.
   """
-  toOActivation: ToOActivation!
+  tooActivationCeiling: TooActivation!
+
+  """
+  The ceiling that applies when none is explicitly set: the most disruptive
+  activation among the program's own observations, capped by what this proposal
+  type permits.
+
+  Note this continues to track the observations after the proposal is accepted,
+  at which point it no longer has any effect -- acceptance freezes the ceiling
+  into `explicitTooActivationCeiling`, so that adding a more disruptive
+  observation can no longer raise the ceiling it is checked against.
+  """
+  defaultTooActivationCeiling: TooActivation!
+
+  """
+  The ceiling explicitly chosen for this proposal, if any: by the PI before
+  submission, or by staff during review.  Always set once the proposal has been
+  accepted, since acceptance freezes the effective ceiling into this field.
+  """
+  explicitTooActivationCeiling: TooActivation
 
   """
   Minimum percentage of observing time (first semester) required to consider this
@@ -5133,10 +5244,31 @@ type Queue implements GeminiProposalType {
   scienceSubtype: ScienceSubtype!
 
   """
-  Whether (and how) the observations in this proposal are available for Target
-  of Opportunity triggering.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare: `explicitTooActivationCeiling` if set, otherwise
+  `defaultTooActivationCeiling`.  An observation exceeding it is flagged and
+  cannot become ready to execute.
   """
-  toOActivation: ToOActivation!
+  tooActivationCeiling: TooActivation!
+
+  """
+  The ceiling that applies when none is explicitly set: the most disruptive
+  activation among the program's own observations, capped by what this proposal
+  type permits.
+
+  Note this continues to track the observations after the proposal is accepted,
+  at which point it no longer has any effect -- acceptance freezes the ceiling
+  into `explicitTooActivationCeiling`, so that adding a more disruptive
+  observation can no longer raise the ceiling it is checked against.
+  """
+  defaultTooActivationCeiling: TooActivation!
+
+  """
+  The ceiling explicitly chosen for this proposal, if any: by the PI before
+  submission, or by staff during review.  Always set once the proposal has been
+  accepted, since acceptance freezes the effective ceiling into this field.
+  """
+  explicitTooActivationCeiling: TooActivation
 
   """
   Minimum percentage of observing time required to consider this proposal
@@ -5188,10 +5320,31 @@ type SystemVerification implements GeminiProposalType {
   scienceSubtype: ScienceSubtype!
 
   """
-  Whether (and how) the observations in this proposal are available for Target
-  of Opportunity triggering.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare: `explicitTooActivationCeiling` if set, otherwise
+  `defaultTooActivationCeiling`.  An observation exceeding it is flagged and
+  cannot become ready to execute.
   """
-  toOActivation: ToOActivation!
+  tooActivationCeiling: TooActivation!
+
+  """
+  The ceiling that applies when none is explicitly set: the most disruptive
+  activation among the program's own observations, capped by what this proposal
+  type permits.
+
+  Note this continues to track the observations after the proposal is accepted,
+  at which point it no longer has any effect -- acceptance freezes the ceiling
+  into `explicitTooActivationCeiling`, so that adding a more disruptive
+  observation can no longer raise the ceiling it is checked against.
+  """
+  defaultTooActivationCeiling: TooActivation!
+
+  """
+  The ceiling explicitly chosen for this proposal, if any: by the PI before
+  submission, or by staff during review.  Always set once the proposal has been
+  accepted, since acceptance freezes the effective ceiling into this field.
+  """
+  explicitTooActivationCeiling: TooActivation
 
   """
   Minimum percentage of observing time required to consider this proposal
@@ -5298,10 +5451,13 @@ input ClassicalInput {
 
 input DemoScienceInput {
   """
-  The toOActivation field is optional. If not specified when creating a
-  proposal, it defaults to `NONE'.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare.  Optional: when unspecified the ceiling is derived from
+  the program's own observations (the most disruptive among them, capped by what
+  this proposal type permits).  May be unset by assigning a null value, which
+  returns it to that derived ceiling.
   """
-  toOActivation: ToOActivation
+  explicitTooActivationCeiling: TooActivation
 
   """
   The minimum percentage of time required to consider this proposal a success.
@@ -5312,10 +5468,13 @@ input DemoScienceInput {
 
 input DirectorsTimeInput {
   """
-  The toOActivation field is optional. If not specified when creating a
-  proposal, it defaults to `NONE'.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare.  Optional: when unspecified the ceiling is derived from
+  the program's own observations (the most disruptive among them, capped by what
+  this proposal type permits).  May be unset by assigning a null value, which
+  returns it to that derived ceiling.
   """
-  toOActivation: ToOActivation
+  explicitTooActivationCeiling: TooActivation
 
   """
   The minimum percentage of time required to consider this proposal a success.
@@ -5326,10 +5485,13 @@ input DirectorsTimeInput {
 
 input FastTurnaroundInput {
   """
-  The toOActivation field is optional. If not specified when creating a
-  proposal, it defaults to `NONE'.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare.  Optional: when unspecified the ceiling is derived from
+  the program's own observations (the most disruptive among them, capped by what
+  this proposal type permits).  May be unset by assigning a null value, which
+  returns it to that derived ceiling.
   """
-  toOActivation: ToOActivation
+  explicitTooActivationCeiling: TooActivation
 
   """
   The minimum percentage of time required to consider this proposal a success.
@@ -5352,10 +5514,13 @@ input FastTurnaroundInput {
 
 input LargeProgramInput {
   """
-  The toOActivation field is optional. If not specified when creating a
-  proposal, it defaults to `NONE'.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare.  Optional: when unspecified the ceiling is derived from
+  the program's own observations (the most disruptive among them, capped by what
+  this proposal type permits).  May be unset by assigning a null value, which
+  returns it to that derived ceiling.
   """
-  toOActivation: ToOActivation
+  explicitTooActivationCeiling: TooActivation
 
   """
   The minimum percentage of time required (first semester) to consider this
@@ -5425,10 +5590,13 @@ input PoorWeatherInput {
 
 input QueueInput {
   """
-  The toOActivation field is optional. If not specified when creating a
-  proposal, it defaults to `NONE'.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare.  Optional: when unspecified the ceiling is derived from
+  the program's own observations (the most disruptive among them, capped by what
+  this proposal type permits).  May be unset by assigning a null value, which
+  returns it to that derived ceiling.
   """
-  toOActivation: ToOActivation
+  explicitTooActivationCeiling: TooActivation
 
   """
   The minimum percentage of time required to consider this proposal a success.
@@ -5470,10 +5638,13 @@ input QueueInput {
 
 input SystemVerificationInput {
   """
-  The toOActivation field is optional. If not specified when creating a
-  proposal, it defaults to `NONE'.
+  The most disruptive Target of Opportunity activation any observation in this
+  program may declare.  Optional: when unspecified the ceiling is derived from
+  the program's own observations (the most disruptive among them, capped by what
+  this proposal type permits).  May be unset by assigning a null value, which
+  returns it to that derived ceiling.
   """
-  toOActivation: ToOActivation
+  explicitTooActivationCeiling: TooActivation
 
   """
   The minimum percentage of time required to consider this proposal a success.
@@ -7596,6 +7767,13 @@ type Attachment {
   id: AttachmentId!
   attachmentType: AttachmentType!
   fileName: NonEmptyString!
+
+  """
+  The identifier of the physical mask plate this attachment describes, derived
+  from the attachment itself and not settable.  Null when the attachment is not
+  a MOS_MASK, always present when it is.
+  """
+  maskName: NonEmptyString
   description: NonEmptyString
   checked: Boolean!
   fileSize: Long!
@@ -11154,11 +11332,48 @@ type GnirsSpectroscopyAcquisition {
 }
 
 """
+A GNIRS spectroscopy science configuration: a central wavelength together with
+the exposure time mode and coadds that apply at that wavelength.
+"""
+type GnirsCentralWavelengthConfig {
+
+  centralWavelength: Wavelength!
+
+  """
+  Exposure time mode for this central wavelength.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  coadds: PosInt!
+
+}
+
+"""
+Defines a GNIRS spectroscopy central wavelength to use along with its exposure
+time mode and coadds.
+"""
+input GnirsCentralWavelengthConfigInput {
+
+  centralWavelength: WavelengthInput!
+
+  """
+  Exposure time mode for this central wavelength.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  Coadds for this central wavelength.  Defaults to 1 when not specified.
+  """
+  coadds: PosInt
+
+}
+
+"""
 GNIRS Spectroscopy mode (long slit or IFU, distinguished by the FPU).
 """
 type GnirsSpectroscopy {
-
-  exposureTimeMode: ExposureTimeMode!
 
   grating: GnirsGrating!
   explicitGrating: GnirsGrating
@@ -11168,8 +11383,18 @@ type GnirsSpectroscopy {
   explicitPrism: GnirsPrism
   initialPrism: GnirsPrism!
 
-  centralWavelength: Wavelength!
-  initialCentralWavelength: Wavelength!
+  """
+  The central wavelengths at which spectra are taken, in increasing wavelength
+  order.  Each one is a separate configuration with its own exposure time mode,
+  coadds, ITC calculation and calibrations.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  """
+  The central wavelengths as they were configured when the observing mode was
+  created.
+  """
+  initialCentralWavelengths: [GnirsCentralWavelengthConfig!]!
 
   camera: GnirsCamera!
   initialCamera: GnirsCamera!
@@ -11188,8 +11413,6 @@ type GnirsSpectroscopy {
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
-
-  coadds: PosInt!
 
   decker: GnirsDecker!
   explicitDecker: GnirsDecker
@@ -11304,9 +11527,12 @@ Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
 """
 input GnirsSpectroscopyInput {
 
-  exposureTimeMode: ExposureTimeModeInput
-
-  coadds: PosInt
+  """
+  The central wavelengths at which spectra are taken.  Required on create, and
+  must contain at least one entry with no duplicated wavelength.  When given on
+  edit, it replaces the existing list wholesale.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfigInput!]
 
   filter: GnirsFilter
 
@@ -11321,8 +11547,6 @@ input GnirsSpectroscopyInput {
   grating: GnirsGrating
 
   prism: GnirsPrism
-
-  centralWavelength: WavelengthInput
 
   explicitDecker: GnirsDecker
 
@@ -14331,6 +14555,15 @@ type ItcGnirsImagingResultSet {
 }
 
 """
+Combines a GNIRS spectroscopy central wavelength with an `ItcResultSet`. In
+other words, ITC results for all targets but a single central wavelength.
+"""
+type ItcGnirsSpectroscopyResultSet {
+  centralWavelength: Wavelength!
+  results:           ItcResultSet!
+}
+
+"""
 ITC results for a particular observation, including relevant instrument
 configurations and targets.  There are specific instances for each `ItcType`.
 """
@@ -14383,6 +14616,16 @@ GNIRS imaging ITC results.  Here each filter is paired with its result set.
 type ItcGnirsImaging implements Itc {
   itcType: ItcType!
   gnirsImagingScience: [ItcGnirsImagingResultSet!]!
+}
+
+"""
+GNIRS spectroscopy ITC results.  Each central wavelength is a separate
+configuration and is paired with its own result set.
+"""
+type ItcGnirsSpectroscopy implements Itc {
+  itcType: ItcType!
+  acquisition: ItcResultSet!
+  gnirsSpectroscopyScience: [ItcGnirsSpectroscopyResultSet!]!
 }
 
 """
@@ -15136,14 +15379,16 @@ enum ConfigurationRequestStatus {
 scalar TooTriggerId
 
 """
-Lifecycle status of a Target-of-Opportunity trigger.  REQUESTED is the only
-non-terminal state; ACCEPTED, DENIED and WITHDRAWN are all terminal.  A re-attempt
-is a new trigger, never a transition out of a terminal state.
+Lifecycle status of a Target-of-Opportunity trigger.  A trigger is REQUESTED
+while its observation carries the READY workflow state, and WITHDRAWN when that
+state is cleared; DECLINED records that an observer saw it and chose not to
+observe.  Both terminal statuses are equivalent to never having been triggered:
+setting the observation READY again produces a new trigger, never a transition
+out of a terminal state.
 """
 enum TooTriggerStatus {
   REQUESTED
-  ACCEPTED
-  DENIED
+  DECLINED
   WITHDRAWN
 }
 
@@ -15217,52 +15462,16 @@ type TooTrigger {
   updatedAt: Timestamp!
 }
 
-input RequestTooTriggerInput {
-  "The observation to request a trigger for.  Provide this or `observationReference`."
-  observationId: ObservationId
-
-  "A reference to the observation to request a trigger for.  Provide this or `observationId`."
-  observationReference: ObservationReference
-}
-
-type RequestTooTriggerResult {
-  "The requested trigger."
+type DeclineTooTriggerResult {
+  "The declined trigger."
   tooTrigger: TooTrigger!
 }
 
-type WithdrawTooTriggerResult {
-  "The withdrawn trigger."
-  tooTrigger: TooTrigger!
-}
-
-type AcceptTooTriggerResult {
-  "The accepted trigger."
-  tooTrigger: TooTrigger!
-}
-
-type DenyTooTriggerResult {
-  "The denied trigger."
-  tooTrigger: TooTrigger!
-}
-
-input WithdrawTooTriggerInput {
-  "The trigger to withdraw."
+input DeclineTooTriggerInput {
+  "The trigger to decline."
   tooTriggerId: TooTriggerId!
 
-  "Optional reason recorded with the withdrawal."
-  reason: NonEmptyString
-}
-
-input AcceptTooTriggerInput {
-  "The trigger to accept."
-  tooTriggerId: TooTriggerId!
-}
-
-input DenyTooTriggerInput {
-  "The trigger to deny."
-  tooTriggerId: TooTriggerId!
-
-  "Optional reason recorded with the denial."
+  "Optional reason recorded with the decision."
   reason: NonEmptyString
 }
 
@@ -15573,6 +15782,12 @@ enum ObservationValidationCode {
   CONFIG_REQUEST_NOT_REQUESTED
   CONFIG_REQUEST_DENIED
   CONFIG_REQUEST_PENDING
+
+  """
+  The observation's `tooActivation` exceeds the ceiling established by the
+  program's accepted proposal.
+  """
+  TOO_ACTIVATION_UNAPPROVED
 }
 
 """
@@ -15758,6 +15973,12 @@ type Program {
   Cfp active period.
   """
   active: DateInterval!
+
+  """
+  Whether the program is currently active, i.e. whether the current UTC date
+  falls within the `active` period (inclusive of both bounds).
+  """
+  isActive: Boolean!
 
   """
   Proposal status of the program
@@ -19234,21 +19455,26 @@ enum ConsiderForBand3 {
 """
 ToO Activation
 """
-enum ToOActivation {
+enum TooActivation {
   """
-  ToOActivation None
+  Not a Target of Opportunity.
   """
   NONE
 
   """
-  ToOActivation Standard
+  Observed whenever convenient, like any other observation.
   """
   STANDARD
 
   """
-  ToOActivation Rapid
+  Observed as soon as possible, but does not displace ongoing work.
   """
   RAPID
+
+  """
+  Observed as soon as possible, displacing ongoing work where permitted.
+  """
+  INTERRUPTING
 }
 
 input UnlinkUserInput {
@@ -19662,6 +19888,11 @@ input WhereAttachment {
   Matches the attachment file name.
   """
   fileName: WhereString
+
+  """
+  Matches the mask name, which is null for attachments that are not MOS masks.
+  """
+  maskName: WhereOptionString
 
   """
   Matches the description.
@@ -20259,26 +20490,26 @@ Filters on equality (or not) of the property value and the supplied criteria.
 All supplied criteria must match, but usually only one is selected.  E.g.
 'EQ = "Foo"' will match when the property value is "FOO".
 """
-input WhereEqToOActivation {
+input WhereEqTooActivation {
   """
   Matches if the property is exactly the supplied value.
   """
-  EQ: ToOActivation
+  EQ: TooActivation
 
   """
   Matches if the property is not the supplied value.
   """
-  NEQ: ToOActivation
+  NEQ: TooActivation
 
   """
   Matches if the property value is any of the supplied options.
   """
-  IN: [ToOActivation!]
+  IN: [TooActivation!]
 
   """
   Matches if the property value is none of the supplied values.
   """
-  NIN: [ToOActivation!]
+  NIN: [TooActivation!]
 }
 
 """
@@ -20513,6 +20744,27 @@ input WhereConfigurationRequest {
   Matches the last update time.
   """
   updatedAt: WhereOrderTimestamp
+
+  """
+  Matches the configuration's observing mode type, if any.
+  """
+  observingModeType: WhereOptionEqObservingModeType
+
+  """
+  Matches if the configuration's target reference coordinates lie within the
+  angular `distance` of `center` (exact great-circle). Resolved out of band.
+  """
+  targetCoordinates: WhereCone
+}
+
+"""
+A cone (angular-distance) match over a sky position.
+"""
+input WhereCone {
+  center: CoordinatesInput!
+
+  "Maximum angular separation between `center` and the target reference coords. Must be between 0° and 180°."
+  distance: AngleInput!
 }
 
 input WhereObservationReference {
@@ -22307,6 +22559,13 @@ input WhereProgram {
 
   "Matches the active period end."
   activeEnd: WhereOrderDate
+
+  """
+  When true, matches programs whose active period `[activeStart, activeEnd]` contains the
+  current UTC date; when false, matches the complement. Evaluated in the database, so the
+  date is taken at transaction start.
+  """
+  isActive: Boolean
 }
 
 input WhereProgramReference {
@@ -22487,7 +22746,7 @@ input WhereProposal {
   #  """
   #  Matches the Target of Opportunity setting.
   #  """
-  #  toOActivation: WhereEqToOActivation
+  #  tooActivation: WhereEqTooActivation
   #
   #  """
   #  Matches the proposal abstract.

@@ -3,69 +3,36 @@
 
 package lucuma.odb.service
 
-import cats.data.NonEmptyChain
-import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.implicits.*
 import grackle.Result
 import grackle.ResultT
-import lucuma.core.enums.Band
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.DeclaredExecutionState
-import lucuma.core.enums.DeclaredExecutionState.given
-import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExecutionState as CoreExecutionState
-import lucuma.core.enums.Instrument
-import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.ProgramType
-import lucuma.core.enums.ProposalStatus
-import lucuma.core.enums.ScienceBand
-import lucuma.core.enums.Site
-import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.VisitorObservingModeType
-import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 import lucuma.core.model.Access
-import lucuma.core.model.CallCoordinatesLimits
-import lucuma.core.model.CallForProposals
 import lucuma.core.model.Observation
-import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
-import lucuma.core.model.SiteCoordinatesLimits
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
-import lucuma.core.syntax.string.*
-import lucuma.core.util.DateInterval
-import lucuma.core.util.Timestamp
 import lucuma.odb.data.Itc
-import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl
-import lucuma.odb.sequence.data.GeneratorParams
-import lucuma.odb.sequence.data.ItcInputDerivation
-import lucuma.odb.sequence.data.MissingParamSet
-import lucuma.odb.service.GeneratorParamsService.Error as GenParamsError
-import lucuma.odb.service.ObservationWorkflowService.UserState
 import lucuma.odb.service.Services.SuperUserAccess
-import lucuma.odb.syntax.instrument.*
-import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.implicits.*
 
-import java.time.Instant
-
 import Services.Syntax.*
+import workflow.*
 
 sealed trait ObservationWorkflowService[F[_]] {
 
@@ -119,93 +86,6 @@ sealed trait ObservationWorkflowService[F[_]] {
 
 }
 
-/* Validation Info Record */
-case class ObservationValidationInfo(
-  pid:                    Program.Id,
-  tpe:                    ProgramType,
-  oid:                    Observation.Id,
-  observingMode:          Option[ObservingModeType],
-  coordinates:            Option[Coordinates],  // explicit base, or coordinates at CFP midpoint, if any
-  explicitBase:           Option[Coordinates],
-  calibrationRole:        Option[CalibrationRole],
-  userState:              Option[ObservationWorkflowService.UserState],
-  declaredExecutionState: Option[DeclaredExecutionState],
-  proposalStatus:         ProposalStatus,
-  cfpid:                  Option[CallForProposals.Id],
-  scienceBand:            Option[ScienceBand],
-  asterism:               List[Target],
-  associatedUserState:    Option[ObservationWorkflowService.UserState], // state of science obs if this is a per-observation calibration (telluric or daytime pinhole)
-  generatorParams:        Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
-  cfpInfo:                Option[CfpInfo] = None,
-  programAllocations:     Option[NonEmptyList[ScienceBand]] = None,
-  otherConfigErrors:      List[String] = Nil,
-  keckInstrument:         Option[KeckInstrument] = None,   // set for exchange_keck observations
-  subaruInstrument:       Option[SubaruInstrument] = None  // set for exchange_subaru observations
-) {
-
-  def isDeclaredComplete: Boolean =
-    declaredExecutionState === Some(CoreExecutionState.DeclaredComplete)
-
-  def instrument: Option[Instrument] =
-    observingMode.flatMap(_.instrumentOption)
-
-  def effectiveUserState: Option[UserState] =
-    // Per-observation calibrations (tellurics, daytime pinhole flats) inherit
-    // their science observation's user state.
-    // A telluric could be declined however, thus it can carrie its own Inactive state,
-    // which overrides that inheritance.
-    if calibrationRole.contains(CalibrationRole.Telluric) && userState.contains(ObservationWorkflowState.Inactive) then Some(ObservationWorkflowState.Inactive)
-    else if calibrationRole.exists(ObsExtract.PerObservationCalibrationRoles.contains) then associatedUserState
-    else userState
-
-  /* Has the proposal been accepted? */
-  def isAccepted:Boolean =
-    proposalStatus === ProposalStatus.Accepted
-
-  def site: Option[Site] =
-    instrument.map(_.site)
-
-  def isOpportunity: Boolean =
-    asterism.exists:
-      case t: Target.Opportunity => true
-      case _ => false
-
-  def isVisitor: Boolean =
-    observingMode.exists:
-      case _: VisitorObservingModeType => true
-      case _ => false
-
-  def isExchange: Boolean =
-    observingMode.exists(_.isExchange)
-
-  lazy val cfpMidpoint: Option[Timestamp] =
-    for
-      s  <- site
-      c  <- cfpInfo
-      ts <- Timestamp.fromInstant(c.midpoint(s))
-    yield ts
-
-}
-
-case class CfpInfo(
-  cfpid:             CallForProposals.Id,
-  observatory:       Observatory,
-  limits:            CallCoordinatesLimits,
-  active:            DateInterval,
-  instruments:       List[Instrument],        // Gemini instruments allowed by the call
-  keckInstruments:   List[KeckInstrument],    // Keck exchange instruments allowed by the call
-  subaruInstruments: List[SubaruInstrument]   // Subaru exchange instruments allowed by the call
-) {
-
-  def midpoint(at: Site): Instant =
-    at.midpoint(active)
-
-  def addInstrument(insts: Option[Instrument]): CfpInfo =
-    insts.fold(this)(inst => copy(instruments = inst :: instruments))
-
-}
-
-
 object ObservationWorkflowService {
 
   // Construct some finer-grained types to make it harder to do something dumb in the status computation.
@@ -213,26 +93,6 @@ object ObservationWorkflowService {
   type UserState       = Inactive.type  | Ready.type
   type ExecutionState  = Ongoing.type   | Completed.type
   type ValidationState = Undefined.type | Unapproved.type | Defined.type
-
-  /* Validation Messages */
-  object Messages {
-
-    val CoordinatesOutOfRange = "Base coordinates out of Call for Proposals limits."
-
-    def invalidInstrument(instr: Instrument): String =
-      s"Instrument $instr not part of Call for Proposals."
-
-    def invalidScienceBand(b: ScienceBand): String =
-      s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
-
-    def exchangeObservatoryMismatch(modeObs: Observatory, cfpObs: Observatory): String =
-      s"Exchange observation requires a $modeObs Call for Proposals, but the proposal's observatory is $cfpObs."
-
-    def invalidExchangeInstrument(instr: String): String =
-      s"Instrument $instr is not part of the Call for Proposals."
-
-    val MissingVMagnitude = "Please add a V magnitude."
-  }
 
   extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
     ws match
@@ -256,164 +116,9 @@ object ObservationWorkflowService {
       case ((ls, rs), (a, Left(b)))  => (ls + (a -> b), rs)
       case ((ls, rs), (a, Right(c))) => (ls, rs + (a -> c))
 
-  extension (mp: MissingParamSet)
-    def toObsValidation: ObservationValidation =
-      ObservationValidation.configuration(s"Missing ${mp.params.map(_.name).toList.intercalate(", ")}")
-
-  extension (ge: GeneratorParamsService.Error)
-    private def toObsValidation: ObservationValidation = ge match
-      case GenParamsError.MissingData(p) => p.toObsValidation
-      case _                             => ObservationValidation.configuration(ge.format)
-
   /* Construct an instance. */
   def instantiate[F[_]: Async](using Services[F]): ObservationWorkflowService[F] =
     new ObservationWorkflowService[F] {
-
-      private def lookupObsDefinitions(
-        oids: List[Observation.Id]
-      )(using Transaction[F]): F[Map[Observation.Id, ObservationValidationInfo]] = {
-
-        def partialObsInfos(oids: NonEmptyList[Observation.Id]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          val enc = observation_id.nel(oids)
-          session
-            .stream(Statements.ObservationValidationInfosWithoutAsterisms(enc))(oids, 1024)
-            .compile
-            .toList
-            .map: list =>
-              list
-                .fproductLeft(_.oid)
-                .toMap
-
-        def addAsterisms(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          Services.asSuperUser:
-            asterismService
-              .getAsterisms(input.keys.toList)
-              .map: results =>
-                input.map: (oid, info) =>
-                  oid -> info.copy(asterism = results.get(oid).foldMap(_.map(_._2)))
-
-        def addGeneratorParams(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          generatorParamsService
-            .selectMany(input.keys.toList)
-            .map: results =>
-              input.map: (oid, info) =>
-                oid -> info.copy(generatorParams = results.get(oid))
-
-        def addCfpInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          NonEmptyList.fromList(input.values.flatMap(_.cfpid).toList.distinct) match
-            case None => input.pure[F]
-            case Some(nel) =>
-              val enc = cfp_id.nel(nel)
-              session
-                .stream(Statements.CfpInfos(enc))(nel, 1024)
-                .compile
-                .fold(Map.empty[CallForProposals.Id, CfpInfo]):
-                  case (m, (cfp, oinst)) =>
-                    m.updatedWith(cfp.cfpid):
-                      case None    => cfp.addInstrument(oinst).some
-                      case Some(c) => c.addInstrument(oinst).some
-                .map: results =>
-                  input.map: (oid, info) =>
-                    oid -> info.copy(cfpInfo = info.cfpid.flatMap(results.get))
-
-        // Enriches exchange observations with their chosen Keck/Subaru instrument.
-        // Only exchange-mode observations are looked up, so non-exchange programs
-        // pay nothing here.
-        def addExchangeInfos(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          val exchangeOids =
-            input.collect:
-              case (oid, info) if info.observingMode.exists(_.isExchange) => oid
-            .toList
-          if exchangeOids.isEmpty then input.pure[F]
-          else
-            exchangeService.select(exchangeOids).map: configs =>
-              input.map: (oid, info) =>
-                configs.get(oid).fold(oid -> info): cfg =>
-                  oid -> info.copy(keckInstrument = cfg.keckInstrument, subaruInstrument = cfg.subaruInstrument)
-
-        def addProgramAllocations(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          NonEmptyList.fromList(input.values.map(_.pid).toList.distinct) match
-            case None => input.pure[F]
-            case Some(nel) =>
-              val enc = program_id.nel(nel)
-              session
-                .stream(Statements.ProgramAllocations(enc))(nel, 1024)
-                .compile
-                .toList
-                .map: list =>
-                  list.foldMap: (pid, band) =>
-                    Map(pid -> NonEmptyList.one(band))
-                .map: result =>
-                  input.map: (oid, info) =>
-                    oid -> info.copy(programAllocations = result.get(info.pid))
-
-        def addCoordinates(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          input
-            .values
-            .groupBy(_.cfpMidpoint)
-            .collect:
-              case (Some(k), v) => k -> v.toList.map(_.oid)
-            .toList // we now have a list of (Timestamp, List[oid]) batches
-            .foldLeftM(input): // fold over this list with `input` as the starting point, updating when we can find coordinates
-              case (accum, (when, batch)) =>
-                trackingService
-                  .getCoordinatesSnapshotOrRegion(batch, when, false)
-                  .map: batchResults =>
-                    batchResults
-                      .collect:
-                        case (oid, Result.Success(Left(snap))) => oid -> snap.base // we only care about results where coordinates are known
-                        case (oid, Result.Success(Right(_, Some(eb)))) => oid -> eb
-                      .foldLeft(accum):
-                        case (accum2, (oid, coords)) =>
-                          accum2.updatedWith(oid): op =>
-                            op.map(_.copy(coordinates = Some(coords)))
-
-        // Configuration errors that don't fit elsewhere.
-        def addOtherConfigErrors(input: Map[Observation.Id, ObservationValidationInfo]): F[Map[Observation.Id, ObservationValidationInfo]] =
-          import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
-
-          extension (e: CoreExecutionState)
-            def shouldCheck: Boolean =
-              e match
-                case CoreExecutionState.NotDefined |
-                     CoreExecutionState.NotStarted => true
-                case _                             => false
-
-          // Get a list of GHOST observations that need to be checked.
-          val ghostObsList: List[Observation.Id] =
-            input
-              .toList
-              .mapFilter: (oid, info) =>
-                info
-                  .generatorParams
-                  .flatMap(_.toOption)
-                  .flatMap: params =>
-                    params.observingMode match
-                      case GhostIfu(_, _, _, _, _, _, _, _) if params.executionState.shouldCheck => oid.some
-                      case _                                                                     => none
-
-          // Validate each one to ensure it has an IFU mapping.
-          ghostIfuService
-            .validationErrors(ghostObsList)
-            .map: errors =>
-              errors.toList.foldLeft(input) { case (m, (oid, msg)) =>
-                m.updatedWith(oid): info =>
-                  info.map(in => in.copy(otherConfigErrors = msg :: in.otherConfigErrors))
-              }
-
-        NonEmptyList.fromList(oids) match
-          case None      =>
-            Map.empty.pure
-          case Some(nel) =>
-            partialObsInfos(nel)
-              .flatMap(addAsterisms)
-              .flatMap(addGeneratorParams)
-              .flatMap(addCfpInfos)
-              .flatMap(addExchangeInfos)
-              .flatMap(addProgramAllocations)
-              .flatMap(addCoordinates)
-              .flatMap(addOtherConfigErrors)
-      }
 
       private def lookupCachedItcResults(
         input:      Map[Observation.Id, ObservationValidationInfo],
@@ -427,21 +132,6 @@ object ObservationWorkflowService {
                 case (id, Some(Right(params))) => id -> params
               .toMap
 
-
-      @annotation.nowarn("msg=unused implicit parameter")
-      private def validateConfigurations(infos: NonEmptyList[ObservationValidationInfo])(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-        ResultT(configurationService.selectRequests(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
-          rs.view
-            .map:
-              case ((_, oid), lst) =>
-                oid -> {
-                  val m = ObservationValidationMap.empty
-                  if lst.isEmpty then m.add(ObservationValidation.configurationRequestNotRequested)
-                  else if lst.exists(_.status === ConfigurationRequestStatus.Approved) then m
-                  else if lst.forall(_.status === ConfigurationRequestStatus.Denied) then m.add(ObservationValidation.configurationRequestDenied)
-                  else m.add(ObservationValidation.configurationRequestPending)
-                }
-            .toMap
 
       private def executionStates(
         infos: Map[Observation.Id, ObservationValidationInfo]
@@ -475,17 +165,19 @@ object ObservationWorkflowService {
             case ObservationValidationCode.ConfigurationRequestNotRequested => 5
             case ObservationValidationCode.ConfigurationRequestDenied => 6
             case ObservationValidationCode.ConfigurationRequestPending => 7
+            case ObservationValidationCode.TooActivationUnapproved => 8
 
         val validationStatus: ValidationState =
           if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined
           else codes.minOption.fold(Defined):
-            case ObservationValidationCode.CallForProposalsError            |
+            case ObservationValidationCode.CallForProposalsError             |
                   ObservationValidationCode.ConfigurationError               |
                   ObservationValidationCode.ItcError                         => Undefined
-            case ObservationValidationCode.ConfigurationRequestUnavailable  |
+            case ObservationValidationCode.ConfigurationRequestUnavailable   |
                   ObservationValidationCode.ConfigurationRequestNotRequested |
                   ObservationValidationCode.ConfigurationRequestDenied       |
-                  ObservationValidationCode.ConfigurationRequestPending      => Unapproved
+                  ObservationValidationCode.ConfigurationRequestPending      |
+                  ObservationValidationCode.TooActivationUnapproved          => Unapproved
 
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:
@@ -525,151 +217,12 @@ object ObservationWorkflowService {
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
               List(Inactive) ++
-                Option.when((!info.isExchange) && (!info.isOpportunity) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
+                Option.when((!info.isExchange) && (!info.hasTooTarget) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 
         (state, allowedTransitions)
-
-      private def validateObsDefinition(
-        infos:  Map[Observation.Id, ObservationValidationInfo],
-        itcFor: Observation.Id => Option[Itc]
-      )(using Transaction[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] = {
-
-        type Validator = ObservationValidationInfo => ObservationValidationMap
-
-        val (cals, other)         = infos.partition(_._2.calibrationRole.isDefined)
-        val (nonScience, science) = other.partition(!_._2.tpe.hasProposal)
-
-        // Here are our simple validators
-
-        val generatorValidator: Validator = info =>
-          if info.isVisitor || info.isExchange then ObservationValidationMap.empty
-          else info.generatorParams.foldMap:
-            case Left(error)                                                         => ObservationValidationMap.singleton(error.toObsValidation)
-            case Right(GeneratorParams(itcInput = ItcInputDerivation.Incomplete(m))) => ObservationValidationMap.singleton(m.toObsValidation)
-            case Right(ps)                                                           => ObservationValidationMap.empty
-
-        val cfpInstrumentValidator: Validator = info =>
-          info.cfpInfo.foldMap: cfp =>
-            if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
-            else info.instrument.foldMap: inst =>
-              if cfp.instruments.contains(inst) then ObservationValidationMap.empty
-              else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidInstrument(inst)))
-
-        // Exchange observations must match the proposal's observatory, and (when
-        // the call restricts instruments) use one of its allowed exchange instruments.
-        val exchangeValidator: Validator = info =>
-          info.observingMode match
-            case Some(e: ExchangeObservingModeType) =>
-              info.cfpInfo.foldMap: cfp =>
-                if cfp.observatory =!= e.observatory then
-                  ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.exchangeObservatoryMismatch(e.observatory, cfp.observatory)))
-                else e match
-                  case ExchangeObservingModeType.ExchangeKeck =>
-                    if cfp.keckInstruments.isEmpty then ObservationValidationMap.empty
-                    else info.keckInstrument.foldMap: inst =>
-                      if cfp.keckInstruments.contains(inst) then ObservationValidationMap.empty
-                      else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(inst.tag)))
-                  case ExchangeObservingModeType.ExchangeSubaru =>
-                    if cfp.subaruInstruments.isEmpty then ObservationValidationMap.empty
-                    else info.subaruInstrument.foldMap: inst =>
-                      if cfp.subaruInstruments.contains(inst) then ObservationValidationMap.empty
-                      else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.invalidExchangeInstrument(inst.tag)))
-            case _ => ObservationValidationMap.empty
-
-        val cfpRaDecValidator: Validator = info =>
-          info.cfpInfo.foldMap: cfp =>
-            info.site.foldMap: site =>
-              info.coordinates.foldMap: coords =>
-                val ok = cfp.limits.siteLimits(site).inLimits(coords)
-                if ok then ObservationValidationMap.empty
-                else ObservationValidationMap.singleton(ObservationValidation.callForProposals(Messages.CoordinatesOutOfRange))
-
-        val bandValidator: Validator = info =>
-          (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
-            if bs.toList.contains(b) then ObservationValidationMap.empty
-            else ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.invalidScienceBand(b)))
-
-        val itcValidator: Validator = info =>
-          if itcFor(info.oid).isDefined || info.isVisitor || info.isExchange then ObservationValidationMap.empty
-          else ObservationValidationMap.singleton(ObservationValidation.itc("ITC results are not present."))
-
-        // An acquisition-capable mode whose acquisition ITC could not be produced
-        // (a cached deterministic failure) carries an ItcError.  Pre-execution this
-        // maps to Undefined and blocks Ready; during execution the frozen snapshot
-        // is present and execution-state dominance keeps the observation Ongoing,
-        // so it is a non-blocking standing error there.
-        val acquisitionValidator: Validator = info =>
-          if info.isVisitor then ObservationValidationMap.empty
-          else itcFor(info.oid).foldMap:
-            _.acquisition match
-              case ItcAcquisition.Failed(msg) => ObservationValidationMap.singleton(ObservationValidation.itc(msg))
-              case _                          => ObservationValidationMap.empty
-
-        // V magnitudes are used by Observe to set the GHOST slit viewing
-        // camera exposure time, so every target in a GHOST observation needs one.
-        val ghostVMagnitudeValidator: Validator = info =>
-          if info.observingMode.contains(ObservingModeType.GhostIfu) && info.asterism.exists(!_.sourceProfile.hasBand(Band.V)) then
-            ObservationValidationMap.singleton(ObservationValidation.configuration(Messages.MissingVMagnitude))
-          else ObservationValidationMap.empty
-
-        val otherConfigErrors: Validator = info =>
-          NonEmptyChain.fromSeq(info.otherConfigErrors) match
-            case None       => ObservationValidationMap.empty
-            case Some(errs) => ObservationValidationMap.singleton(ObservationValidation(ObservationValidationCode.ConfigurationError, errs))
-
-        // Here are our composed validators
-
-        val calibrationValidator, engValidator: Validator = _ =>
-          ObservationValidationMap.empty
-
-        val scienceValidator1: Validator =
-          generatorValidator       |+|
-          cfpInstrumentValidator   |+|
-          exchangeValidator        |+|
-          cfpRaDecValidator        |+|
-          bandValidator            |+|
-          ghostVMagnitudeValidator |+|
-          otherConfigErrors
-
-        val scienceValidator2: Validator =
-          itcValidator |+| acquisitionValidator
-
-        // And our validation results
-
-        val engResults: Map[Observation.Id, ObservationValidationMap] =
-          nonScience.view.mapValues(engValidator).toMap
-
-        val calibrationResults: Map[Observation.Id, ObservationValidationMap] =
-          cals.view.mapValues(calibrationValidator).toMap
-
-        val scienceResults1: Map[Observation.Id, ObservationValidationMap] =
-          science.view.mapValues(scienceValidator1).toMap
-
-        val scienceResults2: Map[Observation.Id, ObservationValidationMap] =
-          science
-            .view
-            .filterKeys(k => scienceResults1.get(k).forall(_.isEmpty)) // ensure there are no warnigs in stage 1
-            .mapValues(scienceValidator2)
-            .toMap
-
-        val prelimV: Map[Observation.Id, ObservationValidationMap] =
-          calibrationResults |+| engResults |+| scienceResults1 |+| scienceResults2
-
-        val toCheck: List[ObservationValidationInfo] =
-          science.values.toList.filter: info =>
-            info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(_.isEmpty)
-
-        val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-          NonEmptyList
-            .fromList(toCheck)
-            .fold(ResultT.pure(Map.empty[Observation.Id, ObservationValidationMap]))(validateConfigurations)
-
-        configValidations.map(prelimV |+| _)
-
-      }
 
       private def computeWorkflows(
         infos: Map[Observation.Id, ObservationValidationInfo],
@@ -706,9 +259,9 @@ object ObservationWorkflowService {
           services.transactionally:
             (
               for
-                infos  <- ResultT.liftF(lookupObsDefinitions(oids))         // Map[Observation.Id, ObsDefinition]
+                infos  <- ResultT.liftF(ObservationValidationInfo.fetch(oids))         // Map[Observation.Id, ObsDefinition]
                 itcRes <- ResultT.liftF(lookupCachedItcResults(infos))      // Map[Observation.Id, ItcService.AsterismResults]
-                errs   <- validateObsDefinition(infos, itcRes.get)          // Map[Observation.Id, ObservationValidationMap]
+                errs   <- ObservationValidator.validate(infos, itcRes.get)          // Map[Observation.Id, ObservationValidationMap]
               yield (infos, errs, itcRes)
             ).value
 
@@ -738,8 +291,8 @@ object ObservationWorkflowService {
         exec0: Option[CoreExecutionState]
       )(using Transaction[F]): F[Result[ObservationWorkflow]] =
         (for
-          infos <- ResultT.liftF(lookupObsDefinitions(List(oid)))
-          errs  <- validateObsDefinition(infos, _ => itc)
+          infos <- ResultT.liftF(ObservationValidationInfo.fetch(List(oid)))
+          errs  <- ObservationValidator.validate(infos, _ => itc)
           exec = exec0.filter:
             case a: DeclaredExecutionState => true // always ok
             case _ => !infos.get(oid).exists(i => i.isVisitor || i.isExchange) // otherwise discard the state if it's a visitor or exchange
@@ -890,95 +443,6 @@ object ObservationWorkflowService {
   }
 
   object Statements {
-
-    def ObservationValidationInfosWithoutAsterisms[A <: NonEmptyList[Observation.Id]](enc: Encoder[A]): Query[A, ObservationValidationInfo] =
-      sql"""
-        SELECT
-          o.c_program_id,
-          p.c_program_type,
-          o.c_observation_id,
-          o.c_observing_mode_type,
-          o.c_explicit_ra,
-          o.c_explicit_dec,
-          o.c_calibration_role,
-          o.c_workflow_user_state,
-          o.c_declared_state,
-          p.c_proposal_status,
-          x.c_cfp_id,
-          o.c_science_band,
-          s.c_workflow_user_state
-        FROM t_observation o
-        JOIN t_program p on p.c_program_id = o.c_program_id
-        LEFT JOIN t_proposal x
-          ON o.c_program_id = x.c_program_id
-        LEFT JOIN t_observation s
-          ON  o.c_calibration_role = ANY(ARRAY['telluric','daytime_pinhole']::e_calibration_role[])
-          AND s.c_calibration_role IS NULL
-          AND o.c_group_id = s.c_group_id
-        WHERE o.c_observation_id IN ($enc)
-      """
-      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: cfp_id.opt *: science_band.opt *: user_state.opt)
-      .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, cfp, sci, Nil, state2)
-
-    def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
-      sql"""
-        SELECT DISTINCT
-          c_program_id,
-          c_science_band
-        FROM
-          t_allocation
-        WHERE
-          c_program_id IN ($enc)
-      """.query(program_id *: science_band)
-
-    def CfpInfos[A <: NonEmptyList[CallForProposals.Id]](enc: Encoder[A]): Query[A, (CfpInfo, Option[Instrument])] =
-      sql"""
-        SELECT
-          c.c_cfp_id,
-          c.c_observatory,
-          c.c_north_ra_start,
-          c.c_north_ra_end,
-          c.c_north_dec_start,
-          c.c_north_dec_end,
-          c.c_south_ra_start,
-          c.c_south_ra_end,
-          c.c_south_dec_start,
-          c.c_south_dec_end,
-          c.c_active_start,
-          c.c_active_end,
-          c.c_keck_instruments,
-          c.c_subaru_instruments,
-          i.c_instrument
-        FROM t_cfp c
-        LEFT JOIN t_gemini_cfp_instrument i
-        ON c.c_cfp_id = i.c_cfp_id
-        WHERE c.c_cfp_id in ($enc)
-      """.query(
-          cfp_id                 *:
-          observatory            *:
-          right_ascension        *: // north limits
-          right_ascension        *: // north limits
-          declination            *: // north limits
-          declination            *: // north liits
-          right_ascension.opt    *: // south limits
-          right_ascension.opt    *: // south limits
-          declination.opt        *: // south limits
-          declination.opt        *: // south limits
-          date_interval          *: // active period
-          _keck_instrument.opt   *:
-          _subaru_instrument.opt *:
-          instrument.opt
-        ).map:
-          // The south coordinate limits are null for exchange (keck/subaru) calls,
-          // which use only the northern limits.  Exchange observations have no site
-          // and so never exercise the coordinate-limit validation; we fall back to
-          // the north limits to keep CallCoordinatesLimits total.
-          case (id, obs, n_ra_s, n_ra_e, n_dec_s, n_dec_e, s_ra_s, s_ra_e, s_dec_s, s_dec_e, active, keck, subaru, oinst) =>
-            val north = SiteCoordinatesLimits(n_ra_s, n_ra_e, n_dec_s, n_dec_e)
-            val south = (s_ra_s, s_ra_e, s_dec_s, s_dec_e).mapN(SiteCoordinatesLimits.apply).getOrElse(north)
-            (CfpInfo(id, obs, CallCoordinatesLimits(north, south), active, Nil, keck.orEmpty, subaru.orEmpty), oinst)
 
     val UpdateUserState: Command[(Option[UserState], Observation.Id)] =
       sql"""

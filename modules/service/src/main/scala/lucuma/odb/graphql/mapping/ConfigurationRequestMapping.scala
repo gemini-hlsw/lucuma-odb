@@ -16,6 +16,7 @@ import grackle.ResultT
 import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
 import lucuma.core.model.ConfigurationRequest
+import lucuma.odb.data.Cone
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.service.Services
@@ -39,6 +40,12 @@ trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with
       EffectField("applicableObservations", applicableObservationsHandler, List("id"))
     )
 
+  /** Selects the ids of configuration requests whose target reference coordinates
+   *  lie within `cone` (exact great-circle). Used by the `targetCoordinates` cone
+   *  WHERE rewrite. */
+  def coneCandidates(cone: Cone): F[Result[List[ConfigurationRequest.Id]]] =
+    services.use(_.configurationService.coneCandidates(cone))
+
   val applicableObservationsHandler: EffectHandler[F] = pairs =>
 
     val sequence: ResultT[F, List[(ConfigurationRequest.Id, Cursor, Context)]] =
@@ -59,4 +66,3 @@ trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with
       query(using(s)).value
 
 }
-

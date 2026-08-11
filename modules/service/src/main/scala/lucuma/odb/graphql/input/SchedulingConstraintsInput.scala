@@ -6,37 +6,49 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.ExecutionRequirement
+import lucuma.core.enums.TooActivation
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 case class SchedulingConstraintsInput(
-  executionRequirement: Option[ExecutionRequirement],
-  timingWindows:        Nullable[List[TimingWindowInput]]
-)
+  tooActivation:                Option[TooActivation],
+  explicitExecutionRequirement: Nullable[ExecutionRequirement],
+  timingWindows:                Nullable[List[TimingWindowInput]]
+):
+
+  /**
+   * Would applying this edit leave the observation unsplittable?  True when the
+   * explicit requirement is set to something that forbids splitting, and also
+   * when the activation is raised high enough that its default forbids it.
+   */
+  def makesUnsplittable: Boolean =
+    explicitExecutionRequirement.toOption.exists(!_.isSplittable) ||
+    tooActivation.exists(!_.executionRequirementDefault.isSplittable)
 
 object SchedulingConstraintsInput:
 
-  // Resolves the (mutually exclusive) `executionRequirement` and deprecated
-  // `isSplittable` inputs into a single optional `ExecutionRequirement`.  `None`
-  // means "leave the requirement untouched"; the deprecated `isSplittable` maps
-  // `true -> Unconstrained` and `false -> NoSplitting` (`Uninterruptible` is not
-  // reachable through it).
+  // Resolves the (mutually exclusive) `explicitExecutionRequirement` and
+  // deprecated `isSplittable` inputs into a single nullable requirement.  The
+  // deprecated flag maps `true -> Unconstrained` and `false -> NoSplitting`
+  // (`Uninterruptible` is not reachable through it).
+  //
+  // The field order below must match the schema's declaration order: Grackle
+  // matches `case List(...)` positionally, not by the names in the pattern.
   val Binding: Matcher[SchedulingConstraintsInput] =
     ObjectFieldsBinding.rmap:
       case List(
-        ExecutionRequirementBinding.Option("executionRequirement", rReq),
+        TooActivationBinding.Option("tooActivation", rToo),
+        ExecutionRequirementBinding.Nullable("explicitExecutionRequirement", rReq),
         BooleanBinding.Option("isSplittable", rSplit),
         TimingWindowInput.Binding.List.Nullable("timingWindows", rTiming)
       ) =>
-        (rReq, rSplit, rTiming).parMapN: (req, split, timing) =>
-          (req, split) match
+        (rToo, rReq, rSplit, rTiming).parMapN: (too, req, split, timing) =>
+          (req.toOption, split) match
             case (Some(_), Some(_)) =>
-              Result.failure("Only one of `executionRequirement` and the deprecated `isSplittable` may be specified.")
-            case (Some(r), None)    =>
-              Result(SchedulingConstraintsInput(r.some, timing))
-            case (None, Some(s))    =>
+              Result.failure("Only one of `explicitExecutionRequirement` and the deprecated `isSplittable` may be specified.")
+            case (_, Some(s))       =>
               val r = if s then ExecutionRequirement.Unconstrained else ExecutionRequirement.NoSplitting
-              Result(SchedulingConstraintsInput(r.some, timing))
-            case (None, None)       =>
-              Result(SchedulingConstraintsInput(none, timing))
+              Result(SchedulingConstraintsInput(too, Nullable.NonNull(r), timing))
+            case (_, None)          =>
+              Result(SchedulingConstraintsInput(too, req, timing))
         .flatten

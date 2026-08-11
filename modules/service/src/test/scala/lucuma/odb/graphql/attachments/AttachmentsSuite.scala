@@ -22,7 +22,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 abstract class AttachmentsSuite extends OdbSuiteWithS3 {
-  
+
   // this logger is turned off to silence some errors (see logback.xml)
   override implicit val log: Logger[IO] =
     Slf4jLogger.getLoggerFromName("lucuma-odb-test-attachments")
@@ -49,7 +49,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
           aid <- resp.getBody.map(s => Attachment.Id.parse(s).get)
         } yield aid
       }
-    
+
     def toNonEmptyString: IO[NonEmptyString] =
       response.use { resp =>
         for {
@@ -70,7 +70,8 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     attachmentType: String,
     description:    Option[String],
     content:        String,
-    checked:        Boolean = false
+    checked:        Boolean = false,
+    maskName:       Option[String] = None
   ) {
     val upperType: String = attachmentType.toUpperCase
   }
@@ -97,7 +98,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
         client.run(request)
       }
-  
+
   def updateAttachment(
     user:         User,
     attachmentId: Attachment.Id,
@@ -188,6 +189,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
             "id"             -> tid.asJson,
             "attachmentType" -> ta.attachmentType.toUpperCase.asJson,
             "fileName"       -> ta.fileName.asJson,
+            "maskName"       -> ta.maskName.asJson,
             "description"    -> ta.description.asJson,
             "checked"        -> ta.checked.asJson,
             "fileSize"       -> ta.content.length.asJson
@@ -201,6 +203,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
        |  id
        |  attachmentType
        |  fileName
+       |  maskName
        |  description
        |  checked
        |  fileSize

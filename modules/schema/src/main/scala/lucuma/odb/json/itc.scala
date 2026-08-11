@@ -94,8 +94,9 @@ trait ItcCodec:
       // Emitted only when set (only GNIRS pins an acquisition type).
       ).deepMerge(a.gnirsAcqType.fold(Json.obj())(t => Json.obj("gnirsAcqType" -> t.asJson)))
 
-  private def imagingScienceNemDecoder[A: Decoder: Order](
-    fieldName: String
+  private def keyedScienceNemDecoder[A: Decoder: Order](
+    fieldName: String,
+    keyName:   String = "filter"
   ): Decoder[NonEmptyMap[A, Zipper[ItcResult]]] =
     Decoder.instance: c =>
       c.downField(fieldName)
@@ -106,9 +107,9 @@ trait ItcCodec:
          val res = nel.traverse: json =>
            val c = json.hcursor
            for
-             filter  <- c.downField("filter").as[A]
+             key     <- c.downField(keyName).as[A]
              results <- c.downField("results").as[Zipper[ItcResult]]
-           yield filter -> results
+           yield key -> results
          res.map(_.toNem)
 
   given Decoder[ItcScience.GhostIfu] =
@@ -119,29 +120,33 @@ trait ItcCodec:
       yield ItcScience.GhostIfu(red, blue)
 
   given Decoder[ItcScience.Flamingos2Imaging] =
-    imagingScienceNemDecoder[Flamingos2Filter]("flamingos2ImagingScience").map(ItcScience.Flamingos2Imaging.apply)
+    keyedScienceNemDecoder[Flamingos2Filter]("flamingos2ImagingScience").map(ItcScience.Flamingos2Imaging.apply)
 
   given Decoder[ItcScience.GmosNorthImaging] =
-    imagingScienceNemDecoder[GmosNorthFilter]("gmosNorthImagingScience").map(ItcScience.GmosNorthImaging.apply)
+    keyedScienceNemDecoder[GmosNorthFilter]("gmosNorthImagingScience").map(ItcScience.GmosNorthImaging.apply)
 
   given Decoder[ItcScience.GmosSouthImaging] =
-    imagingScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(ItcScience.GmosSouthImaging.apply)
+    keyedScienceNemDecoder[GmosSouthFilter]("gmosSouthImagingScience").map(ItcScience.GmosSouthImaging.apply)
 
   given Decoder[ItcScience.GnirsImaging] =
-    imagingScienceNemDecoder[GnirsFilter]("gnirsImagingScience").map(ItcScience.GnirsImaging.apply)
+    keyedScienceNemDecoder[GnirsFilter]("gnirsImagingScience").map(ItcScience.GnirsImaging.apply)
+
+  given (using Decoder[Wavelength]): Decoder[ItcScience.GnirsSpectroscopy] =
+    keyedScienceNemDecoder[Wavelength]("gnirsSpectroscopyScience", "centralWavelength")
+      .map(ItcScience.GnirsSpectroscopy.apply)
 
   given Decoder[ItcScience.Spectroscopy] =
     Decoder.instance:
       _.downField("spectroscopyScience").as[Zipper[ItcResult]].map(ItcScience.Spectroscopy.apply)
 
-  private def imagingScienceNemEncoder[A: Encoder](
-    using Encoder[TimeSpan], Encoder[Wavelength]
-  ): Encoder[NonEmptyMap[A, Zipper[ItcResult]]] =
+  private def keyedScienceNemEncoder[A: Encoder](
+    keyName: String = "filter"
+  )(using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[NonEmptyMap[A, Zipper[ItcResult]]] =
     Encoder.instance: a =>
       Json.fromValues:
-        a.toNel.toList.map: (filter, results) =>
+        a.toNel.toList.map: (key, results) =>
           Json.obj(
-            "filter"  -> filter.asJson,
+            keyName   -> key.asJson,
             "results" -> results.asJson
           )
 
@@ -157,28 +162,35 @@ trait ItcCodec:
     Encoder.instance: a =>
       Json.obj(
         "itcType"                  -> ItcScience.Type.Flamingos2Imaging.asJson,
-        "flamingos2ImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[Flamingos2Filter])
+        "flamingos2ImagingScience" -> a.science.asJson(using keyedScienceNemEncoder[Flamingos2Filter]())
       )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GmosNorthImaging] =
     Encoder.instance: a =>
       Json.obj(
         "itcType"                 -> ItcScience.Type.GmosNorthImaging.asJson,
-        "gmosNorthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosNorthFilter])
+        "gmosNorthImagingScience" -> a.science.asJson(using keyedScienceNemEncoder[GmosNorthFilter]())
       )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GmosSouthImaging] =
     Encoder.instance: a =>
       Json.obj(
         "itcType"                 -> ItcScience.Type.GmosSouthImaging.asJson,
-        "gmosSouthImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GmosSouthFilter])
+        "gmosSouthImagingScience" -> a.science.asJson(using keyedScienceNemEncoder[GmosSouthFilter]())
       )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GnirsImaging] =
     Encoder.instance: a =>
       Json.obj(
         "itcType"             -> ItcScience.Type.GnirsImaging.asJson,
-        "gnirsImagingScience" -> a.science.asJson(using imagingScienceNemEncoder[GnirsFilter])
+        "gnirsImagingScience" -> a.science.asJson(using keyedScienceNemEncoder[GnirsFilter]())
+      )
+
+  given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GnirsSpectroscopy] =
+    Encoder.instance: a =>
+      Json.obj(
+        "itcType"                  -> ItcScience.Type.GnirsSpectroscopy.asJson,
+        "gnirsSpectroscopyScience" -> a.science.asJson(using keyedScienceNemEncoder[Wavelength]("centralWavelength"))
       )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.Spectroscopy] =
@@ -198,6 +210,7 @@ trait ItcCodec:
          case ItcScience.Type.GmosNorthImaging    => Decoder[ItcScience.GmosNorthImaging].apply(c)
          case ItcScience.Type.GmosSouthImaging    => Decoder[ItcScience.GmosSouthImaging].apply(c)
          case ItcScience.Type.GnirsImaging        => Decoder[ItcScience.GnirsImaging].apply(c)
+         case ItcScience.Type.GnirsSpectroscopy   => Decoder[ItcScience.GnirsSpectroscopy].apply(c)
          case ItcScience.Type.Spectroscopy        => Decoder[ItcScience.Spectroscopy].apply(c)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience] =
@@ -207,6 +220,7 @@ trait ItcCodec:
       case a @ ItcScience.GmosNorthImaging(_)    => Encoder[ItcScience.GmosNorthImaging].apply(a)
       case a @ ItcScience.GmosSouthImaging(_)    => Encoder[ItcScience.GmosSouthImaging].apply(a)
       case a @ ItcScience.GnirsImaging(_)        => Encoder[ItcScience.GnirsImaging].apply(a)
+      case a @ ItcScience.GnirsSpectroscopy(_)   => Encoder[ItcScience.GnirsSpectroscopy].apply(a)
       case a @ ItcScience.Spectroscopy(_)        => Encoder[ItcScience.Spectroscopy].apply(a)
 
   // The GraphQL `Itc` union predates the acquisition/science split, so its output
@@ -224,6 +238,15 @@ trait ItcCodec:
     Encoder.instance: itc =>
       val science = itc.science.asJson
       itc.science match
+        // GNIRS spectroscopy always has an acquisition sequence, and its science
+        // results are keyed by central wavelength, so there is no IGRINS-style
+        // fallback type here.
+        case _: ItcScience.GnirsSpectroscopy =>
+          itc.acquisition match
+            case ItcAcquisition.Available(times, _) =>
+              science.deepMerge(Json.obj("acquisition" -> times.asJson))
+            case _                                  =>
+              science
         case _: ItcScience.Spectroscopy =>
           itc.acquisition match
             case ItcAcquisition.Available(times, _) =>

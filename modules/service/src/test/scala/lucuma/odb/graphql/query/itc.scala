@@ -732,4 +732,93 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       )
     yield ()
 
+  test("GNIRS spectroscopy: one ITC result set per central wavelength"):
+
+    def setWavelengths(oid: Observation.Id): IO[Unit] =
+      query(
+        user,
+        s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  gnirsSpectroscopy: {
+                    centralWavelengths: [
+                      {
+                        centralWavelength: { nanometers: 2300 }
+                        exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2300 } } }
+                      }
+                      {
+                        centralWavelength: { nanometers: 2100 }
+                        exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2100 } } }
+                      }
+                      {
+                        centralWavelength: { nanometers: 2200 }
+                        exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } } }
+                      }
+                    ]
+                  }
+                }
+              }
+              WHERE: { id: { EQ: "$oid" } }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      ).void
+
+    def q(oid: Observation.Id): String =
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            itc {
+              ... on ItcGnirsSpectroscopy {
+                gnirsSpectroscopyScience {
+                  centralWavelength { nanometers }
+                  results { selected { exposureCount } }
+                }
+                acquisition { selected { exposureCount } }
+              }
+            }
+          }
+        }
+      """
+
+    // One result set per central wavelength, ordered by increasing wavelength.
+    // The fake ITC echoes the requested Time & Count count (3) for science; the
+    // acquisition pass uses the fake default.
+    val expected: Json =
+      json"""
+        {
+          "observation": {
+            "itc": {
+              "gnirsSpectroscopyScience": [
+                {
+                  "centralWavelength": { "nanometers": 2100.000 },
+                  "results": { "selected": { "exposureCount": 3 } }
+                },
+                {
+                  "centralWavelength": { "nanometers": 2200.000 },
+                  "results": { "selected": { "exposureCount": 3 } }
+                },
+                {
+                  "centralWavelength": { "nanometers": 2300.000 },
+                  "results": { "selected": { "exposureCount": 3 } }
+                }
+              ],
+              "acquisition": { "selected": { "exposureCount": ${FakeItcResult.exposureCount.value} } }
+            }
+          }
+        }
+      """
+
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(user, p)
+      o <- createGnirsLongSlitObservationAs(user, p, t)
+      _ <- setWavelengths(o)
+      _ <- expect(user = user, query = q(o), expected = expected.asRight)
+    yield ()
+
 }
