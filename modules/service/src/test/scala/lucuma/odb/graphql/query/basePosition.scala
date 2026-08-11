@@ -11,8 +11,6 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -20,6 +18,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.TestCoordinates.coords
 
 import java.time.LocalDateTime
 
@@ -266,12 +265,6 @@ class basePosition extends OdbSuite:
         }
       }
     """
-
-    def coords(raDeg: Double, decDeg: Double): Coordinates =
-      Coordinates(
-        RightAscension.fromDoubleDegrees(raDeg),
-        Declination.fromDoubleDegrees(decDeg).get
-      )
 
     val cA = coords(14.999, 29.999)
     val cB = coords(15.001, 30.000)

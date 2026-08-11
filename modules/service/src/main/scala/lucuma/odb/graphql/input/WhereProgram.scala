@@ -50,10 +50,11 @@ object WhereProgram {
         WhereProposalBinding.Option("proposal", rPro),
         WhereCalibrationRoleBinding.Option("calibrationRole", rCalibRole),
         WhereStartBinding.Option("activeStart", rStart),
-        WhereEndBinding.Option("activeEnd", rEnd)
+        WhereEndBinding.Option("activeEnd", rEnd),
+        BooleanBinding.Option("isActive", rIsActive)
       ) =>
-          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole, rStart, rEnd).parMapN {
-            (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib, start, end) =>
+          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole, rStart, rEnd, rIsActive).parMapN {
+            (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib, start, end, isActive) =>
               and(List(
                 AND.map(and),
                 OR.map(or),
@@ -67,7 +68,8 @@ object WhereProgram {
                 pro,
                 calib,
                 start,
-                end
+                end,
+                isActive.map(b => Eql(path / "isActive", Const(b)))
               ).flatten)
         }
     }

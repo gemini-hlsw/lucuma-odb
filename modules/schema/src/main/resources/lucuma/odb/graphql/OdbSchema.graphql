@@ -15975,6 +15975,12 @@ type Program {
   active: DateInterval!
 
   """
+  Whether the program is currently active, i.e. whether the current UTC date
+  falls within the `active` period (inclusive of both bounds).
+  """
+  isActive: Boolean!
+
+  """
   Proposal status of the program
   """
   proposalStatus: ProposalStatus!
@@ -20738,6 +20744,27 @@ input WhereConfigurationRequest {
   Matches the last update time.
   """
   updatedAt: WhereOrderTimestamp
+
+  """
+  Matches the configuration's observing mode type, if any.
+  """
+  observingModeType: WhereOptionEqObservingModeType
+
+  """
+  Matches if the configuration's target reference coordinates lie within the
+  angular `distance` of `center` (exact great-circle). Resolved out of band.
+  """
+  targetCoordinates: WhereCone
+}
+
+"""
+A cone (angular-distance) match over a sky position.
+"""
+input WhereCone {
+  center: CoordinatesInput!
+
+  "Maximum angular separation between `center` and the target reference coords. Must be between 0° and 180°."
+  distance: AngleInput!
 }
 
 input WhereObservationReference {
@@ -22532,6 +22559,13 @@ input WhereProgram {
 
   "Matches the active period end."
   activeEnd: WhereOrderDate
+
+  """
+  When true, matches programs whose active period `[activeStart, activeEnd]` contains the
+  current UTC date; when false, matches the complement. Evaluated in the database, so the
+  date is taken at transaction start.
+  """
+  isActive: Boolean
 }
 
 input WhereProgramReference {

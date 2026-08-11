@@ -24,9 +24,7 @@ import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
 import lucuma.core.math.Region
-import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Ephemeris
 import lucuma.core.model.ExposureTimeMode
@@ -36,6 +34,7 @@ import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.Target
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
+import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.logic.GoaQueryPolicy.TargetPointing
 import lucuma.odb.sequence.exchange.Config as Exchange
@@ -113,14 +112,8 @@ class GoaQueryPolicySuite extends FunSuite:
       totalRequestTime   = 1.hourTimeSpan.some
     )
 
-  private def coordinates(raDeg: Double, decDeg: Double): Coordinates =
-    Coordinates(
-      RightAscension.fromDoubleDegrees(raDeg),
-      Declination.fromDoubleDegrees(decDeg).get
-    )
-
-  private val base: Coordinates   = coordinates(10.0, 20.0)
-  private val center: Coordinates = coordinates(30.0, 40.0)
+  private val base: Coordinates   = coords(10.0, 20.0)
+  private val center: Coordinates = coords(30.0, 40.0)
 
   private def name(s: String): NonEmptyString =
     NonEmptyString.unsafeFrom(s)

@@ -18,7 +18,7 @@ case class UpdateConfigurationRequestsInput(
 object UpdateConfigurationRequestsInput {
 
   def binding(path: Path) = {
-    val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(path)
+    val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(path, allowCone = false)
     ObjectFieldsBinding.rmap {
       case List(
         ConfigurationRequestPropertiesInput.Update.Binding("SET", rSET),

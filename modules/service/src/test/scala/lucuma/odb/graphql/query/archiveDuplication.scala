@@ -12,10 +12,9 @@ import io.circe.syntax.*
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.goa.GoaClientMock
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 import lucuma.core.model.Observation
 import lucuma.core.model.User
+import lucuma.odb.TestCoordinates
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.service.ArchiveDuplicationSearchService
 import lucuma.odb.service.Services
@@ -375,10 +374,7 @@ class archiveDuplication extends OdbSuite:
       val ra       = coords.downField("ra").downField("degrees").as[BigDecimal].toOption.get
       val dec      = coords.downField("dec").downField("degrees").as[BigDecimal].toOption.get
       val actual   = m.downField("distance").downField("microarcseconds").as[Long].toOption.get
-      val matchAt  = Coordinates(
-                       RightAscension.fromDoubleDegrees(ra.toDouble),
-                       Declination.fromDoubleDegrees(dec.toDouble).get
-                     )
+      val matchAt  = TestCoordinates.coords(ra.toDouble, dec.toDouble)
       assertEquals(actual, center.get.angularDistance(matchAt).toMicroarcseconds)
 
   test("distance is null for a match with no pointing"):
