@@ -6,8 +6,8 @@ package lucuma.odb.graphql
 import cats.effect.IO
 import cats.syntax.option.*
 import io.circe.syntax.*
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -24,14 +24,6 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
 
   /** The service user used to drive obscalc; not a GraphQL caller. */
   val tooObscalcUser = TestUsers.service(97)
-
-  // temporary, until this is doable via graphql
-  private def approveConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
-    import skunk.syntax.all.*
-    import lucuma.odb.util.Codecs.configuration_request_id
-    session.use: s =>
-      s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
-        ps.execute(req).void
 
   def setTooActivationAs(user: User, oid: Observation.Id, activation: String): IO[Unit] =
     query(
@@ -86,7 +78,7 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
       _   <- addProposal(pi, pid, cfp.some, None)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- computeItcResultAs(pi, oid)
       _   <- setTooActivationAs(pi, oid, activation)
       _   <- addPartnerSplits(pi, pid)
