@@ -8,10 +8,10 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -33,13 +33,6 @@ class setObservationWorkflowState
       20.minTimeSpan,
       PosInt.unsafeFrom(2)
     )
-
-  def approveConfigurationRequest(req: ConfigurationRequest.Id): IO[Unit] =
-    import skunk.syntax.all.*
-    import lucuma.odb.util.Codecs.configuration_request_id
-    session.use: s =>
-      s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
-        ps.execute(req).void
 
   def queryObservationWorkflowState(oid: Observation.Id): IO[ObservationWorkflowState] =
     queryObservationWorkflowStateAs(pi, oid)
@@ -123,7 +116,7 @@ class setObservationWorkflowState
       _   <- addProposal(pi, pid, Some(cfp), None)
       tid <- mkTarget(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- runObscalcUpdate(pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(pid, oid, Defined, Inactive)
@@ -140,7 +133,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- runObscalcUpdate(pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(pid, oid, Defined, Inactive, Ready)
@@ -156,7 +149,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createOpportunityTargetAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- runObscalcUpdate(pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Defined)
       _   <- testTransitions(pid, oid, Defined, Inactive)
@@ -246,7 +239,7 @@ class setObservationWorkflowState
       _ <- testTransitions(p, o, Completed)
     yield ()
 
-  val visitorMode = 
+  val visitorMode =
     """
       visitor: {
         mode: MAROON_X
@@ -272,7 +265,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _ <- assertIO(queryObservationWorkflowState(oid), Defined)
       _ <- testTransitions(pid, oid, Defined, Inactive, Ready)
@@ -289,7 +282,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- setObservationWorkflowState(pi, oid, Ready)
       _   <- setObservationWorkflowState(pi, oid, Inactive)
       _   <- setObservationWorkflowState(pi, oid, Defined)
@@ -308,7 +301,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- setObservationWorkflowState(pi, oid, Ready)
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
@@ -326,7 +319,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- setObservationWorkflowState(pi, oid, Ready)
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
@@ -345,7 +338,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- setObservationWorkflowState(pi, oid, Ready)
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
@@ -356,7 +349,7 @@ class setObservationWorkflowState
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
     yield ()
-    
+
   test("[Visitor]      Ongoing -> Ready (disallowed for staff)"):
     for
       cfp <- createGeminiCallForProposalsAs(staff)
@@ -367,7 +360,7 @@ class setObservationWorkflowState
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createObservationWithModeAs(pi, pid, List(tid), visitorMode)
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequest)
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
       _   <- setObservationWorkflowState(pi, oid, Ready)
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
