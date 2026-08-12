@@ -226,6 +226,21 @@ All mode tables (`t_gmos_north_long_slit`, `t_flamingos_2_long_slit`, `t_igrins_
 - JSON-typed columns (wavelengths, angles stored as pm/µas) require an implicit `Encoder`/`Decoder` in scope. Import the right given instance, e.g.: `import lucuma.odb.json.wavelength.query.given`.
 - Every type used in the schema (including input types) must either have a registered mapping or be a scalar/enum already known to Grackle.
 
+### Column budget
+
+Grackle compiles a whole GraphQL selection into a single SQL statement whose target list is capped
+at 1664 entries by Postgres, and it hoists every column once per usage path and per object level
+with no deduplication, so wide selections can hit the cap. Two rules keep mappings cheap:
+
+- **Never `Join` a view to itself** to map a sub-object whose fields live on the same row (nullable
+  variants discriminated by a `c_type`-style column). Use a plain `SqlObject("foo")` with the child
+  mapping keyed on a synthetic `CASE WHEN ... THEN id END` view column — null key ⇒ null object.
+  Each `Join` makes grackle emit a fresh aliased copy of the view per path.
+- **Give nested singleton objects exactly one `key = true` column.** Every key column is re-selected
+  at every object level of every path that reaches it; composite keys on wrapper objects (offsets,
+  angles, wavelengths) multiply fast. Grackle validation requires at least one key, so one it is.
+  Composite keys are only for list-element mappings, where they group rows.
+
 ## Skunk Codec Patterns
 
 When writing a `Fragment` / `encoder` for an INSERT that maps to a table with `c_initial_*` columns, the contramap output must include **both** the regular value and the initial value as separate elements, even when they start identical:
