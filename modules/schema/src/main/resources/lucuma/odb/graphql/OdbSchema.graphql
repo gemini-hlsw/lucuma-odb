@@ -11163,6 +11163,12 @@ type GnirsImagingFilter {
   """
   exposureTimeMode: ExposureTimeMode!
 
+  """
+  Coadds per exposure for this filter.  Always 1 when the exposure time mode is
+  signal-to-noise, which does not support coadds.
+  """
+  coadds: PosInt!
+
 }
 
 """
@@ -11180,6 +11186,13 @@ input GnirsImagingFilterInput {
   If not specified, it is taken from the observation's requirements.
   """
   exposureTimeMode: ExposureTimeModeInput
+
+  """
+  Coadds per exposure for this filter.  If not specified, defaults to 1.
+  Forced to 1 when the exposure time mode is signal-to-noise, which does not
+  support coadds.
+  """
+  coadds: PosInt
 
 }
 
@@ -11230,11 +11243,6 @@ type GnirsImaging {
   The camera (determines the pixel scale).
   """
   camera: GnirsCamera!
-
-  """
-  Coadds per exposure.
-  """
-  coadds: PosInt!
 
   """
   Optional explicitly specified read mode.  If not set, the read mode is
@@ -11298,11 +11306,6 @@ input GnirsImagingInput {
   The camera (determines the pixel scale).  Required on creation.
   """
   camera: GnirsCamera
-
-  """
-  Coadds per exposure.  On creation, if not specified, defaults to 1.
-  """
-  coadds: PosInt
 
   """
   The explicitReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
