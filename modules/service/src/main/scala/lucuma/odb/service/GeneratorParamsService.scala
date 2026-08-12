@@ -397,7 +397,7 @@ object GeneratorParamsService {
                   camera           = gnm.camera,
                   readMode         = readMode,
                   wellDepth        = gnm.wellDepth,
-                  coadds           = gnm.coadds
+                  coadds           = f.coadds
                 )
               )
 

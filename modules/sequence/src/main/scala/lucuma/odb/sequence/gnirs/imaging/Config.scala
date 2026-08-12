@@ -6,9 +6,9 @@ package lucuma.odb.sequence.gnirs.imaging
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
-import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
@@ -28,7 +28,6 @@ case class Config(
   variant:           Variant,
   filters:           NonEmptyList[Filter],
   camera:            GnirsCamera,
-  coadds:            PosInt,
   explicitReadMode:  Option[GnirsReadMode],
   defaultWellDepth:  GnirsWellDepth,
   explicitWellDepth: Option[GnirsWellDepth],
@@ -38,6 +37,16 @@ case class Config(
   def wellDepth: GnirsWellDepth =
     explicitWellDepth.getOrElse(defaultWellDepth)
 
+  private lazy val coaddsByFilter: Map[GnirsFilter, PosInt] =
+    filters.toList.map(f => f.filter -> f.coadds).toMap
+
+  /**
+   * Coadds for the given filter.  Falls back to 1 for a filter that isn't part
+   * of this configuration, which the sequence never asks for.
+   */
+  def coaddsFor(filter: GnirsFilter): PosInt =
+    coaddsByFilter.getOrElse(filter, PosInt.unsafeFrom(1))
+
   def staticConfig: GnirsStaticConfig =
     GnirsStaticConfig(wellDepth)
 
@@ -46,10 +55,13 @@ case class Config(
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.write(variant.hashBytes)
-    out.write(filters.hashBytes)
+    // Length-prefixed: the element count is user-controlled, so without it two
+    // different filter lists could hash to the same bytes.
+    out.writeInt(filters.length)
+    filters.toList.foreach: f =>
+      out.write(f.hashBytes)
 
     out.writeChars(camera.tag)
-    out.write(coadds.value.hashBytes)
     out.writeChars(explicitReadMode.fold("")(_.tag))
     out.writeChars(wellDepth.tag)
 

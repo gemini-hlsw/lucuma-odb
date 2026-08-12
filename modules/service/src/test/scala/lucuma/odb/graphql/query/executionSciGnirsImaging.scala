@@ -41,13 +41,14 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     exposureTime: TimeSpan,
     p:            Int            = 0,
     q:            Int            = 0,
-    guiding:      StepGuideState = StepGuideState.Enabled
+    guiding:      StepGuideState = StepGuideState.Enabled,
+    coadds:       Int            = 1
   ): Json =
     json"""
       {
         "instrumentConfig": {
           "exposure":             { "seconds": ${exposureTime.toSeconds} },
-          "coadds":               1,
+          "coadds":               $coadds,
           "centralWavelength":    { "nanometers": ${filter.centralWavelength.toNanometers.value.value} },
           "filter":               ${filter.tag.toScreamingSnakeCase.asJson},
           "decker":               "ACQUISITION",
@@ -114,6 +115,48 @@ class executionSciGnirsImaging extends ExecutionTestSupportForGnirs:
     val atoms =
       List.fill(2)(sciAtom(GnirsFilter.J, 10.secondTimeSpan)) ++
       List.fill(3)(sciAtom(GnirsFilter.Order4, 25.secondTimeSpan))
+
+    setup.flatMap: oid =>
+      expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)
+
+  test("grouped, per-filter coadds"):
+    // Coadds live with the filter's exposure time mode, so each filter's steps
+    // carry its own value.  Signal-to-noise doesn't support coadds, so the
+    // ORDER4 filter is forced back to 1.
+    val mode =
+      s"""
+        gnirsImaging: {
+          camera: SHORT_BLUE
+          variant: { grouped: { skyCount: 0 } }
+          filters: [
+            {
+              filter: J
+              exposureTimeMode: {
+                timeAndCount: { time: { seconds: 10.0 }, count: 2, at: { nanometers: 1250.0 } }
+              }
+              coadds: 4
+            },
+            {
+              filter: ORDER4
+              exposureTimeMode: {
+                signalToNoise: { value: 100.0, at: { nanometers: 1650.0 } }
+              }
+              coadds: 4
+            }
+          ]
+        }
+      """
+
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationWithModeAs(pi, p, List(t), mode)
+      yield o
+
+    val atoms =
+      List.fill(2)(sciAtomOf(sciStep(GnirsFilter.J, 10.secondTimeSpan, coadds = 4))) ++
+      List.fill(3)(sciAtomOf(sciStep(GnirsFilter.Order4, 25.secondTimeSpan)))
 
     setup.flatMap: oid =>
       expect(pi, gnirsScienceQuery(oid, 100.some), expectedScience(atoms).asRight)

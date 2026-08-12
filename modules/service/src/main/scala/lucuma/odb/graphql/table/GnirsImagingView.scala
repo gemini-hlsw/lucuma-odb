@@ -13,6 +13,7 @@ trait GnirsImagingView[F[_]] extends BaseMapping[F]:
     val ObservationId: ColumnRef = col("c_observation_id", observation_id)
     val Filter: ColumnRef        = col("c_filter", gnirs_filter)
     val Version: ColumnRef       = col("c_version", observing_mode_row_version)
+    val Coadds: ColumnRef        = col("c_coadds", int4_pos)
     val ExposureTimeModeId       = col("c_exposure_time_mode_id", exposure_time_mode_id)
     val Role: ColumnRef          = col("c_role", exposure_time_mode_role)
 
@@ -24,7 +25,6 @@ trait GnirsImagingView[F[_]] extends BaseMapping[F]:
     val Filters: ColumnRef          = col("c_filters", _gnirs_filter)
 
     val Camera: ColumnRef           = col("c_camera", gnirs_camera)
-    val Coadds: ColumnRef           = col("c_coadds", int4_pos)
 
     val ReadMode: ColumnRef         = col("c_read_mode", gnirs_read_mode.opt)
 
