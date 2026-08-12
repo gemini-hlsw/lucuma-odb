@@ -106,11 +106,6 @@ object AttachmentFileService {
       // does not contain the dot.
       def extName: Option[NonEmptyString] =
         NonEmptyString.from(Path(fileName.value.value).extName.drop(1).toLowerCase).toOption
-
-      // the whole name when there is no extension to strip.
-      def baseName: NonEmptyString =
-        val name = fileName.value.value
-        NonEmptyString.from(name.stripSuffix(Path(name).extName)).getOrElse(fileName.value)
   }
 
   extension [F[_], A](fe: F[Either[AttachmentException, A]])
@@ -151,14 +146,35 @@ object AttachmentFileService {
   }
 
   /**
-   * The mask name will be derived now from the file, removing the extension.
-   * In the future we should parse the fits file and read the name directly.
+   * MOS mask files follow the standard ODF naming convention in either the OCS
+   * form, `G(N|S)YYYY(A|B)<type>PPP-XX_ODF.fits`, or the GPP form built from
+   * the program reference with its dashes removed,
+   * `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.
+   *
+   * The mask name is the file name with the `_ODF.fits` suffix removed.
+   * Names are matched case-insensitively but stored upper case, so the identifier
+   * handed to observe is canonical however the file was named.
    */
+  private val OcsMaskFileName =
+    raw"(?i)(G[NS]\d{4}[AB](?:ENG|CAL|COM|DD|DS|SV|LP|FT|Q|C)\d{3}-\d{2})_ODF\.fits".r
+  private val GppMaskFileName = raw"(?i)(G\d{4}[AB]\d{4}[CDFLPQSV]-\d{2})_ODF\.fits".r
+
+  val InvalidMaskFileNameMsg =
+    "Invalid MOS mask file name. Must follow the ODF naming convention, e.g. 'GS2015AQ023-01_ODF.fits' or 'G2027A1234Q-42_ODF.fits'."
+
   def deriveMaskName(
     attachmentType: AttachmentType,
     fileName:       FileName
-  ): Option[NonEmptyString] =
-    Option.when(attachmentType === AttachmentType.MosMask)(fileName.baseName)
+  ): Either[AttachmentException, Option[NonEmptyString]] =
+    def maskName(root: String): Either[AttachmentException, Option[NonEmptyString]] =
+      NonEmptyString.from(root.toUpperCase).bimap(_ => InvalidRequest(InvalidMaskFileNameMsg), _.some)
+
+    if (attachmentType =!= AttachmentType.MosMask) none.asRight
+    else
+      fileName.value.value match
+        case OcsMaskFileName(root) => maskName(root)
+        case GppMaskFileName(root) => maskName(root)
+        case _                     => InvalidRequest(InvalidMaskFileNameMsg).asLeft
 
   def checkForEmptyFile(fileSize: Long): Either[AttachmentException, Unit] =
     if (fileSize <= 0) InvalidRequest("File cannot be empty").asLeft
@@ -375,13 +391,15 @@ object AttachmentFileService {
           (
             for {
               fn     <- FileName.fromString(fileName).liftF
-              mn      = deriveMaskName(attachmentType, fn)
-              _      <- services.transactionallyEitherT:
-                          checkAccess(user, programId, AccessRequired.Write, Forbidden) >>
-                            validateFileExtensionByType(attachmentType, fn).liftF >>
-                            checkForDuplicateType(programId, attachmentType).asEitherT >>
-                            checkForDuplicateName(programId, fn, none).asEitherT >>
-                            checkForDuplicateMaskName(programId, mn, none).asEitherT
+              mn     <- services.transactionallyEitherT:
+                          for {
+                            _  <- checkAccess(user, programId, AccessRequired.Write, Forbidden)
+                            _  <- validateFileExtensionByType(attachmentType, fn).liftF
+                            mn <- deriveMaskName(attachmentType, fn).liftF
+                            _  <- checkForDuplicateType(programId, attachmentType).asEitherT
+                            _  <- checkForDuplicateName(programId, fn, none).asEitherT
+                            _  <- checkForDuplicateMaskName(programId, mn, none).asEitherT
+                          } yield mn
               uuid   <- UUIDGen[F].randomUUID.right
               path    = Services.asSuperUser(filePath(programId, uuid, fn.value))
             } yield (fn, mn, path)
@@ -426,7 +444,7 @@ object AttachmentFileService {
                 for {
                   (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
                   at             <- validateFileExtensionById(attachmentId, fn).asEitherT
-                  mn              = deriveMaskName(at, fn)
+                  mn             <- deriveMaskName(at, fn).liftF
                   _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT
                   _              <- checkForDuplicateMaskName(pid, mn, attachmentId.some).asEitherT
                 } yield (pid, mn, oldPath)

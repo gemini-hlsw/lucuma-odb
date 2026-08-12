@@ -43,7 +43,7 @@ class customMaskInUse
       p <- createProgram
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      a <- insertMosMaskAttachment(p, "in-use.fits")
+      a <- insertMosMaskAttachment(p, "GN2025AQ001-02_ODF.fits")
       m  = s"""{ attachmentId: "$a", slitWidth: $SlitWidth }"""
       i  = input(o, SequenceType.Science, atomInput("Masked", gmosStep(m)))
       _ <- query(pi, mutation(Instrument.GmosNorth, i))

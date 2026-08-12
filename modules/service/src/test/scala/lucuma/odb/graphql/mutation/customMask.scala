@@ -42,7 +42,7 @@ trait CustomMaskOps extends ReplaceSequenceOps:
         VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix(".fits")))
+    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix("_ODF.fits").toUpperCase))
 
   protected def gmosStep(customMask: String): String =
     s"""
@@ -136,7 +136,7 @@ class customMask extends query.ExecutionTestSupportForGmos with CustomMaskOps:
         p   <- createProgram
         t   <- createTargetWithProfileAs(pi, p)
         o   <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        a   <- Option.when(defined)(insertMosMaskAttachment(p, "mask.fits")).sequence
+        a   <- Option.when(defined)(insertMosMaskAttachment(p, "GN2025AQ001-01_ODF.fits")).sequence
         // Pending simply omits the attachment id; the slit width alone marks
         // the custom mask as present.
         cm   = a.fold(s"""{ slitWidth: $SlitWidth }""")(id => s"""{ attachmentId: "$id", slitWidth: $SlitWidth }""")
