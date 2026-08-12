@@ -11,9 +11,9 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.CloudExtinction
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
@@ -100,13 +100,6 @@ class observation_workflow_tellurics
       """)
     )
 
-  def approveConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
-    import skunk.syntax.all.*
-    import lucuma.odb.util.Codecs.configuration_request_id
-    session.use: s =>
-      s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
-        ps.execute(req).void
-
   // A per-observation calibration (telluric or daytime pinhole) inherits its
   // science observation's workflow state. A daytime pinhole has no transitions
   // of its own; a telluric may additionally be declined.
@@ -130,7 +123,7 @@ class observation_workflow_tellurics
         // science
         sci <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- updateCloudExtinctionAs(pi, sci, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
-        _   <- createConfigurationRequestAs(pi, sci).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, sci).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, sci)
 
         // Cal
