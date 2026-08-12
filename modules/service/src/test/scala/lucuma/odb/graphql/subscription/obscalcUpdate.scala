@@ -10,8 +10,8 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Semester
 import lucuma.core.util.CalculationState
@@ -501,13 +501,6 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
       )
 
   test("do trigger when executableOnly field is set and is executable"):
-    def approveConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
-      import skunk.syntax.all.*
-      import lucuma.odb.util.Codecs.configuration_request_id
-      session.use: s =>
-        s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
-          ps.execute(req).void
-
     val setup =
       for
         cfp <- createGeminiCallForProposalsAs(staff)
@@ -518,7 +511,7 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- setObservationWorkflowState(serviceUser, oid, ObservationWorkflowState.Ready)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
