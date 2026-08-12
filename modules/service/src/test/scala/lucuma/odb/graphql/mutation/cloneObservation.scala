@@ -2686,7 +2686,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix(".fits")))
+    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix("_ODF.fits").toUpperCase))
 
   private def readMaskColumns(
     table: String,
@@ -2704,7 +2704,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetAs(pi, pid)
-      aid  <- insertMosMaskAttachment(pid, "mask.fits")
+      aid  <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits")
       mode  = s"""
         gmosNorthMos: {
           grating: R831_G5302

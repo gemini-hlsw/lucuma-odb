@@ -7769,9 +7769,12 @@ type Attachment {
   fileName: NonEmptyString!
 
   """
-  The identifier of the physical mask plate this attachment describes, derived
-  from the attachment itself and not settable.  Null when the attachment is not
-  a MOS_MASK, always present when it is.
+  The identifier of the physical mask plate this attachment describes.  It is
+  derived from the file name by dropping the `_ODF.fits` suffix.
+  The file name must follow the standard ODF naming convention, either
+  `G(N|S)YYYY(A|B)<type>PPP-XX_ODF.fits` or
+  `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.  
+  Not settable.  Null when the attachment is not a MOS_MASK, always present when it is.
   """
   maskName: NonEmptyString
   description: NonEmptyString

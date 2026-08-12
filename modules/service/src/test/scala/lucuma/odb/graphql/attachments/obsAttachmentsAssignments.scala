@@ -209,7 +209,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
       expected = List(error).asLeft
     )
 
-  val mosMask = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful", maskName = "file1".some)
+  val mosMask = TestAttachment("GS2015AQ023-01_ODF.fits", "mos_mask", "A description".some, "Hopeful", maskName = "GS2015AQ023-01".some)
   val finder  = TestAttachment("file2.jpg", "finder", "jpg file".some, "A finder JPG file")
   val preImaging  = TestAttachment("preImaging.fits", "pre_imaging", none, "A pre imaging file")
   val science = TestAttachment("science.pdf", "science", none, "science file")

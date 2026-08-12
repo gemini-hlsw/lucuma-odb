@@ -44,7 +44,7 @@ class updateObservations_GmosMos extends OdbSuite:
         VALUES ($program_id, $text::e_attachment_type, $text, 42, 'unused', ${text.opt})
         RETURNING c_attachment_id
       """.query(attachment_id)
-    val maskName = Option.when(tpe === "mos_mask")(fileName.stripSuffix(".fits"))
+    val maskName = Option.when(tpe === "mos_mask")(fileName.stripSuffix("_ODF.fits").toUpperCase)
     withSession(_.unique(q)(pid, tpe, fileName, maskName))
 
   // The mask attachment is stored as two columns (id + type) pinned together
@@ -139,7 +139,7 @@ class updateObservations_GmosMos extends OdbSuite:
   test("attach a mask to a maskless observation"):
     for
       (pid, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
-      aid        <- insertAttachment(pid, "mos_mask", "mask.fits")
+      aid        <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
       _          <- expect(pi, updateMutation(
                       oid,
                       s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" } }""",
@@ -168,7 +168,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "mask.fits")
+      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
       oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
       _   <- expect(pi, updateMutation(
                oid,
@@ -201,7 +201,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "mask.fits")
+      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
       oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
       _   <- expect(pi, updateMutation(
                oid,
@@ -233,7 +233,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "mask.fits")
+      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
       oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
       _   <- expect(pi, updateMutation(
                oid,
@@ -311,7 +311,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "mask.fits")
+      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
       oid <- create(pid, tid, southMode("slitWidth: CUSTOM_WIDTH_1_00"))
       _   <- expect(pi, updateMutation(
                oid,
@@ -393,7 +393,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       (_, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
       other    <- createProgramAs(pi)
-      aid      <- insertAttachment(other, "mos_mask", "mask.fits")
+      aid      <- insertAttachment(other, "mos_mask", "GN2025AQ001-01_ODF.fits")
       _        <- expect(
                     user     = pi,
                     query    = updateMutation(
@@ -410,7 +410,7 @@ class updateObservations_GmosMos extends OdbSuite:
       pid   <- createProgramAs(pi)
       tid   <- createTargetAs(pi, pid)
       other <- createProgramAs(pi)
-      aid   <- insertAttachment(other, "mos_mask", "mask.fits")
+      aid   <- insertAttachment(other, "mos_mask", "GN2025AQ001-01_ODF.fits")
       _     <- expect(
                  user     = pi,
                  query    = s"""

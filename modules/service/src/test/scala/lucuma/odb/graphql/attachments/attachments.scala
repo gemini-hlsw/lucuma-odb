@@ -91,10 +91,10 @@ class attachments extends AttachmentsSuite {
   }
 
   // TODO: science, team and custom_sed file tests
-  val mosMask1A         = TestAttachment("file1.fits", "mos_mask", "A description".some, "Hopeful", maskName = "file1".some)
-  val mosMask1B         = TestAttachment("file1.fits", "mos_mask", None, "New contents", maskName = "file1".some)
-  val mosMask1Upper     = TestAttachment("file1.FITS", "mos_mask", "Shouty".some, "Also hopeful", maskName = "file1".some)
-  val mosMask2          = TestAttachment("file2.fits", "mos_mask", "Masked".some, "Zorro", maskName = "file2".some)
+  val mosMask1A         = TestAttachment("GS2015AQ023-01_ODF.fits", "mos_mask", "A description".some, "Hopeful", maskName = "GS2015AQ023-01".some)
+  val mosMask1B         = TestAttachment("GS2015AQ023-01_ODF.fits", "mos_mask", None, "New contents", maskName = "GS2015AQ023-01".some)
+  val mosMask1Lower     = TestAttachment("gs2015aq023-01_odf.FITS", "mos_mask", "Shouty".some, "Also hopeful", maskName = "GS2015AQ023-01".some)
+  val mosMask2          = TestAttachment("GS2015AQ023-02_ODF.fits", "mos_mask", "Masked".some, "Zorro", maskName = "GS2015AQ023-02".some)
   val finderPNG         = TestAttachment("different.png", "finder", "Unmatching file name".some, "Something different")
   val finderJPG         = TestAttachment("finder.jpg", "finder", "jpg file".some, "A finder JPG file")
   val preImaging        = TestAttachment("pi.fits", "pre_imaging", none, "A pre imaging file")
@@ -106,7 +106,7 @@ class attachments extends AttachmentsSuite {
   val customSedSED      = TestAttachment("sed.sed", "custom_sed", "It's custom".some, "A custom SED file")
   val customSedTXT      = TestAttachment("sed.TXT", "custom_sed", "It's custom".some, "Another custom SED file")
   val customSedDAT      = TestAttachment("sed.dat", "custom_sed", "It's custom".some, "A third custom SED file")
-  val emptyFile         = TestAttachment("file1.fits", "mos_mask", "Thing".some, "")
+  val emptyFile         = TestAttachment("GS2015AQ023-01_ODF.fits", "mos_mask", "Thing".some, "")
   val missingType       = TestAttachment("file1.fits", "", "Whatever".some, "It'll never make it")
   val invalidType       = TestAttachment("file1.fits", "NotAType", none, "It'll never make it")
   val missingFileName   = TestAttachment("", "finder", none, "Doesn't matter")
@@ -115,6 +115,15 @@ class attachments extends AttachmentsSuite {
   val emptyMosMaskExt   = TestAttachment("file.", "mos_mask", none, "Doesn't matter")
   val invalidFinderExt  = TestAttachment("file.fits", "finder", none, "Doesn't matter")
   val invalidMosMaskExt = TestAttachment("file.png", "mos_mask", none, "Doesn't matter")
+  val engMask           = TestAttachment("GN2026AENG051-10_ODF.fits", "mos_mask", "Engineering".some, "Three letter type", maskName = "GN2026AENG051-10".some)
+  val svMask            = TestAttachment("GN2026ASV051-10_ODF.fits", "mos_mask", "System verification".some, "Two letter type", maskName = "GN2026ASV051-10".some)
+  val gppMask           = TestAttachment("G2027A1234Q-42_ODF.fits", "mos_mask", "GPP style".some, "From a program reference", maskName = "G2027A1234Q-42".some)
+  val gppMaskLower      = TestAttachment("g2027a1234q-42_odf.fits", "mos_mask", "GPP style".some, "Shouty", maskName = "G2027A1234Q-42".some)
+  val badMaskName       = TestAttachment("mask.fits", "mos_mask", none, "Doesn't matter")
+  val unpaddedMaskName  = TestAttachment("GS2015AQ23-01_ODF.fits", "mos_mask", none, "Doesn't matter")
+  val noOdfMaskName     = TestAttachment("GS2015AQ023-01.fits", "mos_mask", none, "Doesn't matter")
+  val gppShortProgram   = TestAttachment("G2027A123Q-42_ODF.fits", "mos_mask", none, "Doesn't matter")
+  val gppBadSubtype     = TestAttachment("G2027A1234Z-42_ODF.fits", "mos_mask", none, "Doesn't matter")
   val invalidPreImgExt  = TestAttachment("file.jpg", "pre_imaging", none, "Doesn't matter")
 
   val invalidFitsMsg = "Invalid file. Must be a FITS file."
@@ -741,7 +750,7 @@ class attachments extends AttachmentsSuite {
       newTa1  = mosMask1A.copy(description = newDesc.some)
       newTa2  = mosMask2.copy(description = newDesc.some)
       _      <- updateAttachmentsGql(pi,
-                                     WHERE = s"""{ fileName: { LIKE: "file%"}, program: { id: { EQ: "$pid" } } }""",
+                                     WHERE = s"""{ fileName: { LIKE: "GS2015AQ023%"}, program: { id: { EQ: "$pid" } } }""",
                                      SET = s"""{ description: "$newDesc" }""",
                                      (aid1, newTa1),
                                      (aid2, newTa2)
@@ -847,19 +856,38 @@ class attachments extends AttachmentsSuite {
     } yield ()
   }
 
-  test("mask name ignores the case of the extension"):
+  List(mosMask1A, mosMask1Lower, engMask, svMask, gppMask, gppMaskLower).foreach: ta =>
+    test(s"mask name of '${ta.fileName}' is '${ta.maskName.orEmpty}'"):
+      for {
+        pid <- createProgramAs(pi)
+        aid <- insertAttachment(pi, pid, ta).toAttachmentId
+        _   <- assertAttachmentsGql(pi, pid, (aid, ta))
+      } yield ()
+
+  List(badMaskName, unpaddedMaskName, noOdfMaskName, gppShortProgram, gppBadSubtype).foreach: ta =>
+    test(s"insert of mask '${ta.fileName}' is a BadRequest"):
+      for {
+        pid <- createProgramAs(pi)
+        _   <- insertAttachment(pi, pid, ta)
+                 .withExpectation(Status.BadRequest, AttachmentFileService.InvalidMaskFileNameMsg)
+        _   <- assertAttachmentsGql(pi, pid)
+      } yield ()
+
+  test("update to a mask name not following the convention is a BadRequest"):
     for {
       pid <- createProgramAs(pi)
-      aid <- insertAttachment(pi, pid, mosMask1Upper).toAttachmentId
-      _   <- assertAttachmentsGql(pi, pid, (aid, mosMask1Upper))
+      aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
+      _   <- updateAttachment(pi, aid, badMaskName)
+               .withExpectation(Status.BadRequest, AttachmentFileService.InvalidMaskFileNameMsg)
+      _   <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
     } yield ()
 
   test("insert with duplicate mask name is a BadRequest"):
     for {
       pid <- createProgramAs(pi)
       aid <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
-      _   <- insertAttachment(pi, pid, mosMask1Upper)
-               .withExpectation(Status.BadRequest, AttachmentFileService.duplicateMaskNameMsg(NonEmptyString.unsafeFrom("file1")))
+      _   <- insertAttachment(pi, pid, mosMask1Lower)
+               .withExpectation(Status.BadRequest, AttachmentFileService.duplicateMaskNameMsg(NonEmptyString.unsafeFrom("GS2015AQ023-01")))
       _   <- assertAttachmentsGql(pi, pid, (aid, mosMask1A))
     } yield ()
 
@@ -878,8 +906,8 @@ class attachments extends AttachmentsSuite {
       pid  <- createProgramAs(pi)
       aid1 <- insertAttachment(pi, pid, mosMask1A).toAttachmentId
       aid2 <- insertAttachment(pi, pid, mosMask2).toAttachmentId
-      _    <- updateAttachment(pi, aid2, mosMask1Upper)
-                .withExpectation(Status.BadRequest, AttachmentFileService.duplicateMaskNameMsg(NonEmptyString.unsafeFrom("file1")))
+      _    <- updateAttachment(pi, aid2, mosMask1Lower)
+                .withExpectation(Status.BadRequest, AttachmentFileService.duplicateMaskNameMsg(NonEmptyString.unsafeFrom("GS2015AQ023-01")))
       _    <- assertAttachmentsGql(pi, pid, (aid1, mosMask1A), (aid2, mosMask2))
       _    <- getAttachment(pi, aid2).expectBody(mosMask2.content)
     } yield ()
@@ -892,7 +920,7 @@ class attachments extends AttachmentsSuite {
       _     <- insertAttachment(pi, pid, finderPNG).toAttachmentId
       newTa2 = mosMask2.copy(description = "Found".some)
       _     <- updateAttachmentsGql(pi,
-                                    WHERE = s"""{ maskName: { EQ: "file2" }, program: { id: { EQ: "$pid" } } }""",
+                                    WHERE = s"""{ maskName: { EQ: "GS2015AQ023-02" }, program: { id: { EQ: "$pid" } } }""",
                                     SET = """{ description: "Found" }""",
                                     (aid2, newTa2)
                )
