@@ -212,7 +212,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
    * The ceiling has to be written directly: it is normally derived from the
    * program's observations and frozen when the proposal is accepted, and several
    * fixtures accept the proposal before the observation exists, which would
-   * freeze it at NONE.  Same spirit as `approveConfigurationRequestHack`.
+   * freeze it at NONE.
    */
   private def setTooActivationForOpportunityTargets(
     user: User,
