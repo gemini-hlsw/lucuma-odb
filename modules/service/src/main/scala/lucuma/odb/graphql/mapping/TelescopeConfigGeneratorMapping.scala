@@ -68,22 +68,15 @@ trait TelescopeConfigGeneratorMapping[F[_]] extends TelescopeConfigGeneratorView
 
       SqlField("generatorType", TelescopeConfigGeneratorView.TelescopeConfigGeneratorType),
 
-      SqlObject("enumerated", Join(List(
-        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Enumerated.ObservationId,
-        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Enumerated.Role
-      ))),
-      SqlObject("random",     Join(List(
-        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Random.ObservationId,
-        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Random.Role
-      ))),
-      SqlObject("spiral",     Join(List(
-        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Spiral.ObservationId,
-        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Spiral.Role
-      ))),
-      SqlObject("uniform",    Join(List(
-        TelescopeConfigGeneratorView.ObservationId -> TelescopeConfigGeneratorView.Uniform.ObservationId,
-        TelescopeConfigGeneratorView.Role          -> TelescopeConfigGeneratorView.Uniform.Role
-      )))
+      // The generator sub-shapes live on the same v_offset_generator row, so
+      // they are mapped without a Join: a self-join here makes grackle emit a
+      // fresh aliased copy of the view per sub-shape and path, which pushes
+      // wide selections past the Postgres 1664-column target-list limit
+      // (sc-9893).  Nullability comes from the synthetic CASE WHEN keys.
+      SqlObject("enumerated"),
+      SqlObject("random"),
+      SqlObject("spiral"),
+      SqlObject("uniform")
     )
 
   lazy val TelescopeConfigGeneratorMappings: List[TypeMapping] =
