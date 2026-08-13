@@ -62,7 +62,10 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .compile
       .toList
       .map: rows =>
-        assertEquals(rows.length, 42)
+        assertEquals(rows.length, 84)
+        assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Multislit), 42)
+        assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Singleslit), 42)
+        assertEquals(rows.count(_._1.fpu.isEmpty), 42)
 
   test("loadAll GHOST IFU configurations"):
     val rdr = FileReader[IO](fileName)

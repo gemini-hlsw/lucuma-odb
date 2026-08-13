@@ -579,6 +579,7 @@ object TelluricTargetsService:
         JOIN   t_spectroscopy_config_option config
           ON   config.c_instrument = f2config.c_instrument AND config.c_index = f2config.c_index
         WHERE  config.c_instrument = 'Flamingos2'
+          AND  config.c_focal_plane = 'single_slit'
       """.query(flamingos_2_disperser *: flamingos_2_filter *: flamingos_2_fpu *: numeric.opt *: numeric.opt)
 
     val SelectIgrins2Hmin: Query[Void, (Option[BigDecimal], Option[BigDecimal])] =
