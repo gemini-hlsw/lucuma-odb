@@ -2,6 +2,10 @@ import NativePackagerHelper.*
 
 ThisBuild / resolvers += Resolver.sonatypeCentralSnapshots
 
+// Hosts the skunk build we pin below.
+ThisBuild / resolvers +=
+  "Gemini Repository".at("https://github.com/gemini-hlsw/maven-repo/raw/master/releases")
+
 // Please keep in alphabetical order
 val awsJavaSdkVersion            = "1.12.797"
 val boopickleVersion             = "1.5.0"
