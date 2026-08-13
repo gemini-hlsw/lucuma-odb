@@ -179,7 +179,7 @@ object Phase0Table {
         instrument            *:
         flamingos_2_disperser *:
         flamingos_2_filter    *:
-        flamingos_2_fpu
+        flamingos_2_fpu.opt
       ).contramap[Flamingos2SpectroscopyRow] { row => (
         row.spec.instrument,
         row.disperser,

@@ -18,7 +18,7 @@ case class Flamingos2SpectroscopyRow(
   spec:      SpectroscopyRow,
   disperser: Flamingos2Disperser,
   filter:    Flamingos2Filter,
-  fpu:       Flamingos2Fpu
+  fpu:       Option[Flamingos2Fpu]
 )
 
 object Flamingos2SpectroscopyRow:
@@ -39,11 +39,12 @@ object Flamingos2SpectroscopyRow:
                  .flatMap: f =>
                     Enumerated[Flamingos2Filter].all.find(a => a.shortName === f)
                       .toRight(s"Cannot find filter: $f. Does a non-obsolete value exist in the Enumerated?")
-          // In the table they are written as "n\s?pixels"
-          u <- Enumerated[Flamingos2Fpu]
-                 .all
-                 .find(f => fpuParser.parse(r.fpu).map(_._2).forall(_ === f.slitWidth.value))
-                 .toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?")
+          // For MOS rows the focal plane is a custom mask, not a builtin slit, so we return none.
+          u <- (if (r.fpuOption === FpuOption.Multislit) none[Flamingos2Fpu].asRight[String]
+                else Enumerated[Flamingos2Fpu]
+                       .all
+                       .find(f => fpuParser.parse(r.fpu).map(_._2).forall(_ === f.slitWidth.value))
+                       .map(_.some)
+                       .toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?"))
         } yield Flamingos2SpectroscopyRow(r, g, l, u)
         row.fold(Parser.failWith, Parser.pure)
-

@@ -7773,7 +7773,7 @@ type Attachment {
   derived from the file name by dropping the `_ODF.fits` suffix.
   The file name must follow the standard ODF naming convention, either
   `G(N|S)YYYY(A|B)<type>PPP-XX_ODF.fits` or
-  `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.  
+  `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.
   Not settable.  Null when the attachment is not a MOS_MASK, always present when it is.
   """
   maskName: NonEmptyString
@@ -14206,7 +14206,11 @@ type SpectroscopyConfigOption {
 }
 
 type SpectroscopyConfigOptionFlamingos2 {
-  fpu: Flamingos2Fpu!
+  """
+  The builtin FPU, present for single-slit configurations. Null for multislit
+  (MOS) configurations, where the focal-plane unit is a custom mask.
+  """
+  fpu: Flamingos2Fpu
   disperser: Flamingos2Disperser!
   filter: Flamingos2Filter!
 }

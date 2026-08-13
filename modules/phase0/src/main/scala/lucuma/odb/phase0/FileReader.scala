@@ -59,7 +59,7 @@ class FileReader[F[_]](fileName: String)(using ApplicativeError[F, Throwable]):
 
   val flamingos2Spectroscopy: Pipe[F, Byte, (Flamingos2SpectroscopyRow, PosInt)] =
     read(Instrument.Flamingos2, Flamingos2SpectroscopyRow.flamingos2)
-      .andThen(_.filter(_._1.spec.fpuOption === FpuOption.Singleslit)) // for now only single slit
+      .andThen(_.filter(_._1.spec.fpuOption =!= FpuOption.Ifu)) // single-slit + multislit (MOS)
 
   val gnirsSpectroscopy: Pipe[F, Byte, (GnirsSpectroscopyRow, PosInt)] =
     read(Instrument.Gnirs, GnirsSpectroscopyRow.gnirs)
