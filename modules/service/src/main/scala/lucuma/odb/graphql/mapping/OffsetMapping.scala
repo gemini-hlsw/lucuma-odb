@@ -111,25 +111,29 @@ trait OffsetMapping[F[_]] extends EnumeratedOffsetView[F]
     flamingos2PreImagingMappings ++
     gnirsPreImagingMappings ++
     List(
-      offsetMappingAtPath(EnumeratedPath, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),
-      offsetComponentMappingAtPath(EnumeratedPath / "p", EnumeratedOffsetView.OffsetP, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),
-      offsetComponentMappingAtPath(EnumeratedPath / "q", EnumeratedOffsetView.OffsetQ, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.OffsetGeneratorRole, EnumeratedOffsetView.Index),
+      // Singleton offsets under the telescope-config generators carry a
+      // single key column: every key = true column is hoisted once per
+      // object level and per generator path in the generated SQL, which
+      // contributes to the Postgres 1664-column target-list limit (sc-9893).
+      offsetMappingAtPath(EnumeratedPath, EnumeratedOffsetView.ObservationId, EnumeratedOffsetView.Index),
+      offsetComponentMappingAtPath(EnumeratedPath / "p", EnumeratedOffsetView.OffsetP, EnumeratedOffsetView.ObservationId),
+      offsetComponentMappingAtPath(EnumeratedPath / "q", EnumeratedOffsetView.OffsetQ, EnumeratedOffsetView.ObservationId),
 
-      offsetMappingAtPath(CornerAPath, TelescopeConfigGeneratorView.Uniform.ObservationId, TelescopeConfigGeneratorView.Uniform.Role),
-      offsetComponentMappingAtPath(CornerAPath / "p", TelescopeConfigGeneratorView.UniformCornerAP, TelescopeConfigGeneratorView.Uniform.ObservationId, TelescopeConfigGeneratorView.Uniform.Role),
-      offsetComponentMappingAtPath(CornerAPath / "q", TelescopeConfigGeneratorView.UniformCornerAQ, TelescopeConfigGeneratorView.Uniform.ObservationId, TelescopeConfigGeneratorView.Uniform.Role),
+      offsetMappingAtPath(CornerAPath, TelescopeConfigGeneratorView.Uniform.ObservationId),
+      offsetComponentMappingAtPath(CornerAPath / "p", TelescopeConfigGeneratorView.UniformCornerAP, TelescopeConfigGeneratorView.Uniform.ObservationId),
+      offsetComponentMappingAtPath(CornerAPath / "q", TelescopeConfigGeneratorView.UniformCornerAQ, TelescopeConfigGeneratorView.Uniform.ObservationId),
 
-      offsetMappingAtPath(CornerBPath, TelescopeConfigGeneratorView.Uniform.ObservationId, TelescopeConfigGeneratorView.Uniform.Role),
-      offsetComponentMappingAtPath(CornerBPath / "p", TelescopeConfigGeneratorView.UniformCornerBP, TelescopeConfigGeneratorView.Uniform.ObservationId, TelescopeConfigGeneratorView.Uniform.Role),
-      offsetComponentMappingAtPath(CornerBPath / "q", TelescopeConfigGeneratorView.UniformCornerBQ, TelescopeConfigGeneratorView.Uniform.ObservationId, TelescopeConfigGeneratorView.Uniform.Role),
+      offsetMappingAtPath(CornerBPath, TelescopeConfigGeneratorView.Uniform.ObservationId),
+      offsetComponentMappingAtPath(CornerBPath / "p", TelescopeConfigGeneratorView.UniformCornerBP, TelescopeConfigGeneratorView.Uniform.ObservationId),
+      offsetComponentMappingAtPath(CornerBPath / "q", TelescopeConfigGeneratorView.UniformCornerBQ, TelescopeConfigGeneratorView.Uniform.ObservationId),
 
-      offsetMappingAtPath(RandomPath, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
-      offsetComponentMappingAtPath(RandomPath / "p", TelescopeConfigGeneratorView.CenterOffsetP, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
-      offsetComponentMappingAtPath(RandomPath / "q", TelescopeConfigGeneratorView.CenterOffsetQ, TelescopeConfigGeneratorView.Random.ObservationId, TelescopeConfigGeneratorView.Random.Role),
+      offsetMappingAtPath(RandomPath, TelescopeConfigGeneratorView.Random.ObservationId),
+      offsetComponentMappingAtPath(RandomPath / "p", TelescopeConfigGeneratorView.CenterOffsetP, TelescopeConfigGeneratorView.Random.ObservationId),
+      offsetComponentMappingAtPath(RandomPath / "q", TelescopeConfigGeneratorView.CenterOffsetQ, TelescopeConfigGeneratorView.Random.ObservationId),
 
-      offsetMappingAtPath(SpiralPath, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
-      offsetComponentMappingAtPath(SpiralPath / "p", TelescopeConfigGeneratorView.CenterOffsetP, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
-      offsetComponentMappingAtPath(SpiralPath / "q", TelescopeConfigGeneratorView.CenterOffsetQ, TelescopeConfigGeneratorView.Spiral.ObservationId, TelescopeConfigGeneratorView.Spiral.Role),
+      offsetMappingAtPath(SpiralPath, TelescopeConfigGeneratorView.Spiral.ObservationId),
+      offsetComponentMappingAtPath(SpiralPath / "p", TelescopeConfigGeneratorView.CenterOffsetP, TelescopeConfigGeneratorView.Spiral.ObservationId),
+      offsetComponentMappingAtPath(SpiralPath / "q", TelescopeConfigGeneratorView.CenterOffsetQ, TelescopeConfigGeneratorView.Spiral.ObservationId),
 
       offsetMappingAtPath(StepRecordPath, StepRecordView.Id),
       offsetComponentMappingAtPath(StepRecordPath / "p", StepRecordView.OffsetP, StepRecordView.Id),
