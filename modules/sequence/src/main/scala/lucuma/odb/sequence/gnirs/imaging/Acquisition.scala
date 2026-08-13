@@ -10,6 +10,7 @@ import cats.Order
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.applicative.*
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -177,17 +178,17 @@ object Acquisition:
     given Order[GnirsFilter] = ImagingSequence.wavelengthOrder(config.variant)(_.centralWavelength)
     val firstFilter: GnirsFilter = config.filters.map(_.filter).sorted.head
 
-    val generator: Either[OdbError, SequenceGenerator[GnirsDynamicConfig]] =
-      time
-        .filterOrElse(
-          _.exposureTime.toNonNegMicroseconds.value > 0,
-          sequenceError("GNIRS Imaging requires a positive acquisition exposure time.")
-        )
-        .map: t =>
-          val mode           = config.acquisition.resolvedMode(t, GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset, pinnedAcqType)
-          val selFilter      = config.acquisition.selectedFilter(mode, firstFilter)
-          val coadds: PosInt = config.acquisition.resolvedCoadds(t)
-          val steps: Steps   = StepComputer.compute(config.camera, mode, selFilter, coadds, t)
-          Generator(builder, steps.initialAtom, steps.repeatingAtom)
-
-    generator.pure[F]
+    (for
+      t         <- time.filterOrElse(
+                     _.exposureTime.toNonNegMicroseconds.value > 0,
+                     sequenceError("GNIRS Imaging requires a positive acquisition exposure time.")
+                   )
+      mode       = config.acquisition.resolvedMode(t, GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset, pinnedAcqType)
+      selFilter <- config.acquisition
+                     .selectedFilter(mode, Right(firstFilter))
+                     .leftMap(sequenceError)
+    yield
+      val coadds: PosInt = config.acquisition.resolvedCoadds(t)
+      val steps: Steps   = StepComputer.compute(config.camera, mode, selFilter, coadds, t)
+      Generator(builder, steps.initialAtom, steps.repeatingAtom): SequenceGenerator[GnirsDynamicConfig]
+    ).pure[F]
