@@ -65,6 +65,7 @@ import lucuma.core.util.RetryFlakyTests
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcCcd
 import lucuma.itc.ItcVersions
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
@@ -272,6 +273,24 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
     None
 
+  val FakeItcCcds: List[ItcCcd] =
+    List(1000.0, 2500.0).map: peak =>
+      ItcCcd(
+        singleSNRatio                 = SingleSN(SignalToNoise.unsafeFromBigDecimalExact(6)),
+        maxSingleSNRatio              = None,
+        totalSNRatio                  = TotalSN(SignalToNoise.unsafeFromBigDecimalExact(7)),
+        maxTotalSNRatio               = None,
+        wavelengthForMaxTotalSNRatio  = None,
+        wavelengthForMaxSingleSNRatio = None,
+        peakPixelFlux                 = peak,
+        wellDepth                     = 100000.0,
+        ampGain                       = 2.0,
+        warnings                      = Nil
+      )
+
+  val FakeItcPeakPixelFlux: Double =
+    FakeItcCcds.map(_.peakPixelFlux).max
+
   def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
     SignalToNoiseAt(
       w,
@@ -290,7 +309,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, None, Nil).asRight
+                  TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, None, FakeItcCcds).asRight
                 )
               )
             ).get
@@ -324,7 +343,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               NonEmptyChain.fromSeq(
                 List.fill(input.asterism.length)(
                   TargetIntegrationTimeOutcome(
-                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some, Nil).asRight
+                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some, FakeItcCcds).asRight
                   )
                 )
               ).get
@@ -474,7 +493,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
    * Runs `document` as `user` against a dedicated mapping whose monitor records every SQL
    * statement issued, compiling and then resolving cone filters exactly as `GraphQLRoutes`
    * does.
-   * Yields the response JSON and the statements that produced it, so a test can assert not just 
+   * Yields the response JSON and the statements that produced it, so a test can assert not just
    * the result but how many queries it took.
    */
   def queryWithSqlStats(user: User, document: String, variables: Option[JsonObject] = None): IO[(Json, List[SqlStats])] =

@@ -524,7 +524,9 @@ object ItcService {
            .map: a =>
              val z = a.value.zipWithIndex.map { case (intTime, index) =>
                val t = targets.get(index).get
-               ItcResult(t.targetId, intTime.times.focus, intTime.signalToNoiseAt)
+               // we keep the largest of the per-CCD peak pixel fluxes.
+               val peak = intTime.ccds.map(_.peakPixelFlux).maxOption
+               ItcResult(t.targetId, intTime.times.focus, intTime.signalToNoiseAt, peak)
              }
              // Pin the "selected" result to the user's signal-to-noise target,
              // if one is set and present; otherwise keep the automatic
@@ -650,7 +652,7 @@ object ItcService {
             Zipper.fromNel:
               targets.map: t =>
                 val it = IntegrationTime(d.timeAndCount.time, d.timeAndCount.count)
-                ItcResult(t.targetId, it, none)
+                ItcResult(t.targetId, it, none, none)
 
           EitherT.pure:
             Itc(

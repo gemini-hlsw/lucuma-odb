@@ -14495,6 +14495,18 @@ type ItcResult {
   exposureTime: TimeSpan!
   exposureCount: NonNegInt!
   signalToNoiseAt: SignalToNoiseAt
+
+  """
+  The maximum, across the CCDs, of each CCD's peak pixel flux: the highest
+  electron count in any single pixel, as computed by the ITC for a single
+  exposure.  Null when the ITC reported no CCD data (GHOST, which has no ITC
+  calculation at all, and sources too bright to calculate), and for results
+  that were cached or frozen before this field existed.  For an acquisition
+  whose exposure time was clamped to the instrument's acquisition limits, this
+  is the flux the ITC computed for the unclamped time, so it may disagree with
+  the exposure time reported alongside it.
+  """
+  peakPixelFlux: Float
 }
 
 """

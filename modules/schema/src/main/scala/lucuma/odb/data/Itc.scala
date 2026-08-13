@@ -30,11 +30,15 @@ import monocle.macros.GenPrism
  * count) and, when available, the achieved signal-to-noise.  Shared by both the
  * science ([[ItcScience]]) and acquisition ([[ItcAcquisition]]) results.
  * Corresponds to `ItcResult` in the GraphQL schema.
+ *
+ * `peakPixelFlux` is the maximum, across the CCDs the ITC reported, of each
+ * CCD's peak pixel flux.  It is absent wherever no CCD data reaches us: GHOST
  */
 case class ItcResult(
   targetId:      Target.Id,
   value:         IntegrationTime,
-  signalToNoise: Option[SignalToNoiseAt]
+  signalToNoise: Option[SignalToNoiseAt],
+  peakPixelFlux: Option[Double]
 ):
   def totalTime: Option[TimeSpan] =
     val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value

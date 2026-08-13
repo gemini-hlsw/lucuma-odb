@@ -57,7 +57,8 @@ trait ItcCodec:
         exposureTime    <- c.downField("exposureTime").as[TimeSpan]
         exposureCount   <- c.downField("exposureCount").as[PosInt]
         signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
-      yield ItcResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt)
+        peakPixelFlux   <- c.downField("peakPixelFlux").as[Option[Double]]
+      yield ItcResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt, peakPixelFlux)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcResult] =
     Encoder.instance: a =>
@@ -65,7 +66,8 @@ trait ItcCodec:
         "targetId"        -> a.targetId.asJson,
         "exposureTime"    -> a.value.exposureTime.asJson,
         "exposureCount"   -> a.value.exposureCount.value.asJson,
-        "signalToNoiseAt" -> a.signalToNoise.asJson
+        "signalToNoiseAt" -> a.signalToNoise.asJson,
+        "peakPixelFlux"   -> a.peakPixelFlux.asJson
       )
 
   // GnirsAcquisitionType is a plain Enumerated; encode by tag.  Round-trips

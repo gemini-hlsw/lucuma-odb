@@ -3,6 +3,8 @@
 
 package lucuma.odb.json
 
+import io.circe.parser.decode
+import io.circe.syntax.*
 import io.circe.testing.ArbitraryInstances
 import io.circe.testing.CodecTests
 import lucuma.odb.data.ItcAcquisition
@@ -10,6 +12,7 @@ import lucuma.odb.data.ItcResult
 import lucuma.odb.data.ItcScience
 import lucuma.odb.data.arb.ArbItc
 import munit.DisciplineSuite
+import org.scalacheck.Prop.forAll
 
 class ItcSuite extends DisciplineSuite with ArbitraryInstances:
   import ArbItc.given
@@ -23,3 +26,23 @@ class ItcSuite extends DisciplineSuite with ArbitraryInstances:
   checkAll("ItcResultCodec", CodecTests[ItcResult].codec)
   checkAll("ItcScienceCodec", CodecTests[ItcScience].codec)
   checkAll("ItcAcquisitionAvailableCodec", CodecTests[ItcAcquisition.Available].codec)
+
+  property("peakPixelFlux survives a round trip"):
+    forAll: (r: ItcResult) =>
+      assertEquals(
+        decode[ItcResult](r.asJson.spaces2).map(_.peakPixelFlux),
+        Right(r.peakPixelFlux)
+      )
+
+  // Rows cached before the field existed must still decode.
+  test("peakPixelFlux is absent from legacy JSON"):
+    val legacy =
+      """
+        {
+          "targetId": "t-100",
+          "exposureTime": { "microseconds": 1000000 },
+          "exposureCount": 3,
+          "signalToNoiseAt": null
+        }
+      """
+    assertEquals(decode[ItcResult](legacy).map(_.peakPixelFlux), Right(None))
