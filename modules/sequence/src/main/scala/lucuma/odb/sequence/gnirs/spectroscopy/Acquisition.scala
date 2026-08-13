@@ -173,8 +173,7 @@ object Acquisition:
       val acqExposureTime: TimeSpan = time.exposureTime
       val readMode: GnirsReadMode   = GnirsReadMode.forExposureTime(acqExposureTime)
       // The science-aperture decker, from camera + prism (always Mirror) for the long
-      // slit.  (IFU acquisitions take the computeIfu path.)  The decker depends only on the
-      // pixel scale, which the acquisition camera shares, so it is the same either way.
+      // slit.  (IFU acquisitions take the computeIfu path.)
       val specDecker: GnirsDecker   = GnirsDecker.forCameraAndPrism(config.camera, GnirsPrism.Mirror)
 
       // The FPU image (first step) uses a single coadd and the fixed filter/exposure from
@@ -196,7 +195,7 @@ object Acquisition:
                    coadds            = SingleCoadd,
                    filter            = fpuStepFilter,
                    acquisitionMirror = GnirsAcquisitionMirrorMode.In,
-                   camera            = config.acquisitionCamera,
+                   camera            = config.camera,
                    focus             = config.focus,
                    readMode          = fpuStepReadMode,
                    decker            = specDecker,
@@ -241,8 +240,7 @@ object Acquisition:
     /**
      * The unexpanded smart flat leading an HR-IFU acquisition, taken at the science
      * configuration to check the alignment of the spectrograph. Exposure, lamp and
-     * coadds come from the SmartGcal lookup.  Being a science configuration, it keeps the
-     * science camera rather than the blue acquisition camera.
+     * coadds come from the SmartGcal lookup.
      */
     def ifuAlignmentFlat(config: Config): ProtoStep[GnirsDynamicConfig] =
       eval:
@@ -290,7 +288,7 @@ object Acquisition:
                              coadds            = acqCoadds,
                              filter            = selectedFilter,
                              acquisitionMirror = GnirsAcquisitionMirrorMode.In,
-                             camera            = config.acquisitionCamera,
+                             camera            = config.camera,
                              focus             = config.focus,
                              readMode          = GnirsReadMode.forExposureTime(fieldExposureTime),
                              decker            = GnirsDecker.Acquisition,
@@ -371,22 +369,22 @@ object Acquisition:
     // Resolve the acquisition mode (explicit or auto) and the selected filter (explicit,
     // or auto from the mode + spectroscopy wavelength).
     val checked: Either[OdbError, (IntegrationTime, GnirsAcquisitionMode, GnirsFilter)] =
-      time
-        .filterOrElse(
-          _.exposureTime.toNonNegMicroseconds.value > 0,
-          sequenceError("GNIRS Spectroscopy requires a positive acquisition exposure time.")
-        )
-        .map: t =>
-          val mode      = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedAcqType)
-          val selFilter = config.acquisition
-                            .selectedFilter(mode, GnirsFilter.fromAcquisitionWavelength(config.primaryCentralWavelength))
-          (t, mode, selFilter)
+      for
+        t         <- time.filterOrElse(
+                       _.exposureTime.toNonNegMicroseconds.value > 0,
+                       sequenceError("GNIRS Spectroscopy requires a positive acquisition exposure time.")
+                     )
+        mode       = config.acquisition.resolvedMode(t, defaultFaintSkyOffset(config.fpu), pinnedAcqType)
+        selFilter <- config.acquisition
+                       .selectedFilter(mode, GnirsFilter.fromAcquisitionWavelength(config.primaryCentralWavelength))
+                       .leftMap(sequenceError)
+      yield (t, mode, selFilter)
 
     config.fpu match
       case GnirsFpu.Spectroscopy.Slit(_)  =>
         (for
           (t, mode, selFilter) <- checked
-          fpuStep              <- firstStepFilterAndExposure(mode, config.acquisitionCamera, selFilter).leftMap(sequenceError)
+          fpuStep              <- firstStepFilterAndExposure(mode, config.camera, selFilter).leftMap(sequenceError)
         yield
           val (fpuStepFilter, fpuStepExposureTime): (GnirsFilter, TimeSpan) = fpuStep
           val steps: Steps = StepComputer.compute(config, mode, fpuStepFilter, fpuStepExposureTime, selFilter, t)

@@ -59,13 +59,13 @@ case class AcquisitionConfig(
    */
   def selectedFilter(
     mode: GnirsAcquisitionMode,
-    auto: => GnirsFilter
-  ): GnirsFilter =
+    auto: => Either[String, GnirsFilter]
+  ): Either[String, GnirsFilter] =
     explicitFilter match
-      case Some(f) => f
+      case Some(f) => Right(f)
       case None    =>
         mode match
-          case GnirsAcquisitionMode.VeryBright => GnirsFilter.H2
+          case GnirsAcquisitionMode.VeryBright => Right(GnirsFilter.H2)
           case _                               => auto
 
   /**
