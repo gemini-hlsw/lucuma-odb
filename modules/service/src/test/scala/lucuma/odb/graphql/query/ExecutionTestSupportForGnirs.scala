@@ -149,7 +149,11 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat),
           // IFU flat + arc, so IFU science sequences resolve smart gcal too.
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartFlat),
-          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc),
+          // The same configs at Deep well depth, which is the default for the red cameras
+          // and so applies to thermal-IR (L and M) science.
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(wellDepth = GnirsWellDepth.Deep), gnirsSmartFlat),
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(wellDepth = GnirsWellDepth.Deep), gnirsSmartArc)
         )
       ::: List(
         Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrKey, gnirsSmartFlat),
@@ -276,6 +280,43 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                     }
                   ]
                   explicitWellDepth: DEEP
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  /**
+   * Set the science filter and central wavelength (with a matching science ETM) on a
+   * GNIRS LongSlit observation, for exercising bands other than the default K / 2200 nm.
+   */
+  def setFilterAndCentralWavelength(oid: Observation.Id, filter: String, centralNm: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  filter: $filter
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: $centralNm }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time: { seconds: 30.0 }
+                          count: 3
+                          at: { nanometers: $centralNm }
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
