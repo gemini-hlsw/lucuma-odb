@@ -41,9 +41,7 @@ object GmosFpu {
     given Decoder[North] =
       decoder[North, GmosNorthFpu](North(_))
 
-    given Eq[North] with
-      def eqv(x: North, y: North): Boolean =
-        x.fpu === y.fpu
+    given Eq[North] = Eq.by(_.fpu)
 
   }
 
@@ -70,9 +68,7 @@ object GmosFpu {
     given Decoder[South] =
       decoder[South, GmosSouthFpu](South(_))
 
-    given Eq[South] with
-      def eqv(x: South, y: South): Boolean =
-        x.fpu === y.fpu
+    given Eq[South] = Eq.by(_.fpu)
 
   }
 
@@ -85,20 +81,18 @@ object GmosFpu {
     )
 
   private def decoder[A, U: Enumerated](f: (Either[GmosCustomMask, U] => A)): Decoder[A] =
-    new Decoder[A] {
-      def apply(c: HCursor): Decoder.Result[A] =
-        for {
-          m <- c.downField("customMask").as[Option[GmosCustomMask]]
-          b <- c.downField("builtin").as[Option[U]]
-          u <- (m, b) match {
-                 case (Some(m), None) => m.asLeft[U].asRight[DecodingFailure]
-                 case (None, Some(b)) => b.asRight[GmosCustomMask].asRight[DecodingFailure]
-                 case _               =>
-                   DecodingFailure("Expected exactly one of `customMask` or `builtin`",
-                                   c.history
-                   ).asLeft
-               }
-        } yield f(u)
-    }
+    (c: HCursor) =>
+      for {
+        m <- c.downField("customMask").as[Option[GmosCustomMask]]
+        b <- c.downField("builtin").as[Option[U]]
+        u <- (m, b) match {
+               case (Some(m), None) => m.asLeft[U].asRight[DecodingFailure]
+               case (None, Some(b)) => b.asRight[GmosCustomMask].asRight[DecodingFailure]
+               case _               =>
+                 DecodingFailure("Expected exactly one of `customMask` or `builtin`",
+                                 c.history
+                 ).asLeft
+             }
+      } yield f(u)
 
 }

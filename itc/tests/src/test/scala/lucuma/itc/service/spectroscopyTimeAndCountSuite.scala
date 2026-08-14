@@ -1565,7 +1565,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               flamingos2Spectroscopy: {
                 exposureTimeMode: { timeAndCount: { time: { seconds: 2 }, count: 3, at: { nanometers: 60 } } },
                 filter: Y,
-                fpu: LONG_SLIT_1,
+                fpu: { builtin: LONG_SLIT_1 },
                 disperser: R3000,
                 readMode: FAINT
               }

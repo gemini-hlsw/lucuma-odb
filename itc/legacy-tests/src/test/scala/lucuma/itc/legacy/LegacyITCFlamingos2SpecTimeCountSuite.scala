@@ -6,6 +6,7 @@ package lucuma.itc.legacy
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
 
@@ -36,7 +37,7 @@ class LegacyITCFlamingos2SpecTimeAndCountSuite extends LegacyITCFlamingos2Suite:
       Flamingos2Disperser.R3000,
       Flamingos2Filter.J,
       Flamingos2ReadMode.Faint,
-      Flamingos2Fpu.LongSlit2,
+      Flamingos2FpuMask.Builtin(Flamingos2Fpu.LongSlit2),
       PortDisposition.Side
     )
 
@@ -52,7 +53,7 @@ class LegacyITCFlamingos2SpecTimeAndCountSuite extends LegacyITCFlamingos2Suite:
     f2.copy(filter = f, disperser = d)
 
   def observingModeWithFpu(f: Flamingos2Fpu): ObservingMode =
-    f2.copy(fpu = f)
+    f2.copy(fpu = Flamingos2FpuMask.Builtin(f))
 
   def observingModeWithReadMode(rm: Flamingos2ReadMode): ObservingMode =
     f2.copy(readMode = rm)

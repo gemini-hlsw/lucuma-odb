@@ -8,7 +8,6 @@ import eu.timepit.refined.scalacheck.all.given
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
-import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
@@ -32,6 +31,7 @@ import org.scalacheck.Arbitrary.arbitrary
 trait ArbInstrumentMode {
   import ArbEnumerated.given
   import ArbExposureTimeMode.given
+  import ArbFlamingos2FpuMask.given
   import ArbGmosFpu.given
   import ArbGmosCcdMode.given
   import ArbWavelength.given
@@ -151,7 +151,7 @@ trait ArbInstrumentMode {
         d  <- arbitrary[Flamingos2Disperser]
         f  <- arbitrary[Flamingos2Filter]
         rm <- arbitrary[Flamingos2ReadMode]
-        fp <- arbitrary[Flamingos2Fpu]
+        fp <- arbitrary[Flamingos2FpuMask]
         p  <- arbitrary[PortDisposition]
       } yield Flamingos2Spectroscopy(et, d, f, rm, fp, p)
     }
@@ -162,7 +162,7 @@ trait ArbInstrumentMode {
        Flamingos2Disperser,
        Flamingos2Filter,
        Flamingos2ReadMode,
-       Flamingos2Fpu,
+       Flamingos2FpuMask,
        PortDisposition
       )
     ].contramap(a => (a.exposureTimeMode, a.disperser, a.filter, a.readMode, a.fpu, a.port))
