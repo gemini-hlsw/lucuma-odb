@@ -797,7 +797,14 @@ lazy val schema =
           rootDir / "modules" / "sso-service" / "src" / "main" / "resources" / "Sso.graphql"
         val resourceSchemaFile: File     =
           rootDir / "resource" / "service" / "src" / "main" / "resources" / "graphql" / "resource.graphql"
-        val semVerWithPrerelease: String = version.value.replace("-SNAPSHOT", "")
+        // sbt-typelevel versions are not always full semver: between a base version bump
+        // and its first tag they look like "0.91-67fba49-SNAPSHOT". npm rejects those,
+        // so pad the numeric core to major.minor.patch: "0.91.0-67fba49".
+        val semVerWithPrerelease: String = {
+          val (core, prerelease) =
+            version.value.stripSuffix("-SNAPSHOT").span(_ != '-')
+          core.split('.').padTo(3, "0").mkString(".") + prerelease
+        }
 
         IO.write(
           npmDir / "package.json",
