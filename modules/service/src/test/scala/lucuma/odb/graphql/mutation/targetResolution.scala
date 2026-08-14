@@ -5,13 +5,16 @@ package lucuma.odb.graphql
 package mutation
 
 import cats.effect.IO
-import cats.syntax.either.*
+import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.model.Ephemeris
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import skunk.codec.all.*
+import skunk.syntax.all.*
 
 /**
  * A Target of Opportunity keeps its identity when the alert arrives: it gains a resolution and
@@ -314,6 +317,43 @@ class targetResolution extends OdbSuite {
                expected = List("Argument 'input.SET.opportunity.region.declinationArc' is invalid: cannot be null").asLeft
              )
     yield ()
+  }
+
+  /** How many ephemeris elements are stored under `des`, which is the whole point below. */
+  private def storedElements(des: String): IO[Long] =
+    session.use: s =>
+      s.prepareR(sql"select count(*) from t_ephemeris where c_des = $text".query(int8)).use: pq =>
+        pq.unique(des)
+
+  // A user-supplied ephemeris can arrive as an opportunity target's resolution rather than as the
+  // target's own tracking.  Both write the same key columns, so both have to replace the stored
+  // elements; the nested path used to write the columns and leave the old ephemeris in place,
+  // pointing the target at data nobody supplied.
+  test("resolving to a user-supplied ephemeris replaces the stored elements") {
+    for
+      pid    <- createProgramAs(pi)
+      full   <- createUserDefinedEphemerisFor(Ephemeris.Key.Comet("1P"))
+      nsid   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, pid, full)
+      js     <- query(pi, s"""query { target(targetId: ${nsid.asJson}) { nonsidereal { key des } } }""")
+      key     = js.hcursor.downFields("target", "nonsidereal", "key").require[String]
+      des     = js.hcursor.downFields("target", "nonsidereal", "des").require[String]
+      before <- storedElements(des)
+      half    = full.map(es => es.take(es.length / 2))
+      tid    <- createToo(pid)
+      _      <- query(pi,
+                  s"""
+                    mutation {
+                      updateTargets(input: {
+                        SET: { opportunity: { resolution: { nonsidereal: { key: "$key" ephemeris: ${half.asGraphQL} } } } }
+                        WHERE: { id: { EQ: ${tid.asJson} } }
+                      }) { targets { id } }
+                    }
+                  """
+                )
+      after  <- storedElements(des)
+    yield
+      assertEquals(before, full.toList.map(_.length.toLong).sum)
+      assertEquals(after,  half.toList.map(_.length.toLong).sum)
   }
 
   test("a plain sidereal target can be converted into a Target of Opportunity") {

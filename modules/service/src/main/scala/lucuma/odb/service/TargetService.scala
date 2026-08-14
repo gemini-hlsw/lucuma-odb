@@ -148,14 +148,22 @@ object TargetService {
 
       private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F], SuperUserAccess): F[UpdateTargetsResponse] =
 
-        // Updates to the user-supplied ephemeris, if any
+        // Updates to the user-supplied ephemeris, if any.  It arrives either as the target's own
+        // tracking or as an opportunity target's resolution, and the two mean the same thing: the
+        // same key columns are written either way, so if the nested one is not unwrapped here the
+        // target ends up pointing at a key whose elements were never replaced.
+        val userSuppliedEphemeris: Option[NonsiderealInput.Edit.UserSupplied] =
+          input.subtypeInfo.flatMap:
+            case u: NonsiderealInput.Edit.UserSupplied => u.some
+            case o: OpportunityInput.Edit              =>
+              o.resolution.toOption.collect:
+                case u: NonsiderealInput.Edit.UserSupplied => u
+            case _                                     => none
+
         val replaceEphemeris: F[Unit] =
-          input
-            .subtypeInfo
-            .collect:
-              case NonsiderealInput.Edit.UserSupplied(k, elems) =>
-                trackingService.replaceUserSuppliedEphemeris(Ephemeris.UserSupplied(k, elems))
-            .sequence_
+          userSuppliedEphemeris.traverse_ { u =>
+            trackingService.replaceUserSuppliedEphemeris(Ephemeris.UserSupplied(u.key, u.ephemeris))
+          }
 
         // Updates that don't concern source profile
         val nonSourceProfileUpdates: Stream[F, Target.Id] = {
