@@ -13,6 +13,7 @@ import coulomb.syntax.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
+import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -168,6 +169,29 @@ class WiringSuite extends ClientSuite:
   test("ItcClient flamingos2 spectroscopy basic wiring and sanity check"):
     spectroscopy(
       WiringSuite.Flamingos2SpectroscopyInputData,
+      ClientCalculationResult(
+        ItcVersions(
+          buildinfo.BuildInfo.itcSourceHash,
+          BuildInfo.ocslibHash.some
+        ),
+        AsterismIntegrationTimeOutcomes:
+          NonEmptyChain:
+            TargetIntegrationTimeOutcome:
+              TargetIntegrationTime(
+                Zipper.fromNel(NonEmptyList.one(selected)),
+                Band.R.asLeft,
+                SignalToNoiseAt(atWavelength,
+                                SingleSN(SignalToNoise.unsafeFromBigDecimalExact(101.0)),
+                                TotalSN(SignalToNoise.unsafeFromBigDecimalExact(102.0))
+                ).some,
+                List.empty
+              ).asRight
+      ).asRight
+    )
+
+  test("ItcClient flamingos2 mos spectroscopy basic wiring and sanity check"):
+    spectroscopy(
+      WiringSuite.Flamingos2MosSpectroscopyInputData,
       ClientCalculationResult(
         ItcVersions(
           buildinfo.BuildInfo.itcSourceHash,
@@ -804,7 +828,47 @@ object WiringSuite:
           Flamingos2Disperser.R3000,
           Flamingos2Filter.J,
           Flamingos2ReadMode.Faint,
-          Flamingos2Fpu.LongSlit2,
+          Flamingos2FpuMask.builtin(Flamingos2Fpu.LongSlit2),
+          PortDisposition.Side
+        )
+      ),
+      NonEmptyList.of(
+        TargetInput(
+          SourceProfile.Point(
+            BandNormalized[Integrated](
+              Galaxy(Spiral).some,
+              SortedMap(
+                Band.R ->
+                  Measure(
+                    BrightnessValue.unsafeFrom(BigDecimal(10.0)),
+                    TaggedUnit[VegaMagnitude, Brightness[Integrated]].unit
+                  ).tag
+              )
+            )
+          ),
+          RadialVelocity.fromMetersPerSecond.getOption(1.0).get
+        )
+      )
+    )
+
+  val Flamingos2MosSpectroscopyInputData: SpectroscopyInput =
+    SpectroscopyInput(
+      SpectroscopyParameters(
+        ItcConstraintsInput(
+          ImageQualityInput.preset(ImageQuality.Preset.PointOne),
+          CloudExtinctionInput.preset(CloudExtinction.Preset.PointOne),
+          skyBackground = SkyBackground.Darkest,
+          waterVapor = WaterVapor.VeryDry,
+          elevationRange = ElevationRange.ByAirMass.Default
+        ),
+        InstrumentMode.Flamingos2Spectroscopy(
+          defaultEtm,
+          Flamingos2Disperser.R3000,
+          Flamingos2Filter.J,
+          Flamingos2ReadMode.Faint,
+          Flamingos2FpuMask.customMask(
+            Flamingos2CustomMask(Flamingos2CustomSlitWidth.CustomWidth_2_pix)
+          ),
           PortDisposition.Side
         )
       ),

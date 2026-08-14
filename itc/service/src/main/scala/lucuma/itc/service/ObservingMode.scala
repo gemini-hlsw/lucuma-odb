@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.*
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.itc.ItcGhostDetector
@@ -109,7 +110,7 @@ object ObservingMode {
       disperser:       Flamingos2Disperser,
       filter:          Flamingos2Filter,
       readMode:        Flamingos2ReadMode,
-      fpu:             Flamingos2Fpu,
+      fpu:             Flamingos2FpuMask,
       portDisposition: PortDisposition
     ) extends SpectroscopyMode derives Hash {
 
@@ -122,7 +123,8 @@ object ObservingMode {
         Instrument.Flamingos2
 
       val description: String =
-        s"${instrument.shortName} Longslit"
+        if fpu.custom.isDefined then s"${instrument.shortName} MOS"
+        else s"${instrument.shortName} Longslit"
     }
 
     case class Igrins2(portDisposition: PortDisposition) extends SpectroscopyMode derives Hash {

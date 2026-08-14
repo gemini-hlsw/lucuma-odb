@@ -40,6 +40,7 @@ import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
+import lucuma.itc.client.Flamingos2FpuMask
 import lucuma.itc.client.GmosCustomMask
 import lucuma.itc.client.GmosFpu
 import lucuma.itc.client.ImagingParameters
@@ -352,7 +353,12 @@ object GeneratorParamsService {
                                  case ExposureTimeMode.TimeAndCountMode(time = time) =>
                                    f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
 
-            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci, disperser, filter, sciReadMode, fpu)
+            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci,
+                                                                  disperser,
+                                                                  filter,
+                                                                  sciReadMode,
+                                                                  Flamingos2FpuMask.builtin(fpu)
+            )
 
             spectroscopyGeneratorParams(
               obsMode = f2,

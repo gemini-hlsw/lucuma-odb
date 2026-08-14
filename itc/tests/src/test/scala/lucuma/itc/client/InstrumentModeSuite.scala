@@ -15,5 +15,8 @@ class InstrumentModeSuite extends DisciplineSuite:
   checkAll("InstrumentMode", EqTests[InstrumentMode].eqv)
   checkAll("InstrumentMode.gmosNorthSpectroscopy", PrismTests(InstrumentMode.gmosNorthSpectroscopy))
   checkAll("InstrumentMode.gmosSouthSpectroscopy", PrismTests(InstrumentMode.gmosSouthSpectroscopy))
+  checkAll("InstrumentMode.flamingos2Spectroscopy",
+           PrismTests(InstrumentMode.flamingos2Spectroscopy)
+  )
   checkAll("InstrumentMode.gmosNorthImaging", PrismTests(InstrumentMode.gmosNorthImaging))
   checkAll("InstrumentMode.gmosSouthImaging", PrismTests(InstrumentMode.gmosSouthImaging))
