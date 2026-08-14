@@ -635,17 +635,27 @@ object TargetService {
         case opp: OpportunityInput.Edit =>
           // Omitting the region leaves it exactly as it was, which is what lets a client
           // resolve a target without having to restate -- and risk redrawing -- the patch of
-          // sky the TAC approved.
+          // sky the TAC approved.  Omitting one arc leaves that axis alone for the same
+          // reason, which is why each arc contributes updates only when it is present:
+          // `Option.asUpdate` writes null for an absent value, so naming the columns
+          // unconditionally would erase the arc the client did not mention -- and an
+          // opportunity target with a null arc type fails `opportunity_fields`.
+          //
+          // A *present* arc does own all three of its columns, though.  Its endpoints are
+          // null for a full or empty arc, and going from partial to either has to clear
+          // them, so within an arc the absent-is-null behaviour is exactly right.
+          def arcUpdates[A: Angular](arc: Option[Arc[A]], prefix: String, e: Encoder[A]): List[AppliedFragment] =
+            arc.toList.flatMap: a =>
+              List(
+                sql"#${prefix}_arc_type = $arc_type".apply(a.tpe),
+                Arc.start.getOption(a).asUpdate(s"${prefix}_arc_start", e),
+                Arc.end.getOption(a).asUpdate(s"${prefix}_arc_end", e)
+              )
+
           val regionUpdates: List[AppliedFragment] =
             opp.region.toList.flatMap: region =>
-              List(
-                region.raArc.map(_.tpe).asUpdate("c_opp_ra_arc_type", arc_type),
-                region.raArc.map(Arc.start.getOption).asUpdate("c_opp_ra_arc_start", right_ascension.opt),
-                region.raArc.map(Arc.end.getOption).asUpdate("c_opp_ra_arc_end", right_ascension.opt),
-                region.decArc.map(_.tpe).asUpdate("c_opp_dec_arc_type", arc_type),
-                region.decArc.map(Arc.start.getOption).asUpdate("c_opp_dec_arc_start", declination.opt),
-                region.decArc.map(Arc.end.getOption).asUpdate("c_opp_dec_arc_end", declination.opt),
-              )
+              arcUpdates(region.raArc,  "c_opp_ra",  right_ascension) ++
+              arcUpdates(region.decArc, "c_opp_dec", declination)
           void"c_type = 'opportunity'" :: regionUpdates ++ resolutionUpdates(opp.resolution)
 
       }

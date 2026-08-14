@@ -969,6 +969,105 @@ class updateTargets extends OdbSuite {
       }
     }  }
 
+  // createOpportunityTargetAs draws RA FULL and declination 10..70.  Editing one arc must leave
+  // the other exactly as it was: naming all six columns unconditionally nulled the arc the client
+  // did not mention, which an opportunity target cannot have -- it fails opportunity_fields.
+  test("update opportunity region (one arc only, leaving the other alone)") {
+    createProgramAs(pi).flatMap { pid =>
+      createOpportunityTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: {
+                  opportunity: {
+                    region: {
+                      declinationArc: { type: PARTIAL, start: { degrees: 20 }, end: { degrees: 30 } }
+                    }
+                  }
+                }
+                WHERE: { id: { EQ: "$tid"} }
+              }) {
+                targets {
+                  opportunity {
+                    region {
+                      rightAscensionArc { type start { degrees } end { degrees } }
+                      declinationArc { type start { degrees } end { degrees } }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "opportunity" : {
+                        "region" : {
+                          "rightAscensionArc" : { "type": "FULL", "start": null, "end": null },
+                          "declinationArc" : {
+                            "type" : "PARTIAL",
+                            "start" : { "degrees": 20.0 },
+                            "end" : { "degrees": 30.0 }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }  }
+
+  // The converse: a present arc owns all three of its columns, so narrowing to a full arc has to
+  // clear the endpoints it used to have rather than leaving them behind.
+  test("update opportunity region (partial to full clears the endpoints)") {
+    createProgramAs(pi).flatMap { pid =>
+      createOpportunityTargetAs(pi, pid).flatMap { tid =>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              updateTargets(input: {
+                SET: { opportunity: { region: { declinationArc: { type: FULL } } } }
+                WHERE: { id: { EQ: "$tid"} }
+              }) {
+                targets {
+                  opportunity {
+                    region { declinationArc { type start { degrees } end { degrees } } }
+                  }
+                }
+              }
+            }
+          """,
+          expected = Right(
+            json"""
+              {
+                "updateTargets" : {
+                  "targets" : [
+                    {
+                      "opportunity" : {
+                        "region" : {
+                          "declinationArc" : { "type": "FULL", "start": null, "end": null }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            """
+          )
+        )
+      }
+    }  }
+
   test("update source profile (point/bandNormalized/sed)") {
     createProgramAs(pi).flatMap { pid =>
       createAllTargetTypesAs(pi, pid).flatMap { tids =>
