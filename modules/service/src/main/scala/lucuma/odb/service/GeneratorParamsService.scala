@@ -585,60 +585,59 @@ object GeneratorParamsService {
             GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.executionRequirement.isSplittable).asRight
 
           case gn: gnirs.spectroscopy.Config =>
-            for
-              // Acquisition (imaging) filter for the ITC: the explicit acquisition
-              // filter if set, otherwise the default for the spectroscopy wavelength.
-              // This must use the same wavelength as Acquisition.scala's filter
-              // selection, or the acquisition would be sized for a different filter
-              // than the sequence actually uses.
-              acqFilter <- gn.acquisition.explicitFilter
-                             .fold(GnirsFilter.fromAcquisitionWavelength(gn.primaryCentralWavelength))(_.asRight[String])
-                             .leftMap(msg => Error.MisconfiguredObservation(obsParams.observationId, msg))
-            yield
-              // One science mode per central wavelength: each is a separate
-              // configuration and so a separate ITC calculation.
-              val sciModes = gn.wavelengths.map: w =>
-                val sciReadMode = w.exposureTimeMode match
-                                    case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                      GnirsReadMode.Bright // In practice this will be ignored by the ITC, which derives the read mode itself in S/N mode
-                                    case ExposureTimeMode.TimeAndCountMode(time = time) =>
-                                      gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+            // Acquisition (imaging) filter for the ITC: the explicit acquisition
+            // filter if set, otherwise the default for the spectroscopy wavelength.
+            // This must use the same wavelength as Acquisition.scala's filter
+            // selection, or the acquisition would be sized for a different filter
+            // than the sequence actually uses.
+            val acqFilter =
+              gn.acquisition.explicitFilter
+                .getOrElse(GnirsFilter.fromAcquisitionWavelength(gn.primaryCentralWavelength))
 
-                InstrumentMode.GnirsSpectroscopy(
-                  exposureTimeMode  = w.exposureTimeMode,
-                  centralWavelength = w.centralWavelength,
-                  filter            = gn.filter,
-                  fpu               = gn.fpu,
-                  prism             = gn.prism,
-                  grating           = gn.grating,
-                  camera            = gn.camera,
-                  readMode          = sciReadMode,
-                  wellDepth         = gn.wellDepth,
-                  coadds            = w.coadds
-                )
+            // One science mode per central wavelength: each is a separate
+            // configuration and so a separate ITC calculation.
+            val sciModes = gn.wavelengths.map: w =>
+              val sciReadMode = w.exposureTimeMode match
+                                  case ExposureTimeMode.SignalToNoiseMode(_, _) =>
+                                    GnirsReadMode.Bright // In practice this will be ignored by the ITC, which derives the read mode itself in S/N mode
+                                  case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                                    gn.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
 
-              // Two-pass acquisition ITC whenever the acquisition mode and filter are
-              // both auto: only then does the resolved filter depend on the ITC-derived
-              // brightness classification (Very Bright → H2), creating the circularity.
-              // This holds for both S/N and time-and-count acquisition ETMs — the
-              // classification must not depend on the user's acquisition ETM.
-              val acqAutoClassify: Boolean =
-                gn.acquisition.explicitAcqMode.isEmpty &&
-                gn.acquisition.explicitFilter.isEmpty
-
-              gnirsSpectroscopyGeneratorParams(
-                obsMode = gn,
-                acqMode = InstrumentMode.GnirsImaging(
-                  exposureTimeMode = gn.acquisition.exposureTimeMode,
-                  filter           = acqFilter,
-                  camera           = gn.camera,
-                  readMode         = GnirsReadMode.Bright,
-                  wellDepth        = gn.wellDepth,
-                  coadds           = gn.acquisition.coadds
-                ),
-                sciModes = sciModes,
-                gnirsAcqAutoClassify = acqAutoClassify
+              InstrumentMode.GnirsSpectroscopy(
+                exposureTimeMode  = w.exposureTimeMode,
+                centralWavelength = w.centralWavelength,
+                filter            = gn.filter,
+                fpu               = gn.fpu,
+                prism             = gn.prism,
+                grating           = gn.grating,
+                camera            = gn.camera,
+                readMode          = sciReadMode,
+                wellDepth         = gn.wellDepth,
+                coadds            = w.coadds
               )
+
+            // Two-pass acquisition ITC whenever the acquisition mode and filter are
+            // both auto: only then does the resolved filter depend on the ITC-derived
+            // brightness classification (Very Bright → H2), creating the circularity.
+            // This holds for both S/N and time-and-count acquisition ETMs — the
+            // classification must not depend on the user's acquisition ETM.
+            val acqAutoClassify: Boolean =
+              gn.acquisition.explicitAcqMode.isEmpty &&
+              gn.acquisition.explicitFilter.isEmpty
+
+            gnirsSpectroscopyGeneratorParams(
+              obsMode = gn,
+              acqMode = InstrumentMode.GnirsImaging(
+                exposureTimeMode = gn.acquisition.exposureTimeMode,
+                filter           = acqFilter,
+                camera           = gn.acquisitionCamera,
+                readMode         = GnirsReadMode.Bright,
+                wellDepth        = gn.wellDepth,
+                coadds           = gn.acquisition.coadds
+              ),
+              sciModes = sciModes,
+              gnirsAcqAutoClassify = acqAutoClassify
+            ).asRight
 
           case ig: igrins2.longslit.Config =>
             val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
