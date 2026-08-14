@@ -85,9 +85,10 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlField("instrument", SpectroscopyConfigOptionGmosNorthTable.Instrument, key = true, hidden = true),
       SqlField("index",      SpectroscopyConfigOptionGmosNorthTable.Index, key = true, hidden = true),
 
-      SqlField("fpu",        SpectroscopyConfigOptionGmosNorthTable.Fpu),
-      SqlField("grating",    SpectroscopyConfigOptionGmosNorthTable.Grating),
-      SqlField("filter",     SpectroscopyConfigOptionGmosNorthTable.Filter)
+      SqlField("fpu",             SpectroscopyConfigOptionGmosNorthTable.Fpu),
+      SqlField("customSlitWidth", SpectroscopyConfigOptionGmosNorthTable.CustomSlitWidth),
+      SqlField("grating",         SpectroscopyConfigOptionGmosNorthTable.Grating),
+      SqlField("filter",          SpectroscopyConfigOptionGmosNorthTable.Filter)
     )
 
   lazy val SpectroscopyConfigOptionGmosSouthMapping: ObjectMapping =
@@ -95,9 +96,10 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlField("instrument", SpectroscopyConfigOptionGmosSouthTable.Instrument, key = true, hidden = true),
       SqlField("index",      SpectroscopyConfigOptionGmosSouthTable.Index, key = true, hidden = true),
 
-      SqlField("fpu",        SpectroscopyConfigOptionGmosSouthTable.Fpu),
-      SqlField("grating",    SpectroscopyConfigOptionGmosSouthTable.Grating),
-      SqlField("filter",     SpectroscopyConfigOptionGmosSouthTable.Filter)
+      SqlField("fpu",             SpectroscopyConfigOptionGmosSouthTable.Fpu),
+      SqlField("customSlitWidth", SpectroscopyConfigOptionGmosSouthTable.CustomSlitWidth),
+      SqlField("grating",         SpectroscopyConfigOptionGmosSouthTable.Grating),
+      SqlField("filter",          SpectroscopyConfigOptionGmosSouthTable.Filter)
     )
 
   lazy val SpectroscopyConfigOptionGnirsMapping: ObjectMapping =

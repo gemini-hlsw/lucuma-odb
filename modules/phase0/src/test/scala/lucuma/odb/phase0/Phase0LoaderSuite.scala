@@ -29,6 +29,8 @@ class Phase0LoaderSuite extends CatsEffectSuite:
         assertEquals(rows.length, 322)
         assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Multislit), 161)
         assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Singleslit), 161)
+        assertEquals(rows.count(_._1.customSlitWidth.isDefined), 161)
+        assert(rows.forall(r => r._1.fpu.isDefined != r._1.customSlitWidth.isDefined))
 
   test("loadAll gmosSouth spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)
@@ -47,6 +49,8 @@ class Phase0LoaderSuite extends CatsEffectSuite:
       .map: rows =>
         assertEquals(rows.length, 364)
         assertEquals(rows.count(_._1.spec.fpuOption == FpuOption.Multislit), 182)
+        assertEquals(rows.count(_._1.customSlitWidth.isDefined), 182)
+        assert(rows.forall(r => r._1.fpu.isDefined != r._1.customSlitWidth.isDefined))
 
   test("loadAll flamingos2 spectroscopy configurations"):
     val rdr = FileReader[IO](fileName)

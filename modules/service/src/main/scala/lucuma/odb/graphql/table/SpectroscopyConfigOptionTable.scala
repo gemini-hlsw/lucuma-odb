@@ -57,17 +57,19 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
-    val Fpu        = col("c_fpu",     gmos_north_fpu.opt)
-    val Grating    = col("c_grating", gmos_north_grating)
-    val Filter     = col("c_filter",  gmos_north_filter.opt)
+    val Fpu             = col("c_fpu",               gmos_north_fpu.opt)
+    val CustomSlitWidth = col("c_custom_slit_width", gmos_custom_slit_width.opt)
+    val Grating         = col("c_grating",           gmos_north_grating)
+    val Filter          = col("c_filter",            gmos_north_filter.opt)
 
   object SpectroscopyConfigOptionGmosSouthTable extends TableDef("t_spectroscopy_config_option_gmos_south"):
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
-    val Fpu        = col("c_fpu",     gmos_south_fpu.opt)
-    val Grating    = col("c_grating", gmos_south_grating)
-    val Filter     = col("c_filter",  gmos_south_filter.opt)
+    val Fpu             = col("c_fpu",               gmos_south_fpu.opt)
+    val CustomSlitWidth = col("c_custom_slit_width", gmos_custom_slit_width.opt)
+    val Grating         = col("c_grating",           gmos_south_grating)
+    val Filter          = col("c_filter",            gmos_south_filter.opt)
 
   object SpectroscopyConfigOptionGnirsTable extends TableDef("t_spectroscopy_config_option_gnirs"):
     val Instrument = col("c_instrument", instrument)
