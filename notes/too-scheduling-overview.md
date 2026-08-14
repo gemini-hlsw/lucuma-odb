@@ -270,7 +270,7 @@ activation**, tied together by a rule where raising one silently raised the othe
 a matching default-and-floor arrangement on top. It worked, but the interaction between
 the two fields was hard to explain and hard to reason about. The scheduling mode above
 collapses both into a single ladder, and the activation is derived rather than stored.
-That earlier design is being dropped, not extended.
+That earlier design was dropped rather than extended.
 
 ---
 
@@ -278,14 +278,16 @@ That earlier design is being dropped, not extended.
 
 | Piece | Status |
 |---|---|
-| ToO activation ceiling on the proposal, frozen at acceptance | in `main` |
-| Trigger records, lifecycle, subscription, decline mutation | in `main` |
-| Opportunity target survives resolution, resolvable to sidereal or nonsidereal | built, under review |
-| `SchedulingMode` replacing the two current observation-level fields | designed, not yet built |
-| Derived ToO activation | designed, not yet built |
+| ToO activation ceiling on the proposal, frozen at acceptance | built |
+| Trigger records, lifecycle, subscription, decline mutation | built |
+| Opportunity target survives resolution, resolvable to sidereal or nonsidereal | built |
+| `SchedulingMode` replacing the two earlier observation-level fields | built |
+| Derived ToO activation | built |
+| Region enforced at the resolved position, via configuration approval | built |
 | Default scheduling window applied at trigger time | designed, not yet built |
-| Region enforced at the resolved position, via configuration approval | in `main`, and now exercised |
 | Region enforced over a path, and who may edit a region | **deferred** — needs science staff input, see [§2](#2-the-target-of-opportunity-target) |
 
-Until the scheduling mode lands, the API still exposes the two-field version described
-under [What this replaces](#what-this-replaces).
+The two outstanding pieces are independent of each other, and neither blocks a ToO from
+being proposed, approved, triggered and observed. Until the default scheduling window
+exists, promptness has to be expressed by timing windows the PI supplies — the trigger
+records the request but adds no window of its own.
