@@ -53,6 +53,16 @@ case class Config(
   def primaryCentralWavelength: Wavelength =
     primaryWavelength.centralWavelength
 
+  /**
+   * The camera the acquisition images are taken with: always the blue one, since the
+   * acquisition filters are all short of the blue/red boundary.  For blue-camera science
+   * this is just the science camera; red-camera (thermal-IR) science is acquired with the
+   * blue camera at the same pixel scale, as the GNIRS instrument scientists prescribe and
+   * as the OCS did.  The pixel scale is never mixed within an observation.
+   */
+  def acquisitionCamera: GnirsCamera =
+    camera.blue
+
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(512)
     val out = new DataOutputStream(bao)
