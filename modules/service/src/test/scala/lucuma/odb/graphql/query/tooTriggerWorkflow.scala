@@ -328,3 +328,49 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       assertEquals(inside,  "DEFINED")
       assertEquals(outside, "UNAPPROVED")
       assertEquals(back,    "DEFINED")
+
+  private def unresolveTargetAs(tid: lucuma.core.model.Target.Id): IO[Unit] =
+    query(pi,
+      s"""
+        mutation {
+          updateTargets(input: {
+            SET: { opportunity: { resolution: null } }
+            WHERE: { id: { EQ: ${tid.asJson} } }
+          }) { targets { id } }
+        }
+      """
+    ).void
+
+  // An unresolved ToO has nowhere to point, so it must not put a request in front of an observer.
+  // The workflow validator calls such an observation Undefined, but that is a computed opinion --
+  // it does not reach into t_too_trigger -- so resolvedness has to be part of the trigger's own
+  // predicate.  Both of these created or kept a live trigger before it was.
+  test("adding an unresolved opportunity target while Ready records no trigger"):
+    for
+      (pid, oid) <- createTriggerableObservationAs(pi, staff)
+      tid        <- createOpportunityTargetAs(pi, pid)
+      _          <- setState(oid, ObservationWorkflowState.Ready)
+      _          <- editAsterismAs(pi, oid, add = List(tid), del = Nil)
+      ts         <- triggers(oid)
+    yield assertEquals(ts, Nil)
+
+  test("clearing the resolution of a triggered ToO withdraws the trigger"):
+    for
+      (_, oid, tid) <- createTooObservationAs(pi, staff, resolved = true)
+      _             <- setState(oid, ObservationWorkflowState.Ready)
+      before        <- triggers(oid)
+      _             <- unresolveTargetAs(tid)
+      after         <- triggers(oid)
+    yield
+      assertEquals(before, List(("REQUESTED", None)))
+      assertEquals(after,  List(("WITHDRAWN", None)))
+
+  // ... and resolving it again asks afresh, so the round trip is not one-way.
+  test("re-resolving a withdrawn trigger requests it again"):
+    for
+      (_, oid, tid) <- createTooObservationAs(pi, staff, resolved = true)
+      _             <- setState(oid, ObservationWorkflowState.Ready)
+      _             <- unresolveTargetAs(tid)
+      _             <- resolveOpportunityTargetAs(pi, tid)
+      ts            <- triggers(oid)
+    yield assertEquals(ts.map(_._1).sorted, List("REQUESTED", "WITHDRAWN"))

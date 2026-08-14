@@ -41,7 +41,8 @@
 -- Adding a column with a constant default is metadata-only (no table rewrite, no
 -- triggers fired), so this can lead.  It is backfilled at the very end.
 ALTER TABLE t_observation
-  ADD COLUMN c_has_too_target boolean NOT NULL DEFAULT false;
+  ADD COLUMN c_has_too_target boolean NOT NULL DEFAULT false,
+  ADD COLUMN c_has_unresolved_too_target boolean NOT NULL DEFAULT false;
 
 -- Does this observation's asterism hold an opportunity target?  Deleted targets
 -- do not count: v_generator_params and the rest of the pipeline already ignore
@@ -56,6 +57,25 @@ CREATE FUNCTION observation_has_too_target(
      WHERE a.c_observation_id = oid
        AND t.c_existence = 'present'
        AND t.c_type = 'opportunity'::e_target_type
+  );
+$$ LANGUAGE sql STABLE;
+
+-- ... and does it hold one that is still waiting to be identified?  This is not
+-- an input to the activation -- an unresolved ToO is still a ToO, still counts
+-- toward its proposal's ceiling, and still satisfies `Interrupting` -- but it is
+-- an input to the trigger: there is nowhere to point yet, so there is nothing to
+-- ask an observer to do.
+CREATE FUNCTION observation_has_unresolved_too_target(
+  oid d_observation_id
+) RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1
+      FROM t_asterism_target a
+      JOIN t_target t ON t.c_target_id = a.c_target_id
+     WHERE a.c_observation_id = oid
+       AND t.c_existence = 'present'
+       AND t.c_type = 'opportunity'::e_target_type
+       AND t.c_resolved_type IS NULL
   );
 $$ LANGUAGE sql STABLE;
 
@@ -128,12 +148,47 @@ CREATE VIEW v_observation AS
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
 
+-- The trigger predicate gains resolvedness.  V1246 asked only "ready, and not
+-- activation none", which was right when the activation was declared: there was
+-- no such thing as an unresolved ToO.  Now there is, and an observation holding
+-- one has nowhere to point -- so a request for it would put a trigger in front
+-- of an observer for something that cannot be observed, and the workflow
+-- validator's Undefined does not withdraw a database row.
+--
+-- Body otherwise copied verbatim from V1246.
+CREATE OR REPLACE FUNCTION too_trigger_track_ready()
+  RETURNS trigger AS $$
+DECLARE
+  was_triggered bool := TG_OP = 'UPDATE'
+                    AND OLD.c_workflow_user_state IS NOT DISTINCT FROM 'ready'::e_workflow_user_state
+                    AND OLD.c_too_activation <> 'none'::e_too_activation
+                    AND NOT OLD.c_has_unresolved_too_target;
+  is_triggered  bool := NEW.c_workflow_user_state IS NOT DISTINCT FROM 'ready'::e_workflow_user_state
+                    AND NEW.c_too_activation <> 'none'::e_too_activation
+                    AND NOT NEW.c_has_unresolved_too_target;
+BEGIN
+  IF is_triggered AND NOT was_triggered THEN
+    INSERT INTO t_too_trigger (c_observation_id, c_program_id)
+    VALUES (NEW.c_observation_id, NEW.c_program_id)
+    ON CONFLICT DO NOTHING;
+
+  ELSIF was_triggered AND NOT is_triggered THEN
+    UPDATE t_too_trigger
+       SET c_status = 'withdrawn'
+     WHERE c_observation_id = NEW.c_observation_id
+       AND c_status = 'requested';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- As V1246, except for the UPDATE OF list.  A generated column can never appear
 -- in an UPDATE's SET clause, and UPDATE OF matches the statement's target
 -- columns rather than what actually changed -- so `UPDATE OF c_too_activation`
 -- would silently never fire again.  Watch the two inputs instead.
 CREATE TRIGGER too_trigger_track_ready_trigger
-  AFTER INSERT OR UPDATE OF c_workflow_user_state, c_scheduling_mode, c_has_too_target ON t_observation
+  AFTER INSERT OR UPDATE OF c_workflow_user_state, c_scheduling_mode, c_has_too_target, c_has_unresolved_too_target ON t_observation
   FOR EACH ROW
   EXECUTE FUNCTION too_trigger_track_ready();
 
@@ -141,14 +196,27 @@ CREATE TRIGGER too_trigger_track_ready_trigger
 -- Keeping c_has_too_target in step with the asterism.
 -------------------------------------------------------------------------------
 
--- Recomputes the flag for one observation.  The IS DISTINCT FROM guard keeps a
+-- Recomputes both flags for one observation.  The IS DISTINCT FROM guard keeps a
 -- no-op edit from firing too_trigger_track_ready, which would otherwise see an
--- UPDATE OF c_has_too_target on every asterism touch.
+-- UPDATE OF c_has_too_target on every asterism touch -- and there are plenty of
+-- those, since an opportunity edit writes c_resolved_type whether or not it
+-- changed.
+--
+-- The predicates come from a one-row subquery rather than being named twice
+-- each.  PostgreSQL does not eliminate repeated identical calls, and neither is
+-- inlined -- their bodies contain a sub-SELECT -- so writing them once in FROM
+-- is the difference between two executions and four.
 CREATE FUNCTION refresh_has_too_target(oid d_observation_id) RETURNS void AS $$
   UPDATE t_observation o
-     SET c_has_too_target = observation_has_too_target(oid)
+     SET c_has_too_target            = f.any_too,
+         c_has_unresolved_too_target = f.any_unresolved
+    FROM (
+      SELECT observation_has_too_target(oid)            AS any_too,
+             observation_has_unresolved_too_target(oid) AS any_unresolved
+    ) f
    WHERE o.c_observation_id = oid
-     AND o.c_has_too_target IS DISTINCT FROM observation_has_too_target(oid);
+     AND (o.c_has_too_target            IS DISTINCT FROM f.any_too
+       OR o.c_has_unresolved_too_target IS DISTINCT FROM f.any_unresolved);
 $$ LANGUAGE sql;
 
 CREATE FUNCTION too_target_track_asterism() RETURNS trigger AS $$
@@ -163,8 +231,9 @@ CREATE TRIGGER too_target_track_asterism_trigger
   FOR EACH ROW
   EXECUTE FUNCTION too_target_track_asterism();
 
--- A target can become (or stop being) an opportunity target in place, and it can
--- be soft-deleted, so the observations holding it have to be revisited.
+-- A target can become (or stop being) an opportunity target in place, it can be
+-- resolved or un-resolved in place, and it can be soft-deleted, so the
+-- observations holding it have to be revisited.
 CREATE FUNCTION too_target_track_target() RETURNS trigger AS $$
 DECLARE
   oid d_observation_id;
@@ -181,7 +250,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER too_target_track_target_trigger
-  AFTER DELETE OR UPDATE OF c_type, c_existence ON t_target
+  AFTER DELETE OR UPDATE OF c_type, c_existence, c_resolved_type ON t_target
   FOR EACH ROW
   EXECUTE FUNCTION too_target_track_target();
 
@@ -193,6 +262,12 @@ COMMENT ON COLUMN t_observation.c_has_too_target IS
   'Whether the asterism holds an undeleted opportunity target, maintained by '
   'too_target_track_asterism() and too_target_track_target().  Denormalized so '
   'that the ToO activation and the trigger stay single-table.';
+
+COMMENT ON COLUMN t_observation.c_has_unresolved_too_target IS
+  'Whether the asterism holds an opportunity target that has not been resolved '
+  'yet, maintained alongside c_has_too_target.  Not an input to the activation, '
+  'which an unresolved ToO still earns; an input to the trigger, which it does '
+  'not, since there is nowhere to point.';
 
 COMMENT ON COLUMN t_observation.c_too_activation IS
   'Derived: what this observation is permitted to disrupt, from whether it holds '
@@ -207,17 +282,19 @@ COMMENT ON COLUMN t_observation.c_too_activation IS
 -- ALTER may follow it -- and it deliberately fires too_trigger_track_ready, so
 -- an observation that is Ready with a genuine ToO target gets its trigger row.
 UPDATE t_observation o
-   SET c_has_too_target = true
+   SET c_has_too_target            = true,
+       c_has_unresolved_too_target = observation_has_unresolved_too_target(o.c_observation_id)
  WHERE observation_has_too_target(o.c_observation_id);
 
--- The converse is not covered by that UPDATE: an observation that *declared* a
--- ToO activation with an ordinary asterism was previously triggerable and may
--- hold a live request, but derives 'none' now and is no longer a ToO.  Nothing
--- updates its row, so withdraw those explicitly rather than leaving a trigger
--- that no observation backs.
+-- Two converses are not covered by that UPDATE.  An observation that *declared*
+-- a ToO activation with an ordinary asterism was previously triggerable and may
+-- hold a live request, but derives 'none' now and is no longer a ToO; nothing
+-- updates its row.  And one holding an unresolved opportunity target could hold a
+-- live request under the old predicate, which did not ask.  Withdraw both
+-- explicitly rather than leaving triggers no observation backs.
 UPDATE t_too_trigger t
    SET c_status = 'withdrawn'
   FROM t_observation o
  WHERE o.c_observation_id = t.c_observation_id
    AND t.c_status = 'requested'
-   AND o.c_too_activation = 'none'::e_too_activation;
+   AND (o.c_too_activation = 'none'::e_too_activation OR o.c_has_unresolved_too_target);
