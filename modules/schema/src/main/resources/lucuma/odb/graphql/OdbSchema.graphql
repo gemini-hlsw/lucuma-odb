@@ -14211,6 +14211,13 @@ type SpectroscopyConfigOptionFlamingos2 {
   (MOS) configurations, where the focal-plane unit is a custom mask.
   """
   fpu: Flamingos2Fpu
+
+  """
+  The custom mask slit width, present for multislit (MOS) configurations. Null
+  for single-slit configurations, where the width is implied by `fpu`.
+  """
+  customSlitWidth: Flamingos2CustomSlitWidth
+
   disperser: Flamingos2Disperser!
   filter: Flamingos2Filter!
 }
@@ -14226,6 +14233,13 @@ type SpectroscopyConfigOptionGmosNorth {
   (MOS) configurations, where the focal-plane unit is a custom mask.
   """
   fpu: GmosNorthBuiltinFpu
+
+  """
+  The custom mask slit width, present for multislit (MOS) configurations. Null
+  for single-slit configurations, where the width is implied by `fpu`.
+  """
+  customSlitWidth: GmosCustomSlitWidth
+
   grating: GmosNorthGrating!
   filter: GmosNorthFilter
 }
@@ -14236,6 +14250,13 @@ type SpectroscopyConfigOptionGmosSouth {
   (MOS) configurations, where the focal-plane unit is a custom mask.
   """
   fpu: GmosSouthBuiltinFpu
+
+  """
+  The custom mask slit width, present for multislit (MOS) configurations. Null
+  for single-slit configurations, where the width is implied by `fpu`.
+  """
+  customSlitWidth: GmosCustomSlitWidth
+
   grating: GmosSouthGrating!
   filter: GmosSouthFilter
 }
