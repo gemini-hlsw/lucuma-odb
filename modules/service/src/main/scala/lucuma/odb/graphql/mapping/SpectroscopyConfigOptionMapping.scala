@@ -65,9 +65,10 @@ trait SpectroscopyConfigOptionMapping[F[_]] extends SpectroscopyConfigOptionTabl
       SqlField("instrument", SpectroscopyConfigOptionFlamingos2Table.Instrument, key = true, hidden = true),
       SqlField("index",      SpectroscopyConfigOptionFlamingos2Table.Index, key = true, hidden = true),
 
-      SqlField("fpu",        SpectroscopyConfigOptionFlamingos2Table.Fpu),
-      SqlField("disperser",  SpectroscopyConfigOptionFlamingos2Table.Disperser),
-      SqlField("filter",     SpectroscopyConfigOptionFlamingos2Table.Filter)
+      SqlField("fpu",             SpectroscopyConfigOptionFlamingos2Table.Fpu),
+      SqlField("customSlitWidth", SpectroscopyConfigOptionFlamingos2Table.CustomSlitWidth),
+      SqlField("disperser",       SpectroscopyConfigOptionFlamingos2Table.Disperser),
+      SqlField("filter",          SpectroscopyConfigOptionFlamingos2Table.Filter)
     )
 
   lazy val SpectroscopyConfigOptionGhostMapping: ObjectMapping =

@@ -176,15 +176,17 @@ object Phase0Table {
 
     override def encoder: Encoder[Flamingos2SpectroscopyRow] =
       (
-        instrument            *:
-        flamingos_2_disperser *:
-        flamingos_2_filter    *:
-        flamingos_2_fpu.opt
+        instrument                        *:
+        flamingos_2_disperser             *:
+        flamingos_2_filter                *:
+        flamingos_2_fpu.opt               *:
+        flamingos_2_custom_slit_width.opt
       ).contramap[Flamingos2SpectroscopyRow] { row => (
         row.spec.instrument,
         row.disperser,
         row.filter,
-        row.fpu
+        row.fpu,
+        row.customSlitWidth
       )}
 
     override def columns: List[String] =
@@ -192,7 +194,8 @@ object Phase0Table {
         "c_instrument",
         "c_disperser",
         "c_filter",
-        "c_fpu"
+        "c_fpu",
+        "c_custom_slit_width"
       )
   }
 

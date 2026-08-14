@@ -42,9 +42,10 @@ trait SpectroscopyConfigOptionTable[F[_]] extends BaseMapping[F]:
     val Instrument = col("c_instrument",  instrument)
     val Index      = col("c_index",       int4_pos)
 
-    val Fpu        = col("c_fpu",       flamingos_2_fpu.opt)
-    val Disperser  = col("c_disperser", flamingos_2_disperser)
-    val Filter     = col("c_filter",    flamingos_2_filter)
+    val Fpu             = col("c_fpu",               flamingos_2_fpu.opt)
+    val CustomSlitWidth = col("c_custom_slit_width", flamingos_2_custom_slit_width.opt)
+    val Disperser       = col("c_disperser",         flamingos_2_disperser)
+    val Filter          = col("c_filter",            flamingos_2_filter)
 
   object SpectroscopyConfigOptionGhostTable extends TableDef("t_spectroscopy_config_option_ghost"):
     val Instrument     = col("c_instrument",      instrument)
