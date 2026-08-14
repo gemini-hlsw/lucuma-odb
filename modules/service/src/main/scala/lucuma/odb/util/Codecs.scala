@@ -202,6 +202,25 @@ trait Codecs {
   val arc_type: Codec[ArcType] =
     enumerated[ArcType](Type("e_arc_type"))
 
+  /**
+   * The `e_target_tracking_type` recorded in `t_target.c_resolved_type` and derived into
+   * `c_target_tracking_type`: how a target moves. This cannot use `enumerated`, because
+   * `TrackType`'s tags are capitalized while the Postgres labels are not.
+   */
+  val target_tracking_type: Codec[TrackType] =
+    `enum`(
+      {
+        case TrackType.Sidereal    => "sidereal"
+        case TrackType.Nonsidereal => "nonsidereal"
+      },
+      {
+        case "sidereal"    => Some(TrackType.Sidereal)
+        case "nonsidereal" => Some(TrackType.Nonsidereal)
+        case _             => None
+      },
+      Type("e_target_tracking_type")
+    )
+
   val atom_execution_state: Codec[AtomExecutionState] =
     enumerated[AtomExecutionState](Type.varchar)
 
@@ -311,9 +330,6 @@ trait Codecs {
 
   val execution_event_type: Codec[ExecutionEventType] =
     enumerated(Type("e_execution_event_type"))
-
-  val execution_requirement: Codec[ExecutionRequirement] =
-    enumerated(Type("e_execution_requirement"))
 
   val execution_state: Codec[ExecutionState] =
     enumerated(Type("e_execution_state"))
@@ -587,6 +603,9 @@ trait Codecs {
         val tracking = SiderealTracking(coords, ep, pm, rv, par)
         Right(tracking)
     }
+
+  val scheduling_mode: Codec[SchedulingMode] =
+    enumerated(Type("e_scheduling_mode"))
 
   val science_band: Codec[ScienceBand] =
     enumerated(Type("e_science_band"))

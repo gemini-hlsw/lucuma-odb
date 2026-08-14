@@ -59,6 +59,7 @@ schemaspy/out
 
 # vim
 *.swp
+*.swo
 
 setup_api.bash
 .direnv/

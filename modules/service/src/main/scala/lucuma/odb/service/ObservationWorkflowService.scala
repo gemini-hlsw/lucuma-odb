@@ -216,8 +216,14 @@ object ObservationWorkflowService {
             case Defined    =>
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
+              //
+              // An opportunity target blocks Ready only while it is *unresolved*.
+              // Setting a ToO Ready is what requests its trigger, so gating on the
+              // mere presence of the target would make a resolved one impossible to
+              // trigger -- the target keeps its identity after the alert arrives
+              // rather than being replaced by an ordinary one.
               List(Inactive) ++
-                Option.when((!info.isExchange) && (!info.hasTooTarget) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
+                Option.when((!info.isExchange) && (!info.hasUnresolvedTooTarget) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
             case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil

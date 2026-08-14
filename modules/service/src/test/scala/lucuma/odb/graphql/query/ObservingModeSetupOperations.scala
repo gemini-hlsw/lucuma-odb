@@ -243,23 +243,11 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
           """.command
         ).use(_.execute(oid).void)
 
-    val setActivation: IO[Unit] =
-      query(
-        user,
-        s"""
-          mutation {
-            updateObservations(input: {
-              SET: { schedulingConstraints: { tooActivation: RAPID } }
-              WHERE: { id: { EQ: ${oid.asJson} } }
-            }) {
-              observations { id }
-            }
-          }
-        """
-      ).void
-
+    // The activation is derived from the asterism now, so an opportunity target
+    // needs nothing set on the observation -- only a proposal ceiling high enough
+    // to permit what it derives.
     NonEmptyList.fromList(tids).fold(IO.unit): tns =>
-      hasOpportunityTarget(tns).flatMap(IO.whenA(_)(setActivation *> raiseCeiling))
+      hasOpportunityTarget(tns).flatMap(IO.whenA(_)(raiseCeiling))
 
   def createObservationWithModeAs(
     user:         User,

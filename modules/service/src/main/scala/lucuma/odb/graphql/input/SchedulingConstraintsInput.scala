@@ -5,50 +5,47 @@ package lucuma.odb.graphql.input
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.enums.ExecutionRequirement
-import lucuma.core.enums.TooActivation
+import lucuma.core.enums.SchedulingMode
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 case class SchedulingConstraintsInput(
-  tooActivation:                Option[TooActivation],
-  explicitExecutionRequirement: Nullable[ExecutionRequirement],
-  timingWindows:                Nullable[List[TimingWindowInput]]
+  schedulingMode: Option[SchedulingMode],
+  timingWindows:  Nullable[List[TimingWindowInput]]
 ):
 
   /**
-   * Would applying this edit leave the observation unsplittable?  True when the
-   * explicit requirement is set to something that forbids splitting, and also
-   * when the activation is raised high enough that its default forbids it.
+   * Would applying this edit leave the observation unsplittable?  The mode is
+   * the only thing that decides this now: it is a single ordered value rather
+   * than an explicit choice floored by the Target of Opportunity activation,
+   * so there is no second source to consult.
    */
   def makesUnsplittable: Boolean =
-    explicitExecutionRequirement.toOption.exists(!_.isSplittable) ||
-    tooActivation.exists(!_.executionRequirementDefault.isSplittable)
+    schedulingMode.exists(!_.isSplittable)
 
 object SchedulingConstraintsInput:
 
-  // Resolves the (mutually exclusive) `explicitExecutionRequirement` and
-  // deprecated `isSplittable` inputs into a single nullable requirement.  The
-  // deprecated flag maps `true -> Unconstrained` and `false -> NoSplitting`
-  // (`Uninterruptible` is not reachable through it).
+  // Resolves the (mutually exclusive) `schedulingMode` and deprecated
+  // `isSplittable` inputs into a single mode.  The deprecated flag maps
+  // `true -> Unconstrained` and `false -> NoSplitting`; the two upper rungs are
+  // not reachable through it.
   //
   // The field order below must match the schema's declaration order: Grackle
   // matches `case List(...)` positionally, not by the names in the pattern.
   val Binding: Matcher[SchedulingConstraintsInput] =
     ObjectFieldsBinding.rmap:
       case List(
-        TooActivationBinding.Option("tooActivation", rToo),
-        ExecutionRequirementBinding.Nullable("explicitExecutionRequirement", rReq),
+        SchedulingModeBinding.Option("schedulingMode", rMode),
         BooleanBinding.Option("isSplittable", rSplit),
         TimingWindowInput.Binding.List.Nullable("timingWindows", rTiming)
       ) =>
-        (rToo, rReq, rSplit, rTiming).parMapN: (too, req, split, timing) =>
-          (req.toOption, split) match
+        (rMode, rSplit, rTiming).parMapN: (mode, split, timing) =>
+          (mode, split) match
             case (Some(_), Some(_)) =>
-              Result.failure("Only one of `explicitExecutionRequirement` and the deprecated `isSplittable` may be specified.")
+              Result.failure("Only one of `schedulingMode` and the deprecated `isSplittable` may be specified.")
             case (_, Some(s))       =>
-              val r = if s then ExecutionRequirement.Unconstrained else ExecutionRequirement.NoSplitting
-              Result(SchedulingConstraintsInput(too, Nullable.NonNull(r), timing))
+              val m = if s then SchedulingMode.Unconstrained else SchedulingMode.NoSplitting
+              Result(SchedulingConstraintsInput(m.some, timing))
             case (_, None)          =>
-              Result(SchedulingConstraintsInput(too, req, timing))
+              Result(SchedulingConstraintsInput(mode, timing))
         .flatten

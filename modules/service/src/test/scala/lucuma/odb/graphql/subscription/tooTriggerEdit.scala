@@ -80,7 +80,7 @@ class tooTriggerEdit extends OdbSuite with SubscriptionUtils with TooTriggerSetu
         mutations =
           Right(
             for
-              (_, oid) <- createTooObservationAs(pi, staff)
+              (_, oid, _) <- createTooObservationAs(pi, staff)
               _        <- oidRef.complete(oid)
               _        <- setTooWorkflowState(pi, oid, ObservationWorkflowState.Ready)
               rid      <- liveTriggerId(oid)

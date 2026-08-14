@@ -51,9 +51,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       }
       schedulingConstraints {
         tooActivation
-        executionRequirement
-        defaultExecutionRequirement
-        explicitExecutionRequirement
+        schedulingMode
         isSplittable
         $TimingWindowsGraph
       }
@@ -396,9 +394,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     {
       schedulingConstraints {
         tooActivation
-        executionRequirement
-        defaultExecutionRequirement
-        explicitExecutionRequirement
+        schedulingMode
         isSplittable
       }
     }
@@ -434,23 +430,21 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """
     ).map(_.hcursor.downFields("cloneObservation", "newObservation", "schedulingConstraints").require[Json])
 
-  test("clone copies tooActivation and the explicit execution requirement") {
+  test("clone copies the scheduling mode") {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          // RAPID raises the default to UNINTERRUPTIBLE, so the explicit value
-          // (NO_SPLITTING) and the effective value differ -- which means a clone
-          // that merely recomputed defaults could not produce this result.
-          _ <- setScheduling(oid, "tooActivation: RAPID, explicitExecutionRequirement: NO_SPLITTING")
+          // The mode differs from its default, so a clone that recomputed it
+          // rather than copying could not produce this result.  The activation
+          // is derived and so is recomputed by definition.
+          _ <- setScheduling(oid, "schedulingMode: UNINTERRUPTIBLE")
           c <- cloneWith(oid)
         yield assertEquals(
           c,
           json"""
             {
-              "tooActivation": "RAPID",
-              "executionRequirement": "UNINTERRUPTIBLE",
-              "defaultExecutionRequirement": "UNINTERRUPTIBLE",
-              "explicitExecutionRequirement": "NO_SPLITTING",
+              "tooActivation": "NONE",
+              "schedulingMode": "UNINTERRUPTIBLE",
               "isSplittable": false
             }
           """
@@ -459,20 +453,18 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("clone preserves an unset explicit execution requirement") {
+  test("clone copies a scheduling mode left at its default") {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          _ <- setScheduling(oid, "tooActivation: STANDARD")
+          _ <- setScheduling(oid, "schedulingMode: UNCONSTRAINED")
           c <- cloneWith(oid)
         yield assertEquals(
           c,
           json"""
             {
-              "tooActivation": "STANDARD",
-              "executionRequirement": "UNCONSTRAINED",
-              "defaultExecutionRequirement": "UNCONSTRAINED",
-              "explicitExecutionRequirement": null,
+              "tooActivation": "NONE",
+              "schedulingMode": "UNCONSTRAINED",
               "isSplittable": true
             }
           """
@@ -485,16 +477,14 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          _ <- setScheduling(oid, "tooActivation: INTERRUPTING, explicitExecutionRequirement: UNINTERRUPTIBLE")
-          c <- cloneWith(oid, "tooActivation: STANDARD, explicitExecutionRequirement: NO_SPLITTING".some)
+          _ <- setScheduling(oid, "schedulingMode: INTERRUPTING")
+          c <- cloneWith(oid, "schedulingMode: NO_SPLITTING".some)
         yield assertEquals(
           c,
           json"""
             {
-              "tooActivation": "STANDARD",
-              "executionRequirement": "NO_SPLITTING",
-              "defaultExecutionRequirement": "UNCONSTRAINED",
-              "explicitExecutionRequirement": "NO_SPLITTING",
+              "tooActivation": "NONE",
+              "schedulingMode": "NO_SPLITTING",
               "isSplittable": false
             }
           """

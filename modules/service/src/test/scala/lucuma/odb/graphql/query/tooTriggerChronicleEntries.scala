@@ -46,7 +46,7 @@ class tooTriggerChronicleEntries extends OdbSuite with TooTriggerSetupOperations
 
   test("triggering then declining generates two chronicle entries"):
     for
-      (pid, oid) <- createTooObservationAs(pi, staff)
+      (pid, oid, _) <- createTooObservationAs(pi, staff)
       _          <- setTooWorkflowState(pi, oid, ObservationWorkflowState.Ready)
       rid        <- liveTriggerId(oid)
       _          <- declineTooTrigger(staff, rid, "too faint")

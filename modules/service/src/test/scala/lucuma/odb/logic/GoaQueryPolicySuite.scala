@@ -32,6 +32,7 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.Target
+import lucuma.core.model.TargetResolution
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.TestCoordinates.coords
@@ -215,11 +216,20 @@ class GoaQueryPolicySuite extends FunSuite:
   test("targets are classified by how they can be pointed at"):
     val sidereal    = Target.Sidereal(name("Star"), SiderealTracking.const(base), sourceProfile, none)
     val nonSidereal = Target.Nonsidereal(name("Halley"), Ephemeris.Key.Comet("1P"), sourceProfile)
-    val opportunity = Target.Opportunity(name("Anywhere"), Region.Full, sourceProfile)
+    val opportunity = Target.Opportunity(name("Anywhere"), Region.Full, none, sourceProfile)
 
     assertEquals(TargetPointing.fromTarget(sidereal), TargetPointing.Sidereal)
     assertEquals(TargetPointing.fromTarget(nonSidereal), TargetPointing.NonSidereal(name("Halley")))
     assertEquals(TargetPointing.fromTarget(opportunity), TargetPointing.Unresolvable)
+
+  test("a resolved Target of Opportunity is pointed at like the target it resolved to"):
+    val resolvedSidereal =
+      Target.Opportunity(name("Anywhere"), Region.Full, TargetResolution.Sidereal(SiderealTracking.const(base), none).some, sourceProfile)
+    val resolvedNonSidereal =
+      Target.Opportunity(name("Burst"), Region.Full, TargetResolution.Nonsidereal(Ephemeris.Key.Comet("1P")).some, sourceProfile)
+
+    assertEquals(TargetPointing.fromTarget(resolvedSidereal), TargetPointing.Sidereal)
+    assertEquals(TargetPointing.fromTarget(resolvedNonSidereal), TargetPointing.NonSidereal(name("Burst")))
 
   // -- Search radius -------------------------------------------------------
 

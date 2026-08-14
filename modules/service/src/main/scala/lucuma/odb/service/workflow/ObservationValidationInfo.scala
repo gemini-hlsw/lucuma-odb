@@ -20,6 +20,7 @@ import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProposalStatus
+import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
 import lucuma.core.enums.SubaruInstrument
@@ -61,7 +62,8 @@ case class ObservationValidationInfo(
   userState:              Option[ObservationWorkflowService.UserState],
   declaredExecutionState: Option[DeclaredExecutionState],
   proposalStatus:         ProposalStatus,
-  tooActivation:          TooActivation,
+  tooActivation:          TooActivation,      // derived from the asterism and the scheduling mode; not declared
+  schedulingMode:         SchedulingMode,
   tooCeiling:             Option[TooActivation], // effective proposal ceiling; None when the program has no proposal
   cfpid:                  Option[CallForProposals.Id],
   scienceBand:            Option[ScienceBand],
@@ -112,24 +114,27 @@ case class ObservationValidationInfo(
    * rather than for the queue?  Setting such an observation `Ready` is what
    * requests its trigger.
    *
-   * Independent of [[hasTooTarget]]: this is about the observation's declared
-   * urgency, not about whether its target has been found yet.
-   */
-  def isTooObservation: Boolean =
-    tooActivation =!= TooActivation.None
-
-  /**
-   * Does the asterism still hold an opportunity target -- the placeholder that
-   * stands in for a Target of Opportunity until the real one is identified?
+   * This is exactly [[hasTooTarget]]: an observation is a ToO precisely when its
+   * asterism holds an opportunity target, and its activation is derived from
+   * that plus the scheduling mode rather than declared.  The two used to be
+   * independent, which is what made a declared-but-targetless ToO expressible.
    *
-   * Independent of [[isTooObservation]]: a placeholder is only coherent in an
-   * observation that declares a ToO activation, and only until the alert
-   * arrives, but neither implies the other.
+   * True for the observation's whole life, resolved or not -- an opportunity
+   * target does not stop being one when the alert arrives.  Use
+   * [[hasUnresolvedTooTarget]] for the "still waiting" question.
    */
   def hasTooTarget: Boolean =
     asterism.exists:
-      case t: Target.Opportunity => true
+      case _: Target.Opportunity => true
       case _ => false
+
+  /**
+   * Is the asterism still waiting on an alert?  An unresolved Target of
+   * Opportunity has no coordinates at all, so nothing downstream can point at
+   * it, which is why this blocks Ready.
+   */
+  def hasUnresolvedTooTarget: Boolean =
+    asterism.exists(_.resolution.isEmpty)
 
   def isVisitor: Boolean =
     observingMode.exists:
@@ -330,6 +335,7 @@ object ObservationValidationInfo {
           o.c_declared_state,
           p.c_proposal_status,
           o.c_too_activation,
+          o.c_scheduling_mode,
           x.c_too_activation_effective,
           x.c_cfp_id,
           o.c_science_band,
@@ -346,10 +352,10 @@ object ObservationValidationInfo {
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: too_activation *: too_activation.opt *: cfp_id.opt *: science_band.opt *: user_state.opt)
+      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: too_activation *: scheduling_mode *: too_activation.opt *: cfp_id.opt *: science_band.opt *: user_state.opt)
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, ceil, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, ceil, cfp, sci, Nil, state2)
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2) =>
+          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

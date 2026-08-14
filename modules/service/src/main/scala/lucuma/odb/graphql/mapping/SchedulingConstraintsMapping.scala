@@ -20,9 +20,7 @@ trait SchedulingConstraintsMapping[F[_]]
     ObjectMapping(SchedulingConstraintsType)(
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("tooActivation", ObservationView.TooActivation),
-      SqlField("executionRequirement", ObservationView.ExecutionRequirementEffective),
-      SqlField("defaultExecutionRequirement", ObservationView.ExecutionRequirementDefault),
-      SqlField("explicitExecutionRequirement", ObservationView.ExecutionRequirement),
+      SqlField("schedulingMode", ObservationView.SchedulingMode),
       SqlField("isSplittable", ObservationView.IsSplittable),
       SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId))
     )
