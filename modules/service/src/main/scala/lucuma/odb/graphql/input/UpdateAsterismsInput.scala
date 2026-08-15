@@ -35,7 +35,7 @@ final case class UpdateAsterismsInput(
 object UpdateAsterismsInput:
 
   def binding(path: Path): Matcher[UpdateAsterismsInput] =
-    val WhereObservationBinding = WhereObservation.binding(path)
+    val WhereObservationBinding = WhereObservation.binding(path, allowCone = false)
     ObjectFieldsBinding.rmap:
       case List(
         EditAsterismsPatchInput.Binding("SET", rSET),

@@ -112,7 +112,7 @@ object OdbMapping {
     schema0:         Schema,
     allowSub:        Boolean = true,        // Are submappings (recursive calls) allowed?
     shouldValidate:  Boolean = true,        // should we validatate the TypeMappings?
-  ): Mapping[F] & ConfigurationRequestMapping[F] =
+  ): Mapping[F] & ConeCandidatesMapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
           with AddConditionsEntryResultMapping[F]
@@ -150,6 +150,7 @@ object OdbMapping {
           with ConfigurationGmosLongSlitMappings[F]
           with ConfigurationGmosMosMappings[F]
           with ConfigurationMapping[F]
+          with ConeCandidatesMapping[F]
           with ConfigurationRequestMapping[F]
           with ConfigurationRequestEditMapping[F]
           with ConfigurationRequestSelectResultMapping[F]

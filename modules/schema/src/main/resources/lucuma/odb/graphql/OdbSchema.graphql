@@ -20732,6 +20732,15 @@ input WhereObservation {
   Matches the calibration role.
   """
   calibrationRole: WhereOptionEqCalibrationRole
+
+  """
+  Matches if the observation's stored base position lies within the angular
+  `distance` of `center`. The stored position is the
+  explicit base if set, otherwise the asterism composite with every target
+  proper-motion corrected to epoch J2000.
+  Supported when querying observations, not in update mutations or the group queries.
+  """
+  targetCoordinates: WhereCone
 }
 
 """
