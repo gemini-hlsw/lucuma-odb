@@ -148,7 +148,7 @@ object GraphQLRoutes {
                                     // streams through the same pooled sessions as the query itself,
                                     // so it gets the same invalid-cursor retry.
                                     def resolveAndRun: F[Result[Json]] =
-                                      ConeFilter.resolve(request.query)(map.coneCandidates).retryOnInvalidCursorName.flatMap:
+                                      ConeFilter.resolve(request.query)(map.configurationRequestConeCandidates, map.observationConeCandidates).retryOnInvalidCursorName.flatMap:
                                         case Result.Success(q)       => runQuery(request.copy(query = q))
                                         case Result.Warning(ps, q)   => runQuery(request.copy(query = q)).map(r => Result.Warning(ps, ()).flatMap(_ => r))
                                         case f: Result.Failure       => F.pure(f)

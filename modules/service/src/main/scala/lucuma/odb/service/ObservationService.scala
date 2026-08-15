@@ -43,8 +43,10 @@ import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.Cone
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
@@ -92,6 +94,14 @@ sealed trait ObservationService[F[_]] {
   def selectProgram(
     oid: Observation.Id
   )(using Transaction[F]): F[Result[Program.Id]]
+
+  /** Selects the ids of observations whose stored J2000 base position lies
+   *  within `cone` (exact great-circle match on angular distance), restricted
+   *  to programs visible to the current user. The caller injects every id into
+   *  a rewritten query, so the list bounds both the heap and the generated
+   *  statement. Observations without a position (non-sidereal or opportunity
+   *  targets, or not yet computed by obscalc) are never candidates. */
+  def coneCandidates(cone: Cone, max: Int = ConeSearch.MaxCandidates): F[Result[List[Observation.Id]]]
 
   def createObservation(
     input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id],
@@ -234,6 +244,14 @@ object ObservationService {
       )(using Transaction[F]): F[Result[Program.Id]] =
         session.option(Statements.selectPid)(oid).map: p =>
           p.fold(OdbError.InvalidObservation(oid, s"Program for observation $oid not found.".some).asFailure)(_.success)
+
+      override def coneCandidates(cone: Cone, max: Int): F[Result[List[Observation.Id]]] =
+        val af = Statements.coneCandidates(user, cone, max)
+        session.prepareR(af.fragment.query(observation_id)).use: pq =>
+          pq.stream(af.argument, 1024).compile.toList.map: ids =>
+            if ids.sizeIs > max then
+              OdbError.InvalidArgument(s"targetCoordinates matches more than $max observations; narrow the cone.".some).asFailure
+            else Result(ids)
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
@@ -736,6 +754,21 @@ object ObservationService {
           FROM t_observation
          WHERE c_observation_id = $observation_id
       """.query(program_id)
+
+    /** AppliedFragment yielding the ids of observations whose stored J2000
+     *  base position lies within `distance` of `center`; see
+     *  `ConeSearch.candidates` for the query shape. */
+    def coneCandidates(user: User, cone: Cone, max: Int): AppliedFragment =
+      ConeSearch.candidates(
+        relation        = "t_obscalc",
+        idColumn        = "c_observation_id",
+        raColumn        = "c_j2000_base_ra",
+        decColumn       = "c_j2000_base_dec",
+        programIdColumn = "t_obscalc.c_program_id",
+        user            = user,
+        cone            = cone,
+        max             = max
+      )
 
     def insertObservation(
       programId: Program.Id,
