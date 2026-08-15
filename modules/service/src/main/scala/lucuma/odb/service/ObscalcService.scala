@@ -22,9 +22,13 @@ import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.math.Coordinates
+import lucuma.core.math.Epoch
+import lucuma.core.model.CompositeTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
@@ -282,11 +286,36 @@ object ObscalcService:
         result.flatTap: r =>
           Logger[F].info(s"${pending.observationId}: *** end calculating: $r")
 
+      /** The stored J2000 base position: the explicit base if set, otherwise the
+       *  asterism composite with every target proper-motion corrected to epoch
+       *  J2000.0.  None when any target is non-sidereal or opportunity (and there
+       *  is no explicit base), so such observations are invisible to
+       *  targetCoordinates cone filters.
+       */
+      private def computeBasePosition(
+        oid: Observation.Id
+      )(using ServiceAccess): F[Option[Coordinates]] =
+        Services.asSuperUser:
+          (
+            session.option(Statements.SelectExplicitBase)(oid),
+            asterismService.getAsterisms(List(oid))
+          ).mapN: (explicitBase, asterisms) =>
+            explicitBase.flatten.orElse:
+              NonEmptyList
+                .fromList(asterisms.getOrElse(oid, Nil))
+                .flatMap: targets =>
+                  targets
+                    .traverse:
+                      case (_, t: Target.Sidereal) => t.tracking.some
+                      case _                       => none
+                    .flatMap(ts => CompositeTracking(ts).at(Epoch.J2000.toInstant))
+
       @annotation.nowarn("msg=unused implicit parameter")
       private def storeResult(
-        pending:  Obscalc.PendingCalc,
-        result:   Obscalc.Result,
-        expected: CalculationState
+        pending:      Obscalc.PendingCalc,
+        result:       Obscalc.Result,
+        basePosition: Option[Coordinates],
+        expected:     CalculationState
       )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.Meta]] =
         for
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
@@ -297,24 +326,28 @@ object ObscalcService:
                   // updated (its recompute failed); retry so it is attempted again.
                   else if timeAccountingDirty                      then CalculationState.Retry
                   else                                                  expected
-          af  = ns.map(newState => Statements.storeResult(pending, result, newState))
+          af  = ns.map(newState => Statements.storeResult(pending, result, basePosition, newState))
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
 
       override def calculateAndUpdate(
         pending: Obscalc.PendingCalc
       )(using ServiceAccess, NoTransaction[F]): F[Option[Obscalc.Meta]] =
-        calculateWithAtomDigests(pending)
-          .flatMap: (result, atomDigests) =>
-            services.transactionally:
-              sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
-              (result.odbError match
-                case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, CalculationState.Retry)
-                case _                                        => storeResult(pending, result, CalculationState.Ready))
+        computeBasePosition(pending.observationId)
           .handleErrorWith: e =>
-            val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
-            services.transactionally:
-              storeResult(pending, result, CalculationState.Retry)
+            Logger[F].warn(s"${pending.observationId}: failure computing base position: ${e.getMessage}").as(none)
+          .flatMap: basePosition =>
+            calculateWithAtomDigests(pending)
+              .flatMap: (result, atomDigests) =>
+                services.transactionally:
+                  sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
+                  (result.odbError match
+                    case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, basePosition, CalculationState.Retry)
+                    case _                                        => storeResult(pending, result, basePosition, CalculationState.Ready))
+              .handleErrorWith: e =>
+                val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
+                services.transactionally:
+                  storeResult(pending, result, basePosition, CalculationState.Retry)
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -554,7 +587,14 @@ object ObscalcService:
         RETURNING c.c_program_id, c.c_observation_id, c.c_last_invalidation
       """.query(pending_obscalc)
 
-    private def updatesForResult(r: Obscalc.Result): NonEmptyList[AppliedFragment] =
+    val SelectExplicitBase: Query[Observation.Id, Option[Coordinates]] =
+      sql"""
+        SELECT c_explicit_ra, c_explicit_dec
+        FROM   t_observation
+        WHERE  c_observation_id = $observation_id
+      """.query(coordinates.opt)
+
+    private def updatesForResult(r: Obscalc.Result, basePosition: Option[Coordinates]): NonEmptyList[AppliedFragment] =
 
       // Don't inline these or sorting could be incorrect
       val acqConfigs = r.digest.map(_.acquisition.telescopeConfigs.toList)
@@ -589,7 +629,11 @@ object ObscalcService:
         // Workflow
         sql"c_workflow_state       = ${observation_workflow_state}"(r.workflow.state),
         sql"c_workflow_transitions = ${_observation_workflow_state}"(r.workflow.validTransitions),
-        sql"c_workflow_validations = ${_observation_validation}"(r.workflow.validationErrors)
+        sql"c_workflow_validations = ${_observation_validation}"(r.workflow.validationErrors),
+
+        // J2000 Base Position
+        sql"c_base_ra              = ${right_ascension.opt}"(basePosition.map(_.ra)),
+        sql"c_base_dec             = ${declination.opt}"(basePosition.map(_.dec))
       )
 
     // Along with the last invalidation timestamp, reports whether any of the
@@ -611,9 +655,10 @@ object ObscalcService:
       """.query(core_timestamp *: bool)
 
     def storeResult(
-      pending:  Obscalc.PendingCalc,
-      result:   Obscalc.Result,
-      newState: CalculationState
+      pending:      Obscalc.PendingCalc,
+      result:       Obscalc.Result,
+      basePosition: Option[Coordinates],
+      newState:     CalculationState
     ): AppliedFragment =
 
       val isRetry = newState === CalculationState.Retry
@@ -624,7 +669,7 @@ object ObscalcService:
       val upRetryAt      = void"c_retry_at      = " |+|
                            (if isRetry then void"now() + (interval '1 minute' * POWER(2, LEAST(c_failure_count, 5)))" else void"NULL")
 
-      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: updatesForResult(result)
+      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: updatesForResult(result, basePosition)
 
       void"UPDATE t_obscalc " |+|
         void"SET " |+| updates.intercalate(void", ") |+| void" " |+|
