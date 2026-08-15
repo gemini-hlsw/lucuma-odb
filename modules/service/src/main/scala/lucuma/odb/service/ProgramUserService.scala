@@ -153,7 +153,7 @@ trait ProgramUserService[F[_]]:
 
 
   def chown(
-    from: GuestUser, 
+    from: GuestUser,
     to: StandardUser
   )(using ServiceAccess, Transaction[F]): F[Result[List[Program.Id]]]
 
@@ -352,7 +352,7 @@ object ProgramUserService:
             pids
               .traverse: (pid, old_puid) => // traverse rather than evalTap so we accumulate errors
                 for
-                  _    <- ResultT(unlinkUser(old_puid))                 
+                  _    <- ResultT(unlinkUser(old_puid))
                   _    <- ResultT(linkUser(LinkUserInput(old_puid, to.id)))
                 yield pid
               .value
@@ -369,7 +369,7 @@ object ProgramUserService:
         AND    c_user_id = $user_id
         ORDER BY c_program_id ASC
       """.query(program_id ~ program_user_id)
-  
+
     val InsertAndLinkUnconditionally: Query[(Program.Id, User.Id, UserType, ProgramUserRole, PartnerLink), ProgramUser.Id] =
       sql"""
         INSERT INTO t_program_user (
@@ -722,6 +722,32 @@ object ProgramUserService:
         case ServiceRole(_)        |
              StandardRole.Admin(_) |
              StandardRole.Staff(_)        => none
+
+    /** A boolean predicate correlated on `programIdColumn` (qualified, e.g.
+     *  `"v_configuration_request.c_program_id"`) mirroring
+     *  `ProgramPredicates.isVisibleTo`, the visibility the query WHEREs apply:
+     *  guests and PIs see a program they are linked to (any role); staff and
+     *  above see everything; NGO visibility is unimplemented there, so NGO
+     *  stays unscoped (`true`).
+     *
+     *  Used to scope cone-search *prefilters*, whose ids are injected into a
+     *  query that then applies `isVisibleTo` itself -- so this must never be
+     *  narrower than that predicate: anything dropped here is silently lost.
+     *  In particular do not swap in `existsUserReadAccess` semantics, which
+     *  are narrower for NGO users and role-restricted links.  For the same
+     *  reason `correlatedExistsUserAs` and the inline check in
+     *  `UserInvitationService` stay separate: both encode narrower,
+     *  role-specific access, not visibility.
+     */
+    def correlatedIsVisibleTo(
+      user:            User,
+      programIdColumn: String
+    ): AppliedFragment =
+      user.role.access match
+        case Access.Guest | Access.Pi =>
+          sql"exists (select 1 from t_program_user pu where pu.c_program_id = #$programIdColumn and pu.c_user_id = $user_id)".apply(user.id)
+        case _                        =>
+          void"true"
 
     private def correlatedPiAccessOnly(
       user:       User,
