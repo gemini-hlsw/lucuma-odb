@@ -34,8 +34,15 @@ class ItcSuite extends DisciplineSuite with ArbitraryInstances:
         Right(r.peakPixelFlux)
       )
 
-  // Rows cached before the field existed must still decode.
-  test("peakPixelFlux is absent from legacy JSON"):
+  property("peakPixelAdu survives a round trip"):
+    forAll: (r: ItcResult) =>
+      assertEquals(
+        decode[ItcResult](r.asJson.spaces2).map(_.peakPixelAdu),
+        Right(r.peakPixelAdu)
+      )
+
+  // Rows cached before the fields existed must still decode.
+  test("peakPixelFlux and peakPixelAdu are absent from legacy JSON"):
     val legacy =
       """
         {
@@ -46,3 +53,4 @@ class ItcSuite extends DisciplineSuite with ArbitraryInstances:
         }
       """
     assertEquals(decode[ItcResult](legacy).map(_.peakPixelFlux), Right(None))
+    assertEquals(decode[ItcResult](legacy).map(_.peakPixelAdu), Right(None))

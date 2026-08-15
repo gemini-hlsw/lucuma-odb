@@ -14528,6 +14528,16 @@ type ItcResult {
   the exposure time reported alongside it.
   """
   peakPixelFlux: Float
+
+  """
+  The maximum, across the CCDs, of each CCD's peak pixel flux converted to ADU
+  using that CCD's own amplifier gain.  Because the gain differs per CCD this
+  is not in general `peakPixelFlux` divided by a single gain; the per-CCD
+  maximum is what matters for saturation.  Null under exactly the same
+  conditions as `peakPixelFlux`, and likewise computed for the unclamped
+  acquisition exposure time.
+  """
+  peakPixelAdu: Int
 }
 
 """

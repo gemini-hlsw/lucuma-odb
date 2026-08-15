@@ -68,6 +68,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     total
                   }
                   peakPixelFlux
+                  peakPixelAdu
                 }
                 all {
                   targetId
@@ -88,6 +89,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     total
                   }
                   peakPixelFlux
+                  peakPixelAdu
                 }
                 all {
                   targetId
@@ -114,7 +116,8 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
                 "signalToNoiseAt": ${fakeSignalToNoiseAt(Wavelength.fromIntNanometers(500).get).asJson},
-                "peakPixelFlux": $FakeItcPeakPixelFlux
+                "peakPixelFlux": $FakeItcPeakPixelFlux,
+                "peakPixelAdu": $FakeItcPeakPixelAdu
               },
               "all": [
                 {
@@ -130,7 +133,8 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
                 "signalToNoiseAt": null,
-                "peakPixelFlux": $FakeItcPeakPixelFlux
+                "peakPixelFlux": $FakeItcPeakPixelFlux,
+                "peakPixelAdu": $FakeItcPeakPixelAdu
               },
               "all": [
                 {
@@ -586,6 +590,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     total
                   }
                   peakPixelFlux
+                  peakPixelAdu
                 }
                 all {
                   targetId
@@ -606,6 +611,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     total
                   }
                   peakPixelFlux
+                  peakPixelAdu
                 }
                 all {
                   targetId
@@ -630,7 +636,8 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount" : 1,
                 "signalToNoiseAt" : null,
-                "peakPixelFlux" : null
+                "peakPixelFlux" : null,
+                "peakPixelAdu" : null
               },
               "all" : [
                 {
@@ -646,7 +653,8 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount" : 2,
                 "signalToNoiseAt" : null,
-                "peakPixelFlux" : null
+                "peakPixelFlux" : null,
+                "peakPixelAdu" : null
               },
               "all" : [
                 {

@@ -526,7 +526,9 @@ object ItcService {
                val t = targets.get(index).get
                // we keep the largest of the per-CCD peak pixel fluxes.
                val peak = intTime.ccds.map(_.peakPixelFlux).maxOption
-               ItcResult(t.targetId, intTime.times.focus, intTime.signalToNoiseAt, peak)
+               // The ADU maximum is taken over the per-CCD ADU value
+               val adu  = intTime.ccds.map(_.adu).maxOption
+               ItcResult(t.targetId, intTime.times.focus, intTime.signalToNoiseAt, peak, adu)
              }
              // Pin the "selected" result to the user's signal-to-noise target,
              // if one is set and present; otherwise keep the automatic
@@ -652,7 +654,7 @@ object ItcService {
             Zipper.fromNel:
               targets.map: t =>
                 val it = IntegrationTime(d.timeAndCount.time, d.timeAndCount.count)
-                ItcResult(t.targetId, it, none, none)
+                ItcResult(t.targetId, it, none, none, none)
 
           EitherT.pure:
             Itc(

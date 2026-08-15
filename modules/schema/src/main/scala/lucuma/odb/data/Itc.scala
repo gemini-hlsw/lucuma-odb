@@ -33,12 +33,16 @@ import monocle.macros.GenPrism
  *
  * `peakPixelFlux` is the maximum, across the CCDs the ITC reported, of each
  * CCD's peak pixel flux.  It is absent wherever no CCD data reaches us: GHOST
+ *
+ * `peakPixelAdu` is the maximum, across the same CCDs, of each CCD's flux
+ * converted to ADU by its own amplifier gain.
  */
 case class ItcResult(
   targetId:      Target.Id,
   value:         IntegrationTime,
   signalToNoise: Option[SignalToNoiseAt],
-  peakPixelFlux: Option[Double]
+  peakPixelFlux: Option[Double],
+  peakPixelAdu:  Option[Int]
 ):
   def totalTime: Option[TimeSpan] =
     val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value

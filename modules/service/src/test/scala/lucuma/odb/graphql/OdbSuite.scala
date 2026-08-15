@@ -291,6 +291,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   val FakeItcPeakPixelFlux: Double =
     FakeItcCcds.map(_.peakPixelFlux).max
 
+  val FakeItcPeakPixelAdu: Int =
+    FakeItcCcds.map(_.adu).max
+
   def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
     SignalToNoiseAt(
       w,
