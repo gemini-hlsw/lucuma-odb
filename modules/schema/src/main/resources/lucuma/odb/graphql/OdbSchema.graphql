@@ -15194,12 +15194,6 @@ type ArchiveMatch {
   instrument: Instrument
 
   """
-  Observation type as the archive reports it.  Always present, and in practice
-  always OBJECT
-  """
-  observationType: String!
-
-  """
   Observation class as the archive reports it, e.g. science.  This is the
   legacy GOA class.
   """

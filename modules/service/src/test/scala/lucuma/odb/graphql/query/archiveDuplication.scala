@@ -171,7 +171,6 @@ class archiveDuplication extends OdbSuite:
                  coordinates { ra { degrees } dec { degrees } }
                  instrumentString
                  instrument
-                 observationType
                  observeClassString
                  observeClass
                  qaStateString
@@ -205,7 +204,6 @@ class archiveDuplication extends OdbSuite:
               "coordinates": { "ra": { "degrees": 0.0 }, "dec": { "degrees": 0.01 } },
               "instrumentString": "GMOS-S",
               "instrument": "GMOS_SOUTH",
-              "observationType": "OBJECT",
               "observeClassString": "science",
               "observeClass": "SCIENCE",
               "qaStateString": "Pass",
@@ -232,7 +230,7 @@ class archiveDuplication extends OdbSuite:
     for
       oid <- siderealObservation
       _   <- refresh(GoaClientMock.fromJson[IO](AwkwardRecord))(oid)
-      js  <- archiveDuplication(oid, "matchCount matches { name observationType observeClassString observeClass qaStateString qaState utDateTime }")
+      js  <- archiveDuplication(oid, "matchCount matches { name observeClassString observeClass qaStateString qaState utDateTime }")
     yield assertEquals(
       js,
       json"""
@@ -241,7 +239,6 @@ class archiveDuplication extends OdbSuite:
           "matches": [
             {
               "name": "S20240101S0002.fits",
-              "observationType": "TELLURIC_STANDARD",
               "observeClassString": "science_verification",
               "observeClass": null,
               "qaStateString": "Undefined",
@@ -250,7 +247,6 @@ class archiveDuplication extends OdbSuite:
             },
             {
               "name": "S20240101S0003.fits",
-              "observationType": "OBJECT",
               "observeClassString": null,
               "observeClass": null,
               "qaStateString": null,

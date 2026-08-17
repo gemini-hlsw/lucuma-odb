@@ -12,8 +12,8 @@ import skunk.codec.text.text
 trait ArchiveMatchView[F[_]] extends BaseMapping[F]:
 
   // The GOA record fields do not all map onto lucuma types; the archive
-  // instrument name, disperser, filter, QA state, observation type and class,
-  // and the program and observation ids are text.
+  // instrument name, disperser, filter, QA state, observation class, and the
+  // program and observation ids are text.
   //
   // The archive holds both OCS- and GPP-era data, so those last four carry
   // values from either era.
@@ -23,7 +23,6 @@ trait ArchiveMatchView[F[_]] extends BaseMapping[F]:
     val Name: ColumnRef             = col("c_file_name",           text)
     val DataLabel: ColumnRef        = col("c_data_label",          text.opt)
     val Instrument: ColumnRef       = col("c_instrument",          text)
-    val ObservationType: ColumnRef  = col("c_observation_type",    text)
     val ObservationClass: ColumnRef = col("c_observation_class",   text.opt)
     val QaState: ColumnRef          = col("c_qa_state",            text.opt)
     val UtDateTime: ColumnRef       = col("c_ut_datetime",         core_timestamp.opt)

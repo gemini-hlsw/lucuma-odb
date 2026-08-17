@@ -72,7 +72,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       ra               = none,
       dec              = none,
       instrument       = "GMOS-S",
-      observationType  = GoaObservationType.Unknown("WEIRD"),
+      observationType  = GoaObservationType.Object,
       observationClass = none,
       qaState          = none,
       utDateTime       = none,
@@ -129,6 +129,14 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     yield
       assertEquals(s.summary, h)
       assertEquals(s.matches.sortBy(_.name), ms.sortBy(_.name))
+
+  test("the observation type is not stored: anything else reads back as OBJECT"):
+    val odd = sparseRecord.copy(observationType = GoaObservationType.Unknown("WEIRD"))
+    for
+      oid <- newObservation
+      _   <- run(_.store(oid, sidereal(1), List(odd)))
+      s   <- run(_.select(oid))
+    yield assertEquals(s.matches, List(sparseRecord))
 
   test("a non-sidereal search center round-trips as a target name"):
     val name = NonEmptyString.unsafeFrom("Ceres")
