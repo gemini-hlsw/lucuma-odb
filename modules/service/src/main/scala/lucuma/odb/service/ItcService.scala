@@ -22,6 +22,7 @@ import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
 import cats.syntax.parallel.*
+import cats.syntax.reducible.*
 import cats.syntax.traverse.*
 import clue.ResponseException
 import fs2.Stream
@@ -54,6 +55,7 @@ import lucuma.itc.client.SpectroscopyInput
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcPeakPixel
 import lucuma.odb.data.ItcResult
 import lucuma.odb.data.ItcScience
 import lucuma.odb.data.Md5Hash
@@ -524,8 +526,11 @@ object ItcService {
            .map: a =>
              val z = a.value.zipWithIndex.map { case (intTime, index) =>
                val t = targets.get(index).get
-               // we keep the largest of the per-CCD peak pixel fluxes.
-               val peak = intTime.ccds.map(_.peakPixelFlux).maxOption
+               // We keep the largest of the per-CCD peak pixel fluxes.  The ADU
+               // maximum is taken over the per-CCD ADU values rather than
+               // derived from the winning flux, since the gain differs per CCD.
+               val peak = NonEmptyList.fromList(intTime.ccds).map: ccds =>
+                 ItcPeakPixel(ccds.map(_.peakPixelFlux).maximum, ccds.map(_.adu).maximum)
                ItcResult(t.targetId, intTime.times.focus, intTime.signalToNoiseAt, peak)
              }
              // Pin the "selected" result to the user's signal-to-noise target,

@@ -76,6 +76,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
+import lucuma.odb.data.ItcPeakPixel
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
@@ -288,8 +289,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         warnings                      = Nil
       )
 
-  val FakeItcPeakPixelFlux: Double =
-    FakeItcCcds.map(_.peakPixelFlux).max
+  val FakeItcPeakPixel: ItcPeakPixel =
+    ItcPeakPixel(FakeItcCcds.map(_.peakPixelFlux).max, FakeItcCcds.map(_.adu).max)
 
   def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
     SignalToNoiseAt(

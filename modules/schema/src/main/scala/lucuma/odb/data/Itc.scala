@@ -26,19 +26,28 @@ import monocle.Prism
 import monocle.macros.GenPrism
 
 /**
+ * The brightest pixel the ITC found, taken across the CCDs it reported.  `flux`
+ * is the maximum of the per-CCD peak pixel fluxes; `adu` is the maximum of the
+ * per-CCD ADU values, each converted with its own CCD's amplifier gain.
+ */
+case class ItcPeakPixel(
+  flux: Double,
+  adu:  Int
+) derives Eq
+
+/**
  * A single ITC result for one target: the integration time (exposure time and
  * count) and, when available, the achieved signal-to-noise.  Shared by both the
  * science ([[ItcScience]]) and acquisition ([[ItcAcquisition]]) results.
  * Corresponds to `ItcResult` in the GraphQL schema.
  *
- * `peakPixelFlux` is the maximum, across the CCDs the ITC reported, of each
- * CCD's peak pixel flux.  It is absent wherever no CCD data reaches us: GHOST
+ * `peakPixel` is absent wherever no CCD data reaches us: GHOST
  */
 case class ItcResult(
   targetId:      Target.Id,
   value:         IntegrationTime,
   signalToNoise: Option[SignalToNoiseAt],
-  peakPixelFlux: Option[Double]
+  peakPixel:     Option[ItcPeakPixel]
 ):
   def totalTime: Option[TimeSpan] =
     val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value

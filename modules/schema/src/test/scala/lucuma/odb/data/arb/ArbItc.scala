@@ -64,8 +64,15 @@ trait ArbItc:
     Cogen[(Wavelength, SignalToNoise, SignalToNoise)].contramap: a =>
       (a.wavelength, a.single.value, a.total.value)
 
-  private val genPeakPixelFlux: Gen[Double] =
-    Gen.chooseNum(0.0, 1.0e7)
+  given Arbitrary[ItcPeakPixel] =
+    Arbitrary:
+      for
+        f <- Gen.chooseNum(0.0, 1.0e7)
+        a <- Gen.chooseNum(0, 10000000)
+      yield ItcPeakPixel(f, a)
+
+  given Cogen[ItcPeakPixel] =
+    Cogen[(Double, Int)].contramap(a => (a.flux, a.adu))
 
   given Arbitrary[ItcResult] =
     Arbitrary:
@@ -73,12 +80,12 @@ trait ArbItc:
         t <- arbitrary[Target.Id]
         v <- arbitrary[IntegrationTime]
         s <- arbitrary[Option[SignalToNoiseAt]]
-        p <- Gen.option(genPeakPixelFlux)
+        p <- arbitrary[Option[ItcPeakPixel]]
       yield ItcResult(t, v, s, p)
 
   given Cogen[ItcResult] =
-    Cogen[(Target.Id, IntegrationTime, Option[SignalToNoiseAt], Option[Double])].contramap: a =>
-      (a.targetId, a.value, a.signalToNoise, a.peakPixelFlux)
+    Cogen[(Target.Id, IntegrationTime, Option[SignalToNoiseAt], Option[ItcPeakPixel])].contramap: a =>
+      (a.targetId, a.value, a.signalToNoise, a.peakPixel)
 
   given Arbitrary[ItcScience.Flamingos2Imaging] =
     Arbitrary:
