@@ -621,6 +621,7 @@ object PerScienceObservationCalibrationsService:
           sql"""
             UPDATE t_observation target
             SET
+              c_science_band             = source.c_science_band,
               c_cloud_extinction         = source.c_cloud_extinction,
               c_image_quality            = source.c_image_quality,
               c_sky_background           = source.c_sky_background,
