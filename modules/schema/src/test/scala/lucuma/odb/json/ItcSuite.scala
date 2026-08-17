@@ -27,22 +27,15 @@ class ItcSuite extends DisciplineSuite with ArbitraryInstances:
   checkAll("ItcScienceCodec", CodecTests[ItcScience].codec)
   checkAll("ItcAcquisitionAvailableCodec", CodecTests[ItcAcquisition.Available].codec)
 
-  property("peakPixelFlux survives a round trip"):
+  property("peakPixel survives a round trip"):
     forAll: (r: ItcResult) =>
       assertEquals(
-        decode[ItcResult](r.asJson.spaces2).map(_.peakPixelFlux),
-        Right(r.peakPixelFlux)
+        decode[ItcResult](r.asJson.spaces2).map(_.peakPixel),
+        Right(r.peakPixel)
       )
 
-  property("peakPixelAdu survives a round trip"):
-    forAll: (r: ItcResult) =>
-      assertEquals(
-        decode[ItcResult](r.asJson.spaces2).map(_.peakPixelAdu),
-        Right(r.peakPixelAdu)
-      )
-
-  // Rows cached before the fields existed must still decode.
-  test("peakPixelFlux and peakPixelAdu are absent from legacy JSON"):
+  // Rows cached before the field existed must still decode.
+  test("peakPixel is absent from legacy JSON"):
     val legacy =
       """
         {
@@ -52,5 +45,17 @@ class ItcSuite extends DisciplineSuite with ArbitraryInstances:
           "signalToNoiseAt": null
         }
       """
-    assertEquals(decode[ItcResult](legacy).map(_.peakPixelFlux), Right(None))
-    assertEquals(decode[ItcResult](legacy).map(_.peakPixelAdu), Right(None))
+    assertEquals(decode[ItcResult](legacy).map(_.peakPixel), Right(None))
+
+  test("peakPixel is absent from flat peakPixelFlux JSON"):
+    val flat =
+      """
+        {
+          "targetId": "t-100",
+          "exposureTime": { "microseconds": 1000000 },
+          "exposureCount": 3,
+          "signalToNoiseAt": null,
+          "peakPixelFlux": 2500.0
+        }
+      """
+    assertEquals(decode[ItcResult](flat).map(_.peakPixel), Right(None))

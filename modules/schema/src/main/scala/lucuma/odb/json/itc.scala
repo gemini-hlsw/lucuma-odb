@@ -31,6 +31,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
+import lucuma.odb.data.ItcPeakPixel
 import lucuma.odb.data.ItcResult
 import lucuma.odb.data.ItcScience
 
@@ -50,6 +51,20 @@ trait ItcCodec:
   // N.B. lucuma.itc.SignalToNoiseAt defines its own encoder consistent with
   // this decoder.  Perhaps we should move the decoder there as well.
 
+  given Decoder[ItcPeakPixel] =
+    Decoder.instance: c =>
+      for
+        flux <- c.downField("flux").as[Double]
+        adu  <- c.downField("adu").as[Int]
+      yield ItcPeakPixel(flux, adu)
+
+  given Encoder[ItcPeakPixel] =
+    Encoder.instance: a =>
+      Json.obj(
+        "flux" -> a.flux.asJson,
+        "adu"  -> a.adu.asJson
+      )
+
   given Decoder[ItcResult] =
     Decoder.instance: c =>
       for
@@ -57,9 +72,8 @@ trait ItcCodec:
         exposureTime    <- c.downField("exposureTime").as[TimeSpan]
         exposureCount   <- c.downField("exposureCount").as[PosInt]
         signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
-        peakPixelFlux   <- c.downField("peakPixelFlux").as[Option[Double]]
-        peakPixelAdu    <- c.downField("peakPixelAdu").as[Option[Int]]
-      yield ItcResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt, peakPixelFlux, peakPixelAdu)
+        peakPixel       <- c.downField("peakPixel").as[Option[ItcPeakPixel]]
+      yield ItcResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt, peakPixel)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcResult] =
     Encoder.instance: a =>
@@ -68,8 +82,7 @@ trait ItcCodec:
         "exposureTime"    -> a.value.exposureTime.asJson,
         "exposureCount"   -> a.value.exposureCount.value.asJson,
         "signalToNoiseAt" -> a.signalToNoise.asJson,
-        "peakPixelFlux"   -> a.peakPixelFlux.asJson,
-        "peakPixelAdu"    -> a.peakPixelAdu.asJson
+        "peakPixel"       -> a.peakPixel.asJson
       )
 
   // GnirsAcquisitionType is a plain Enumerated; encode by tag.  Round-trips

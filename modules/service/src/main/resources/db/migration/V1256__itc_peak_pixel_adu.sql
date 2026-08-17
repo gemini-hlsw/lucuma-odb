@@ -1,4 +1,5 @@
--- ItcResult gained a peakPixelAdu field.  We need to invalidate the cache to recalculate adu
+-- ItcResult replaced peakPixelFlux with peakPixel { flux, adu }.  We need to
+-- invalidate the cache to recalculate adu; the old flat field is ignored on read.
 --
 -- Frozen rows are spared.
 DELETE FROM t_itc_result WHERE NOT c_is_frozen;

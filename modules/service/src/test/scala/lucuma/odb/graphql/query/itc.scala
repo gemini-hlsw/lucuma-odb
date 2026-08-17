@@ -67,8 +67,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     single
                     total
                   }
-                  peakPixelFlux
-                  peakPixelAdu
+                  peakPixel {
+                    flux
+                    adu
+                  }
                 }
                 all {
                   targetId
@@ -88,8 +90,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     single
                     total
                   }
-                  peakPixelFlux
-                  peakPixelAdu
+                  peakPixel {
+                    flux
+                    adu
+                  }
                 }
                 all {
                   targetId
@@ -116,8 +120,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
                 "signalToNoiseAt": ${fakeSignalToNoiseAt(Wavelength.fromIntNanometers(500).get).asJson},
-                "peakPixelFlux": $FakeItcPeakPixelFlux,
-                "peakPixelAdu": $FakeItcPeakPixelAdu
+                "peakPixel": {
+                  "flux": ${FakeItcPeakPixel.flux},
+                  "adu": ${FakeItcPeakPixel.adu}
+                }
               },
               "all": [
                 {
@@ -133,8 +139,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount": ${FakeItcResult.exposureCount.value},
                 "signalToNoiseAt": null,
-                "peakPixelFlux": $FakeItcPeakPixelFlux,
-                "peakPixelAdu": $FakeItcPeakPixelAdu
+                "peakPixel": {
+                  "flux": ${FakeItcPeakPixel.flux},
+                  "adu": ${FakeItcPeakPixel.adu}
+                }
               },
               "all": [
                 {
@@ -589,8 +597,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     single
                     total
                   }
-                  peakPixelFlux
-                  peakPixelAdu
+                  peakPixel {
+                    flux
+                    adu
+                  }
                 }
                 all {
                   targetId
@@ -610,8 +620,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                     single
                     total
                   }
-                  peakPixelFlux
-                  peakPixelAdu
+                  peakPixel {
+                    flux
+                    adu
+                  }
                 }
                 all {
                   targetId
@@ -636,8 +648,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount" : 1,
                 "signalToNoiseAt" : null,
-                "peakPixelFlux" : null,
-                "peakPixelAdu" : null
+                "peakPixel" : null
               },
               "all" : [
                 {
@@ -653,8 +664,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 },
                 "exposureCount" : 2,
                 "signalToNoiseAt" : null,
-                "peakPixelFlux" : null,
-                "peakPixelAdu" : null
+                "peakPixel" : null
               },
               "all" : [
                 {
