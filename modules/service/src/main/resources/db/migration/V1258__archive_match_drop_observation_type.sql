@@ -1,4 +1,11 @@
 -- Every GOA query the Archive Duplication Search sends carries the OBJECT, we can drop it.
+--
+-- The searches now also filter by Mode Class, so a snapshot taken before this
+-- counts matches of both kinds and reads high.  Given we are not yet using this
+-- feature we can drop the results and recalculate on demand.
+
+DELETE FROM t_archive_duplication;
+
 DROP VIEW v_archive_match;
 
 ALTER TABLE t_archive_match DROP COLUMN c_observation_type;
