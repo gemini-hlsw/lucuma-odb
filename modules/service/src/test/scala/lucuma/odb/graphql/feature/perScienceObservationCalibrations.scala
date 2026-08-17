@@ -1232,7 +1232,10 @@ class perScienceObservationCalibrations
     }
 
   test("telluric observation takes the science band of its science observation"):
-    // Two allocated bands, so the band isn't assigned program-wide on allocation.
+    // With a single allocated band, setAllocations back-fills it onto every
+    // observation with no band, which would hide the case under test.  More
+    // than one band skips that back-fill, so the bands here are only the ones
+    // set explicitly below.
     val allocations = List(
       AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
       AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 4.hourTimeSpan)
