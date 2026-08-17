@@ -314,7 +314,7 @@ object ObscalcService:
       private def storeResult(
         pending:      Obscalc.PendingCalc,
         result:       Obscalc.Result,
-        basePosition: Option[Coordinates],
+        basePosition: Option[Option[Coordinates]],
         expected:     CalculationState
       )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.Meta]] =
         for
@@ -334,8 +334,9 @@ object ObscalcService:
         pending: Obscalc.PendingCalc
       )(using ServiceAccess, NoTransaction[F]): F[Option[Obscalc.Meta]] =
         computeBasePosition(pending.observationId)
+          .map(_.some)
           .handleErrorWith: e =>
-            Logger[F].warn(s"${pending.observationId}: failure computing base position: ${e.getMessage}").as(none)
+            Logger[F].warn(s"${pending.observationId}: failure computing base position, keeping the stored one: ${e.getMessage}").as(none)
           .flatMap: basePosition =>
             calculateWithAtomDigests(pending)
               .flatMap: (result, atomDigests) =>
@@ -594,7 +595,7 @@ object ObscalcService:
         WHERE  c_observation_id = $observation_id
       """.query(coordinates.opt)
 
-    private def updatesForResult(r: Obscalc.Result, basePosition: Option[Coordinates]): NonEmptyList[AppliedFragment] =
+    private def updatesForResult(r: Obscalc.Result, basePosition: Option[Option[Coordinates]]): NonEmptyList[AppliedFragment] =
 
       // Don't inline these or sorting could be incorrect
       val acqConfigs = r.digest.map(_.acquisition.telescopeConfigs.toList)
@@ -629,12 +630,15 @@ object ObscalcService:
         // Workflow
         sql"c_workflow_state       = ${observation_workflow_state}"(r.workflow.state),
         sql"c_workflow_transitions = ${_observation_workflow_state}"(r.workflow.validTransitions),
-        sql"c_workflow_validations = ${_observation_validation}"(r.workflow.validationErrors),
-
-        // J2000 Base Position
-        sql"c_j2000_base_ra        = ${right_ascension.opt}"(basePosition.map(_.ra)),
-        sql"c_j2000_base_dec       = ${declination.opt}"(basePosition.map(_.dec))
-      )
+        sql"c_workflow_validations = ${_observation_validation}"(r.workflow.validationErrors)
+      ) ++
+      // J2000 Base Position; skipped entirely (keeping the stored value) when
+      // the computation failed -- see `storeResult` in ObscalcService.
+      basePosition.toList.flatMap: p =>
+        List(
+          sql"c_j2000_base_ra        = ${right_ascension.opt}"(p.map(_.ra)),
+          sql"c_j2000_base_dec       = ${declination.opt}"(p.map(_.dec))
+        )
 
     // Along with the last invalidation timestamp, reports whether any of the
     // observation's visits still has dirty time accounting (its recompute failed
@@ -657,7 +661,7 @@ object ObscalcService:
     def storeResult(
       pending:      Obscalc.PendingCalc,
       result:       Obscalc.Result,
-      basePosition: Option[Coordinates],
+      basePosition: Option[Option[Coordinates]],
       newState:     CalculationState
     ): AppliedFragment =
 

@@ -34,8 +34,9 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 
 /** Resolves `targetCoordinates` cone filters, which grackle cannot evaluate on its own:
- *  finding the rows inside a cone is an `F` effect, and the elaborator that turns a
- *  WHERE input into a predicate is a pure `StateT[Result, ElabState, *]`.
+ *  finding the rows (observations, configurationRequests, etc) inside a cone is an `F`
+ *  effect, and the elaborator that turns a WHERE input into a predicate is a pure
+ *  `StateT[Result, ElabState, *]`.
  *
  *  {{{
  *  request with a targetCoordinates cone

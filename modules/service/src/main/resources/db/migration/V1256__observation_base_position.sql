@@ -25,4 +25,4 @@ UPDATE t_obscalc SET
   c_failure_count     = 0,
   c_retry_at          = NULL,
   c_obscalc_state     = 'pending'
-WHERE c_obscalc_state IN ('ready', 'retry');
+WHERE c_obscalc_state IN ('ready', 'retry', 'calculating');
