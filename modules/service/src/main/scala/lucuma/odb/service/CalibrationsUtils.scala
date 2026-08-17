@@ -311,6 +311,17 @@ trait CalibrationObservations {
   def toConfigForCalibration(all: List[ObsExtract[ObservingMode]]): List[ObsExtract[CalibrationConfigSubset]] =
     all.map(_.map(_.toConfigSubset))
 
+  // The props are keyed by science configuration, which the calibration's own
+  // configuration only matches modulo the role's normalization (e.g. spec photo
+  // ignores the ROI), hence the search rather than a direct lookup.
+  private def propsForConfig(
+    props:  Map[CalibrationConfigSubset, CalObsProps],
+    role:   CalibrationRole,
+    config: CalibrationConfigSubset
+  ): Option[CalObsProps] =
+    props.collectFirst:
+      case (sciConfig, p) if CalibrationConfigMatcher.matcherFor(sciConfig, role).configsMatch(sciConfig, config) => p
+
   def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
     pid:    Program.Id,
     gid:    Group.Id,
@@ -318,14 +329,9 @@ trait CalibrationObservations {
     props:  Map[CalibrationConfigSubset, CalObsProps],
     config: CalibrationConfigSubset.Gmos[G, L, U]
   ): F[Observation.Id] =
-    val matchingProps = props.find { case (originalConfig, _) =>
-      // Check if this original config could have produced the transformed config using SpectroPhotometric strategy
-      CalibrationConfigMatcher
-        .matcherFor(originalConfig, CalibrationRole.SpectroPhotometric)
-        .configsMatch(originalConfig, config)
-    }.map(_._2)
-    val wavelengthAt = matchingProps.flatMap(_.wavelengthAt)
-    val band         = matchingProps.flatMap(_.band)
+    val matchingProps: Option[CalObsProps] = propsForConfig(props, CalibrationRole.SpectroPhotometric, config)
+    val wavelengthAt: Option[Wavelength]   = matchingProps.flatMap(_.wavelengthAt)
+    val band: Option[ScienceBand]          = matchingProps.flatMap(_.band)
     specPhotoObservation(pid, gid, tid, wavelengthAt, band, config.toLongSlitInput)
 
   def roleConstraints(role: CalibrationRole) =
@@ -381,15 +387,18 @@ trait CalibrationObservations {
     pid:    Program.Id,
     gid:    Group.Id,
     tid:    Target.Id,
+    props:  Map[CalibrationConfigSubset, CalObsProps],
     config: CalibrationConfigSubset.Gmos[G, L, U]
   ): F[Observation.Id] =
-    twilightObservation(pid, gid, tid, config.centralWavelength, config.toLongSlitInput)
+    val band: Option[ScienceBand] = propsForConfig(props, CalibrationRole.Twilight, config).flatMap(_.band)
+    twilightObservation(pid, gid, tid, band, config.centralWavelength, config.toLongSlitInput)
 
-  private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
+  private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, band: Option[ScienceBand], cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
       observationService.createObservation(
         Services.asSuperUser:
           AccessControl.unchecked(
             ObservationPropertiesInput.Create.Default.copy(
+              scienceBand = band,
               targetEnvironment = TargetEnvironmentInput.Create(
                 none,
                 List(tid).some,

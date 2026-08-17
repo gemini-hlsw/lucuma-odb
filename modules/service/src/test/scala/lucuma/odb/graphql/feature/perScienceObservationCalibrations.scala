@@ -26,8 +26,10 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
@@ -53,6 +55,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
 import lucuma.odb.graphql.query.ExecutionTestSupportForIgrins2
@@ -1226,6 +1229,33 @@ class perScienceObservationCalibrations
       assertEquals(telluricFpu1, Flamingos2Fpu.LongSlit1.some)
       assertEquals(scienceFpu2, Flamingos2Fpu.LongSlit2.some)
       assertEquals(telluricFpu2, Flamingos2Fpu.LongSlit2.some)
+    }
+
+  test("telluric observation takes the science band of its science observation"):
+    // Two allocated bands, so the band isn't assigned program-wide on allocation.
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 4.hourTimeSpan)
+    )
+    for {
+      pid         <- createProgramAs(pi)
+      _           <- setAllocationsAs(staff, pid, allocations)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      obs         <- queryObservation(oid)
+      obsInGroup  <- queryObservationsInGroup(obs.groupId.get)
+      telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      band1       <- queryScienceBand(telluricOid)
+      _           <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- sleep >> recalculateCalibrations(pid, when, oid)
+      band2       <- queryScienceBand(telluricOid)
+    } yield {
+      assertEquals(band1, ScienceBand.Band2.some)
+      assertEquals(band2, ScienceBand.Band1.some)
     }
 
   test("Don't generate for inactive"):

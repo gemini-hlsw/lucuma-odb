@@ -20,7 +20,9 @@ import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Wavelength
 import lucuma.core.model.CloudExtinction
@@ -31,9 +33,11 @@ import lucuma.core.model.ProgramReference.Description
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.EditType
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.input.ProgramPropertiesInput
 import lucuma.odb.graphql.query.ExecutionQuerySetupOperations
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
@@ -63,7 +67,7 @@ class perProgramPerConfigCalibrations
 
   val DefaultSnAt: Wavelength = Wavelength.fromIntNanometers(510).get
 
-  override val validUsers = List(pi, service)
+  override val validUsers = List(pi, service, staff)
 
   def scienceRequirements(pi: User, oid: Observation.Id, snAt: Wavelength = DefaultSnAt): IO[Json] =
     query(
@@ -174,6 +178,26 @@ class perProgramPerConfigCalibrations
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
      }
+
+  case class CalibBand(calibrationRole: Option[CalibrationRole], scienceBand: Option[ScienceBand]) derives Decoder
+
+  // Bands of the program's calibration observations, ordered by calibration role.
+  private def queryCalibrationBands(pid: Program.Id): IO[List[Option[ScienceBand]]] =
+    query(
+      service,
+      s"""query {
+            observations(WHERE: { program: { id: { EQ: "$pid" } } }) {
+              matches {
+                calibrationRole
+                scienceBand
+              }
+            }
+          }"""
+    ).flatMap { c =>
+      c.hcursor.downFields("observations", "matches").as[List[CalibBand]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }.map(_.collect { case CalibBand(Some(r), b) => (r, b) }.sortBy(_._1.tag).map(_._2))
 
   private def queryObservations(pid: Program.Id): IO[List[CalibObs]] =
     query(
@@ -301,6 +325,39 @@ class perProgramPerConfigCalibrations
       assert(obsGids.forall(g => cgid.exists(_ == g)))
       assertEquals(cCount, 4)
       assertEquals(oids.size, 2)
+    }
+  }
+
+  test("calibrations take the highest priority band of the science observations") {
+    // More than one allocated band, so no band is assigned program-wide on allocation.
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 2.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band3, 4.hourTimeSpan)
+    )
+    for {
+      pid    <- createProgramAs(pi)
+      _      <- setAllocationsAs(staff, pid, allocations)
+      tid    <- createTargetAs(pi, pid, "One")
+      oid1   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      oid2   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      // Same configuration, hence the same calibrations, but no band assigned.
+      oid3   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _      <- setScienceBandAs(pi, oid1, ScienceBand.Band3.some)
+      _      <- setScienceBandAs(pi, oid2, ScienceBand.Band2.some)
+      _      <- prepareObservation(pi, pid, oid1, tid)
+      _      <- prepareObservation(pi, pid, oid2, tid)
+      _      <- prepareObservation(pi, pid, oid3, tid)
+      _      <- recalculateCalibrations(pid, when, oid1)
+      bands1 <- queryCalibrationBands(pid)
+      // A higher priority band on any of them moves the existing calibrations
+      _      <- setScienceBandAs(pi, oid1, ScienceBand.Band1.some)
+      _      <- runObscalcUpdate(pid, oid1)
+      _      <- recalculateCalibrations(pid, when, oid1)
+      bands2 <- queryCalibrationBands(pid)
+    } yield {
+      assertEquals(bands1, List(ScienceBand.Band2.some, ScienceBand.Band2.some))
+      assertEquals(bands2, List(ScienceBand.Band1.some, ScienceBand.Band1.some))
     }
   }
 

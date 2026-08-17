@@ -79,7 +79,11 @@ object PerProgramPerConfigCalibrationsService:
             case ws  =>
               val pm = ws.map(_.toPicometers.value.value).combineAll / ws.size
               PosInt.from(pm).map(Wavelength(_)).toOption
-          k -> CalObsProps(w, v.map(_.band).min)
+          // Highest priority band (band 1 beats band 2, …) among the science
+          // observations sharing the configuration.  Observations with no band
+          // assigned are ignored rather than dragging the result to "no band",
+          // which would leave the calibration unschedulable.
+          k -> CalObsProps(w, v.flatMap(_.band).minOption)
 
       private def uniqueConfiguration(
         all: List[ObsExtract[ObservingMode]]
@@ -169,9 +173,9 @@ object PerProgramPerConfigCalibrationsService:
           case (Site.GS, CalibrationRole.SpectroPhotometric, c: GmosSConfigs) =>
             gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
           case (Site.GN, CalibrationRole.Twilight, c: GmosNConfigs)           =>
-            gmosLongSlitTwilightObs(pid, gid, tid, c).some
+            gmosLongSlitTwilightObs(pid, gid, tid, props, c).some
           case (Site.GS, CalibrationRole.Twilight, c: GmosSConfigs)           =>
-            gmosLongSlitTwilightObs(pid, gid, tid, c).some
+            gmosLongSlitTwilightObs(pid, gid, tid, props, c).some
           case _                                                              =>
             none
 
