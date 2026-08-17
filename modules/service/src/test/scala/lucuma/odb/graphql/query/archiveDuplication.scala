@@ -356,7 +356,8 @@ class archiveDuplication extends OdbSuite:
       assert(urls.exists(_.contains("/GMOS-N/")))
       assert(urls.exists(_.contains("/GMOS-S/")))
       assert(urls.forall(_.startsWith("https://archive.gemini.edu/jsonsummary/notengineering/NotFail/")))
-      assert(urls.forall(_.contains("/OBJECT/ra=")))
+      // An imaging observation is not duplicated by a spectrum of the same field.
+      assert(urls.forall(_.contains("/OBJECT/imaging/ra=")))
 
   test("distance is the separation from the stored search center"):
     for
@@ -403,7 +404,7 @@ class archiveDuplication extends OdbSuite:
       val urls = js.hcursor.downField("queryUrls").as[List[String]].toOption.get
       // A non-sidereal search carries the target name in the URL rather than coordinates.
       assertEquals(urls.size, 2)
-      assert(urls.forall(_.contains("/object=Halley/")))
+      assert(urls.forall(_.contains("/OBJECT/imaging/object=Halley/")))
       assertEquals(js.hcursor.downField("searchTargetName").focus, Json.fromString("Halley").some)
       assertEquals(js.hcursor.downField("searchCoordinates").focus, Json.Null.some)
       assertEquals(

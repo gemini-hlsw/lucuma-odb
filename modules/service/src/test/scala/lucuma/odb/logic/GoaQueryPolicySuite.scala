@@ -21,6 +21,7 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
+import lucuma.core.enums.ScienceMode
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -248,12 +249,37 @@ class GoaQueryPolicySuite extends FunSuite:
     // zero-radius field.
     assertEquals(GoaQueryPolicy.searchRadius(gmosNorthLongSlit(GmosNorthFpu.Ifu2Slits)), none)
 
+  // -- Science mode --------------------------------------------------------
+
+  test("an imaging mode searches imaging"):
+    assertEquals(GoaQueryPolicy.scienceMode(gmosNorthImaging), ScienceMode.Imaging.some)
+
+  test("a spectroscopy mode searches spectroscopy"):
+    assertEquals(
+      GoaQueryPolicy.scienceMode(gmosNorthLongSlit(GmosNorthFpu.LongSlit_1_00)),
+      ScienceMode.Spectroscopy.some
+    )
+
+  test("a visitor instrument is classified by its mode"):
+    assertEquals(
+      GoaQueryPolicy.scienceMode(visitorNorth.copy(mode = VisitorObservingModeType.AlopekeSpeckle)),
+      ScienceMode.Imaging.some
+    )
+    assertEquals(
+      GoaQueryPolicy.scienceMode(visitorNorth.copy(mode = VisitorObservingModeType.MaroonX)),
+      ScienceMode.Spectroscopy.some
+    )
+
+  test("a generic visitor does not say which it takes, so the search is unrestricted"):
+    assertEquals(GoaQueryPolicy.scienceMode(visitorNorth), none)
+
   // -- The three combined --------------------------------------------------
 
   test("a GMOS observation asks both sites about the same field"):
     val ps = GoaQueryPolicy.queries(gmosNorthImaging, base.some, none, List(TargetPointing.Sidereal))
     assertEquals(ps.map(_.instrument), List(Instrument.GmosNorth, Instrument.GmosSouth))
     assertEquals(ps.map(_.searchRadius).distinct.length, 1)
+    assertEquals(ps.map(_.scienceMode).distinct, List(ScienceMode.Imaging.some))
     assertEquals(
       ps.collect { case s: GoaParams.Sidereal => s.coords }.distinct,
       List(base)
