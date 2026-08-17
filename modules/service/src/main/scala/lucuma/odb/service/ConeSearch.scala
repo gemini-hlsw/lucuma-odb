@@ -19,18 +19,15 @@ import skunk.implicits.*
  */
 object ConeSearch:
 
-  /** Cap on cone-candidate matches.  The caller injects every id into a
-   *  rewritten query, so the list bounds both the heap and the generated
-   *  statement.
+  /** Cap on cone-candidate matches.
    */
   val MaxCandidates: Int = 10000
 
   /** AppliedFragment yielding the ids of `relation` rows whose coordinates lie
    *  within `distance` of `center`.
    *
-   *  A wrap-aware bounding-box prefilter on the int8 microarcsecond columns (index-friendly)
-   *  is followed by an exact great-circle trim. The dec column uses lucuma-core's
-   *  angle encoding, which is safe here because the exact trim relies on sin/cos (2π-periodic).
+   *  A bounding-box prefilter on the int8 microarcsecond columns is followed by an exact
+   *  great-circle trim.
    *  Null coordinates never satisfy the box predicate, so rows without a position drop out.
    *
    *  Scoped to programs visible to `user` and capped at `max + 1` rows */

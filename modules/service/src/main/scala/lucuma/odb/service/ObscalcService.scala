@@ -286,11 +286,11 @@ object ObscalcService:
         result.flatTap: r =>
           Logger[F].info(s"${pending.observationId}: *** end calculating: $r")
 
-      /** The stored J2000 base position: the explicit base if set, otherwise the
+      /** The stored J2000 base position. Taken from the explicit base if set, otherwise the
        *  asterism composite with every target proper-motion corrected to epoch
-       *  J2000.0.  None when any target is non-sidereal or opportunity (and there
-       *  is no explicit base), so such observations are invisible to
-       *  targetCoordinates cone filters.
+       *  J2000.0.
+       *  None when any target is non-sidereal or opportunity, so such observations are invisible
+       *  to targetCoordinates cone filters.
        */
       private def computeBasePosition(
         oid: Observation.Id
@@ -310,13 +310,12 @@ object ObscalcService:
                       case _                       => none
                     .flatMap(ts => CompositeTracking(ts).at(Epoch.J2000.toInstant))
 
-      @annotation.nowarn("msg=unused implicit parameter")
       private def storeResult(
         pending:      Obscalc.PendingCalc,
         result:       Obscalc.Result,
         basePosition: Option[Option[Coordinates]],
         expected:     CalculationState
-      )(using ServiceAccess, Transaction[F]): F[Option[Obscalc.Meta]] =
+      )(using ServiceAccess): F[Option[Obscalc.Meta]] =
         for
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
           ns  = lu.map: (lastInvalidation, timeAccountingDirty) =>
@@ -632,8 +631,9 @@ object ObscalcService:
         sql"c_workflow_transitions = ${_observation_workflow_state}"(r.workflow.validTransitions),
         sql"c_workflow_validations = ${_observation_validation}"(r.workflow.validationErrors)
       ) ++
-      // J2000 Base Position; skipped entirely (keeping the stored value) when
-      // the computation failed -- see `storeResult` in ObscalcService.
+      // J2000 Base Position; skipped entirely when the computation failed
+      // We record the coordinates on j2000 to do distance calculations without
+      // having to recalculate pm
       basePosition.toList.flatMap: p =>
         List(
           sql"c_j2000_base_ra        = ${right_ascension.opt}"(p.map(_.ra)),

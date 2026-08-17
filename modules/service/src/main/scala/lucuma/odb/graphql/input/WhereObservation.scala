@@ -26,12 +26,12 @@ import lucuma.odb.syntax.instrument.*
 object WhereObservation {
 
   /** The WHERE input shared by the observation queries and the observation
-   *  update mutations (and embedded by dataset / execution-event WHEREs).
+   *  update mutations.
    *
    *  @param `allowCone` says whether `targetCoordinates` may be used. A cone elaborates to a
    *  `ConePredicate` that `ConeFilter` resolves by walking the compiled query, so it only
-   *  works where the predicate ends up in the query tree. Thus it is only usable on queries,
-   *  not mutations.
+   *  works where the predicate ends up in the query tree. 
+   *  Thus it is only usable on queries, not mutations.
    */
   def binding(path: Path, allowCone: Boolean): Matcher[Predicate] = {
 

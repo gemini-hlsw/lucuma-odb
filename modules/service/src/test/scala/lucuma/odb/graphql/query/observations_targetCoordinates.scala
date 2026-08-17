@@ -10,11 +10,10 @@ import io.circe.Json
 import io.circe.JsonObject
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
 import lucuma.core.math.Epoch
 import lucuma.core.math.ProperMotion
-import lucuma.core.math.RightAscension
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -23,18 +22,7 @@ import lucuma.core.model.Target
 import lucuma.odb.data.OdbError
 
 // GraphQL-level tests for the `targetCoordinates` cone WHERE filter on observations.
-//
-// The filter matches against the stored J2000 base position, computed by obscalc:
-// the explicit base if set, otherwise the asterism composite PM-corrected to J2000.0.
-// Observations whose asterism contains a non-sidereal or opportunity target have no
-// position and are invisible to the filter (and so always match under NOT).
-//
-// The SQL geometry is shared with configuration requests (ConeSearch) and covered at
-// the service level by coneCandidates; the binding/resolution plumbing is covered by
-// configurationRequests_targetCoordinates. This suite covers what is specific to
-// observations: the stored position's semantics and freshness, and the reachability
-// of the filter through the WHEREs that embed WhereObservation.
-class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOperations with ConeSearchFixture {
+class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOperations with ConeSearchFixture:
 
   val pi      = TestUsers.Standard.pi(1, 30)
   val pi2     = TestUsers.Standard.pi(2, 32)
@@ -42,11 +30,22 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
   val service = TestUsers.service(4)
   val validUsers = List(pi, pi2, admin, service)
 
-  private def raInput(c: Coordinates): String  = s"""ra: { hms: "${RightAscension.fromStringHMS.reverseGet(c.ra)}" }"""
-  private def decInput(c: Coordinates): String = s"""dec: { dms: "${Declination.fromStringSignedDMS.reverseGet(c.dec)}" }"""
+  private val Near = coords("00:00:00 +10:00:00")
+  private val Far  = coords("06:00:00 +40:00:00")
 
-  private def coneText(center: Coordinates, arcseconds: Long): String =
-    s"""targetCoordinates: { center: { ${raInput(center)}, ${decInput(center)} }, distance: { arcseconds: $arcseconds } }"""
+  // A 5° cone at (0h, +10°): matches Near, not Far.
+  private val NearCone: String = coneText(Near, 5.degrees)
+
+  // One observation inside the 5° cone at (0h, +10°) and one well outside it.
+  private def coneSetup: IO[(Program.Id, Observation.Id, Observation.Id)] =
+    for
+      pid  <- createProgramAs(pi)
+      near <- observationAt(pid, Near)
+      far  <- observationAt(pid, Far)
+    yield (pid, near, far)
+
+  private def coneText(center: Coordinates, distance: Angle): String =
+    s"""targetCoordinates: { center: { ${coordinatesInput(center)} }, distance: { arcseconds: ${Angle.signedDecimalArcseconds.get(distance)} } }"""
 
   private def observationAt(pid: Program.Id, c: Coordinates): IO[Observation.Id] =
     for
@@ -80,20 +79,6 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       assertEquals(seam.toSet,  within(seeded)(center, 21.degrees))
       assertEquals(pole.toSet,  within(seeded)(coords("12:00:00 +89:00:00"), 2.degrees))
 
-  private val Near = coords("00:00:00 +10:00:00")
-  private val Far  = coords("06:00:00 +40:00:00")
-
-  // A 5° cone at (0h, +10°): matches Near, not Far.
-  private val NearCone: String = coneText(Near, 18000L)
-
-  // One observation inside the 5° cone at (0h, +10°) and one well outside it.
-  private def coneSetup: IO[(Program.Id, Observation.Id, Observation.Id)] =
-    for
-      pid  <- createProgramAs(pi)
-      near <- observationAt(pid, Near)
-      far  <- observationAt(pid, Far)
-    yield (pid, near, far)
-
   test("cone supplied as the whole WHERE variable"):
     for
       (pid, near, _) <- coneSetup
@@ -121,15 +106,14 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       got <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, OR: [ { $NearCone }, { id: { EQ: "$far" } } ]""")
     yield assertEquals(got.toSet, Set(near, far))
 
-  // An empty candidate set becomes `In(idPath, Nil)`, which grackle compiles to false;
-  // the main query must still run as a single statement and return no matches.
+  // An empty candidate set becomes `In(idPath, Nil)`, which grackle compiles to false
   test("cone matching nothing"):
     for
       (pid, _, _)   <- coneSetup
       (resp, stats) <- queryWithSqlStats(
                          pi,
                          s"""query {
-                               observations(WHERE: { program: { id: { EQ: "$pid" } }, ${coneText(coords("12:00:00 -45:00:00"), 10L)} }) {
+                               observations(WHERE: { program: { id: { EQ: "$pid" } }, ${coneText(coords("12:00:00 -45:00:00"), 10.arcseconds)} }) {
                                  matches { id }
                                }
                              }"""
@@ -139,8 +123,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       assertEquals(got, Nil)
       assertEquals(stats.length, 1, clue = stats.map(_.normalize.sql))
 
-  // The two cone entities dispatch to different candidate lookups; one operation
-  // may use both.
+  // The two cone entities dispatch to different candidate lookups
   test("observation and configuration-request cones in one operation"):
     for
       (pid, near, _) <- coneSetup
@@ -187,7 +170,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       pi,
       s"""mutation {
             updateObservations(input: {
-              SET: { targetEnvironment: { explicitBase: { ${raInput(c)}, ${decInput(c)} } } },
+              SET: { targetEnvironment: { explicitBase: { ${coordinatesInput(c)} } } },
               WHERE: { id: { EQ: ${oid.asJson} } }
             }) { observations { id } }
           }"""
@@ -227,8 +210,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
               SET: {
                 name: "PM"
                 sidereal: {
-                  ${raInput(c)}
-                  ${decInput(c)}
+                  ${coordinatesInput(c)}
                   epoch: "$epoch"
                   properMotion: { ra: { milliarcsecondsPerYear: 0 }, dec: { milliarcsecondsPerYear: $pmDecMasYr } }
                   radialVelocity: { kilometersPerSecond: 0.0 }
@@ -245,8 +227,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
   // The stored position is PM-corrected to epoch J2000.0, not left at the catalog
   // epoch. A 10″/yr proper motion over the 16 years back from J2016 moves the
   // target ~160″, far beyond a 10″ cone, so a cone at the catalog position must
-  // miss while a cone at the J2000 position (computed with lucuma-core, the same
-  // math obscalc uses) must match.
+  // miss while a cone at the J2000 position must match.
   test("stored position is PM-corrected to J2000.0"):
     val catalog  = Near
     val tracking = SiderealTracking(
@@ -265,8 +246,8 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       tid  <- createPmTargetAs(pid, catalog, "J2016.000", 10000)
       oid  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _    <- runObscalcUpdateAs(service, pid, oid)
-      here <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(j2000Pos, 10L)}""")
-      cat  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(catalog, 10L)}""")
+      here <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(j2000Pos, 10.arcseconds)}""")
+      cat  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(catalog, 10.arcseconds)}""")
     yield
       assertEquals(here, List(oid))
       assertEquals(cat, Nil)
@@ -276,7 +257,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       pi,
       s"""mutation {
             updateTargets(input: {
-              SET: { sidereal: { ${raInput(c)}, ${decInput(c)} } },
+              SET: { sidereal: { ${coordinatesInput(c)} } },
               WHERE: { id: { EQ: "$tid" } }
             }) { targets { id } }
           }"""
@@ -284,7 +265,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
 
   // The stored position is eventually consistent: it reflects the last obscalc
   // pass, not the transactional state, so an edit shows up only after the next
-  // pass (in production, when the daemon catches up).
+  // pass.
   test("position lags a target edit until obscalc runs again"):
     for
       pid    <- createProgramAs(pi)
@@ -295,7 +276,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       stale  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, $NearCone""")
       _      <- runObscalcUpdateAs(service, pid, oid)
       fresh  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, $NearCone""")
-      moved  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Far, 18000L)}""")
+      moved  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Far, 5.degrees)}""")
     yield
       assertEquals(stale, List(oid))
       assertEquals(fresh, Nil)
@@ -359,8 +340,7 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
   test("cone is rejected by the group queries"):
     expectConeRejected(s"query { asterismGroup(WHERE: { $NearCone }) { matches { program { id } } } }")
 
-  // WhereObservation is embedded in the dataset and execution-event WHEREs; the
-  // cone must resolve there too (an unresolved placeholder fails loudly).
+  // WhereObservation is embedded in the dataset and execution-event WHEREs
   test("cone reachable through the datasets and events WHEREs"):
     for
       (pid, _, _) <- coneSetup
@@ -369,5 +349,3 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
     yield
       assertEquals(d.hcursor.downFields("datasets", "matches").values.toList.flatten, Nil)
       assertEquals(e.hcursor.downFields("events", "matches").values.toList.flatten, Nil)
-
-}

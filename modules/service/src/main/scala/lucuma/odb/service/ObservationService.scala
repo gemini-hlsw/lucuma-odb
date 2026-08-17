@@ -96,11 +96,8 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Result[Program.Id]]
 
   /** Selects the ids of observations whose stored J2000 base position lies
-   *  within `cone` (exact great-circle match on angular distance), restricted
-   *  to programs visible to the current user. The caller injects every id into
-   *  a rewritten query, so the list bounds both the heap and the generated
-   *  statement. Observations without a position (non-sidereal or opportunity
-   *  targets, or not yet computed by obscalc) are never candidates. */
+   *  within `cone` (exact great-circle match on angular distance).
+   */
   def coneCandidates(cone: Cone, max: Int = ConeSearch.MaxCandidates): F[Result[List[Observation.Id]]]
 
   def createObservation(
@@ -756,8 +753,7 @@ object ObservationService {
       """.query(program_id)
 
     /** AppliedFragment yielding the ids of observations whose stored J2000
-     *  base position lies within `distance` of `center`; see
-     *  `ConeSearch.candidates` for the query shape. */
+     *  base position lies within `distance` of `center` */
     def coneCandidates(user: User, cone: Cone, max: Int): AppliedFragment =
       ConeSearch.candidates(
         relation        = "t_obscalc",

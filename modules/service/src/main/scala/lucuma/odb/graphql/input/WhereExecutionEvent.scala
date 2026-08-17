@@ -27,7 +27,6 @@ object WhereExecutionEvent {
   def binding(path: Path): Matcher[Predicate] = {
     val WhereExecutionEventIdBinding   = WhereOrder.binding[ExecutionEvent.Id](path / "id", ExecutionEventIdBinding)
     val WhereVisitIdBinding            = WhereEq.binding[Visit.Id](path / "visit" / "id", VisitIdBinding)
-    // Only the `events` query uses this WHERE, so the cone filter is reachable.
     val WhereObservationBinding        = WhereObservation.binding(path / "observation", allowCone = true)
     val WhereTimestampBinding          = WhereOrder.binding[Timestamp](path / "received", TimestampBinding)
     val WhereExecutionEventTypeBinding = WhereEq.binding(path / "eventType", enumeratedBinding[ExecutionEventType])

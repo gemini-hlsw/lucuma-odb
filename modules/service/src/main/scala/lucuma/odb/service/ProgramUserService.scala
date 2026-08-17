@@ -729,15 +729,6 @@ object ProgramUserService:
      *  guests and PIs see a program they are linked to (any role); staff and
      *  above see everything; NGO visibility is unimplemented there, so NGO
      *  stays unscoped (`true`).
-     *
-     *  Used to scope cone-search *prefilters*, whose ids are injected into a
-     *  query that then applies `isVisibleTo` itself -- so this must never be
-     *  narrower than that predicate: anything dropped here is silently lost.
-     *  In particular do not swap in `existsUserReadAccess` semantics, which
-     *  are narrower for NGO users and role-restricted links.  For the same
-     *  reason `correlatedExistsUserAs` and the inline check in
-     *  `UserInvitationService` stay separate: both encode narrower,
-     *  role-specific access, not visibility.
      */
     def correlatedIsVisibleTo(
       user:            User,

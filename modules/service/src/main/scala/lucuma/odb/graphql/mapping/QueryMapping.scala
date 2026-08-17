@@ -226,7 +226,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   // Elaborators below
 
   private lazy val AsterismGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    // Cone filters are untested under the group queries, so they are refused here.
     val WhereObservationBinding = WhereObservation.binding(AsterismGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "asterismGroup", List(
@@ -408,7 +407,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val ConstraintSetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    // Cone filters are untested under the group queries, so they are refused here.
     val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "constraintSetGroup", List(
@@ -604,7 +602,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val ObservingModeGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    // Cone filters are untested under the group queries, so they are refused here.
     val WhereObservationBinding = WhereObservation.binding(ObservingModeGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "observingModeGroup", List(
@@ -907,7 +904,6 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
 
   private lazy val TargetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    // Cone filters are untested under the group queries, so they are refused here.
     val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "targetGroup", List(

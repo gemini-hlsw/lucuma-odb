@@ -88,8 +88,8 @@ object ConeFilter:
     def children: List[Term[?]]           = Nil
 
   /** Cap on distinct cones per operation. Each one costs a candidate scan and can inject
-   *  up to `ConeSearch.MaxCandidates` ids into the final statement, so an unbounded `OR`
-   *  list would be a cheap amplification lever.
+   *  up to `ConeSearch.MaxCandidates` ids into the final statement.
+   *  The limit is present to avoid having an unbounded amount of `OR`s.
    */
   val MaxConesPerOperation: Int = 5
 
@@ -98,7 +98,7 @@ object ConeFilter:
    *  cones -- nearly all of them -- are returned untouched.
    *
    *  The `In` is built inside the per-entity branch, while the ids still have
-   *  their concrete type; the branches only meet at `Predicate`.
+   *  their concrete type.
    */
   def resolve[F[_]: Monad](
     query: Query

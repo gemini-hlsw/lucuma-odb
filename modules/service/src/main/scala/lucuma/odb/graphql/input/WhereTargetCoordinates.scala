@@ -19,8 +19,7 @@ import lucuma.odb.graphql.binding.*
  *  The cone's candidate lookup is an effect the elaborator cannot run, so this
  *  yields a placeholder that `ConeFilter.resolve` swaps for `id IN (…)` before
  *  execution. Parsing it as an ordinary binding means variables are already
- *  substituted here. `entity` selects the candidate lookup; it is carried
- *  explicitly because `idPath` may be rooted at an embedding type.
+ *  substituted here. `entity` selects the candidate lookup.
  */
 object WhereTargetCoordinates:
 
