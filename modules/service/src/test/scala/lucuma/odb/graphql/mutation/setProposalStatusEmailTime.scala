@@ -60,6 +60,43 @@ class setProposalStatusEmailTime extends ExecutionTestSupportForGmos {
     }
   }
 
+  test("✓ an explicit request is what the notification reports") {
+    for {
+      cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester)
+      pid <- createProgramWithNonPartnerPi(pi, "Explicitly Timed Proposal")
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- runObscalcUpdate(pid, oid)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      _   <- addCoisAs(pi, pid, List(Partner.US))
+      _   <- query(
+               pi,
+               s"""
+                 mutation {
+                   updateProposal(
+                     input: {
+                       programId: "$pid"
+                       SET: { explicitTimeRequest: { hours: 42 } }
+                     }
+                   ) {
+                     proposal { explicitTimeRequest { hours } }
+                   }
+                 }
+               """
+             )
+      _   <- submitProposal(pi, pid)
+      ms  <- getEmailMessages(pid, proposalAddress)
+    } yield {
+      val (_, text, html) = ms.head
+      assertEquals(ms.size, 1)
+      // The observation's own estimate is nowhere near 42 hours, so this shows
+      // the explicit request displacing the derived sum rather than adding to it.
+      assertEquals(lineOf(text, "Request"), "Request: 42.00 hours")
+      assertEquals(lineOf(html.get, "Request"), "Request: 42.00 hours<br/>")
+    }
+  }
+
   private def lineOf(message: String, label: String): String =
     message.linesIterator.find(_.startsWith(s"$label:")).getOrElse(s"<no $label line in: $message>")
 

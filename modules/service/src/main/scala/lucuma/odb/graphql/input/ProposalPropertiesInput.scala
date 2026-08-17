@@ -11,6 +11,7 @@ import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.IntPercent
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.Tag
 import lucuma.odb.graphql.binding.*
@@ -24,11 +25,12 @@ object ProposalPropertiesInput {
     "Specify only one of 'gemini', 'keck' or 'subaru'."
 
   case class Create(
-    category:  Option[Tag],
-    callId:    Option[CallForProposals.Id],
-    gemini:    Option[GeminiProposalTypeInput.Create],
-    keck:      Option[KeckProposalTypeInput.Create],
-    subaru:    Option[SubaruProposalTypeInput.Create]
+    category:    Option[Tag],
+    callId:      Option[CallForProposals.Id],
+    timeRequest: Option[TimeSpan],
+    gemini:      Option[GeminiProposalTypeInput.Create],
+    keck:        Option[KeckProposalTypeInput.Create],
+    subaru:      Option[SubaruProposalTypeInput.Create]
   ) {
     def scienceSubtype: Option[ScienceSubtype] =
       gemini.map(_.scienceSubtype)
@@ -47,11 +49,12 @@ object ProposalPropertiesInput {
   }
 
   case class Edit(
-    category:  Nullable[Tag],
-    callId:    Nullable[CallForProposals.Id],
-    gemini:    Option[GeminiProposalTypeInput.Edit],
-    keck:      Option[KeckProposalTypeInput.Edit],
-    subaru:    Option[SubaruProposalTypeInput.Edit]
+    category:    Nullable[Tag],
+    callId:      Nullable[CallForProposals.Id],
+    timeRequest: Nullable[TimeSpan],
+    gemini:      Option[GeminiProposalTypeInput.Edit],
+    keck:        Option[KeckProposalTypeInput.Edit],
+    subaru:      Option[SubaruProposalTypeInput.Edit]
   ) {
     def scienceSubtype: Option[ScienceSubtype] =
       gemini.map(_.scienceSubtype)
@@ -83,7 +86,7 @@ object ProposalPropertiesInput {
 
   object Edit {
     val Empty: Edit =
-      Edit(Nullable.Absent, Nullable.Absent, None, None, None)
+      Edit(Nullable.Absent, Nullable.Absent, Nullable.Absent, None, None, None)
   }
 
   // Reject more than one of gemini/keck/subaru.
@@ -96,15 +99,16 @@ object ProposalPropertiesInput {
       case List(
         TagBinding.Option("category", rCategory),
         CallForProposalsIdBinding.Option("callId", rCid),
+        TimeSpanInput.Binding.Option("explicitTimeRequest", rTimeRequest),
         GeminiProposalTypeInput.Create.Binding.Option("gemini", rGemini),
         KeckProposalTypeInput.Create.Binding.Option("keck", rKeck),
         SubaruProposalTypeInput.Create.Binding.Option("subaru", rSubaru)
       ) =>
-        (rCategory, rCid, rGemini, rKeck, rSubaru).parTupled.flatMap { case (category, cid, gemini, keck, subaru) =>
+        (rCategory, rCid, rTimeRequest, rGemini, rKeck, rSubaru).parTupled.flatMap { case (category, cid, timeRequest, gemini, keck, subaru) =>
           atMostOne(gemini, keck, subaru, {
             // If no variant is specified, assume a regular semester queue proposal.
             val g = if gemini.isEmpty && keck.isEmpty && subaru.isEmpty then GeminiProposalTypeInput.Create.Default.some else gemini
-            Create(category, cid, g, keck, subaru)
+            Create(category, cid, timeRequest, g, keck, subaru)
           })
         }
     }
@@ -114,12 +118,13 @@ object ProposalPropertiesInput {
       case List(
         TagBinding.Nullable("category", rCategory),
         CallForProposalsIdBinding.Nullable("callId", rCid),
+        TimeSpanInput.Binding.Nullable("explicitTimeRequest", rTimeRequest),
         GeminiProposalTypeInput.Edit.Binding.Option("gemini", rGemini),
         KeckProposalTypeInput.Edit.Binding.Option("keck", rKeck),
         SubaruProposalTypeInput.Edit.Binding.Option("subaru", rSubaru)
       ) =>
-        (rCategory, rCid, rGemini, rKeck, rSubaru).parTupled.flatMap { case (category, cid, gemini, keck, subaru) =>
-          atMostOne(gemini, keck, subaru, Edit(category, cid, gemini, keck, subaru))
+        (rCategory, rCid, rTimeRequest, rGemini, rKeck, rSubaru).parTupled.flatMap { case (category, cid, timeRequest, gemini, keck, subaru) =>
+          atMostOne(gemini, keck, subaru, Edit(category, cid, timeRequest, gemini, keck, subaru))
         }
     }
 
