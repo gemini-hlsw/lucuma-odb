@@ -289,8 +289,10 @@ object ObscalcService:
       /** The stored J2000 base position. Taken from the explicit base if set, otherwise the
        *  asterism composite with every target proper-motion corrected to epoch
        *  J2000.0.
-       *  None when any target is non-sidereal or opportunity, so such observations are invisible
-       *  to targetCoordinates cone filters.
+       *  None when any target is non-sidereal or opportunity, or when the composite cannot
+       *  be propagated to J2000 (e.g. a PM correction landing on a pole); in every case a
+       *  deterministic property of the current asterism, not a transient failure, so such
+       *  observations are invisible to targetCoordinates cone filters.
        */
       private def computeBasePosition(
         oid: Observation.Id

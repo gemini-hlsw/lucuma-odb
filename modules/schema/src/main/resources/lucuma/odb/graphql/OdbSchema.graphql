@@ -20752,7 +20752,10 @@ input WhereObservation {
   `distance` of `center`. The stored position is the
   explicit base if set, otherwise the asterism composite with every target
   proper-motion corrected to epoch J2000.
-  Non-sidereal and ToOs are not included.
+  An observation has no stored position when its asterism contains a
+  non-sidereal or opportunity target and no explicit base is set, or when the
+  background calculation has not yet caught up with recent edits; such
+  observations never match, and always match the negation.
   """
   targetCoordinates: WhereCone
 }
