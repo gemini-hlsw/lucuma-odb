@@ -2001,6 +2001,51 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  /**
+   * Resolves an opportunity target siderally at the given coordinates, as the alert would.
+   * The region is deliberately not restated, so the approved patch of sky is left alone.
+   */
+  def resolveOpportunityTargetAtAs(
+    user:   User,
+    tid:    Target.Id,
+    coords: Coordinates
+  ): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateTargets(input: {
+            SET: {
+              opportunity: {
+                resolution: {
+                  sidereal: { ${coordinatesInput(coords)} epoch: "J2000.000" }
+                }
+              }
+            }
+            WHERE: { id: { EQ: ${tid.asJson} } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
+
+  /** Clears an opportunity target's resolution, returning it to awaiting its alert. */
+  def unresolveOpportunityTargetAs(user: User, tid: Target.Id): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateTargets(input: {
+            SET: { opportunity: { resolution: null } }
+            WHERE: { id: { EQ: ${tid.asJson} } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
+
   def createNonsiderealTargetAs(
     user: User,
     pid:  Program.Id,

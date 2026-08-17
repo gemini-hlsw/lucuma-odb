@@ -16,14 +16,13 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ExecutionRequirement
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapability
-import lucuma.core.enums.TooActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -791,8 +790,7 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           calibrationRole,
-          SET.scheduling.flatMap(_.tooActivation).getOrElse(TooActivation.None),
-          SET.scheduling.flatMap(_.explicitExecutionRequirement.toOption)
+          SET.scheduling.flatMap(_.schedulingMode).getOrElse(SchedulingMode.Unconstrained)
         )
       }
 
@@ -814,8 +812,7 @@ object ObservationService {
       useBlindOffset:      Boolean,
       blindOffsetType:     BlindOffsetType,
       calibrationRole:     Option[CalibrationRole],
-      tooActivation:       TooActivation,
-      executionRequirement: Option[ExecutionRequirement]
+      schedulingMode:      SchedulingMode
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -860,8 +857,7 @@ object ObservationService {
            useBlindOffset                                                                                                         ,
            blindOffsetType                                                                                                        ,
            calibrationRole                                                                                                        ,
-           tooActivation                                                                                                          ,
-           executionRequirement
+           schedulingMode
         )
       }
 
@@ -908,8 +904,7 @@ object ObservationService {
       Boolean                          ,
       BlindOffsetType                  ,
       Option[CalibrationRole]          ,
-      TooActivation                    ,
-      Option[ExecutionRequirement]
+      SchedulingMode
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -947,8 +942,7 @@ object ObservationService {
           c_use_blind_offset,
           c_blind_offset_type,
           c_calibration_role,
-          c_too_activation,
-          c_execution_requirement
+          c_scheduling_mode
         )
         SELECT
           $program_id,
@@ -985,8 +979,7 @@ object ObservationService {
           $bool,
           $blind_offset_type,
           ${calibration_role.opt},
-          $too_activation,
-          ${execution_requirement.opt}
+          $scheduling_mode
       """
 
     def selectObservingModes(
@@ -1136,8 +1129,7 @@ object ObservationService {
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
-      val upExecutionReq      = sql"c_execution_requirement = ${execution_requirement.opt}"
-      val upTooActivation     = sql"c_too_activation = $too_activation"
+      val upSchedulingMode    = sql"c_scheduling_mode = $scheduling_mode"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1146,8 +1138,7 @@ object ObservationService {
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
-          SET.scheduling.fold(Option(none[ExecutionRequirement]), none, _.explicitExecutionRequirement.foldPresent(identity)).map(upExecutionReq),
-          SET.scheduling.fold(TooActivation.None.some, none, _.tooActivation).map(upTooActivation)
+          SET.scheduling.fold(SchedulingMode.Unconstrained.some, none, _.schedulingMode).map(upSchedulingMode)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1269,8 +1260,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
-          c_too_activation,
-          c_execution_requirement
+          c_scheduling_mode
         )
         SELECT
           c_program_id,
@@ -1307,8 +1297,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
-          c_too_activation,
-          c_execution_requirement
+          c_scheduling_mode
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id

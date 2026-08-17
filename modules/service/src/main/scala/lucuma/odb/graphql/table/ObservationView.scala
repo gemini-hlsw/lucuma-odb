@@ -34,13 +34,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val SignalToNoiseTargetId: ColumnRef = col("c_signal_to_noise_target_id", target_id.opt)
       val TooActivation: ColumnRef         = col("c_too_activation",            too_activation)
 
-      // Explicit / default / effective, as for the observing modes.  The stored
-      // column is the explicit value; the other two are computed in the view.
-      val ExecutionRequirement: ColumnRef  = col("c_execution_requirement",     execution_requirement.opt)
-      val ExecutionRequirementDefault: ColumnRef =
-        col("c_execution_requirement_default", execution_requirement)
-      val ExecutionRequirementEffective: ColumnRef =
-        col("c_execution_requirement_effective", execution_requirement)
+      val SchedulingMode: ColumnRef        = col("c_scheduling_mode",           scheduling_mode)
       val IsSplittable: ColumnRef          = col("c_is_splittable",             bool)
 
       val AcquisitionSequenceIsMaterialized: ColumnRef =

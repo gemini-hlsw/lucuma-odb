@@ -5119,20 +5119,18 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       _   <- updateObservation(pi, oid, update, query, expected)
     yield ()
 
-  test("scheduling: set explicitExecutionRequirement"):
+  test("scheduling: set schedulingMode"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
-          explicitExecutionRequirement: NO_SPLITTING
+          schedulingMode: NO_SPLITTING
         }
       """,
       query = """
         observations {
           schedulingConstraints {
-            executionRequirement
-            defaultExecutionRequirement
-            explicitExecutionRequirement
+            schedulingMode
             isSplittable
           }
         }
@@ -5143,9 +5141,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             "observations": [
               {
                 "schedulingConstraints": {
-                  "executionRequirement": "NO_SPLITTING",
-                  "defaultExecutionRequirement": "UNCONSTRAINED",
-                  "explicitExecutionRequirement": "NO_SPLITTING",
+                  "schedulingMode": "NO_SPLITTING",
                   "isSplittable": false
                 }
               }
@@ -5155,52 +5151,18 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """.asRight
     )
 
-  test("scheduling: with nothing explicit, the default applies"):
+  test("scheduling: the mode defaults to UNCONSTRAINED"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
-          tooActivation: NONE
+          timingWindows: []
         }
       """,
       query = """
         observations {
           schedulingConstraints {
-            executionRequirement
-            defaultExecutionRequirement
-            explicitExecutionRequirement
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "updateObservations": {
-            "observations": [
-              {
-                "schedulingConstraints": {
-                  "executionRequirement": "UNCONSTRAINED",
-                  "defaultExecutionRequirement": "UNCONSTRAINED",
-                  "explicitExecutionRequirement": null
-                }
-              }
-            ]
-          }
-        }
-      """.asRight
-    )
-
-  test("scheduling: explicitExecutionRequirement UNINTERRUPTIBLE implies not splittable"):
-    oneUpdateTest(
-      user   = pi,
-      update = """
-        schedulingConstraints: {
-          explicitExecutionRequirement: UNINTERRUPTIBLE
-        }
-      """,
-      query = """
-        observations {
-          schedulingConstraints {
-            executionRequirement
+            schedulingMode
             isSplittable
           }
         }
@@ -5211,7 +5173,39 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             "observations": [
               {
                 "schedulingConstraints": {
-                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "schedulingMode": "UNCONSTRAINED",
+                  "isSplittable": true
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("scheduling: UNINTERRUPTIBLE implies not splittable"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          schedulingMode: UNINTERRUPTIBLE
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            schedulingMode
+            isSplittable
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "schedulingMode": "UNINTERRUPTIBLE",
                   "isSplittable": false
                 }
               }
@@ -5221,7 +5215,42 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """.asRight
     )
 
-  test("scheduling: RAPID tooActivation raises the default, leaving the explicit value intact"):
+  test("scheduling: INTERRUPTING sits at the top of the ladder"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        schedulingConstraints: {
+          schedulingMode: INTERRUPTING
+        }
+      """,
+      query = """
+        observations {
+          schedulingConstraints {
+            schedulingMode
+            isSplittable
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "schedulingMode": "INTERRUPTING",
+                  "isSplittable": false
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  // The activation used to be settable, and it floored the mode.  It is derived
+  // now -- from the asterism and the mode -- so it is no longer an input at all,
+  // and an observation with no opportunity target reads NONE whatever its mode.
+  test("scheduling: tooActivation is not settable"):
     oneUpdateTest(
       user   = pi,
       update = """
@@ -5230,84 +5259,24 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         }
       """,
       query = """
-        observations {
-          schedulingConstraints {
-            tooActivation
-            executionRequirement
-            defaultExecutionRequirement
-            explicitExecutionRequirement
-          }
-        }
+        observations { id }
       """,
-      expected = json"""
-        {
-          "updateObservations": {
-            "observations": [
-              {
-                "schedulingConstraints": {
-                  "tooActivation": "RAPID",
-                  "executionRequirement": "UNINTERRUPTIBLE",
-                  "defaultExecutionRequirement": "UNINTERRUPTIBLE",
-                  "explicitExecutionRequirement": null
-                }
-              }
-            ]
-          }
-        }
-      """.asRight
+      expected = "Unknown field(s) 'tooActivation' for input object value of type SchedulingConstraintsInput in field 'updateObservations' of type 'Mutation'".asLeft
     )
 
-  test("scheduling: an explicit requirement below the ToO default does not loosen it"):
+  test("scheduling: an observation with no opportunity target derives NONE"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
-          tooActivation: INTERRUPTING
-          explicitExecutionRequirement: UNCONSTRAINED
-        }
-      """,
-      query = """
-        observations {
-          schedulingConstraints {
-            executionRequirement
-            defaultExecutionRequirement
-            explicitExecutionRequirement
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "updateObservations": {
-            "observations": [
-              {
-                "schedulingConstraints": {
-                  "executionRequirement": "UNINTERRUPTIBLE",
-                  "defaultExecutionRequirement": "UNINTERRUPTIBLE",
-                  "explicitExecutionRequirement": "UNCONSTRAINED"
-                }
-              }
-            ]
-          }
-        }
-      """.asRight
-    )
-
-  test("scheduling: STANDARD tooActivation leaves the execution requirement alone"):
-    oneUpdateTest(
-      user   = pi,
-      update = """
-        schedulingConstraints: {
-          tooActivation: STANDARD
-          explicitExecutionRequirement: NO_SPLITTING
+          schedulingMode: UNINTERRUPTIBLE
         }
       """,
       query = """
         observations {
           schedulingConstraints {
             tooActivation
-            executionRequirement
-            defaultExecutionRequirement
-            explicitExecutionRequirement
+            schedulingMode
           }
         }
       """,
@@ -5317,10 +5286,8 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             "observations": [
               {
                 "schedulingConstraints": {
-                  "tooActivation": "STANDARD",
-                  "executionRequirement": "NO_SPLITTING",
-                  "defaultExecutionRequirement": "UNCONSTRAINED",
-                  "explicitExecutionRequirement": "NO_SPLITTING"
+                  "tooActivation": "NONE",
+                  "schedulingMode": "UNINTERRUPTIBLE"
                 }
               }
             ]
@@ -5329,46 +5296,29 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """.asRight
     )
 
-  test("scheduling: lowering tooActivation restores the explicit execution requirement"):
+  test("scheduling: the mode can be raised and lowered again"):
     multiUpdateTest(
       user = pi,
       updates = List(
         (
-          """schedulingConstraints: { tooActivation: INTERRUPTING, explicitExecutionRequirement: NO_SPLITTING }""",
-          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
-          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"UNINTERRUPTIBLE","explicitExecutionRequirement":"NO_SPLITTING"}}]}}""".asRight
+          """schedulingConstraints: { schedulingMode: INTERRUPTING }""",
+          """observations { schedulingConstraints { schedulingMode } }""",
+          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"schedulingMode":"INTERRUPTING"}}]}}""".asRight
         ),
         (
-          """schedulingConstraints: { tooActivation: STANDARD }""",
-          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
-          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"NO_SPLITTING","explicitExecutionRequirement":"NO_SPLITTING"}}]}}""".asRight
+          """schedulingConstraints: { schedulingMode: UNCONSTRAINED }""",
+          """observations { schedulingConstraints { schedulingMode } }""",
+          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"schedulingMode":"UNCONSTRAINED"}}]}}""".asRight
         )
       )
     )
 
-  test("scheduling: explicitExecutionRequirement can be unset with null"):
-    multiUpdateTest(
-      user = pi,
-      updates = List(
-        (
-          """schedulingConstraints: { explicitExecutionRequirement: UNINTERRUPTIBLE }""",
-          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
-          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"UNINTERRUPTIBLE","explicitExecutionRequirement":"UNINTERRUPTIBLE"}}]}}""".asRight
-        ),
-        (
-          """schedulingConstraints: { explicitExecutionRequirement: null }""",
-          """observations { schedulingConstraints { executionRequirement explicitExecutionRequirement } }""",
-          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"executionRequirement":"UNCONSTRAINED","explicitExecutionRequirement":null}}]}}""".asRight
-        )
-      )
-    )
-
-  test("scheduling: explicitExecutionRequirement and isSplittable are mutually exclusive"):
+  test("scheduling: schedulingMode and isSplittable are mutually exclusive"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
-          explicitExecutionRequirement: NO_SPLITTING
+          schedulingMode: NO_SPLITTING
           isSplittable: false
         }
       """,
@@ -5377,6 +5327,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           id
         }
       """,
-      expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `explicitExecutionRequirement` and the deprecated `isSplittable` may be specified.".asLeft
+      expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `schedulingMode` and the deprecated `isSplittable` may be specified.".asLeft
     )
 

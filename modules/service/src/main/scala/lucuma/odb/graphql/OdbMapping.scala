@@ -249,6 +249,7 @@ object OdbMapping {
           with ObservingModeMapping[F]
           with OffsetMapping[F]
           with OpportunityMapping[F]
+          with TargetResolutionMapping[F]
           with ParallaxMapping[F]
           with PartnerSplitMapping[F]
           with PosAngleConstraintMapping[F]
@@ -661,6 +662,7 @@ object OdbMapping {
                 RegionMappings,
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
+                TargetResolutionMappings,
                 TelescopeConfigMappings,
                 TimeSpanMappings,
                 UserProfileMappings,
@@ -847,5 +849,9 @@ object OdbMapping {
 
 
   def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
+    // NOTE: `load` is an inline macro -- it reads the .graphql at *compile time* and bakes the
+    // schema into this class.  Editing OdbSchema.graphql therefore has no effect until this file
+    // is recompiled, and zinc hashes content, so `touch` will not do it.  If a schema change seems
+    // to be ignored at runtime, make a real edit here or `sbt service/clean`.
     SchemaStitcher.load("lucuma/odb/graphql/OdbSchema.graphql")
 }

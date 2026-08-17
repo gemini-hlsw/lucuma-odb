@@ -202,20 +202,19 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
     """
 
   /**
-   * An opportunity target is a placeholder for a Target of Opportunity, so an
-   * observation holding one is only coherent if it declares a ToO activation
-   * other than NONE (otherwise the workflow flags it `Undefined`) and its
-   * proposal allows that much disruption (otherwise `Unapproved`).  Fixtures
-   * built from an opportunity target are not trying to exercise either rule, so
-   * make the whole configuration consistent for them.
+   * An observation holding an opportunity target derives a ToO activation other
+   * than NONE, and is only coherent if its proposal allows that much disruption
+   * (otherwise the workflow flags it `Unapproved`).  Fixtures built from an
+   * opportunity target are not trying to exercise that rule, so raise the ceiling
+   * far enough to permit whatever they derive.  Nothing is set on the observation
+   * itself: the activation follows from the asterism.
    *
    * The ceiling has to be written directly: it is normally derived from the
    * program's observations and frozen when the proposal is accepted, and several
    * fixtures accept the proposal before the observation exists, which would
    * freeze it at NONE.
    */
-  private def setTooActivationForOpportunityTargets(
-    user: User,
+  private def raiseTooCeilingForOpportunityTargets(
     oid:  Observation.Id,
     tids: List[Target.Id]
   ): IO[Unit] =
@@ -243,23 +242,8 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
           """.command
         ).use(_.execute(oid).void)
 
-    val setActivation: IO[Unit] =
-      query(
-        user,
-        s"""
-          mutation {
-            updateObservations(input: {
-              SET: { schedulingConstraints: { tooActivation: RAPID } }
-              WHERE: { id: { EQ: ${oid.asJson} } }
-            }) {
-              observations { id }
-            }
-          }
-        """
-      ).void
-
     NonEmptyList.fromList(tids).fold(IO.unit): tns =>
-      hasOpportunityTarget(tns).flatMap(IO.whenA(_)(setActivation *> raiseCeiling))
+      hasOpportunityTarget(tns).flatMap(IO.whenA(_)(raiseCeiling))
 
   def createObservationWithModeAs(
     user:         User,
@@ -272,7 +256,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       query = createObservationWithModeQuery(pid, tids, mode),
     ).map { json =>
       json.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id]
-    }.flatTap(setTooActivationForOpportunityTargets(user, _, tids))
+    }.flatTap(raiseTooCeilingForOpportunityTargets(_, tids))
 
   def createObservationWithNoModeAs(
     user:         User,

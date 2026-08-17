@@ -21,6 +21,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.model.Target
+import lucuma.core.model.TargetResolution
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.sequence.ObservingMode
@@ -59,11 +60,13 @@ object GoaQueryPolicy:
 
   object TargetPointing:
 
+    // Keyed on how the target tracks rather than on its subtype: a Target of Opportunity that
+    // has been resolved points somewhere definite, and only an unresolved one is Unresolvable.
     def fromTarget(target: Target): TargetPointing =
-      target match
-        case _: Target.Sidereal    => Sidereal
-        case n: Target.Nonsidereal => NonSidereal(n.name)
-        case _: Target.Opportunity => Unresolvable
+      target.resolution match
+        case Some(TargetResolution.Sidereal(_, _))    => Sidereal
+        case Some(TargetResolution.Nonsidereal(_))    => NonSidereal(target.name)
+        case None                                     => Unresolvable
 
   /**
    * every instrument an observation taken with `instrument` is searched against, itself included.

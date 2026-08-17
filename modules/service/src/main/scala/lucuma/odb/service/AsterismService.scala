@@ -11,6 +11,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.ArcType
+import lucuma.core.enums.TrackType
 import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -24,6 +25,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
+import lucuma.core.model.TargetResolution
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -422,6 +424,8 @@ object AsterismService {
         select
           t.c_target_id,
           c_name,
+          c_type = 'opportunity',
+          c_resolved_type,
           c_sid_ra,
           c_sid_dec,
           c_sid_epoch,
@@ -454,6 +458,8 @@ object AsterismService {
           a.c_observation_id,
           t.c_target_id,
           c_name,
+          c_type = 'opportunity',
+          c_resolved_type,
           c_sid_ra,
           c_sid_dec,
           c_sid_epoch,
@@ -495,6 +501,8 @@ object AsterismService {
     val targetDecoder: Decoder[(Target.Id, Target)] =
       (target_id *:
         text_nonempty *:           // name
+        bool *:                    // c_type = 'opportunity'
+        target_tracking_type.opt *:// c_resolved_type (opportunity targets only)
         right_ascension.opt *:
         declination.opt *:
         epoch.opt *:
@@ -517,6 +525,8 @@ object AsterismService {
       ).emap {
         case (id,
               name,
+              isOpportunity,
+              oResolvedType,
               oRa,
               oDec,
               oEpoch,
@@ -538,47 +548,56 @@ object AsterismService {
               profile
             ) =>
           val oSourceProfile = profile.as[SourceProfile].toOption
-          (oRa, oDec, oEpoch, oSourceProfile)
-            .mapN { (ra, dec, epoch, sourceProfile) =>
-              val baseCoords   = Coordinates(ra, dec)
-              val properMotion = (oPmRa, oPmDec).mapN(ProperMotion.apply)
-              val catalogInfo  = (oCatName, oCatId.flatMap(toNonEmpty)).mapN { (name, id) =>
-                CatalogInfo(name, id, oCatType.flatMap(toNonEmpty))
-              }
-              val tracking     = SiderealTracking(baseCoords, epoch, properMotion, oRv, oParallax)
-              (id, Target.Sidereal(name, tracking, sourceProfile, catalogInfo))
-            }
-            .orElse(
-              (oDes, oEphemKeyType, oSourceProfile)
-                .mapN((des, keyType, sourceProfile) =>
-                  Ephemeris.Key.fromTypeAndDes
-                    .getOption((keyType, des))
-                    .map(key => (id, Target.Nonsidereal(name, key, sourceProfile)))
-                )
-                .flatten
-            )
-            .orElse(
-              (oRaArcType, oDecArcType, oSourceProfile).tupled.flatMap: (raArcType, decArcType, sourceProfile) =>
 
-                val oRaArc: Option[Arc[RightAscension]] =
-                  (raArcType, oRaArcStart, oRaArcEnd) match
-                    case (ArcType.Empty, None, None) => Arc.Empty[RightAscension]().some
-                    case (ArcType.Full, None, None) => Arc.Full[RightAscension]().some
-                    case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).some
-                    case _ => None
+          // The tracking columns of a resolved Target of Opportunity are populated exactly as a
+          // plain target's are, so which subtype this is cannot be inferred from which columns
+          // are non-null -- it must come from the discriminator. Without that, a ToO resolved
+          // siderally would decode as an ordinary sidereal target and lose its region.
+          val oSiderealTracking: Option[SiderealTracking] =
+            (oRa, oDec, oEpoch).mapN: (ra, dec, epoch) =>
+              SiderealTracking(Coordinates(ra, dec), epoch, (oPmRa, oPmDec).mapN(ProperMotion.apply), oRv, oParallax)
 
-                val oDecArc: Option[Arc[Declination]] =
-                  (decArcType, oDecArcStart, oDecArcEnd) match
-                    case (ArcType.Empty, None, None) => Arc.Empty[Declination]().some
-                    case (ArcType.Full, None, None) => Arc.Full[Declination]().some
-                    case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).some
-                    case _ => None
+          val oCatalogInfo: Option[CatalogInfo] =
+            (oCatName, oCatId.flatMap(toNonEmpty)).mapN: (name, id) =>
+              CatalogInfo(name, id, oCatType.flatMap(toNonEmpty))
 
-                (oRaArc, oDecArc).mapN: (raArc, decArc) =>
-                  (id, Target.Opportunity(name, Region(raArc, decArc), sourceProfile))
+          val oEphemerisKey: Option[Ephemeris.Key] =
+            (oDes, oEphemKeyType).mapN((des, keyType) => Ephemeris.Key.fromTypeAndDes.getOption((keyType, des))).flatten
 
-            )
+          val oResolution: Option[TargetResolution] =
+            oResolvedType.flatMap:
+              case TrackType.Sidereal    => oSiderealTracking.map(TargetResolution.Sidereal(_, oCatalogInfo))
+              case TrackType.Nonsidereal => oEphemerisKey.map(TargetResolution.Nonsidereal(_))
+
+          if isOpportunity then
+            (oSourceProfile, oRaArcType, oDecArcType).tupled.flatMap: (sourceProfile, raArcType, decArcType) =>
+
+              val oRaArc: Option[Arc[RightAscension]] =
+                (raArcType, oRaArcStart, oRaArcEnd) match
+                  case (ArcType.Empty, None, None) => Arc.Empty[RightAscension]().some
+                  case (ArcType.Full, None, None) => Arc.Full[RightAscension]().some
+                  case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).some
+                  case _ => None
+
+              val oDecArc: Option[Arc[Declination]] =
+                (decArcType, oDecArcStart, oDecArcEnd) match
+                  case (ArcType.Empty, None, None) => Arc.Empty[Declination]().some
+                  case (ArcType.Full, None, None) => Arc.Full[Declination]().some
+                  case (ArcType.Partial, Some(s), Some(e)) => Arc.Partial(s, e).some
+                  case _ => None
+
+              (oRaArc, oDecArc).mapN: (raArc, decArc) =>
+                (id, Target.Opportunity(name, Region(raArc, decArc), oResolution, sourceProfile))
+
             .toRight(s"Invalid target $id.")
+          else
+            (oSiderealTracking, oSourceProfile)
+              .mapN: (tracking, sourceProfile) =>
+                (id, Target.Sidereal(name, tracking, sourceProfile, oCatalogInfo))
+              .orElse:
+                (oEphemerisKey, oSourceProfile).mapN: (key, sourceProfile) =>
+                  (id, Target.Nonsidereal(name, key, sourceProfile))
+              .toRight(s"Invalid target $id.")
       }
 
   }
