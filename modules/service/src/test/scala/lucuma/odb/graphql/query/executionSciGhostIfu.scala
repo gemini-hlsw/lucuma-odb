@@ -73,10 +73,7 @@ class executionSciGhostIfu extends ExecutionTestSupportForGhost:
         ${
           skyPosition.fold(""): s =>
             s"""
-              skyPosition: {
-                ra: { hms: "${RightAscension.fromStringHMS.reverseGet(s.ra)}" }
-                dec: { dms: "${Declination.fromStringSignedDMS.reverseGet(s.dec)}" }
-              }
+              skyPosition: { ${coordinatesInput(s)} }
             """
         }
       }

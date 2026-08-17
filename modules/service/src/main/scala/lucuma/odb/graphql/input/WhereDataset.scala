@@ -24,9 +24,13 @@ import lucuma.odb.graphql.binding.WhereString
 
 object WhereDataset {
 
-  def binding(path: Path): Matcher[Predicate] = {
+  /** @param `allowCone` says whether the embedded observation WHERE may use
+   *  `targetCoordinates`; only the `datasets` query supports it, not the
+   *  `updateDatasets` mutation (see `WhereObservation.binding`).
+   */
+  def binding(path: Path, allowCone: Boolean): Matcher[Predicate] = {
     val WhereOrderDatasetIdBinding = WhereOrder.binding[Dataset.Id](path / "id", DatasetIdBinding)
-    val WhereObservationBinding    = WhereObservation.binding(path / "observation")
+    val WhereObservationBinding    = WhereObservation.binding(path / "observation", allowCone)
     val WhereProgramBinding        = WhereProgram.binding(path / "observation" / "program")
     val WhereReferenceBinding      = WhereDatasetReference.binding(path / "reference")
     val WhereEqStepIdBinding       = WhereEq.binding[Step.Id](path / "step" / "id", StepIdBinding)
@@ -44,7 +48,7 @@ object WhereDataset {
 
     WhereBoolean.binding(path / "isWritten", BooleanBinding)
 
-    lazy val WhereDatasetBinding = binding(path)
+    lazy val WhereDatasetBinding = binding(path, allowCone)
 
     ObjectFieldsBinding.rmap {
       case List(
@@ -89,4 +93,3 @@ object WhereDataset {
   }
 
 }
-

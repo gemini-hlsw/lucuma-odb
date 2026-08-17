@@ -9,12 +9,9 @@ import cats.syntax.parallel.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
-import grackle.Result
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.util.Timestamp
-import lucuma.odb.data.Cone
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.binding.WhereOptionEq
 import lucuma.odb.graphql.binding.WhereOptionString
@@ -44,21 +41,8 @@ object WhereConfigurationRequest:
     // than the equivalent field on `WhereObservation`.
     val ObservingModeTypeBinding = WhereOptionEq.unwrappedBinding(path / "configuration" / "observingMode" / "mode", enumeratedBinding[ObservingModeType])
 
-    // The cone's candidate lookup is an effect the elaborator cannot run, so this yields a
-    // placeholder that `ConeFilter.resolve` swaps for `id IN (…)` before execution. Parsing
-    // it as an ordinary binding means variables are already substituted here.
     val TargetCoordinatesBinding: Matcher[Predicate] =
-      if !allowCone then
-        _ => Left("`targetCoordinates` is only supported when querying configuration requests.")
-      else
-        ObjectFieldsBinding.rmap:
-          case List(
-            CoordinatesInput.Create.Binding("center", rCenter),
-            AngleInput.Binding("distance", rDistance)
-          ) => (rCenter, rDistance).parTupled.flatMap: (c, d) =>
-            Cone.from(c, d) match
-              case Some(cone) => Result(ConeFilter.ConePredicate(path / "id", cone))
-              case None       => Matcher.validationFailure("The `distance` must be an angle between 0° and 180°.")
+      WhereTargetCoordinates.binding(path / "id", ConeFilter.ConeEntity.ConfigurationRequest, "configuration requests", allowCone)
 
     lazy val WhereObservationBinding = binding(path, allowCone) // lazy self-reference
     ObjectFieldsBinding.rmap {

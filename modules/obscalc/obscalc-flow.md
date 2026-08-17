@@ -2,7 +2,7 @@
 
 ## Overview
 
-`t_obscalc` caches the expensive per-observation derived values — ITC results, execution digest, workflow state — that the ODB serves to clients. A daemon recomputes entries asynchronously: database triggers mark rows `pending` whenever input data changes, the daemon picks them up, runs ITC + generator + workflow, and writes results back. PostgreSQL `NOTIFY` is used both to wake the daemon and to publish updates to GraphQL subscribers.
+`t_obscalc` caches the expensive per-observation derived values — ITC results, execution digest, workflow state, J2000 base position — that the ODB serves to clients. A daemon recomputes entries asynchronously: database triggers mark rows `pending` whenever input data changes, the daemon picks them up, runs ITC + generator + workflow (plus the base-position lookup), and writes results back. PostgreSQL `NOTIFY` is used both to wake the daemon and to publish updates to GraphQL subscribers.
 
 ## Trigger Chain
 
@@ -52,6 +52,7 @@ Composite primary key `(c_program_id, c_observation_id)`; cascades from `t_obser
 - Setup times: `c_full_setup_time`, `c_reacq_setup_time`.
 - Digests: `c_acq_*`, `c_sci_*` (obs class, charged/non-charged time, offsets, atom count, execution state).
 - Workflow: `c_workflow_state`, `c_workflow_transitions`, `c_workflow_validations`.
+- J2000 base position: `c_j2000_base_ra`, `c_j2000_base_dec` — indexed, backing the `targetCoordinates` cone WHERE filter. The explicit base if set, otherwise the asterism composite PM-corrected to J2000; null when the asterism has a non-sidereal or opportunity target (and no explicit base) or the entry has not been computed yet.
 
 ## Invalidation
 
@@ -125,7 +126,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[calculateAndUpdate pending] --> B[calculateWithAtomDigests]
+    A[calculateAndUpdate pending] --> BP[computeBasePosition:<br/>explicit base, else J2000 composite]
+    BP -->|read failure: keep stored columns| B
+    BP --> B[calculateWithAtomDigests]
     B --> I[ItcService.lookup pid, oid]
     B --> G[Generator.obscalc oid, itc]
     G --> D[ExecutionDigest + Stream of AtomDigest]
@@ -149,10 +152,13 @@ flowchart TD
 | `ItcService.lookup` (`ItcService.scala:73`) | Cached or remote ITC result (imaging + spectroscopy) |
 | `Generator.obscalc` (`Generator.scala:299`) | `ExecutionDigest` (acq + sci) and per-atom `AtomDigest` stream |
 | `ObservationWorkflowService.getCalculatedWorkflow` (`ObservationWorkflowService.scala:87`) | Workflow state, allowed transitions, validation errors |
+| `ObscalcService.computeBasePosition` | Stored J2000 base position: explicit base, else the all-sidereal asterism composite PM-corrected to J2000; `None` when undefined. Computed independently of ITC success so a misconfigured observation still gets a position |
 
 ### Result Storage Guard
 
 `storeResult` (`ObscalcService.scala:286`) locks the row and re-reads `c_last_invalidation`. If it changed during calculation, the result is *still* written but the state is forced back to `pending` so the next pickup re-runs against the newer inputs. It also checks whether any of the observation's visits is still time-accounting-dirty (a recompute that failed): if so — and `c_last_invalidation` is unchanged — the state is forced to `retry` so the time-accounting update is attempted again. See [`time-accounting-flow.md`](time-accounting-flow.md).
+
+The J2000 base position columns are written only when the computation ran: a *computed absence* (non-sidereal or opportunity target, no explicit base) clears them, but a *failure reading the inputs* skips the two column updates so the previously stored position is kept rather than silently nulled.
 
 ### Retry Backoff
 

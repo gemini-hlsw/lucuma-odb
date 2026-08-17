@@ -1879,6 +1879,10 @@ trait DatabaseOperations { this: OdbSuite =>
   ): IO[Target.Id] =
     createSiderealTargetAs(user, pid, name, sourceProfile)
 
+  /** GraphQL input text for a pair of coordinates fields: `ra: { hms: ... }, dec: { dms: ... }`. */
+  def coordinatesInput(c: Coordinates): String =
+    s"""ra: { hms: "${RightAscension.fromStringHMS.reverseGet(c.ra)}" }, dec: { dms: "${Declination.fromStringSignedDMS.reverseGet(c.dec)}" }"""
+
   def createSiderealTargetAtAs(
     user:   User,
     pid:    Program.Id,
@@ -1895,8 +1899,7 @@ trait DatabaseOperations { this: OdbSuite =>
               SET: {
                 name: "$name"
                 sidereal: {
-                  ra: { hms: "${RightAscension.fromStringHMS.reverseGet(coords.ra)}" }
-                  dec: { dms: "${Declination.fromStringSignedDMS.reverseGet(coords.dec)}" }
+                  ${coordinatesInput(coords)}
                   epoch: "J2000.000"
                   radialVelocity: { kilometersPerSecond: 0.0 }
                 }

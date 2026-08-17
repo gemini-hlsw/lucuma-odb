@@ -21,7 +21,7 @@ case class UpdateObservationsTimesInput(
 object UpdateObservationsTimesInput {
 
   def binding(path: Path): Matcher[UpdateObservationsTimesInput] = {
-    val WhereObservationBinding = WhereObservation.binding(path)
+    val WhereObservationBinding = WhereObservation.binding(path, allowCone = false)
     ObjectFieldsBinding.rmap {
       case List(
         ObservationTimesInput.Binding("SET", rSET),

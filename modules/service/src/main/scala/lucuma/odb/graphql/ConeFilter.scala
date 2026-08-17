@@ -28,28 +28,30 @@ import grackle.Query.Unique
 import grackle.Result
 import grackle.Term
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.Observation
 import lucuma.odb.data.Cone
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 
 /** Resolves `targetCoordinates` cone filters, which grackle cannot evaluate on its own:
- *  finding the configuration requests inside a cone is an `F` effect, and the elaborator
- *  that turns a WHERE input into a predicate is a pure `StateT[Result, ElabState, *]`.
+ *  finding the rows (observations, configurationRequests, etc) inside a cone is an `F`
+ *  effect, and the elaborator that turns a WHERE input into a predicate is a pure
+ *  `StateT[Result, ElabState, *]`.
  *
  *  {{{
  *  request with a targetCoordinates cone
  *    │ parse, substitute variables
  *    ▼
- *  WhereConfigurationRequest binding ──(mutation: allowCone = false)──▶ InvalidArgument
+ *  WHERE binding ──────────────────(mutation: allowCone = false)──▶ InvalidArgument
  *    │ query: allowCone = true
  *    ▼
  *  compiled Query with a ConePredicate placeholder in its WHERE tree
  *    │
  *    ▼
  *  ConeFilter.resolve, in F ──(no cones)──▶ query untouched
- *    │ per distinct cone
+ *    │ per distinct cone, dispatched on the predicate's entity
  *    ▼
- *  ConfigurationService.coneCandidates:                                   [SQL 1]
+ *  coneCandidates (configuration requests or observations):               [SQL 1]
  *  box prefilter (indexed), exact great-circle trim, visibility, limit max+1
  *    │ ids                  ──(over the cap)──▶ fail: narrow the cone
  *    ▼
@@ -67,47 +69,56 @@ import lucuma.odb.data.OdbErrorExtensions.asFailure
  *  What grackle finally executes is an ordinary WHERE that pushes down to a single SQL
  *  statement (SQL 2).
  *
- *  Driven by `GraphQLRoutes`, which resolves each compiled operation before running it.
- *  That reaches every cone the `configurationRequests` query can produce, because its
- *  WHERE becomes a `Filter` in the compiled query. It would *not* reach one in the
- *  `updateConfigurationRequests` mutation, which keeps its bound input in an `Env` and
- *  builds the `Filter` at execution time -- so that mutation's WHERE binding refuses
- *  `targetCoordinates` outright (see `WhereConfigurationRequest.binding`).
  */
 object ConeFilter:
-  /** Placeholder for a `WhereConfigurationRequest.targetCoordinates` cone: created by the
-   *  WHERE binding, swapped for `In(idPath, candidateIds)` by `ConeFilter.resolve` before
-   *  execution.
+  /** The entity whose ids a cone resolves to; selects the candidate lookup. */
+  enum ConeEntity:
+    case ConfigurationRequest, Observation
+
+  /** Placeholder for a `targetCoordinates` cone: created by a WHERE binding, swapped for
+   *  `In(idPath, candidateIds)` by `ConeFilter.resolve` before execution.
    *
    *  Evaluating it means the swap was missed: `resolve` only walks the compiled query
    *  tree, so a cone stored anywhere else (an `Env`, an `Effect`/`Component` child) would
    *  escape it. `apply` fails loudly rather than silently matching, and the binding's
    *  `allowCone` flag keeps cones out of those unreachable spots.
    */
-  case class ConePredicate(idPath: Path, cone: Cone) extends Predicate:
+  case class ConePredicate(idPath: Path, cone: Cone, entity: ConeEntity) extends Predicate:
     def apply(c: Cursor): Result[Boolean] = Result.internalError("Unresolved targetCoordinates cone.")
     def children: List[Term[?]]           = Nil
 
   /** Cap on distinct cones per operation. Each one costs a candidate scan and can inject
-   *  up to `ConfigurationService.MaxConeCandidates` ids into the final statement, so an
-   *  unbounded `OR` list would be a cheap amplification lever.
+   *  up to `ConeSearch.MaxCandidates` ids into the final statement.
+   *  The limit is present to avoid having an unbounded amount of `OR`s.
    */
   val MaxConesPerOperation: Int = 5
 
-  /** Replaces each `ConePredicate` in `query` with the ids `compute` finds for its cone.
-   *  Queries without cones -- nearly all of them -- are returned untouched.
+  /** Replaces each `ConePredicate` in `query` with `id IN (candidates)`, where the
+   *  handler for its entity finds the candidates for its cone. Queries without
+   *  cones -- nearly all of them -- are returned untouched.
+   *
+   *  The `In` is built inside the per-entity branch, while the ids still have
+   *  their concrete type.
    */
   def resolve[F[_]: Monad](
     query: Query
-  )(compute: Cone => F[Result[List[ConfigurationRequest.Id]]]): F[Result[Query]] =
+  )(
+    configurationRequests: Cone => F[Result[List[ConfigurationRequest.Id]]],
+    observations:          Cone => F[Result[List[Observation.Id]]]
+  ): F[Result[Query]] =
+    def replacement(c: ConePredicate): F[Result[Predicate]] =
+      c.entity match
+        case ConeEntity.ConfigurationRequest => configurationRequests(c.cone).map(_.map(In(c.idPath, _)))
+        case ConeEntity.Observation          => observations(c.cone).map(_.map(In(c.idPath, _)))
+
     collect(query).distinct match
       case Nil   => Result.success(query).pure[F]
       case cones if cones.sizeIs > MaxConesPerOperation =>
         OdbError.InvalidArgument(s"A query may use at most $MaxConesPerOperation distinct targetCoordinates filters.".some)
           .asFailure.pure[F]
       case cones =>
-        cones.traverse(c => compute(c.cone)).map: rs =>
-          rs.sequence.map(ids => substitute(query, cones.zip(ids).toMap))
+        cones.traverse(replacement).map: rs =>
+          rs.sequence.map(preds => substitute(query, cones.zip(preds).toMap))
 
   /** The one walk over the query tree: rewrites the predicate of every reachable
    *  `Filter` node. Collection reuses it with a predicate-preserving `f` that records
@@ -139,15 +150,15 @@ object ConeFilter:
       p
     found.result()
 
-  private type Ids = Map[ConePredicate, List[ConfigurationRequest.Id]]
+  private type Replacements = Map[ConePredicate, Predicate]
 
-  private def substitute(q: Query, ids: Ids): Query =
-    mapFilterPredicates(q)(substitutePred(_, ids))
+  private def substitute(q: Query, replacements: Replacements): Query =
+    mapFilterPredicates(q)(substitutePred(_, replacements))
 
-  private def substitutePred(p: Predicate, ids: Ids): Predicate =
+  private def substitutePred(p: Predicate, replacements: Replacements): Predicate =
     p match
-      case c: ConePredicate => ids.get(c).fold(c: Predicate)(In(c.idPath, _))
-      case And(x, y)        => And(substitutePred(x, ids), substitutePred(y, ids))
-      case Or(x, y)         => Or(substitutePred(x, ids), substitutePred(y, ids))
-      case Not(x)           => Not(substitutePred(x, ids))
+      case c: ConePredicate => replacements.getOrElse(c, c)
+      case And(x, y)        => And(substitutePred(x, replacements), substitutePred(y, replacements))
+      case Or(x, y)         => Or(substitutePred(x, replacements), substitutePred(y, replacements))
+      case Not(x)           => Not(substitutePred(x, replacements))
       case other            => other

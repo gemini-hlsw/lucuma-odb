@@ -195,6 +195,24 @@ class configurationRequests_targetCoordinates extends OdbSuite with ObservingMod
       _ <- query(pi, s"query { configurationRequests(${whereOr(5)}) { matches { id } } }")
     yield ()
 
+  // An empty candidate set becomes `In(idPath, Nil)`, which grackle compiles to false;
+  // the main query must still run as a single statement and return no matches.
+  test("cone matching nothing"):
+    for
+      (pid, _, _)   <- coneSetup
+      (resp, stats) <- queryWithSqlStats(
+                         pi,
+                         s"""query {
+                               configurationRequests(WHERE: { program: { id: { EQ: "$pid" } }, targetCoordinates: { center: { ra: { hours: "12.0" }, dec: { degrees: "-45.0" } }, distance: { arcseconds: 10 } } }) {
+                                 matches { id }
+                               }
+                             }"""
+                       )
+      got <- ids(resp.hcursor.downField("data").focus.getOrElse(Json.Null))
+    yield
+      assertEquals(got, Nil)
+      assertEquals(stats.length, 1, clue = stats.map(_.normalize.sql))
+
   test("cone under OR keeps its position"):
     for
       (pid, near, far) <- coneSetup

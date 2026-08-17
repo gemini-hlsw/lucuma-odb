@@ -12,13 +12,13 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.CloudExtinction
-import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
@@ -262,21 +262,6 @@ class observation_workflow
         ).asRight
       )
 
-  // temporary, until this is doable via graphql
-  def approveConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
-    import skunk.syntax.all.*
-    import lucuma.odb.util.Codecs.configuration_request_id
-    session.use: s =>
-      s.prepareR(sql"update t_configuration_request set c_status = 'approved' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
-        ps.execute(req).void
-
-  def denyConfigurationRequestHack(req: ConfigurationRequest.Id): IO[Unit] =
-    import skunk.syntax.all.*
-    import lucuma.odb.util.Codecs.configuration_request_id
-    session.use: s =>
-      s.prepareR(sql"update t_configuration_request set c_status = 'denied' where c_configuration_request_id = $configuration_request_id".command).use: ps =>
-        ps.execute(req).void
-
   def updateCloudExtinctionAs(user: User, oid: Observation.Id, cloudExtinction: CloudExtinction.Preset): IO[Unit] =
     updateObservation(user, oid,
       update = s"""
@@ -310,7 +295,7 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
@@ -370,7 +355,7 @@ class observation_workflow
         _   <- addProposal(pi, pid, cid.some)
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
@@ -434,7 +419,7 @@ class observation_workflow
     setup.flatMap: (pid, oid) =>
       List((RaStart, DecStart), (RaEnd, DecEnd), (RaStart, DecEnd), (RaCenter, DecCenter)).traverse: (ra, dec) =>
         setObservationExplicitBase(oid, ra, dec) >>
-        createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack) >>
+        createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved)) >>
           runObscalcUpdateAs(serviceUser, pid, oid) >>
           expect(
             pi,
@@ -465,7 +450,7 @@ class observation_workflow
     setup.flatMap: (pid, oid) =>
       List((RaStartWrap, DecStart), (RaEndWrap, DecEnd), (RaStartWrap, DecEnd), (RaCenterWrap, DecCenter)).traverse: (ra, dec) =>
         setObservationExplicitBase(oid, ra, dec) >>
-          createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack) >>
+          createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved)) >>
           runObscalcUpdateAs(serviceUser, pid, oid) >>
           expect(
             pi,
@@ -549,7 +534,7 @@ class observation_workflow
         tid <- mkTarget(pi, pid)
         _   <- setTargetCoords(tid, RaCenter, DecCenter)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
@@ -771,7 +756,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(denyConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Denied))
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
@@ -860,7 +845,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
@@ -923,7 +908,7 @@ class observation_workflow
         _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
@@ -962,7 +947,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield (pid, oid)
@@ -1013,7 +998,7 @@ class observation_workflow
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
-        _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
+        _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
         _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Ready)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)

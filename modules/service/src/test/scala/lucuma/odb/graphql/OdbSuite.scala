@@ -522,7 +522,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     res.use: (map, mon) =>
       for {
         op   <- orRaise(map.compiler.compile(document, none, variables.map(_.toJson), reportUnused = false))
-        qry  <- ConeFilter.resolve(op.query)(map.coneCandidates).flatMap(orRaise)
+        qry  <- ConeFilter.resolve(op.query)(map.configurationRequestConeCandidates, map.observationConeCandidates).flatMap(orRaise)
         _    <- mon.take
         json <- map.interpreter.run(qry, op.rootTpe, Env.empty).evalMap(map.mkResponse).compile.lastOrError
         sts  <- mon.take

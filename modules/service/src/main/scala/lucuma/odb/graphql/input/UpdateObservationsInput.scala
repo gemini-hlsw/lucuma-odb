@@ -32,7 +32,7 @@ final case class UpdateObservationsInput(
 object UpdateObservationsInput:
 
   def binding(path: Path): Matcher[UpdateObservationsInput] =
-    val WhereObservationBinding = WhereObservation.binding(path)
+    val WhereObservationBinding = WhereObservation.binding(path, allowCone = false)
     ObjectFieldsBinding.rmap:
       case List(
         ObservationPropertiesInput.Edit.Binding("SET", rSET),
