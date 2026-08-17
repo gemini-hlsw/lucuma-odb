@@ -28,7 +28,6 @@ import lucuma.core.model.CompositeTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
@@ -289,10 +288,11 @@ object ObscalcService:
       /** The stored J2000 base position. Taken from the explicit base if set, otherwise the
        *  asterism composite with every target proper-motion corrected to epoch
        *  J2000.0.
-       *  None when any target is non-sidereal or opportunity, or when the composite cannot
-       *  be propagated to J2000 (e.g. a PM correction landing on a pole); in every case a
-       *  deterministic property of the current asterism, not a transient failure, so such
-       *  observations are invisible to targetCoordinates cone filters.
+       *  None when any target tracks non-siderally or is a Target of Opportunity still
+       *  awaiting its alert, or when the composite cannot be propagated to J2000 (e.g. a
+       *  PM correction landing on a pole); in every case a deterministic property of the
+       *  current asterism, not a transient failure, so such observations are invisible to
+       *  targetCoordinates cone filters.
        */
       private def computeBasePosition(
         oid: Observation.Id
@@ -308,8 +308,10 @@ object ObscalcService:
                 .flatMap: targets =>
                   targets
                     .traverse:
-                      case (_, t: Target.Sidereal) => t.tracking.some
-                      case _                       => none
+                      // Asking for the sidereal projection rather than testing the subtype
+                      // picks up a Target of Opportunity that resolved siderally, which has
+                      // a real position while keeping its opportunity identity.
+                      case (_, t) => t.asSidereal.map(_.tracking)
                     .flatMap(ts => CompositeTracking(ts).at(Epoch.J2000.toInstant))
 
       private def storeResult(

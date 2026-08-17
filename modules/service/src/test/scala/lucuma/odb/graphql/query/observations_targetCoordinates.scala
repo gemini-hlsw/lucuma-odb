@@ -33,6 +33,11 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
   private val Near = coords("00:00:00 +10:00:00")
   private val Far  = coords("06:00:00 +40:00:00")
 
+  // Where an alert resolves a Target of Opportunity: inside the 5 degree cone at Near, and
+  // inside the declination arc `createOpportunityTargetAs` draws (10 to 70 degrees), so that
+  // resolving does not also make the observation Unapproved.
+  private val Resolved = coords("00:00:00 +12:00:00")
+
   // A 5° cone at (0h, +10°): matches Near, not Far.
   private val NearCone: String = coneText(Near, 5.degrees)
 
@@ -164,6 +169,49 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       _    <- runObscalcUpdateAs(service, pid, oid)
       got  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, $NearCone""")
     yield assertEquals(got, Nil)
+
+  // Resolving is what gives a Target of Opportunity a position, and it keeps its
+  // opportunity identity when it does -- so the subtype no longer answers whether a
+  // position exists, and a resolved ToO has to be findable at the coordinates the
+  // alert supplied.
+  test("resolved opportunity target is visible to the cone"):
+    for
+      (pid, near, _) <- coneSetup
+      tid  <- createOpportunityTargetAs(pi, pid)
+      opp  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _    <- resolveOpportunityTargetAtAs(pi, tid, Resolved)
+      _    <- runObscalcUpdateAs(service, pid, opp)
+      got  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, $NearCone""")
+    yield assertEquals(got.toSet, Set(near, opp))
+
+  // The counterpart to the unresolved mixed asterism above: once every member tracks
+  // siderally the composite is well defined, whichever subtype each member is.
+  test("a resolved opportunity target contributes to a mixed asterism"):
+    for
+      pid  <- createProgramAs(pi)
+      sid  <- createSiderealTargetAtAs(pi, pid, Resolved)
+      opp  <- createOpportunityTargetAs(pi, pid)
+      _    <- resolveOpportunityTargetAtAs(pi, opp, Resolved)
+      oid  <- createGmosNorthLongSlitObservationAs(pi, pid, List(sid, opp))
+      _    <- runObscalcUpdateAs(service, pid, oid)
+      got  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Resolved, 5.degrees)}""")
+    yield assertEquals(got, List(oid))
+
+  // Clearing the resolution takes the position away again.
+  test("un-resolving an opportunity target removes its position"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createOpportunityTargetAs(pi, pid)
+      oid  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _    <- resolveOpportunityTargetAtAs(pi, tid, Resolved)
+      _    <- runObscalcUpdateAs(service, pid, oid)
+      pos  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Resolved, 5.degrees)}""")
+      _    <- unresolveOpportunityTargetAs(pi, tid)
+      _    <- runObscalcUpdateAs(service, pid, oid)
+      gone <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Resolved, 5.degrees)}""")
+    yield
+      assertEquals(pos, List(oid))
+      assertEquals(gone, Nil)
 
   private def setExplicitBase(oid: Observation.Id, c: Coordinates): IO[Unit] =
     query(
