@@ -6,6 +6,7 @@ package lucuma.resource.test
 import cats.effect.*
 import cats.syntax.all.*
 import clue.FetchClient
+import clue.GraphQLDocument
 import clue.GraphQLOperation
 import clue.ResponseException
 import clue.http4s.Http4sHttpBackend
@@ -104,8 +105,11 @@ trait ResourceGraphQLSuite extends ServerFixtures:
         val op  = variables.fold(req.apply)(req.withInput).raiseGraphQLErrors
         op
 
-  private case class Operation(document: String)
-      extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
+  // The query is a plain runtime `String` here, so it skips the `gql` interpolator's compile-time
+  // checks — there is nothing to check, no subqueries are spliced.
+  private case class Operation(query: String)
+      extends GraphQLOperation.Typed[Nothing, JsonObject, Json]:
+    override val document = GraphQLDocument.unsafeFromString(query)
 
 enum ClientOption:
   case Http

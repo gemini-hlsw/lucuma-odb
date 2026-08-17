@@ -14,6 +14,7 @@ import cats.effect.unsafe.IORuntime
 import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits.*
 import clue.FetchClient
+import clue.GraphQLDocument
 import clue.GraphQLOperation
 import clue.ResponseException
 import clue.http4s.Http4sHttpBackend
@@ -580,7 +581,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       xc  <- Resource.eval(Http4sHttpClient.of[IO, Nothing](uri)(using Async[IO], xbe, Logger[IO]))
     } yield xc
 
-  case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
+  // Tests supply the query as a plain runtime `String`, so it skips the `gql` interpolator's
+  // compile-time checks — there is nothing to check here, no subqueries are spliced.
+  case class Operation(query: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]:
+    override val document = GraphQLDocument.unsafeFromString(query)
 
   private lazy val serverFixture: AnyFixture[Server] =
     ResourceSuiteLocalFixture("server", server)

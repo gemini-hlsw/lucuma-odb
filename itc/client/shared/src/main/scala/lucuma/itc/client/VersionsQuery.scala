@@ -14,8 +14,7 @@ object VersionsQuery extends GraphQLOperation[Unit] {
   type Data      = ItcVersions
   type Variables = Unit
 
-  override val document: String =
-    """
+  override val document = gql"""
       query Versions {
         versions {
           serverVersion
