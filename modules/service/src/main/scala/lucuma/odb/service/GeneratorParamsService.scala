@@ -331,6 +331,15 @@ object GeneratorParamsService {
 
           GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
+        // Shared by long slit and MOS.  Signal-to-noise is solved by the ITC, so
+        // the read mode it is given is ignored; only Time & Count needs a real one.
+        def flamingos2ScienceReadMode(c: flamingos2.spectroscopy.Config): Flamingos2ReadMode =
+          c.exposureTimeMode match
+            case ExposureTimeMode.SignalToNoiseMode(_, _)       =>
+              Flamingos2ReadMode.Bright
+            case ExposureTimeMode.TimeAndCountMode(time = time) =>
+              c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
+
         observingMode(obsParams.targets, config, obsParams.calibrationRole).flatMap:
 
           // Exchange Modes (no ITC, like visitors)
@@ -368,14 +377,6 @@ object GeneratorParamsService {
           // The real custom mask is sent: the ITC client carries a slit width,
           // which is all a Flamingos 2 custom mask contributes.
           case f2m: flamingos2.mos.Config =>
-
-            def flamingos2ScienceReadMode(c: flamingos2.spectroscopy.Config): Flamingos2ReadMode =
-              c.exposureTimeMode match
-                case ExposureTimeMode.SignalToNoiseMode(_, _)       =>
-                  Flamingos2ReadMode.Bright
-                case ExposureTimeMode.TimeAndCountMode(time = time) =>
-                  c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
-
             val sciMode = InstrumentMode.Flamingos2Spectroscopy(
               f2m.exposureTimeMode,
               f2m.disperser,
