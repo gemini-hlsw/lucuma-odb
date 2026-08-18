@@ -9,6 +9,8 @@ import lucuma.catalog.goa.GoaParams
 import lucuma.catalog.goa.syntax.*
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.geom.ShapeExpression
 import lucuma.core.geom.flamingos2.scienceArea as flamingos2ScienceArea
 import lucuma.core.geom.ghost.scienceArea as ghostScienceArea
@@ -147,6 +149,37 @@ object GoaQueryPolicy:
         List(visitorScienceArea.fov(c.scienceFovDiameter))
 
   /**
+   * Whether to search imaging or spectroscopy.
+   *
+   * `None` leaves the search unrestricted, which is the honest answer for a
+   * visitor instrument whose mode does not say which it takes.
+   */
+  def scienceMode(mode: ObservingMode): Option[ScienceMode] =
+    mode match
+      case _: Exchange           => none
+      case _: Flamingos2Imaging  => ScienceMode.Imaging.some
+      case _: Flamingos2LongSlit => ScienceMode.Spectroscopy.some
+      case _: GhostIfu           => ScienceMode.Spectroscopy.some
+      case _: GmosNorthImaging   => ScienceMode.Imaging.some
+      case _: GmosSouthImaging   => ScienceMode.Imaging.some
+      case _: GmosNorthLongSlit  => ScienceMode.Spectroscopy.some
+      case _: GmosSouthLongSlit  => ScienceMode.Spectroscopy.some
+      case _: GmosNorthMos       => ScienceMode.Spectroscopy.some
+      case _: GmosSouthMos       => ScienceMode.Spectroscopy.some
+      case _: GnirsImaging       => ScienceMode.Imaging.some
+      case _: GnirsSpectroscopy  => ScienceMode.Spectroscopy.some
+      case _: Igrins2LongSlit    => ScienceMode.Spectroscopy.some
+      case v: Visitor            =>
+        v.mode match
+          case VisitorObservingModeType.AlopekeSpeckle
+             | VisitorObservingModeType.AlopekeWideField
+             | VisitorObservingModeType.ZorroSpeckle
+             | VisitorObservingModeType.ZorroWideField   => ScienceMode.Imaging.some
+          case VisitorObservingModeType.MaroonX          => ScienceMode.Spectroscopy.some
+          case VisitorObservingModeType.VisitorNorth
+             | VisitorObservingModeType.VisitorSouth     => none
+
+  /**
    * How wide to search: half the observation's field of view, taken as the
    * angular distance from the science area's origin to its most distant vertex.
    * There is deliberately no minimum, so small-aperture modes search narrowly.
@@ -174,9 +207,10 @@ object GoaQueryPolicy:
         instrument <- mode.instrument
         center     <- searchPointing(explicitBase, asterismCenter, asterism)
         radius     <- searchRadius(mode)
-      yield equivalenceGroup(instrument).map: i =>
-        center match
-          case ArchiveSearchPointing.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
-          case ArchiveSearchPointing.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
+      yield
+        val sm = scienceMode(mode)
+        equivalenceGroup(instrument).map: i =>
+          center match
+            case ArchiveSearchPointing.Sidereal(c)    => GoaParams.Sidereal(c, i, radius, sm)
+            case ArchiveSearchPointing.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius, sm)
     params.orEmpty
-

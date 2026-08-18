@@ -99,29 +99,56 @@ object ArchiveDuplicationService:
     private val goa_observation_class: Codec[GoaObservationClass] =
       text.imap(GoaObservationClass.fromTag)(_.tag)
 
-    /** Columns of `t_archive_match`, in `GoaSummaryRecord` field order. */
-    private val goa_match: Codec[GoaSummaryRecord] =
-      (text                     *:  // c_file_name
-       text.opt                 *:  // c_data_label
-       right_ascension.opt      *:  // c_ra
-       declination.opt          *:  // c_dec
-       text                     *:  // c_instrument
-       goa_observation_type     *:  // c_observation_type
-       goa_observation_class.opt*:  // c_observation_class
-       text.opt                 *:  // c_qa_state
-       ut_datetime.opt          *:  // c_ut_datetime
-       date.opt                 *:  // c_release_date
-       text.opt                 *:  // c_goa_program_id
-       text.opt                 *:  // c_goa_observation_id
-       text.opt                 *:  // c_object_name
-       time_span.opt            *:  // c_exposure
-       text.opt                 *:  // c_disperser
-       text.opt                 *:  // c_filter
-       wavelength_pm.opt        *:  // c_wavelength
-       float8.opt               *:  // c_airmass
-       angle_µas.opt            *:  // c_azimuth
-       angle_µas.opt                // c_elevation
+     /** Columns of `t_archive_match`, in `GoaSummaryRecord` field order. */
+    private val goa_match: Decoder[GoaSummaryRecord] =
+      (text                      *:  // c_file_name
+       text.opt                  *:  // c_data_label
+       right_ascension.opt       *:  // c_ra
+       declination.opt           *:  // c_dec
+       text                      *:  // c_instrument
+       goa_observation_type      *:  // the OBJECT constant
+       goa_observation_class.opt *:  // c_observation_class
+       text.opt                  *:  // c_qa_state
+       ut_datetime.opt           *:  // c_ut_datetime
+       date.opt                  *:  // c_release_date
+       text.opt                  *:  // c_goa_program_id
+       text.opt                  *:  // c_goa_observation_id
+       text.opt                  *:  // c_object_name
+       time_span.opt             *:  // c_exposure
+       text.opt                  *:  // c_disperser
+       text.opt                  *:  // c_filter
+       wavelength_pm.opt         *:  // c_wavelength
+       float8.opt                *:  // c_airmass
+       angle_µas.opt             *:  // c_azimuth
+       angle_µas.opt                 // c_elevation
       ).to[GoaSummaryRecord]
+
+    /** The same columns as `goa_match`, less the observation type. */
+    private val goa_match_write: Encoder[GoaSummaryRecord] =
+      (text                      *:  // c_file_name
+       text.opt                  *:  // c_data_label
+       right_ascension.opt       *:  // c_ra
+       declination.opt           *:  // c_dec
+       text                      *:  // c_instrument
+       goa_observation_class.opt *:  // c_observation_class
+       text.opt                  *:  // c_qa_state
+       ut_datetime.opt           *:  // c_ut_datetime
+       date.opt                  *:  // c_release_date
+       text.opt                  *:  // c_goa_program_id
+       text.opt                  *:  // c_goa_observation_id
+       text.opt                  *:  // c_object_name
+       time_span.opt             *:  // c_exposure
+       text.opt                  *:  // c_disperser
+       text.opt                  *:  // c_filter
+       wavelength_pm.opt         *:  // c_wavelength
+       float8.opt                *:  // c_airmass
+       angle_µas.opt             *:  // c_azimuth
+       angle_µas.opt                 // c_elevation
+      ).contramap: r =>
+        (r.name, r.dataLabel, r.ra, r.dec, r.instrument,
+         r.observationClass, r.qaState, r.utDateTime, r.releaseDate,
+         r.programId, r.observationId, r.objectName, r.exposure,
+         r.disperser, r.filter, r.wavelength, r.airmass, r.azimuth, r.elevation)
 
     /**
      * Summary columns as `v_archive_duplication` reports them.  Read-only,
@@ -196,7 +223,7 @@ object ArchiveDuplicationService:
           c_ra,
           c_dec,
           c_instrument,
-          c_observation_type,
+          'OBJECT'::text,
           c_observation_class,
           c_qa_state,
           c_ut_datetime,
@@ -275,7 +302,6 @@ object ArchiveDuplicationService:
           c_ra,
           c_dec,
           c_instrument,
-          c_observation_type,
           c_observation_class,
           c_qa_state,
           c_ut_datetime,
@@ -290,7 +316,7 @@ object ArchiveDuplicationService:
           c_airmass,
           c_azimuth,
           c_elevation
-        ) VALUES ${(observation_id *: goa_match).values.list(matches.size)}
+        ) VALUES ${(observation_id *: goa_match_write).values.list(matches.size)}
       """.command
          .contramap: (oid, ms) =>
            ms.toList.map((oid, _))
