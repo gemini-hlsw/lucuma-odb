@@ -146,15 +146,12 @@ class maskDefinition extends AttachmentsSuite:
       assertEquals(mask.decodePath[List[Json]]("mask", "slits").length, 40)
     }
 
-  test("a design without a recorded position angle has a null positionAngle"):
+  test("a design without a recorded position angle is rejected"):
     for
       pid   <- createProgramAs(pi)
-      _     <- insertAttachment(pi, pid, noPaMask).toAttachmentId
+      _     <- expectInvalidMaskFile(insertAttachment(pi, pid, noPaMask))
       masks <- queryMasks(pid)
-      mask   = masks.head
-    yield
-      assertEquals(mask.path("mask", "positionAngle"), Json.Null)
-      assertEquals(mask.decodePath[String]("mask", "instrument"), "FLAMINGOS2")
+    yield assertEquals(masks, List.empty)
 
   test("non-mask attachments have a null mask"):
     val finder = TestAttachment("finder.jpg", "finder", none, "A finder JPG file")

@@ -193,6 +193,9 @@ object AttachmentFileService {
   def invalidMaskFileMsg(problem: MosMaskProblem): String =
     s"Invalid MOS mask file. ${problem.displayValue}"
 
+  val MissingPositionAngleMsg =
+    "Invalid MOS mask file. The design records no position angle (MASK_PA), so it cannot be observed."
+
   def instantiate[F[_]: {Concurrent, Tracer as T, UUIDGen}](
     s3FileSvc: S3FileService[F]
   )(using Services[F]): AttachmentFileService[F] = {
@@ -381,9 +384,9 @@ object AttachmentFileService {
       s3FileSvc.filePath(programId, remoteId, fileName)
 
     // A MOS mask file is parsed at upload so its design can be recorded on
-    // the attachment; a file the reader cannot understand rejects the upload.
-    // Mask files are small, so the body is buffered in memory to parse and
-    // upload from the same bytes.
+    // the attachment.
+    // Mask files are small, so the body is buffered in memory to parse and upload from the
+    // same bytes.
     def parseMaskDefinition(
       maskName: NonEmptyString,
       data:     Stream[F, Byte]
@@ -391,14 +394,17 @@ object AttachmentFileService {
       T.span("parseMaskDefinition").surround:
         data.compile.to(Chunk).flatMap: bytes =>
           val buffered = Stream.chunk(bytes).covary[F]
-          if bytes.isEmpty then 
+          if bytes.isEmpty then
             InvalidRequest(EmptyFileMsg).asLeft.pure
           else
             (for {
               header <- buffered.through(MosMaskReader.header[F]).compile.lastOrError
               slits  <- buffered.through(MosMaskReader.slits[F]).compile.toList
-              json    = MaskDefinition.fromMosMask(maskName, header, slits).asJson
-            } yield (buffered, json.some).asRight[AttachmentException])
+              result  = MaskDefinition
+                          .fromMosMask(maskName, header, slits)
+                          .toRight(InvalidRequest(MissingPositionAngleMsg))
+                          .map(d => (buffered, d.asJson.some))
+            } yield result)
               .recover { case p: MosMaskProblem => InvalidRequest(invalidMaskFileMsg(p)).asLeft }
 
     def maybeParseMaskDefinition(

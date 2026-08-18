@@ -7846,8 +7846,7 @@ slits.
 """
 type MaskDefinition {
   """
-  The mask name of the attachment carrying this definition, repeated here so
-  the definition is self-contained.
+  The mask name of the attachment.
   """
   name: NonEmptyString!
 
@@ -7857,9 +7856,7 @@ type MaskDefinition {
   instrument: Instrument!
 
   """
-  Nominal plate scale of the pre-image, in arcseconds per pixel.  Mask design
-  software snaps this to a fixed value per detector configuration, so it is
-  not a measurement of the true scale, which varies across the field.
+  Nominal plate scale of the pre-image, in arcseconds per pixel.
   """
   pixelScale: BigDecimal!
 
@@ -7869,10 +7866,9 @@ type MaskDefinition {
   pointing: Coordinates!
 
   """
-  The position angle the mask must be observed at.  Null in designs produced
-  before mask design software began recording it.
+  The position angle the mask must be observed at.
   """
-  positionAngle: Angle
+  positionAngle: Angle!
 
   """
   Every aperture in the design, acquisition boxes included.
@@ -7882,8 +7878,8 @@ type MaskDefinition {
 
 """
 One aperture of a MOS mask design.  The width is always the extent along the
-dispersion direction and the length the extent across it, whatever the
-instrument.
+dispersion direction (horizontal for GMOS-S/N, vertical for FLAMINGOS2) and
+the length the extent across it.
 """
 type MaskSlit {
   """

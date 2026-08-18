@@ -4,7 +4,6 @@
 package lucuma.odb.json
 
 import cats.syntax.eq.*
-import coulomb.syntax.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
 import io.circe.Encoder
@@ -15,7 +14,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.MosSlitPriority
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
-import lucuma.core.math.units.ArcSecondPerPixel
+import lucuma.core.math.syntax.units.*
 import lucuma.core.model.mos.MosObjectId
 import lucuma.odb.data.MaskDefinition
 import lucuma.odb.data.MaskSlit
@@ -87,7 +86,7 @@ trait MaskDefinitionCodec:
         "instrument"    -> d.instrument.asJson,
         "pixelScale"    -> d.pixelScale.value.asJson,
         "pointing"      -> d.pointing.asJson,
-        "positionAngle" -> d.positionAngle.fold(Json.Null)(_.asJson),
+        "positionAngle" -> d.positionAngle.asJson,
         "slits"         -> d.slits.asJson
       )
 
@@ -98,8 +97,8 @@ trait MaskDefinitionCodec:
         instrument    <- c.downField("instrument").as[Instrument]
         pixelScale    <- c.downField("pixelScale").as[BigDecimal]
         pointing      <- c.downField("pointing").as[Coordinates]
-        positionAngle <- c.downField("positionAngle").as[Option[Angle]]
+        positionAngle <- c.downField("positionAngle").as[Angle]
         slits         <- c.downField("slits").as[List[MaskSlit]]
-      yield MaskDefinition(name, instrument, pixelScale.withUnit[ArcSecondPerPixel], pointing, positionAngle, slits)
+      yield MaskDefinition(name, instrument, pixelScale.pixelScale, pointing, positionAngle, slits)
 
 object maskDefinition extends MaskDefinitionCodec

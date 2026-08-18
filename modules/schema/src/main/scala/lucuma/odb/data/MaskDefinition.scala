@@ -58,22 +58,28 @@ case class MaskDefinition(
   instrument:    Instrument,
   pixelScale:    PixelScale,
   pointing:      Coordinates,
-  positionAngle: Option[Angle],
+  positionAngle: Angle,
   slits:         List[MaskSlit]
 ) derives Eq
 
 object MaskDefinition:
 
+  /**
+   * The design, or None when it records no position angle.  A mask cannot be
+   * observed without knowing the angle to observe it at, so such a design is
+   * not accepted.
+   */
   def fromMosMask(
     name:   NonEmptyString,
     header: MosMaskHeader,
     slits:  List[MosMaskSlit]
-  ): MaskDefinition =
-    MaskDefinition(
-      name          = name,
-      instrument    = header.instrument,
-      pixelScale    = header.pixelScale,
-      pointing      = header.pointing,
-      positionAngle = header.positionAngle,
-      slits         = slits.map(MaskSlit.fromMosMaskSlit)
-    )
+  ): Option[MaskDefinition] =
+    header.positionAngle.map: pa =>
+      MaskDefinition(
+        name          = name,
+        instrument    = header.instrument,
+        pixelScale    = header.pixelScale,
+        pointing      = header.pointing,
+        positionAngle = pa,
+        slits         = slits.map(MaskSlit.fromMosMaskSlit)
+      )
