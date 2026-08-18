@@ -65,7 +65,7 @@ object Flamingos2SequenceService:
         // F2 imaging is supported.
         session
           .option(Statements.SelectIsLongSlit)(observationId)
-          .map(_.as(lucuma.odb.sequence.flamingos2.longslit.LongSlit.Static))
+          .map(_.as(lucuma.odb.sequence.flamingos2.Static))
 
       override def selectStatic(
         observationId: Observation.Id

@@ -118,7 +118,11 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
   def flamingos2TimeEstimateCalculator: IO[StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig]] =
     timeEstimateCalculator.map(_.flamingos2Step)
 
-  val Flamingos2AtomQuery: String =
+  /**
+   * The atom query, selecting whichever half of the FPU mask the mode uses: `builtin`
+   * for long slit, `customMask { ... }` for MOS.
+   */
+  def flamingos2AtomQuery(fpuSelection: String): String =
     s"""
       description
       observeClass
@@ -129,7 +133,7 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
           filter
           readMode
           lyotWheel
-          fpu { builtin }
+          fpu { $fpuSelection }
           decker
           readoutMode
           reads
@@ -154,11 +158,17 @@ trait ExecutionTestSupportForFlamingos2 extends ExecutionTestSupport:
       }
     """
 
-  def flamingos2AcquisitionQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
-    executionConfigQuery(oid, "flamingos2", "acquisition", Flamingos2AtomQuery, futureLimit)
+  val Flamingos2AtomQuery: String =
+    flamingos2AtomQuery("builtin")
 
-  def flamingos2ScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None): String =
-    executionConfigQuery(oid, "flamingos2", "science", Flamingos2AtomQuery, futureLimit)
+  val Flamingos2MosAtomQuery: String =
+    flamingos2AtomQuery("customMask { attachmentId slitWidth }")
+
+  def flamingos2AcquisitionQuery(oid: Observation.Id, futureLimit: Option[Int] = None, atomQuery: String = Flamingos2AtomQuery): String =
+    executionConfigQuery(oid, "flamingos2", "acquisition", atomQuery, futureLimit)
+
+  def flamingos2ScienceQuery(oid: Observation.Id, futureLimit: Option[Int] = None, atomQuery: String = Flamingos2AtomQuery): String =
+    executionConfigQuery(oid, "flamingos2", "science", atomQuery, futureLimit)
 
   def flamingos2Science(exposureTime: TimeSpan): Flamingos2DynamicConfig =
     Flamingos2DynamicConfig(
