@@ -5655,6 +5655,16 @@ input ProposalPropertiesInput {
   callId: CallForProposalsId
 
   """
+  The observing time this proposal requests.  Optional: when unspecified the
+  request is the sum of the time estimates of the program's observations (see
+  'timeRequest' on the proposal itself).  Set it when that sum does not describe
+  the real ask -- most obviously for a Target of Opportunity proposal, whose
+  observations cannot all be written down before the targets are known.  May be
+  unset by assigning a null value, which returns it to the derived sum.
+  """
+  explicitTimeRequest: TimeSpanInput
+
+  """
   Specifies the properties that depend on the Gemini call type. If none of
   'gemini', 'keck' or 'subaru' is set on creation, a regular semester queue
   proposal is assumed.  The selected call properties must match the call (see
@@ -16405,6 +16415,29 @@ type Proposal {
   Proposal TAC category
   """
   category: TacCategory
+
+  """
+  The observing time this proposal requests: `explicitTimeRequest` if set,
+  otherwise `defaultTimeRequest`.
+  """
+  timeRequest: CalculatedCategorizedTimeRange
+
+  """
+  The request that applies when none is explicitly set: the sum of the time
+  estimates of the program's observations, the same figure reported by the
+  program's `timeEstimateRange`.  Observations that are not fully defined have
+  no estimate and so contribute nothing to it.
+  """
+  defaultTimeRequest: CalculatedCategorizedTimeRange
+
+  """
+  The time explicitly requested for this proposal, if any: by the PI before
+  submission, or by staff during review.  Set it when the sum of the
+  observations' estimates does not describe the real ask -- most obviously for a
+  Target of Opportunity proposal, whose observations cannot all be written down
+  before the targets are known.
+  """
+  explicitTimeRequest: TimeSpan
 
   """
   Properties of a Gemini proposal that depend upon the Call for Proposals type.
