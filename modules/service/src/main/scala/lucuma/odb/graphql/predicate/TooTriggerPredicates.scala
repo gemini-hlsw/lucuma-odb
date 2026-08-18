@@ -4,6 +4,7 @@
 package lucuma.odb.graphql.predicate
 
 import grackle.Path
+import lucuma.core.enums.TooActivation
 import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.TooTrigger
@@ -14,5 +15,6 @@ class TooTriggerPredicates(path: Path):
   val programId   = LeafPredicates[Program.Id](path / "programId")
   val observation = ObservationPredicates(path / "observation")
   val status      = LeafPredicates[TooTriggerStatus](path / "status")
+  val activation  = LeafPredicates[TooActivation](path / "tooActivation")
   val requestedAt = LeafPredicates[Timestamp](path / "requestedAt")
   val updatedAt   = LeafPredicates[Timestamp](path / "updatedAt")

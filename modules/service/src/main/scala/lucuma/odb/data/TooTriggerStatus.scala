@@ -15,9 +15,20 @@ import lucuma.core.util.Enumerated
  * that a trigger was seen and passed over, with a reason, and clears the
  * observation's user state so the observation returns to `Defined`.
  *
- * `Declined` and `Withdrawn` are terminal, and for the purpose of triggering
- * again are equivalent to never having been triggered: setting the observation
- * `Ready` once more produces a new trigger rather than reviving an old one.
+ * `Superseded` is the one status nobody sets deliberately.  A trigger records
+ * the ToO activation it was requested at, and that value never changes: an
+ * activation at a different level is a different request, because who is
+ * notified, how fast, and what they are expected to drop all differ.  So when the
+ * observation's activation moves while a request is outstanding, the outstanding
+ * row is closed out as `Superseded` and a successor takes its place, linked back
+ * to it by `supersedes`.
+ *
+ * `Declined`, `Withdrawn` and `Superseded` are terminal, and for the purpose of
+ * triggering again are equivalent to never having been triggered: setting the
+ * observation `Ready` once more produces a new trigger rather than reviving an
+ * old one.  They are kept distinct because they answer different questions --
+ * `Withdrawn` means the PI took it back, `Superseded` means the same request
+ * came back wearing a different activation.
  *
  * There is deliberately no status meaning "approved".  The proposal's ToO
  * activation ceiling, frozen at acceptance, is the authorization; a second
@@ -30,6 +41,7 @@ import lucuma.core.util.Enumerated
  * settles.
  */
 enum TooTriggerStatus(val tag: String) derives Enumerated:
-  case Requested extends TooTriggerStatus("requested")
-  case Declined  extends TooTriggerStatus("declined")
-  case Withdrawn extends TooTriggerStatus("withdrawn")
+  case Requested  extends TooTriggerStatus("requested")
+  case Declined   extends TooTriggerStatus("declined")
+  case Withdrawn  extends TooTriggerStatus("withdrawn")
+  case Superseded extends TooTriggerStatus("superseded")
