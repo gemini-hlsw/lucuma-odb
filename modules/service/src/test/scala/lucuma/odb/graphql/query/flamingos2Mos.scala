@@ -81,6 +81,12 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
         """.asRight
       )
 
+  test("the mode type is accepted as a query filter"):
+    for
+      (pid, oid, _) <- setup
+      oids          <- observationsWhere(user, s"""program: { id: { EQ: "$pid" } }, observingModeType: { EQ: FLAMINGOS_2_MOS }""")
+    yield assertEquals(oids, List(oid))
+
   test("the sequence cannot be generated"):
     setup.flatMap: (_, oid, _) =>
       expect(

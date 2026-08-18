@@ -8221,6 +8221,11 @@ enum ObservingModeType {
   FLAMINGOS_2_LONG_SLIT
 
   """
+  ObservingModeType Flamingos2Mos
+  """
+  FLAMINGOS_2_MOS
+
+  """
   ObservingModeType GhostIfu
   """
   GHOST_IFU
