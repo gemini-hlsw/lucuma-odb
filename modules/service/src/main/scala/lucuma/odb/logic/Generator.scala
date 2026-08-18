@@ -241,7 +241,7 @@ object Generator:
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)).flatMap(digest(_, calculator.flamingos2ImagingSetup))
             case ObservingModeType.Flamingos2Mos      =>
-              EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "Flamingos2 MOS sequence generation is not yet implemented".some))
+              EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "Flamingos 2 MOS sequence generation is not yet implemented".some))
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
             case ObservingModeType.GhostIfu           =>
@@ -315,7 +315,7 @@ object Generator:
           case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
           case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
           case ObservingModeType.Flamingos2Mos      =>
-            EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos North MOS sequence generation is not yet implemented".some))
+            EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Flamingos 2 MOS sequence generation is not yet implemented".some))
           case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
           case ObservingModeType.GmosNorthImaging   => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
           case ObservingModeType.GmosNorthLongSlit  => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
@@ -510,7 +510,6 @@ object Generator:
                     go(freshAcq, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
                   case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-                    // Not sure about acquisition for MOS yet
                     EitherT.pure(())
 
                   case ObservingModeType.GnirsImaging       =>
@@ -551,7 +550,7 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
 
             case ObservingModeType.Flamingos2Mos      =>
-              EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Flamingos 2 mos sequence generation is not yet implemented".some))
+              EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Flamingos 2 MOS sequence generation is not yet implemented".some))
 
             case ObservingModeType.GhostIfu           =>
               EitherT(streaming.generateGhost(ctx))

@@ -31,6 +31,7 @@ import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
+import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
 import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
@@ -122,6 +123,8 @@ object GoaQueryPolicy:
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Imaging))
       case c: Flamingos2LongSlit =>
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(c.fpu)))
+      case c: Flamingos2Mos      =>
+        List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, c.customMask))
       case _: GhostIfu           =>
         List(ghostScienceArea.fov)
       case _: GmosNorthImaging   =>
@@ -159,6 +162,7 @@ object GoaQueryPolicy:
       case _: Exchange           => none
       case _: Flamingos2Imaging  => ScienceMode.Imaging.some
       case _: Flamingos2LongSlit => ScienceMode.Spectroscopy.some
+      case _: Flamingos2Mos      => ScienceMode.Spectroscopy.some
       case _: GhostIfu           => ScienceMode.Spectroscopy.some
       case _: GmosNorthImaging   => ScienceMode.Imaging.some
       case _: GmosSouthImaging   => ScienceMode.Imaging.some

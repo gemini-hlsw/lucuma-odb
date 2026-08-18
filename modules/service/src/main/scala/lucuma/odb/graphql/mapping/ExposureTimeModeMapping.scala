@@ -54,6 +54,7 @@ trait ExposureTimeModeMapping[F[_]] extends ExposureTimeModeView[F]:
       etmMappings(GnirsImagingFilterType,            ExposureTimeModeView),
       etmMappings(GnirsImagingAcquisitionType,       ExposureTimeModeView),
       etmMappings(Flamingos2LongSlitType,            ExposureTimeModeView),
+      etmMappings(Flamingos2MosType,                ExposureTimeModeView),
       etmMappings(Flamingos2LongSlitAcquisitionType, ExposureTimeModeView),
 
       // Ghost

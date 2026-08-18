@@ -22,6 +22,7 @@ trait ObservingModeMapping[F[_]]
      with GmosLongSlitView[F]
      with GmosMosView[F]
      with GnirsSpectroscopyView[F]
+     with Flamingos2MosView[F]
      with Igrins2LongSlitView[F]
      with VisitorTable[F] { this: SkunkMapping[F] =>
 
@@ -36,6 +37,7 @@ trait ObservingModeMapping[F[_]]
       SqlObject("flamingos2Imaging",  Join(ObservationView.Id, Flamingos2ImagingView.ObservationId)),
       SqlObject("gnirsImaging",       Join(ObservationView.Id, GnirsImagingView.ObservationId)),
       SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
+      SqlObject("flamingos2Mos",      Join(ObservationView.Id, Flamingos2MosView.ObservationId)),
       SqlObject("ghostIfu",           Join(ObservationView.Id, GhostIfuView.ObservationId)),
       SqlObject("gmosNorthImaging",   Join(ObservationView.Id, GmosNorthImagingView.Common.ObservationId)),
       SqlObject("gmosNorthLongSlit",  Join(ObservationView.Id, GmosNorthLongSlitView.Common.ObservationId)),

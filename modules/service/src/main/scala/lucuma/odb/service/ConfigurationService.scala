@@ -403,6 +403,9 @@ object ConfigurationService {
                     flamingos2LongSlit {
                       disperser
                     }
+                    flamingos2Mos {
+                      disperser
+                    }
                     gnirsLongSlit {
                       grating
                       camera
@@ -483,6 +486,9 @@ object ConfigurationService {
                           filters
                         }
                         flamingos2LongSlit {
+                          disperser
+                        }
+                        flamingos2Mos {
                           disperser
                         }
                         gnirsLongSlit {
@@ -600,6 +606,9 @@ object ConfigurationService {
                   flamingos2LongSlit {
                     disperser
                   }
+                  flamingos2Mos {
+                    disperser
+                  }
                   gnirsLongSlit {
                     grating
                     camera
@@ -682,6 +691,9 @@ object ConfigurationService {
                         filters
                       }
                       flamingos2LongSlit {
+                        disperser
+                      }
+                      flamingos2Mos {
                         disperser
                       }
                       gnirsLongSlit {
@@ -788,6 +800,9 @@ object ConfigurationService {
                       filters
                     }
                     flamingos2LongSlit {
+                      disperser
+                    }
+                    flamingos2Mos {
                       disperser
                     }
                     gnirsLongSlit {
@@ -897,6 +912,9 @@ object ConfigurationService {
                         flamingos2LongSlit {
                           disperser
                         }
+                        flamingos2Mos {
+                          disperser
+                        }
                         gnirsLongSlit {
                           grating
                           camera
@@ -980,6 +998,9 @@ object ConfigurationService {
                       filters
                     }
                     flamingos2LongSlit {
+                      disperser
+                    }
+                    flamingos2Mos {
                       disperser
                     }
                     gnirsLongSlit {
@@ -1134,6 +1155,9 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
@@ -1221,31 +1245,34 @@ object ConfigurationService {
 
           }
       ).contramap[(Observation.Id, Configuration)] { (oid, cfg) =>
-        oid                                                                                                      *:
-        cfg.conditions.cloudExtinction                                                                           *:
-        cfg.conditions.imageQuality                                                                              *:
-        cfg.conditions.skyBackground                                                                             *:
-        cfg.conditions.waterVapor                                                                                *:
-        cfg.target.left.toOption.map(_.ra)                                                                       *:
-        cfg.target.left.toOption.map(_.dec)                                                                      *:
-        cfg.target.toOption.map(_.raArc.tag)                                                                     *:
-        cfg.target.toOption.flatMap(Region.raArcStart.getOption)                                                 *:
-        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)                                                   *:
-        cfg.target.toOption.map(_.decArc.tag)                                                                    *:
-        cfg.target.toOption.flatMap(Region.decArcStart.getOption)                                                *:
-        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)                                                  *:
-        cfg.observingMode.tpe                                                                                    *:
-        cfg.observingMode.flamingos2LongSlit.map(_.disperser)                                                    *:
-        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable)                                  *:
-        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable)                                  *:
-        cfg.observingMode.gmosNorthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosNorthMos.map(_.grating)) *:
-        cfg.observingMode.gmosSouthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosSouthMos.map(_.grating)) *:
-        cfg.observingMode.gnirsLongSlit.map(_.grating)                                                           *:
-        cfg.observingMode.gnirsLongSlit.map(_.camera)                                                            *:
-        cfg.observingMode.gnirsLongSlit.map(_.prism)                                                             *:
-        cfg.observingMode.visitor.map(_.radius)                                                                  *:
-        cfg.observingMode.gnirsIfu.map(_.grating)                                                                *:
-        cfg.observingMode.gnirsIfu.map(_.fpu)                                                                    *:
+        oid                                                                     *:
+        cfg.conditions.cloudExtinction                                          *:
+        cfg.conditions.imageQuality                                             *:
+        cfg.conditions.skyBackground                                            *:
+        cfg.conditions.waterVapor                                               *:
+        cfg.target.left.toOption.map(_.ra)                                      *:
+        cfg.target.left.toOption.map(_.dec)                                     *:
+        cfg.target.toOption.map(_.raArc.tag)                                    *:
+        cfg.target.toOption.flatMap(Region.raArcStart.getOption)                *:
+        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)                  *:
+        cfg.target.toOption.map(_.decArc.tag)                                   *:
+        cfg.target.toOption.flatMap(Region.decArcStart.getOption)               *:
+        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)                 *:
+        cfg.observingMode.tpe                                                   *:
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)
+          .orElse(cfg.observingMode.flamingos2Mos.map(_.disperser))             *:
+        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosNorthMos.map(_.grating))                *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosSouthMos.map(_.grating))                *:
+        cfg.observingMode.gnirsLongSlit.map(_.grating)                          *:
+        cfg.observingMode.gnirsLongSlit.map(_.camera)                           *:
+        cfg.observingMode.gnirsLongSlit.map(_.prism)                            *:
+        cfg.observingMode.visitor.map(_.radius)                                 *:
+        cfg.observingMode.gnirsIfu.map(_.grating)                               *:
+        cfg.observingMode.gnirsIfu.map(_.fpu)                                   *:
         EmptyTuple
       }
 
@@ -1402,6 +1429,11 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  // MOS reuses the long slit disperser column; the mode type
+                  // is what discriminates the two (see V1262).
+                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
@@ -1489,33 +1521,37 @@ object ConfigurationService {
 
           }
       ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) =>
-        input.oid                                                 *:
-        input.SET.justification                                   *:
-        cfg.conditions.cloudExtinction                            *:
-        cfg.conditions.imageQuality                               *:
-        cfg.conditions.skyBackground                              *:
-        cfg.conditions.waterVapor                                 *:
-        cfg.target.left.toOption.map(_.ra)                        *:
-        cfg.target.left.toOption.map(_.dec)                       *:
-        cfg.target.toOption.map(_.raArc.tag)                      *:
-        cfg.target.toOption.flatMap(Region.raArcStart.getOption)  *:
-        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)    *:
-        cfg.target.toOption.map(_.decArc.tag)                     *:
-        cfg.target.toOption.flatMap(Region.decArcStart.getOption) *:
-        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)   *:
-        cfg.observingMode.tpe                                     *:
-        cfg.observingMode.flamingos2LongSlit.map(_.disperser)     *:
+        input.oid                                                               *:
+        input.SET.justification                                                 *:
+        cfg.conditions.cloudExtinction                                          *:
+        cfg.conditions.imageQuality                                             *:
+        cfg.conditions.skyBackground                                            *:
+        cfg.conditions.waterVapor                                               *:
+        cfg.target.left.toOption.map(_.ra)                                      *:
+        cfg.target.left.toOption.map(_.dec)                                     *:
+        cfg.target.toOption.map(_.raArc.tag)                                    *:
+        cfg.target.toOption.flatMap(Region.raArcStart.getOption)                *:
+        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)                  *:
+        cfg.target.toOption.map(_.decArc.tag)                                   *:
+        cfg.target.toOption.flatMap(Region.decArcStart.getOption)               *:
+        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)                 *:
+        cfg.observingMode.tpe                                                   *:
+        // MOS shares the long slit disperser column (see V1262).
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)
+          .orElse(cfg.observingMode.flamingos2Mos.map(_.disperser))             *:
         cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         // MOS shares the long slit grating column (see V1235).
-        cfg.observingMode.gmosNorthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosNorthMos.map(_.grating)) *:
-        cfg.observingMode.gmosSouthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosSouthMos.map(_.grating)) *:
-        cfg.observingMode.gnirsLongSlit.map(_.grating)            *:
-        cfg.observingMode.gnirsLongSlit.map(_.camera)             *:
-        cfg.observingMode.gnirsLongSlit.map(_.prism)              *:
-        cfg.observingMode.visitor.map(_.radius)                   *:
-        cfg.observingMode.gnirsIfu.map(_.grating)                 *:
-        cfg.observingMode.gnirsIfu.map(_.fpu)                     *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosNorthMos.map(_.grating))                *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosSouthMos.map(_.grating))                *:
+        cfg.observingMode.gnirsLongSlit.map(_.grating)                          *:
+        cfg.observingMode.gnirsLongSlit.map(_.camera)                           *:
+        cfg.observingMode.gnirsLongSlit.map(_.prism)                            *:
+        cfg.observingMode.visitor.map(_.radius)                                 *:
+        cfg.observingMode.gnirsIfu.map(_.grating)                               *:
+        cfg.observingMode.gnirsIfu.map(_.fpu)                                   *:
         EmptyTuple
       }
 

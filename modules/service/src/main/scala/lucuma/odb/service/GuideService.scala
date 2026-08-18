@@ -299,6 +299,8 @@ object GuideService {
           (Site.GN, c.mode, Wavelength.Min)
         case mode: flamingos2.longslit.Config                 =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
+        case mode: flamingos2.mos.Config                      =>
+          (Site.GS, ObservingModeType.Flamingos2Mos, mode.filter.wavelength)
         case flamingos2.imaging.Config(filters = filters) =>
           (Site.GS, ObservingModeType.Flamingos2Imaging, filters.map(_.filter.wavelength).maximum)
         case mode: ghost.ifu.Config                           =>

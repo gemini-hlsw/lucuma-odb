@@ -1129,6 +1129,22 @@ trait DatabaseOperations { this: OdbSuite =>
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
+      case ObservingModeType.Flamingos2Mos =>
+        """{
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
+          }
+          spectroscopy: {
+            wavelength: { nanometers: 1200 }
+            resolution: 100
+            wavelengthCoverage: { nanometers: 20 }
+            focalPlane: MULTIPLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
       case ObservingModeType.GhostIfu         =>
         """{
           exposureTimeMode: {
@@ -1365,7 +1381,15 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Flamingos2Mos =>
-        """{}"""
+        """{
+          flamingos2Mos: {
+            disperser: R1200_HK
+            filter: Y
+            customMask: {
+              slitWidth: CUSTOM_WIDTH_2_PIX
+            }
+          }
+        }"""
       case ObservingModeType.GmosNorthImaging =>
         """{
           gmosNorthImaging: {

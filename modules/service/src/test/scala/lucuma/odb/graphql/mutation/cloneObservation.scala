@@ -318,6 +318,56 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             }
           }
         }
+        flamingos2Mos {
+          disperser
+          filter
+          customMask {
+            slitWidth
+            attachmentId
+          }
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+          explicitReadMode
+          explicitReads
+          decker
+          defaultDecker
+          explicitDecker
+          readoutMode
+          defaultReadoutMode
+          explicitReadoutMode
+          offsetPreset
+          telescopeConfigs {
+            offsetMode
+            alongSlit { q { arcseconds } guiding }
+            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+          }
+          defaultTelescopeConfigs {
+            offsetMode
+            alongSlit { q { arcseconds } guiding }
+            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+          }
+          explicitTelescopeConfigs {
+            offsetMode
+            alongSlit { q { arcseconds } guiding }
+            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+          }
+          telluricType {
+            tag
+            starTypes
+          }
+          initialDisperser
+          initialFilter
+          initialSlitWidth
+        }
         igrins2LongSlit {
           telescopeConfigs {
             offsetMode
@@ -2785,6 +2835,141 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                """.asRight
              )
       cols <- readMaskColumns("t_gmos_south_mos", coid)
+      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+    yield ()
+
+  test("clone F2 MOS observation preserves the mask, preset and overrides"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      aid  <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits")
+      mode  = s"""
+        flamingos2Mos: {
+          disperser: R1200_HK
+          filter: Y
+          customMask: { slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: "$aid" }
+          offsetPreset: CROWDED_FIELD
+          explicitReadMode: MEDIUM
+          explicitReads: READS_4
+          explicitDecker: LONG_SLIT
+          explicitReadoutMode: ENGINEERING
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 60.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 70.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
+            ]
+          }
+        }
+      """
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), mode)
+      coid <- cloneObservationAs(pi, oid)
+      _    <- expect(
+               user  = pi,
+               query = s"""
+                 query {
+                   clone: observation(observationId: "$coid") {
+                     observingMode {
+                       flamingos2Mos {
+                         disperser
+                         filter
+                         customMask { slitWidth attachmentId }
+                         offsetPreset
+                         explicitReadMode
+                         explicitReads
+                         decker
+                         readoutMode
+                         explicitTelescopeConfigs {
+                           offsetMode
+                           toSky { offset { q { arcseconds } } guiding }
+                         }
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                 {
+                   "clone": {
+                     "observingMode": {
+                       "flamingos2Mos": {
+                         "disperser": "R1200_HK",
+                         "filter": "Y",
+                         "customMask": {
+                           "slitWidth": "CUSTOM_WIDTH_2_PIX",
+                           "attachmentId": ${aid.asJson}
+                         },
+                         "offsetPreset": "CROWDED_FIELD",
+                         "explicitReadMode": "MEDIUM",
+                         "explicitReads": "READS_4",
+                         "decker": "LONG_SLIT",
+                         "readoutMode": "ENGINEERING",
+                         "explicitTelescopeConfigs": {
+                           "offsetMode": "NOD_TO_SKY",
+                           "toSky": [
+                             { "offset": { "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" },
+                             { "offset": { "q": { "arcseconds": 60.000000 } }, "guiding": "DISABLED" },
+                             { "offset": { "q": { "arcseconds": 70.000000 } }, "guiding": "DISABLED" },
+                             { "offset": { "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
+                           ]
+                         }
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      cols <- readMaskColumns("t_flamingos_2_mos", coid)
+      _    <- IO(assertEquals(cols, (aid.some, AttachmentType.MosMask.some)))
+    yield ()
+
+  test("clone F2 MOS observation with no mask defined keeps the empty mask"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      mode  = s"""
+        flamingos2Mos: {
+          disperser: R1200_HK
+          filter: Y
+          customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+        }
+      """
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), mode)
+      coid <- cloneObservationAs(pi, oid)
+      _    <- expect(
+               user  = pi,
+               query = s"""
+                 query {
+                   clone: observation(observationId: "$coid") {
+                     observingMode {
+                       flamingos2Mos {
+                         customMask { slitWidth attachmentId }
+                         offsetPreset
+                         defaultDecker
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                 {
+                   "clone": {
+                     "observingMode": {
+                       "flamingos2Mos": {
+                         "customMask": {
+                           "slitWidth": "CUSTOM_WIDTH_2_PIX",
+                           "attachmentId": null
+                         },
+                         "offsetPreset": "SPARSE_FIELD",
+                         "defaultDecker": "MOS"
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      cols <- readMaskColumns("t_flamingos_2_mos", coid)
       _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
 

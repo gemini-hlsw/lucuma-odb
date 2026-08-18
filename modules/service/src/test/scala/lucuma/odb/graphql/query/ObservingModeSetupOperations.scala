@@ -38,6 +38,24 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       """
     )
 
+  def createFlamingos2MosObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tids: List[Target.Id]
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids,
+      s"""
+        flamingos2Mos: {
+          disperser: R1200_JH
+          filter: JH
+          customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+        }
+      """
+    )
+
   def createGhostIfuObservationAs(
     user:           User,
     pid:            Program.Id,

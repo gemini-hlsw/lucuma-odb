@@ -39,6 +39,7 @@ import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2ImagingConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
+import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
@@ -121,6 +122,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput, none).some,
         none,
         none,
@@ -148,6 +150,7 @@ object CalibrationConfigSubset:
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
+        none,
         none,
         none,
         none,
@@ -189,6 +192,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosImagingInput.Create(
           ImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
@@ -222,6 +226,7 @@ object CalibrationConfigSubset:
 
     def toImagingInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
+        none,
         none,
         none,
         none,
@@ -270,6 +275,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         none
       )
 
@@ -298,6 +304,16 @@ object CalibrationConfigSubset:
             f2.disperser,
             f2.filter,
             f2.fpu
+          )
+
+        // MOS is calibrated as a long slit: the custom mask's slit width has a
+        // 1:1 builtin long slit FPU, so a MOS and a long slit observation with
+        // matching configuration share one calibration.
+        case f2m: Flamingos2MosConfig =>
+          Flamingos2Configs(
+            f2m.disperser,
+            f2m.filter,
+            f2m.equivalentFpu
           )
 
         case f2i: Flamingos2ImagingConfig =>

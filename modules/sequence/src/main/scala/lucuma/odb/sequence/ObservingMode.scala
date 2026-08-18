@@ -12,6 +12,7 @@ import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
+import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
 import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
@@ -33,6 +34,7 @@ type ObservingMode =
   Exchange           |
   Flamingos2Imaging  |
   Flamingos2LongSlit |
+  Flamingos2Mos      |
   GhostIfu           |
   GmosNorthImaging   |
   GmosNorthLongSlit  |
@@ -50,6 +52,7 @@ object ObservingMode:
   val ExchangeName: String           = "Exchange"
   val Flamingos2ImagingName: String  = "Flamingos 2 Imaging"
   val Flamingos2LongSlitName: String = "Flamingos 2 Long Slit"
+  val Flamingos2MosName: String      = "Flamingos 2 MOS"
   val GhostIfuName: String           = "GHOST IFU"
   val GmosNorthImagingName: String   = "GMOS North Imaging"
   val GmosNorthLongSlitName: String  = "GMOS North Long Slit"
@@ -68,6 +71,7 @@ object ObservingMode:
         case (a: Exchange,           b: Exchange)           => a === b
         case (a: Flamingos2LongSlit, b: Flamingos2LongSlit) => a === b
         case (a: Flamingos2Imaging,  b: Flamingos2Imaging)  => a === b
+        case (a: Flamingos2Mos,      b: Flamingos2Mos)      => a === b
         case (a: GhostIfu,           b: GhostIfu)           => a === b
         case (a: GmosNorthLongSlit,  b: GmosNorthLongSlit)  => a === b
         case (a: GmosSouthLongSlit,  b: GmosSouthLongSlit)  => a === b
@@ -85,6 +89,7 @@ object ObservingMode:
       case exc: Exchange           => exc.hashBytes
       case f2:  Flamingos2LongSlit => f2.hashBytes
       case f2i: Flamingos2Imaging  => f2i.hashBytes
+      case f2m: Flamingos2Mos      => f2m.hashBytes
       case ghs: GhostIfu           => ghs.hashBytes
       case gnl: GmosNorthLongSlit  => gnl.hashBytes
       case gsl: GmosSouthLongSlit  => gsl.hashBytes
@@ -105,6 +110,7 @@ object ObservingMode:
           case _: Exchange           => none
           case _: Flamingos2Imaging  => Instrument.Flamingos2.some
           case _: Flamingos2LongSlit => Instrument.Flamingos2.some
+          case _: Flamingos2Mos      => Instrument.Flamingos2.some
           case _: GhostIfu           => Instrument.Ghost.some
           case _: GmosNorthImaging   => Instrument.GmosNorth.some
           case _: GmosNorthLongSlit  => Instrument.GmosNorth.some
@@ -122,6 +128,7 @@ object ObservingMode:
           case _: Exchange           => ExchangeName
           case _: Flamingos2Imaging  => Flamingos2ImagingName
           case _: Flamingos2LongSlit => Flamingos2LongSlitName
+          case _: Flamingos2Mos      => Flamingos2MosName
           case _: GhostIfu           => GhostIfuName
           case _: GmosNorthImaging   => GmosNorthImagingName
           case _: GmosNorthLongSlit  => GmosNorthLongSlitName
@@ -139,6 +146,7 @@ object ObservingMode:
           case e: Exchange           => e.mode
           case _: Flamingos2Imaging  => ObservingModeType.Flamingos2Imaging
           case _: Flamingos2LongSlit => ObservingModeType.Flamingos2LongSlit
+          case _: Flamingos2Mos      => ObservingModeType.Flamingos2Mos
           case _: GhostIfu           => ObservingModeType.GhostIfu
           case _: GmosNorthImaging   => ObservingModeType.GmosNorthImaging
           case _: GmosNorthLongSlit  => ObservingModeType.GmosNorthLongSlit
@@ -168,6 +176,11 @@ object ObservingMode:
         m match
           case a: Flamingos2LongSlit => a.some
           case _                     => none
+
+      def asFlamingos2Mos: Option[Flamingos2Mos] =
+        m match
+          case a: Flamingos2Mos => a.some
+          case _                => none
 
       def asGhostIfu: Option[GhostIfu] =
         m match

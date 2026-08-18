@@ -689,13 +689,13 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
     yield ()
 
   // IGRINS-2 is science-only spectroscopy, so it serializes as
-  // ItcIgrins2Spectroscopy with a distinct `itcType`.
+  // ItcScienceOnlySpectroscopy with a distinct `itcType`.
   test("igrins2 itcType"):
     def query(oid: Observation.Id) = s"""
       query {
         observation(observationId: "$oid") {
           itc {
-            ... on ItcIgrins2Spectroscopy {
+            ... on ItcScienceOnlySpectroscopy {
               itcType
               spectroscopyScience {
                 selected {
@@ -726,7 +726,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
       {
         "observation": {
           "itc": {
-            "itcType": "IGRINS_2_SPECTROSCOPY",
+            "itcType": "SCIENCE_ONLY_SPECTROSCOPY",
             "spectroscopyScience": {
               "selected": {
                 "targetId": ${t.asJson},

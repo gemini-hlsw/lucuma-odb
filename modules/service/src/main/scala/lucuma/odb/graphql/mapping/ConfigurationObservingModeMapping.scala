@@ -17,6 +17,7 @@ trait ConfigurationObservingModeMappings[F[_]]
      with Flamingos2LongSlitView[F]
      with GmosImagingView[F]
      with GmosLongSlitView[F]
+     with Flamingos2MosView[F]
      with GmosMosView[F]
      with GnirsSpectroscopyView[F]
      with Igrins2LongSlitView[F]
@@ -33,6 +34,7 @@ trait ConfigurationObservingModeMappings[F[_]]
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
       SqlField("mode", ObservationView.ObservingMode.ObservingModeType),
       SqlObject("flamingos2LongSlit", Join(ObservationView.Id, Flamingos2LongSlitView.ObservationId)),
+      SqlObject("flamingos2Mos", Join(ObservationView.Id, Flamingos2MosView.ObservationId)),
       SqlObject("gmosNorthLongSlit", Join(ObservationView.Id, GmosNorthLongSlitView.Common.ObservationId)),
       SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId)),
       SqlObject("gmosNorthMos", Join(ObservationView.Id, GmosNorthMosView.Common.ObservationId)),
@@ -51,6 +53,7 @@ trait ConfigurationObservingModeMappings[F[_]]
       FieldRef[ObservingModeType]("mode").as("instrument", _.instrumentOption),
       SqlField("mode", ConfigurationRequestView.ObservingModeType),
       SqlObject("flamingos2LongSlit"),
+      SqlObject("flamingos2Mos"),
       SqlObject("gmosNorthLongSlit"),
       SqlObject("gmosSouthLongSlit"),
       SqlObject("gmosNorthMos"),

@@ -64,6 +64,9 @@ object configurationrequest:
     val DecodeFlamingos2LongSlit: Decoder[Flamingos2LongSlit] = hc =>
       hc.downField("disperser").as[Flamingos2Disperser].map(Flamingos2LongSlit(_))
 
+    val DecodeFlamingos2Mos: Decoder[Flamingos2Mos] = hc =>
+      hc.downField("disperser").as[Flamingos2Disperser].map(Flamingos2Mos(_))
+
     val DecodeGmosNorthImaging: Decoder[GmosNorthImaging] = hc =>
       hc.downField("filters").as[List[GmosNorthFilter]].map(GmosNorthImaging(_))
 
@@ -103,6 +106,7 @@ object configurationrequest:
 
     given Decoder[ObservingMode] = hc =>
       hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit) orElse
+      hc.downField("flamingos2Mos").as(using DecodeFlamingos2Mos) orElse
       hc.downField("visitor").as(using DecodeVisitor) orElse
       hc.downField("gmosNorthImaging").as(using DecodeGmosNorthImaging) orElse
       hc.downField("gmosNorthLongSlit").as(using DecodeGmosNorthLongSlit) orElse
@@ -137,10 +141,10 @@ object configurationrequest:
           case Flamingos2LongSlit(disperser)         => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
           case Flamingos2Mos(disperser)              => "flamingos2Mos"      -> Json.obj("disperser" -> disperser.asJson)
           case GhostIfu                              => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
-          case GmosNorthImaging(filter)              => "gmosNorthImaging"   -> Json.obj("filter" -> filter.asJson)
+          case GmosNorthImaging(filters)             => "gmosNorthImaging"   -> Json.obj("filters" -> filters.asJson)
           case GmosNorthLongSlit(grating)            => "gmosNorthLongSlit"  -> Json.obj("grating" -> grating.asJson)
           case GmosNorthMos(grating)                 => "gmosNorthMos"       -> Json.obj("grating" -> grating.asJson)
-          case GmosSouthImaging(filter)              => "gmosSouthImaging"   -> Json.obj("filter" -> filter.asJson)
+          case GmosSouthImaging(filters)             => "gmosSouthImaging"   -> Json.obj("filters" -> filters.asJson)
           case GmosSouthLongSlit(grating)            => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
           case GmosSouthMos(grating)                 => "gmosSouthMos"       -> Json.obj("grating" -> grating.asJson)
           case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit"      -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
