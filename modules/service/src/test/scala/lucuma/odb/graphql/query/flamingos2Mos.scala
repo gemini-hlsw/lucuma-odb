@@ -49,7 +49,7 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
           query {
             observation(observationId: "$oid") {
               itc {
-                ... on ItcIgrins2Spectroscopy {
+                ... on ItcScienceOnlySpectroscopy {
                   itcType
                   spectroscopyScience {
                     selected {
@@ -67,7 +67,7 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
           {
             "observation": {
               "itc": {
-                "itcType": "IGRINS_2_SPECTROSCOPY",
+                "itcType": "SCIENCE_ONLY_SPECTROSCOPY",
                 "spectroscopyScience": {
                   "selected": {
                     "targetId": $tid,

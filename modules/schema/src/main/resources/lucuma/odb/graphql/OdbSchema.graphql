@@ -10696,7 +10696,7 @@ input Flamingos2MosInput {
   explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   """
-  The telluricType field must be either specified or skipped altogether. It cannot be unset with 
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with
   a null value. On create the default is HOT.
   """
   telluricType: TelluricTypeInput
@@ -14793,7 +14793,7 @@ enum ItcType {
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING,
   GNIRS_IMAGING,
-  IGRINS_2_SPECTROSCOPY,
+  SCIENCE_ONLY_SPECTROSCOPY,
   GNIRS_SPECTROSCOPY,
   SPECTROSCOPY
 }
@@ -14935,10 +14935,11 @@ type ItcSpectroscopy implements Itc {
 }
 
 """
-ITC results for IGRINS-2 spectroscopy observations. IGRINS-2 has no acquisition estimate.
-SVC  acquisition sequence, when present, uses the SVC exposure time configuration.
+ITC results for spectroscopy observations that have no acquisition estimate:
+IGRINS-2, GMOS MOS and Flamingos 2 MOS.  For IGRINS-2 the SVC acquisition
+sequence, when present, uses the SVC exposure time configuration.
 """
-type ItcIgrins2Spectroscopy implements Itc {
+type ItcScienceOnlySpectroscopy implements Itc {
   itcType: ItcType!
   spectroscopyScience: ItcResultSet!
 }

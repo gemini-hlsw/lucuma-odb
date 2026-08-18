@@ -246,7 +246,7 @@ trait ItcCodec:
   // columns (see ItcService), never decoded from a single blob.  Imaging and
   // GHOST encode straight from their science result (they have no acquisition).
   // A spectroscopy science with an acquisition result is an `ItcSpectroscopy`
-  // (acquisition merged in); one without is an `ItcIgrins2Spectroscopy` (distinct
+  // (acquisition merged in); one without is an `ItcScienceOnlySpectroscopy` (distinct
   // `itcType`).  A `Failed` acquisition is not represented here — the caller
   // surfaces it as an error, as before the split an acquisition ITC failure
   // failed the whole lookup.  `gnirsAcqType` is an internal detail with no
@@ -256,7 +256,7 @@ trait ItcCodec:
       val science = itc.science.asJson
       itc.science match
         // GNIRS spectroscopy always has an acquisition sequence, and its science
-        // results are keyed by central wavelength, so there is no IGRINS-style
+        // results are keyed by central wavelength, so there is no science-only
         // fallback type here.
         case _: ItcScience.GnirsSpectroscopy =>
           itc.acquisition match
@@ -269,7 +269,7 @@ trait ItcCodec:
             case ItcAcquisition.Available(times, _) =>
               science.deepMerge(Json.obj("acquisition" -> times.asJson))
             case _                                  =>
-              science.deepMerge(Json.obj("itcType" -> "IGRINS_2_SPECTROSCOPY".asJson))
+              science.deepMerge(Json.obj("itcType" -> "SCIENCE_ONLY_SPECTROSCOPY".asJson))
         case _                          =>
           science
 
