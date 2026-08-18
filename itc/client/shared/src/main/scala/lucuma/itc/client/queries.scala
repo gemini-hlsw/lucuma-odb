@@ -14,8 +14,7 @@ object SpectroscopyIntegrationTime extends GraphQLOperation[Unit] {
   type Data      = ClientCalculationResult
   type Variables = SpectroscopyInput
 
-  override val document: String =
-    """
+  override val document = gql"""
       fragment IntegrationTimeFields on IntegrationTime {
         exposureTime {
           microseconds
@@ -72,8 +71,8 @@ object SpectroscopyIntegrationTime extends GraphQLOperation[Unit] {
         }
       }
 
-      query Spectroscopy($spec: SpectroscopyInput!) {
-        spectroscopy(input: $spec) {
+      query Spectroscopy($$spec: SpectroscopyInput!) {
+        spectroscopy(input: $$spec) {
           versions {
             serverVersion
             dataVersion
@@ -101,8 +100,7 @@ object ImagingIntegrationTime extends GraphQLOperation[Unit] {
   type Data      = ClientCalculationResult
   type Variables = ImagingInput
 
-  override val document: String =
-    """
+  override val document = gql"""
       fragment IntegrationTimeFields on IntegrationTime {
         exposureTime {
           microseconds
@@ -159,8 +157,8 @@ object ImagingIntegrationTime extends GraphQLOperation[Unit] {
         }
       }
 
-      query Imaging($spec: ImagingInput!) {
-        imaging(input: $spec) {
+      query Imaging($$spec: ImagingInput!) {
+        imaging(input: $$spec) {
           versions {
             serverVersion
             dataVersion
@@ -188,8 +186,7 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
   type Data      = SpectroscopyIntegrationTimeAndGraphsResult
   type Variables = SpectroscopyIntegrationTimeAndGraphsInput
 
-  val document =
-    """
+  val document = gql"""
       fragment IntegrationTimeFields on IntegrationTime {
         exposureTime {
           microseconds
@@ -274,8 +271,8 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
         }
       }
 
-      query($input: SpectroscopyIntegrationTimeAndGraphsInput!) {
-        spectroscopyIntegrationTimeAndGraphs(input: $input) {
+      query($$input: SpectroscopyIntegrationTimeAndGraphsInput!) {
+        spectroscopyIntegrationTimeAndGraphs(input: $$input) {
           versions {
             serverVersion
             dataVersion
