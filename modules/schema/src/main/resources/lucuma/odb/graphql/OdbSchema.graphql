@@ -7879,6 +7879,23 @@ type MaskDefinition {
   Every aperture in the design, acquisition boxes included.
   """
   slits: [MaskSlit!]!
+
+  """
+  Number of science slits in the design, alignment-star boxes excluded.
+  """
+  scienceSlitCount: Int!
+
+  """
+  Number of alignment-star boxes in the design.
+  """
+  acquisitionSlitCount: Int!
+
+  """
+  Mean width of the science slits.  Alignment-star boxes are excluded so
+  their wide boxes do not skew the mean, and a design with no science slits
+  has no average.
+  """
+  averageSlitWidth: Angle
 }
 
 """

@@ -5,6 +5,7 @@ package lucuma.odb.data
 
 import cats.Eq
 import cats.derived.*
+import cats.syntax.eq.*
 import coulomb.integrations.cats.quantity.given
 import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.string.NonEmptyString
@@ -65,7 +66,25 @@ case class MaskDefinition(
   pointing:      Coordinates,
   positionAngle: Angle,
   slits:         List[MaskSlit]
-) derives Eq
+) derives Eq:
+
+  /** Slits that place science objects, excluding alignment-star boxes. */
+  def scienceSlits: List[MaskSlit] =
+    slits.filter(_.priority =!= MosSlitPriority.Acquisition)
+
+  /** Alignment-star boxes used to position the mask on sky. */
+  def acquisitionSlits: List[MaskSlit] =
+    slits.filter(_.priority === MosSlitPriority.Acquisition)
+
+  /**
+   * Mean width of the science slits, or None for a design with none.
+   * Alignment-star boxes are excluded so their wide boxes do not skew the
+   * mean.
+   */
+  def averageSlitWidth: Option[Angle] =
+    val sci = scienceSlits
+    Option.when(sci.nonEmpty):
+      Angle.fromMicroarcseconds(sci.map(_.width.toMicroarcseconds).sum / sci.length)
 
 object MaskDefinition:
 

@@ -106,12 +106,15 @@ trait MaskDefinitionCodec:
   given Encoder[MaskDefinition] =
     Encoder.instance: d =>
       Json.obj(
-        "name"          -> d.name.asJson,
-        "instrument"    -> d.instrument.asJson,
-        "pixelScale"    -> d.pixelScale.value.asJson,
-        "pointing"      -> d.pointing.asJson,
-        "positionAngle" -> d.positionAngle.asJson,
-        "slits"         -> d.slits.asJson
+        "name"                 -> d.name.asJson,
+        "instrument"           -> d.instrument.asJson,
+        "pixelScale"           -> d.pixelScale.value.asJson,
+        "pointing"             -> d.pointing.asJson,
+        "positionAngle"        -> d.positionAngle.asJson,
+        "slits"                -> d.slits.asJson,
+        "scienceSlitCount"     -> d.scienceSlits.length.asJson,
+        "acquisitionSlitCount" -> d.acquisitionSlits.length.asJson,
+        "averageSlitWidth"     -> d.averageSlitWidth.asJson
       )
 
   given Decoder[MaskDefinition] =

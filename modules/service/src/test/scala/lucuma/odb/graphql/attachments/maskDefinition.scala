@@ -57,6 +57,9 @@ class maskDefinition extends AttachmentsSuite:
                 pixelScale
                 pointing { ra { hms } dec { dms } }
                 positionAngle { degrees }
+                scienceSlitCount
+                acquisitionSlitCount
+                averageSlitWidth { arcseconds }
                 slits {
                   id
                   coordinates { ra { hms } dec { dms } }
@@ -111,6 +114,17 @@ class maskDefinition extends AttachmentsSuite:
       assertEquals(first.decodePath[BigDecimal]("offsetAlongSlit", "arcseconds"), BigDecimal(0))
       assertEquals(first.decodePath[BigDecimal]("offsetAcrossSlit", "arcseconds"), BigDecimal(0))
       assertEquals(slits.count(_.decodePath[String]("priority") === "ACQUISITION"), 3)
+      assertEquals(mask.decodePath[Int]("mask", "scienceSlitCount"), 37)
+      assertEquals(mask.decodePath[Int]("mask", "acquisitionSlitCount"), 3)
+      // The stored average must agree with the slits it was derived from.
+      val sciWidths = slits
+        .filter(_.decodePath[String]("priority") =!= "ACQUISITION")
+        .map(_.decodePath[BigDecimal]("width", "arcseconds"))
+      assertEqualsDouble(
+        mask.decodePath[BigDecimal]("mask", "averageSlitWidth", "arcseconds").toDouble,
+        (sciWidths.sum / sciWidths.length).toDouble,
+        1e-5
+      )
 
   test("a file that is not a readable mask design is rejected"):
     for
