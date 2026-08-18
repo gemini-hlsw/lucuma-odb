@@ -797,13 +797,14 @@ lazy val schema =
           rootDir / "modules" / "sso-service" / "src" / "main" / "resources" / "Sso.graphql"
         val resourceSchemaFile: File     =
           rootDir / "resource" / "service" / "src" / "main" / "resources" / "graphql" / "resource.graphql"
-        // sbt-typelevel versions are not always full semver: between a base version bump
-        // and its first tag they look like "0.91-67fba49-SNAPSHOT". npm rejects those,
-        // so pad the numeric core to major.minor.patch: "0.91.0-67fba49".
+        // npm needs full semver, so this code pads "0.91-67fba49" to "0.91.0-67fba49".
+        // Semver compares "10-67fba49" as text, but "10" as a number. The dot makes "0.92.0-10.67fba49" newer than "0.92.0-8.67fba49".
         val semVerWithPrerelease: String = {
           val (core, prerelease) =
             version.value.stripSuffix("-SNAPSHOT").span(_ != '-')
-          core.split('.').padTo(3, "0").mkString(".") + prerelease
+          val paddedCore   = core.split('.').padTo(3, "0").mkString(".")
+          val dottedSuffix = prerelease.stripPrefix("-").replace('-', '.')
+          if (dottedSuffix.isEmpty) paddedCore else s"$paddedCore-$dottedSuffix"
         }
 
         IO.write(
