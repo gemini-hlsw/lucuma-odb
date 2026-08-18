@@ -33,23 +33,17 @@ import lucuma.odb.sequence.flamingos2.mos.Config
 
 /**
  * Create and edit inputs for the Flamingos 2 MOS observing mode.
- *
- * The shape follows Flamingos 2 long slit, with the builtin FPU replaced by a
- * custom mask, the acquisition dropped (MOS has no acquisition sequence), and an
- * offset preset selecting the default telescope configs.
  */
 object Flamingos2MosInput:
 
   /**
-   * `Other` carries no slit width at all, so an observation using it could be
-   * neither costed by the ITC nor collapsed onto an equivalent long slit
-   * calibration.  GraphQL cannot subset an enum, so the type accepts it and it
-   * is rejected here; a database CHECK is the backstop.
+   * `Other` carries no slit width at all and it is unsupported at the moment.
    */
   private def validateCustomMask(m: Flamingos2FpuMask.Custom): Result[Flamingos2FpuMask.Custom] =
-    if m.slitWidth === Flamingos2CustomSlitWidth.Other
-    then OdbError.InvalidArgument(Config.OtherSlitWidthMessage.some).asFailure
-    else Result(m)
+    if m.slitWidth === Flamingos2CustomSlitWidth.Other then
+      OdbError.InvalidArgument(Config.OtherSlitWidthMessage.some).asFailure
+    else
+      Result(m)
 
   // Flamingos2's ABBA science pattern requires exactly 4 telescope configs.
   private def validateConfigs(tc: SlitTelescopeConfigs): Result[SlitTelescopeConfigs] =
@@ -61,14 +55,14 @@ object Flamingos2MosInput:
     disperser:                Flamingos2Disperser,
     filter:                   Flamingos2Filter,
     customMask:               Flamingos2FpuMask.Custom,
-    exposureTimeMode:         Option[ExposureTimeMode]     = None,
-    explicitReadMode:         Option[Flamingos2ReadMode]   = None,
-    explicitReads:            Option[Flamingos2Reads]      = None,
-    explicitDecker:           Option[Flamingos2Decker]     = None,
+    exposureTimeMode:         Option[ExposureTimeMode]      = None,
+    explicitReadMode:         Option[Flamingos2ReadMode]    = None,
+    explicitReads:            Option[Flamingos2Reads]       = None,
+    explicitDecker:           Option[Flamingos2Decker]      = None,
     explicitReadoutMode:      Option[Flamingos2ReadoutMode] = None,
-    offsetPreset:             Flamingos2MosOffsetPreset    = Flamingos2MosOffsetPreset.SparseField,
-    explicitTelescopeConfigs: Option[SlitTelescopeConfigs] = None,
-    telluricType:             TelluricType                 = TelluricType.Hot
+    offsetPreset:             Flamingos2MosOffsetPreset     = Flamingos2MosOffsetPreset.SparseField,
+    explicitTelescopeConfigs: Option[SlitTelescopeConfigs]  = None,
+    telluricType:             TelluricType                  = TelluricType.Hot
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2Mos

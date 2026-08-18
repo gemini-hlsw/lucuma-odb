@@ -134,18 +134,6 @@ object GeneratorParamsService {
           case (MissingData(p0), MissingData(p1))                                   => p0 === p1
           case (ConflictingData, ConflictingData)                                   => true
           case _                                                                    => false
-
-  /**
-   * The read mode the ITC is asked to assume for a Flamingos 2 science sequence.
-   * In signal-to-noise mode the ITC solves for the exposure time and ignores it.
-   */
-  private def flamingos2ScienceReadMode(c: flamingos2.spectroscopy.Config): Flamingos2ReadMode =
-    c.exposureTimeMode match
-      case ExposureTimeMode.SignalToNoiseMode(_, _)       =>
-        Flamingos2ReadMode.Bright
-      case ExposureTimeMode.TimeAndCountMode(time = time) =>
-        c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
-
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
 
@@ -380,6 +368,14 @@ object GeneratorParamsService {
           // The real custom mask is sent: the ITC client carries a slit width,
           // which is all a Flamingos 2 custom mask contributes.
           case f2m: flamingos2.mos.Config =>
+
+            def flamingos2ScienceReadMode(c: flamingos2.spectroscopy.Config): Flamingos2ReadMode =
+              c.exposureTimeMode match
+                case ExposureTimeMode.SignalToNoiseMode(_, _)       =>
+                  Flamingos2ReadMode.Bright
+                case ExposureTimeMode.TimeAndCountMode(time = time) =>
+                  c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
+
             val sciMode = InstrumentMode.Flamingos2Spectroscopy(
               f2m.exposureTimeMode,
               f2m.disperser,

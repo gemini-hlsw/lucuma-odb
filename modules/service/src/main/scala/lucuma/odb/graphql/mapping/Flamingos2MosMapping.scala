@@ -69,8 +69,7 @@ trait Flamingos2MosMapping[F[_]]
 
       SqlJson("telluricType", Flamingos2MosView.TelluricType),
 
-      // Read-only snapshot of what the mode was created with.  The mask
-      // attachment has no counterpart here: it is expected to arrive later.
+      // Read-only snapshot of what the mode was created with
       SqlField("initialDisperser", Flamingos2MosView.InitialDisperser),
       SqlField("initialFilter",    Flamingos2MosView.InitialFilter),
       SqlField("initialSlitWidth", Flamingos2MosView.InitialSlitWidth)

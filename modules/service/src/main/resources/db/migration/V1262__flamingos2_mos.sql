@@ -4,8 +4,7 @@
 -- replaced by a custom mask (a required slit width plus an optional attachment),
 -- and the science telescope configs come from a MOS offset preset rather than
 -- long slit's single fixed default.  The attachment is nullable because the mask
--- is usually only machined during Phase 2 (cf. V1230, which made the same
--- allowance for the dynamic config).
+-- is usually only machined during Phase 2.
 
 -- The MOS offset presets, following the t_slit_offset_mode pattern.
 CREATE TABLE t_f2_mos_offset_preset (
@@ -29,9 +28,7 @@ CREATE TABLE t_flamingos_2_mos (
   c_disperser            d_tag                 NOT NULL          REFERENCES t_f2_disperser(c_tag),
   c_filter               d_tag                 NOT NULL          REFERENCES t_f2_filter(c_tag),
 
-  -- The custom mask: the slit width is always known, the mask is usually only
-  -- machined during Phase 2.  'Other' carries no width at all, so neither the
-  -- ITC nor the equivalent builtin long slit FPU can be derived from it.
+  -- The custom mask: the slit width is always known.
   c_slit_width           d_tag                 NOT NULL          REFERENCES t_f2_custom_slit_width(c_tag) CHECK (c_slit_width <> 'Other'),
   c_mask_attachment_id   d_attachment_id       NULL DEFAULT NULL,
   c_mask_attachment_type e_attachment_type     NULL DEFAULT NULL CHECK (c_mask_attachment_type = 'mos_mask'),
@@ -54,12 +51,11 @@ CREATE TABLE t_flamingos_2_mos (
   c_initial_filter       d_tag                 NOT NULL          REFERENCES t_f2_filter(c_tag),
   c_initial_slit_width   d_tag                 NOT NULL          REFERENCES t_f2_custom_slit_width(c_tag),
 
-  -- Explicit configs are both-or-neither (a SlitTelescopeConfigs override needs both).
+  -- Explicit configs are both-or-neither.
   CONSTRAINT flamingos_2_mos_explicit_configs_check
     CHECK ((c_telescope_configs IS NULL) = (c_slit_offset_mode IS NULL)),
 
-  -- The type column exists only to pin the attachment's type through the
-  -- composite foreign key, so it is present exactly when the id is.
+  -- The type column exists only to pin the attachment's type.
   CONSTRAINT flamingos_2_mos_mask_attachment_check
     CHECK ((c_mask_attachment_id IS NULL) = (c_mask_attachment_type IS NULL)),
 
@@ -70,8 +66,7 @@ CREATE TABLE t_flamingos_2_mos (
     ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
 
   -- The attachment if it exists must be a mask and on the same program.
-  -- Deleting the mask returns the observation to "mask not yet defined", so the
-  -- column-list form of SET NULL is used and the program id is left alone.
+  -- Deleting the mask returns the observation to "mask not yet defined".
   CONSTRAINT flamingos_2_mos_mask_attachment_fkey
     FOREIGN KEY (c_program_id, c_mask_attachment_id, c_mask_attachment_type)
     REFERENCES t_attachment (c_program_id, c_attachment_id, c_attachment_type)
@@ -176,7 +171,7 @@ FOR EACH ROW
 EXECUTE FUNCTION ch_observation_edit_associated_table_update();
 
 -- F2 MOS has a science exposure time mode but no acquisition, since it has no
--- acquisition sequence.
+-- acquisition sequence yet.
 CREATE OR REPLACE FUNCTION check_etm_consistent()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -295,9 +290,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Configuration requests.  An F2 MOS request is discriminated by its disperser
--- alone, exactly as long slit, so the existing disperser column is reused and its
--- CHECK widened to admit the MOS mode.  The check was declared inline in V1031
--- and so carries a generated name; look it up rather than guess.
+-- alone, exactly as long slit.
 DO $$
 DECLARE
   cname text;

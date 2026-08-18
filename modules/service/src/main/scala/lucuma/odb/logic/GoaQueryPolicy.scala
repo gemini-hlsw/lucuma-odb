@@ -123,8 +123,6 @@ object GoaQueryPolicy:
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Imaging))
       case c: Flamingos2LongSlit =>
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(c.fpu)))
-      // The real GMMPS-derived MOS outline, roughly 120 x 365 arcsec, so the
-      // search radius is much larger than for any other Flamingos 2 mode.
       case c: Flamingos2Mos      =>
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, c.customMask))
       case _: GhostIfu           =>

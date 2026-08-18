@@ -272,9 +272,9 @@ class GoaQueryPolicySuite extends FunSuite:
       BigDecimal("165.201").some
     )
 
-  // A MOS mask really does spread its slits over the whole field, so the radius
-  // is far larger than any other Flamingos 2 mode's.
   test("a Flamingos 2 MOS mask is searched over the whole GMMPS field"):
+    // A MOS mask really does spread its slits over the whole field, so the radius
+    // is far larger than any other Flamingos 2 mode's.
     assertEquals(GoaQueryPolicy.searchRadius(flamingos2Mos).map(arcseconds), BigDecimal("184.201").some)
 
   test("a mode with no measurable science area has no radius"):

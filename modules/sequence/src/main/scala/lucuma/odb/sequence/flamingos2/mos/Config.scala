@@ -21,11 +21,10 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 /**
- * Configuration for the Flamingos 2 MOS science mode.
+ * Configuration for Flamingos 2 MOS science mode.
  *
  * This is Flamingos 2 long slit with the builtin FPU replaced by a custom mask
- * and with no acquisition.  Sequence generation is not implemented, so the
- * configuration exists to be stored, read, calibrated and costed by the ITC.
+ * and no acquisition (yet).  Sequence generation is not implemented yet.
  */
 case class Config private (
   disperser:     Flamingos2Disperser,
@@ -74,9 +73,9 @@ object Config:
 
   /**
    * `Flamingos2CustomSlitWidth.Other` carries no width at all, so neither the
-   * ITC nor the equivalent-long-slit calibration can be derived from it.  It is
-   * rejected at the GraphQL input and by a database CHECK; this is the last
-   * backstop.
+   * ITC nor the equivalent-long-slit calibration can be derived from it.
+   * It will be implemented later as we need a way to input or calculate an approximate
+   * slit width.
    */
   val OtherSlitWidthMessage: String =
     "Flamingos 2 MOS does not support the 'OTHER' custom slit width."

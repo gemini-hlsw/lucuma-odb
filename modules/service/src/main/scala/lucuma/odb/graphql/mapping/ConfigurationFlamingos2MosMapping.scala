@@ -9,7 +9,7 @@ import lucuma.odb.graphql.table.Flamingos2MosView
 
 trait ConfigurationFlamingos2MosMappings[F[_]]
   extends Flamingos2MosView[F]
-     with ConfigurationRequestView[F] {
+     with ConfigurationRequestView[F]:
 
   lazy val ConfigurationFlamingos2MosMappings = List(
     ConfigurationFlamingos2MosMapping,
@@ -27,5 +27,3 @@ trait ConfigurationFlamingos2MosMappings[F[_]]
       SqlField("id", ConfigurationRequestView.Flamingos2Mos.Id, key = true, hidden = true),
       SqlField("disperser", ConfigurationRequestView.Flamingos2Mos.Disperser),
     )
-
-}

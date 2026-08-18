@@ -336,9 +336,6 @@ object GuideService {
         case g: ghost.ifu.Config => g.skyPosition.toList
         case _                   => Nil
 
-    // Flamingos 2 MOS deliberately has no AgsParams case below: guide star
-    // lookup is unavailable for the mode even though lucuma-core declares a
-    // guide probe for it.  It falls through to `case _ => none`.
     def agsParamsFor(trackType: TrackType): Option[AgsParams] =
       probes.guideProbe(observingModeType, trackType).flatMap: probe =>
         (params.observingMode, probe) match

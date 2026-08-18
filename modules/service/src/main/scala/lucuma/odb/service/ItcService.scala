@@ -755,7 +755,6 @@ object ItcService {
             ghost(gh, targets)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, InstrumentMode.Igrins2Spectroscopy(_, _)), _, _) =>
             scienceOnlySpectroscopy(sp)
-          // MOS: spectroscopy through a custom mask, with no acquisition.
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, _: InstrumentMode.Flamingos2Spectroscopy), _, _) =>
             scienceOnlySpectroscopy(sp)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, _: InstrumentMode.GmosNorthSpectroscopy), _, _) =>

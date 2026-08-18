@@ -62,11 +62,6 @@ trait Flamingos2MosService[F[_]]:
 
 object Flamingos2MosService:
 
-  /**
-   * A nonexistent attachment, one belonging to another program, and one that is
-   * not a MOS mask all arrive as the same composite foreign key violation, so
-   * they get one message naming all three conditions.
-   */
   val MaskAttachmentViolationMessage: String =
     "The MOS mask attachment must exist, be of type 'mos_mask', and belong to the same program as the observation."
 
@@ -254,7 +249,7 @@ object Flamingos2MosService:
       observationId: Observation.Id,
       input:         Flamingos2MosInput.Create
     ): AppliedFragment =
-      InsertFlamingos2Mos.apply(
+      InsertFlamingos2Mos(
         observationId,
         input.disperser,
         input.filter,
