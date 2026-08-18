@@ -7811,7 +7811,15 @@ type Attachment {
   `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.
   Not settable.  Null when the attachment is not a MOS_MASK, always present when it is.
   """
-  maskName: NonEmptyString
+  maskName: NonEmptyString @deprecated(reason: "Use `mask.name` instead.")
+
+  """
+  The design read from a MOS mask attachment's file when it was uploaded.
+  Null when the attachment is not a MOS_MASK, and null for MOS_MASK
+  attachments uploaded before mask parsing was introduced (re-uploading the
+  file populates it).  Not settable.
+  """
+  mask: MaskDefinition
   description: NonEmptyString
   checked: Boolean!
   fileSize: Long!
@@ -7829,6 +7837,139 @@ input AttachmentPropertiesInput {
   The checked status can be set, or ignored by skipping it altogether
   """
   checked: Boolean
+}
+
+"""
+The design read from a MOS mask attachment's file (ODF/MDF): the instrument
+the mask was cut for, the position angle it must be observed at, and its
+slits.
+"""
+type MaskDefinition {
+  """
+  The mask name of the attachment carrying this definition, repeated here so
+  the definition is self-contained.
+  """
+  name: NonEmptyString!
+
+  """
+  The instrument the mask was designed for.
+  """
+  instrument: Instrument!
+
+  """
+  Nominal plate scale of the pre-image, in arcseconds per pixel.  Mask design
+  software snaps this to a fixed value per detector configuration, so it is
+  not a measurement of the true scale, which varies across the field.
+  """
+  pixelScale: BigDecimal!
+
+  """
+  Pointing centre of the pre-image the mask was designed on.
+  """
+  pointing: Coordinates!
+
+  """
+  The position angle the mask must be observed at.  Null in designs produced
+  before mask design software began recording it.
+  """
+  positionAngle: Angle
+
+  """
+  Every aperture in the design, acquisition boxes included.
+  """
+  slits: [MaskSlit!]!
+}
+
+"""
+One aperture of a MOS mask design.  The width is always the extent along the
+dispersion direction and the length the extent across it, whatever the
+instrument.
+"""
+type MaskSlit {
+  """
+  Object identifier, unique within the mask.
+  """
+  id: Int!
+
+  """
+  Sky position of the object the slit targets.
+  """
+  coordinates: Coordinates!
+
+  """
+  Object centroid on the pre-image along the detector x axis, in pixels
+  (`x_ccd` in the design file).  Fractional: it is a measured centroid, not a
+  pixel index.
+  """
+  x: BigDecimal!
+
+  """
+  Object centroid on the pre-image along the detector y axis, in pixels
+  (`y_ccd` in the design file).
+  """
+  y: BigDecimal!
+
+  """
+  Extent along the dispersion direction.
+  """
+  width: Angle!
+
+  """
+  Extent across the dispersion direction.
+  """
+  length: Angle!
+
+  """
+  Displacement of the slit from the object along the slit's length.
+  """
+  offsetAlongSlit: Angle!
+
+  """
+  Displacement of the slit from the object across its width.  A non-zero value
+  drives a point source off the slit and loses flux.
+  """
+  offsetAcrossSlit: Angle!
+
+  """
+  Slit position angle, counter-clockwise positive.
+  """
+  tilt: Angle!
+
+  """
+  Placement priority of the object.  ACQUISITION marks an alignment-star box
+  rather than a science slit.
+  """
+  priority: MosSlitPriority!
+}
+
+"""
+Placement priority of an object in a MOS mask design.
+"""
+enum MosSlitPriority {
+  """
+  Acquisition star, used to align the mask on sky rather than to take a spectrum.
+  """
+  ACQUISITION
+
+  """
+  Highest science priority.
+  """
+  HIGH
+
+  """
+  Medium science priority.
+  """
+  MEDIUM
+
+  """
+  Lowest science priority.
+  """
+  LOW
+
+  """
+  Not a priority level: marks the object as excluded from the design.
+  """
+  IGNORE
 }
 
 """

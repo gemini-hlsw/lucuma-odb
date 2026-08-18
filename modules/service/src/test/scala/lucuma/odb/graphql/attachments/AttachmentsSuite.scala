@@ -21,6 +21,10 @@ import org.http4s.client.JavaNetClientBuilder
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
+import scala.util.Using
+
+import java.nio.charset.StandardCharsets
+
 abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
   // this logger is turned off to silence some errors (see logback.xml)
@@ -31,6 +35,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
   extension (response: Response[IO])
     def getBody: IO[String] = response.body.through(utf8.decode).compile.string
+    def getBodyBytes: IO[Array[Byte]] = response.body.compile.to(Array)
 
   extension (response: Resource[IO, Response[IO]])
     def withExpectation(expectedStatus: Status, expectedBody: String = ""): IO[Unit] =
@@ -39,6 +44,11 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
         .assertEquals((expectedStatus, expectedBody))
 
     def expectBody(body: String): IO[Unit] = withExpectation(Status.Ok, body)
+
+    def expectBodyBytes(body: Array[Byte]): IO[Unit] =
+      response
+        .use(resp => resp.getBodyBytes.map(bs => (resp.status, bs.toList)))
+        .assertEquals((Status.Ok, body.toList))
 
     def expectOk: IO[Unit] = withExpectation(Status.Ok)
 
@@ -71,10 +81,25 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
     description:    Option[String],
     content:        String,
     checked:        Boolean = false,
-    maskName:       Option[String] = None
+    maskName:       Option[String] = None,
+    binary:         Option[Array[Byte]] = None
   ) {
     val upperType: String = attachmentType.toUpperCase
+
+    def bytes: Array[Byte] = binary.getOrElse(content.getBytes(StandardCharsets.UTF_8))
   }
+
+  // MOS mask attachments need real ODF FITS content.
+  def resourceBytes(name: String): Array[Byte] =
+    Option(getClass.getResourceAsStream(s"/$name")) match
+      case Some(is) => Using.resource(is)(_.readAllBytes())
+      case None     => fail(s"Test resource '$name' is not on the test classpath")
+
+  // GMOS-S design: PA 160.1, 40 slits of which 3 are acquisition.
+  lazy val gmosOdfFits: Array[Byte] = resourceBytes("ngc7796_ODF.fits")
+
+  // Flamingos-2 design: 53 slits of which 3 are acquisition.
+  lazy val flamingos2OdfFits: Array[Byte] = resourceBytes("n159_ODF.fits")
 
   def insertAttachment(
     user:      User,
@@ -94,7 +119,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
           method = Method.POST,
           uri = uri,
           headers = Headers(auth)
-        ).withEntity(ta.content)
+        ).withEntity(ta.bytes)
 
         client.run(request)
       }
@@ -115,7 +140,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
           method = Method.PUT,
           uri = uri,
           headers = Headers(auth)
-        ).withEntity(ta.content)
+        ).withEntity(ta.bytes)
 
         client.run(request)
       }
@@ -192,7 +217,7 @@ abstract class AttachmentsSuite extends OdbSuiteWithS3 {
             "maskName"       -> ta.maskName.asJson,
             "description"    -> ta.description.asJson,
             "checked"        -> ta.checked.asJson,
-            "fileSize"       -> ta.content.length.asJson
+            "fileSize"       -> ta.bytes.length.asJson
           )
         )
       )

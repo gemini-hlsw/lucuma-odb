@@ -66,6 +66,10 @@ import java.time.LocalDate
 
 trait LeafMappings[F[_]] extends BaseMapping[F]:
 
+  // See the codec for why MosSlitPriority cannot use its Enumerated encoder.
+  private given io.circe.Encoder[MosSlitPriority] =
+    lucuma.odb.json.maskDefinition.EncoderMosSlitPriority
+
   private given io.circe.Encoder[Epoch] =
     e => Json.fromString(Epoch.fromString.reverseGet(e))
 
@@ -182,6 +186,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[IntPercent](IntPercentType),
       LeafMapping[Long](LongType),
       LeafMapping[MosPreImaging](MosPreImagingType),
+      LeafMapping[MosSlitPriority](MosSlitPriorityType),
       LeafMapping[NonEmptyString](NonEmptyStringType),
       LeafMapping[NonNegInt](NonNegIntType),
       LeafMapping[NonNegShort](NonNegShortType),
