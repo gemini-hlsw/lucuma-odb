@@ -14,6 +14,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.MosSlitPriority
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
+import lucuma.core.math.HourAngle
 import lucuma.core.math.syntax.units.*
 import lucuma.core.model.mos.MosObjectId
 import lucuma.odb.data.MaskDefinition
@@ -49,6 +50,29 @@ trait MaskDefinitionCodec:
         .find(_.priorityName === s)
         .toRight(s"Could not parse MOS slit priority '$s'")
 
+  private def signedAngle(a: Angle): Json =
+    val µas = Angle.signedMicroarcseconds.get(a)
+    val µs  = BigDecimal(µas) / 15
+    val hms = HourAngle.HMS(Angle.hourAngle.get(Angle.fromMicroarcseconds(µas.abs))).format
+    Json.obj(
+      "microarcseconds" -> µas.asJson,
+      "microseconds"    -> µs.asJson,
+      "milliarcseconds" -> BigDecimal(µas, 3).asJson,
+      "milliseconds"    -> (µs / 1_000).asJson,
+      "arcseconds"      -> BigDecimal(µas, 6).asJson,
+      "seconds"         -> (µs / 1_000_000).asJson,
+      "arcminutes"      -> (BigDecimal(µas, 6) / 60).asJson,
+      "minutes"         -> (µs / 60_000_000).asJson,
+      "degrees"         -> (BigDecimal(µas, 6) / 3_600).asJson,
+      "hours"           -> (µs / 3_600_000_000L).asJson,
+      "dms"             -> Angle.fromStringSignedDMS.reverseGet(a).asJson,
+      "hms"             -> (if µas < 0 then s"-$hms" else hms).asJson
+    )
+
+  private val signedAngleDecoder: Decoder[Angle] =
+    Decoder.instance:
+      _.downField("microarcseconds").as[Long].map(Angle.signedMicroarcseconds.reverseGet)
+
   given Encoder[MaskSlit] =
     Encoder.instance: s =>
       Json.obj(
@@ -58,9 +82,9 @@ trait MaskDefinitionCodec:
         "y"                -> s.y.asJson,
         "width"            -> s.width.asJson,
         "length"           -> s.length.asJson,
-        "offsetAlongSlit"  -> s.offsetAlongSlit.asJson,
-        "offsetAcrossSlit" -> s.offsetAcrossSlit.asJson,
-        "tilt"             -> s.tilt.asJson,
+        "offsetAlongSlit"  -> signedAngle(s.offsetAlongSlit),
+        "offsetAcrossSlit" -> signedAngle(s.offsetAcrossSlit),
+        "tilt"             -> signedAngle(s.tilt),
         "priority"         -> s.priority.asJson
       )
 
@@ -73,9 +97,9 @@ trait MaskDefinitionCodec:
         y        <- c.downField("y").as[BigDecimal]
         width    <- c.downField("width").as[Angle]
         length   <- c.downField("length").as[Angle]
-        along    <- c.downField("offsetAlongSlit").as[Angle]
-        across   <- c.downField("offsetAcrossSlit").as[Angle]
-        tilt     <- c.downField("tilt").as[Angle]
+        along    <- c.downField("offsetAlongSlit").as(using signedAngleDecoder)
+        across   <- c.downField("offsetAcrossSlit").as(using signedAngleDecoder)
+        tilt     <- c.downField("tilt").as(using signedAngleDecoder)
         priority <- c.downField("priority").as[MosSlitPriority]
       yield MaskSlit(MosObjectId(id), coords, x, y, width, length, along, across, tilt, priority)
 

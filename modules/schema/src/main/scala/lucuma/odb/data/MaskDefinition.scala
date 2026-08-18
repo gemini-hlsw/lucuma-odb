@@ -19,7 +19,12 @@ import lucuma.core.model.mos.MosObjectId
 
 /**
  * One aperture of a MOS mask design, trimmed to what is recorded on the
- * attachment
+ * attachment.
+ *
+ * The two offsets and the tilt are signed quantities held in a type that
+ * wraps at a full turn, so they must be read through
+ * `Angle.signedMicroarcseconds` (or an equivalent signed optic) rather than
+ * as plain magnitudes.
  */
 case class MaskSlit(
   id:               MosObjectId,

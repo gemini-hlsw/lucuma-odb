@@ -385,8 +385,8 @@ object AttachmentFileService {
 
     // A MOS mask file is parsed at upload so its design can be recorded on
     // the attachment.
-    // Mask files are small, so the body is buffered in memory to parse and upload from the
-    // same bytes.
+    // Mask files are small, so the body is buffered in memory to parse and
+    // upload from the same bytes.
     def parseMaskDefinition(
       maskName: NonEmptyString,
       data:     Stream[F, Byte]

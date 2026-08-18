@@ -7649,6 +7649,11 @@ type AirMassRange {
   max: PosBigDecimal!
 }
 
+"""
+An angle in a variety of units.  Values are normalized to [0, 360°) unless
+the field documents a signed quantity, in which case negative values are
+rendered negative (as with `Declination`) rather than wrapped.
+"""
 type Angle {
   """
   Angle in µas
@@ -7916,18 +7921,24 @@ type MaskSlit {
   length: Angle!
 
   """
-  Displacement of the slit from the object along the slit's length.
+  Displacement of the slit from the object along the slit's length.  A signed
+  quantity: the slit may be slid either way, and negative displacements are
+  rendered in the signed representation (-1.5 arcseconds reads as -1.5), not
+  wrapped to just under a full turn.
   """
   offsetAlongSlit: Angle!
 
   """
   Displacement of the slit from the object across its width.  A non-zero value
-  drives a point source off the slit and loses flux.
+  drives a point source off the slit and loses flux.  A signed quantity,
+  rendered in the signed representation like `offsetAlongSlit`.
   """
   offsetAcrossSlit: Angle!
 
   """
-  Slit position angle, counter-clockwise positive.
+  Slit position angle, counter-clockwise positive.  A signed quantity bounded
+  to 45 degrees either way, rendered in the signed representation like
+  `offsetAlongSlit`.
   """
   tilt: Angle!
 
