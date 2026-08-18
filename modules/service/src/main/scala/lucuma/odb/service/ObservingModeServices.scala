@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.effect.MonadCancelThrow
-import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -91,8 +90,10 @@ object ObservingModeServices:
               .select(oids)
               .map(_.widen[ObservingMode])
 
-          case (Flamingos2Mos, _) =>
-            Map.empty.pure
+          case (Flamingos2Mos, oids) =>
+            flamingos2MosService
+              .select(oids)
+              .map(_.widen[ObservingMode])
 
           case (Flamingos2Imaging, oids) =>
             flamingos2ImagingService
@@ -181,6 +182,7 @@ object ObservingModeServices:
           input.exchange.map(m =>           exchangeService.insert(m, which)),
           input.flamingos2Imaging.map(m =>  flamingos2ImagingService.insert(m, etm, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
+          input.flamingos2Mos.map(m =>      flamingos2MosService.insert(m, etm, which)),
           input.ghostIfu.map(m =>           ghostIfuService.insert(m, etm, which)),
           input.gmosNorthImaging.map(m =>   gmosImagingService.insertNorth(m, etm, which)),
           input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
@@ -210,7 +212,7 @@ object ObservingModeServices:
             case _: ExchangeObservingModeType         => exchangeService.delete(which)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.delete(which)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.delete(which)
-            case ObservingModeType.Flamingos2Mos      => MonadCancelThrow[F].raiseError(new Exception("Flamingos2Mos is not supported for deletion."))
+            case ObservingModeType.Flamingos2Mos      => flamingos2MosService.delete(which)
             case ObservingModeType.GhostIfu           => ghostIfuService.delete(which)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.deleteNorth(which)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.deleteNorth(which)
@@ -233,6 +235,7 @@ object ObservingModeServices:
           input.exchange.map(m => exchangeService.update(m, which).map(_.success)),
           input.flamingos2Imaging.map(m => flamingos2ImagingService.update(m, which)),
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which).map(_.success)),
+          input.flamingos2Mos.map(m => flamingos2MosService.update(m, which)),
           input.ghostIfu.map(m => ghostIfuService.update(m, which)),
           input.gmosNorthImaging.map(m => gmosImagingService.updateNorth(m, which)),
           input.gmosNorthLongSlit.map(m => gmosLongSlitService.updateNorth(m, which).map(_.success)),
@@ -267,7 +270,7 @@ object ObservingModeServices:
             case _: ExchangeObservingModeType         => exchangeService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2LongSlit => flamingos2LongSlitService.clone(origOid, newOid)
             case ObservingModeType.Flamingos2Imaging  => flamingos2ImagingService.clone(origOid, newOid, etms)
-            case ObservingModeType.Flamingos2Mos      => MonadCancelThrow[F].raiseError(new Exception("Flamingos2Mos is not supported for clonning."))
+            case ObservingModeType.Flamingos2Mos      => flamingos2MosService.clone(origOid, newOid)
             case ObservingModeType.GhostIfu           => ghostIfuService.clone(origOid, newOid, etms)
             case ObservingModeType.GmosNorthLongSlit  => gmosLongSlitService.cloneNorth(origOid, newOid)
             case ObservingModeType.GmosNorthImaging   => gmosImagingService.cloneNorth(origOid, newOid, etms)

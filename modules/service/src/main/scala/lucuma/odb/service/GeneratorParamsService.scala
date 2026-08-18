@@ -40,6 +40,7 @@ import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
+import lucuma.itc.client.Flamingos2CustomMask
 import lucuma.itc.client.Flamingos2FpuMask
 import lucuma.itc.client.GmosCustomMask
 import lucuma.itc.client.GmosFpu
@@ -133,6 +134,17 @@ object GeneratorParamsService {
           case (MissingData(p0), MissingData(p1))                                   => p0 === p1
           case (ConflictingData, ConflictingData)                                   => true
           case _                                                                    => false
+
+  /**
+   * The read mode the ITC is asked to assume for a Flamingos 2 science sequence.
+   * In signal-to-noise mode the ITC solves for the exposure time and ignores it.
+   */
+  private def flamingos2ScienceReadMode(c: flamingos2.spectroscopy.Config): Flamingos2ReadMode =
+    c.exposureTimeMode match
+      case ExposureTimeMode.SignalToNoiseMode(_, _)       =>
+        Flamingos2ReadMode.Bright
+      case ExposureTimeMode.TimeAndCountMode(time = time) =>
+        c.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
 
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
@@ -346,29 +358,44 @@ object GeneratorParamsService {
               obsParams.schedulingMode.isSplittable
             ).asRight
 
-          case f2 @ flamingos2.longslit.Config(disperser, filter, fpu, sci, acq, _, _, _, _, _, _, _, _) =>
-            val sciReadMode  = f2.exposureTimeMode match
-                                 case ExposureTimeMode.SignalToNoiseMode(_, _) =>
-                                   Flamingos2ReadMode.Bright // In practice this will be ignored by the ITC
-                                 case ExposureTimeMode.TimeAndCountMode(time = time) =>
-                                   f2.explicitReadMode.getOrElse(Flamingos2ReadMode.forExposureTime(time))
-
-            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(sci,
-                                                                  disperser,
-                                                                  filter,
-                                                                  sciReadMode,
-                                                                  Flamingos2FpuMask.builtin(fpu)
+          case f2: flamingos2.longslit.Config =>
+            val sciMode   = InstrumentMode.Flamingos2Spectroscopy(f2.exposureTimeMode,
+                                                                  f2.disperser,
+                                                                  f2.filter,
+                                                                  flamingos2ScienceReadMode(f2),
+                                                                  Flamingos2FpuMask.builtin(f2.fpu)
             )
 
             spectroscopyGeneratorParams(
               obsMode = f2,
               acqMode = InstrumentMode.Flamingos2Imaging(
-                acq.exposureTimeMode,
-                acq.filter,
+                f2.acquisition.exposureTimeMode,
+                f2.acquisition.filter,
                 Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
               ),
               sciMode = sciMode
             ).asRight
+
+          // MOS has no acquisition sequence, so it is costed on science alone.
+          // The real custom mask is sent: the ITC client carries a slit width,
+          // which is all a Flamingos 2 custom mask contributes.
+          case f2m: flamingos2.mos.Config =>
+            val sciMode = InstrumentMode.Flamingos2Spectroscopy(
+              f2m.exposureTimeMode,
+              f2m.disperser,
+              f2m.filter,
+              flamingos2ScienceReadMode(f2m),
+              Flamingos2FpuMask.customMask(Flamingos2CustomMask(f2m.customMask.slitWidth))
+            )
+            val science  = SpectroscopyParameters(obsParams.constraints.toInput, sciMode)
+            val itcInput =
+              obsParams.targets
+                .traverse(itcTargetParams)
+                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
+                .leftMap(MissingParamSet.fromParams)
+                .toEither
+
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2m, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case f2 @ flamingos2.imaging.Config(filters = fs) =>
             // An input per filter.

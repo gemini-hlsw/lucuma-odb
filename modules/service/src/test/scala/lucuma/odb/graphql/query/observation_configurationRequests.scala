@@ -250,7 +250,7 @@ class observation_configurationRequests
           case e: ExchangeObservingModeType         => createExchangeModeObservationAs(pi, pid, e, tid)
           case ObservingModeType.Flamingos2Imaging  => IO.raiseError(new RuntimeException("Flamingos2 imaging not supported yet"))
           case ObservingModeType.Flamingos2LongSlit => createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-          case ObservingModeType.Flamingos2Mos      => IO.raiseError(new RuntimeException("Flamingos2 mos not supported yet"))
+          case ObservingModeType.Flamingos2Mos      => createObservationAs(pi, pid, ObservingModeType.Flamingos2Mos.some, tid)
           case ObservingModeType.GhostIfu           => createGhostIfuObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthLongSlit  => createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
           case ObservingModeType.GmosNorthImaging   => createGmosNorthImagingObservationAs(pi, pid, tid)

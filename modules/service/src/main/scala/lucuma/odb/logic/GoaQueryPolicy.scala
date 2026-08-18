@@ -31,6 +31,7 @@ import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
+import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
 import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
@@ -122,6 +123,10 @@ object GoaQueryPolicy:
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Imaging))
       case c: Flamingos2LongSlit =>
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(c.fpu)))
+      // The real GMMPS-derived MOS outline, roughly 120 x 365 arcsec, so the
+      // search radius is much larger than for any other Flamingos 2 mode.
+      case c: Flamingos2Mos      =>
+        List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, c.customMask))
       case _: GhostIfu           =>
         List(ghostScienceArea.fov)
       case _: GmosNorthImaging   =>

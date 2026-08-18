@@ -53,6 +53,12 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val Id = col("c_flamingos_2_longslit_id", configuration_request_id.embedded)
       val Disperser = col("c_flamingos_2_longslit_disperser", flamingos_2_disperser.embedded)
 
+    // MOS reuses the long slit disperser column; only the discriminating id
+    // column is distinct (see V1262, following V1235).
+    object Flamingos2Mos:
+      val Id = col("c_flamingos_2_mos_id", configuration_request_id.embedded)
+      val Disperser = col("c_flamingos_2_longslit_disperser", flamingos_2_disperser.embedded)
+
     object GmosNorthLongSlit:
       val Id = col("c_gmos_north_longslit_id", configuration_request_id.embedded)
       val Grating = col("c_gmos_north_longslit_grating", gmos_north_grating.embedded)

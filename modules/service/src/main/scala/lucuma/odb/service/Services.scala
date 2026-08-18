@@ -141,6 +141,9 @@ trait Services[F[_]]:
   /** The `Flamingos2LongSlitService`. */
   def flamingos2LongSlitService: Flamingos2LongSlitService[F]
 
+  /** The `Flamingos2MosService`. */
+  def flamingos2MosService: Flamingos2MosService[F]
+
   /** The `Flamingos2SequenceService` */
   def flamingos2SequenceService: Flamingos2SequenceService[F]
 
@@ -368,6 +371,7 @@ object Services:
       lazy val generatorParamsService = GeneratorParamsService.instantiate
       lazy val flamingos2ImagingService = Flamingos2ImagingService.instantiate
       lazy val flamingos2LongSlitService = Flamingos2LongSlitService.instantiate
+      lazy val flamingos2MosService = Flamingos2MosService.instantiate
       lazy val flamingos2SequenceService = Flamingos2SequenceService.instantiate
       lazy val ghostIfuService = GhostIfuService.instantiate
       lazy val ghostSequenceService = GhostSequenceService.instantiate
@@ -443,6 +447,7 @@ object Services:
     def executionEventService[F[_]](using Services[F]): ExecutionEventService[F] = summon[Services[F]].executionEventService
     def exposureTimeModeService[F[_]](using Services[F]): ExposureTimeModeService[F] = summon[Services[F]].exposureTimeModeService
     def flamingos2LongSlitService[F[_]](using Services[F]): Flamingos2LongSlitService[F] = summon[Services[F]].flamingos2LongSlitService
+    def flamingos2MosService[F[_]](using Services[F]): Flamingos2MosService[F] = summon[Services[F]].flamingos2MosService
     def flamingos2SequenceService[F[_]](using Services[F]): Flamingos2SequenceService[F] = summon[Services[F]].flamingos2SequenceService
     def generatorParamsService[F[_]](using Services[F]): GeneratorParamsService[F] = summon[Services[F]].generatorParamsService
     def ghostIfuService[F[_]](using Services[F]): GhostIfuService[F] = summon[Services[F]].ghostIfuService

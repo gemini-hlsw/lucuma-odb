@@ -403,6 +403,9 @@ object ConfigurationService {
                     flamingos2LongSlit {
                       disperser
                     }
+                    flamingos2Mos {
+                      disperser
+                    }
                     gnirsLongSlit {
                       grating
                       camera
@@ -483,6 +486,9 @@ object ConfigurationService {
                           filters
                         }
                         flamingos2LongSlit {
+                          disperser
+                        }
+                        flamingos2Mos {
                           disperser
                         }
                         gnirsLongSlit {
@@ -600,6 +606,9 @@ object ConfigurationService {
                   flamingos2LongSlit {
                     disperser
                   }
+                  flamingos2Mos {
+                    disperser
+                  }
                   gnirsLongSlit {
                     grating
                     camera
@@ -682,6 +691,9 @@ object ConfigurationService {
                         filters
                       }
                       flamingos2LongSlit {
+                        disperser
+                      }
+                      flamingos2Mos {
                         disperser
                       }
                       gnirsLongSlit {
@@ -788,6 +800,9 @@ object ConfigurationService {
                       filters
                     }
                     flamingos2LongSlit {
+                      disperser
+                    }
+                    flamingos2Mos {
                       disperser
                     }
                     gnirsLongSlit {
@@ -897,6 +912,9 @@ object ConfigurationService {
                         flamingos2LongSlit {
                           disperser
                         }
+                        flamingos2Mos {
+                          disperser
+                        }
                         gnirsLongSlit {
                           grating
                           camera
@@ -980,6 +998,9 @@ object ConfigurationService {
                       filters
                     }
                     flamingos2LongSlit {
+                      disperser
+                    }
+                    flamingos2Mos {
                       disperser
                     }
                     gnirsLongSlit {
@@ -1134,6 +1155,11 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  // MOS reuses the long slit disperser column; the mode type
+                  // is what discriminates the two (see V1262).
+                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
@@ -1235,7 +1261,7 @@ object ConfigurationService {
         cfg.target.toOption.flatMap(Region.decArcStart.getOption)                                                *:
         cfg.target.toOption.flatMap(Region.decArcEnd.getOption)                                                  *:
         cfg.observingMode.tpe                                                                                    *:
-        cfg.observingMode.flamingos2LongSlit.map(_.disperser)                                                    *:
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser).orElse(cfg.observingMode.flamingos2Mos.map(_.disperser)) *:
         cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable)                                  *:
         cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable)                                  *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosNorthMos.map(_.grating)) *:
@@ -1402,6 +1428,11 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  // MOS reuses the long slit disperser column; the mode type
+                  // is what discriminates the two (see V1262).
+                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
@@ -1504,7 +1535,8 @@ object ConfigurationService {
         cfg.target.toOption.flatMap(Region.decArcStart.getOption) *:
         cfg.target.toOption.flatMap(Region.decArcEnd.getOption)   *:
         cfg.observingMode.tpe                                     *:
-        cfg.observingMode.flamingos2LongSlit.map(_.disperser)     *:
+        // MOS shares the long slit disperser column (see V1262).
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser).orElse(cfg.observingMode.flamingos2Mos.map(_.disperser)) *:
         cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         // MOS shares the long slit grating column (see V1235).

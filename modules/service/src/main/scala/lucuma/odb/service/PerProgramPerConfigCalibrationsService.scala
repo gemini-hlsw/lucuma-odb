@@ -266,6 +266,7 @@ object PerProgramPerConfigCalibrationsService:
           exchange           = none,
           flamingos2Imaging  = none,
           flamingos2LongSlit = none,
+          flamingos2Mos      = none,
           ghostIfu           = none,
           gmosNorthImaging   = none,
           gmosNorthLongSlit  = gn,

@@ -121,6 +121,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[Flamingos2Filter](Flamingos2FilterType),
       LeafMapping[Flamingos2Fpu](Flamingos2FpuType),
       LeafMapping[Flamingos2LyotWheel](Flamingos2LyotWheelType),
+      LeafMapping[Flamingos2MosOffsetPreset](Flamingos2MosOffsetPresetType),
       LeafMapping[Flamingos2ReadMode](Flamingos2ReadModeType),
       LeafMapping[Flamingos2Decker](Flamingos2DeckerType),
       LeafMapping[Flamingos2ReadoutMode](Flamingos2ReadoutModeType),
