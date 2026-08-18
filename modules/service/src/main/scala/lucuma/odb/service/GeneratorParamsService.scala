@@ -393,7 +393,7 @@ object GeneratorParamsService {
               sciMode = sciMode
             ).asRight
 
-          // MOS has no acquisition sequence yet, so its cost is on on science alone.
+          // MOS has no acquisition sequence yet, so its cost is on science alone.
           case f2m: flamingos2.mos.Config =>
             val sciMode = InstrumentMode.Flamingos2Spectroscopy(
               f2m.exposureTimeMode,
