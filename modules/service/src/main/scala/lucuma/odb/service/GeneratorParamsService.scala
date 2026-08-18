@@ -134,6 +134,7 @@ object GeneratorParamsService {
           case (MissingData(p0), MissingData(p1))                                   => p0 === p1
           case (ConflictingData, ConflictingData)                                   => true
           case _                                                                    => false
+
   def instantiate[F[_]: Concurrent](using Services[F]): GeneratorParamsService[F] =
     new GeneratorParamsService[F] {
 
@@ -297,6 +298,25 @@ object GeneratorParamsService {
           GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
         /**
+         * Modes with no acquisition sequence are costed on science alone.
+         */
+        def scienceOnlySpectroscopyGeneratorParams(
+          obsMode: ObservingMode,
+          sciMode: InstrumentMode
+        ): GeneratorParams =
+
+          val science  = SpectroscopyParameters(obsParams.constraints.toInput, sciMode)
+
+          val itcInput =
+            obsParams.targets
+              .traverse(itcTargetParams)
+              .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
+              .leftMap(MissingParamSet.fromParams)
+              .toEither
+
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+
+        /**
          * GNIRS spectroscopy takes spectra at one or more central wavelengths,
          * each its own ITC calculation, so it gets a list of science modes where
          * the other spectroscopy modes have exactly one.
@@ -373,9 +393,7 @@ object GeneratorParamsService {
               sciMode = sciMode
             ).asRight
 
-          // MOS has no acquisition sequence, so it is costed on science alone.
-          // The real custom mask is sent: the ITC client carries a slit width,
-          // which is all a Flamingos 2 custom mask contributes.
+          // MOS has no acquisition sequence yet, so its cost is on on science alone.
           case f2m: flamingos2.mos.Config =>
             val sciMode = InstrumentMode.Flamingos2Spectroscopy(
               f2m.exposureTimeMode,
@@ -384,15 +402,8 @@ object GeneratorParamsService {
               flamingos2ScienceReadMode(f2m),
               Flamingos2FpuMask.customMask(Flamingos2CustomMask(f2m.customMask.slitWidth))
             )
-            val science  = SpectroscopyParameters(obsParams.constraints.toInput, sciMode)
-            val itcInput =
-              obsParams.targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2m, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            scienceOnlySpectroscopyGeneratorParams(f2m, sciMode).asRight
 
           case f2 @ flamingos2.imaging.Config(filters = fs) =>
             // An input per filter.
@@ -486,17 +497,8 @@ object GeneratorParamsService {
                 ItcGhostDetector(redEtm, red.value.readMode, red.value.binning),
                 ItcGhostDetector(blueEtm, blue.value.readMode, blue.value.binning)
               )
-              val consInput = obsParams.constraints.toInput
-              val science   = SpectroscopyParameters(consInput, sciMode)
 
-              val itcInput  =
-                obsParams.targets
-                  .traverse(itcTargetParams)
-                  .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
-                  .leftMap(MissingParamSet.fromParams)
-                  .toEither
-
-              GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gh, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+              scienceOnlySpectroscopyGeneratorParams(gh, sciMode)
 
           case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
@@ -548,15 +550,8 @@ object GeneratorParamsService {
               gnm.ccdMode.some,
               gnm.roi.some
             )
-            val science  = SpectroscopyParameters(obsParams.constraints.toInput, sciMode)
-            val itcInput =
-              obsParams.targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            scienceOnlySpectroscopyGeneratorParams(gnm, sciMode).asRight
 
           case gsm @ gmos.mos.Config.GmosSouth(g, f, m, _, _, c) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
@@ -568,15 +563,8 @@ object GeneratorParamsService {
               gsm.ccdMode.some,
               gsm.roi.some
             )
-            val science  = SpectroscopyParameters(obsParams.constraints.toInput, sciMode)
-            val itcInput =
-              obsParams.targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gsm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            scienceOnlySpectroscopyGeneratorParams(gsm, sciMode).asRight
 
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
@@ -670,18 +658,9 @@ object GeneratorParamsService {
             ).asRight
 
           case ig: igrins2.longslit.Config =>
-            val sciMode   = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
-            val consInput = obsParams.constraints.toInput
-            val science   = SpectroscopyParameters(consInput, sciMode)
+            val sciMode = InstrumentMode.Igrins2Spectroscopy(ig.scienceExposureTimeMode)
 
-            val itcInput =
-              obsParams.targets
-                .traverse(itcTargetParams)
-                .map(ItcInput.ScienceOnlySpectroscopy(science, _, obsParams.signalToNoiseTargetId))
-                .leftMap(MissingParamSet.fromParams)
-                .toEither
-
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, ig, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            scienceOnlySpectroscopyGeneratorParams(ig, sciMode).asRight
 
           // Visitor Modes
           case vis: visitor.Config =>

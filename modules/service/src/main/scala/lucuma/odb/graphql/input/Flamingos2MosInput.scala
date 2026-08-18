@@ -45,12 +45,6 @@ object Flamingos2MosInput:
     else
       Result(m)
 
-  // Flamingos2's ABBA science pattern requires exactly 4 telescope configs.
-  private def validateConfigs(tc: SlitTelescopeConfigs): Result[SlitTelescopeConfigs] =
-    val n = tc.telescopeConfigs.size
-    if n === 4 then Result(tc)
-    else Result.failure(s"Flamingos2 must have exactly 4 offsets, but $n were provided.")
-
   final case class Create(
     disperser:                Flamingos2Disperser,
     filter:                   Flamingos2Filter,
@@ -167,7 +161,7 @@ object Flamingos2MosInput:
           rDecker,
           rReadoutMode,
           rOffsetPreset,
-          rTelescopeConfigs.flatMap(_.traverse(validateConfigs)),
+          rTelescopeConfigs.flatMap(_.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs)),
           rTelluricType
         ).parMapN(Edit.Common.apply)
       ).parTupled

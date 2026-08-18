@@ -162,6 +162,7 @@ object GoaQueryPolicy:
       case _: Exchange           => none
       case _: Flamingos2Imaging  => ScienceMode.Imaging.some
       case _: Flamingos2LongSlit => ScienceMode.Spectroscopy.some
+      case _: Flamingos2Mos      => ScienceMode.Spectroscopy.some
       case _: GhostIfu           => ScienceMode.Spectroscopy.some
       case _: GmosNorthImaging   => ScienceMode.Imaging.some
       case _: GmosSouthImaging   => ScienceMode.Imaging.some

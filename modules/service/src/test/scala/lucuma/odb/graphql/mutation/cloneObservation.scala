@@ -2856,7 +2856,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           explicitTelescopeConfigs: {
             toSky: [
               { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED },
-              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 60.0 } }, guiding: DISABLED }
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 60.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 70.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
             ]
           }
         }
@@ -2907,7 +2909,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                            "offsetMode": "NOD_TO_SKY",
                            "toSky": [
                              { "offset": { "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" },
-                             { "offset": { "q": { "arcseconds": 60.000000 } }, "guiding": "DISABLED" }
+                             { "offset": { "q": { "arcseconds": 60.000000 } }, "guiding": "DISABLED" },
+                             { "offset": { "q": { "arcseconds": 70.000000 } }, "guiding": "DISABLED" },
+                             { "offset": { "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
                            ]
                          }
                        }

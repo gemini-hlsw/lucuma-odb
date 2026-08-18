@@ -294,6 +294,9 @@ class GoaQueryPolicySuite extends FunSuite:
       ScienceMode.Spectroscopy.some
     )
 
+  test("Flamingos 2 MOS searches spectroscopy"):
+    assertEquals(GoaQueryPolicy.scienceMode(flamingos2Mos), ScienceMode.Spectroscopy.some)
+
   test("a visitor instrument is classified by its mode"):
     assertEquals(
       GoaQueryPolicy.scienceMode(visitorNorth.copy(mode = VisitorObservingModeType.AlopekeSpeckle)),

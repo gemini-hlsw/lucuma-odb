@@ -489,8 +489,6 @@ object Generator:
                   case ObservingModeType.Flamingos2LongSlit =>
                     go(freshAcq, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
-                  // Correct only while Flamingos 2 MOS has no acquisition sequence;
-                  // when acquisition lands this must reset it like the others.
                   case ObservingModeType.Flamingos2Mos      =>
                     EitherT.pure(())
 
@@ -512,7 +510,6 @@ object Generator:
                     go(freshAcq, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
                   case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-                    // Not sure about acquisition for MOS yet
                     EitherT.pure(())
 
                   case ObservingModeType.GnirsImaging       =>

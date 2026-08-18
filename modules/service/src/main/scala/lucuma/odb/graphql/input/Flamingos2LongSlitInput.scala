@@ -34,12 +34,6 @@ import lucuma.odb.graphql.binding.*
 
 object Flamingos2LongSlitInput:
 
-  // Flamingos2's ABBA science pattern requires exactly 4 telescope configs.
-  private def validateConfigs(tc: SlitTelescopeConfigs): Result[SlitTelescopeConfigs] =
-    val n = tc.telescopeConfigs.size
-    if n === 4 then Result(tc)
-    else Result.failure(s"Flamingos2 must have exactly 4 offsets, but $n were provided.")
-
   case class Acquisition(
     filter:           Nullable[Flamingos2Filter],
     exposureTimeMode: Option[ExposureTimeMode]
@@ -115,7 +109,7 @@ object Flamingos2LongSlitInput:
           rTelluricType,
           rAcquisition
         ).parTupled.flatMap { case (disperser, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
-          telescopeConfigs.traverse(validateConfigs).map { validated =>
+          telescopeConfigs.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs).map { validated =>
             Create(
               disperser,
               filter,
@@ -218,7 +212,7 @@ object Flamingos2LongSlitInput:
           rTelluricType,
           rAcquisition
         ).parTupled.flatMap { case (grating, filter, fpu, exposureTimeMode, readMode, reads, decker, readoutMode, telescopeConfigs, telluricType, acquisition) =>
-          telescopeConfigs.traverse(validateConfigs).map { validated =>
+          telescopeConfigs.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs).map { validated =>
             Edit(
               grating,
               filter,
