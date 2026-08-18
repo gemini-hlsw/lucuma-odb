@@ -11,12 +11,17 @@ import io.circe.Json
 import io.circe.refined.given
 import io.circe.syntax.*
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.MosDispersionDirection
 import lucuma.core.enums.MosSlitPriority
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.HourAngle
+import lucuma.core.math.Redshift
 import lucuma.core.math.syntax.units.*
+import lucuma.core.model.mos.MosMaskProvenance
 import lucuma.core.model.mos.MosObjectId
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.MaskDefinition
 import lucuma.odb.data.MaskSlit
 import lucuma.odb.json.angle.query.given
@@ -49,6 +54,57 @@ trait MaskDefinitionCodec:
       MosSlitPriority.values
         .find(_.priorityName === s)
         .toRight(s"Could not parse MOS slit priority '$s'")
+
+  // Spelled out as the names a future GraphQL enum would use, like the
+  // priority above.
+  extension (d: MosDispersionDirection)
+    private def directionName: String =
+      d match
+        case MosDispersionDirection.Horizontal => "HORIZONTAL"
+        case MosDispersionDirection.Vertical   => "VERTICAL"
+
+  given Encoder[MosDispersionDirection] =
+    Encoder[String].contramap(_.directionName)
+
+  given Decoder[MosDispersionDirection] =
+    Decoder[String].emap: s =>
+      MosDispersionDirection.values
+        .find(_.directionName === s)
+        .toRight(s"Could not parse MOS dispersion direction '$s'")
+
+  given Encoder[BrightnessValue] =
+    Encoder[BigDecimal].contramap(_.value.value)
+
+  given Decoder[BrightnessValue] =
+    Decoder[BigDecimal].emap(BrightnessValue.from)
+
+  given Encoder[Redshift] =
+    Encoder[BigDecimal].contramap(_.z)
+
+  given Decoder[Redshift] =
+    Decoder[BigDecimal].map(Redshift(_))
+
+  given Encoder[MosMaskProvenance] =
+    Encoder.instance: p =>
+      Json.obj(
+        "softwareVersion"        -> p.softwareVersion.asJson,
+        "designer"               -> p.designer.asJson,
+        "designedAt"             -> p.designedAt.asJson,
+        "sourceObjectTable"      -> p.sourceObjectTable.asJson,
+        "detectorIdImaging"      -> p.detectorIdImaging.asJson,
+        "detectorIdSpectroscopy" -> p.detectorIdSpectroscopy.asJson
+      )
+
+  given Decoder[MosMaskProvenance] =
+    Decoder.instance: c =>
+      for
+        version <- c.downField("softwareVersion").as[Option[String]]
+        who     <- c.downField("designer").as[Option[String]]
+        when    <- c.downField("designedAt").as[Option[Timestamp]]
+        table   <- c.downField("sourceObjectTable").as[Option[String]]
+        img     <- c.downField("detectorIdImaging").as[Option[String]]
+        spec    <- c.downField("detectorIdSpectroscopy").as[Option[String]]
+      yield MosMaskProvenance(version, who, when, table, img, spec)
 
   private def signedAngle(a: Angle): Json =
     val µas = Angle.signedMicroarcseconds.get(a)
@@ -85,7 +141,9 @@ trait MaskDefinitionCodec:
         "offsetAlongSlit"  -> signedAngle(s.offsetAlongSlit),
         "offsetAcrossSlit" -> signedAngle(s.offsetAcrossSlit),
         "tilt"             -> signedAngle(s.tilt),
-        "priority"         -> s.priority.asJson
+        "priority"         -> s.priority.asJson,
+        "magnitude"        -> s.magnitude.asJson,
+        "redshift"         -> s.redshift.asJson
       )
 
   given Decoder[MaskSlit] =
@@ -101,7 +159,9 @@ trait MaskDefinitionCodec:
         across   <- c.downField("offsetAcrossSlit").as(using signedAngleDecoder)
         tilt     <- c.downField("tilt").as(using signedAngleDecoder)
         priority <- c.downField("priority").as[MosSlitPriority]
-      yield MaskSlit(MosObjectId(id), coords, x, y, width, length, along, across, tilt, priority)
+        mag      <- c.downField("magnitude").as[BrightnessValue]
+        z        <- c.downField("redshift").as[Option[Redshift]]
+      yield MaskSlit(MosObjectId(id), coords, x, y, width, length, along, across, tilt, priority, mag, z)
 
   given Encoder[MaskDefinition] =
     Encoder.instance: d =>
@@ -111,6 +171,9 @@ trait MaskDefinitionCodec:
         "pixelScale"           -> d.pixelScale.value.asJson,
         "pointing"             -> d.pointing.asJson,
         "positionAngle"        -> d.positionAngle.asJson,
+        "dispersionDirection"  -> d.dispersionDirection.asJson,
+        "hasTiltedSlits"       -> d.hasTiltedSlits.asJson,
+        "provenance"           -> d.provenance.asJson,
         "slits"                -> d.slits.asJson,
         "scienceSlitCount"     -> d.scienceSlits.length.asJson,
         "acquisitionSlitCount" -> d.acquisitionSlits.length.asJson,
@@ -125,7 +188,10 @@ trait MaskDefinitionCodec:
         pixelScale    <- c.downField("pixelScale").as[BigDecimal]
         pointing      <- c.downField("pointing").as[Coordinates]
         positionAngle <- c.downField("positionAngle").as[Angle]
+        direction     <- c.downField("dispersionDirection").as[MosDispersionDirection]
+        tilted        <- c.downField("hasTiltedSlits").as[Boolean]
+        provenance    <- c.downField("provenance").as[MosMaskProvenance]
         slits         <- c.downField("slits").as[List[MaskSlit]]
-      yield MaskDefinition(name, instrument, pixelScale.pixelScale, pointing, positionAngle, slits)
+      yield MaskDefinition(name, instrument, pixelScale.pixelScale, pointing, positionAngle, direction, tilted, provenance, slits)
 
 object maskDefinition extends MaskDefinitionCodec

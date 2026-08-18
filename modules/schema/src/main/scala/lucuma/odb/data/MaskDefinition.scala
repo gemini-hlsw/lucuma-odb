@@ -10,11 +10,15 @@ import coulomb.integrations.cats.quantity.given
 import eu.timepit.refined.cats.given
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.MosDispersionDirection
 import lucuma.core.enums.MosSlitPriority
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Redshift
 import lucuma.core.math.units.PixelScale
 import lucuma.core.model.mos.MosMaskHeader
+import lucuma.core.model.mos.MosMaskProvenance
 import lucuma.core.model.mos.MosMaskSlit
 import lucuma.core.model.mos.MosObjectId
 
@@ -26,6 +30,10 @@ import lucuma.core.model.mos.MosObjectId
  * wraps at a full turn, so they must be read through
  * `Angle.signedMicroarcseconds` (or an equivalent signed optic) rather than
  * as plain magnitudes.
+ *
+ * The magnitude and redshift are stored on the attachment but not yet
+ * exposed in the GraphQL schema; exposing them later is a schema change with
+ * no re-upload of existing masks.
  */
 case class MaskSlit(
   id:               MosObjectId,
@@ -37,7 +45,9 @@ case class MaskSlit(
   offsetAlongSlit:  Angle,
   offsetAcrossSlit: Angle,
   tilt:             Angle,
-  priority:         MosSlitPriority
+  priority:         MosSlitPriority,
+  magnitude:        BrightnessValue,
+  redshift:         Option[Redshift]
 ) derives Eq
 
 object MaskSlit:
@@ -53,19 +63,28 @@ object MaskSlit:
       offsetAlongSlit  = slit.offsetAlongSlit,
       offsetAcrossSlit = slit.offsetAcrossSlit,
       tilt             = slit.tilt,
-      priority         = slit.priority
+      priority         = slit.priority,
+      magnitude        = slit.magnitude,
+      redshift         = slit.redshift
     )
 
 /**
  * The design read from a MOS mask attachment's file at upload.
+ *
+ * The dispersion direction, tilted-slit flag and provenance are stored on
+ * the attachment but not yet exposed in the GraphQL schema; exposing them
+ * later is a schema change with no re-upload of existing masks.
  */
 case class MaskDefinition(
-  name:          NonEmptyString,
-  instrument:    Instrument,
-  pixelScale:    PixelScale,
-  pointing:      Coordinates,
-  positionAngle: Angle,
-  slits:         List[MaskSlit]
+  name:                NonEmptyString,
+  instrument:          Instrument,
+  pixelScale:          PixelScale,
+  pointing:            Coordinates,
+  positionAngle:       Angle,
+  dispersionDirection: MosDispersionDirection,
+  hasTiltedSlits:      Boolean,
+  provenance:          MosMaskProvenance,
+  slits:               List[MaskSlit]
 ) derives Eq:
 
   /** Slits that place science objects, excluding alignment-star boxes. */
@@ -100,10 +119,13 @@ object MaskDefinition:
   ): Option[MaskDefinition] =
     header.positionAngle.map: pa =>
       MaskDefinition(
-        name          = name,
-        instrument    = header.instrument,
-        pixelScale    = header.pixelScale,
-        pointing      = header.pointing,
-        positionAngle = pa,
-        slits         = slits.map(MaskSlit.fromMosMaskSlit)
+        name                = name,
+        instrument          = header.instrument,
+        pixelScale          = header.pixelScale,
+        pointing            = header.pointing,
+        positionAngle       = pa,
+        dispersionDirection = header.dispersionDirection,
+        hasTiltedSlits      = header.hasTiltedSlits,
+        provenance          = header.provenance,
+        slits               = slits.map(MaskSlit.fromMosMaskSlit)
       )
