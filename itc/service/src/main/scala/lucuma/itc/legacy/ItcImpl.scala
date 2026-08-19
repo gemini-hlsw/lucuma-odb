@@ -26,6 +26,7 @@ import lucuma.itc.service.ObservingMode.ImagingMode
 import lucuma.itc.service.ObservingMode.SpectroscopyMode
 import lucuma.itc.service.TargetData
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 
@@ -85,14 +86,14 @@ object ItcImpl {
                   )
 
             for
-              _      <- L.info(exposureTimeMode.desiredString)
-              _      <- L.info(s"Target $target")
+              _      <- debug"${exposureTimeMode.desiredString}"
+              _      <- debug"Target $target"
               _      <- traceParams
               _      <- span.addAttributes(
                           Attribute("params.at", exposureTimeMode.at.nm.value.value.toDouble),
                           Attribute("params.observing_mode", observingMode.description)
                         )
-              _      <- L.info(request.noSpaces)
+              _      <- debug"${request.noSpaces}"
               a      <- itcLocal.calculate(request.noSpaces, exposureTimeMode.at)
               result <- T.span("convert integration_time_result")
                           .surround:
@@ -177,14 +178,14 @@ object ItcImpl {
                   )
 
             for
-              _ <- L.info(exposureTimeMode.desiredString)
-              _ <- L.info(s"Target $target")
+              _ <- debug"${exposureTimeMode.desiredString}"
+              _ <- debug"Target $target"
               _ <- traceParams
               _ <- span.addAttributes(
                      Attribute("params.at", exposureTimeMode.at.nm.value.value.toDouble),
                      Attribute("params.observing_mode", observingMode.description)
                    )
-              _ <- L.info(request.noSpaces)
+              _ <- debug"${request.noSpaces}"
               a <- itcLocal.calculateTimeAndGraphs(request.noSpaces, exposureTimeMode.at)
               g <- T.span("convert graphs_result")
                      .surround:
