@@ -3,8 +3,7 @@
 -- GraphQL `mask` field (same convention as t_target.c_source_profile).
 --
 -- Parsing was introduced with this column and runs synchronously on upload,
--- so the column is populated exactly for masks accepted since then; older
--- attachments stay null until re-uploaded.  See ADR 0009.
+-- so the column is populated exactly for masks accepted since then.
 
 ALTER TABLE t_attachment
   ADD COLUMN c_mask_definition jsonb NULL,

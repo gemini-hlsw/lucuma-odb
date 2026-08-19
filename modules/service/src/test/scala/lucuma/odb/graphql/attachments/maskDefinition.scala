@@ -57,6 +57,7 @@ class maskDefinition extends AttachmentsSuite:
                 pixelScale
                 pointing { ra { hms } dec { dms } }
                 positionAngle { degrees }
+                dispersionDirection
                 scienceSlitCount
                 acquisitionSlitCount
                 averageSlitWidth { arcseconds }
@@ -102,6 +103,7 @@ class maskDefinition extends AttachmentsSuite:
       assertEquals(mask.decodePath[BigDecimal]("mask", "pixelScale"), BigDecimal("0.16"))
       assertEquals(mask.decodePath[String]("mask", "pointing", "ra", "hms"), "23:59:07.055999")
       assertEquals(mask.decodePath[String]("mask", "pointing", "dec", "dms"), "-55:28:16.608000")
+      assertEquals(mask.decodePath[String]("mask", "dispersionDirection"), "HORIZONTAL")
       assertEquals(slits.length, 40)
       assertEquals(first.decodePath[Int]("id"), 10)
       assertEquals(first.decodePath[String]("priority"), "MEDIUM")
@@ -143,6 +145,7 @@ class maskDefinition extends AttachmentsSuite:
       slits  = mask.decodePath[List[Json]]("mask", "slits")
     yield
       assertEquals(mask.decodePath[String]("mask", "instrument"), "FLAMINGOS2")
+      assertEquals(mask.decodePath[String]("mask", "dispersionDirection"), "VERTICAL")
       assertEquals(mask.decodePath[BigDecimal]("mask", "positionAngle", "degrees"), BigDecimal("104.5"))
       assertEquals(slits.length, 53)
       assertEquals(slits.count(_.decodePath[String]("priority") === "ACQUISITION"), 3)

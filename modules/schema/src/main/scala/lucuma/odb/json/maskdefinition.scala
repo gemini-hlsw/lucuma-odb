@@ -63,7 +63,7 @@ trait MaskDefinitionCodec:
         case MosDispersionDirection.Horizontal => "HORIZONTAL"
         case MosDispersionDirection.Vertical   => "VERTICAL"
 
-  given Encoder[MosDispersionDirection] =
+  given EncoderMosDispersionDirection: Encoder[MosDispersionDirection] =
     Encoder[String].contramap(_.directionName)
 
   given Decoder[MosDispersionDirection] =

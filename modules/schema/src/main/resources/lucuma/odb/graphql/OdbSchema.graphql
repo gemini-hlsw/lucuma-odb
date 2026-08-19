@@ -7876,6 +7876,14 @@ type MaskDefinition {
   positionAngle: Angle!
 
   """
+  Axis along which the instrument spreads a spectrum, in pre-image detector
+  coordinates.  It decides how the design's x and y columns were read: a
+  slit's width is its extent along the dispersion direction, its length the
+  extent across it.
+  """
+  dispersionDirection: MosDispersionDirection!
+
+  """
   Every aperture in the design, acquisition boxes included.
   """
   slits: [MaskSlit!]!
@@ -7964,6 +7972,22 @@ type MaskSlit {
   rather than a science slit.
   """
   priority: MosSlitPriority!
+}
+
+"""
+Axis along which an instrument spreads a spectrum, in pre-image detector
+coordinates.
+"""
+enum MosDispersionDirection {
+  """
+  GMOS-N and GMOS-S: the x axis is the dispersion axis.
+  """
+  HORIZONTAL
+
+  """
+  Flamingos-2: the y axis is the dispersion axis.
+  """
+  VERTICAL
 }
 
 """

@@ -302,6 +302,7 @@ trait BaseMapping[F[_]]
   lazy val LinkUserResultType                      = schema.ref("LinkUserResult")
   lazy val LongType                                = schema.ref("Long")
   lazy val MonitoringProgramReferenceType          = schema.ref("MonitoringProgramReference")
+  lazy val MosDispersionDirectionType              = schema.ref("MosDispersionDirection")
   lazy val MosPreImagingType                       = schema.ref("MosPreImaging")
   lazy val MosSlitPriorityType                     = schema.ref("MosSlitPriority")
   lazy val MutationType                            = schema.ref("Mutation")

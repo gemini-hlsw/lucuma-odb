@@ -26,14 +26,12 @@ import lucuma.core.model.mos.MosObjectId
  * One aperture of a MOS mask design, trimmed to what is recorded on the
  * attachment.
  *
- * The two offsets and the tilt are signed quantities held in a type that
- * wraps at a full turn, so they must be read through
- * `Angle.signedMicroarcseconds` (or an equivalent signed optic) rather than
- * as plain magnitudes.
+ * The two offsets and the tilt are signed quantities held in an Angle,
+ * they must be read through `Angle.signedMicroarcseconds` rather than
+ * as plain values.
  *
  * The magnitude and redshift are stored on the attachment but not yet
- * exposed in the GraphQL schema; exposing them later is a schema change with
- * no re-upload of existing masks.
+ * exposed in the GraphQL schema.
  */
 case class MaskSlit(
   id:               MosObjectId,
@@ -70,10 +68,6 @@ object MaskSlit:
 
 /**
  * The design read from a MOS mask attachment's file at upload.
- *
- * The dispersion direction, tilted-slit flag and provenance are stored on
- * the attachment but not yet exposed in the GraphQL schema; exposing them
- * later is a schema change with no re-upload of existing masks.
  */
 case class MaskDefinition(
   name:                NonEmptyString,
@@ -97,8 +91,7 @@ case class MaskDefinition(
 
   /**
    * Mean width of the science slits, or None for a design with none.
-   * Alignment-star boxes are excluded so their wide boxes do not skew the
-   * mean.
+   * Alignment-star boxes are excluded,
    */
   def averageSlitWidth: Option[Angle] =
     val sci = scienceSlits
@@ -109,8 +102,7 @@ object MaskDefinition:
 
   /**
    * The design, or None when it records no position angle.  A mask cannot be
-   * observed without knowing the angle to observe it at, so such a design is
-   * not accepted.
+   * observed without knowing the angle to observe it at.
    */
   def fromMosMask(
     name:   NonEmptyString,
