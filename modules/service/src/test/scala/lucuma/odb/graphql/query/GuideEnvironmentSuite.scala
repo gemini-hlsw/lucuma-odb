@@ -736,81 +736,6 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
     }
     """.asRight
 
-  val pwfs2MosResult =
-    json"""
-    {
-      "observation": {
-        "title": "Nonsidereal Target",
-        "targetEnvironment": {
-          "guideEnvironment": {
-            "posAngle": {
-              "degrees": 30.000000
-            },
-            "guideTargets": [
-              {
-                "name": "Gaia DR3 3219118640218737920",
-                "probe": "PWFS2",
-                "sourceProfile": {
-                  "point": {
-                    "bandNormalized": {
-                      "brightnesses": [
-                        {
-                          "band": "GAIA"
-                        },
-                        {
-                          "band": "GAIA_RP"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "sidereal": {
-                  "catalogInfo": {
-                    "name": "GAIA",
-                    "id": "3219118640218737920",
-                    "objectType": null
-                  },
-                  "epoch": "J2016.000",
-                  "ra": {
-                    "microseconds": 20760247957,
-                    "hms": "05:46:00.247957",
-                    "hours": 5.766735543611111111111111111111111,
-                    "degrees": 86.50103315416666666666666666666667
-                  },
-                  "dec": {
-                    "dms": "-00:08:26.290793",
-                    "degrees": 359.85936366861114,
-                    "microarcseconds": 1295493709207
-                  },
-                  "radialVelocity": {
-                    "metersPerSecond": 0,
-                    "centimetersPerSecond": 0,
-                    "kilometersPerSecond": 0
-                  },
-                  "properMotion": {
-                    "ra": {
-                      "microarcsecondsPerYear": 806,
-                      "milliarcsecondsPerYear": 0.806
-                    },
-                    "dec": {
-                      "microarcsecondsPerYear": -1093,
-                      "milliarcsecondsPerYear": -1.093
-                    }
-                  },
-                  "parallax": {
-                    "microarcseconds": 2371,
-                    "milliarcseconds": 2.371
-                  }
-                },
-                "nonsidereal": null
-              }
-            ]
-          }
-        }
-      }
-    }
-    """.asRight
-
   def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id]
 
   // Create ephemeris at the same coordinates as the sidereal target
@@ -826,7 +751,7 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
       }.toList
     PerSite(elements, elements)
 
-  val pwfs2Result: Either[List[String], Json] =
+  def pwfs2ResultAt(posAngle: BigDecimal): Either[List[String], Json] =
     json"""
     {
       "observation": {
@@ -834,7 +759,7 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
         "targetEnvironment": {
           "guideEnvironment": {
             "posAngle": {
-              "degrees": 350.000000
+              "degrees": ${posAngle.setScale(6, BigDecimal.RoundingMode.HALF_UP)}
             },
             "guideTargets": [
               {
@@ -900,6 +825,10 @@ trait GuideEnvironmentSuite extends ExecutionTestSupport:
       }
     }
     """.asRight
+
+  val pwfs2Result: Either[List[String], Json] = pwfs2ResultAt(350)
+
+  val pwfs2MosResult: Either[List[String], Json] = pwfs2ResultAt(30)
 
   val pwfs2ImagingResult =
     json"""

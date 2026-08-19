@@ -34,8 +34,9 @@ import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
 import skunk.Session
 
 /**
- * Flamingos 2 MOS deliberately leaves the guide environment unavailable, while the ITC returns 
- * a result and the science sequence generates, so the observation can be planned.
+ * End-to-end checks that a Flamingos 2 MOS observation can be planned: the ITC
+ * returns a result, the science sequence generates, and AGS finds a guide star.
+ * Detailed guide star expectations live in `guideEnvironmentF2`.
  */
 class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
 
@@ -152,7 +153,7 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
         """.asRight
       )
 
-  test("the guide environment is unavailable"):
+  test("the guide environment resolves"):
     setup.flatMap: (_, oid, _) =>
       setObservationTimeAndDuration(user, oid, ObsTime.some, ObsDuration.some) *>
       expect(
@@ -163,10 +164,24 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
               targetEnvironment {
                 guideEnvironment {
                   posAngle { degrees }
+                  guideTargets { probe }
                 }
               }
             }
           }
         """,
-        expected = List("No guide probe available for this observing mode.").asLeft
+        expected = json"""
+          {
+            "observation": {
+              "targetEnvironment": {
+                "guideEnvironment": {
+                  "posAngle": { "degrees": 270.000000 },
+                  "guideTargets": [
+                    { "probe": "FLAMINGOS2_OIWFS" }
+                  ]
+                }
+              }
+            }
+          }
+        """.asRight
       )
