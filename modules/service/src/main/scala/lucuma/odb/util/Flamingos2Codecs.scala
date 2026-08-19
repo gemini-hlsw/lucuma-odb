@@ -11,7 +11,6 @@ import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2LyotWheel
-import lucuma.core.enums.Flamingos2MosOffsetPreset
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
@@ -53,9 +52,6 @@ trait Flamingos2Codecs:
     enumerated(Type.varchar)
 
   val flamingos_2_lyot_wheel: Codec[Flamingos2LyotWheel] =
-    enumerated(Type.varchar)
-
-  val flamingos_2_mos_offset_preset: Codec[Flamingos2MosOffsetPreset] =
     enumerated(Type.varchar)
 
   val flamingos_2_read_mode: Codec[Flamingos2ReadMode] =

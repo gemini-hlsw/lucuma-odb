@@ -393,7 +393,6 @@ object GeneratorParamsService {
               sciMode = sciMode
             ).asRight
 
-          // MOS has no acquisition sequence yet, so its cost is on science alone.
           case f2m: flamingos2.mos.Config =>
             val sciMode = InstrumentMode.Flamingos2Spectroscopy(
               f2m.exposureTimeMode,
@@ -403,7 +402,15 @@ object GeneratorParamsService {
               Flamingos2FpuMask.customMask(Flamingos2CustomMask(f2m.customMask.slitWidth))
             )
 
-            scienceOnlySpectroscopyGeneratorParams(f2m, sciMode).asRight
+            spectroscopyGeneratorParams(
+              obsMode = f2m,
+              acqMode = InstrumentMode.Flamingos2Imaging(
+                f2m.acquisition.exposureTimeMode,
+                f2m.acquisition.filter,
+                Flamingos2ReadMode.Bright // Default to Bright, may support overrides in the future
+              ),
+              sciMode = sciMode
+            ).asRight
 
           case f2 @ flamingos2.imaging.Config(filters = fs) =>
             // An input per filter.

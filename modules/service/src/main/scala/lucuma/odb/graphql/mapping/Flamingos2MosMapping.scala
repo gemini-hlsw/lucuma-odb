@@ -11,6 +11,7 @@ import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
@@ -22,6 +23,17 @@ trait Flamingos2MosMapping[F[_]]
      with OptionalFieldMapping[F]
      with SlitTelescopeConfigsMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
+
+  lazy val Flamingos2MosAcquisitionMapping: ObjectMapping =
+    ObjectMapping(Flamingos2MosAcquisitionType)(
+      SqlField("observationId", Flamingos2MosView.ObservationId, key = true, hidden = true),
+
+      explicitOrElseDefault[Flamingos2Filter]("filter", "explicitFilter", "defaultFilter"),
+      SqlField("defaultFilter",  Flamingos2MosView.AcquisitionFilterDefault),
+      SqlField("explicitFilter", Flamingos2MosView.AcquisitionFilter),
+
+      SqlObject("exposureTimeMode", Join(Flamingos2MosView.ObservationId, ExposureTimeModeView.ObservationId))
+    )
 
   lazy val Flamingos2MosCustomMaskMapping: ObjectMapping =
     ObjectMapping(Flamingos2MosType / "customMask")(
@@ -53,8 +65,6 @@ trait Flamingos2MosMapping[F[_]]
       SqlField("defaultReadoutMode",  Flamingos2MosView.ReadoutModeDefault),
       SqlField("explicitReadoutMode", Flamingos2MosView.ReadoutMode),
 
-      SqlField("offsetPreset", Flamingos2MosView.OffsetPreset),
-
       // Raw columns (hidden) backing the telescope config cursor fields.
       SqlField("slitOffsetModeEffRaw", Flamingos2MosView.SlitOffsetModeEffective,  hidden = true),
       SqlField("tcEffRaw",             Flamingos2MosView.TelescopeConfigsEffective, hidden = true),
@@ -69,6 +79,8 @@ trait Flamingos2MosMapping[F[_]]
 
       SqlJson("telluricType", Flamingos2MosView.TelluricType),
 
+      SqlObject("acquisition"),
+
       // Read-only snapshot of what the mode was created with
       SqlField("initialDisperser", Flamingos2MosView.InitialDisperser),
       SqlField("initialFilter",    Flamingos2MosView.InitialFilter),
@@ -76,6 +88,15 @@ trait Flamingos2MosMapping[F[_]]
     )
 
   lazy val Flamingos2MosElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (Flamingos2MosAcquisitionType, "exposureTimeMode", Nil) =>
+      Elab.transformChild: child =>
+        Unique(
+          Filter(
+            Predicates.exposureTimeMode.role.eql(ExposureTimeModeRole.Acquisition),
+            child
+          )
+        )
+
     case (Flamingos2MosType, "exposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
@@ -88,6 +109,7 @@ trait Flamingos2MosMapping[F[_]]
   lazy val Flamingos2MosMappings: List[TypeMapping] =
     List(
       Flamingos2MosMapping,
+      Flamingos2MosAcquisitionMapping,
       Flamingos2MosCustomMaskMapping
     )
 

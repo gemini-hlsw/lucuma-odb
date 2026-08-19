@@ -99,7 +99,7 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
       o <- createFlamingos2MosObservationAs(user, p, List(t))
     yield (p, o, t)
 
-  test("the ITC returns a result"):
+  test("the ITC returns a science and an acquisition result"):
     setup.flatMap: (_, oid, tid) =>
       expect(
         user  = user,
@@ -107,9 +107,16 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
           query {
             observation(observationId: "$oid") {
               itc {
-                ... on ItcScienceOnlySpectroscopy {
+                ... on ItcSpectroscopy {
                   itcType
                   spectroscopyScience {
+                    selected {
+                      targetId
+                      exposureTime { seconds }
+                      exposureCount
+                    }
+                  }
+                  acquisition {
                     selected {
                       targetId
                       exposureTime { seconds }
@@ -125,8 +132,15 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
           {
             "observation": {
               "itc": {
-                "itcType": "SCIENCE_ONLY_SPECTROSCOPY",
+                "itcType": "SPECTROSCOPY",
                 "spectroscopyScience": {
+                  "selected": {
+                    "targetId": $tid,
+                    "exposureTime": { "seconds": 10.000000 },
+                    "exposureCount": 6
+                  }
+                },
+                "acquisition": {
                   "selected": {
                     "targetId": $tid,
                     "exposureTime": { "seconds": 10.000000 },

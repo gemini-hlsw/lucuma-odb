@@ -185,19 +185,36 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
       _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
 
-  test("switch the offset preset"):
+  private val AcquisitionSelection: String =
+    """
+      flamingos2Mos {
+        acquisition {
+          filter
+          defaultFilter
+          explicitFilter
+          exposureTimeMode {
+            signalToNoise { value at { nanometers } }
+          }
+        }
+      }
+    """
+
+  test("override the acquisition filter and exposure time mode, then unset the filter"):
     for
       (_, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
       _        <- expect(pi, updateMutation(
                     oid,
-                    "flamingos2Mos: { offsetPreset: CROWDED_FIELD }",
                     """
-                      flamingos2Mos {
-                        offsetPreset
-                        telescopeConfigs { offsetMode }
-                        defaultTelescopeConfigs { offsetMode }
+                      flamingos2Mos: {
+                        acquisition: {
+                          explicitFilter: J
+                          exposureTimeMode: {
+                            signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+                          }
+                        }
                       }
-                    """
+                    """,
+                    AcquisitionSelection
                   ), json"""
                     {
                       "updateObservations": {
@@ -205,9 +222,46 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
                           {
                             "observingMode": {
                               "flamingos2Mos": {
-                                "offsetPreset": "CROWDED_FIELD",
-                                "telescopeConfigs": { "offsetMode": "NOD_TO_SKY" },
-                                "defaultTelescopeConfigs": { "offsetMode": "NOD_TO_SKY" }
+                                "acquisition": {
+                                  "filter": "J",
+                                  "defaultFilter": "H",
+                                  "explicitFilter": "J",
+                                  "exposureTimeMode": {
+                                    "signalToNoise": {
+                                      "value": 25.000,
+                                      "at": { "nanometers": 2200.000 }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """.asRight)
+      _        <- expect(pi, updateMutation(
+                    oid,
+                    "flamingos2Mos: { acquisition: { explicitFilter: null } }",
+                    AcquisitionSelection
+                  ), json"""
+                    {
+                      "updateObservations": {
+                        "observations": [
+                          {
+                            "observingMode": {
+                              "flamingos2Mos": {
+                                "acquisition": {
+                                  "filter": "H",
+                                  "defaultFilter": "H",
+                                  "explicitFilter": null,
+                                  "exposureTimeMode": {
+                                    "signalToNoise": {
+                                      "value": 25.000,
+                                      "at": { "nanometers": 2200.000 }
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
@@ -217,7 +271,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
                   """.asRight)
     yield ()
 
-  test("an explicit override wins over the preset, and null restores it"):
+  test("an explicit override wins over the default, and null restores it"):
     for
       (_, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
       _        <- expect(pi, updateMutation(

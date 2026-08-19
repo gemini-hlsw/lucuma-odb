@@ -11,7 +11,6 @@ import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.util.Enumerated
 import lucuma.odb.service.ObservationWorkflowService
 import lucuma.odb.util.Codecs.*
-import lucuma.odb.util.Flamingos2Codecs.*
 import lucuma.odb.util.GhostCodecs.ghost_ifu_mapping_type
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
@@ -174,7 +173,6 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gnirs_fpu_slit, "t_gnirs_fpu_slit"),
           checkPostgresLookupTable(gnirs_grating, "t_gnirs_grating"),
           checkPostgresLookupTable(gnirs_prism, "t_gnirs_prism"),
-          checkPostgresLookupTable(flamingos_2_mos_offset_preset, "t_f2_mos_offset_preset"),
           checkPostgresLookupTable(slit_offset_mode, "t_slit_offset_mode"),
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),
           checkPostgresLookupTable(imaging_capability, "t_imaging_capability"),

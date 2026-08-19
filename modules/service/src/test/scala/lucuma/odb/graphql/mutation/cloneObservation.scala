@@ -344,7 +344,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           readoutMode
           defaultReadoutMode
           explicitReadoutMode
-          offsetPreset
           telescopeConfigs {
             offsetMode
             alongSlit { q { arcseconds } guiding }
@@ -2838,7 +2837,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
 
-  test("clone F2 MOS observation preserves the mask, preset and overrides"):
+  test("clone F2 MOS observation preserves the mask and overrides"):
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetAs(pi, pid)
@@ -2848,7 +2847,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
           disperser: R1200_HK
           filter: Y
           customMask: { slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: "$aid" }
-          offsetPreset: CROWDED_FIELD
           explicitReadMode: MEDIUM
           explicitReads: READS_4
           explicitDecker: LONG_SLIT
@@ -2875,7 +2873,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                          disperser
                          filter
                          customMask { slitWidth attachmentId }
-                         offsetPreset
                          explicitReadMode
                          explicitReads
                          decker
@@ -2900,7 +2897,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                            "slitWidth": "CUSTOM_WIDTH_2_PIX",
                            "attachmentId": ${aid.asJson}
                          },
-                         "offsetPreset": "CROWDED_FIELD",
                          "explicitReadMode": "MEDIUM",
                          "explicitReads": "READS_4",
                          "decker": "LONG_SLIT",
@@ -2945,7 +2941,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                      observingMode {
                        flamingos2Mos {
                          customMask { slitWidth attachmentId }
-                         offsetPreset
                          defaultDecker
                        }
                      }
@@ -2961,7 +2956,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                            "slitWidth": "CUSTOM_WIDTH_2_PIX",
                            "attachmentId": null
                          },
-                         "offsetPreset": "SPARSE_FIELD",
                          "defaultDecker": "MOS"
                        }
                      }

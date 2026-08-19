@@ -45,6 +45,7 @@ import lucuma.odb.sequence.SmartGcalExpander
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import munit.FunSuite
 
@@ -86,12 +87,15 @@ class MosLongSlitSequencesSuite extends FunSuite:
       telluricType        = lucuma.core.model.TelluricType.Hot
     )
 
+  private val acquisition: AcquisitionConfig =
+    AcquisitionConfig(common.exposureTimeMode, Filter, none)
+
   private val longSlit: longslit.Config =
     longslit.Config(
       Disperser,
       Filter,
       Fpu,
-      longslit.AcquisitionConfig(common.exposureTimeMode, Filter, none),
+      acquisition,
       common
     )
 
@@ -100,6 +104,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
       Disperser,
       Filter,
       Flamingos2FpuMask.Custom(ToBeDefined, SlitWidth),
+      acquisition,
       common
     ).fold(m => fail(s"could not build the MOS config: $m"), identity)
 
@@ -131,7 +136,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
     science(longslit.LongSlit.instantiate[Eval](Oid, estimator, Namespace, expander, longSlit, itc(cycles), itc(cycles), none))
 
   private def generateMos(cycles: Int): List[Atom[Flamingos2DynamicConfig]] =
-    science(mos.Mos.instantiate[Eval](Oid, estimator, Namespace, expander, mosConfig, itc(cycles), none))
+    science(mos.Mos.instantiate[Eval](Oid, estimator, Namespace, expander, mosConfig, itc(cycles), itc(cycles), none))
 
   // The aperture and the decker that follows from it are what the two modes differ in.
   private def normalized(a: Atom[Flamingos2DynamicConfig]): Atom[Flamingos2DynamicConfig] =
