@@ -4,23 +4,38 @@
 package lucuma.odb.graphql
 package query
 
+import cats.data.NonEmptySet
 import cats.effect.IO
-import cats.syntax.either.*
-import cats.syntax.option.*
+import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
+import eu.timepit.refined.types.numeric.PosLong
 import io.circe.literal.*
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.GcalArc
+import lucuma.core.enums.GcalBaselineType
+import lucuma.core.enums.GcalContinuum
+import lucuma.core.enums.GcalDiffuser
+import lucuma.core.enums.GcalFilter
+import lucuma.core.enums.GcalShutter
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.model.sequence.StepConfig.Gcal
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.service.Services
+import lucuma.odb.smartgcal.data.Flamingos2
+import lucuma.odb.smartgcal.data.SmartGcalValue
+import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import skunk.Session
 
 /**
- * Flamingos 2 MOS deliberately produces three partial states, and none of them
- * is a bug: the sequence cannot be generated, the guide environment is
- * unavailable even though lucuma-core declares a guide probe for the mode, and
- * yet the ITC still returns a result so the observation can be planned.
+ * Flamingos 2 MOS deliberately leaves the guide environment unavailable, while the ITC returns 
+ * a result and the science sequence generates, so the observation can be planned.
  */
 class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
 
@@ -33,6 +48,36 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
 
   private val ObsDuration: TimeSpan =
     1.hourTimeSpan
+
+  // The MOS observation is calibrated as its equivalent long slit, so the smart gcal
+  // rows are keyed on the builtin FPU that matches the custom mask's slit width.
+  override def dbInitialization: Option[Session[IO] => IO[Unit]] = Some: s =>
+    val key =
+      Flamingos2.TableKey(
+        Flamingos2Disperser.R1200JH.some,
+        Flamingos2Filter.JH,
+        Flamingos2Fpu.LongSlit2.some
+      )
+
+    def value(lamp: Gcal.Lamp, filter: GcalFilter, shutter: GcalShutter): SmartGcalValue.Legacy =
+      SmartGcalValue(
+        Gcal(lamp, filter, GcalDiffuser.Ir, shutter),
+        GcalBaselineType.Night,
+        PosInt.unsafeFrom(1),
+        LegacyInstrumentConfig(TimeSpan.unsafeFromMicroseconds(15_000_000L))
+      )
+
+    val rows: List[Flamingos2.TableRow] =
+      List(
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), key, value(Gcal.Lamp.fromContinuum(GcalContinuum.IrGreyBodyHigh), GcalFilter.Nd20, GcalShutter.Open)),
+        Flamingos2.TableRow(PosLong.unsafeFrom(1), key, value(Gcal.Lamp.fromArcs(NonEmptySet.one(GcalArc.ArArc)), GcalFilter.Nir, GcalShutter.Closed))
+      )
+
+    servicesFor(user).map(_(s)).use: services =>
+      services.transactionally:
+        rows.zipWithIndex.traverse_ : (r, i) =>
+          Services.asSuperUser:
+            services.smartGcalService.insertFlamingos2(i, r)
 
   private def setup: IO[(Program.Id, Observation.Id, Target.Id)] =
     for
@@ -87,7 +132,7 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
       oids          <- observationsWhere(user, s"""program: { id: { EQ: "$pid" } }, observingModeType: { EQ: FLAMINGOS_2_MOS }""")
     yield assertEquals(oids, List(oid))
 
-  test("the sequence cannot be generated"):
+  test("the sequence is generated"):
     setup.flatMap: (_, oid, _) =>
       expect(
         user     = user,
@@ -98,7 +143,13 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
             }
           }
         """,
-        expected = List("Flamingos 2 MOS sequence generation is not yet implemented").asLeft
+        expected = json"""
+          {
+            "executionConfig": {
+              "instrument": "FLAMINGOS2"
+            }
+          }
+        """.asRight
       )
 
   test("the guide environment is unavailable"):
@@ -117,5 +168,5 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
             }
           }
         """,
-        expected = List("Flamingos 2 MOS sequence generation is not yet implemented").asLeft
+        expected = List("No guide probe available for this observing mode.").asLeft
       )

@@ -3,9 +3,18 @@
 
 package lucuma.odb.sequence.flamingos2
 
+import lucuma.core.enums.MosPreImaging
+import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 
 // Definitions that are shared across F2 modes.
 val MinAcquisitionExposureTime: TimeSpan = 2.secondTimeSpan
 val MaxAcquisitionExposureTime: TimeSpan = TimeSpan.Max  // TBD
+
+/** Every Flamingos 2 mode shares the same static configuration. */
+val Static: Flamingos2StaticConfig =
+  Flamingos2StaticConfig(
+    mosPreImaging           = MosPreImaging.IsNotMosPreImaging,
+    useElectronicOffsetting = false
+  )

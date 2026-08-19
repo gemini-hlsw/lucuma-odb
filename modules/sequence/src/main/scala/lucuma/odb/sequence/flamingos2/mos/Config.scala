@@ -24,7 +24,7 @@ import java.io.DataOutputStream
  * Configuration for Flamingos 2 MOS science mode.
  *
  * This is Flamingos 2 long slit with the builtin FPU replaced by a custom mask
- * and no acquisition (yet).  Sequence generation is not implemented yet.
+ * and no acquisition (yet).
  */
 case class Config private (
   disperser:     Flamingos2Disperser,

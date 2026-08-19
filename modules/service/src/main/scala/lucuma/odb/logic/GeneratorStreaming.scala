@@ -64,6 +64,14 @@ sealed trait GeneratorStreaming[F[_]]:
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
 
+  def selectOrGenerateFlamingos2Mos(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+
+  def generateFlamingos2Mos(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
+
   def selectOrGenerateFlamingos2Imaging(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]]
@@ -277,7 +285,7 @@ object GeneratorStreaming:
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
         selectOrGenerate(
-          lucuma.odb.sequence.flamingos2.longslit.LongSlit.Static,
+          lucuma.odb.sequence.flamingos2.Static,
           sequenceService.selectFlamingos2Sequence(context.oid, _, _),
           generateFlamingos2LongSlit(context)
         )
@@ -292,6 +300,27 @@ object GeneratorStreaming:
           sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
           gen <- EitherT(LongSlit.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, acq, sci, rol))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+      override def selectOrGenerateFlamingos2Mos(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
+        selectOrGenerate(
+          lucuma.odb.sequence.flamingos2.Static,
+          sequenceService.selectFlamingos2Sequence(context.oid, _, _),
+          generateFlamingos2Mos(context)
+        )
+
+      override def generateFlamingos2Mos(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, Flamingos2Static, Flamingos2Dynamic]]] =
+        import lucuma.odb.sequence.flamingos2.mos.Mos
+        (for
+          cfg <- extractMode(ObservingMode.Flamingos2MosName, context)(_.asFlamingos2Mos)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
+          rol  = context.params.calibrationRole
+          gen <- EitherT(Mos.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

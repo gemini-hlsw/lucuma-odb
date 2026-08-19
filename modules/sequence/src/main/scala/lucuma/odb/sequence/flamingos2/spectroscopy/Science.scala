@@ -3,7 +3,7 @@
 
 package lucuma.odb.sequence
 package flamingos2
-package longslit
+package spectroscopy
 
 import cats.Monad
 import cats.data.EitherT
@@ -46,7 +46,12 @@ import lucuma.odb.sequence.util.AtomBuilder
 import java.util.UUID
 
 /**
- * Flamingos 2 long slit science sequence generation.
+ * Flamingos 2 spectroscopy science sequence generation, shared by the long slit
+ * and MOS modes.
+ *
+ * The two modes differ only in the aperture their steps carry and in how often
+ * a "Nighttime Calibrations" atom must be inserted; the latter is the
+ * `maxSciencePeriod` parameter threaded through this object.
  */
 object Science:
 
@@ -66,12 +71,6 @@ object Science:
    */
   val MaxVisitLength: TimeSpan =
     3.hourTimeSpan
-
-  /**
-   * Maximum time that may pass between flats.
-   */
-  val MaxSciencePeriod: TimeSpan =
-    90.minuteTimeSpan
 
   private val Two: NonZeroInt = NonZeroInt.unsafeFrom(2)
 
@@ -108,6 +107,10 @@ object Science:
     def f2ScienceStep(tc: TelescopeConfig, obsClass: ObserveClass): State[F2, ProtoStep[F2]] =
       scienceStep(tc, obsClass)
 
+    /** Replaces the FPU used for the smart gcal lookup with the real aperture. */
+    private def applyFpuMask(mask: Flamingos2FpuMask)(step: ProtoStep[F2]): ProtoStep[F2] =
+      (ProtoStep.value[F2] andThen F2.fpu).replace(mask)(step)
+
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
       a0:   ProtoStep[F2],
@@ -119,7 +122,8 @@ object Science:
     ):
       def expand[F[_]: Monad](
         static:   Flamingos2StaticConfig,
-        expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2]
+        expander: SmartGcalExpander[F, Flamingos2StaticConfig, F2],
+        mask:     Flamingos2FpuMask
       ): EitherT[F, String, StepDefinition] =
 
         // Flamingos2 needs read mode and reads to be consistent with exposure time
@@ -127,11 +131,17 @@ object Science:
           val mode = Flamingos2ReadMode.forExposureTime(f2.value.exposure)
           f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
 
+        val fpu = applyFpuMask(mask)
+
         EitherT(expander.expandFlatAndOrArc(static, flat, arc))
-          .map(cs => StepDefinition(a0, b0, b1, a1, cs.map(adjustReadMode)))
+          .map(cs => StepDefinition(a0, b0, b1, a1, cs.map(adjustReadMode.andThen(fpu))))
 
     object PreDef:
 
+      /**
+       * The flat and arc are built carrying the config's `gcalFpu`, since the smart
+       * gcal tables are keyed on builtin FPUs and would not match a custom mask.
+       */
       def apply(
          config:  Config,
          time:    IntegrationTime,
@@ -157,7 +167,7 @@ object Science:
             _  <- F2.filter      := config.filter
             _  <- F2.readMode    := readMode
             _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
-            _  <- F2.fpu         := Flamingos2FpuMask.builtin(config.fpu)
+            _  <- F2.fpu         := config.fpuMask
             _  <- F2.decker      := config.decker
             _  <- F2.readoutMode := config.readoutMode
             _  <- F2.reads       := config.explicitReads.getOrElse(readMode.readCount)
@@ -165,11 +175,13 @@ object Science:
             b0 <- f2ScienceStep(b0Off, sciClass)
             b1 <- f2ScienceStep(b1Off, sciClass)
             a1 <- f2ScienceStep(a1Off, sciClass)
+            _  <- F2.fpu         := Flamingos2FpuMask.builtin(config.gcalFpu)
             f  <- flatStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
             r  <- arcStep(a1.telescopeConfig.copy(guiding = Disabled), ObserveClass.NightCal)
           yield PreDef(a0, b0, b1, a1, f, r)
 
     def compute[F[_]: Monad](
+      modeName:  String,
       config:    Config,
       time:      IntegrationTime,
       static:    Flamingos2StaticConfig,
@@ -182,18 +194,19 @@ object Science:
                  case NonEmptyList(a0, b0 :: b1 :: a1 :: Nil) => PreDef(config, time, a0, b0, b1, a1, calRole).asRight
                  // This case should be caught when validating arguments to the mode
                  // construction / update.  Nevertheless, we'll guarantee it here.
-                 case _                    => s"Exactly 4 offset positions are needed for Flamingos 2 Long Slit (${config.telescopeConfigs.size} provided).".asLeft
-        d <- p.expand(static, expander)
+                 case _                    => s"Exactly 4 offset positions are needed for $modeName (${config.telescopeConfigs.size} provided).".asLeft
+        d <- p.expand(static, expander, config.fpuMask)
       yield d
 
   end StepDefinition
 
   case class Generator(
-    steps:         StepDefinition,
-    cycleEstimate: TimeSpan,
-    estimate:      (NonEmptyList[ProtoStep[F2]], StepTimeEstimateCalculator.Last[F2]) => TimeSpan,
-    builder:       AtomBuilder[F2],
-    goalCycles:    NonNegInt
+    steps:            StepDefinition,
+    cycleEstimate:    TimeSpan,
+    maxSciencePeriod: TimeSpan,
+    estimate:         (NonEmptyList[ProtoStep[F2]], StepTimeEstimateCalculator.Last[F2]) => TimeSpan,
+    builder:          AtomBuilder[F2],
+    goalCycles:       NonNegInt
   ) extends SequenceGenerator[F2]:
 
     // Computes the atoms remaining in a 3 hour science blocklimited to `maxCycles`
@@ -207,7 +220,7 @@ object Science:
       // Roughly, how many more cycles can we fit in the remaining time?
       val cycles: Int = cyclesIn(MaxVisitLength) min maxCycles.value
 
-      // Remaining science time in this visit. If this is over 1.5 hours we need
+      // Remaining science time in this visit. If it reaches the cadence we need
       // to insert a flat roughly after science-time / 2.
       val scienceTime: TimeSpan = cycleEstimate *| cycles
 
@@ -216,7 +229,7 @@ object Science:
 
       cycles ->
         Option
-          .when(scienceTime >= MaxSciencePeriod)(scienceTime /| Two)
+          .when(scienceTime >= maxSciencePeriod)(scienceTime /| Two)
           .fold(
             // The science time is not long enough to warrant a mid-science cal in this block.
             List.fill(cycles)(abbaAtom) ++ Option.when(cycles > 0)(gcalAtom).toList
@@ -249,7 +262,7 @@ object Science:
               val (cycles, atoms) = atomsInBlock(NonNegInt.unsafeFrom(remainingCycles.value))
 
               // Sanity check....
-              assert(cycles > 0, "No progress made generating future F2 Long Slit sequence!")
+              assert(cycles > 0, "No progress made generating future F2 spectroscopy sequence!")
 
               (atoms, c + cycles)
           .flatMap(Stream.emits)
@@ -267,40 +280,47 @@ object Science:
   private def definitionError(oid: Observation.Id, msg: String): OdbError =
      OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
-  private def zeroExposureTime(oid: Observation.Id): OdbError =
-    definitionError(oid, "Flamingos 2 Long Slit requires a positive exposure time.")
+  private def zeroExposureTime(oid: Observation.Id, modeName: String): OdbError =
+    definitionError(oid, s"$modeName requires a positive exposure time.")
 
-  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
-    definitionError(oid, s"Estimated ABBA cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.")
+  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan, maxSciencePeriod: TimeSpan): OdbError =
+    definitionError(oid, s"Estimated ABBA cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${maxSciencePeriod.toMinutes} minutes.")
 
+  /**
+   * @param modeName         observing mode name, for error messages
+   * @param maxSciencePeriod cadence of the "Nighttime Calibrations" atoms
+   */
   def instantiate[F[_]: Monad](
-    observationId: Observation.Id,
-    estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
-    static:        Flamingos2StaticConfig,
-    namespace:     UUID,
-    expander:      SmartGcalExpander[F, Flamingos2StaticConfig, F2],
-    config:        Config,
-    time:          Either[OdbError, IntegrationTime],
-    calRole:       Option[CalibrationRole]
+    observationId:    Observation.Id,
+    estimator:        StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
+    static:           Flamingos2StaticConfig,
+    namespace:        UUID,
+    expander:         SmartGcalExpander[F, Flamingos2StaticConfig, F2],
+    modeName:         String,
+    maxSciencePeriod: TimeSpan,
+    config:           Config,
+    time:             Either[OdbError, IntegrationTime],
+    calRole:          Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
 
     val posTime: EitherT[F, OdbError, IntegrationTime] =
       EitherT.fromEither:
-        time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId))
+        time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId, modeName))
 
     def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
       val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.abbaCycle))
       EitherT.fromEither:
-        Either.cond(estimate < MaxSciencePeriod, estimate, exposureTimeTooLong(observationId, estimate))
+        Either.cond(estimate < maxSciencePeriod, estimate, exposureTimeTooLong(observationId, estimate, maxSciencePeriod))
 
     val gen = for
       t <- posTime
-      s <- StepDefinition.compute(config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
+      s <- StepDefinition.compute(modeName, config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
       e <- cycleEstimate(s)
       c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
     yield Generator(
       s,
       e,
+      maxSciencePeriod,
       (nel, calcState) => estimator.estimateTotalNel(static, nel).runA(calcState).value,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
       c
