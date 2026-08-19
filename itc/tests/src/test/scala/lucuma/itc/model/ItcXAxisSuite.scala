@@ -53,3 +53,27 @@ class ItcXAxisSuite extends FunSuite:
     assertEquals(x.indexOf(toWv(5000)), 8.some)
     assertEquals(x.indexOf(toWv(5100)), none)
   }
+
+  test("ItcXAxis.nonPositiveCount") {
+    assertEquals(ItcXAxis(1, 5, 9).nonPositiveCount, 0)
+    // Samples at -2, -1, 0, 1, ...: the one exactly at 0 nm has no Wavelength either
+    assertEquals(ItcXAxis(-2, 8, 11).nonPositiveCount, 3)
+    // Every sample below zero
+    assertEquals(ItcXAxis(-5, -1, 5).nonPositiveCount, 5)
+    // The blue CCD axis GMOS R150 reports at a central wavelength of 540 nm
+    assertEquals(ItcXAxis(-65.827, 328.665, 512).nonPositiveCount, 86)
+  }
+
+  test("ItcXAxis.drop keeps the spacing and the surviving wavelengths") {
+    val x = ItcXAxis(-2, 8, 11)
+    val d = x.drop(3)
+    assertEquals(d, ItcXAxis(1.0, 8.0, 8))
+    assertEquals(d.step, x.step)
+    assertEquals(d.at(0), x.at(3))
+
+    // With a fractional step the spacing must survive the shift
+    val r = ItcXAxis(-65.827, 328.665, 512)
+    assertEqualsDouble(r.drop(86).step, r.step, 1e-9)
+    assertEqualsDouble(r.drop(86).at(0), r.at(86), 1e-9)
+    assert(r.drop(86).start > 0)
+  }

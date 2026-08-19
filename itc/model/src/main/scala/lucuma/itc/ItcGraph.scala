@@ -35,9 +35,14 @@ enum GraphType(val tag: String) derives Enumerated:
 
 // X-axis values are always wavelength in nanometers
 case class ItcXAxis(start: Double, end: Double, count: Int) derives Decoder, Encoder.AsObject:
-  assert(start >= 0, "Wavelength <= 0 received in ITC graph data.")
-
   val step: Double = (end - start) / (count - 1)
+
+  // Drop the first n samples, keeping the sample spacing and the remaining wavelengths intact.
+  def drop(n: Int): ItcXAxis = ItcXAxis(start + n * step, end, count - n)
+
+  // Number of leading samples that are at or below 0 nm, i.e. have no valid Wavelength.
+  def nonPositiveCount: Int =
+    if start > 0 then 0 else (((-start) / step).floor.toInt + 1).min(count)
 
   def at(index: Int): Double                       = start + index * step
   def wavelengthAt(index: Int): Option[Wavelength] =
@@ -86,6 +91,29 @@ object ItcSeries:
     xAxis:      ItcXAxis
   ): ItcSeries =
     ItcSeries(title, seriesType, dataY, xAxis, ItcYAxis.fromData(dataY))
+
+  /**
+   * Build a series out of legacy data, dropping the samples at or below 0 nm.
+   *
+   * Low dispersion gratings at blue central wavelengths (e.g. GMOS R150 below ~608 nm) report an
+   * x-axis that extends past 0 nm. 
+   *
+   * Those samples are zero padding but have no valid Wavelength, so
+   * they are dropped together with their y-values to keep the index to wavelength mapping intact.
+   * Returns None if no sample is above 0 nm.
+   */
+  def fromLegacy(
+    title:      String,
+    seriesType: SeriesDataType,
+    dataY:      NonEmptyList[Double],
+    xAxis:      ItcXAxis
+  ): Option[ItcSeries] =
+    xAxis.nonPositiveCount match
+      case 0 => ItcSeries(title, seriesType, dataY, xAxis).some
+      case n =>
+        NonEmptyList
+          .fromList(dataY.toList.drop(n))
+          .map(ItcSeries(title, seriesType, _, xAxis.drop(n)))
 
 case class ItcGraph(graphType: GraphType, series: List[ItcSeries]) derives Eq, Encoder.AsObject
 

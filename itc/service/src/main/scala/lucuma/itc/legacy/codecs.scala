@@ -577,11 +577,15 @@ private[legacy] object codecs:
 
   private given Decoder[ItcSeries] = (c: HCursor) =>
     for
-      title <- c.downField("title").as[String]
-      dt    <- c.downField("dataType").as[SeriesDataType]
-      dataY <- c.downField("dataY").as[NonEmptyList[Double]]
-      xaxis <- c.downField("xAxis").as[ItcXAxis]
-    yield ItcSeries(title, dt, dataY, xaxis)
+      title  <- c.downField("title").as[String]
+      dt     <- c.downField("dataType").as[SeriesDataType]
+      dataY  <- c.downField("dataY").as[NonEmptyList[Double]]
+      xaxis  <- c.downField("xAxis").as[ItcXAxis]
+      series <- ItcSeries
+                  .fromLegacy(title, dt, dataY, xaxis)
+                  .toRight:
+                    DecodingFailure(s"No data above 0 nm in series '$title'", c.history)
+    yield series
 
   given Decoder[ItcGraph] = (c: HCursor) =>
     for
