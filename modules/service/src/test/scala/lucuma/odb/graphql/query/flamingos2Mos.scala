@@ -6,9 +6,12 @@ package query
 
 import cats.data.NonEmptySet
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
+import fs2.Stream
+import fs2.text.utf8
 import io.circe.literal.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
@@ -31,6 +34,8 @@ import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Flamingos2
 import lucuma.odb.smartgcal.data.SmartGcalValue
 import lucuma.odb.smartgcal.data.SmartGcalValue.LegacyInstrumentConfig
+import org.http4s.Request
+import org.http4s.Response
 import skunk.Session
 
 /**
@@ -43,6 +48,13 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
   val user: User = TestUsers.service(3)
 
   override val validUsers: List[User] = List(user)
+
+  // AGS must not reach the real Gaia catalog, which resets connections often enough to
+  // fail this suite. Serve the same canned candidates the guide environment suites use.
+  override protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
+    _ =>
+      Resource.eval:
+        IO.pure(Response(body = Stream(GaiaVoTables.multipleCandidates).through(utf8.encode)))
 
   private val ObsTime: Timestamp =
     Timestamp.FromString.getOption("2025-02-01T00:00:00Z").get
