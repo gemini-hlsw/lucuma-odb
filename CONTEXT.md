@@ -74,6 +74,29 @@ _Avoid_: mask file, MDF, mask id.
 The observatory's identifier for the physical plate a Mask Attachment describes, such as `GN2025AQ001-01` — what is written on the plate, what the mask cutting queue calls it, and what eventually reaches the instrument. Names the *plate*, where the Mask Attachment names the *file* and the Custom Mask names the *FPU*. Always present on a Mask Attachment and unique within a program, but never entered: it is derived from the attachment and is read-only everywhere it appears. The ODB is not the system of record for its syntax, so no convention is enforced on it.
 _Avoid_: MDF name, mask file name, mask id.
 
+### Mask Designs
+
+**Mask Definition**:
+The design parsed out of a Mask Attachment's file at upload and recorded on the attachment: instrument, pixel scale, pointing, position angle, dispersion direction and the slit list. Names the *design*, where the Mask Attachment names the file, the Mask Name the plate and the Custom Mask the FPU. Derived data — the uploaded file remains the source of truth and the definition can always be rebuilt from it. A file that cannot be parsed, or that records no position angle, rejects the upload, so a definition exists exactly for masks accepted since parsing began.
+_Avoid_: mask metadata, mask blob (names the storage, not the concept), ODF (names the file format).
+
+**Alignment Box**:
+An aperture in a Mask Definition cut for a bright star and used to position the mask on sky during acquisition, not to take a spectrum. Distinguished from science slits by its ACQUISITION placement priority — never by shape or slit type, which do not discriminate.
+_Avoid_: acquisition star (names the star, not the aperture), alignment slit.
+
+**Science Slit**:
+Any aperture in a Mask Definition that is not an Alignment Box — the slits that place science objects. The population behind the science slit count and the Average Slit Width.
+
+**Average Slit Width**:
+The mean width of a Mask Definition's Science Slits. Alignment Boxes are excluded so their wide apertures do not skew it; a design with no Science Slits has no average.
+
+**Dispersion Direction**:
+The axis along which the instrument spreads a spectrum, in pre-image detector coordinates — horizontal for GMOS, vertical for Flamingos-2. It decides how a mask file's x and y columns are read: a slit's *width* is always its extent along the dispersion direction, its *length* the extent across it.
+
+**Slit Offsets and Tilt**:
+The signed quantities on a slit: displacement along the slit's length, displacement across its width (which drives a point source off the slit), and the tilt, bounded to ±45°. Held in the wrapping `Angle` type but always rendered in the signed representation, the way Declination is — −1.5″ reads as −1.5″, never as a full turn less. Reading them as plain magnitudes is a bug.
+_Avoid_: unsigned or wrapped readings of these fields.
+
 ### Observing Modes
 
 **MOS (Multi-Object Spectroscopy)**:
