@@ -15,9 +15,9 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.math.dimensional.syntax.*
 import lucuma.core.math.units.*
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.ImageQuality
-import lucuma.core.model.CloudExtinction
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED

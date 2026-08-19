@@ -96,11 +96,11 @@ object ItcSeries:
    * Build a series out of legacy data, dropping the samples at or below 0 nm.
    *
    * Low dispersion gratings at blue central wavelengths (e.g. GMOS R150 below ~608 nm) report an
-   * x-axis that extends past 0 nm. 
+   * x-axis that extends past 0 nm.
    *
-   * Those samples are zero padding but have no valid Wavelength, so
-   * they are dropped together with their y-values to keep the index to wavelength mapping intact.
-   * Returns None if no sample is above 0 nm.
+   * Those samples are zero padding but have no valid Wavelength, so they are dropped together with
+   * their y-values to keep the index to wavelength mapping intact. Returns None if no sample is
+   * above 0 nm.
    */
   def fromLegacy(
     title:      String,
