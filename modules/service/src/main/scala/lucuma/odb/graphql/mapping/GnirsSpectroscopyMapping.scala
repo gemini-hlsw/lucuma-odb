@@ -58,7 +58,11 @@ trait GnirsSpectroscopyMapping[F[_]]
         List("acqSkyOffPRaw", "acqSkyOffQRaw")
       ),
 
+      // The effective acquisition exposure time mode, and the explicit override.
+      // Both read the same t_exposure_time_mode row; the explicit one is keyed on the
+      // view's c_explicit_* columns so it is null when the mode is derived.
       SqlObject("exposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("explicitExposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
     )
 
   /**
@@ -195,7 +199,7 @@ trait GnirsSpectroscopyMapping[F[_]]
     case (GnirsSpectroscopyType, "initialCentralWavelengths", Nil) =>
       wavelengthElaborator(ObservingModeRowVersion.Initial)
 
-    case (GnirsSpectroscopyAcquisitionType, "exposureTimeMode", Nil) =>
+    case (GnirsSpectroscopyAcquisitionType, "exposureTimeMode" | "explicitExposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(

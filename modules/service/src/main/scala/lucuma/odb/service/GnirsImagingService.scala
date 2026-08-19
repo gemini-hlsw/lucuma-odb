@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
@@ -32,6 +33,7 @@ import lucuma.odb.graphql.input.GnirsImagingInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
 import lucuma.odb.sequence.data.TelescopeConfigGenerator
+import lucuma.odb.sequence.gnirs as gnirs
 import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.gnirs.imaging.Config
 import lucuma.odb.sequence.gnirs.imaging.Filter
@@ -40,6 +42,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import monocle.Optional
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int4
 import skunk.codec.numeric.int8
 import skunk.implicits.*
@@ -148,6 +151,15 @@ object GnirsImagingService:
           .traverse_ : rs =>
             session.exec(Statements.insertFilters(rs, version))
 
+      // The acquisition ETM the user asked for, if any.  On create, both Absent and an
+      // explicit null mean "derive it".
+      private def acqEtm(input: GnirsImagingInput.Create): Option[ExposureTimeMode] =
+        input.acquisition.flatMap(_.explicitExposureTimeMode.toOption)
+
+      // None => no explicit acquisition type, so the ITC brightness classification decides.
+      private def acqType(input: GnirsImagingInput.Create): Option[GnirsAcquisitionType] =
+        input.acquisition.flatMap(_.explicitAcqType.toOption)
+
       override def insert(
         input:  GnirsImagingInput.Create,
         reqEtm: Option[ExposureTimeMode],
@@ -169,10 +181,18 @@ object GnirsImagingService:
               _   <- ResultT.liftF(session.exec(Statements.insert(input, oids)))
 
               // Resolve the etms for acquisition and science. An explicit acquisition ETM
-              // wins; otherwise it is derived from the first science ETM.
-              r   <- ResultT(services.exposureTimeModeService.resolve("GNIRS Imaging", input.acquisition.flatMap(_.exposureTimeMode), input.filters.map(f => (f.filter, f.exposureTimeMode)), reqEtm, which))
+              // wins; otherwise it is derived from the brightness classification, at the
+              // first science ETM's wavelength, and the ITC maintains it from there.
+              r   <- ResultT(services.exposureTimeModeService.resolve(
+                       "GNIRS Imaging",
+                       acqEtm(input),
+                       input.filters.map(f => (f.filter, f.exposureTimeMode)),
+                       reqEtm,
+                       which,
+                       gnirs.derivedAcquisitionExposureTimeMode(acqType(input), _)
+                     ))
 
-              ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
+              ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r, acquisitionIsExplicit = acqEtm(input).isDefined))
               ini  = stripAcquisition(ids)
               _   <- ResultT.liftF(insertFilters(input.filters, ini, ObservingModeRowVersion.Initial))
 
@@ -223,9 +243,23 @@ object GnirsImagingService:
                 _   <- ResultT.liftF(insertFilters(fs, cur, ObservingModeRowVersion.Current))
               yield ()
 
-          val acqEtmUpdate =
-            SET.acquisition.flatMap(_.exposureTimeMode).fold(().pure[F]): e =>
-              services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Acquisition, e)
+          // Absent leaves the acquisition ETM alone, an explicit mode replaces it, and
+          // null reverts it to derived (keeping the current value as a prior until the
+          // next ITC pass).  When the acquisition *type* is set explicitly the S/N follows
+          // from it with no ITC involvement, so apply that immediately -- but only to a
+          // derived row.
+          val acqEtmUpdate: F[Unit] =
+            val etmUpdate =
+              SET.acquisition.map(_.explicitExposureTimeMode) match
+                case Some(Nullable.NonNull(e)) => services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Acquisition, e, isExplicit = true)
+                case Some(Nullable.Null)       => services.exposureTimeModeService.setDerived(which, ExposureTimeModeRole.Acquisition, gnirs.acquisitionSignalToNoise(GnirsAcquisitionType.Faint))
+                case _                         => ().pure[F]
+
+            val snUpdate =
+              SET.acquisition.flatMap(_.explicitAcqType.toOption).fold(().pure[F]): t =>
+                services.exposureTimeModeService.updateDerivedSignalToNoise(which, ExposureTimeModeRole.Acquisition, gnirs.acquisitionSignalToNoise(t))
+
+            etmUpdate *> snUpdate
 
           def updateOffsetForRole(
             input:   Nullable[TelescopeConfigGeneratorInput],
@@ -290,15 +324,16 @@ object GnirsImagingService:
        gnirs_filter.opt           *: // c_acq_filter (explicit override; None => first science filter)
        angle_µas.opt              *: // c_acq_sky_offset_p
        angle_µas.opt              *: // c_acq_sky_offset_q
-       exposure_time_mode            // acquisition ETM
-      ).map: (acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, acqEtm) =>
+       exposure_time_mode         *: // acquisition ETM (effective)
+       bool                          // c_is_explicit
+      ).map: (acqType, acqCoadds, acqFilter, acqSkyOffP, acqSkyOffQ, acqEtm, acqEtmExplicit) =>
         val acqSkyOffset: Offset =
           (acqSkyOffP, acqSkyOffQ)
             .mapN((p, q) => Offset(Offset.P(p), Offset.Q(q)))
             .getOrElse(GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset)
         val explicitAcqMode: Option[GnirsAcquisitionMode] =
           acqType.map(GnirsAcquisitionMode.forTypeAndOffset(_, acqSkyOffset))
-        AcquisitionConfig(explicitAcqMode, acqFilter, acqEtm, acqCoadds)
+        AcquisitionConfig(explicitAcqMode, acqFilter, acqEtm, acqEtmExplicit, acqCoadds)
 
     val modeFields: Decoder[ModeFields] =
       (gnirs_camera         *:
@@ -348,7 +383,8 @@ object GnirsImagingService:
           acq.c_signal_to_noise_at,
           acq.c_signal_to_noise,
           acq.c_exposure_time,
-          acq.c_exposure_count
+          acq.c_exposure_count,
+          acq.c_is_explicit
         FROM v_gnirs_imaging v
         JOIN #${GnirsImagingService.FilterTableName} f
           ON f.c_observation_id = v.c_observation_id AND f.c_version = 'current'

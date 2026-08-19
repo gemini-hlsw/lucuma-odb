@@ -238,7 +238,7 @@ class updateObservations_GnirsImaging extends OdbSuite with UpdateObservationsOp
         gnirsImaging: {
           acquisition: {
             explicitFilter: H2
-            exposureTimeMode: {
+            explicitExposureTimeMode: {
               timeAndCount: { time: { seconds: 8.0 }, count: 1, at: { nanometers: 1250.0 } }
             }
             coadds: 3
@@ -295,7 +295,7 @@ class updateObservations_GnirsImaging extends OdbSuite with UpdateObservationsOp
           camera: SHORT_BLUE
           filters: [ { filter: J } ]
           acquisition: {
-            exposureTimeMode: {
+            explicitExposureTimeMode: {
               timeAndCount: { time: { seconds: 8.0 }, count: 1, at: { nanometers: 1250.0 } }
             }
             coadds: 3

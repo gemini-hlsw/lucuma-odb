@@ -302,7 +302,7 @@ class createObservation_GnirsImaging extends OdbSuite:
   test("create GNIRS imaging with an explicit acquisition exposure time mode and coadds"):
     createWithAcquisition(
       """{
-        exposureTimeMode: {
+        explicitExposureTimeMode: {
           timeAndCount: { time: { seconds: 12.0 }, count: 1, at: { nanometers: 1250.0 } }
         }
         coadds: 4

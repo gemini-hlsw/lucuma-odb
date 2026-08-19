@@ -9,6 +9,7 @@ import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import eu.timepit.refined.api.Refined
@@ -36,6 +37,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
+import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.util.CommitHash
@@ -460,14 +462,15 @@ object Generator:
       )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, Unit]] =
 
         def go[S, D](
-          acq: ItcAcquisition,
-          gen: F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
+          acq:   ItcAcquisition,
+          input: Option[ItcInput],
+          gen:   F[Either[OdbError, StreamingExecutionConfig[F, S, D]]]
         )(
           persist: (Observation.Id, Stream[F, Atom[D]]) => F[Unit]
         )(using Transaction[F]): EitherT[F, OdbError, Unit] =
           EitherT(gen)
             .flatMap(s => EitherT.liftF(persist(observationId, s.acquisition)))
-            .flatMap(_ => EitherT.liftF(itcService.updateAcquisition(observationId, acq)))
+            .flatMap(_ => EitherT.liftF(input.traverse_(itcService.updateAcquisition(observationId, _, acq))))
 
         // Re-derive the acquisition ITC, bypassing the frozen snapshot, so that
         // an edited acquisition exposure-time mode takes effect.  The remote call
@@ -489,7 +492,7 @@ object Generator:
                     EitherT.pure(())
 
                   case ObservingModeType.Flamingos2LongSlit =>
-                    go(freshAcq, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
+                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
                   // N.B. there is no MOS acquisition yet, so there is nothing to reset.
                   // This becomes wrong once a MOS acquisition lands.
@@ -505,13 +508,13 @@ object Generator:
                     EitherT.pure(())
 
                   case ObservingModeType.GmosNorthLongSlit  =>
-                    go(freshAcq, streaming.generateGmosNorthLongSlit(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
+                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthLongSlit(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
 
                   case ObservingModeType.GmosSouthImaging   =>
                     EitherT.pure(())
 
                   case ObservingModeType.GmosSouthLongSlit  =>
-                    go(freshAcq, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
+                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
                   case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
                     EitherT.pure(())
@@ -520,7 +523,7 @@ object Generator:
                     EitherT.pure(())
 
                   case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
-                    go(freshAcq, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)
+                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)
 
                   case ObservingModeType.Igrins2LongSlit    =>
                     EitherT.pure(())

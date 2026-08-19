@@ -4,9 +4,12 @@
 package lucuma.odb.sequence.gnirs
 
 import cats.syntax.eq.*
+import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 
@@ -24,5 +27,34 @@ def keyholeExposureTime(camera: GnirsCamera): TimeSpan =
 // The fixed signal-to-noise used to classify the acquisition mode (Very Bright /
 // Bright / Faint) from target brightness, independent of the user's requested S/N.
 // See the two-pass acquisition ITC in ItcService.
+//
+// By construction this equals `acquisitionSignalToNoise(Faint)`, which is why a
+// target that classifies as Faint needs no second ITC pass: the classification
+// call already computed its exposure at the S/N the acquisition will use.
 val AcquisitionClassificationSignalToNoise: SignalToNoise =
-  SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(10))
+  acquisitionSignalToNoise(GnirsAcquisitionType.Faint)
+
+// The signal-to-noise an automatic acquisition targets, as a function of the
+// brightness classification: brighter targets are acquired at a higher S/N because
+// the exposure needed to reach it is still short.
+//
+// ATTENTION: duplicated in the migration that backfills c_is_explicit. Modify in sync.
+def acquisitionSignalToNoise(acquisitionType: GnirsAcquisitionType): SignalToNoise =
+  val sn = acquisitionType match
+    case GnirsAcquisitionType.VeryBright => 30
+    case GnirsAcquisitionType.Bright     => 20
+    case GnirsAcquisitionType.Faint      => 10
+  SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(sn))
+
+// The acquisition exposure time mode to use when the user has not set one: always
+// signal-to-noise, at the value the brightness classification calls for. An explicit
+// acquisition type determines the classification outright; otherwise we start from Faint
+// and the ITC rewrites it once it has classified the target.
+def derivedAcquisitionExposureTimeMode(
+  acquisitionType: Option[GnirsAcquisitionType],
+  at:              Wavelength
+): ExposureTimeMode =
+  ExposureTimeMode.SignalToNoiseMode(
+    acquisitionSignalToNoise(acquisitionType.getOrElse(GnirsAcquisitionType.Faint)),
+    at
+  )

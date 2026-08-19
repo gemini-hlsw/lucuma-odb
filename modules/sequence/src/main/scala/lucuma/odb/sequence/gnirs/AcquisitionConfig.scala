@@ -24,13 +24,44 @@ import java.io.DataOutputStream
  * `explicitAcqMode` of `None` means the brightness classification is used; when it is
  * `Faint` it carries its own sky offset (whose default differs per mode). An
  * `explicitFilter` of `None` means the filter is derived per mode.
+ *
+ * `exposureTimeMode` is the *effective* mode: the user's when `explicitExposureTimeMode`
+ * is set, otherwise the one derived from the brightness classification and maintained by
+ * the ITC service. Because a derived value is a function of an ITC result, it must not
+ * take part in configuration identity — see `itcExposureTimeMode`, which `hashBytes` and
+ * `Eq` use in its place.
  */
 case class AcquisitionConfig(
-  explicitAcqMode:  Option[GnirsAcquisitionMode],
-  explicitFilter:   Option[GnirsFilter],
-  exposureTimeMode: ExposureTimeMode,
-  coadds:           PosInt
+  explicitAcqMode:          Option[GnirsAcquisitionMode],
+  explicitFilter:           Option[GnirsFilter],
+  exposureTimeMode:         ExposureTimeMode,
+  explicitExposureTimeMode: Boolean,
+  coadds:                   PosInt
 ):
+
+  /**
+   * True when the acquisition signal-to-noise is derived from the ITC brightness
+   * classification, i.e. the user set neither the exposure time mode nor the
+   * acquisition type (an explicit type determines the S/N on its own, with no ITC).
+   */
+  def autoSignalToNoise: Boolean =
+    !explicitExposureTimeMode && explicitAcqMode.isEmpty
+
+  /**
+   * The acquisition exposure time mode as presented to the ITC.
+   *
+   * When the S/N is derived, the effective value is whatever the last classification
+   * produced — so putting it here would make the ITC input hash a function of the ITC
+   * output, and every write would invalidate the result that produced it. A fixed
+   * placeholder at the classification S/N stands in instead, and the real S/N is chosen
+   * inside `ItcService.safeAcquisitionCall`'s second pass from the classification it just
+   * computed. Do not "fix" this by using `exposureTimeMode`.
+   */
+  def itcExposureTimeMode: ExposureTimeMode =
+    if autoSignalToNoise then
+      ExposureTimeMode.SignalToNoiseMode(AcquisitionClassificationSignalToNoise, exposureTimeMode.at)
+    else
+      exposureTimeMode
 
   /**
    * The acquisition mode: the explicit choice if set, else the brightness
@@ -92,11 +123,19 @@ case class AcquisitionConfig(
         out.write(o.hashBytes)
     out.writeChars(explicitFilter.fold("")(_.tag))
     out.write(coadds.value.hashBytes)
-    out.write(exposureTimeMode.hashBytes)
+    // The ITC-facing mode, not the effective one: a derived S/N must not change the hash.
+    out.write(itcExposureTimeMode.hashBytes)
     out.close()
     bao.toByteArray
 
 object AcquisitionConfig:
+
+  /**
+   * Compares the ITC-facing exposure time mode rather than the effective one, so that two
+   * configurations differing only in a derived signal-to-noise are equal. This keeps
+   * `CalibrationConfigSubset` from re-syncing telluric standards every time a
+   * classification lands.
+   */
   given Eq[AcquisitionConfig] =
     Eq.by: a =>
-      (a.explicitAcqMode, a.explicitFilter, a.coadds.value, a.exposureTimeMode)
+      (a.explicitAcqMode, a.explicitFilter, a.coadds.value, a.itcExposureTimeMode)
