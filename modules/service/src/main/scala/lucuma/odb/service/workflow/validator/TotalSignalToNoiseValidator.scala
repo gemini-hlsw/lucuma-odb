@@ -10,6 +10,7 @@ import lucuma.core.data.Zipper
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.TotalSN
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservationValidation
 import lucuma.core.util.Enumerated
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcResult
@@ -33,7 +34,7 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
       .filter(_ < MinRecommended)
       .foldMap: sn =>
         val msg = s"Total S/N ${extra.foldMap(s => s"($s) ")} is $sn (min. 3 recommended)"
-        ??? : ObservationValidationMap
+        ObservationValidationMap.singleton(ObservationValidation.genericWaning(msg))
 
   def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(using e: Enumerated[A]): ObservationValidationMap =
     map.toNel.foldMap: (a, z) =>

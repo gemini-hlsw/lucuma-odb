@@ -26,8 +26,10 @@ import lucuma.core.enums.SubaruInstrument
 import lucuma.core.enums.TooActivation
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Wavelength
 import lucuma.core.model.CallCoordinatesLimits
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.ConstraintSet
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.SiteCoordinatesLimits
@@ -54,6 +56,8 @@ case class ObservationValidationInfo(
   pid:                    Program.Id,
   tpe:                    ProgramType,
   oid:                    Observation.Id,
+  constraintSet:          ConstraintSet,
+  spectroscopyWavelength: Option[Wavelength],
   observingMode:          Option[ObservingModeType],
   coordinates:            Option[Coordinates],  // explicit base, or coordinates at CFP midpoint, if any
   explicitBase:           Option[Coordinates],
@@ -72,7 +76,7 @@ case class ObservationValidationInfo(
   programAllocations:     Option[NonEmptyList[ScienceBand]] = None,
   otherConfigErrors:      List[String] = Nil,
   keckInstrument:         Option[KeckInstrument] = None,   // set for exchange_keck observations
-  subaruInstrument:       Option[SubaruInstrument] = None  // set for exchange_subaru observations
+  subaruInstrument:       Option[SubaruInstrument] = None, // set for exchange_subaru observations
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -333,7 +337,22 @@ object ObservationValidationInfo {
           x.c_too_activation_effective,
           x.c_cfp_id,
           o.c_science_band,
-          s.c_workflow_user_state
+          s.c_workflow_user_state,
+
+          -- conditions
+          o.c_cloud_extinction,
+          o.c_image_quality,   
+          o.c_sky_background,  
+          o.c_water_vapor,
+
+          -- relative order is important here; we're decoding a 4-col vector for elevationrange
+          o.c_air_mass_min,    
+          o.c_air_mass_max,    
+          o.c_hour_angle_min,  
+          o.c_hour_angle_max,
+
+          o.c_spec_wavelength
+
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
         -- v_proposal rather than t_proposal: it adds the effective ToO ceiling
@@ -346,10 +365,33 @@ object ObservationValidationInfo {
           AND o.c_group_id = s.c_group_id
         WHERE o.c_observation_id IN ($enc)
       """
-      .query(program_id *: program_type *: observation_id *: observing_mode_type.opt *: right_ascension.opt *: declination.opt *: calibration_role.opt *: user_state.opt *: declared_execution_state.opt *: proposal_status *: too_activation *: too_activation.opt *: cfp_id.opt *: science_band.opt *: user_state.opt)
+      .query(
+        program_id                   *:
+        program_type                 *:
+        observation_id               *:
+        observing_mode_type.opt      *:
+        right_ascension.opt          *:
+        declination.opt              *:
+        calibration_role.opt         *:
+        user_state.opt               *:
+        declared_execution_state.opt *:
+        proposal_status              *:
+        too_activation               *:
+        too_activation.opt           *:
+        cfp_id.opt                   *:
+        science_band.opt             *:
+        user_state.opt               *:
+        cloud_extinction_preset      *:
+        image_quality_preset         *:
+        sky_background               *:
+        water_vapor                  *:
+        elevation_range              *:
+        wavelength_pm.opt
+      )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, ceil, cfp, sci, state2) =>
-          ObservationValidationInfo(pid, tpe, oid, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, ceil, cfp, sci, Nil, state2)
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl) =>
+          val cs = ConstraintSet(iq, ce, sb, wv, er)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, ceil, cfp, sci, Nil, state2)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

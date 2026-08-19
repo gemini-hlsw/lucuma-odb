@@ -62,19 +62,20 @@ object ObservationValidator:
       ObservationValidationMap.empty
 
     val scienceValidator1: ObservationValidator =
-      GeneratorValidator         |+|
-      CfpInstrumentValidator     |+|
-      ExchangeValidator          |+|
-      CfpRaDecValidator          |+|
-      BandValidator              |+|
-      GhostVMagnitudeValidator   |+|
-      TooActivationValidator     |+|
-      OpportunityTargetValidator |+|
-      OtherConfigErrorValidator
+      GeneratorValidator             |+|
+      CfpInstrumentValidator         |+|
+      ExchangeValidator              |+|
+      CfpRaDecValidator              |+|
+      BandValidator                  |+|
+      GhostVMagnitudeValidator       |+|
+      TooActivationValidator         |+|
+      OpportunityTargetValidator     |+|
+      OtherConfigErrorValidator      |+|
+      ConditionsProbabilityValidator
 
     val scienceValidator2: ObservationValidator =
       ItcValidator(itcFor)                |+| 
-      AcquisitionValidator(itcFor)        |+| 
+      AcquisitionValidator(itcFor)        //|+| 
       TotalSignalToNoiseValidator(itcFor)
 
     // And our validation results
