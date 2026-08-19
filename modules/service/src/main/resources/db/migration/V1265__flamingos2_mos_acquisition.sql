@@ -2,15 +2,33 @@
 -- acquisition configuration long slit does: an optional filter override (the
 -- default being the acquisition filter nearest the science filter) and an
 -- acquisition-role exposure time mode.
+--
+-- It also stops storing an offset preset (V1264).
 
 ALTER TABLE t_flamingos_2_mos
   ADD COLUMN c_acquisition_filter d_tag REFERENCES t_f2_filter(c_tag);
 
--- Rebuild the view with the acquisition filter default, computed exactly as in
--- v_flamingos_2_long_slit (V1219).  The preset-driven telescope config defaults
--- are unchanged from V1264.
+-- Preserve behaviour before the preset goes: a crowded-field row with no override
+-- would silently fall back to the along-slit default, so write its configs out
+-- explicitly.  V1222 did this for IGRINS 2's nod_to_sky rows.
+UPDATE t_flamingos_2_mos
+SET c_slit_offset_mode  = 'nod_to_sky',
+    c_telescope_configs =
+      '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"},{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":300000000}},"guiding":"DISABLED"},{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":320000000}},"guiding":"DISABLED"},{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]'
+WHERE c_mos_offset_preset = 'crowded_field'
+  AND c_slit_offset_mode IS NULL;
+
+-- The view selects m.*, so it must go before the column can.
 DROP VIEW v_flamingos_2_mos;
 
+ALTER TABLE t_flamingos_2_mos
+  DROP COLUMN c_mos_offset_preset;
+
+DROP TABLE t_f2_mos_offset_preset;
+
+-- Rebuild with the acquisition filter default, computed exactly as in
+-- v_flamingos_2_long_slit (V1219), and a single literal telescope config default,
+-- as that view and v_igrins_2_long_slit (V1222) both have.
 CREATE VIEW v_flamingos_2_mos AS
   SELECT
     m.*,
@@ -29,20 +47,11 @@ CREATE VIEW v_flamingos_2_mos AS
   FROM t_flamingos_2_mos m
   CROSS JOIN LATERAL (
     SELECT
-      -- Default slit offset mode (shape) per preset.
-      CASE m.c_mos_offset_preset
-        WHEN 'crowded_field' THEN 'nod_to_sky'
-        ELSE                      'nod_along_slit'
-      END::varchar AS c_slit_offset_mode_default,
+      'nod_along_slit'::varchar AS c_slit_offset_mode_default,
       -- Default telescope configs JSON (transport codec).
-      -- ATTENTION: duplicated from lucuma-core flamingos2.defaultMosTelescopeConfigs.
-      -- Keep in sync.
-      CASE m.c_mos_offset_preset
-        WHEN 'crowded_field' THEN
-          '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"},{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":300000000}},"guiding":"DISABLED"},{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":320000000}},"guiding":"DISABLED"},{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]'
-        ELSE
-          '[{"q":{"microarcseconds":1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":-1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":-1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":1200000},"guiding":"ENABLED"}]'
-      END::text AS c_telescope_configs_default
+      -- ATTENTION: duplicated from lucuma-core flamingos2.defaultMosTelescopeConfigs
+      -- for the sparse field.  Keep in sync.
+      '[{"q":{"microarcseconds":1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":-1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":-1200000},"guiding":"ENABLED"},{"q":{"microarcseconds":1200000},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
   ) d;
 
 -- Existing F2 MOS observations have no acquisition ETM row.  Give each one the

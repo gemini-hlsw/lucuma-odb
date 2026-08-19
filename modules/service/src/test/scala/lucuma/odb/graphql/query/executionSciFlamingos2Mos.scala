@@ -162,13 +162,21 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
       }
     """
 
+  // A crowded field is asked for by writing the nod-to-sky configs explicitly.
   private val CrowdedFieldMode: String =
     """
       flamingos2Mos: {
         disperser: R1200_JH
         filter: JH
         customMask: { slitWidth: CUSTOM_WIDTH_1_PIX }
-        offsetPreset: CROWDED_FIELD
+        explicitTelescopeConfigs: {
+          toSky: [
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:   0.0 } }, guiding: ENABLED },
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 300.0 } }, guiding: DISABLED },
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 320.0 } }, guiding: DISABLED },
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:   0.0 } }, guiding: ENABLED }
+          ]
+        }
       }
     """
 

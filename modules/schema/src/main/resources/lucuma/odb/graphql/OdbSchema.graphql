@@ -9972,24 +9972,6 @@ enum Flamingos2CustomSlitWidth {
 }
 
 """
-Flamingos 2 MOS offset preset, which selects the default telescope configs for
-the science sequence.
-"""
-enum Flamingos2MosOffsetPreset {
-
-  """
-  Nod along the slit, ABBA at +/- 1.2 arcsec, all offsets guided.
-  """
-  SPARSE_FIELD
-
-  """
-  Nod to sky, with guiding disabled on the two sky offsets.
-  """
-  CROWDED_FIELD
-
-}
-
-"""
 Flamingos 2 Lyot Wheel
 """
 enum Flamingos2LyotWheel {
@@ -10650,11 +10632,6 @@ type Flamingos2Mos {
   explicitReadoutMode: Flamingos2ReadoutMode
 
   """
-  The offset preset from which the default telescope configs are taken.
-  """
-  offsetPreset: Flamingos2MosOffsetPreset!
-
-  """
   Effective telescope configs (explicit override coalesced with the default).
   """
   telescopeConfigs: SlitTelescopeConfigs!
@@ -10746,13 +10723,6 @@ input Flamingos2MosInput {
   The readoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitReadoutMode: Flamingos2ReadoutMode
-
-  """
-  The offset preset from which the default telescope configs are taken.  It may be
-  specified or skipped altogether, but not unset with a null value.  On create the
-  default is SPARSE_FIELD.
-  """
-  offsetPreset: Flamingos2MosOffsetPreset
 
   """
   Explicit telescope configs. May be unset by assigning null, or ignored by skipping.

@@ -140,7 +140,7 @@ object ObservingModeInput:
       access <= Access.Pi                                        ||
         flamingos2Imaging.isDefined                              ||
         flamingos2LongSlit.exists(_.limitToPreExecution(access)) ||
-        flamingos2Mos.exists(_.limitToPreExecution(access))       ||
+        flamingos2Mos.exists(_.limitToPreExecution(access))      ||
         ghostIfu.isDefined                                       ||
         gmosNorthImaging.isDefined                               ||
         gmosNorthLongSlit.exists(_.limitToPreExecution(access))  ||

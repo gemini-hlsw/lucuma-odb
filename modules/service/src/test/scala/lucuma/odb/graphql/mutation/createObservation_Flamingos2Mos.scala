@@ -18,7 +18,6 @@ import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.flamingos2.defaultMosTelescopeConfigs
-import lucuma.core.syntax.string.*
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.util.Codecs.attachment_id
 import lucuma.odb.util.Codecs.observation_id
@@ -136,7 +135,6 @@ class createObservation_Flamingos2Mos extends OdbSuite:
               explicitDecker
               readoutMode
               defaultReadoutMode
-              offsetPreset
               telluricType { tag }
               acquisition {
                 filter
@@ -180,7 +178,6 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                 "explicitDecker": null,
                 "readoutMode": "SCIENCE",
                 "defaultReadoutMode": "SCIENCE",
-                "offsetPreset": "SPARSE_FIELD",
                 "telluricType": { "tag": "HOT" },
                 "acquisition": {
                   "filter": "H",
@@ -330,14 +327,13 @@ class createObservation_Flamingos2Mos extends OdbSuite:
              )
     yield ()
 
-  test("the sparse field preset nods along the slit at +/- 1.2 arcsec"):
+  test("the default nods along the slit at +/- 1.2 arcsec"):
     setup(simpleMode).flatMap: (_, oid) =>
       expect(pi, s"""
         query {
           observation(observationId: "$oid") {
             observingMode {
               flamingos2Mos {
-                offsetPreset
                 telescopeConfigs { $telescopeConfigsSelection }
                 defaultTelescopeConfigs { $telescopeConfigsSelection }
                 explicitTelescopeConfigs { $telescopeConfigsSelection }
@@ -350,7 +346,6 @@ class createObservation_Flamingos2Mos extends OdbSuite:
           "observation": {
             "observingMode": {
               "flamingos2Mos": {
-                "offsetPreset": "SPARSE_FIELD",
                 "telescopeConfigs": {
                   "offsetMode": "NOD_ALONG_SLIT",
                   "alongSlit": [
@@ -378,13 +373,22 @@ class createObservation_Flamingos2Mos extends OdbSuite:
         }
       """.asRight)
 
-  test("the crowded field preset nods to sky with guiding off on the sky offsets"):
+  // A crowded field nods to sky, which the client asks for by writing the configs
+  // explicitly from lucuma-core's defaultMosTelescopeConfigs, as for IGRINS 2.
+  test("explicit nod-to-sky configs keep guiding off on the sky offsets"):
     setup("""
       flamingos2Mos: {
         disperser: R1200_HK
         filter: H
         customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
-        offsetPreset: CROWDED_FIELD
+        explicitTelescopeConfigs: {
+          toSky: [
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:   0.0 } }, guiding: ENABLED },
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 300.0 } }, guiding: DISABLED },
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 320.0 } }, guiding: DISABLED },
+            { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:   0.0 } }, guiding: ENABLED }
+          ]
+        }
       }
     """).flatMap: (_, oid) =>
       expect(pi, s"""
@@ -392,7 +396,6 @@ class createObservation_Flamingos2Mos extends OdbSuite:
           observation(observationId: "$oid") {
             observingMode {
               flamingos2Mos {
-                offsetPreset
                 telescopeConfigs { $telescopeConfigsSelection }
               }
             }
@@ -403,7 +406,6 @@ class createObservation_Flamingos2Mos extends OdbSuite:
           "observation": {
             "observingMode": {
               "flamingos2Mos": {
-                "offsetPreset": "CROWDED_FIELD",
                 "telescopeConfigs": {
                   "offsetMode": "NOD_TO_SKY",
                   "alongSlit": null,
@@ -481,20 +483,12 @@ class createObservation_Flamingos2Mos extends OdbSuite:
     withSession(_.unique(q)(oid)).map: stored =>
       SlitTelescopeConfigsFormat.getOption(stored).getOrElse(sys.error(s"Could not parse '$stored'."))
 
-  Flamingos2MosOffsetPreset.values.toList.foreach: preset =>
-    test(s"the stored ${preset.tag} default matches lucuma-core"):
-      for
-        (_, oid) <- setup(s"""
-                      flamingos2Mos: {
-                        disperser: R1200_HK
-                        filter: H
-                        customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
-                        offsetPreset: ${preset.tag.toScreamingSnakeCase}
-                      }
-                    """)
-        stored   <- readDefaultTelescopeConfigs(oid)
-        _        <- IO(assertEquals(stored, defaultMosTelescopeConfigs(preset)))
-      yield ()
+  test("the stored default matches lucuma-core's sparse field"):
+    for
+      (_, oid) <- setup(simpleMode)
+      stored   <- readDefaultTelescopeConfigs(oid)
+      _        <- IO(assertEquals(stored, defaultMosTelescopeConfigs(Flamingos2MosOffsetPreset.SparseField)))
+    yield ()
 
   test("OTHER is rejected as a custom slit width"):
     for

@@ -33,8 +33,6 @@ trait Flamingos2MosView[F[_]] extends BaseMapping[F]:
     val ReadoutMode: ColumnRef        = col("c_readout_mode", flamingos_2_readout_mode.opt)
     val ReadoutModeDefault: ColumnRef = col("c_readout_mode_default", flamingos_2_readout_mode)
 
-    val OffsetPreset: ColumnRef       = col("c_mos_offset_preset", flamingos_2_mos_offset_preset)
-
     val SlitOffsetMode: ColumnRef          = col("c_slit_offset_mode", slit_offset_mode.opt)
     val SlitOffsetModeDefault: ColumnRef   = col("c_slit_offset_mode_default", slit_offset_mode.opt)
     val SlitOffsetModeEffective: ColumnRef = col("c_slit_offset_mode_effective", slit_offset_mode.opt)

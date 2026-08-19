@@ -17,7 +17,6 @@ import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
-import lucuma.core.enums.Flamingos2MosOffsetPreset
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
@@ -81,7 +80,6 @@ object Flamingos2MosInput:
     explicitReads:            Option[Flamingos2Reads]       = None,
     explicitDecker:           Option[Flamingos2Decker]      = None,
     explicitReadoutMode:      Option[Flamingos2ReadoutMode] = None,
-    offsetPreset:             Flamingos2MosOffsetPreset     = Flamingos2MosOffsetPreset.SparseField,
     explicitTelescopeConfigs: Option[SlitTelescopeConfigs]  = None,
     telluricType:             TelluricType                  = TelluricType.Hot,
     acquisition:              Option[Acquisition]           = None
@@ -139,7 +137,6 @@ object Flamingos2MosInput:
         common.explicitReads.toOption,
         common.explicitDecker.toOption,
         common.explicitReadoutMode.toOption,
-        common.offsetPreset.getOrElse(Flamingos2MosOffsetPreset.SparseField),
         common.explicitTelescopeConfigs.toOption,
         common.telluricType.getOrElse(TelluricType.Hot),
         common.acquisition
@@ -153,7 +150,6 @@ object Flamingos2MosInput:
       explicitReads:            Nullable[Flamingos2Reads],
       explicitDecker:           Nullable[Flamingos2Decker],
       explicitReadoutMode:      Nullable[Flamingos2ReadoutMode],
-      offsetPreset:             Option[Flamingos2MosOffsetPreset],
       explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs],
       telluricType:             Option[TelluricType],
       acquisition:              Option[Acquisition]
@@ -171,7 +167,7 @@ object Flamingos2MosInput:
     object Common:
 
       val AllUndefined: Common =
-        Common(None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None, Nullable.Absent, None, None)
+        Common(None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None, None)
 
     val Binding: Matcher[Edit] =
       Data.rmap: (disperser, filter, customMask, common) =>
@@ -196,7 +192,6 @@ object Flamingos2MosInput:
         Flamingos2ReadsBinding.Nullable("explicitReads", rReads),
         Flamingos2DeckerBinding.Nullable("explicitDecker", rDecker),
         Flamingos2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode),
-        Flamingos2MosOffsetPresetBinding.Option("offsetPreset", rOffsetPreset),
         SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
         TelluricTypeBinding.Option("telluricType", rTelluricType),
         Acquisition.Binding.Option("acquisition", rAcquisition)
@@ -210,7 +205,6 @@ object Flamingos2MosInput:
           rReads,
           rDecker,
           rReadoutMode,
-          rOffsetPreset,
           rTelescopeConfigs.flatMap(_.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs)),
           rTelluricType,
           rAcquisition

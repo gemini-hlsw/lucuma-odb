@@ -271,39 +271,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
                   """.asRight)
     yield ()
 
-  test("switch the offset preset"):
-    for
-      (_, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
-      _        <- expect(pi, updateMutation(
-                    oid,
-                    "flamingos2Mos: { offsetPreset: CROWDED_FIELD }",
-                    """
-                      flamingos2Mos {
-                        offsetPreset
-                        telescopeConfigs { offsetMode }
-                        defaultTelescopeConfigs { offsetMode }
-                      }
-                    """
-                  ), json"""
-                    {
-                      "updateObservations": {
-                        "observations": [
-                          {
-                            "observingMode": {
-                              "flamingos2Mos": {
-                                "offsetPreset": "CROWDED_FIELD",
-                                "telescopeConfigs": { "offsetMode": "NOD_TO_SKY" },
-                                "defaultTelescopeConfigs": { "offsetMode": "NOD_TO_SKY" }
-                              }
-                            }
-                          }
-                        ]
-                      }
-                    }
-                  """.asRight)
-    yield ()
-
-  test("an explicit override wins over the preset, and null restores it"):
+  test("an explicit override wins over the default, and null restores it"):
     for
       (_, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
       _        <- expect(pi, updateMutation(

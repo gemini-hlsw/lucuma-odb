@@ -13,7 +13,6 @@ import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
-import lucuma.core.enums.Flamingos2MosOffsetPreset
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
@@ -215,7 +214,6 @@ object Flamingos2MosService:
       Option[Flamingos2Reads],
       Option[Flamingos2Decker],
       Option[Flamingos2ReadoutMode],
-      Flamingos2MosOffsetPreset,
       Option[SlitOffsetMode],
       Option[String],
       TelluricType,
@@ -237,7 +235,6 @@ object Flamingos2MosService:
           c_reads,
           c_decker,
           c_readout_mode,
-          c_mos_offset_preset,
           c_slit_offset_mode,
           c_telescope_configs,
           c_telluric_type,
@@ -258,7 +255,6 @@ object Flamingos2MosService:
           ${flamingos_2_reads.opt},
           ${flamingos_2_decker.opt},
           ${flamingos_2_readout_mode.opt},
-          $flamingos_2_mos_offset_preset,
           ${slit_offset_mode.opt},
           ${text.opt},
           $telluric_type,
@@ -267,8 +263,8 @@ object Flamingos2MosService:
           $flamingos_2_custom_slit_width
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, sw, a, af, rm, rs, dk, ro, op, som, tc, tt, id, if_, isw) => (
-         o, d, f, sw, a, a.as(AttachmentType.MosMask), af, rm, rs, dk, ro, op, som, tc, tt, id, if_, isw, o
+       """.contramap { (o, d, f, sw, a, af, rm, rs, dk, ro, som, tc, tt, id, if_, isw) => (
+         o, d, f, sw, a, a.as(AttachmentType.MosMask), af, rm, rs, dk, ro, som, tc, tt, id, if_, isw, o
        )}
 
     def insertFlamingos2Mos(
@@ -286,7 +282,6 @@ object Flamingos2MosService:
         input.explicitReads,
         input.explicitDecker,
         input.explicitReadoutMode,
-        input.offsetPreset,
         input.explicitSlitOffsetMode,
         input.formattedTelescopeConfigs,
         input.telluricType,
@@ -328,7 +323,6 @@ object Flamingos2MosService:
       val upReads         = sql"c_reads               = ${flamingos_2_reads.opt}"
       val upDecker        = sql"c_decker              = ${flamingos_2_decker.opt}"
       val upReadoutMode   = sql"c_readout_mode        = ${flamingos_2_readout_mode.opt}"
-      val upOffsetPreset  = sql"c_mos_offset_preset   = $flamingos_2_mos_offset_preset"
       val upSlitMode      = sql"c_slit_offset_mode    = ${slit_offset_mode.opt}"
       val upTelescopeCfgs = sql"c_telescope_configs   = ${text.opt}"
       val upTelluricType  = sql"c_telluric_type       = $telluric_type"
@@ -344,7 +338,6 @@ object Flamingos2MosService:
           common.explicitReads.toOptionOption.map(upReads),
           common.explicitDecker.toOptionOption.map(upDecker),
           common.explicitReadoutMode.toOptionOption.map(upReadoutMode),
-          common.offsetPreset.map(upOffsetPreset),
           common.explicitSlitOffsetMode.toOptionOption.map(upSlitMode),
           common.formattedTelescopeConfigs.toOptionOption.map(upTelescopeCfgs),
           common.telluricType.map(upTelluricType)
@@ -382,7 +375,6 @@ object Flamingos2MosService:
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
-        c_mos_offset_preset,
         c_slit_offset_mode,
         c_telescope_configs,
         c_telluric_type,
@@ -406,7 +398,6 @@ object Flamingos2MosService:
         c_decker_default,
         c_readout_mode,
         c_readout_mode_default,
-        c_mos_offset_preset,
         c_slit_offset_mode,
         c_telescope_configs,
         c_telluric_type,

@@ -14,9 +14,6 @@ import java.io.DataOutputStream
 
 /**
  * Acquisition parameters shared by the Flamingos 2 long slit and MOS modes.
- * Both resolve the acquisition exposure from an acquisition-role exposure time
- * mode via the ITC, and both default the filter to the acquisition filter
- * nearest the science filter's wavelength.
  */
 final case class AcquisitionConfig(
   exposureTimeMode: ExposureTimeMode,

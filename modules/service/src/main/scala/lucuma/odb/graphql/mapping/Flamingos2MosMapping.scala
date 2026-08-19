@@ -65,8 +65,6 @@ trait Flamingos2MosMapping[F[_]]
       SqlField("defaultReadoutMode",  Flamingos2MosView.ReadoutModeDefault),
       SqlField("explicitReadoutMode", Flamingos2MosView.ReadoutMode),
 
-      SqlField("offsetPreset", Flamingos2MosView.OffsetPreset),
-
       // Raw columns (hidden) backing the telescope config cursor fields.
       SqlField("slitOffsetModeEffRaw", Flamingos2MosView.SlitOffsetModeEffective,  hidden = true),
       SqlField("tcEffRaw",             Flamingos2MosView.TelescopeConfigsEffective, hidden = true),
