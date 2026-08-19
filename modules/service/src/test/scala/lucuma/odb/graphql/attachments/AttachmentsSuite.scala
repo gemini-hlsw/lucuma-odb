@@ -21,9 +21,8 @@ import org.http4s.client.JavaNetClientBuilder
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.util.Using
-
 import java.nio.charset.StandardCharsets
+import scala.util.Using
 
 abstract class AttachmentsSuite extends OdbSuiteWithS3 {
 
