@@ -19,6 +19,9 @@ trait Flamingos2MosView[F[_]] extends BaseMapping[F]:
     val Filter: ColumnRef             = col("c_filter", flamingos_2_filter)
 
     val SlitWidth: ColumnRef          = col("c_slit_width", flamingos_2_custom_slit_width)
+
+    val AcquisitionFilter: ColumnRef        = col("c_acquisition_filter", flamingos_2_filter.opt)
+    val AcquisitionFilterDefault: ColumnRef = col("c_acquisition_filter_default", flamingos_2_filter)
     val MaskAttachmentId: ColumnRef   = col("c_mask_attachment_id", attachment_id.opt)
 
     val ReadMode: ColumnRef           = col("c_read_mode", flamingos_2_read_mode.opt)

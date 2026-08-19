@@ -7,12 +7,15 @@ import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.foldable.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
+import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
@@ -29,17 +32,24 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.json.time.decoder.given
+import lucuma.odb.sequence.flamingos2.mos.Acquisition.RepeatingAtomCount
 
 /**
- * The Flamingos 2 MOS science sequence: the equivalent long slit sequence with the
- * custom mask on every step and no acquisition.
+ * The Flamingos 2 MOS sequences: the equivalent long slit science sequence with the
+ * custom mask on every step, and an acquisition that images the field with the mask
+ * out of the beam before confirming the alignment through it.
  */
 class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
 
   val ExposureTime: TimeSpan = 5.minuteTimeSpan
 
+  val AcqExposureTime: TimeSpan = 30.secTimeSpan
+
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
+
+  override def fakeItcImagingResult: IntegrationTime =
+    IntegrationTime(AcqExposureTime, PosInt.unsafeFrom(1))
 
   // CUSTOM_WIDTH_1_PIX is equivalent to LONG_SLIT_1, which is what f2_key_JH1 is keyed on.
   val SlitWidth: Flamingos2CustomSlitWidth =
@@ -67,6 +77,18 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
         "breakpoint": "DISABLED"
       }
     """
+
+  // The acquisition steps: the mask out of the beam, then through it.
+  private val MosAcqImage: Flamingos2DynamicConfig =
+    flamingos2Science(AcqExposureTime).copy(
+      disperser = none,
+      filter    = Flamingos2Filter.J,
+      fpu       = Flamingos2FpuMask.Imaging,
+      decker    = Flamingos2Decker.Imaging
+    )
+
+  private val MosAcqMask: Flamingos2DynamicConfig =
+    MosAcqImage.copy(fpu = CustomMask, decker = Flamingos2Decker.MOS)
 
   private val ScienceStepConfig: Json =
     json"""{ "stepType": "SCIENCE" }"""
@@ -179,19 +201,48 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
       // Only 2 of the 4 steps are guided, so 2 cycles are needed for the ITC's 4 exposures.
       expectScience(oid, scienceAtom(cycle*), List(scienceAtom(cycle*), gcalAtom(cycle.last)))
 
-  test("there is no MOS acquisition sequence yet"):
+  test("acquisition: mask out at q=0 and q=10, breakpoint, then the through-mask pair"):
     setupWith(SparseFieldMode).flatMap: oid =>
       expect(
         user     = pi,
         query    = mosAcquisitionQuery(oid),
         expected =
-          Json.obj(
-            "executionConfig" -> Json.obj(
-              "flamingos2" -> Json.obj(
-                "acquisition" -> Json.Null
-              )
-            )
-          ).asRight
+          json"""
+            {
+              "executionConfig": {
+                "flamingos2": {
+                  "acquisition": {
+                    "nextAtom": {
+                      "description": "Initial Acquisition",
+                      "observeClass": "ACQUISITION",
+                      "steps": [
+                        ${flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0,  0)},
+                        ${flamingos2ExpectedAcq(MosAcqImage, AcqExposureTime, 0, 10)},
+                        ${flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0,  0, Breakpoint.Enabled)},
+                        ${flamingos2ExpectedAcq(MosAcqMask,  AcqExposureTime, 0, 10)}
+                      ]
+                    },
+                    "possibleFuture": ${
+                      List
+                        .fill(RepeatingAtomCount):
+                          json"""
+                            {
+                              "description": "Fine Adjustments",
+                              "observeClass": "ACQUISITION",
+                              "steps": [
+                                ${flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 0, Breakpoint.Enabled)},
+                                ${flamingos2ExpectedAcq(MosAcqMask, AcqExposureTime, 0, 10)}
+                              ]
+                            }
+                          """
+                        .asJson
+                    },
+                    "hasMore": false
+                  }
+                }
+              }
+            }
+          """.asRight
       )
 
   private def setupTime(pid: Program.Id, oid: Observation.Id): IO[TimeSpan] =

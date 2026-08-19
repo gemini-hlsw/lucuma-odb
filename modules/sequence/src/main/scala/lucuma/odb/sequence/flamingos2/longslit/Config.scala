@@ -19,6 +19,7 @@ import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.sequence.flamingos2.spectroscopy
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.all.*
 

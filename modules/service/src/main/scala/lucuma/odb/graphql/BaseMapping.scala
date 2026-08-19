@@ -165,6 +165,7 @@ trait BaseMapping[F[_]]
   lazy val Flamingos2ImagingFilterType             = schema.ref("Flamingos2ImagingFilter")
   lazy val Flamingos2LongSlitAcquisitionType       = schema.ref("Flamingos2LongSlitAcquisition")
   lazy val Flamingos2LongSlitType                  = schema.ref("Flamingos2LongSlit")
+  lazy val Flamingos2MosAcquisitionType            = schema.ref("Flamingos2MosAcquisition")
   lazy val Flamingos2MosType                       = schema.ref("Flamingos2Mos")
   lazy val Flamingos2MosOffsetPresetType           = schema.ref("Flamingos2MosOffsetPreset")
   lazy val Flamingos2StaticType                    = schema.ref("Flamingos2Static")

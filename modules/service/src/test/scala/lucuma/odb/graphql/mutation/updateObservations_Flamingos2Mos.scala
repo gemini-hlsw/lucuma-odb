@@ -185,6 +185,92 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
       _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
 
+  private val AcquisitionSelection: String =
+    """
+      flamingos2Mos {
+        acquisition {
+          filter
+          defaultFilter
+          explicitFilter
+          exposureTimeMode {
+            signalToNoise { value at { nanometers } }
+          }
+        }
+      }
+    """
+
+  test("override the acquisition filter and exposure time mode, then unset the filter"):
+    for
+      (_, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
+      _        <- expect(pi, updateMutation(
+                    oid,
+                    """
+                      flamingos2Mos: {
+                        acquisition: {
+                          explicitFilter: J
+                          exposureTimeMode: {
+                            signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+                          }
+                        }
+                      }
+                    """,
+                    AcquisitionSelection
+                  ), json"""
+                    {
+                      "updateObservations": {
+                        "observations": [
+                          {
+                            "observingMode": {
+                              "flamingos2Mos": {
+                                "acquisition": {
+                                  "filter": "J",
+                                  "defaultFilter": "H",
+                                  "explicitFilter": "J",
+                                  "exposureTimeMode": {
+                                    "signalToNoise": {
+                                      "value": 25.000,
+                                      "at": { "nanometers": 2200.000 }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """.asRight)
+      _        <- expect(pi, updateMutation(
+                    oid,
+                    "flamingos2Mos: { acquisition: { explicitFilter: null } }",
+                    AcquisitionSelection
+                  ), json"""
+                    {
+                      "updateObservations": {
+                        "observations": [
+                          {
+                            "observingMode": {
+                              "flamingos2Mos": {
+                                "acquisition": {
+                                  "filter": "H",
+                                  "defaultFilter": "H",
+                                  "explicitFilter": null,
+                                  "exposureTimeMode": {
+                                    "signalToNoise": {
+                                      "value": 25.000,
+                                      "at": { "nanometers": 2200.000 }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  """.asRight)
+    yield ()
+
   test("switch the offset preset"):
     for
       (_, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")

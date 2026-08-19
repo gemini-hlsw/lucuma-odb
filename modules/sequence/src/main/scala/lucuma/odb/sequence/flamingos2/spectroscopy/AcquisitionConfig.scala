@@ -1,7 +1,7 @@
 // Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
-package lucuma.odb.sequence.flamingos2.longslit
+package lucuma.odb.sequence.flamingos2.spectroscopy
 
 import cats.Eq
 import lucuma.core.enums.Flamingos2Filter
@@ -12,6 +12,12 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 
 
+/**
+ * Acquisition parameters shared by the Flamingos 2 long slit and MOS modes.
+ * Both resolve the acquisition exposure from an acquisition-role exposure time
+ * mode via the ITC, and both default the filter to the acquisition filter
+ * nearest the science filter's wavelength.
+ */
 final case class AcquisitionConfig(
   exposureTimeMode: ExposureTimeMode,
   defaultFilter:    Flamingos2Filter,

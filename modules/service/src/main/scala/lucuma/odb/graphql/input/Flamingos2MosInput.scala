@@ -6,11 +6,13 @@ package input
 
 import cats.Eq
 import cats.derived.*
-import cats.syntax.eq.*
+import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
+import cats.syntax.partialOrder.*
 import cats.syntax.traverse.*
 import grackle.Result
+import grackle.syntax.*
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
@@ -20,10 +22,12 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Access
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -45,6 +49,29 @@ object Flamingos2MosInput:
     else
       Result(m)
 
+  case class Acquisition(
+    filter:           Nullable[Flamingos2Filter],
+    exposureTimeMode: Option[ExposureTimeMode]
+  ) derives Eq:
+    def updatesAcquisition: Boolean =
+      filter.isDefined || exposureTimeMode.isDefined
+
+  object Acquisition:
+
+    val Binding: Matcher[Acquisition] =
+      ObjectFieldsBinding.rmap:
+        case List(
+          Flamingos2FilterBinding.Nullable("explicitFilter", rFilter),
+          ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTime)
+        ) => (
+          rFilter.flatMap: n =>
+            n.traverse: f =>
+              if Flamingos2Filter.acquisition.exists(_ === f) then f.success
+              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${Flamingos2Filter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
+          ,
+          rExposureTime
+        ).parMapN(apply)
+
   final case class Create(
     disperser:                Flamingos2Disperser,
     filter:                   Flamingos2Filter,
@@ -56,7 +83,8 @@ object Flamingos2MosInput:
     explicitReadoutMode:      Option[Flamingos2ReadoutMode] = None,
     offsetPreset:             Flamingos2MosOffsetPreset     = Flamingos2MosOffsetPreset.SparseField,
     explicitTelescopeConfigs: Option[SlitTelescopeConfigs]  = None,
-    telluricType:             TelluricType                  = TelluricType.Hot
+    telluricType:             TelluricType                  = TelluricType.Hot,
+    acquisition:              Option[Acquisition]           = None
   ):
     def observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2Mos
@@ -83,6 +111,14 @@ object Flamingos2MosInput:
     val observingModeType: ObservingModeType =
       ObservingModeType.Flamingos2Mos
 
+    def updatesAcquisition: Boolean =
+      common.updatesAcquisition
+
+    def limitToPreExecution(access: Access): Boolean =
+      // Staff can edit the acquisition info for ongoing observations
+      access <= Access.Pi ||
+        copy(common = common.copy(acquisition = None)) =!= Edit.AllUndefined
+
     private def required[A](oa: Option[A], itemName: String): Result[A] =
       Result.fromOption(
         oa,
@@ -105,7 +141,8 @@ object Flamingos2MosInput:
         common.explicitReadoutMode.toOption,
         common.offsetPreset.getOrElse(Flamingos2MosOffsetPreset.SparseField),
         common.explicitTelescopeConfigs.toOption,
-        common.telluricType.getOrElse(TelluricType.Hot)
+        common.telluricType.getOrElse(TelluricType.Hot),
+        common.acquisition
       )
 
   object Edit:
@@ -118,8 +155,12 @@ object Flamingos2MosInput:
       explicitReadoutMode:      Nullable[Flamingos2ReadoutMode],
       offsetPreset:             Option[Flamingos2MosOffsetPreset],
       explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs],
-      telluricType:             Option[TelluricType]
+      telluricType:             Option[TelluricType],
+      acquisition:              Option[Acquisition]
     ) derives Eq:
+
+      def updatesAcquisition: Boolean =
+        acquisition.exists(_.updatesAcquisition)
 
       private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
 
@@ -127,9 +168,17 @@ object Flamingos2MosInput:
 
       val formattedTelescopeConfigs = stored.map(_.telescopeConfigs)
 
+    object Common:
+
+      val AllUndefined: Common =
+        Common(None, Nullable.Absent, Nullable.Absent, Nullable.Absent, Nullable.Absent, None, Nullable.Absent, None, None)
+
     val Binding: Matcher[Edit] =
       Data.rmap: (disperser, filter, customMask, common) =>
         Result(Edit(disperser, filter, customMask, common))
+
+    private val AllUndefined: Edit =
+      Edit(None, None, None, Common.AllUndefined)
 
   private val Data: Matcher[(
     Option[Flamingos2Disperser],
@@ -149,7 +198,8 @@ object Flamingos2MosInput:
         Flamingos2ReadoutModeBinding.Nullable("explicitReadoutMode", rReadoutMode),
         Flamingos2MosOffsetPresetBinding.Option("offsetPreset", rOffsetPreset),
         SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
-        TelluricTypeBinding.Option("telluricType", rTelluricType)
+        TelluricTypeBinding.Option("telluricType", rTelluricType),
+        Acquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rDisperser,
         rFilter,
@@ -162,6 +212,7 @@ object Flamingos2MosInput:
           rReadoutMode,
           rOffsetPreset,
           rTelescopeConfigs.flatMap(_.traverse(Flamingos2SpectroscopyInput.validateTelescopeConfigs)),
-          rTelluricType
+          rTelluricType,
+          rAcquisition
         ).parMapN(Edit.Common.apply)
       ).parTupled

@@ -30,6 +30,7 @@ import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2MosInput
 import lucuma.odb.sequence.flamingos2.longslit.DefaultFlamingos2ReadoutMode
 import lucuma.odb.sequence.flamingos2.mos.Config
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
@@ -69,11 +70,18 @@ object Flamingos2MosService:
 
     new Flamingos2MosService[F]:
 
+      val acquisition: Decoder[AcquisitionConfig] =
+        (exposure_time_mode *:
+         flamingos_2_filter *:
+         flamingos_2_filter.opt
+        ).to[AcquisitionConfig]
+
       val f2Mos: Decoder[Config] =
         (flamingos_2_disperser        *:
          flamingos_2_filter           *:
          flamingos_2_fpu_mask_custom  *:
          exposure_time_mode           *:
+         acquisition                  *:
          flamingos_2_read_mode.opt    *:
          flamingos_2_reads.opt        *:
          flamingos_2_decker.opt       *:
@@ -81,7 +89,7 @@ object Flamingos2MosService:
          slit_offset_mode             *: // c_slit_offset_mode_effective
          text                         *: // c_telescope_configs_effective
          telluric_type
-        ).emap: (disperser, filter, mask, sci, readMode, reads, decker, readoutMode, offsetMode, tcJson, telluricType) =>
+        ).emap: (disperser, filter, mask, sci, acq, readMode, reads, decker, readoutMode, offsetMode, tcJson, telluricType) =>
           for
             tcs <- SlitTelescopeConfigsFormat
                      .getOption((offsetMode, tcJson))
@@ -91,6 +99,7 @@ object Flamingos2MosService:
                      disperser,
                      filter,
                      mask,
+                     acq,
                      Common(
                        sci,
                        readMode,
@@ -126,7 +135,7 @@ object Flamingos2MosService:
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         (for
-          _ <- ResultT(exposureTimeModeService.insertScienceOnlyWithDefaults("Flamingos 2 MOS", input.exposureTimeMode, req, which).map(_.void))
+          _ <- ResultT(exposureTimeModeService.insertOneWithDefaults("Flamingos 2 MOS", input.acquisition.flatMap(_.exposureTimeMode), input.exposureTimeMode, req, which).map(_.void))
           _ <- ResultT(translateMaskViolation(which.traverse(oid => session.exec(Statements.insertFlamingos2Mos(oid, input))).void))
         yield ()).value
 
@@ -137,9 +146,13 @@ object Flamingos2MosService:
         SET:   Flamingos2MosInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
+        def updateEtm(etm: Option[ExposureTimeMode], role: ExposureTimeModeRole): F[Unit] =
+          etm.fold(F.unit): e =>
+            services.exposureTimeModeService.updateMany(which, role, e)
+
         for
-          _ <- SET.common.exposureTimeMode.fold(F.unit): e =>
-                 services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Science, e)
+          _ <- updateEtm(SET.common.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition)
+          _ <- updateEtm(SET.common.exposureTimeMode, ExposureTimeModeRole.Science)
           r <- translateMaskViolation(Statements.updateFlamingos2Mos(SET, which).fold(F.unit)(session.exec))
         yield r
 
@@ -161,6 +174,13 @@ object Flamingos2MosService:
           sci.c_signal_to_noise,
           sci.c_exposure_time,
           sci.c_exposure_count,
+          acq.c_exposure_time_mode,
+          acq.c_signal_to_noise_at,
+          acq.c_signal_to_noise,
+          acq.c_exposure_time,
+          acq.c_exposure_count,
+          m.c_acquisition_filter_default,
+          m.c_acquisition_filter,
           m.c_read_mode,
           m.c_reads,
           m.c_decker,
@@ -170,6 +190,9 @@ object Flamingos2MosService:
           m.c_telluric_type
         FROM
           v_flamingos_2_mos m
+        LEFT JOIN t_exposure_time_mode acq
+           ON acq.c_observation_id = m.c_observation_id
+          AND acq.c_role = 'acquisition'
         LEFT JOIN t_exposure_time_mode sci
            ON sci.c_observation_id = m.c_observation_id
           AND sci.c_role = 'science'
@@ -187,6 +210,7 @@ object Flamingos2MosService:
       Flamingos2Filter,
       Flamingos2CustomSlitWidth,
       Option[Attachment.Id],
+      Option[Flamingos2Filter],
       Option[Flamingos2ReadMode],
       Option[Flamingos2Reads],
       Option[Flamingos2Decker],
@@ -208,6 +232,7 @@ object Flamingos2MosService:
           c_slit_width,
           c_mask_attachment_id,
           c_mask_attachment_type,
+          c_acquisition_filter,
           c_read_mode,
           c_reads,
           c_decker,
@@ -228,6 +253,7 @@ object Flamingos2MosService:
           $flamingos_2_custom_slit_width,
           ${attachment_id.opt},
           ${attachment_type.opt},
+          ${flamingos_2_filter.opt},
           ${flamingos_2_read_mode.opt},
           ${flamingos_2_reads.opt},
           ${flamingos_2_decker.opt},
@@ -241,8 +267,8 @@ object Flamingos2MosService:
           $flamingos_2_custom_slit_width
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, d, f, sw, a, rm, rs, dk, ro, op, som, tc, tt, id, if_, isw) => (
-         o, d, f, sw, a, a.as(AttachmentType.MosMask), rm, rs, dk, ro, op, som, tc, tt, id, if_, isw, o
+       """.contramap { (o, d, f, sw, a, af, rm, rs, dk, ro, op, som, tc, tt, id, if_, isw) => (
+         o, d, f, sw, a, a.as(AttachmentType.MosMask), af, rm, rs, dk, ro, op, som, tc, tt, id, if_, isw, o
        )}
 
     def insertFlamingos2Mos(
@@ -255,6 +281,7 @@ object Flamingos2MosService:
         input.filter,
         input.customMask.slitWidth,
         maskAttachmentId(input.customMask),
+        input.acquisition.flatMap(_.filter.toOption),
         input.explicitReadMode,
         input.explicitReads,
         input.explicitDecker,
@@ -296,6 +323,7 @@ object Flamingos2MosService:
 
       val upDisperser     = sql"c_disperser           = $flamingos_2_disperser"
       val upFilter        = sql"c_filter              = $flamingos_2_filter"
+      val upAcqFilter     = sql"c_acquisition_filter  = ${flamingos_2_filter.opt}"
       val upReadMode      = sql"c_read_mode           = ${flamingos_2_read_mode.opt}"
       val upReads         = sql"c_reads               = ${flamingos_2_reads.opt}"
       val upDecker        = sql"c_decker              = ${flamingos_2_decker.opt}"
@@ -311,6 +339,7 @@ object Flamingos2MosService:
         List(
           input.disperser.map(upDisperser),
           input.filter.map(upFilter),
+          common.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter),
           common.explicitReadMode.toOptionOption.map(upReadMode),
           common.explicitReads.toOptionOption.map(upReads),
           common.explicitDecker.toOptionOption.map(upDecker),
@@ -346,6 +375,7 @@ object Flamingos2MosService:
         c_slit_width,
         c_mask_attachment_id,
         c_mask_attachment_type,
+        c_acquisition_filter,
         c_read_mode,
         c_reads,
         c_decker,
@@ -369,6 +399,7 @@ object Flamingos2MosService:
         c_slit_width,
         c_mask_attachment_id,
         c_mask_attachment_type,
+        c_acquisition_filter,
         c_read_mode,
         c_reads,
         c_decker,

@@ -51,6 +51,7 @@ import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.logic.GoaQueryPolicy.TargetPointing
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig as Flamingos2AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config as Flamingos2Spectroscopy
 import lucuma.odb.sequence.gmos.imaging.Config as GmosImaging
 import lucuma.odb.sequence.gmos.imaging.Filter as GmosImagingFilter
@@ -117,6 +118,11 @@ class GoaQueryPolicySuite extends FunSuite:
       disperser  = Flamingos2Disperser.R1200HK,
       filter     = Flamingos2Filter.H,
       customMask = Flamingos2FpuMask.Custom(ToBeDefined, Flamingos2CustomSlitWidth.CustomWidth_2_pix),
+      acquisition = Flamingos2AcquisitionConfig(
+        exposureTimeMode = exposureTimeMode,
+        defaultFilter    = Flamingos2Filter.H,
+        explicitFilter   = none
+      ),
       common     = Flamingos2Spectroscopy.Common(
         exposureTimeMode    = exposureTimeMode,
         explicitReadMode    = none,

@@ -138,6 +138,14 @@ class createObservation_Flamingos2Mos extends OdbSuite:
               defaultReadoutMode
               offsetPreset
               telluricType { tag }
+              acquisition {
+                filter
+                defaultFilter
+                explicitFilter
+                exposureTimeMode {
+                  signalToNoise { value at { nanometers } }
+                }
+              }
               initialDisperser
               initialFilter
               initialSlitWidth
@@ -174,6 +182,17 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                 "defaultReadoutMode": "SCIENCE",
                 "offsetPreset": "SPARSE_FIELD",
                 "telluricType": { "tag": "HOT" },
+                "acquisition": {
+                  "filter": "H",
+                  "defaultFilter": "H",
+                  "explicitFilter": null,
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 10.000,
+                      "at": { "nanometers": 2100.000 }
+                    }
+                  }
+                },
                 "initialDisperser": "R1200_HK",
                 "initialFilter": "H",
                 "initialSlitWidth": "CUSTOM_WIDTH_2_PIX"
@@ -222,6 +241,93 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                  }
                }
              """.asRight)
+    yield ()
+
+  private def acquisitionQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        observation(observationId: "$oid") {
+          observingMode {
+            flamingos2Mos {
+              acquisition {
+                filter
+                defaultFilter
+                explicitFilter
+                exposureTimeMode {
+                  signalToNoise { value at { nanometers } }
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+
+  test("the acquisition filter and exposure time mode may be specified"):
+    setup("""
+      flamingos2Mos: {
+        disperser: R1200_HK
+        filter: H
+        customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+        acquisition: {
+          explicitFilter: K_SHORT
+          exposureTimeMode: {
+            signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+          }
+        }
+      }
+    """).flatMap: (_, oid) =>
+      expect(pi, acquisitionQuery(oid), json"""
+        {
+          "observation": {
+            "observingMode": {
+              "flamingos2Mos": {
+                "acquisition": {
+                  "filter": "K_SHORT",
+                  "defaultFilter": "H",
+                  "explicitFilter": "K_SHORT",
+                  "exposureTimeMode": {
+                    "signalToNoise": {
+                      "value": 25.000,
+                      "at": { "nanometers": 2200.000 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """.asRight)
+
+  test("only J, H and K_SHORT are accepted as acquisition filters"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- expect(
+               user     = pi,
+               query    = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: {
+                         flamingos2Mos: {
+                           disperser: R1200_HK
+                           filter: H
+                           customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+                           acquisition: { explicitFilter: JH }
+                         }
+                       }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = List("Argument 'input.SET.observingMode.flamingos2Mos.acquisition' is invalid: 'explicitFilter' must contain one of: J, H, K_SHORT").asLeft
+             )
     yield ()
 
   test("the sparse field preset nods along the slit at +/- 1.2 arcsec"):

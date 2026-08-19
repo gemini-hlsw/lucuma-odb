@@ -3,26 +3,20 @@
 
 package lucuma.odb.sequence
 package flamingos2
-package longslit
+package mos
 
-import cats.Order.catsKernelOrderingForOrder
 import cats.data.NonEmptyList
 import cats.syntax.option.*
-import cats.syntax.order.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.Flamingos2Disperser
-import lucuma.core.enums.Flamingos2Filter
-import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
-import lucuma.core.math.Wavelength
 import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
@@ -30,7 +24,6 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
@@ -41,39 +34,46 @@ import lucuma.odb.sequence.util.AtomBuilder
 import java.util.UUID
 
 /**
- * Flamingos 2 long slit acquisition.
+ * Flamingos 2 MOS acquisition.
+ *
+ * The observer cannot measure the offset through the mask, so the initial atom
+ * images the field with the mask out of the beam and then, after a breakpoint
+ * where the measured offset is applied, repeats the pair through the mask to
+ * confirm the targets land in the slitlets.  Each pair is an on-target step and
+ * its sky nod.
+ *
+ * The "Fine Adjustments" atoms that follow are a ceiling rather than a plan:
+ * each carries a breakpoint, so taking another mask-in pair is always the
+ * observer's explicit decision.
  */
 object Acquisition:
 
+  /** Number of optional "Fine Adjustments" atoms generated after the initial atom. */
   val RepeatingAtomCount: Int = 10
 
-  val SkySubtractionLimit: TimeSpan = 2.secondTimeSpan
-
-  extension (scienceFilter: Flamingos2Filter)
-    def toAcquisitionFilter: Flamingos2Filter =
-      Flamingos2Filter.acquisition.toList.minBy(f => scienceFilter.wavelength.diff(f.wavelength).abs)
-
   case class Steps(
-    image:    ProtoStep[F2],
-    imageQ10: ProtoStep[F2],
-    slitP10:  ProtoStep[F2],
-    slitQ10:  ProtoStep[F2],
-    slit:     ProtoStep[F2]
+    maskOut:   ProtoStep[F2],
+    maskOutQ:  ProtoStep[F2],
+    maskIn:    ProtoStep[F2],
+    maskInQ:   ProtoStep[F2]
   ):
+    /**
+     * Mask out, its sky nod, then the through-mask pair.  The breakpoint sits on
+     * the first mask-in step: execution halts there so the observer can measure
+     * and apply the offset from the two field images.
+     */
     val initialAtom: NonEmptyList[ProtoStep[F2]] =
-      if image.value.exposure <= SkySubtractionLimit then
-        NonEmptyList.of(image, slitP10, slit.withBreakpoint)
-      else
-        NonEmptyList.of(imageQ10, image, slitP10, slitQ10, slit.withBreakpoint)
+      NonEmptyList.of(maskOut, maskOutQ, maskIn.withBreakpoint, maskInQ)
 
+    /** An optional extra through-mask pair, gated by a breakpoint. */
     val repeatingAtom: NonEmptyList[ProtoStep[F2]] =
-      NonEmptyList.of(slit)
+      NonEmptyList.of(maskIn.withBreakpoint, maskInQ)
 
   private object StepComputer extends SequenceState[F2] with Flamingos2InitialDynamicConfig:
     def compute(
       exposureTime: TimeSpan,
       acqConfig:    AcquisitionConfig,
-      builtin:      Flamingos2Fpu
+      customMask:   Flamingos2FpuMask.Custom
     ): Steps =
       eval:
         for
@@ -82,27 +82,26 @@ object Acquisition:
           _  <- F2.filter      := acqConfig.filter
           _  <- F2.readMode    := Flamingos2ReadMode.forExposureTime(exposureTime)
           _  <- F2.lyotWheel   := Flamingos2LyotWheel.F16
-          _  <- F2.fpu         := Flamingos2FpuMask.Imaging
-          _  <- F2.decker      := Flamingos2FpuMask.Imaging.defaultDecker
           _  <- F2.readoutMode := Flamingos2ReadoutMode.Science
           _  <- F2.reads       := Flamingos2ReadMode.forExposureTime(exposureTime).readCount
+
+          // The mask is out of the beam: this is plain imaging of the field.
+          _  <- F2.fpu         := Flamingos2FpuMask.Imaging
+          _  <- F2.decker      := Flamingos2FpuMask.Imaging.defaultDecker
           s0 <- scienceStep(0.arcsec,  0.arcsec, ObserveClass.Acquisition)
           s1 <- scienceStep(0.arcsec, 10.arcsec, ObserveClass.Acquisition)
 
-          _  <- F2.exposure    := 10.secondTimeSpan  // Fixed
-          _  <- F2.fpu         := Flamingos2FpuMask.Builtin(builtin)
-          _  <- F2.decker      := Flamingos2FpuMask.Builtin(builtin).defaultDecker
-          s2 <- scienceStep(10.arcsec,  0.arcsec, ObserveClass.Acquisition)
-
-          _  <- F2.exposure    := exposureTime
-          s3 <- scienceStep( 0.arcsec, 10.arcsec, ObserveClass.Acquisition)
-
-          s4 <- scienceStep( 0.arcsec,  0.arcsec, ObserveClass.Acquisition)
-        yield Steps(s0, s1, s2, s3, s4)
+          // Through the mask, which the science steps carry whether or not its
+          // attachment exists yet.
+          _  <- F2.fpu         := customMask
+          _  <- F2.decker      := customMask.defaultDecker
+          s2 <- scienceStep(0.arcsec,  0.arcsec, ObserveClass.Acquisition)
+          s3 <- scienceStep(0.arcsec, 10.arcsec, ObserveClass.Acquisition)
+        yield Steps(s0, s1, s2, s3)
 
   private class Generator(
-    builder:   AtomBuilder[F2],
-    steps:     Steps
+    builder: AtomBuilder[F2],
+    steps:   Steps
   ) extends SequenceGenerator[F2]:
 
     override val generate: Stream[Pure, Atom[F2]] =
@@ -123,7 +122,7 @@ object Acquisition:
     time
       .filterOrElse(
         _.exposureTime.toNonNegMicroseconds.value > 0,
-        OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 Long Slit requires a positive exposure time.".some)
+        OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 MOS requires a positive exposure time.".some)
       )
       .map: t =>
         new Generator(
@@ -133,5 +132,5 @@ object Acquisition:
             namespace,
             SequenceType.Acquisition
           ),
-          StepComputer.compute(t.exposureTime, config.acquisition, config.fpu)
+          StepComputer.compute(t.exposureTime, config.acquisition, config.customMask)
         )

@@ -24,7 +24,9 @@ import java.util.UUID
  * Flamingos 2 MOS sequence generation.
  *
  * The science sequence is the shared Flamingos 2 spectroscopy sequence, generated exactly
- * as it would be for the equivalent long slit but carrying the custom mask.
+ * as it would be for the equivalent long slit but carrying the custom mask.  The
+ * acquisition images the field with the mask out of the beam before confirming
+ * the alignment through it.
  */
 object Mos:
 
@@ -36,14 +38,16 @@ object Mos:
     2.hourTimeSpan
 
   def instantiate[F[_]: Monad](
-    observationId: Observation.Id,
-    estimator:     StepTimeEstimateCalculator[F2Static, F2Dynamic],
-    namespace:     UUID,
-    expander:      SmartGcalExpander[F, F2Static, F2Dynamic],
-    config:        Config,
-    scienceItc:    Either[OdbError, IntegrationTime],
-    calRole:       Option[CalibrationRole]
+    observationId:  Observation.Id,
+    estimator:      StepTimeEstimateCalculator[F2Static, F2Dynamic],
+    namespace:      UUID,
+    expander:       SmartGcalExpander[F, F2Static, F2Dynamic],
+    config:         Config,
+    acquisitionItc: Either[OdbError, IntegrationTime],
+    scienceItc:     Either[OdbError, IntegrationTime],
+    calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
-    EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2MosName, MaxSciencePeriod, config, scienceItc, calRole))
-      .map(s => StreamingExecutionConfig(Static, SequenceGenerator.empty.generate, s.generate))
-      .value
+    (for
+       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, acquisitionItc))
+       s <- EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2MosName, MaxSciencePeriod, config, scienceItc, calRole))
+    yield StreamingExecutionConfig(Static, a.generate, s.generate)).value

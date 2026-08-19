@@ -14,6 +14,7 @@ import lucuma.core.model.Defined
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.sequence.flamingos2.spectroscopy
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.all.*
 
@@ -23,14 +24,14 @@ import java.io.DataOutputStream
 /**
  * Configuration for Flamingos 2 MOS science mode.
  *
- * This is Flamingos 2 long slit with the builtin FPU replaced by a custom mask
- * and no acquisition (yet).
+ * This is Flamingos 2 long slit with the builtin FPU replaced by a custom mask.
  */
 case class Config private (
   disperser:     Flamingos2Disperser,
   filter:        Flamingos2Filter,
   customMask:    Flamingos2FpuMask.Custom,
   equivalentFpu: Flamingos2Fpu,
+  acquisition:   AcquisitionConfig,
   common:        Common
 ) extends spectroscopy.Config derives Eq:
 
@@ -56,6 +57,7 @@ case class Config private (
       case ToBeDefined => ()
       case Defined(id) => out.writeLong(id.value.value)
     out.write(exposureTimeMode.hashBytes)
+    out.write(acquisition.hashBytes)
     out.writeChars(explicitReadMode.foldMap(_.tag))
     out.writeChars(explicitReads.foldMap(_.tag))
     out.writeChars(decker.tag)
@@ -81,13 +83,14 @@ object Config:
     "Flamingos 2 MOS does not support the 'OTHER' custom slit width."
 
   def apply(
-    disperser:  Flamingos2Disperser,
-    filter:     Flamingos2Filter,
-    customMask: Flamingos2FpuMask.Custom,
-    common:     Common
+    disperser:   Flamingos2Disperser,
+    filter:      Flamingos2Filter,
+    customMask:  Flamingos2FpuMask.Custom,
+    acquisition: AcquisitionConfig,
+    common:      Common
   ): Either[String, Config] =
     equivalentFpu(customMask.slitWidth).map: fpu =>
-      new Config(disperser, filter, customMask, fpu, common)
+      new Config(disperser, filter, customMask, fpu, acquisition, common)
 
   def equivalentFpu(slitWidth: Flamingos2CustomSlitWidth): Either[String, Flamingos2Fpu] =
     slitWidth.fpu.toRight(OtherSlitWidthMessage)

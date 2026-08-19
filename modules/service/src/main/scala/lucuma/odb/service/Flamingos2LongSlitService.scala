@@ -16,8 +16,8 @@ import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
-import lucuma.odb.sequence.flamingos2.longslit.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
