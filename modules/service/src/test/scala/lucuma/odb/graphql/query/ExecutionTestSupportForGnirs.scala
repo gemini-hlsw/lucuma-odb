@@ -149,7 +149,11 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Other(pinholeFpu(ps))), gnirsSmartFlat),
           // IFU flat + arc, so IFU science sequences resolve smart gcal too.
           Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartFlat),
-          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc)
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(fpu = GnirsFpu.Spectroscopy.Ifu(ifuFpu(ps))), gnirsSmartArc),
+          // The same configs at Deep well depth, which is the default for the red cameras
+          // and so applies to thermal-IR (L and M) science.
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(wellDepth = GnirsWellDepth.Deep), gnirsSmartFlat),
+          Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsSmartKey(ps).copy(wellDepth = GnirsWellDepth.Deep), gnirsSmartArc)
         )
       ::: List(
         Gnirs.TableRow(PosLong.unsafeFrom(1), gnirsThermalIrKey, gnirsSmartFlat),
@@ -213,8 +217,12 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
       """
     ).void
 
-  /** Replace the science TimeAndCount ETM on a GNIRS LongSlit observation. */
-  def setScienceTimeAndCount(oid: Observation.Id, seconds: BigDecimal, count: Int, atNm: BigDecimal): IO[Unit] =
+  /**
+   * Replace the science TimeAndCount ETM on a GNIRS LongSlit observation.  The
+   * ETM is per central wavelength, so the wavelength must be given too; it
+   * defaults to the 2200 nm the test observations are created with.
+   */
+  def setScienceTimeAndCount(oid: Observation.Id, seconds: BigDecimal, count: Int, atNm: BigDecimal, centralNm: BigDecimal = BigDecimal(2200)): IO[Unit] =
     query(
       pi,
       s"""
@@ -223,13 +231,18 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
             SET: {
               observingMode: {
                 gnirsSpectroscopy: {
-                  exposureTimeMode: {
-                    timeAndCount: {
-                      time:  { seconds: $seconds }
-                      count: $count
-                      at:    { nanometers: $atNm }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: $centralNm }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time:  { seconds: $seconds }
+                          count: $count
+                          at:    { nanometers: $atNm }
+                        }
+                      }
                     }
-                  }
+                  ]
                 }
               }
             }
@@ -254,8 +267,56 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                   camera: LONG_BLUE
                   explicitGrating: D10
                   slit: { fpu: LONG_SLIT_0_20 }
-                  centralWavelength: { nanometers: 3300 }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 3300 }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time: { seconds: 30.0 }
+                          count: 3
+                          at: { nanometers: 3300 }
+                        }
+                      }
+                    }
+                  ]
                   explicitWellDepth: DEEP
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  /**
+   * Set the science filter and central wavelength (with a matching science ETM) on a
+   * GNIRS LongSlit observation, for exercising bands other than the default K / 2200 nm.
+   */
+  def setFilterAndCentralWavelength(oid: Observation.Id, filter: String, centralNm: BigDecimal): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  filter: $filter
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: $centralNm }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time: { seconds: 30.0 }
+                          count: 3
+                          at: { nanometers: $centralNm }
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -284,7 +345,18 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
                   explicitGrating: D111
                   explicitPrism: LXD
                   slit: { fpu: LONG_SLIT_0_675 }
-                  centralWavelength: { nanometers: 1600 }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 1600 }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time: { seconds: 30.0 }
+                          count: 3
+                          at: { nanometers: 1600 }
+                        }
+                      }
+                    }
+                  ]
                   explicitWellDepth: SHALLOW
                 }
               }

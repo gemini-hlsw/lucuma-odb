@@ -2,6 +2,10 @@ import NativePackagerHelper.*
 
 ThisBuild / resolvers += Resolver.sonatypeCentralSnapshots
 
+// Hosts the skunk build we pin below.
+ThisBuild / resolvers +=
+  "Gemini Repository".at("https://github.com/gemini-hlsw/maven-repo/raw/master/releases")
+
 // Please keep in alphabetical order
 val awsJavaSdkVersion            = "1.12.797"
 val boopickleVersion             = "1.5.0"
@@ -14,12 +18,12 @@ val catsVersion                  = "2.13.0"
 val circeVersion                 = "0.14.16"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.0"
-val clueVersion                  = "0.56.0"
+val clueVersion                  = "0.57.0"
 val declineVersion               = "2.6.2"
 val flywayVersion                = "13.2.0"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
-val grackleVersion               = "0.29.0"
+val grackleVersion               = "0.30.0"
 val http4sVersion                = "0.23.36"
 val http4sBlazeVersion           = "0.23.18"
 val http4sJdkHttpClientVersion   = "0.10.0"
@@ -28,10 +32,10 @@ val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
-val logbackVersion               = "1.6.1"
+val logbackVersion               = "1.6.3"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.231-e250bcb-20260813T165953Z-SNAPSHOT" // "0.228.0"
-val lucumaGraphQLRoutesVersion   = "0.13.9"
+val lucumaCoreVersion            = "0.235.0-2-5b4b72b-SNAPSHOT"
+val lucumaGraphQLRoutesVersion   = "0.13.11"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.5"
@@ -55,7 +59,7 @@ val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.91"
+ThisBuild / tlBaseVersion      := "0.93"
 ThisBuild / scalaVersion       := "3.8.4"
 ThisBuild / crossScalaVersions := Seq("3.8.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
@@ -793,7 +797,15 @@ lazy val schema =
           rootDir / "modules" / "sso-service" / "src" / "main" / "resources" / "Sso.graphql"
         val resourceSchemaFile: File     =
           rootDir / "resource" / "service" / "src" / "main" / "resources" / "graphql" / "resource.graphql"
-        val semVerWithPrerelease: String = version.value.replace("-SNAPSHOT", "")
+        // npm needs full semver, so this code pads "0.91-67fba49" to "0.91.0-67fba49".
+        // Semver compares "10-67fba49" as text, but "10" as a number. The dot makes "0.92.0-10.67fba49" newer than "0.92.0-8.67fba49".
+        val semVerWithPrerelease: String = {
+          val (core, prerelease) =
+            version.value.stripSuffix("-SNAPSHOT").span(_ != '-')
+          val paddedCore   = core.split('.').padTo(3, "0").mkString(".")
+          val dottedSuffix = prerelease.stripPrefix("-").replace('-', '.')
+          if (dottedSuffix.isEmpty) paddedCore else s"$paddedCore-$dottedSuffix"
+        }
 
         IO.write(
           npmDir / "package.json",

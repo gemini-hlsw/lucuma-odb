@@ -10,6 +10,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.GeminiCallForProposalsType.RegularSemester
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.User
 
 /**
@@ -17,7 +18,7 @@ import lucuma.core.model.User
  * derived as the maximum among the program's observations, frozen on
  * acceptance, and thereafter enforced against each observation.
  */
-class tooActivationCeiling extends OdbSuite with ObservingModeSetupOperations:
+class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
 
   val pi:      User = TestUsers.Standard.pi(1, 101)
   val staff:   User = TestUsers.Standard.staff(3, 103)
@@ -25,13 +26,48 @@ class tooActivationCeiling extends OdbSuite with ObservingModeSetupOperations:
 
   override val validUsers: List[User] = List(pi, staff)
 
-  private def setTooActivation(oid: Observation.Id, activation: String): IO[Unit] =
+  /**
+   * Makes an observation derive `activation`.  The activation is no longer set
+   * directly: an observation is a Target of Opportunity exactly when its asterism
+   * holds an opportunity target, and how disruptive it may be follows from its
+   * scheduling mode.  So this adds the target and picks the mode that produces
+   * the wanted value.
+   */
+  private def deriveTooActivation(pid: Program.Id, oid: Observation.Id, activation: String): IO[Unit] =
+    val mode = activation match
+      case "STANDARD"     => "UNCONSTRAINED"
+      case "RAPID"        => "UNINTERRUPTIBLE"
+      case "INTERRUPTING" => "INTERRUPTING"
+      case other          => fail(s"no scheduling mode derives $other")
+    for
+      tid <- createOpportunityTargetAs(pi, pid)
+      _   <- resolveOpportunityTargetAs(pi, tid)
+      _   <- addOpportunityTargetToAsterism(oid, tid)
+      _   <- setSchedulingMode(oid, mode)
+    yield ()
+
+  private def addOpportunityTargetToAsterism(oid: Observation.Id, tid: Target.Id): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateAsterisms(input: {
+            SET: { ADD: [ ${tid.asJson} ] }
+            WHERE: { id: { EQ: ${oid.asJson} } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def setSchedulingMode(oid: Observation.Id, mode: String): IO[Unit] =
     query(
       pi,
       s"""
         mutation {
           updateObservations(input: {
-            SET: { schedulingConstraints: { tooActivation: $activation } }
+            SET: { schedulingConstraints: { schedulingMode: $mode } }
             WHERE: { id: { EQ: ${oid.asJson} } }
           }) {
             observations { id }
@@ -109,8 +145,8 @@ class tooActivationCeiling extends OdbSuite with ObservingModeSetupOperations:
       p <- createProgramWithNonPartnerPi(pi, "ToO ceiling")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- deriveTooActivation(p, o, activation)
       _ <- computeItcResultAs(pi, o)
-      _ <- setTooActivation(o, activation)
       _ <- addProposal(pi, p, c.some)
       _ <- addPartnerSplits(pi, p)
       _ <- addCoisAs(pi, p)
@@ -127,7 +163,7 @@ class tooActivationCeiling extends OdbSuite with ObservingModeSetupOperations:
       (p, o) <- setup("STANDARD")
       t      <- createTargetWithProfileAs(pi, p)
       o2     <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _      <- setTooActivation(o2, "INTERRUPTING")
+      _      <- deriveTooActivation(p, o2, "INTERRUPTING")
       too    <- proposalCeiling(p)
     yield assertEquals(too, "INTERRUPTING")
 
@@ -148,7 +184,7 @@ class tooActivationCeiling extends OdbSuite with ObservingModeSetupOperations:
       before <- proposalCeiling(p)
       t      <- createTargetWithProfileAs(pi, p)
       o2     <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _      <- setTooActivation(o2, "INTERRUPTING")
+      _      <- deriveTooActivation(p, o2, "INTERRUPTING")
       after  <- proposalCeiling(p)
     yield
       assertEquals(before, "RAPID")
@@ -158,7 +194,7 @@ class tooActivationCeiling extends OdbSuite with ObservingModeSetupOperations:
     for
       (p, o) <- setup("RAPID")
       _      <- acceptProposal(staff, p)
-      _      <- setTooActivation(o, "INTERRUPTING")
+      _      <- setSchedulingMode(o, "INTERRUPTING")
       _      <- runObscalcUpdateAs(service, p, o)
       codes  <- validationCodes(o)
       state  <- workflowState(o)
@@ -170,7 +206,7 @@ class tooActivationCeiling extends OdbSuite with ObservingModeSetupOperations:
     for
       (p, o) <- setup("RAPID")
       _      <- acceptProposal(staff, p)
-      _      <- setTooActivation(o, "STANDARD")
+      _      <- setSchedulingMode(o, "UNCONSTRAINED")
       _      <- runObscalcUpdateAs(service, p, o)
       codes  <- validationCodes(o)
     yield assert(!codes.contains("TOO_ACTIVATION_UNAPPROVED"), s"unexpected ceiling violation: $codes")

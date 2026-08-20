@@ -5,6 +5,7 @@ package lucuma.odb.phase0
 
 import cats.parse.*
 import cats.syntax.all.*
+import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
@@ -15,10 +16,11 @@ import lucuma.core.enums.Instrument
 import lucuma.core.util.Enumerated
 
 case class GmosSpectroscopyRow[G, L, U](
-  spec:      SpectroscopyRow,
-  disperser: G,
-  filter:    Option[L],
-  fpu:       Option[U]
+  spec:            SpectroscopyRow,
+  disperser:       G,
+  filter:          Option[L],
+  fpu:             Option[U],
+  customSlitWidth: Option[GmosCustomSlitWidth]
 )
 
 object GmosSpectroscopyRow {
@@ -47,7 +49,12 @@ object GmosSpectroscopyRow {
           // For MOS rows there is no builtin FPU then we return none
           u <- (if (r.fpuOption === FpuOption.Multislit) none[U].asRight[String]
                 else Enumerated[U].all.find(a => u(a) === r.fpu).map(_.some).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?"))
-        } yield GmosSpectroscopyRow(r, g, l, u)
+          w <- (if (r.fpuOption === FpuOption.Multislit)
+                  GmosCustomSlitWidth.fromWidth(r.slitWidth)
+                    .map(_.some)
+                    .toRight(s"Cannot find custom slit width: ${r.slitWidth}. Does a value exist in the Enumerated?")
+                else none[GmosCustomSlitWidth].asRight[String])
+        } yield GmosSpectroscopyRow(r, g, l, u, w)
         gn.fold(Parser.failWith, Parser.pure)
       }
     }

@@ -9,6 +9,10 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.catalog.goa.GoaParams
 import lucuma.catalog.goa.syntax.*
+import lucuma.core.enums.Flamingos2CustomSlitWidth
+import lucuma.core.enums.Flamingos2Disperser
+import lucuma.core.enums.Flamingos2Filter
+import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
@@ -21,12 +25,13 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
+import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.StepGuideState
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
+import lucuma.core.math.Offset
 import lucuma.core.math.Region
-import lucuma.core.math.RightAscension
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Ephemeris
 import lucuma.core.model.ExposureTimeMode
@@ -34,11 +39,20 @@ import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition.BandNormalized
 import lucuma.core.model.Target
+import lucuma.core.model.TargetResolution
+import lucuma.core.model.TelluricType
+import lucuma.core.model.ToBeDefined
+import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
+import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.logic.GoaQueryPolicy.TargetPointing
 import lucuma.odb.sequence.exchange.Config as Exchange
+import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig as Flamingos2AcquisitionConfig
+import lucuma.odb.sequence.flamingos2.spectroscopy.Config as Flamingos2Spectroscopy
 import lucuma.odb.sequence.gmos.imaging.Config as GmosImaging
 import lucuma.odb.sequence.gmos.imaging.Filter as GmosImagingFilter
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
@@ -99,6 +113,28 @@ class GoaQueryPolicySuite extends FunSuite:
       )
     )
 
+  private val flamingos2Mos: Flamingos2Mos =
+    Flamingos2Mos(
+      disperser  = Flamingos2Disperser.R1200HK,
+      filter     = Flamingos2Filter.H,
+      customMask = Flamingos2FpuMask.Custom(ToBeDefined, Flamingos2CustomSlitWidth.CustomWidth_2_pix),
+      acquisition = Flamingos2AcquisitionConfig(
+        exposureTimeMode = exposureTimeMode,
+        defaultFilter    = Flamingos2Filter.H,
+        explicitFilter   = none
+      ),
+      common     = Flamingos2Spectroscopy.Common(
+        exposureTimeMode    = exposureTimeMode,
+        explicitReadMode    = none,
+        explicitReads       = none,
+        explicitDecker      = none,
+        defaultReadoutMode  = Flamingos2ReadoutMode.Science,
+        explicitReadoutMode = none,
+        telescopeConfigs    = NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled)),
+        telluricType        = TelluricType.Hot
+      )
+    ).getOrElse(sys.error("Flamingos 2 MOS fixture is not valid"))
+
   private val exchange: Exchange =
     Exchange(KeckInstrument.Hires.asLeft, 1.hourTimeSpan)
 
@@ -113,14 +149,8 @@ class GoaQueryPolicySuite extends FunSuite:
       totalRequestTime   = 1.hourTimeSpan.some
     )
 
-  private def coordinates(raDeg: Double, decDeg: Double): Coordinates =
-    Coordinates(
-      RightAscension.fromDoubleDegrees(raDeg),
-      Declination.fromDoubleDegrees(decDeg).get
-    )
-
-  private val base: Coordinates   = coordinates(10.0, 20.0)
-  private val center: Coordinates = coordinates(30.0, 40.0)
+  private val base: Coordinates   = coords(10.0, 20.0)
+  private val center: Coordinates = coords(30.0, 40.0)
 
   private def name(s: String): NonEmptyString =
     NonEmptyString.unsafeFrom(s)
@@ -222,11 +252,20 @@ class GoaQueryPolicySuite extends FunSuite:
   test("targets are classified by how they can be pointed at"):
     val sidereal    = Target.Sidereal(name("Star"), SiderealTracking.const(base), sourceProfile, none)
     val nonSidereal = Target.Nonsidereal(name("Halley"), Ephemeris.Key.Comet("1P"), sourceProfile)
-    val opportunity = Target.Opportunity(name("Anywhere"), Region.Full, sourceProfile)
+    val opportunity = Target.Opportunity(name("Anywhere"), Region.Full, none, sourceProfile)
 
     assertEquals(TargetPointing.fromTarget(sidereal), TargetPointing.Sidereal)
     assertEquals(TargetPointing.fromTarget(nonSidereal), TargetPointing.NonSidereal(name("Halley")))
     assertEquals(TargetPointing.fromTarget(opportunity), TargetPointing.Unresolvable)
+
+  test("a resolved Target of Opportunity is pointed at like the target it resolved to"):
+    val resolvedSidereal =
+      Target.Opportunity(name("Anywhere"), Region.Full, TargetResolution.Sidereal(SiderealTracking.const(base), none).some, sourceProfile)
+    val resolvedNonSidereal =
+      Target.Opportunity(name("Burst"), Region.Full, TargetResolution.Nonsidereal(Ephemeris.Key.Comet("1P")).some, sourceProfile)
+
+    assertEquals(TargetPointing.fromTarget(resolvedSidereal), TargetPointing.Sidereal)
+    assertEquals(TargetPointing.fromTarget(resolvedNonSidereal), TargetPointing.NonSidereal(name("Burst")))
 
   // -- Search radius -------------------------------------------------------
 
@@ -239,11 +278,43 @@ class GoaQueryPolicySuite extends FunSuite:
       BigDecimal("165.201").some
     )
 
+  test("a Flamingos 2 MOS mask is searched over the whole GMMPS field"):
+    // A MOS mask really does spread its slits over the whole field, so the radius
+    // is far larger than any other Flamingos 2 mode's.
+    assertEquals(GoaQueryPolicy.searchRadius(flamingos2Mos).map(arcseconds), BigDecimal("184.201").some)
+
   test("a mode with no measurable science area has no radius"):
     // A long slit configuration carrying an IFU FPU evaluates to an empty
     // shape; there is nothing to search, which is not the same as searching a
     // zero-radius field.
     assertEquals(GoaQueryPolicy.searchRadius(gmosNorthLongSlit(GmosNorthFpu.Ifu2Slits)), none)
+
+  // -- Science mode --------------------------------------------------------
+
+  test("an imaging mode searches imaging"):
+    assertEquals(GoaQueryPolicy.scienceMode(gmosNorthImaging), ScienceMode.Imaging.some)
+
+  test("a spectroscopy mode searches spectroscopy"):
+    assertEquals(
+      GoaQueryPolicy.scienceMode(gmosNorthLongSlit(GmosNorthFpu.LongSlit_1_00)),
+      ScienceMode.Spectroscopy.some
+    )
+
+  test("Flamingos 2 MOS searches spectroscopy"):
+    assertEquals(GoaQueryPolicy.scienceMode(flamingos2Mos), ScienceMode.Spectroscopy.some)
+
+  test("a visitor instrument is classified by its mode"):
+    assertEquals(
+      GoaQueryPolicy.scienceMode(visitorNorth.copy(mode = VisitorObservingModeType.AlopekeSpeckle)),
+      ScienceMode.Imaging.some
+    )
+    assertEquals(
+      GoaQueryPolicy.scienceMode(visitorNorth.copy(mode = VisitorObservingModeType.MaroonX)),
+      ScienceMode.Spectroscopy.some
+    )
+
+  test("a generic visitor does not say which it takes, so the search is unrestricted"):
+    assertEquals(GoaQueryPolicy.scienceMode(visitorNorth), none)
 
   // -- The three combined --------------------------------------------------
 
@@ -251,6 +322,7 @@ class GoaQueryPolicySuite extends FunSuite:
     val ps = GoaQueryPolicy.queries(gmosNorthImaging, base.some, none, List(TargetPointing.Sidereal))
     assertEquals(ps.map(_.instrument), List(Instrument.GmosNorth, Instrument.GmosSouth))
     assertEquals(ps.map(_.searchRadius).distinct.length, 1)
+    assertEquals(ps.map(_.scienceMode).distinct, List(ScienceMode.Imaging.some))
     assertEquals(
       ps.collect { case s: GoaParams.Sidereal => s.coords }.distinct,
       List(base)

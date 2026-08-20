@@ -26,15 +26,15 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.BrightnessUnits.BrightnessMeasure
 import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
-import lucuma.core.math.Declination
-import lucuma.core.math.RightAscension
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
@@ -53,7 +53,9 @@ import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
+import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
 import lucuma.odb.graphql.query.ExecutionTestSupportForIgrins2
@@ -91,10 +93,7 @@ class perScienceObservationCalibrations
   val mockStarBefore = TelluricStar(
     id = "12345",
     spType = TelluricType.A0V,
-    coordinates = Coordinates(
-      RightAscension.fromDoubleDegrees(123.456),
-      Declination.fromDoubleDegrees(45.678).getOrElse(Declination.Zero)
-    ),
+    coordinates = coords(123.456, 45.678),
     distance = 100.5,
     hmag = 7.5,
     score = 0.95,
@@ -105,10 +104,7 @@ class perScienceObservationCalibrations
   val mockStarAfter = TelluricStar(
     id = "12346",
     spType = TelluricType.A0V,
-    coordinates = Coordinates(
-      RightAscension.fromDoubleDegrees(123.789),
-      Declination.fromDoubleDegrees(45.123).getOrElse(Declination.Zero)
-    ),
+    coordinates = coords(123.789, 45.123),
     distance = 98.2,
     hmag = 7.8,
     score = 0.92,
@@ -1235,6 +1231,36 @@ class perScienceObservationCalibrations
       assertEquals(telluricFpu2, Flamingos2Fpu.LongSlit2.some)
     }
 
+  test("telluric observation takes the science band of its science observation"):
+    // With a single allocated band, setAllocations back-fills it onto every
+    // observation with no band, which would hide the case under test.  More
+    // than one band skips that back-fill, so the bands here are only the ones
+    // set explicitly below.
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band2, 4.hourTimeSpan)
+    )
+    for {
+      pid         <- createProgramAs(pi)
+      _           <- setAllocationsAs(staff, pid, allocations)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      obs         <- queryObservation(oid)
+      obsInGroup  <- queryObservationsInGroup(obs.groupId.get)
+      telluricOid =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
+      band1       <- queryScienceBand(telluricOid)
+      _           <- setScienceBandAs(pi, oid, ScienceBand.Band1.some)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- sleep >> recalculateCalibrations(pid, when, oid)
+      band2       <- queryScienceBand(telluricOid)
+    } yield {
+      assertEquals(band1, ScienceBand.Band2.some)
+      assertEquals(band2, ScienceBand.Band1.some)
+    }
+
   test("Don't generate for inactive"):
     for {
       pid  <- createProgramAs(pi)
@@ -2281,8 +2307,12 @@ class perScienceObservationCalibrations
                   camera: SHORT_BLUE
                   slit: { fpu: LONG_SLIT_0_30 }
                   filter: ORDER3
-                  centralWavelength: { nanometers: 1650 }
-                  exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 1650 }
+                      exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
+                    }
+                  ]
                 }
               }
               constraintSet: { imageQuality: POINT_EIGHT }

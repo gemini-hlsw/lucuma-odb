@@ -44,7 +44,7 @@ class createObservation_GmosMos extends OdbSuite:
         VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix(".fits")))
+    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix("_ODF.fits").toUpperCase))
 
   private def scienceRequirements: String =
     """
@@ -203,7 +203,7 @@ class createObservation_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertMosMaskAttachment(pid, "mask.fits")
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits")
       oid <- create(pid, tid, s"""
                gmosNorthMos: {
                  grating: R831_G5302

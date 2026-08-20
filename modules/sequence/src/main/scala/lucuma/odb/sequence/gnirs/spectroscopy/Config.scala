@@ -6,8 +6,6 @@ package lucuma.odb.sequence.gnirs.spectroscopy
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
-import eu.timepit.refined.cats.*
-import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
@@ -16,7 +14,6 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.math.Wavelength
-import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gnirs.GnirsFocus
@@ -33,17 +30,38 @@ case class Config(
   fpu:                     GnirsFpu.Spectroscopy,
   prism:                   GnirsPrism,
   grating:                 GnirsGrating,
-  centralWavelength:       Wavelength,
+  wavelengths:             NonEmptyList[CentralWavelengthConfig],
   camera:                  GnirsCamera,
   focus:                   GnirsFocus,
   explicitReadMode:        Option[GnirsReadMode],
   wellDepth:               GnirsWellDepth,
-  exposureTimeMode:        ExposureTimeMode,
-  coadds:                  PosInt,
   telescopeConfigs:        NonEmptyList[TelescopeConfig],
   acquisition:             AcquisitionConfig,
   telluricType:            TelluricType
 ) derives Eq:
+
+  /**
+   * The configuration the sequence starts with.  Used where a single
+   * representative setting is required: the acquisition filter (both when
+   * generating the acquisition sequence and when sizing it via the ITC) and the
+   * HR-IFU alignment flat.  Wavelengths are stored in increasing order, so this
+   * is the shortest.
+   */
+  def primaryWavelength: CentralWavelengthConfig =
+    wavelengths.head
+
+  def primaryCentralWavelength: Wavelength =
+    primaryWavelength.centralWavelength
+
+  /**
+   * The camera the acquisition images are taken with: always the blue one, since the
+   * acquisition filters are all short of the blue/red boundary.  For blue-camera science
+   * this is just the science camera; red-camera (thermal-IR) science is acquired with the
+   * blue camera at the same pixel scale, as the GNIRS instrument scientists prescribe and
+   * as the OCS did.  The pixel scale is never mixed within an observation.
+   */
+  def acquisitionCamera: GnirsCamera =
+    camera.blue
 
   def hashBytes: Array[Byte] =
     val bao = new ByteArrayOutputStream(512)
@@ -61,7 +79,11 @@ case class Config(
         out.writeChars(i.tag)
     out.writeChars(prism.tag)
     out.writeChars(grating.tag)
-    out.write(centralWavelength.hashBytes)
+    // Length-prefixed: the element count is user-controlled, so without it two
+    // different wavelength lists could hash to the same bytes.
+    out.writeInt(wavelengths.length)
+    wavelengths.toList.foreach: w =>
+      out.write(w.hashBytes)
     out.writeChars(camera.tag)
     focus match
       case GnirsFocus.Best          => out.writeByte(0)
@@ -70,8 +92,6 @@ case class Config(
         out.writeInt(qty.value.value.value)
     out.writeChars(explicitReadMode.fold("")(_.tag))
     out.writeChars(wellDepth.tag)
-    out.write(exposureTimeMode.hashBytes)
-    out.write(coadds.value.hashBytes)
 
     telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)

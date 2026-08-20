@@ -16,7 +16,7 @@ final case class GmosCustomMask(
   slitWidth: GmosCustomSlitWidth
 )
 
-object GmosCustomMask {
+object GmosCustomMask:
 
   given Encoder[GmosCustomMask] with
     def apply(a: GmosCustomMask): Json =
@@ -31,4 +31,3 @@ object GmosCustomMask {
   given Eq[GmosCustomMask] with
     def eqv(x: GmosCustomMask, y: GmosCustomMask): Boolean =
       x.slitWidth === y.slitWidth
-}

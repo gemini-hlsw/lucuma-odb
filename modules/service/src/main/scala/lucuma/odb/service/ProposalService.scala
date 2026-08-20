@@ -13,6 +13,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
@@ -31,8 +32,10 @@ import lucuma.core.model.Program
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
+import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
@@ -75,6 +78,15 @@ private[service] trait ProposalService[F[_]] {
   def updateProposal(
     input: UpdateProposalInput
   )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]]
+
+  /**
+   * The observing time requested by the proposal in the given program: the
+   * explicit request if one has been made, and otherwise the sum of the time
+   * estimates of the program's observations.
+   */
+  def timeRequest(
+    pid: Program.Id
+  )(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]]
 
   /**
    * Checks whether a proposal is defined for the given program.
@@ -211,6 +223,17 @@ object ProposalService {
       case None                                               => "Not available"
       case Some(r) if r.min.programTime === r.max.programTime => s"${hours(r.max.programTime)} hours"
       case Some(r)                                            => s"${hours(r.min.programTime)} - ${hours(r.max.programTime)} hours"
+
+  /**
+   * Presents an explicit time request in the shape of the derived one: a
+   * settled, degenerate range charged entirely to program time.  Clients then
+   * read the explicit and derived cases through a single field.
+   */
+  private[odb] def explicitTimeRequestRange(ts: TimeSpan): CalculatedValue[CategorizedTimeRange] =
+    CalculatedValue(
+      CalculationState.Ready,
+      CategorizedTimeRange.single(CategorizedTime(ChargeClass.Program -> ts))
+    )
 
   /** Escapes the characters that would otherwise be markup in an html message. */
   private[odb] def escapeHtml(s: String): String =
@@ -546,7 +569,7 @@ object ProposalService {
             case Nil        => Result.unit.pure
             case recipients =>
               (for {
-                timeRequested <- ResultT.liftF(timeEstimateService.estimateProgramRange(pid))
+                timeRequested <- ResultT.liftF(timeRequest(pid))
                 _             <- recipients.traverse: a =>
                                    ResultT(sendEmailHelper(
                                      pid,
@@ -729,6 +752,11 @@ object ProposalService {
         } yield pid).value
       }
 
+      override def timeRequest(pid: Program.Id)(using Transaction[F]): F[Option[CalculatedValue[CategorizedTimeRange]]] =
+        session.option(Statements.SelectTimeRequest)(pid).map(_.flatten).flatMap:
+          case Some(ts) => explicitTimeRequestRange(ts).some.pure[F]
+          case None     => timeEstimateService.estimateProgramRange(pid)
+
       override def hasProposal(pid: Program.Id)(using Transaction[F]): F[Boolean] =
         session.unique(Statements.HasProposal)(pid)
 
@@ -807,6 +835,11 @@ object ProposalService {
 
   private object Statements {
 
+    val SelectTimeRequest: Query[Program.Id, Option[TimeSpan]] =
+      sql"""
+        SELECT c_time_request FROM t_proposal WHERE c_program_id = $program_id
+      """.query(time_span.opt)
+
     val HasProposal: Query[Program.Id, Boolean] =
       sql"""
         SELECT COUNT(1) FROM t_proposal WHERE c_program_id = $program_id
@@ -832,7 +865,8 @@ object ProposalService {
       val mainUpdates: List[AppliedFragment] =
         List(
           SET.category.foldPresent(sql"c_category = ${tag.opt}"),
-          SET.callId.foldPresent(sql"c_cfp_id = ${cfp_id.opt}")
+          SET.callId.foldPresent(sql"c_cfp_id = ${cfp_id.opt}"),
+          SET.timeRequest.foldPresent(sql"c_time_request = ${time_span.opt}")
         ).flatten
 
       val geminiUpdates: List[AppliedFragment] =
@@ -938,7 +972,8 @@ object ProposalService {
           c_jwst_synergy,
           c_us_long_term,
           c_consider_for_band_3,
-          c_exchange_partner
+          c_exchange_partner,
+          c_time_request
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
@@ -955,7 +990,8 @@ object ProposalService {
           ${bool},
           ${bool},
           ${consider_for_band_3},
-          ${exchange_partner.opt}
+          ${exchange_partner.opt},
+          ${time_span.opt}
       """.apply(
         pid,
         c.callId,
@@ -972,7 +1008,8 @@ object ProposalService {
         g.jwstSynergy,
         g.usLongTerm,
         g.considerForBand3,
-        g.exchangePartner
+        g.exchangePartner,
+        c.timeRequest
       )
 
     // An external (exchange) proposal has no science subtype; it carries an
@@ -993,19 +1030,22 @@ object ProposalService {
           c_cfp_id,
           c_category,
           c_observatory,
-          c_min_percent
+          c_min_percent,
+          c_time_request
         ) SELECT
           ${program_id},
           ${cfp_id.opt},
           ${tag.opt},
           ${observatory},
-          ${int_percent}
+          ${int_percent},
+          ${time_span.opt}
       """.apply(
         pid,
         c.callId,
         c.category,
         c.observatory,
-        minPercentTime
+        minPercentTime,
+        c.timeRequest
       )
 
     // The science subtype, program type (which encodes the observatory:

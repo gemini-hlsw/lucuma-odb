@@ -32,6 +32,13 @@ trait ProposalView[F[_]] extends BaseMapping[F]:
     val MinPercent      = col("c_min_percent",    int_percent)
     val ExchangePartner = col("c_exchange_partner", exchange_partner.opt)
 
+    // The explicitly requested observing time, null when nobody has chosen one
+    // and the sum over the program's observations stands instead.  The default
+    // and effective values are not view columns: the derivation is the group
+    // tree fold in TimeEstimateService, so they come from an effect handler.
+    val TimeRequestExplicit   = col("c_time_request", time_span.embedded)
+    val TimeRequestExplicitId = col("c_time_request_id", program_id.embedded)
+
     val CallId          = col("c_cfp_id", cfp_id.opt)
 
     object Classical:

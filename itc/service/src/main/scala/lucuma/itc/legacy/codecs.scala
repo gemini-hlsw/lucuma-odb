@@ -24,6 +24,7 @@ import lucuma.core.math.dimensional.syntax.*
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.display.*
 import lucuma.core.syntax.string.*
@@ -190,12 +191,23 @@ private[legacy] object codecs:
       )
     )
 
+  // A MOS mask is sent as its equivalent builtin longslit.
+  private def f2MaskTag(mask: Flamingos2FpuMask): String =
+    mask match
+      case Flamingos2FpuMask.Builtin(f)   => f.ocs2Tag
+      case Flamingos2FpuMask.Custom(_, w) =>
+        w.fpu.fold(sys.error(s"Flamingos 2 custom slit width ${w.tag} has no equivalent slit"))(
+          _.ocs2Tag
+        )
+      case Flamingos2FpuMask.Imaging      =>
+        sys.error("Flamingos 2 spectroscopy requires a focal plane unit")
+
   private val encodeF2Spectroscopy: Encoder[ObservingMode.SpectroscopyMode.Flamingos2] = a =>
     Json.obj(
       // Translate observing mode to OCS2 style
       "filter"          -> Json.fromString(a.filter.ocs2Tag),
       "grism"           -> Json.fromString(a.disperser.ocs2Tag),
-      "mask"            -> Json.fromString(a.fpu.ocs2Tag),
+      "mask"            -> Json.fromString(f2MaskTag(a.fpu)),
       "readMode"        -> Json.fromString(a.readMode match {
         case Flamingos2ReadMode.Bright => "BRIGHT_OBJECT_SPEC"
         case Flamingos2ReadMode.Medium => "MEDIUM_OBJECT_SPEC"
@@ -565,11 +577,15 @@ private[legacy] object codecs:
 
   private given Decoder[ItcSeries] = (c: HCursor) =>
     for
-      title <- c.downField("title").as[String]
-      dt    <- c.downField("dataType").as[SeriesDataType]
-      dataY <- c.downField("dataY").as[NonEmptyList[Double]]
-      xaxis <- c.downField("xAxis").as[ItcXAxis]
-    yield ItcSeries(title, dt, dataY, xaxis)
+      title  <- c.downField("title").as[String]
+      dt     <- c.downField("dataType").as[SeriesDataType]
+      dataY  <- c.downField("dataY").as[NonEmptyList[Double]]
+      xaxis  <- c.downField("xAxis").as[ItcXAxis]
+      series <- ItcSeries
+                  .fromLegacy(title, dt, dataY, xaxis)
+                  .toRight:
+                    DecodingFailure(s"No data above 0 nm in series '$title'", c.history)
+    yield series
 
   given Decoder[ItcGraph] = (c: HCursor) =>
     for

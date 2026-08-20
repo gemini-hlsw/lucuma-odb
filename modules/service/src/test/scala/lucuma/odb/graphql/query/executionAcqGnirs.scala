@@ -568,3 +568,163 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
             s"Could not generate a sequence for $oid: PAH acquisition filter cannot be used with short camera"
           ).asLeft
         )
+
+  test("[gnirs] the acquisition filter change costs the configured overhead"):
+    // A spectroscopy acquisition images the slit and then the field, and the two
+    // do not always use the same filter: the slit image falls back to H (Order4)
+    // for filters that have no short-camera entry of their own, so an H2
+    // acquisition moves the wheel even though the science sequence stays on one
+    // filter.  (With the default Order3 the two coincide and nothing is charged,
+    // which is why this picks H2 explicitly.)
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+        _ <- setAcquisitionFilter(o, "H2")
+      yield o
+
+    setup.flatMap: oid =>
+      query(
+        pi,
+        s"""
+          query {
+            executionConfig(observationId: "$oid") {
+              gnirs {
+                acquisition {
+                  nextAtom { steps { instrumentConfig { filter } estimate { configChange { all { name estimate { seconds } } } } } }
+                }
+              }
+            }
+          }
+        """
+      ).map: json =>
+        val steps =
+          json.hcursor
+            .downField("executionConfig").downField("gnirs").downField("acquisition")
+            .downField("nextAtom").downField("steps")
+            .values.toList.flatten
+
+        val filters: List[String] =
+          steps.flatMap(_.hcursor.downField("instrumentConfig").downField("filter").as[String].toOption)
+
+        val filterChanges: List[BigDecimal] =
+          steps.flatMap: step =>
+            step.hcursor
+              .downField("estimate").downField("configChange").downField("all")
+              .values.toList.flatten
+              .flatMap: c =>
+                (for
+                  n <- c.hcursor.downField("name").as[String].toOption
+                  v <- c.hcursor.downField("estimate").downField("seconds").as[BigDecimal].toOption
+                  if n == "GNIRS Filter"
+                yield v).toList
+
+        // The acquisition really does change filter, and each change is charged.
+        assertEquals(filterChanges.size, filters.zip(filters.tail).count(_ != _))
+        assert(filterChanges.nonEmpty, s"expected a filter change in the acquisition; filters were $filters")
+        assert(filterChanges.forall(_ == BigDecimal("10.000000")), s"unexpected costs: $filterChanges")
+
+  def firstAtomCameraQuery(oid: Observation.Id): String =
+    s"""
+      query {
+        executionConfig(observationId: "$oid") {
+          gnirs { acquisition { nextAtom { steps {
+            instrumentConfig { exposure { microseconds } coadds filter readMode camera }
+          } } } }
+        }
+      }
+    """
+
+  def firstAtomCameraConfig(expµs: Long, coadds: Int, filter: String, readMode: String, camera: String): Json =
+    json"""{ "instrumentConfig": { "exposure": { "microseconds": $expµs }, "coadds": $coadds, "filter": $filter, "readMode": $readMode, "camera": $camera } }"""
+
+  def acquisitionCameras(json: Json): List[String] =
+    json.hcursor
+      .downField("executionConfig").downField("gnirs").downField("acquisition")
+      .downField("nextAtom").downField("steps")
+      .values.toList.flatten
+      .flatMap(_.hcursor.downField("instrumentConfig").downField("camera").as[String].toOption)
+
+  // Thermal-IR science (L and M) has no acquisition filter covering its wavelength. It is
+  // acquired with the blue camera at the same pixel scale, in H (or H2 when very bright, by
+  // the ordinary brightness rule). These wavelengths previously failed sequence generation
+  // outright ("No Gnirs spectroscopy filter available for wavelength"), except 3.3 µm, which
+  // selected PAH and then failed on the short camera.
+  List(
+    ("SHORT_RED", "SHORT_BLUE", "ORDER2", BigDecimal(3300), HShortµs), // L, the PAH band
+    ("SHORT_RED", "SHORT_BLUE", "ORDER2", BigDecimal(3500), HShortµs), // L, optimal
+    ("SHORT_RED", "SHORT_BLUE", "ORDER1", BigDecimal(5000), HShortµs), // M, the reported failure
+    ("LONG_RED",  "LONG_BLUE",  "ORDER2", BigDecimal(3500), HLongµs),
+    ("LONG_RED",  "LONG_BLUE",  "ORDER1", BigDecimal(5000), HLongµs)
+  ).foreach: (camera, acqCamera, filter, centralNm, fpuµs) =>
+    test(s"$camera Bright acquisition for thermal-IR science ($filter at $centralNm nm) uses H on $acqCamera"):
+      val setup: IO[Observation.Id] =
+        for
+          p <- createProgram
+          t <- createTargetWithProfileAs(pi, p)
+          o <- createGnirsLongSlitObservationAs(pi, p, t)
+          _ <- setCamera(o, camera)
+          _ <- setFilterAndCentralWavelength(o, filter, centralNm)
+          _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+          // Pin the mode so the sequence shape is fixed; the filter stays automatic.
+          _ <- setAcquisitionType(o, "BRIGHT")
+        yield o
+
+      setup.flatMap: oid =>
+        expect(
+          user     = pi,
+          query    = firstAtomCameraQuery(oid),
+          expected = json"""
+            {
+              "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
+                ${firstAtomCameraConfig(fpuµs,    1, "ORDER4", "BRIGHT", acqCamera)},
+                ${firstAtomCameraConfig(Brightµs, 1, "ORDER4", "BRIGHT", acqCamera)},
+                ${firstAtomCameraConfig(Brightµs, 1, "ORDER4", "BRIGHT", acqCamera)},
+                ${firstAtomCameraConfig(Brightµs, 1, "ORDER4", "BRIGHT", acqCamera)}
+              ] } } } }
+            }
+          """.asRight
+        )
+
+  test("blue-camera science keeps its camera for acquisition"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t) // K at 2200 nm, SHORT_BLUE
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+        _ <- setAcquisitionType(o, "BRIGHT")
+      yield o
+
+    setup.flatMap: oid =>
+      query(pi, firstAtomCameraQuery(oid)).map: json =>
+        assertEquals(acquisitionCameras(json).distinct, List("SHORT_BLUE"))
+
+  test("fully automatic M-band acquisition generates a sequence"):
+    // The reported failure: nothing pinned, so both the acquisition mode and the filter are
+    // derived. Generation used to fail with "No Gnirs spectroscopy filter available for
+    // wavelength: 5000000".
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- setCamera(o, "LONG_RED")
+        _ <- setFilterAndCentralWavelength(o, "ORDER1", BigDecimal(5000))
+        _ <- setAcquisitionTimeAndCount(o, 5.0, 1, 1645)
+      yield o
+
+    setup.flatMap: oid =>
+      query(pi, firstAtomCameraQuery(oid)).map: json =>
+        val filters =
+          json.hcursor
+            .downField("executionConfig").downField("gnirs").downField("acquisition")
+            .downField("nextAtom").downField("steps")
+            .values.toList.flatten
+            .flatMap(_.hcursor.downField("instrumentConfig").downField("filter").as[String].toOption)
+
+        assert(filters.nonEmpty, "expected acquisition steps")
+        assertEquals(filters.distinct, List("ORDER4"))
+        assertEquals(acquisitionCameras(json).distinct, List("LONG_BLUE"))

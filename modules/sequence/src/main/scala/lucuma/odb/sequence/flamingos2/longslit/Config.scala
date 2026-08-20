@@ -6,7 +6,7 @@ package lucuma.odb.sequence.flamingos2.longslit
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
-import cats.syntax.all.*
+import cats.syntax.foldable.*
 import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
@@ -17,6 +17,10 @@ import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.odb.sequence.flamingos2.spectroscopy
+import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
+import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.all.*
 
 import java.io.ByteArrayOutputStream
@@ -26,27 +30,19 @@ import java.io.DataOutputStream
  * Configuration for the Flamingos2 Long Slit science mode.  Using these parameters, a
  * F2 long slit sequence may be generated.
  */
-case class Config private[longslit](
-  disperser: Flamingos2Disperser,
-  filter: Flamingos2Filter,
-  fpu: Flamingos2Fpu,
-  exposureTimeMode: ExposureTimeMode,
+case class Config(
+  disperser:   Flamingos2Disperser,
+  filter:      Flamingos2Filter,
+  fpu:         Flamingos2Fpu,
   acquisition: AcquisitionConfig,
-  explicitReadMode: Option[Flamingos2ReadMode],
-  explicitReads: Option[Flamingos2Reads],
-  defaultDecker: Flamingos2Decker,
-  explicitDecker: Option[Flamingos2Decker],
-  defaultReadoutMode: Flamingos2ReadoutMode,
-  explicitReadoutMode: Option[Flamingos2ReadoutMode],
-  telescopeConfigs: NonEmptyList[TelescopeConfig],
-  telluricType: TelluricType
-) derives Eq:
+  common:      Common
+) extends spectroscopy.Config derives Eq:
 
-  def decker: Flamingos2Decker =
-    explicitDecker.getOrElse(defaultDecker)
+  override def fpuMask: Flamingos2FpuMask =
+    Flamingos2FpuMask.Builtin(fpu)
 
-  def readoutMode: Flamingos2ReadoutMode =
-    explicitReadoutMode.getOrElse(defaultReadoutMode)
+  override def gcalFpu: Flamingos2Fpu =
+    fpu
 
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
@@ -90,14 +86,15 @@ object Config:
       disperser,
       filter,
       fpu,
-      exposureTimeMode,
       acquisition,
-      explicitReadMode,
-      explicitReads,
-      Flamingos2Decker.LongSlit,
-      explicitDecker,
-      DefaultFlamingos2ReadoutMode,
-      explicitReadoutMode,
-      telescopeConfigs,
-      telluricType
+      Common(
+        exposureTimeMode,
+        explicitReadMode,
+        explicitReads,
+        explicitDecker,
+        DefaultFlamingos2ReadoutMode,
+        explicitReadoutMode,
+        telescopeConfigs,
+        telluricType
+      )
     )

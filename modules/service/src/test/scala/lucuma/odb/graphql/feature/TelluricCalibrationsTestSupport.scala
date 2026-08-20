@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Decoder
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.odb.graphql.query.ExecutionTestSupport
@@ -59,6 +60,19 @@ trait TelluricCalibrationsTestSupport:
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  protected def queryScienceBand(oid: Observation.Id): IO[Option[ScienceBand]] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              scienceBand
+            }
+          }"""
+    ).flatMap: c =>
+      c.hcursor.downFields("observation", "scienceBand").as[Option[ScienceBand]]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
 
   protected def queryObservationExists(oid: Observation.Id): IO[Boolean] =
     query(

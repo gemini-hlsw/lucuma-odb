@@ -14,7 +14,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
-import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GhostResolutionMode
 import lucuma.core.enums.GmosNorthFilter
@@ -116,7 +115,7 @@ object InstrumentMode {
     disperser:        Flamingos2Disperser,
     filter:           Flamingos2Filter,
     readMode:         Flamingos2ReadMode,
-    fpu:              Flamingos2Fpu,
+    fpu:              Flamingos2FpuMask,
     port:             PortDisposition = PortDisposition.Side
   ) extends InstrumentMode derives Eq:
     override def displayName: String =

@@ -51,6 +51,19 @@ trait TargetView[F[_]] extends BaseMapping[F] {
     }
     object Opportunity {
       val SyntheticId = col("c_opportunity_id", target_id.embedded)
+      // The resolution of a Target of Opportunity. These reuse the c_sid_* / c_nsid_* columns
+      // -- a resolution is stored exactly as the subtype it resolved to -- and differ from the
+      // top-level Sidereal/Nonsidereal mappings only in their synthetic key, which is null
+      // unless this target is an opportunity target resolved that way.
+      object Resolution {
+        val SyntheticId = col("c_opportunity_resolution_id", target_id.embedded)
+        object Sidereal {
+          val SyntheticId = col("c_opportunity_sidereal_id", target_id.embedded)
+        }
+        object Nonsidereal {
+          val SyntheticId = col("c_opportunity_nonsidereal_id", target_id.embedded)
+        }
+      }
       object Region {
         val SyntheticId = col("c_opportunity_id", target_id.embedded)
         object RightAscensionArc {

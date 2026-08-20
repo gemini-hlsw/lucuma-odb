@@ -91,9 +91,11 @@ final class Enums(
     case GmosSouthReacquisition     extends TimeEstimate("gmos_south_reacquisition")
     case GmosSouthWrite             extends TimeEstimate("gmos_south_write")
 
+    case GnirsFilter                extends TimeEstimate("gnirs_filter")
     case GnirsLongslitMaxVisit      extends TimeEstimate("gnirs_longslit_max_visit")
     case GnirsLongslitSetup         extends TimeEstimate("gnirs_longslit_setup")
     case GnirsReacquisition         extends TimeEstimate("gnirs_reacquisition")
+    case GnirsWavelength            extends TimeEstimate("gnirs_wavelength")
     case GnirsWrite                 extends TimeEstimate("gnirs_write")
 
     case Igrins2LongslitMaxVisit    extends TimeEstimate("igrins2_longslit_max_visit")

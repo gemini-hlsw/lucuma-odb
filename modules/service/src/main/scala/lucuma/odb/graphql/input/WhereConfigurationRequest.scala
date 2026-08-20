@@ -10,15 +10,24 @@ import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.ConfigurationRequestStatus
-import lucuma.core.model.ConfigurationRequest
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.binding.*
+import lucuma.odb.graphql.binding.WhereOptionEq
 import lucuma.odb.graphql.binding.WhereOptionString
 import lucuma.odb.graphql.binding.WhereOrder
 
-object WhereConfigurationRequest {
+object WhereConfigurationRequest:
 
-  def binding(path: Path): Matcher[Predicate] = {
+  /** The WHERE input shared by the `configurationRequests` query and the
+   *  `updateConfigurationRequests` mutation.
+   *
+   *  @param `allowCone` says whether `targetCoordinates` may be used. A cone elaborates to a
+   *  `ConePredicate` that `ConeFilter` resolves by walking the compiled query, so it only
+   *  works where the predicate ends up in the query tree. Thus it is only usable on queries,
+   *  not mutations.
+   */
+  def binding(path: Path, allowCone: Boolean): Matcher[Predicate] = {
     val WhereOrderConfigurationRequestId = WhereOrder.binding(path / "id", ConfigurationRequestIdBinding)
     val WhereStatusBinding = WhereOrder.binding(path / "status", enumeratedBinding[ConfigurationRequestStatus])
     val WhereProgramBinding = WhereProgram.binding(path / "program")
@@ -27,7 +36,15 @@ object WhereConfigurationRequest {
     val WhereCreatedAtBinding = WhereOrder.binding[Timestamp](path / "createdAt", TimestampBinding)
     val WhereUpdatedAtBinding = WhereOrder.binding[Timestamp](path / "updatedAt", TimestampBinding)
 
-    lazy val WhereObservationBinding = binding(path) // lazy self-reference
+    // A configuration request exposes its observing mode type nested under its
+    // `configuration.observingMode`, so the predicate path is one segment deeper
+    // than the equivalent field on `WhereObservation`.
+    val ObservingModeTypeBinding = WhereOptionEq.unwrappedBinding(path / "configuration" / "observingMode" / "mode", enumeratedBinding[ObservingModeType])
+
+    val TargetCoordinatesBinding: Matcher[Predicate] =
+      WhereTargetCoordinates.binding(path / "id", ConeFilter.ConeEntity.ConfigurationRequest, "configuration requests", allowCone)
+
+    lazy val WhereObservationBinding = binding(path, allowCone) // lazy self-reference
     ObjectFieldsBinding.rmap {
       case List(
         WhereObservationBinding.List.Option("AND", rAND),
@@ -40,9 +57,11 @@ object WhereConfigurationRequest {
         WhereFeedbackBinding.Option("feedback", rFeedback),
         WhereCreatedAtBinding.Option("createdAt", rCreatedAt),
         WhereUpdatedAtBinding.Option("updatedAt", rUpdatedAt),
+        ObservingModeTypeBinding.Option("observingModeType", rObservingModeType),
+        TargetCoordinatesBinding.Option("targetCoordinates", rTargetCoordinates),
       ) =>
-        (rAND, rOR, rNOT, rId, rStatus, rProgram, rJustification, rFeedback, rCreatedAt, rUpdatedAt).parMapN {
-          (AND, OR, NOT, id, status, program, justification, feedback, createdAt, updatedAt) =>
+        (rAND, rOR, rNOT, rId, rStatus, rProgram, rJustification, rFeedback, rCreatedAt, rUpdatedAt, rObservingModeType, rTargetCoordinates).parMapN {
+          (AND, OR, NOT, id, status, program, justification, feedback, createdAt, updatedAt, observingModeType, targetCoordinates) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -54,9 +73,9 @@ object WhereConfigurationRequest {
               feedback,
               createdAt,
               updatedAt,
+              observingModeType,
+              targetCoordinates,
             ).flatten)
         }
     }
   }
-
-}

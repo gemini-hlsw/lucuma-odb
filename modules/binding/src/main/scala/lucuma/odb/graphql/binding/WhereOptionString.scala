@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 
 package binding
 
+import cats.Eq
 import cats.syntax.all.*
 import eu.timepit.refined.cats.*
 import grackle.Path
@@ -17,13 +18,23 @@ import lucuma.odb.graphql.binding.*
 object WhereOptionString {
 
   def binding(path: Path): Matcher[Predicate] =
+    bindingAs(path, NonEmptyStringBinding)
+
+  /**
+   * As `binding`, but parses the equality-style values (EQ, NEQ, IN, NIN) with the
+   * given matcher. Use this when the mapped column's Scala type is not `String`,
+   * since the constants are bound into the query with the column's own codec.
+   * LIKE and NLIKE remain string comparisons, which is always correct because
+   * Grackle encodes them with a string encoder regardless of the column codec.
+   */
+  def bindingAs[A: Eq](path: Path, value: Matcher[A]): Matcher[Predicate] =
     ObjectFieldsBinding.rmap {
       case List(
         BooleanBinding.Option("IS_NULL", rIsNull),
-        NonEmptyStringBinding.Option("EQ", rEq),
-        NonEmptyStringBinding.Option("NEQ", rNeq),
-        NonEmptyStringBinding.List.Option("IN", rIn),
-        NonEmptyStringBinding.List.Option("NIN", rNin),
+        value.Option("EQ", rEq),
+        value.Option("NEQ", rNeq),
+        value.List.Option("IN", rIn),
+        value.List.Option("NIN", rNin),
         NonEmptyStringBinding.Option("LIKE", rLike),
         NonEmptyStringBinding.Option("NLIKE", rNlike),
         BooleanBinding.Option("MATCH_CASE", rMatchCase)

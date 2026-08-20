@@ -51,10 +51,9 @@ class createObservation_GnirsImaging extends OdbSuite:
                 observingMode {
                   mode
                   gnirsImaging {
-                    filters { filter }
-                    initialFilters { filter }
+                    filters { filter coadds }
+                    initialFilters { filter coadds }
                     camera
-                    coadds
                     explicitReadMode
                     wellDepth
                     defaultWellDepth
@@ -84,15 +83,14 @@ class createObservation_GnirsImaging extends OdbSuite:
                   "mode": "GNIRS_IMAGING",
                   "gnirsImaging": {
                     "filters": [
-                      { "filter": "ORDER4" },
-                      { "filter": "J" }
+                      { "filter": "ORDER4", "coadds": 1 },
+                      { "filter": "J", "coadds": 1 }
                     ],
                     "initialFilters": [
-                      { "filter": "ORDER4" },
-                      { "filter": "J" }
+                      { "filter": "ORDER4", "coadds": 1 },
+                      { "filter": "J", "coadds": 1 }
                     ],
                     "camera": "SHORT_BLUE",
-                    "coadds": 1,
                     "explicitReadMode": "BRIGHT",
                     "wellDepth": "SHALLOW",
                     "defaultWellDepth": "SHALLOW",
@@ -116,6 +114,104 @@ class createObservation_GnirsImaging extends OdbSuite:
             }
           }
         """.asRight)
+
+  test("create GNIRS imaging with per-filter coadds"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(pi,
+          s"""
+            mutation {
+              createObservation(input: {
+                programId: ${pid.asJson}
+                SET: {
+                  targetEnvironment: {
+                    asterism: [${tid.asJson}]
+                  }
+                  scienceRequirements: {
+                    exposureTimeMode: {
+                      signalToNoise: {
+                        value: 100.0
+                        at: { nanometers: 1250.0 }
+                      }
+                    }
+                  }
+                  observingMode: {
+                    gnirsImaging: {
+                      camera: SHORT_BLUE
+                      filters: [
+                        {
+                          filter: J
+                          exposureTimeMode: {
+                            timeAndCount: { time: { seconds: 30.0 }, count: 6, at: { nanometers: 1250.0 } }
+                          }
+                          coadds: 4
+                        },
+                        {
+                          filter: ORDER4
+                          exposureTimeMode: {
+                            signalToNoise: { value: 50.0, at: { nanometers: 1250.0 } }
+                          }
+                          coadds: 7
+                        }
+                      ]
+                    }
+                  }
+                }
+              }) {
+                observation {
+                  observingMode {
+                    gnirsImaging {
+                      filters {
+                        filter
+                        coadds
+                        exposureTimeMode {
+                          signalToNoise { value at { nanometers } }
+                          timeAndCount { time { seconds } count at { nanometers } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """,
+          json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsImaging": {
+                      "filters": [
+                        {
+                          "filter": "ORDER4",
+                          "coadds": 1,
+                          "exposureTimeMode": {
+                            "signalToNoise": {
+                              "value": 50.000,
+                              "at": { "nanometers": 1250.000 }
+                            },
+                            "timeAndCount": null
+                          }
+                        },
+                        {
+                          "filter": "J",
+                          "coadds": 4,
+                          "exposureTimeMode": {
+                            "signalToNoise": null,
+                            "timeAndCount": {
+                              "time": { "seconds": 30.000000 },
+                              "count": 6,
+                              "at": { "nanometers": 1250.000 }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          """.asRight)
 
   /** Creates a GNIRS imaging observation with the given acquisition input block. */
   private def createWithAcquisition(acquisition: String, selection: String) =

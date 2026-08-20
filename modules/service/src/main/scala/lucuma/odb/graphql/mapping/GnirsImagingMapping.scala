@@ -38,6 +38,7 @@ trait GnirsImagingMapping[F[_]]
       SqlField("observationId",     GnirsImagingFilterTable.ObservationId, key = true, hidden = true),
       SqlField("filter",            GnirsImagingFilterTable.Filter, key = true),
       SqlField("version",           GnirsImagingFilterTable.Version, key = true, hidden = true),
+      SqlField("coadds",            GnirsImagingFilterTable.Coadds),
       SqlObject("exposureTimeMode", Join(GnirsImagingFilterTable.ExposureTimeModeId, ExposureTimeModeView.Id))
     )
 
@@ -116,7 +117,6 @@ trait GnirsImagingMapping[F[_]]
       SqlObject("initialFilters", Join(GnirsImagingView.ObservationId, GnirsImagingFilterTable.ObservationId)),
 
       SqlField("camera", GnirsImagingView.Camera),
-      SqlField("coadds", GnirsImagingView.Coadds),
 
       SqlField("explicitReadMode", GnirsImagingView.ReadMode),
 

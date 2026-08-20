@@ -367,15 +367,21 @@ object PerScienceObservationCalibrationsService:
               MaxTelluricSN
           ExposureTimeMode.SignalToNoiseMode(snValue, etm.at)
 
+        // Update in place rather than delete-and-insert: GNIRS spectroscopy's
+        // central wavelength rows reference their science ETM with ON DELETE
+        // CASCADE, so deleting the ETM would take the observing mode's
+        // wavelengths with it.  `updateMany` updates the rows that exist and
+        // inserts where none does, so the end state is the same for every other
+        // mode.
         def replaceEtm(
           role:    ExposureTimeModeRole,
           newEtm:  ExposureTimeMode,
           current: Option[ExposureTimeMode]
         ): F[Unit] =
-          (exposureTimeModeService.deleteMany(List(telluricOid), role) *>
-            exposureTimeModeService.insertOne(telluricOid, role, newEtm))
-              .unlessA(current.contains(newEtm))
-              .void
+          exposureTimeModeService
+            .updateMany(List(telluricOid), role, newEtm)
+            .unlessA(current.contains(newEtm))
+            .void
 
         for {
           allEtm     <- exposureTimeModeService
@@ -615,6 +621,7 @@ object PerScienceObservationCalibrationsService:
           sql"""
             UPDATE t_observation target
             SET
+              c_science_band             = source.c_science_band,
               c_cloud_extinction         = source.c_cloud_extinction,
               c_image_quality            = source.c_image_quality,
               c_sky_background           = source.c_sky_background,

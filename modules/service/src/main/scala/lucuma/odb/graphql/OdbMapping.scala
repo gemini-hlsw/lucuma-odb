@@ -112,7 +112,7 @@ object OdbMapping {
     schema0:         Schema,
     allowSub:        Boolean = true,        // Are submappings (recursive calls) allowed?
     shouldValidate:  Boolean = true,        // should we validatate the TypeMappings?
-  ): Mapping[F] =
+  ): Mapping[F] & ConeCandidatesMapping[F] =
         new SkunkMapping[F](database, monitor0)
           with BaseMapping[F]
           with AddConditionsEntryResultMapping[F]
@@ -150,6 +150,7 @@ object OdbMapping {
           with ConfigurationGmosLongSlitMappings[F]
           with ConfigurationGmosMosMappings[F]
           with ConfigurationMapping[F]
+          with ConeCandidatesMapping[F]
           with ConfigurationRequestMapping[F]
           with ConfigurationRequestEditMapping[F]
           with ConfigurationRequestSelectResultMapping[F]
@@ -193,6 +194,7 @@ object OdbMapping {
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
           with ConfigurationFlamingos2LongSlitMappings[F]
+          with ConfigurationFlamingos2MosMappings[F]
           with ConfigurationGnirsLongSlitMappings[F]
           with ConfigurationIgrins2LongSlitMappings[F]
           with Flamingos2CustomMaskMapping[F]
@@ -200,6 +202,7 @@ object OdbMapping {
           with Flamingos2FpuMaskMapping[F]
           with Flamingos2ImagingMapping[F]
           with Flamingos2LongSlitMapping[F]
+          with Flamingos2MosMapping[F]
           with Flamingos2StaticMapping[F]
           with Igrins2DynamicMapping[F]
           with Igrins2LongSlitMapping[F]
@@ -248,6 +251,7 @@ object OdbMapping {
           with ObservingModeMapping[F]
           with OffsetMapping[F]
           with OpportunityMapping[F]
+          with TargetResolutionMapping[F]
           with ParallaxMapping[F]
           with PartnerSplitMapping[F]
           with PosAngleConstraintMapping[F]
@@ -480,6 +484,7 @@ object OdbMapping {
                 Igrins2StaticMapping,
                 GnirsSpectroscopyAcquisitionMapping,
                 GnirsSpectroscopyMapping,
+                GnirsCentralWavelengthConfigMapping,
                 GnirsSlitMapping,
                 GnirsIfuMapping,
                 GnirsDynamicMapping,
@@ -616,6 +621,7 @@ object OdbMapping {
                 ConfigurationConditionsMappings,
                 ConfigurationRequestSelectResultMappings,
                 ConfigurationFlamingos2LongSlitMappings,
+                ConfigurationFlamingos2MosMappings,
                 ConfigurationGnirsLongSlitMappings,
                 ConfigurationIgrins2LongSlitMappings,
                 ConfigurationGmosNorthImagingMappings,
@@ -625,6 +631,7 @@ object OdbMapping {
                 ConfigurationGmosNorthMosMappings,
                 ConfigurationGmosSouthMosMappings,
                 GmosMosMappings,
+                Flamingos2MosMappings,
                 ConfigurationObservingModeMappings,
                 ConfigurationTargetMappings,
                 ConfigurationVisitorMappings,
@@ -659,6 +666,7 @@ object OdbMapping {
                 RegionMappings,
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
+                TargetResolutionMappings,
                 TelescopeConfigMappings,
                 TimeSpanMappings,
                 UserProfileMappings,
@@ -680,6 +688,7 @@ object OdbMapping {
                 ExecutionElaborator,
                 Flamingos2ImagingElaborator,
                 Flamingos2LongSlitElaborator,
+                Flamingos2MosElaborator,
                 Igrins2LongSlitElaborator,
                 GnirsImagingElaborator,
                 GnirsSpectroscopyElaborator,
@@ -845,5 +854,9 @@ object OdbMapping {
 
 
   def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
+    // NOTE: `load` is an inline macro -- it reads the .graphql at *compile time* and bakes the
+    // schema into this class.  Editing OdbSchema.graphql therefore has no effect until this file
+    // is recompiled, and zinc hashes content, so `touch` will not do it.  If a schema change seems
+    // to be ignored at runtime, make a real edit here or `sbt service/clean`.
     SchemaStitcher.load("lucuma/odb/graphql/OdbSchema.graphql")
 }

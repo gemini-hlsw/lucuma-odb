@@ -49,10 +49,9 @@ object Science:
       for
         // The initial dynamic config already has the acquisition decker,
         // acquisition mirror in, and best focus; only the acquisition FPU and the
-        // mode's camera and coadds need setting.
+        // mode's camera need setting.  Coadds come with the filter.
         _ <- GnirsDynamicConfig.fpu    := GnirsFpu.Other(Acquisition)
         _ <- GnirsDynamicConfig.camera := config.camera
-        _ <- GnirsDynamicConfig.coadds := config.coadds
       yield ()
 
     def runSetup(config: Config): GnirsDynamicConfig =
@@ -63,6 +62,7 @@ object Science:
       for
         _ <- GnirsDynamicConfig.filter   := filter
         _ <- GnirsDynamicConfig.exposure := time
+        _ <- GnirsDynamicConfig.coadds   := config.coaddsFor(filter)
         _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
       yield ()
 

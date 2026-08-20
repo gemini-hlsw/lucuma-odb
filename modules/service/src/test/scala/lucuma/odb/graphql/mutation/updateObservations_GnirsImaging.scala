@@ -42,10 +42,9 @@ class updateObservations_GnirsImaging extends OdbSuite with UpdateObservationsOp
         observingMode {
           mode
           gnirsImaging {
-            filters { filter }
-            initialFilters { filter }
+            filters { filter coadds }
+            initialFilters { filter coadds }
             camera
-            coadds
             explicitReadMode
             wellDepth
             defaultWellDepth
@@ -65,15 +64,14 @@ class updateObservations_GnirsImaging extends OdbSuite with UpdateObservationsOp
                 "mode": "GNIRS_IMAGING",
                 "gnirsImaging": {
                   "filters": [
-                    { "filter": "ORDER4" },
-                    { "filter": "J" }
+                    { "filter": "ORDER4", "coadds": 1 },
+                    { "filter": "J", "coadds": 1 }
                   ],
                   "initialFilters": [
-                    { "filter": "ORDER4" },
-                    { "filter": "J" }
+                    { "filter": "ORDER4", "coadds": 1 },
+                    { "filter": "J", "coadds": 1 }
                   ],
                   "camera": "SHORT_BLUE",
-                  "coadds": 1,
                   "explicitReadMode": "BRIGHT",
                   "wellDepth": "SHALLOW",
                   "defaultWellDepth": "SHALLOW",
@@ -362,6 +360,70 @@ class updateObservations_GnirsImaging extends OdbSuite with UpdateObservationsOp
       List(
         (setWithAcqEtm, query, expected(json"""[ { "filter": "J" } ]""")),
         (editFilters, query, expected(json"""[ { "filter": "ORDER4" }, { "filter": "K" } ]"""))
+      )
+    )
+
+  test("observing mode: update GNIRS imaging per-filter coadds"):
+    // The initial filters keep the coadds they were created with, and a
+    // signal-to-noise filter is forced to 1 coadd.
+    val update = """
+      observingMode: {
+        gnirsImaging: {
+          filters: [
+            {
+              filter: J
+              exposureTimeMode: {
+                timeAndCount: { time: { seconds: 30.0 }, count: 6, at: { nanometers: 1250.0 } }
+              }
+              coadds: 5
+            },
+            {
+              filter: ORDER4
+              exposureTimeMode: {
+                signalToNoise: { value: 50.0, at: { nanometers: 1250.0 } }
+              }
+              coadds: 5
+            }
+          ]
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gnirsImaging {
+            filters { filter coadds }
+            initialFilters { filter coadds }
+          }
+        }
+      }
+    """
+
+    def expected(filters: io.circe.Json) =
+      json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "observingMode": {
+                  "gnirsImaging": {
+                    "filters": $filters,
+                    "initialFilters": [ { "filter": "J", "coadds": 1 } ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
+
+    multiUpdateTest(pi,
+      List(
+        (setGnirsImaging, query, expected(json"""[ { "filter": "J", "coadds": 1 } ]""")),
+        (update, query, expected(json"""
+          [ { "filter": "ORDER4", "coadds": 1 }, { "filter": "J", "coadds": 5 } ]
+        """))
       )
     )
 

@@ -52,7 +52,6 @@ trait ArchiveDuplicationMapping[F[_]]
         _.fieldAs[String]("instrumentString").map(goa.instrument),
         List("instrumentString")
       ),
-      SqlField("observationType", ArchiveMatchView.ObservationType),
       SqlField("observeClassString", ArchiveMatchView.ObservationClass),
       CursorField[Option[ObserveClass]](
         "observeClass",

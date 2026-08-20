@@ -15,6 +15,7 @@ trait OpportunityMapping[F[_]] extends TargetView[F] {
     ObjectMapping(OpportunityType)(
       SqlField("synthetic_id", TargetView.Opportunity.SyntheticId, key = true, hidden = true),
       SqlObject("region"),
+      SqlObject("resolution"),
     )
 
 }

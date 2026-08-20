@@ -8,6 +8,8 @@ package spectroscopy
 import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
+import cats.data.NonEmptyMap
+import cats.data.NonEmptyVector
 import cats.data.State
 import cats.syntax.either.*
 import cats.syntax.option.*
@@ -25,6 +27,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.TelescopeConfig
@@ -80,6 +83,7 @@ object Science:
 
   /** `cals` holds the flat, the arc or both; empty for telluric sequences. */
   case class StepDefinition(
+    wavelength:   CentralWavelengthConfig,
     scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
     cals:         Option[NonEmptyList[ProtoStep[GnirsDynamicConfig]]]
   ):
@@ -98,6 +102,7 @@ object Science:
 
     // PreDef is a StepDefinition before SmartGcal expansion.
     case class PreDef(
+      wavelength:   CentralWavelengthConfig,
       scienceSteps: NonEmptyList[ProtoStep[GnirsDynamicConfig]],
       // Unexpanded SmartGcal (flat, arc), absent for telluric sequences.
       cals:         Option[(ProtoStep[GnirsDynamicConfig], ProtoStep[GnirsDynamicConfig])]
@@ -113,15 +118,16 @@ object Science:
         def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
           s.copy(value = s.value.copy(readMode = GnirsReadMode.forExposureTime(s.value.exposure)))
 
-        cals.fold(EitherT.pure(StepDefinition(scienceSteps, none))): (flat, arc) =>
+        cals.fold(EitherT.pure(StepDefinition(wavelength, scienceSteps, none))): (flat, arc) =>
           // 111/LXD, for instance, has arcs but no slit flat.
           EitherT(expander.expandFlatAndOrArc(static, flat, arc))
-            .map(cs => StepDefinition(scienceSteps, cs.map(adjustReadMode).some))
+            .map(cs => StepDefinition(wavelength, scienceSteps, cs.map(adjustReadMode).some))
 
     object PreDef:
 
       def apply(
         config:  Config,
+        sw:      CentralWavelengthConfig,
         time:    IntegrationTime,
         calRole: Option[CalibrationRole]
       ): PreDef =
@@ -133,7 +139,7 @@ object Science:
         val acqMirror        = GnirsAcquisitionMirrorMode.Out(
           config.prism,
           config.grating,
-          GnirsGratingWavelength(config.centralWavelength)
+          GnirsGratingWavelength(sw.centralWavelength)
         )
 
         val sciClass = calRole.sciClass
@@ -150,7 +156,7 @@ object Science:
             _  <- State.modify[GnirsDynamicConfig]: dyn =>
                     dyn.copy(
                       exposure          = time.exposureTime,
-                      coadds            = config.coadds,
+                      coadds            = sw.coadds,
                       filter            = config.filter,
                       decker            = config.decker,
                       fpu               = config.fpu,
@@ -164,62 +170,117 @@ object Science:
             f  <- SeqState.flatStep(ct, ObserveClass.NightCal)
             r  <- SeqState.arcStep(ct, ObserveClass.NightCal)
           yield PreDef(
+            sw,
             ss,
             Option.when(includeCals)((f, r))
           )
 
     def compute[F[_]: Monad](
       config:   Config,
+      sw:       CentralWavelengthConfig,
       time:     IntegrationTime,
       static:   GnirsStaticConfig,
       expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
       calRole:  Option[CalibrationRole]
     ): EitherT[F, String, StepDefinition] =
-      PreDef(config, time, calRole).expand(static, expander)
+      PreDef(config, sw, time, calRole).expand(static, expander)
+
+    /**
+     * One step definition per central wavelength.  Each gets its own SmartGcal
+     * expansion, since the flat and arc lookups are keyed on the wavelength.
+     */
+    def computeAll[F[_]: Monad](
+      config:   Config,
+      times:    NonEmptyList[(CentralWavelengthConfig, IntegrationTime)],
+      static:   GnirsStaticConfig,
+      expander: SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
+      calRole:  Option[CalibrationRole]
+    ): EitherT[F, String, NonEmptyList[StepDefinition]] =
+      times.traverse((sw, t) => compute(config, sw, t, static, expander, calRole))
 
   end StepDefinition
 
-  case class Generator(
+  /**
+   * One central wavelength's contribution to the science sequence: its steps
+   * (science plus, unless this is a telluric, its own flat and/or arc), the
+   * estimated duration of a single science cycle at that wavelength, and the
+   * number of cycles needed to reach the requested signal-to-noise there.
+   */
+  case class WavelengthBlock(
     steps:         StepDefinition,
     cycleEstimate: TimeSpan,
-    builder:       AtomBuilder[GnirsDynamicConfig],
     goalCycles:    NonNegInt
+  )
+
+  /**
+   * Generates the science sequence across every central wavelength.
+   *
+   * Each wavelength is a separate configuration whose flats and arcs are looked
+   * up by wavelength, so its exposures run as a contiguous segment followed by
+   * its own calibrations.  The segments are then round-robined -- λ1, λ2, ... λN,
+   * λ1, ... -- until every wavelength has met its goal, following the GMOS
+   * wavelength-dither generator.  Running each wavelength to completion instead
+   * would push the later ones into fresh visits (paying a full acquisition each
+   * time) and would leave an interrupted program with nothing at all for the
+   * wavelengths it never reached.
+   */
+  case class Generator(
+    blocks:  NonEmptyVector[WavelengthBlock],
+    builder: AtomBuilder[GnirsDynamicConfig]
   ) extends SequenceGenerator[GnirsDynamicConfig]:
 
-    // Computes the atoms remaining in a 3 hour science block, limited to
-    // `maxCycles` at most.  A "Nighttime Calibrations" atom (flat + arc) is
-    // inserted at the end of the block and, when the block is long enough,
-    // around its midpoint, aligned to a science cycle boundary.  Telluric
-    // sequences (`steps.cals.isEmpty`) omit the calibration atoms entirely.
-    private def atomsInBlock(maxCycles: NonNegInt): (Int, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]) =
+    private val multi: Boolean = blocks.length > 1
+
+    /**
+     * Nominal on-sky time given to one wavelength before moving to the next.
+     * The visit-length budget is shared out, so N wavelengths still break for a
+     * telluric at the same cadence a single one would.  For N = 1 this is
+     * exactly `MaxVisitLength`.
+     */
+    private val segmentBudget: TimeSpan =
+      MaxVisitLength /| NonZeroInt.unsafeFrom(blocks.length)
+
+    // Computes the atoms in one wavelength's segment, limited to `maxCycles`.
+    // A "Nighttime Calibrations" atom (flat + arc) closes the segment and, when
+    // the segment is long enough, appears around its midpoint aligned to a cycle
+    // boundary.  Telluric sequences (`cals.isEmpty`) omit them entirely.
+    private def atomsInSegment(
+      b:         WavelengthBlock,
+      maxCycles: NonNegInt
+    ): (Int, List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]]) =
 
       def cyclesIn(timeSpan: TimeSpan): Int =
-        (timeSpan.toMicroseconds / cycleEstimate.toMicroseconds).toInt
+        (timeSpan.toMicroseconds / b.cycleEstimate.toMicroseconds).toInt
 
-      val cycles: Int = cyclesIn(MaxVisitLength) min maxCycles.value
+      // `1 max` guarantees forward progress: once the visit budget is split N
+      // ways a single cycle can be longer than one segment.  The cycle is still
+      // bounded by MaxSciencePeriod, checked at instantiation.
+      val cycles: Int = (1 max cyclesIn(segmentBudget)) min maxCycles.value
 
-      val scienceTime: TimeSpan = cycleEstimate *| cycles
+      val scienceTime: TimeSpan = b.cycleEstimate *| cycles
 
-      val scienceAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] = ProtoAtom(ScienceCycleTitle.some, steps.scienceSteps)
+      val scienceAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] =
+        ProtoAtom(atomTitle(ScienceCycleTitle, b.steps.wavelength, multi).some, b.steps.scienceSteps)
 
-      steps.cals.fold(cycles -> List.fill(cycles)(scienceAtom)): cals =>
-        val gcalAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] = ProtoAtom(NighttimeCalTitle.some, cals)
+      b.steps.cals.fold(cycles -> List.fill(cycles)(scienceAtom)): cals =>
+        val gcalAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] =
+          ProtoAtom(atomTitle(NighttimeCalTitle, b.steps.wavelength, multi).some, cals)
 
         cycles ->
           Option
             .when(scienceTime >= MaxSciencePeriod)(scienceTime /| Two)
             .fold(
-              // The science time is not long enough to warrant a mid-science cal in this block.
+              // The science time is not long enough to warrant a mid-science cal in this segment.
               List.fill(cycles)(scienceAtom) ++ Option.when(cycles > 0)(gcalAtom).toList
             ): timeUntilMidScienceCals =>
 
               val fullPreCalCycles: Int        = cyclesIn(timeUntilMidScienceCals)
-              val leftOverPreCalTime: TimeSpan = timeUntilMidScienceCals -| (cycleEstimate *| fullPreCalCycles)
+              val leftOverPreCalTime: TimeSpan = timeUntilMidScienceCals -| (b.cycleEstimate *| fullPreCalCycles)
 
               // If the nominal cal time falls in the middle of a science cycle, make it so
               // the break to do calibrations falls closest to a cycle boundary.
               val extraPreCalCycle: Int =
-                if leftOverPreCalTime >= (cycleEstimate /| Two) then 1 min cycles else 0
+                if leftOverPreCalTime >= (b.cycleEstimate /| Two) then 1 min cycles else 0
 
               val preCalCycles:  Int = fullPreCalCycles + extraPreCalCycle
               val postCalCycles: Int = cycles - preCalCycles
@@ -230,30 +291,51 @@ object Science:
 
     override def generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
 
-      // Add future blocks until we've completed all the cycles.
-      val atoms: List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
+      val n = blocks.length
+
+      // Round-robin the wavelengths, skipping any that have met their goal, until
+      // all have.  Atom ids come from the atom's index within a single builder,
+      // so every segment must feed the same `buildStream` -- separate builders
+      // would emit duplicate ids.
+      val atoms: Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]] =
         Stream
-          .unfold(0): c =>
-            Option.when(goalCycles.value - c > 0):
-              val (cycles, atoms) = atomsInBlock(NonNegInt.unsafeFrom(goalCycles.value - c))
+          .unfold((blocks.map(_.goalCycles.value).toVector, 0)): (remaining, pos) =>
+            Option.when(remaining.exists(_ > 0)):
+              val i = LazyList.from(0).map(k => (pos + k) % n).find(remaining(_) > 0).get
+              val (used, as) = atomsInSegment(blocks.getUnsafe(i), NonNegInt.unsafeFrom(remaining(i)))
 
               // Sanity check....
-              assert(cycles > 0, "No progress made generating future GNIRS Long Slit sequence!")
+              assert(used > 0, "No progress made generating future GNIRS Spectroscopy sequence!")
 
-              (atoms, c + cycles)
+              (as, (remaining.updated(i, remaining(i) - used), (i + 1) % n))
           .flatMap(Stream.emits)
-          .toList
 
-      builder.buildStream(Stream.emits(atoms))
+      builder.buildStream(atoms)
 
   private def definitionError(oid: Observation.Id, msg: String): OdbError =
     OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
 
-  private def zeroExposureTime(oid: Observation.Id): OdbError =
-    definitionError(oid, "GNIRS Long Slit requires a positive exposure time.")
+  private def nm(sw: CentralWavelengthConfig): String =
+    f"${sw.centralWavelength.toNanometers.value.value.toDouble}%.0f nm"
 
-  private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan): OdbError =
-    definitionError(oid, s"Estimated science cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.")
+  /**
+   * Atom title for a block of steps taken at one central wavelength: bare when
+   * the observation has a single wavelength (so existing sequences are
+   * unchanged), suffixed with the wavelength when it has several, so the
+   * observer can tell the segments apart.
+   */
+  private def atomTitle(base: NonEmptyString, sw: CentralWavelengthConfig, multi: Boolean): NonEmptyString =
+    if multi then NonEmptyString.unsafeFrom(s"${base.value} (${nm(sw)})") else base
+
+  // "GNIRS Spectroscopy" rather than "Long Slit": this generator serves the IFU too.
+  private def zeroExposureTime(oid: Observation.Id): OdbError =
+    definitionError(oid, "GNIRS Spectroscopy requires a positive exposure time.")
+
+  private def missingItcResult(oid: Observation.Id, sw: CentralWavelengthConfig): OdbError =
+    definitionError(oid, s"No ITC result for central wavelength ${nm(sw)}.")
+
+  private def exposureTimeTooLong(oid: Observation.Id, sw: CentralWavelengthConfig, estimate: TimeSpan): OdbError =
+    definitionError(oid, s"Estimated science cycle time (${estimate.toMinutes} minutes) at ${nm(sw)} for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.")
 
   /**
    * Generates the sequence for a daytime pinhole flat calibration: a single
@@ -271,19 +353,23 @@ object Science:
     config:        Config
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
 
-    val flat: ProtoStep[GnirsDynamicConfig] =
+    // A pinhole flat traces the cross-dispersed order positions, which move with
+    // the grating angle, so a single flat is only valid for one setting: take one
+    // per distinct central wavelength.  These are DayCal and so cost no program
+    // time.
+    def flat(sw: CentralWavelengthConfig): ProtoStep[GnirsDynamicConfig] =
       SeqState.eval:
         for
           _ <- State.modify[GnirsDynamicConfig]: dyn =>
                  dyn.copy(
-                   coadds            = config.coadds,
+                   coadds            = sw.coadds,
                    filter            = config.filter,
                    decker            = config.decker,
                    fpu               = GnirsFpu.Other(pinholeFpu(config.camera)),
                    acquisitionMirror = GnirsAcquisitionMirrorMode.Out(
                                          config.prism,
                                          config.grating,
-                                         GnirsGratingWavelength(config.centralWavelength)
+                                         GnirsGratingWavelength(sw.centralWavelength)
                                        ),
                    camera            = config.camera,
                    focus             = config.focus,
@@ -292,15 +378,23 @@ object Science:
           f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
         yield f
 
-    EitherT(expander.expandStep(static, flat))
+    val distinctWavelengths: NonEmptyList[CentralWavelengthConfig] =
+      NonEmptyList.fromListUnsafe(config.wavelengths.toList.distinctBy(_.centralWavelength))
+
+    val multi: Boolean = distinctWavelengths.length > 1
+
+    distinctWavelengths
+      .traverse: sw =>
+        EitherT(expander.expandStep(static, flat(sw)))
+          .map: steps =>
+            ProtoAtom(atomTitle(DaytimePinholeTitle, sw, multi).some, steps)
       .bimap(
         m => definitionError(observationId, m),
-        steps =>
-          val atom    = ProtoAtom(DaytimePinholeTitle.some, steps)
+        atoms =>
           val builder = AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
           new SequenceGenerator[GnirsDynamicConfig]:
             def generate: Stream[Pure, Atom[GnirsDynamicConfig]] =
-              builder.buildStream(Stream.emit(atom))
+              builder.buildStream(Stream.emits(atoms.toList))
       ).value
 
   def instantiate[F[_]: Monad](
@@ -310,14 +404,14 @@ object Science:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
-    time:          Either[OdbError, IntegrationTime],
+    times:         Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
     calRole match
       case Some(CalibrationRole.DaytimePinhole) =>
         daytimePinhole(observationId, estimator, static, namespace, expander, config)
       case _ =>
-        instantiateScience(observationId, estimator, static, namespace, expander, config, time, calRole)
+        instantiateScience(observationId, estimator, static, namespace, expander, config, times, calRole)
 
   private def instantiateScience[F[_]: Monad](
     observationId: Observation.Id,
@@ -326,29 +420,40 @@ object Science:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
-    time:          Either[OdbError, IntegrationTime],
+    times:         Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
 
-    val posTime: EitherT[F, OdbError, IntegrationTime] =
+    // Pair each configured wavelength with its ITC result, in configuration
+    // order.  A wavelength with no result is a programming error upstream, not
+    // something to silently drop.
+    val pairs: EitherT[F, OdbError, NonEmptyList[(CentralWavelengthConfig, IntegrationTime)]] =
       EitherT.fromEither:
-        time.filterOrElse(_.exposureTime.toNonNegMicroseconds.value > 0, zeroExposureTime(observationId))
+        times.flatMap: m =>
+          config.wavelengths.traverse: sw =>
+            m(sw.centralWavelength)
+              .toRight(missingItcResult(observationId, sw))
+              .flatMap: t =>
+                Either.cond(t.exposureTime.toNonNegMicroseconds.value > 0, (sw, t), zeroExposureTime(observationId))
 
+    // A science cycle must fit inside the calibration validity period at every
+    // wavelength; the error names the offending one.
     def cycleEstimate(steps: StepDefinition): EitherT[F, OdbError, TimeSpan] =
       val estimate = StepTimeEstimateCalculator.runEmpty(estimator.estimateTotalNel(static, steps.scienceSteps))
       EitherT.fromEither:
-        Either.cond(estimate < MaxSciencePeriod, estimate, exposureTimeTooLong(observationId, estimate))
+        Either.cond(estimate < MaxSciencePeriod, estimate, exposureTimeTooLong(observationId, steps.wavelength, estimate))
 
     val gen = for
-      t <- posTime
-      s <- StepDefinition.compute(config, t, static, expander, calRole).leftMap(m => definitionError(observationId, m))
-      e <- cycleEstimate(s)
-      c <- EitherT.fromEither(s.cycleCount(t).leftMap(m => definitionError(observationId, m)))
+      ts <- pairs
+      ds <- StepDefinition.computeAll(config, ts, static, expander, calRole).leftMap(m => definitionError(observationId, m))
+      bs <- ds.zip(ts).traverse: (d, wt) =>
+              for
+                e <- cycleEstimate(d)
+                c <- EitherT.fromEither(d.cycleCount(wt._2).leftMap(m => definitionError(observationId, m)))
+              yield WavelengthBlock(d, e, c)
     yield Generator(
-      s,
-      e,
-      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science),
-      c
+      bs.toNev,
+      AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)
     ): SequenceGenerator[GnirsDynamicConfig]
 
     gen.value

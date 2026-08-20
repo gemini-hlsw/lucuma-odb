@@ -9,6 +9,8 @@ import lucuma.catalog.goa.GoaParams
 import lucuma.catalog.goa.syntax.*
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ScienceMode
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.geom.ShapeExpression
 import lucuma.core.geom.flamingos2.scienceArea as flamingos2ScienceArea
 import lucuma.core.geom.ghost.scienceArea as ghostScienceArea
@@ -21,6 +23,7 @@ import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.model.Target
+import lucuma.core.model.TargetResolution
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.sequence.ObservingMode
@@ -28,6 +31,7 @@ import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.exchange.Config as Exchange
 import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
+import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
 import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
@@ -59,11 +63,13 @@ object GoaQueryPolicy:
 
   object TargetPointing:
 
+    // Keyed on how the target tracks rather than on its subtype: a Target of Opportunity that
+    // has been resolved points somewhere definite, and only an unresolved one is Unresolvable.
     def fromTarget(target: Target): TargetPointing =
-      target match
-        case _: Target.Sidereal    => Sidereal
-        case n: Target.Nonsidereal => NonSidereal(n.name)
-        case _: Target.Opportunity => Unresolvable
+      target.resolution match
+        case Some(TargetResolution.Sidereal(_, _))    => Sidereal
+        case Some(TargetResolution.Nonsidereal(_))    => NonSidereal(target.name)
+        case None                                     => Unresolvable
 
   /**
    * every instrument an observation taken with `instrument` is searched against, itself included.
@@ -117,6 +123,8 @@ object GoaQueryPolicy:
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Imaging))
       case c: Flamingos2LongSlit =>
         List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(c.fpu)))
+      case c: Flamingos2Mos      =>
+        List(flamingos2ScienceArea.shapeAt(pa, off, Flamingos2LyotWheel.F16, c.customMask))
       case _: GhostIfu           =>
         List(ghostScienceArea.fov)
       case _: GmosNorthImaging   =>
@@ -142,6 +150,38 @@ object GoaQueryPolicy:
         List(igrins2ScienceArea.scienceSlitFOV)
       case c: Visitor            =>
         List(visitorScienceArea.fov(c.scienceFovDiameter))
+
+  /**
+   * Whether to search imaging or spectroscopy.
+   *
+   * `None` leaves the search unrestricted, which is the honest answer for a
+   * visitor instrument whose mode does not say which it takes.
+   */
+  def scienceMode(mode: ObservingMode): Option[ScienceMode] =
+    mode match
+      case _: Exchange           => none
+      case _: Flamingos2Imaging  => ScienceMode.Imaging.some
+      case _: Flamingos2LongSlit => ScienceMode.Spectroscopy.some
+      case _: Flamingos2Mos      => ScienceMode.Spectroscopy.some
+      case _: GhostIfu           => ScienceMode.Spectroscopy.some
+      case _: GmosNorthImaging   => ScienceMode.Imaging.some
+      case _: GmosSouthImaging   => ScienceMode.Imaging.some
+      case _: GmosNorthLongSlit  => ScienceMode.Spectroscopy.some
+      case _: GmosSouthLongSlit  => ScienceMode.Spectroscopy.some
+      case _: GmosNorthMos       => ScienceMode.Spectroscopy.some
+      case _: GmosSouthMos       => ScienceMode.Spectroscopy.some
+      case _: GnirsImaging       => ScienceMode.Imaging.some
+      case _: GnirsSpectroscopy  => ScienceMode.Spectroscopy.some
+      case _: Igrins2LongSlit    => ScienceMode.Spectroscopy.some
+      case v: Visitor            =>
+        v.mode match
+          case VisitorObservingModeType.AlopekeSpeckle
+             | VisitorObservingModeType.AlopekeWideField
+             | VisitorObservingModeType.ZorroSpeckle
+             | VisitorObservingModeType.ZorroWideField   => ScienceMode.Imaging.some
+          case VisitorObservingModeType.MaroonX          => ScienceMode.Spectroscopy.some
+          case VisitorObservingModeType.VisitorNorth
+             | VisitorObservingModeType.VisitorSouth     => none
 
   /**
    * How wide to search: half the observation's field of view, taken as the
@@ -171,9 +211,10 @@ object GoaQueryPolicy:
         instrument <- mode.instrument
         center     <- searchPointing(explicitBase, asterismCenter, asterism)
         radius     <- searchRadius(mode)
-      yield equivalenceGroup(instrument).map: i =>
-        center match
-          case ArchiveSearchPointing.Sidereal(c)    => GoaParams.Sidereal(c, i, radius)
-          case ArchiveSearchPointing.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius)
+      yield
+        val sm = scienceMode(mode)
+        equivalenceGroup(instrument).map: i =>
+          center match
+            case ArchiveSearchPointing.Sidereal(c)    => GoaParams.Sidereal(c, i, radius, sm)
+            case ArchiveSearchPointing.NonSidereal(n) => GoaParams.NonSidereal(n.value, i, radius, sm)
     params.orEmpty
-

@@ -33,6 +33,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.Target.Nonsidereal
 import lucuma.core.model.Target.Opportunity
 import lucuma.core.model.Target.Sidereal
+import lucuma.core.model.TargetResolution
 import lucuma.core.model.Tracking
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
@@ -354,7 +355,11 @@ object TrackingService:
           t match
             case s: Sidereal    => Result.success(BasePosition(BasePositionType.SingleTarget, name, Some(s), None,    None).some)
             case n: Nonsidereal => Result.success(BasePosition(BasePositionType.SingleTarget, name, None,    Some(n), None).some)
-            case _: Opportunity => Result.success(None)
+            case o: Opportunity =>
+              // A resolved Target of Opportunity has a real position; an unresolved one does not.
+              Result.success:
+                o.asSidereal.map(s => BasePosition(BasePositionType.SingleTarget, name, Some(s), None, None))
+                 .orElse(o.asNonsidereal.map(n => BasePosition(BasePositionType.SingleTarget, name, None, Some(n), None)))
 
         def explicitBaseResult(
           targets: NonEmptyList[Target],
@@ -372,7 +377,9 @@ object TrackingService:
           targets: NonEmptyList[Target],
           obsTime: Option[Timestamp]
         )(using SuperUserAccess): F[Result[Option[BasePosition]]] =
-          if targets.exists { case _: Opportunity => true; case _ => false } then
+          // An unresolved target has no position, so the asterism has no base position either.
+          // A resolved Target of Opportunity is no obstacle.
+          if targets.exists(_.resolution.isEmpty) then
             Result.success(Option.empty[BasePosition]).pure[F]
           else obsTime match
             case None    =>
@@ -433,11 +440,15 @@ object TrackingService:
       ): F[Result[Either[Snapshot[(Tracking, Int)], (Region, Option[Coordinates])]]] =
         asterism
           .traverse: (tid, target) =>
+            // Keyed on how the target tracks rather than on its subtype, so a resolved Target
+            // of Opportunity yields real tracking. Only an unresolved one falls through to the
+            // region, which is all that is known about it.
             val p =
-              target match
-                case Nonsidereal(_, key, _)      => mkEphemerisTrackingEx(tid, key, site, interval, force).map(eph => tid -> eph.asRight)
-                case Sidereal(_, tracking, _, _) => ResultT.success(tid -> tracking.asRight.tupleRight(0))
-                case Opportunity(_, region, _)   => ResultT.success(tid -> region.asLeft.tupleRight(0))
+              (target, target.resolution) match
+                case (_, Some(TargetResolution.Nonsidereal(key)))      => mkEphemerisTrackingEx(tid, key, site, interval, force).map(eph => tid -> eph.asRight)
+                case (_, Some(TargetResolution.Sidereal(tracking, _))) => ResultT.success(tid -> tracking.asRight.tupleRight(0))
+                case (o: Opportunity, None)                            => ResultT.success(tid -> o.region.asLeft.tupleRight(0))
+                case (_, None)                                         => ResultT.failure(OdbError.InvalidTarget(tid, s"Target $tid has no tracking.".some).asProblem)
             p.widen[(Target.Id, Either[Region, (Tracking, Int)])] // :-\
           .map(_.traverse(_.sequence)) // these are not the droids you are looking for
           .map:

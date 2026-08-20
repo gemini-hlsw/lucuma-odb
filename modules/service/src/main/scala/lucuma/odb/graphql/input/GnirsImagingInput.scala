@@ -50,7 +50,6 @@ object GnirsImagingInput extends ImagingFilterCheck:
   case class Create(
     filters:           NonEmptyList[GnirsImagingFilterInput],
     camera:            GnirsCamera,
-    coadds:            PosInt                   = DefaultCoadds,
     explicitReadMode:  Option[GnirsReadMode]    = None,
     explicitWellDepth: Option[GnirsWellDepth]   = None,
     variant:           ImagingVariantInput      = DefaultVariant,
@@ -67,7 +66,6 @@ object GnirsImagingInput extends ImagingFilterCheck:
           ImagingVariantInput.Binding.Option("variant", rVariant),
           GnirsImagingFilterInput.Binding.List("filters", rFilters),
           GnirsCameraBinding.Option("camera", rCamera),
-          PosIntBinding.Option("coadds", rCoadds),
           GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
@@ -76,20 +74,18 @@ object GnirsImagingInput extends ImagingFilterCheck:
             rVariant,
             notEmpty("GNIRS", rFilters),
             rCamera,
-            rCoadds,
             rReadMode,
             rWellDepth,
             rAcq
-          ).parTupled.flatMap: (variant, filters, camera, coadds, readMode, wellDepth, acq) =>
+          ).parTupled.flatMap: (variant, filters, camera, readMode, wellDepth, acq) =>
             camera.fold(OdbError.InvalidArgument("A 'camera' is required on creation.".some).asFailure): c =>
-              Create(filters, c, coadds.getOrElse(DefaultCoadds), readMode, wellDepth, variant.getOrElse(DefaultVariant), acq).success
+              Create(filters, c, readMode, wellDepth, variant.getOrElse(DefaultVariant), acq).success
 
   end Create
 
   case class Edit(
     filters:           Option[NonEmptyList[GnirsImagingFilterInput]],
     camera:            Option[GnirsCamera],
-    coadds:            Option[PosInt],
     explicitReadMode:  Nullable[GnirsReadMode],
     explicitWellDepth: Nullable[GnirsWellDepth],
     variant:           Option[ImagingVariantInput],
@@ -108,7 +104,6 @@ object GnirsImagingInput extends ImagingFilterCheck:
         Create(
           fs,
           c,
-          coadds.getOrElse(DefaultCoadds),
           explicitReadMode.toOption,
           explicitWellDepth.toOption,
           variant.getOrElse(DefaultVariant),
@@ -123,7 +118,6 @@ object GnirsImagingInput extends ImagingFilterCheck:
           ImagingVariantInput.Binding.Option("variant", rVariant),
           GnirsImagingFilterInput.Binding.List.Option("filters", rFilters),
           GnirsCameraBinding.Option("camera", rCamera),
-          PosIntBinding.Option("coadds", rCoadds),
           GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
           AcquisitionInput.Binding.Option("acquisition", rAcq)
@@ -132,12 +126,11 @@ object GnirsImagingInput extends ImagingFilterCheck:
             rVariant,
             notEmptyIfPresent("GNIRS", rFilters),
             rCamera,
-            rCoadds,
             rReadMode,
             rWellDepth,
             rAcq
-          ).parMapN: (variant, filters, camera, coadds, readMode, wellDepth, acq) =>
-            Edit(filters, camera, coadds, readMode, wellDepth, variant, acq)
+          ).parMapN: (variant, filters, camera, readMode, wellDepth, acq) =>
+            Edit(filters, camera, readMode, wellDepth, variant, acq)
 
   end Edit
 

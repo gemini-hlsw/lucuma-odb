@@ -2,7 +2,7 @@
 #import WavelengthInput, ExposureTimeModeInput, TimeAndCountExposureTimeModeInput, PortDisposition from "lucuma/odb/graphql/OdbSchema.graphql"
 #import ImageQualityPreset, CloudExtinctionPreset, SkyBackground, WaterVapor, ElevationRangeInput, SourceProfileInput, RadialVelocityInput from "lucuma/odb/graphql/OdbSchema.graphql"
 #import GmosSouthGrating, GmosSouthFpuInput, GmosSouthFilter, GmosCcdModeInput, GmosRoi, GmosNorthGrating, GmosNorthFpuInput, GmosNorthFilter from "lucuma/odb/graphql/OdbSchema.graphql"
-#import Flamingos2Disperser, Flamingos2Fpu, Flamingos2Filter, Flamingos2ReadMode from "lucuma/odb/graphql/OdbSchema.graphql"
+#import Flamingos2Disperser, Flamingos2FpuMaskInput, Flamingos2Filter, Flamingos2ReadMode from "lucuma/odb/graphql/OdbSchema.graphql"
 #import GhostReadMode, GhostBinning, GhostResolutionMode from "lucuma/odb/graphql/OdbSchema.graphql"
 #import GnirsFilter, GnirsFpuSlit, GnirsFpuIfu, GnirsPrism, GnirsGrating, GnirsCamera, GnirsReadMode, GnirsWellDepth from "lucuma/odb/graphql/OdbSchema.graphql"
 
@@ -188,9 +188,9 @@ input Flamingos2SpectroscopyInput {
   disperser: Flamingos2Disperser!
 
   """
-  Flamingos2 Focal plane unit
+  Flamingos2 Focal plane unit, either a builtin slit or a MOS custom mask
   """
-  fpu: Flamingos2Fpu!
+  fpu: Flamingos2FpuMaskInput!
 
   """
   Flamingos2 filter

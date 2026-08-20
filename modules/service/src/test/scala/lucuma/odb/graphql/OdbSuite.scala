@@ -14,6 +14,7 @@ import cats.effect.unsafe.IORuntime
 import cats.effect.unsafe.IORuntimeConfig
 import cats.implicits.*
 import clue.FetchClient
+import clue.GraphQLDocument
 import clue.GraphQLOperation
 import clue.ResponseException
 import clue.http4s.Http4sHttpBackend
@@ -29,12 +30,14 @@ import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import fs2.io.net.tls.TLSContext
 import fs2.text.utf8
+import grackle.Env
 import grackle.Mapping
 import grackle.Result
 import grackle.Result.Failure
 import grackle.Result.Success
 import grackle.Result.Warning
 import grackle.skunk.SkunkMonitor
+import grackle.sql.SqlStatsMonitor.SqlStats
 import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
@@ -63,6 +66,7 @@ import lucuma.core.util.RetryFlakyTests
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.AsterismIntegrationTimeOutcomes
 import lucuma.itc.IntegrationTime
+import lucuma.itc.ItcCcd
 import lucuma.itc.ItcVersions
 import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
@@ -73,6 +77,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.Config
 import lucuma.odb.FMain
+import lucuma.odb.data.ItcPeakPixel
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.enums.Enums
@@ -270,6 +275,24 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
     None
 
+  val FakeItcCcds: List[ItcCcd] =
+    List(1000.0, 2500.0).map: peak =>
+      ItcCcd(
+        singleSNRatio                 = SingleSN(SignalToNoise.unsafeFromBigDecimalExact(6)),
+        maxSingleSNRatio              = None,
+        totalSNRatio                  = TotalSN(SignalToNoise.unsafeFromBigDecimalExact(7)),
+        maxTotalSNRatio               = None,
+        wavelengthForMaxTotalSNRatio  = None,
+        wavelengthForMaxSingleSNRatio = None,
+        peakPixelFlux                 = peak,
+        wellDepth                     = 100000.0,
+        ampGain                       = 2.0,
+        warnings                      = Nil
+      )
+
+  val FakeItcPeakPixel: ItcPeakPixel =
+    ItcPeakPixel(FakeItcCcds.map(_.peakPixelFlux).max, FakeItcCcds.map(_.adu).max)
+
   def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
     SignalToNoiseAt(
       w,
@@ -288,7 +311,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
             NonEmptyChain.fromSeq(
               List.fill(input.asterism.length)(
                 TargetIntegrationTimeOutcome(
-                  TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, None, Nil).asRight
+                  TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, None, FakeItcCcds).asRight
                 )
               )
             ).get
@@ -322,7 +345,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               NonEmptyChain.fromSeq(
                 List.fill(input.asterism.length)(
                   TargetIntegrationTimeOutcome(
-                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some, Nil).asRight
+                    TargetIntegrationTime(Zipper.one(result), FakeBandOrLine, fakeSignalToNoiseAt(wavelength).some, FakeItcCcds).asRight
                   )
                 )
               ).get
@@ -468,6 +491,44 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
     } yield map
 
+  /**
+   * Runs `document` as `user` against a dedicated mapping whose monitor records every SQL
+   * statement issued, compiling and then resolving cone filters exactly as `GraphQLRoutes`
+   * does.
+   * Yields the response JSON and the statements that produced it, so a test can assert not just
+   * the result but how many queries it took.
+   */
+  def queryWithSqlStats(user: User, document: String, variables: Option[JsonObject] = None): IO[(Json, List[SqlStats])] =
+    import Tracer.Implicits.noop
+    import Meter.Implicits.noop
+    val res =
+      for {
+        db     <- FMain.databasePoolResource[IO](databaseConfig)
+        mon    <- Resource.eval(SkunkMonitor.statsMonitor[IO])
+        top    <- OdbMapping.Topics(db)
+        enm    <- db.evalMap(Enums.load)
+        ptc    <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
+        goa    <- Resource.eval(goaClient)
+        schema <- Resource.eval(OdbMapping.loadSchema[IO])
+        map     = OdbMapping(db, mon, user, top, gaiaClient, itcClient, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
+      } yield (map, mon)
+
+    def orRaise[A](r: Result[A]): IO[A] =
+      r match
+        case Success(a)              => IO.pure(a)
+        case Warning(_, a)           => IO.pure(a)
+        case f: Failure              => IO.raiseError(new RuntimeException(f.problems.toList.mkString("; ")))
+        case e: Result.InternalError => IO.raiseError(e.error)
+
+    res.use: (map, mon) =>
+      for {
+        op   <- orRaise(map.compiler.compile(document, none, variables.map(_.toJson), reportUnused = false))
+        qry  <- ConeFilter.resolve(op.query)(map.configurationRequestConeCandidates, map.observationConeCandidates).flatMap(orRaise)
+        _    <- mon.take
+        json <- map.interpreter.run(qry, op.rootTpe, Env.empty).evalMap(map.mkResponse).compile.lastOrError
+        sts  <- mon.take
+      } yield (json, sts)
+
   protected def trace: Resource[IO, Trace[IO]] =
     Resource.pure(Trace.Implicits.noop)
 
@@ -520,7 +581,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       xc  <- Resource.eval(Http4sHttpClient.of[IO, Nothing](uri)(using Async[IO], xbe, Logger[IO]))
     } yield xc
 
-  case class Operation(document: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]
+  // Tests supply the query as a plain runtime `String`, so it skips the `gql` interpolator's
+  // compile-time checks — there is nothing to check here, no subqueries are spliced.
+  case class Operation(query: String) extends GraphQLOperation.Typed[Nothing, JsonObject, Json]:
+    override val document = GraphQLDocument.unsafeFromString(query)
 
   private lazy val serverFixture: AnyFixture[Server] =
     ResourceSuiteLocalFixture("server", server)

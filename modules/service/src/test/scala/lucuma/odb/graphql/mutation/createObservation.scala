@@ -3130,7 +3130,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
             .require[Boolean]
 
-  test("[general] created observation should have specified explicitExecutionRequirement"):
+  test("[general] created observation should have specified schedulingMode"):
     createProgramAs(pi).flatMap: pid =>
       expect(
         user  = pi,
@@ -3140,13 +3140,13 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
               programId: ${pid.asJson}
               SET: {
                 schedulingConstraints: {
-                  explicitExecutionRequirement: UNINTERRUPTIBLE
+                  schedulingMode: UNINTERRUPTIBLE
                 }
               }
             }) {
               observation {
                 schedulingConstraints {
-                  executionRequirement
+                  schedulingMode
                   isSplittable
                 }
               }
@@ -3158,7 +3158,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             "createObservation": {
               "observation": {
                 "schedulingConstraints": {
-                  "executionRequirement": "UNINTERRUPTIBLE",
+                  "schedulingMode": "UNINTERRUPTIBLE",
                   "isSplittable": false
                 }
               }
@@ -3167,7 +3167,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
         """.asRight
       )
 
-  test("[general] created observation should default to UNCONSTRAINED executionRequirement"):
+  test("[general] created observation should default to UNCONSTRAINED schedulingMode"):
     createProgramAs(pi).flatMap: pid =>
       expect(
         user  = pi,
@@ -3178,7 +3178,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             }) {
               observation {
                 schedulingConstraints {
-                  executionRequirement
+                  schedulingMode
                   isSplittable
                 }
               }
@@ -3190,7 +3190,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
             "createObservation": {
               "observation": {
                 "schedulingConstraints": {
-                  "executionRequirement": "UNCONSTRAINED",
+                  "schedulingMode": "UNCONSTRAINED",
                   "isSplittable": true
                 }
               }

@@ -72,7 +72,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       ra               = none,
       dec              = none,
       instrument       = "GMOS-S",
-      observationType  = GoaObservationType.Unknown("WEIRD"),
+      observationType  = GoaObservationType.Object,
       observationClass = none,
       qaState          = none,
       utDateTime       = none,

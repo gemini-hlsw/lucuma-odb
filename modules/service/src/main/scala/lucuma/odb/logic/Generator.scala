@@ -241,7 +241,8 @@ object Generator:
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)).flatMap(digest(_, calculator.flamingos2ImagingSetup))
             case ObservingModeType.Flamingos2Mos      =>
-              EitherT.leftT[F, ExecutionDigest](OdbError.SequenceUnavailable(ctx.oid, "Flamingos2 MOS sequence generation is not yet implemented".some))
+              // No MOS setup time has been measured yet, so the long slit's stands in.
+              EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
             case ObservingModeType.GhostIfu           =>
@@ -314,8 +315,7 @@ object Generator:
               StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
           case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
           case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
-          case ObservingModeType.Flamingos2Mos      =>
-            EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Gmos North MOS sequence generation is not yet implemented".some))
+          case ObservingModeType.Flamingos2Mos      => EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx))
           case ObservingModeType.GhostIfu           => EitherT(streaming.selectOrGenerateGhost(ctx))
           case ObservingModeType.GmosNorthImaging   => EitherT(streaming.selectOrGenerateGmosNorthImaging(ctx))
           case ObservingModeType.GmosNorthLongSlit  => EitherT(streaming.selectOrGenerateGmosNorthLongSlit(ctx))
@@ -394,8 +394,10 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.Flamingos2.apply)
 
-            case ObservingModeType.Flamingos2Mos  =>
-                EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Flamingos 2 MOS sequence generation is not yet implemented".some))
+            case ObservingModeType.Flamingos2Mos      =>
+              EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx))
+                .flatMap(s => EitherT.liftF(executionConfig(s)))
+                .map(InstrumentExecutionConfig.Flamingos2.apply)
 
             case ObservingModeType.GhostIfu           =>
               EitherT(streaming.selectOrGenerateGhost(ctx))
@@ -489,6 +491,8 @@ object Generator:
                   case ObservingModeType.Flamingos2LongSlit =>
                     go(freshAcq, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
 
+                  // N.B. there is no MOS acquisition yet, so there is nothing to reset.
+                  // This becomes wrong once a MOS acquisition lands.
                   case ObservingModeType.Flamingos2Mos      =>
                     EitherT.pure(())
 
@@ -510,7 +514,6 @@ object Generator:
                     go(freshAcq, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
 
                   case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-                    // Not sure about acquisition for MOS yet
                     EitherT.pure(())
 
                   case ObservingModeType.GnirsImaging       =>
@@ -551,7 +554,8 @@ object Generator:
                 .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
 
             case ObservingModeType.Flamingos2Mos      =>
-              EitherT.leftT(OdbError.SequenceUnavailable(ctx.oid, "Flamingos 2 mos sequence generation is not yet implemented".some))
+              EitherT(streaming.generateFlamingos2Mos(ctx))
+                .flatMap(s => EitherT.liftF(sequenceService.materializeFlamingos2ExecutionConfig(oid, s)))
 
             case ObservingModeType.GhostIfu           =>
               EitherT(streaming.generateGhost(ctx))

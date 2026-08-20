@@ -18,7 +18,7 @@ case class UpdateDatasetsInput(
 object UpdateDatasetsInput {
 
   def binding(path: Path) = {
-    val WhereDatasetsBinding = WhereDataset.binding(path)
+    val WhereDatasetsBinding = WhereDataset.binding(path, allowCone = false)
     ObjectFieldsBinding.rmap {
       case List(
         DatasetPropertiesInput.Binding("SET", rSET),

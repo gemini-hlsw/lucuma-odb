@@ -4195,11 +4195,11 @@ input ConfigurationRequestProperties {
 }
 
 """
-Controls how the Scheduler may treat an observation once it is running or
-planned.  The values form a chain of increasing restriction: each withdraws one
-freedom from the scheduler relative to the previous.
+What the Scheduler may do with an observation.  The values form a chain of
+increasing power in which each one keeps every restriction below it and adds one
+more, so combinations that make no sense are unrepresentable.
 """
-enum ExecutionRequirement {
+enum SchedulingMode {
   """
   Normal: the science sequence may be divided into discrete segments (i.e.
   "atoms") scheduled in order across separate visits, and a running visit may be
@@ -4209,7 +4209,10 @@ enum ExecutionRequirement {
 
   """
   The science sequence must complete within a single visit (it may not be split
-  across visits), but a running visit may still be interrupted.
+  across visits), but a running visit may still be interrupted.  Note that
+  interrupting it destroys the work: the visit is abandoned and restarted from
+  the beginning rather than resumed, which is what distinguishes this from
+  `UNINTERRUPTIBLE`.
   """
   NO_SPLITTING
 
@@ -4218,6 +4221,16 @@ enum ExecutionRequirement {
   visit.
   """
   UNINTERRUPTIBLE
+
+  """
+  The above, and this observation may interrupt one that is already executing.
+  Reserved to Targets of Opportunity: an observation carrying this mode without
+  an opportunity target in its asterism is invalid and cannot become ready to
+  execute.  Because this sits above `UNINTERRUPTIBLE`, an interrupting
+  observation is itself uninterruptible, so no Target of Opportunity can ever
+  preempt another.
+  """
+  INTERRUPTING
 }
 
 """
@@ -4228,26 +4241,11 @@ timing constraints.
 input SchedulingConstraintsInput {
 
   """
-  Whether this observation is a Target of Opportunity, and how disruptive its
-  execution may be.  Defaults to `NONE` (not a ToO).  May not exceed the
-  ceiling established by the program's accepted proposal; an observation that
-  exceeds it is flagged and cannot become ready to execute.  `RAPID` and
-  `INTERRUPTING` additionally raise `defaultExecutionRequirement` to
-  `UNINTERRUPTIBLE`.
-  """
-  tooActivation: TooActivation
-
-  """
-  Controls how the Scheduler may treat this observation once it is running or
-  planned.  The explicitExecutionRequirement field may be unset by assigning a
-  null value, or ignored by skipping it altogether, in which case
-  `defaultExecutionRequirement` applies — which depends on `tooActivation`, and
-  is `UNINTERRUPTIBLE` rather than `UNCONSTRAINED` for a `RAPID` or
-  `INTERRUPTING` observation.  Note also that the default acts as a floor: an
-  explicit value more permissive than it has no effect.  This field is mutually
+  What the Scheduler may do with this observation.  Defaults to `UNCONSTRAINED`;
+  skipping it altogether leaves the current value alone.  This field is mutually
   exclusive with the deprecated `isSplittable`; supplying both is an error.
   """
-  explicitExecutionRequirement: ExecutionRequirement
+  schedulingMode: SchedulingMode
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -4255,7 +4253,7 @@ input SchedulingConstraintsInput {
   (i.e. "atoms") scheduled in order across separate visits. When false, the
   entire science sequence must complete within a single uninterrupted visit.
   """
-  isSplittable: Boolean @deprecated(reason: "Use `explicitExecutionRequirement` instead (`true` maps to `UNCONSTRAINED`, `false` to `NO_SPLITTING`). (Deprecated July 31, 2026)")
+  isSplittable: Boolean @deprecated(reason: "Use `schedulingMode` instead (`true` maps to `UNCONSTRAINED`, `false` to `NO_SPLITTING`). (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.
@@ -4277,33 +4275,18 @@ type SchedulingConstraints {
 
   """
   Whether this observation is a Target of Opportunity, and how disruptive its
-  execution may be.
+  execution may be.  Derived, not set: an observation is a Target of Opportunity
+  exactly when its asterism holds an opportunity target, and how disruptive it
+  may be follows from its `schedulingMode`.  May not exceed the ceiling
+  established by the program's accepted proposal; an observation that exceeds it
+  is flagged and cannot become ready to execute.
   """
   tooActivation: TooActivation!
 
   """
-  The execution requirement the Scheduler honors: the more restrictive of
-  `explicitExecutionRequirement` and `defaultExecutionRequirement`.  Note this
-  is not simply the explicit value falling back to the default — the default is
-  a floor, so an explicit value may tighten the requirement but never loosen it
-  below what the Target of Opportunity activation demands.
+  What the Scheduler may do with this observation.
   """
-  executionRequirement: ExecutionRequirement!
-
-  """
-  The execution requirement that applies when none is explicitly specified, and
-  the floor beneath the effective value.  `UNINTERRUPTIBLE` when `tooActivation`
-  is `RAPID` or `INTERRUPTING` — interrupting such an observation would defeat
-  the purpose of triggering it — and `UNCONSTRAINED` otherwise.
-  """
-  defaultExecutionRequirement: ExecutionRequirement!
-
-  """
-  The execution requirement explicitly requested for this observation, if any.
-  `executionRequirement` may still be more restrictive than this value, when
-  `defaultExecutionRequirement` is higher.
-  """
-  explicitExecutionRequirement: ExecutionRequirement
+  schedulingMode: SchedulingMode!
 
   """
   Controls whether the observation may be split across multiple visits. When
@@ -4311,7 +4294,7 @@ type SchedulingConstraints {
   (i.e. "atoms") scheduled in order across separate visits. When false, the
   entire science sequence must complete within a single uninterrupted visit.
   """
-  isSplittable: Boolean! @deprecated(reason: "Use `executionRequirement` instead; this is `true` exactly when `executionRequirement` is `UNCONSTRAINED`. (Deprecated July 31, 2026)")
+  isSplittable: Boolean! @deprecated(reason: "Use `schedulingMode` instead; this is `true` exactly when `schedulingMode` is `UNCONSTRAINED`. (Deprecated July 31, 2026)")
 
   """
   One or more windows during which the observation is permitted to execute.  If
@@ -5672,6 +5655,16 @@ input ProposalPropertiesInput {
   callId: CallForProposalsId
 
   """
+  The observing time this proposal requests.  Optional: when unspecified the
+  request is the sum of the time estimates of the program's observations (see
+  'timeRequest' on the proposal itself).  Set it when that sum does not describe
+  the real ask -- most obviously for a Target of Opportunity proposal, whose
+  observations cannot all be written down before the targets are known.  May be
+  unset by assigning a null value, which returns it to the derived sum.
+  """
+  explicitTimeRequest: TimeSpanInput
+
+  """
   Specifies the properties that depend on the Gemini call type. If none of
   'gemini', 'keck' or 'subaru' is set on creation, a regular semester queue
   proposal is assumed.  The selected call properties must match the call (see
@@ -5928,6 +5921,11 @@ input ObservingModeInput @oneOf {
   The flamingos2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   flamingos2LongSlit: Flamingos2LongSlitInput
+
+  """
+  The flamingos2Mos field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  flamingos2Mos: Flamingos2MosInput
 
   """
   The ghostIfu field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -6338,12 +6336,49 @@ input SiderealInput {
 }
 
 input OpportunityInput {
-  region: RegionInput!
+  """
+  The patch of sky this Target of Opportunity is approved for.  Optional in both
+  creation and editing, but meaning different things: omitting it when creating
+  approves the whole sky, while omitting it when editing leaves the existing
+  region alone.
+
+  It may not be set to null.  Every opportunity target has a region, so unlike
+  `resolution` there is nothing for null to mean.  Note in particular that
+  resolving a target does not require restating its region; supplying one here
+  always redraws it.
+  """
+  region: RegionInput
+
+  """
+  How this Target of Opportunity is tracked.  Supplying it resolves the target,
+  which keeps the region intact; assigning null unsets it, returning the target
+  to the unresolved state.  Omit it to leave the resolution unchanged.
+
+  To stop being a Target of Opportunity altogether, supply the top-level
+  `sidereal` or `nonsidereal` field instead -- that changes the target's subtype
+  and discards the region.
+  """
+  resolution: TargetResolutionInput
 }
 
+"""
+What a Target of Opportunity turned out to be.  Exactly one field must be
+specified.
+"""
+input TargetResolutionInput {
+  sidereal: SiderealInput
+  nonsidereal: NonsiderealInput
+}
+
+"""
+A quasirectangular patch of sky, given as an arc in right ascension and an arc in
+declination.  Neither arc may be set to null.  On creation an omitted arc is the
+full circle, so a region that names neither is the whole sky; when editing, an
+omitted arc is left as it is.
+"""
 input RegionInput {
-  rightAscensionArc: RightAscensionArcInput!
-  declinationArc: DeclinationArcInput!
+  rightAscensionArc: RightAscensionArcInput
+  declinationArc: DeclinationArcInput
 }
 
 input RightAscensionArcInput {
@@ -7769,9 +7804,12 @@ type Attachment {
   fileName: NonEmptyString!
 
   """
-  The identifier of the physical mask plate this attachment describes, derived
-  from the attachment itself and not settable.  Null when the attachment is not
-  a MOS_MASK, always present when it is.
+  The identifier of the physical mask plate this attachment describes.  It is
+  derived from the file name by dropping the `_ODF.fits` suffix.
+  The file name must follow the standard ODF naming convention, either
+  `G(N|S)YYYY(A|B)<type>PPP-XX_ODF.fits` or
+  `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.
+  Not settable.  Null when the attachment is not a MOS_MASK, always present when it is.
   """
   maskName: NonEmptyString
   description: NonEmptyString
@@ -8181,6 +8219,11 @@ enum ObservingModeType {
   ObservingModeType Flamingos2LongSlit
   """
   FLAMINGOS_2_LONG_SLIT
+
+  """
+  ObservingModeType Flamingos2Mos
+  """
+  FLAMINGOS_2_MOS
 
   """
   ObservingModeType GhostIfu
@@ -10460,6 +10503,245 @@ input Flamingos2LongSlitInput {
 }
 
 """
+Flamingos2 MOS acquisition settings.
+"""
+type Flamingos2MosAcquisition {
+
+  """
+  The filter that will be used in the acquisition sequence.  This will be the
+  `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: Flamingos2Filter!
+
+  """
+  The filter that will be used by default, if an explicit acquisition filter was
+  not specified.  The default is calculated as the acquisition filter closest in
+  wavelength to the observation's science filter.
+  """
+  defaultFilter: Flamingos2Filter!
+
+  """
+  An explicitly specified filter to use in acquisition (if any).
+  """
+  explicitFilter: Flamingos2Filter
+
+  """
+  The exposure time mode used for ITC lookup for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+Flamingos2 MOS acquisition input parameters.  When specified, these override
+default values.
+"""
+input Flamingos2MosAcquisitionInput {
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the acquisition filter closest to
+  the science filter wavelength.
+  Allowed filters are J, H and K_SHORT.
+  """
+  explicitFilter: Flamingos2Filter
+
+  """
+  Exposure time mode for the acquisition sequence.  If not specified, a default
+  exposure time mode is used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+Flamingos 2 MOS mode.
+
+This is Flamingos 2 long slit with the builtin FPU replaced by a custom mask.
+The acquisition images the field with the mask out of the beam before confirming
+the alignment through it.
+"""
+type Flamingos2Mos {
+
+  """
+  Flamingos2 Disperser
+  """
+  disperser: Flamingos2Disperser!
+
+  """
+  Flamingos2 Filter
+  """
+  filter: Flamingos2Filter!
+
+  """
+  The custom mask through which the observation is taken.  Its `attachmentId` is
+  null until the mask has been designed.
+  """
+  customMask: Flamingos2CustomMask!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  Optional explicitly specified F2 ReadMode. If set it overrides the
+  default.
+  """
+  explicitReadMode: Flamingos2ReadMode
+
+  """
+  Optional explicitly specified F2 Reads. If set it overrides the
+  default.
+  """
+  explicitReads: Flamingos2Reads
+
+  """
+  The decker field is either explicitly specified in explicitDecker or else taken
+  from defaultDecker
+  """
+  decker: Flamingos2Decker!
+
+  """
+  Default decker, which for a custom mask is MOS.
+  """
+  defaultDecker: Flamingos2Decker!
+
+  """
+  Optional explicitly specified F2 Decker. If set it overrides the
+  default.
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The readoutMode field is either explicitly specified in explicitReadoutMode or else taken
+  from defaultReadoutMode
+  """
+  readoutMode: Flamingos2ReadoutMode!
+
+  """
+  Default readout mode, science
+  """
+  defaultReadoutMode: Flamingos2ReadoutMode!
+
+  """
+  Optional explicitly specified F2 Readout mode. If set it overrides the
+  default.
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  Effective telescope configs (explicit override coalesced with the default).
+  """
+  telescopeConfigs: SlitTelescopeConfigs!
+
+  """
+  Default telescope configs for the selected offset preset.
+  """
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+
+  """
+  Optional explicitly specified telescope configs. If set they override the
+  preset default.
+  """
+  explicitTelescopeConfigs: SlitTelescopeConfigs
+
+  """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
+  """
+  Acquisition settings for the acquisition sequence.
+  """
+  acquisition: Flamingos2MosAcquisition!
+
+  """
+  The disperser as it was initially selected.  See the `disperser` field for the
+  disperser that will be used in the observation.
+  """
+  initialDisperser: Flamingos2Disperser!
+
+  """
+  The filter as it was initially selected.  See the `filter` field for the filter
+  that will be used in the observation.
+  """
+  initialFilter: Flamingos2Filter!
+
+  """
+  The custom slit width as it was initially selected.  See the `customMask` field
+  for the mask that will be used in the observation.
+  """
+  initialSlitWidth: Flamingos2CustomSlitWidth!
+
+}
+
+"""
+Edit or create Flamingos 2 MOS advanced configuration
+"""
+input Flamingos2MosInput {
+  """
+  The disperser field must be specified.  It cannot be unset with a null value.
+  """
+  disperser: Flamingos2Disperser
+
+  """
+  The filter field must be specified.  It cannot be unset with a null value.
+  """
+  filter: Flamingos2Filter
+
+  """
+  The custom mask through which the observation is taken.  Supply it complete or
+  skip it altogether; `slitWidth` must be resent even when only the attachment
+  changes.  `OTHER` is not an accepted slit width for this mode.
+  """
+  customMask: Flamingos2CustomMaskInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  The read mode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadMode: Flamingos2ReadMode
+
+  """
+  The reads field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReads: Flamingos2Reads
+
+  """
+  The decker field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitDecker: Flamingos2Decker
+
+  """
+  The readoutMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitReadoutMode: Flamingos2ReadoutMode
+
+  """
+  Explicit telescope configs. May be unset by assigning null, or ignored by skipping.
+  """
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with
+  a null value. On create the default is HOT.
+  """
+  telluricType: TelluricTypeInput
+
+  """
+  Acquisition input parameters, which override the acquisition defaults.
+  """
+  acquisition: Flamingos2MosAcquisitionInput
+}
+
+"""
 Imaging filters combine an actual filter with an exposure time mode.
 """
 type Flamingos2ImagingFilter {
@@ -11160,6 +11442,12 @@ type GnirsImagingFilter {
   """
   exposureTimeMode: ExposureTimeMode!
 
+  """
+  Coadds per exposure for this filter.  Always 1 when the exposure time mode is
+  signal-to-noise, which does not support coadds.
+  """
+  coadds: PosInt!
+
 }
 
 """
@@ -11177,6 +11465,13 @@ input GnirsImagingFilterInput {
   If not specified, it is taken from the observation's requirements.
   """
   exposureTimeMode: ExposureTimeModeInput
+
+  """
+  Coadds per exposure for this filter.  If not specified, defaults to 1.
+  Forced to 1 when the exposure time mode is signal-to-noise, which does not
+  support coadds.
+  """
+  coadds: PosInt
 
 }
 
@@ -11227,11 +11522,6 @@ type GnirsImaging {
   The camera (determines the pixel scale).
   """
   camera: GnirsCamera!
-
-  """
-  Coadds per exposure.
-  """
-  coadds: PosInt!
 
   """
   Optional explicitly specified read mode.  If not set, the read mode is
@@ -11297,11 +11587,6 @@ input GnirsImagingInput {
   camera: GnirsCamera
 
   """
-  Coadds per exposure.  On creation, if not specified, defaults to 1.
-  """
-  coadds: PosInt
-
-  """
   The explicitReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
   """
   explicitReadMode: GnirsReadMode
@@ -11332,11 +11617,48 @@ type GnirsSpectroscopyAcquisition {
 }
 
 """
+A GNIRS spectroscopy science configuration: a central wavelength together with
+the exposure time mode and coadds that apply at that wavelength.
+"""
+type GnirsCentralWavelengthConfig {
+
+  centralWavelength: Wavelength!
+
+  """
+  Exposure time mode for this central wavelength.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  coadds: PosInt!
+
+}
+
+"""
+Defines a GNIRS spectroscopy central wavelength to use along with its exposure
+time mode and coadds.
+"""
+input GnirsCentralWavelengthConfigInput {
+
+  centralWavelength: WavelengthInput!
+
+  """
+  Exposure time mode for this central wavelength.
+  If not specified, it is taken from the observation's requirements.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  Coadds for this central wavelength.  Defaults to 1 when not specified.
+  """
+  coadds: PosInt
+
+}
+
+"""
 GNIRS Spectroscopy mode (long slit or IFU, distinguished by the FPU).
 """
 type GnirsSpectroscopy {
-
-  exposureTimeMode: ExposureTimeMode!
 
   grating: GnirsGrating!
   explicitGrating: GnirsGrating
@@ -11346,8 +11668,18 @@ type GnirsSpectroscopy {
   explicitPrism: GnirsPrism
   initialPrism: GnirsPrism!
 
-  centralWavelength: Wavelength!
-  initialCentralWavelength: Wavelength!
+  """
+  The central wavelengths at which spectra are taken, in increasing wavelength
+  order.  Each one is a separate configuration with its own exposure time mode,
+  coadds, ITC calculation and calibrations.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  """
+  The central wavelengths as they were configured when the observing mode was
+  created.
+  """
+  initialCentralWavelengths: [GnirsCentralWavelengthConfig!]!
 
   camera: GnirsCamera!
   initialCamera: GnirsCamera!
@@ -11366,8 +11698,6 @@ type GnirsSpectroscopy {
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
-
-  coadds: PosInt!
 
   decker: GnirsDecker!
   explicitDecker: GnirsDecker
@@ -11482,9 +11812,12 @@ Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
 """
 input GnirsSpectroscopyInput {
 
-  exposureTimeMode: ExposureTimeModeInput
-
-  coadds: PosInt
+  """
+  The central wavelengths at which spectra are taken.  Required on create, and
+  must contain at least one entry with no duplicated wavelength.  When given on
+  edit, it replaces the existing list wholesale.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfigInput!]
 
   filter: GnirsFilter
 
@@ -11499,8 +11832,6 @@ input GnirsSpectroscopyInput {
   grating: GnirsGrating
 
   prism: GnirsPrism
-
-  centralWavelength: WavelengthInput
 
   explicitDecker: GnirsDecker
 
@@ -14154,7 +14485,18 @@ type SpectroscopyConfigOption {
 }
 
 type SpectroscopyConfigOptionFlamingos2 {
-  fpu: Flamingos2Fpu!
+  """
+  The builtin FPU, present for single-slit configurations. Null for multislit
+  (MOS) configurations, where the focal-plane unit is a custom mask.
+  """
+  fpu: Flamingos2Fpu
+
+  """
+  The custom mask slit width, present for multislit (MOS) configurations. Null
+  for single-slit configurations, where the width is implied by `fpu`.
+  """
+  customSlitWidth: Flamingos2CustomSlitWidth
+
   disperser: Flamingos2Disperser!
   filter: Flamingos2Filter!
 }
@@ -14170,6 +14512,13 @@ type SpectroscopyConfigOptionGmosNorth {
   (MOS) configurations, where the focal-plane unit is a custom mask.
   """
   fpu: GmosNorthBuiltinFpu
+
+  """
+  The custom mask slit width, present for multislit (MOS) configurations. Null
+  for single-slit configurations, where the width is implied by `fpu`.
+  """
+  customSlitWidth: GmosCustomSlitWidth
+
   grating: GmosNorthGrating!
   filter: GmosNorthFilter
 }
@@ -14180,6 +14529,13 @@ type SpectroscopyConfigOptionGmosSouth {
   (MOS) configurations, where the focal-plane unit is a custom mask.
   """
   fpu: GmosSouthBuiltinFpu
+
+  """
+  The custom mask slit width, present for multislit (MOS) configurations. Null
+  for single-slit configurations, where the width is implied by `fpu`.
+  """
+  customSlitWidth: GmosCustomSlitWidth
+
   grating: GmosSouthGrating!
   filter: GmosSouthFilter
 }
@@ -14439,6 +14795,32 @@ type ItcResult {
   exposureTime: TimeSpan!
   exposureCount: NonNegInt!
   signalToNoiseAt: SignalToNoiseAt
+
+  """
+  The brightest pixel the ITC found, as computed for a single exposure.  Null
+  when the ITC reported no CCD data or a frozen row.
+  For an acquisition whose exposure time was clamped to the instrument's acquisition
+  limits, this is what the ITC computed for the unclamped time, so it may disagree
+  with the exposure time reported alongside it.
+  """
+  peakPixel: ItcPeakPixel
+}
+
+"""
+The brightest pixel found by the ITC, taken across the CCDs it reported.
+"""
+type ItcPeakPixel {
+  """
+  The maximum, across the CCDs, of each CCD's peak pixel flux: the highest
+  electron count in any single pixel.
+  """
+  flux: Float!
+
+  """
+  The maximum, across the CCDs, of each CCD's peak pixel flux converted to ADU
+  using that CCD's own amplifier gain.
+  """
+  adu: Int!
 }
 
 """
@@ -14450,7 +14832,7 @@ enum ItcType {
   GMOS_NORTH_IMAGING,
   GMOS_SOUTH_IMAGING,
   GNIRS_IMAGING,
-  IGRINS_2_SPECTROSCOPY,
+  SCIENCE_ONLY_SPECTROSCOPY,
   GNIRS_SPECTROSCOPY,
   SPECTROSCOPY
 }
@@ -14509,6 +14891,15 @@ type ItcGnirsImagingResultSet {
 }
 
 """
+Combines a GNIRS spectroscopy central wavelength with an `ItcResultSet`. In
+other words, ITC results for all targets but a single central wavelength.
+"""
+type ItcGnirsSpectroscopyResultSet {
+  centralWavelength: Wavelength!
+  results:           ItcResultSet!
+}
+
+"""
 ITC results for a particular observation, including relevant instrument
 configurations and targets.  There are specific instances for each `ItcType`.
 """
@@ -14564,6 +14955,16 @@ type ItcGnirsImaging implements Itc {
 }
 
 """
+GNIRS spectroscopy ITC results.  Each central wavelength is a separate
+configuration and is paired with its own result set.
+"""
+type ItcGnirsSpectroscopy implements Itc {
+  itcType: ItcType!
+  acquisition: ItcResultSet!
+  gnirsSpectroscopyScience: [ItcGnirsSpectroscopyResultSet!]!
+}
+
+"""
 ITC results for spectroscopy observations.
 """
 type ItcSpectroscopy implements Itc {
@@ -14573,10 +14974,11 @@ type ItcSpectroscopy implements Itc {
 }
 
 """
-ITC results for IGRINS-2 spectroscopy observations. IGRINS-2 has no acquisition estimate.
-SVC  acquisition sequence, when present, uses the SVC exposure time configuration.
+ITC results for spectroscopy observations that have no acquisition estimate:
+IGRINS-2, GMOS MOS and Flamingos 2 MOS.  For IGRINS-2 the SVC acquisition
+sequence, when present, uses the SVC exposure time configuration.
 """
-type ItcIgrins2Spectroscopy implements Itc {
+type ItcScienceOnlySpectroscopy implements Itc {
   itcType: ItcType!
   spectroscopyScience: ItcResultSet!
 }
@@ -15042,12 +15444,6 @@ type ArchiveMatch {
   instrument: Instrument
 
   """
-  Observation type as the archive reports it.  Always present, and in practice
-  always OBJECT
-  """
-  observationType: String!
-
-  """
   Observation class as the archive reports it, e.g. science.  This is the
   legacy GOA class.
   """
@@ -15248,6 +15644,7 @@ type ConfigurationObservingMode {
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
+  flamingos2Mos: ConfigurationFlamingos2Mos
   gnirsLongSlit: ConfigurationGnirsLongSlit
   gnirsIfu: ConfigurationGnirsIfu
   igrins2LongSlit: ConfigurationIgrins2LongSlit
@@ -15284,6 +15681,10 @@ type ConfigurationGmosSouthImaging {
 }
 
 type ConfigurationFlamingos2LongSlit {
+  disperser: Flamingos2Disperser!
+}
+
+type ConfigurationFlamingos2Mos {
   disperser: Flamingos2Disperser!
 }
 
@@ -15913,6 +16314,12 @@ type Program {
   active: DateInterval!
 
   """
+  Whether the program is currently active, i.e. whether the current UTC date
+  falls within the `active` period (inclusive of both bounds).
+  """
+  isActive: Boolean!
+
+  """
   Proposal status of the program
   """
   proposalStatus: ProposalStatus!
@@ -16260,6 +16667,29 @@ type Proposal {
   Proposal TAC category
   """
   category: TacCategory
+
+  """
+  The observing time this proposal requests: `explicitTimeRequest` if set,
+  otherwise `defaultTimeRequest`.
+  """
+  timeRequest: CalculatedCategorizedTimeRange
+
+  """
+  The request that applies when none is explicitly set: the sum of the time
+  estimates of the program's observations, the same figure reported by the
+  program's `timeEstimateRange`.  Observations that are not fully defined have
+  no estimate and so contribute nothing to it.
+  """
+  defaultTimeRequest: CalculatedCategorizedTimeRange
+
+  """
+  The time explicitly requested for this proposal, if any: by the PI before
+  submission, or by staff during review.  Set it when the sum of the
+  observations' estimates does not describe the real ask -- most obviously for a
+  Target of Opportunity proposal, whose observations cannot all be written down
+  before the targets are known.
+  """
+  explicitTimeRequest: TimeSpan
 
   """
   Properties of a Gemini proposal that depend upon the Call for Proposals type.
@@ -16883,6 +17313,11 @@ type ObservingMode {
   Flamingos 2 Long Slit mode
   """
   flamingos2LongSlit: Flamingos2LongSlit
+
+  """
+  Flamingos 2 MOS mode
+  """
+  flamingos2Mos: Flamingos2Mos
 
   """
   GHOST IFU mode
@@ -18888,6 +19323,30 @@ type Target {
 
 type Opportunity {
   region: Region!
+
+  """
+  How this Target of Opportunity is tracked, once the alert has arrived and
+  identified it -- or null while it is still unresolved.
+
+  A Target of Opportunity does not stop being one when it is resolved.  It keeps
+  its `region` (which is what the accepted proposal authorized) and continues to
+  appear here rather than moving to the top-level `sidereal` or `nonsidereal`
+  field, so exactly one of those three remains non-null for any target.
+  """
+  resolution: TargetResolution
+}
+
+"""
+What a Target of Opportunity turned out to be.  Exactly one field is non-null.
+The types are the same ones an ordinary target uses, since a resolution differs
+from a plain target only in that its name and source profile live on the Target.
+"""
+type TargetResolution {
+  "Sidereal tracking information, if the target resolved to a sidereal target."
+  sidereal: Sidereal
+
+  "Nonsidereal tracking information, if the target resolved to a nonsidereal target."
+  nonsidereal: Nonsidereal
 }
 
 enum ArcType {
@@ -20621,6 +21080,18 @@ input WhereObservation {
   Matches the calibration role.
   """
   calibrationRole: WhereOptionEqCalibrationRole
+
+  """
+  Matches if the observation's stored base position lies within the angular
+  `distance` of `center`. The stored position is the
+  explicit base if set, otherwise the asterism composite with every target
+  proper-motion corrected to epoch J2000.
+  An observation has no stored position when its asterism contains a
+  non-sidereal or opportunity target and no explicit base is set, or when the
+  background calculation has not yet caught up with recent edits; such
+  observations never match, and always match the negation.
+  """
+  targetCoordinates: WhereCone
 }
 
 """
@@ -20676,6 +21147,27 @@ input WhereConfigurationRequest {
   Matches the last update time.
   """
   updatedAt: WhereOrderTimestamp
+
+  """
+  Matches the configuration's observing mode type, if any.
+  """
+  observingModeType: WhereOptionEqObservingModeType
+
+  """
+  Matches if the configuration's target reference coordinates lie within the
+  angular `distance` of `center` (exact great-circle). Resolved out of band.
+  """
+  targetCoordinates: WhereCone
+}
+
+"""
+A cone (angular-distance) match over a sky position.
+"""
+input WhereCone {
+  center: CoordinatesInput!
+
+  "Maximum angular separation between `center` and the target reference coords. Must be between 0° and 180°."
+  distance: AngleInput!
 }
 
 input WhereObservationReference {
@@ -22470,6 +22962,13 @@ input WhereProgram {
 
   "Matches the active period end."
   activeEnd: WhereOrderDate
+
+  """
+  When true, matches programs whose active period `[activeStart, activeEnd]` contains the
+  current UTC date; when false, matches the complement. Evaluated in the database, so the
+  date is taken at transaction start.
+  """
+  isActive: Boolean
 }
 
 input WhereProgramReference {

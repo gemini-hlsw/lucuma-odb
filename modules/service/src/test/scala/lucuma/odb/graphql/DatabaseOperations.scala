@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
+import io.circe.Decoder
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.refined.*
@@ -16,6 +17,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.PerSite
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.DatasetStage
 import lucuma.core.enums.EducationalStatus
@@ -40,6 +42,8 @@ import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
+import lucuma.core.math.Declination
+import lucuma.core.math.RightAscension
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Ephemeris
@@ -296,6 +300,43 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  def setConfigurationRequestStatusAs(user: User, rid: ConfigurationRequest.Id, status: ConfigurationRequestStatus): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateConfigurationRequests(
+            input: {
+              SET: { status: ${status.tag.toUpperCase} }
+              WHERE: { id: { EQ: ${rid.asJson} } }
+            }
+          ) {
+            requests { id }
+          }
+        }
+      """
+    ).void
+
+  def setProgramActiveAs(user: User, pid: Program.Id, activeStart: LocalDate, activeEnd: LocalDate): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                activeStart: "${activeStart.toString}"
+                activeEnd:   "${activeEnd.toString}"
+              }
+              WHERE: { id: { EQ: ${pid.asJson} } }
+            }
+          ) {
+            programs { id }
+          }
+        }
+      """
+    ).void
 
   def createProgramWithPiAffiliation(
     pi: User,
@@ -966,12 +1007,12 @@ trait DatabaseOperations { this: OdbSuite =>
         """
     ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
-  def observationsWhere(user: User, where: String): IO[List[Observation.Id]] =
+  private def idsWhere[A: Decoder](user: User, field: String, where: String): IO[List[A]] =
     query(
       user,
       s"""
          query {
-          observations(WHERE: { $where }) {
+          $field(WHERE: { $where }) {
             matches {
               id
             }
@@ -979,12 +1020,21 @@ trait DatabaseOperations { this: OdbSuite =>
         }
       """
     ).flatMap { json =>
-      json.hcursor.downFields("observations", "matches").values.toList.flatten.traverse { json =>
-        json.hcursor.downField("id").as[Observation.Id]
+      json.hcursor.downFields(field, "matches").values.toList.flatten.traverse { json =>
+        json.hcursor.downField("id").as[A]
       }
       .leftMap(f => new RuntimeException(f.message))
       .liftTo[IO]
     }
+
+  def observationsWhere(user: User, where: String): IO[List[Observation.Id]] =
+    idsWhere[Observation.Id](user, "observations", where)
+
+  def configurationRequestsWhere(user: User, where: String): IO[List[ConfigurationRequest.Id]] =
+    idsWhere[ConfigurationRequest.Id](user, "configurationRequests", where)
+
+  def programsWhere(user: User, where: String): IO[List[Program.Id]] =
+    idsWhere[Program.Id](user, "programs", where)
 
   def setObservationExistence(
     user: User,
@@ -1076,6 +1126,22 @@ trait DatabaseOperations { this: OdbSuite =>
             resolution: 100
             wavelengthCoverage: { nanometers: 20 }
             focalPlane: SINGLE_SLIT
+            focalPlaneAngle: { microarcseconds: 0 }
+          }
+        }"""
+      case ObservingModeType.Flamingos2Mos =>
+        """{
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 100.0
+              at: { nanometers: 1210 }
+            }
+          }
+          spectroscopy: {
+            wavelength: { nanometers: 1200 }
+            resolution: 100
+            wavelengthCoverage: { nanometers: 20 }
+            focalPlane: MULTIPLE_SLIT
             focalPlaneAngle: { microarcseconds: 0 }
           }
         }"""
@@ -1315,7 +1381,15 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       case ObservingModeType.Flamingos2Mos =>
-        """{}"""
+        """{
+          flamingos2Mos: {
+            disperser: R1200_HK
+            filter: Y
+            customMask: {
+              slitWidth: CUSTOM_WIDTH_2_PIX
+            }
+          }
+        }"""
       case ObservingModeType.GmosNorthImaging =>
         """{
           gmosNorthImaging: {
@@ -1401,14 +1475,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             slit: { fpu: LONG_SLIT_0_30 }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case ObservingModeType.GnirsIfu =>
@@ -1419,14 +1497,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case ObservingModeType.Igrins2LongSlit =>
@@ -1607,14 +1689,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             slit: { fpu: LONG_SLIT_0_30 }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case ObservingModeType.GnirsIfu =>
@@ -1625,14 +1711,18 @@ trait DatabaseOperations { this: OdbSuite =>
             camera: SHORT_BLUE
             ifu: { fpu: LOW_RESOLUTION }
             filter: ORDER3
-            centralWavelength: { nanometers: 2200 }
-            exposureTimeMode: {
-              timeAndCount: {
-                time: { seconds: 30.0 }
-                count: 3
-                at: { nanometers: 2200 }
+            centralWavelengths: [
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: {
+                    time: { seconds: 30.0 }
+                    count: 3
+                    at: { nanometers: 2200 }
+                  }
+                }
               }
-            }
+            ]
           }
         }"""
       case v: VisitorObservingModeType =>
@@ -1813,6 +1903,44 @@ trait DatabaseOperations { this: OdbSuite =>
   ): IO[Target.Id] =
     createSiderealTargetAs(user, pid, name, sourceProfile)
 
+  /** GraphQL input text for a pair of coordinates fields: `ra: { hms: ... }, dec: { dms: ... }`. */
+  def coordinatesInput(c: Coordinates): String =
+    s"""ra: { hms: "${RightAscension.fromStringHMS.reverseGet(c.ra)}" }, dec: { dms: "${Declination.fromStringSignedDMS.reverseGet(c.dec)}" }"""
+
+  def createSiderealTargetAtAs(
+    user:   User,
+    pid:    Program.Id,
+    coords: Coordinates,
+    name:   String = "T"
+  ): IO[Target.Id] =
+    query(
+      user,
+      s"""
+        mutation {
+          createTarget(
+            input: {
+              programId: ${pid.asJson}
+              SET: {
+                name: "$name"
+                sidereal: {
+                  ${coordinatesInput(coords)}
+                  epoch: "J2000.000"
+                  radialVelocity: { kilometersPerSecond: 0.0 }
+                }
+                $DefaultSourceProfile
+              }
+            }
+          ) {
+            target { id }
+          }
+        }
+      """
+    ).flatMap { js =>
+      js.hcursor.downField("createTarget").downField("target").downField("id").as[Target.Id]
+        .leftMap(f => new RuntimeException(f.message))
+        .liftTo[IO]
+    }
+
   def createSiderealTargetAs(
     user: User,
     pid:  Program.Id,
@@ -1896,6 +2024,51 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
+
+  /**
+   * Resolves an opportunity target siderally at the given coordinates, as the alert would.
+   * The region is deliberately not restated, so the approved patch of sky is left alone.
+   */
+  def resolveOpportunityTargetAtAs(
+    user:   User,
+    tid:    Target.Id,
+    coords: Coordinates
+  ): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateTargets(input: {
+            SET: {
+              opportunity: {
+                resolution: {
+                  sidereal: { ${coordinatesInput(coords)} epoch: "J2000.000" }
+                }
+              }
+            }
+            WHERE: { id: { EQ: ${tid.asJson} } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
+
+  /** Clears an opportunity target's resolution, returning it to awaiting its alert. */
+  def unresolveOpportunityTargetAs(user: User, tid: Target.Id): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateTargets(input: {
+            SET: { opportunity: { resolution: null } }
+            WHERE: { id: { EQ: ${tid.asJson} } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
 
   def createNonsiderealTargetAs(
     user: User,

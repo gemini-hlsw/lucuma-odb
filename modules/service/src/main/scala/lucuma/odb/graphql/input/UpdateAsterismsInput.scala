@@ -10,7 +10,6 @@ import grackle.Path
 import grackle.Predicate
 import lucuma.odb.graphql.binding.*
 
-
 //# Input for bulk updating multiple observations.  Select observations
 //# with the 'WHERE' input and specify the changes in 'SET'.
 //#
@@ -33,11 +32,11 @@ final case class UpdateAsterismsInput(
   includeDeleted: Option[Boolean]
 )
 
-object UpdateAsterismsInput {
+object UpdateAsterismsInput:
 
-  def binding(path: Path): Matcher[UpdateAsterismsInput] = {
-    val WhereObservationBinding = WhereObservation.binding(path)
-    ObjectFieldsBinding.rmap {
+  def binding(path: Path): Matcher[UpdateAsterismsInput] =
+    val WhereObservationBinding = WhereObservation.binding(path, allowCone = false)
+    ObjectFieldsBinding.rmap:
       case List(
         EditAsterismsPatchInput.Binding("SET", rSET),
         WhereObservationBinding.Option("WHERE", rWHERE),
@@ -45,7 +44,3 @@ object UpdateAsterismsInput {
         BooleanBinding.Option("includeDeleted", rIncludeDeleted)
       ) =>
         (rSET, rWHERE, rLIMIT, rIncludeDeleted).parMapN(apply)
-    }
-  }
-
-}

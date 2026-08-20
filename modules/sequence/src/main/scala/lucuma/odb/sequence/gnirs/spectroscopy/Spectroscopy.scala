@@ -6,11 +6,13 @@ package gnirs.spectroscopy
 
 import cats.Monad
 import cats.data.EitherT
+import cats.data.NonEmptyMap
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import fs2.Pure
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.GnirsAcquisitionType
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
@@ -34,7 +36,7 @@ object Spectroscopy:
     config:         Config,
     acquisitionItc: Either[OdbError, IntegrationTime],
     gnirsAcqType:   Option[GnirsAcquisitionType],
-    scienceItc:     Either[OdbError, IntegrationTime],
+    scienceItc:     Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]],
     calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
     val static = staticFrom(config)

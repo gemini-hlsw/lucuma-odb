@@ -15,9 +15,11 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
 class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
-                              with GuideEnvironmentSuite:
+                              with GuideEnvironmentSuite
+                              with UpdateObservationsOps:
 
   override val fullTimeEstimate: TimeSpan = TimeSpan.fromMinutes(40).get
 
@@ -228,3 +230,29 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
 
     setup.flatMap: oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = flamingos2ImagingResult("Nonsidereal Target", GuideProbe.PWFS2, 250.0))
+
+  test("Flamingos2 MOS with oiwfs"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2MosObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = flamingos2ImagingResult("V1647 Orionis", GuideProbe.Flamingos2OIWFS, 270.0))
+
+  test("Flamingos2 MOS with pwfs2"):
+    val setup: IO[Observation.Id] =
+      for
+        p   <- createProgramAs(pi)
+        eph  = createNonsiderealEphemeris
+        t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
+        o   <- createFlamingos2MosObservationAs(pi, p, List(t))
+        _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _   <- setBestConditionsAs(pi, o)
+      yield o
+
+    setup.flatMap: oid =>
+      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2ResultAt(340))

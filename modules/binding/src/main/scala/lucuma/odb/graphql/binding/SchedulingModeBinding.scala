@@ -4,7 +4,7 @@
 package lucuma.odb.graphql
 package binding
 
-import lucuma.core.enums.ExecutionRequirement
+import lucuma.core.enums.SchedulingMode
 
-val ExecutionRequirementBinding: Matcher[ExecutionRequirement] =
+val SchedulingModeBinding: Matcher[SchedulingMode] =
   enumeratedBinding

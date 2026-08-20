@@ -27,6 +27,7 @@ import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.TelescopeConfigGeneratorRole
+import lucuma.odb.graphql.input.GnirsImagingFilterInput
 import lucuma.odb.graphql.input.GnirsImagingInput
 import lucuma.odb.graphql.input.ImagingVariantInput
 import lucuma.odb.graphql.input.TelescopeConfigGeneratorInput
@@ -95,7 +96,15 @@ object GnirsImagingService:
                   pq.stream(af.argument, chunkSize = 1024)
                     .compile
                     .toList
-                    .map(_.map((oid, fs, vf, mf) => oid -> (fs, vf, mf)).toMap)
+                    .map: rows =>
+                      // One row per filter, ordered by filter.  `groupBy` preserves
+                      // that order within each group.
+                      rows
+                        .groupBy(_._1)
+                        .flatMap: (oid, group) =>
+                          NonEmptyList.fromList(group.map(_._2)).map: fs =>
+                            oid -> (fs, group.head._3, group.head._4)
+                        .toMap
 
             for
               c <- precursorMap
@@ -108,7 +117,6 @@ object GnirsImagingService:
                 vf.toVariant(og, sg),
                 fs,
                 mf.camera,
-                mf.coadds,
                 mf.explicitReadMode,
                 mf.defaultWellDepth,
                 mf.explicitWellDepth,
@@ -121,17 +129,24 @@ object GnirsImagingService:
       ): Map[Observation.Id, NonEmptyList[(GnirsFilter, E)]] =
         m.view.mapValues(_._2).toMap
 
+      /**
+       * Writes the filter rows for one row version.  The ETM resolution carries
+       * only the filter, so the coadds are re-attached here from the input.
+       */
       private def insertFilters(
+        input:   NonEmptyList[GnirsImagingFilterInput],
         etms:    Map[Observation.Id, NonEmptyList[(GnirsFilter, ExposureTimeModeId)]],
         version: ObservingModeRowVersion
       ): F[Unit] =
+        val coaddsFor: Map[GnirsFilter, PosInt] =
+          input.toList.map(f => f.filter -> f.coadds.getOrElse(GnirsImagingInput.DefaultCoadds)).toMap
         NonEmptyList
           .fromList:
             etms.toList.flatMap: (oid, fs) =>
               fs.toList.map: (filter, eid) =>
-                (oid, filter, eid)
+                (oid, filter, coaddsFor.getOrElse(filter, GnirsImagingInput.DefaultCoadds), eid)
           .traverse_ : rs =>
-            session.exec(ImagingStatements.insertFilters(GnirsImagingService.FilterTableName, gnirs_filter, rs, version))
+            session.exec(Statements.insertFilters(rs, version))
 
       override def insert(
         input:  GnirsImagingInput.Create,
@@ -159,11 +174,11 @@ object GnirsImagingService:
 
               ids <- ResultT.liftF(services.exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
               ini  = stripAcquisition(ids)
-              _   <- ResultT.liftF(insertFilters(ini, ObservingModeRowVersion.Initial))
+              _   <- ResultT.liftF(insertFilters(input.filters, ini, ObservingModeRowVersion.Initial))
 
               // Insert the science filters
               cur <- ResultT.liftF(services.exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
-              _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
+              _   <- ResultT.liftF(insertFilters(input.filters, cur, ObservingModeRowVersion.Current))
 
               // Insert the offset generators
               _   <- ResultT.liftF(services.telescopeConfigGeneratorService.insert(oids, offsets, TelescopeConfigGeneratorRole.Object))
@@ -205,7 +220,7 @@ object GnirsImagingService:
                 // Insert the science filters (current / mutable version)
                 r   <- ResultT(services.exposureTimeModeService.resolve("GNIRS Imaging", none, fs.map(f => (f.filter, f.exposureTimeMode)), none, which))
                 cur <- ResultT.liftF(services.exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
-                _   <- ResultT.liftF(insertFilters(cur, ObservingModeRowVersion.Current))
+                _   <- ResultT.liftF(insertFilters(fs, cur, ObservingModeRowVersion.Current))
               yield ()
 
           val acqEtmUpdate =
@@ -250,9 +265,8 @@ object GnirsImagingService:
         newObservationId: Observation.Id,
         etms:             List[(ExposureTimeModeId, ExposureTimeModeId)]
       )(using Transaction[F]): F[Unit] =
-        session.exec(Statements.clone(observationId, newObservationId))                                                        *>
-          session.exec(
-            ImagingStatements.cloneFiltersAndEtms(GnirsImagingService.FilterTableName, observationId, newObservationId, etms)) *>
+        session.exec(Statements.clone(observationId, newObservationId))                                *>
+          session.exec(Statements.cloneFiltersAndEtms(observationId, newObservationId, etms))          *>
           services.telescopeConfigGeneratorService.clone(observationId, newObservationId)
 
   object Statements:
@@ -260,7 +274,6 @@ object GnirsImagingService:
     // GNIRS imaging properties including overrides
     case class ModeFields(
       camera:            GnirsCamera,
-      coadds:            PosInt,
       explicitReadMode:  Option[GnirsReadMode],
       defaultWellDepth:  GnirsWellDepth,
       explicitWellDepth: Option[GnirsWellDepth],
@@ -289,55 +302,40 @@ object GnirsImagingService:
 
     val modeFields: Decoder[ModeFields] =
       (gnirs_camera         *:
-       int4_pos             *:
        gnirs_read_mode.opt  *:
        gnirs_well_depth     *:
        gnirs_well_depth.opt *:
        acquisition
       ).to[ModeFields]
 
-    val configFields: Decoder[(NonEmptyList[Filter], Variant.Fields, ModeFields)] =
-      (GmosImagingService.Statements.filter_list(gnirs_filter) *:
-       GmosImagingService.Statements.variant_fields            *:
+    /**
+     * Decodes one (observation, filter) row.  `select` groups the rows per
+     * observation to recover the full filter list.
+     */
+    val configFields: Decoder[(Filter, Variant.Fields, ModeFields)] =
+      (gnirs_filter                                *: // c_filter
+       exposure_time_mode                          *: // the filter's science ETM
+       int4_pos                                    *: // c_coadds
+       GmosImagingService.Statements.variant_fields *:
        modeFields
-      ).map: (filters, variantFields, mode) =>
-        (filters.map(f => Filter(f.filter, f.exposureTimeMode)), variantFields, mode)
+      ).map: (filter, etm, coadds, variantFields, mode) =>
+        (Filter(filter, etm, coadds), variantFields, mode)
 
     def select(
       oids: NonEmptyList[Observation.Id]
     ): AppliedFragment =
       sql"""
-        WITH selected_observations AS (
-          SELECT t.c_observation_id
-          FROM #${GnirsImagingService.ModeTableName} t
-          WHERE """(Void) |+| observationIdIn(oids) |+| sql"""
-        ),
-        aggregated_filters AS (
-          SELECT
-            f.c_observation_id,
-            array_agg(
-              ROW(
-                f.c_filter,
-                e.c_exposure_time_mode,
-                e.c_signal_to_noise_at,
-                e.c_signal_to_noise,
-                e.c_exposure_time,
-                e.c_exposure_count
-              )::s_filter_exposure_time_mode
-              ORDER BY f.c_filter
-            ) AS c_filters
-          FROM #${GnirsImagingService.FilterTableName} f
-          JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = f.c_exposure_time_mode_id
-          JOIN selected_observations s ON s.c_observation_id = f.c_observation_id
-          WHERE f.c_version = 'current'
-          GROUP BY f.c_observation_id
-        )
         SELECT
           v.c_observation_id,
-          af.c_filters,
+          f.c_filter,
+          sci.c_exposure_time_mode,
+          sci.c_signal_to_noise_at,
+          sci.c_signal_to_noise,
+          sci.c_exposure_time,
+          sci.c_exposure_count,
+          f.c_coadds,
           #${ImagingStatements.variantColumns("v.")},
           v.c_camera,
-          v.c_coadds,
           v.c_read_mode,
           v.c_well_depth_default,
           v.c_well_depth,
@@ -352,10 +350,14 @@ object GnirsImagingService:
           acq.c_exposure_time,
           acq.c_exposure_count
         FROM v_gnirs_imaging v
-        JOIN aggregated_filters af ON af.c_observation_id = v.c_observation_id
+        JOIN #${GnirsImagingService.FilterTableName} f
+          ON f.c_observation_id = v.c_observation_id AND f.c_version = 'current'
+        JOIN t_exposure_time_mode sci
+          ON sci.c_exposure_time_mode_id = f.c_exposure_time_mode_id
         JOIN t_exposure_time_mode acq
           ON acq.c_observation_id = v.c_observation_id AND acq.c_role = 'acquisition'
-      """(Void)
+        WHERE """(Void) |+| observationIdIn(oids, "v".some) |+|
+      void" ORDER BY v.c_observation_id, f.c_filter"
 
     def insert(
       input: GnirsImagingInput.Create,
@@ -371,7 +373,6 @@ object GnirsImagingService:
             $observation_id,
             (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
             $gnirs_camera,
-            $int4,
             ${gnirs_read_mode.opt},
             ${gnirs_well_depth.opt},
             ${gnirs_acquisition_type.opt},
@@ -390,7 +391,6 @@ object GnirsImagingService:
             oid,
             oid,
             input.camera,
-            input.coadds.value,
             input.explicitReadMode,
             input.explicitWellDepth,
             input.acquisition.flatMap(_.explicitAcqType.toOption),
@@ -412,7 +412,6 @@ object GnirsImagingService:
           c_observation_id,
           c_program_id,
           c_camera,
-          c_coadds,
           c_read_mode,
           c_well_depth,
           c_acq_type,
@@ -423,6 +422,75 @@ object GnirsImagingService:
           #${ImagingStatements.variantColumns()}
         ) VALUES
       """(Void) |+| modeEntries.intercalate(void", ")
+
+    /**
+     * Inserts the filter rows for one row version.  Unlike the other imaging
+     * modes, GNIRS carries coadds per filter, so this doesn't use the shared
+     * `ImagingStatements.insertFilters`.
+     */
+    def insertFilters(
+      rows:    NonEmptyList[(Observation.Id, GnirsFilter, PosInt, ExposureTimeModeId)],
+      version: ObservingModeRowVersion
+    ): AppliedFragment =
+      val insertInto: AppliedFragment =
+        void"""
+          INSERT INTO t_gnirs_imaging_filter (
+            c_observation_id,
+            c_filter,
+            c_version,
+            c_coadds,
+            c_exposure_time_mode_id
+          ) VALUES
+        """
+
+      val values =
+        rows.map: (oid, filter, coadds, eid) =>
+          sql"($observation_id, $gnirs_filter, $observing_mode_row_version, $int4_pos, $exposure_time_mode_id)"(
+            oid, filter, version, coadds, eid
+          )
+
+      insertInto |+| values.intercalate(void", ")
+
+    /**
+     * Copies the filter rows to a cloned observation, remapping each to its
+     * cloned exposure time mode row.  Carries the coadds that the shared
+     * `ImagingStatements.cloneFiltersAndEtms` doesn't know about.
+     */
+    def cloneFiltersAndEtms(
+      originalId: Observation.Id,
+      newId:      Observation.Id,
+      etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
+    ): AppliedFragment =
+      sql"""
+        WITH etm_map AS (
+          SELECT
+            old_exposure_time_mode_id,
+            new_exposure_time_mode_id
+          FROM
+            unnest(
+              ARRAY[${exposure_time_mode_id.list(etms.length)}],
+              ARRAY[${exposure_time_mode_id.list(etms.length)}]
+            ) AS map(old_exposure_time_mode_id, new_exposure_time_mode_id)
+        )
+        INSERT INTO t_gnirs_imaging_filter (
+          c_observation_id,
+          c_exposure_time_mode_id,
+          c_filter,
+          c_version,
+          c_coadds,
+          c_role
+        )
+        SELECT
+          $observation_id,
+          e.new_exposure_time_mode_id,
+          f.c_filter,
+          f.c_version,
+          f.c_coadds,
+          f.c_role
+        FROM t_gnirs_imaging_filter f
+        JOIN etm_map e ON f.c_exposure_time_mode_id = e.old_exposure_time_mode_id
+        WHERE f.c_observation_id = $observation_id
+      """.apply(etms.map(_._1), etms.map(_._2), newId, originalId)
 
     def delete(
       which: List[Observation.Id]
@@ -437,7 +505,6 @@ object GnirsImagingService:
       input: GnirsImagingInput.Edit
     ): List[AppliedFragment] =
       val upCamera    = sql"c_camera     = $gnirs_camera"
-      val upCoadds    = sql"c_coadds     = $int4"
       val upReadMode  = sql"c_read_mode  = ${gnirs_read_mode.opt}"
       val upWellDepth = sql"c_well_depth = ${gnirs_well_depth.opt}"
 
@@ -471,7 +538,6 @@ object GnirsImagingService:
 
       List(
         input.camera.map(upCamera),
-        input.coadds.map(c => upCoadds(c.value)),
         input.explicitReadMode.toOptionOption.map(upReadMode),
         input.explicitWellDepth.toOptionOption.map(upWellDepth)
       ).flatten ++ acqUpdates
@@ -485,7 +551,6 @@ object GnirsImagingService:
           c_observation_id,
           c_program_id,
           c_camera,
-          c_coadds,
           c_read_mode,
           c_well_depth,
           c_acq_type,
@@ -499,7 +564,6 @@ object GnirsImagingService:
           $observation_id,
           (SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id),
           c_camera,
-          c_coadds,
           c_read_mode,
           c_well_depth,
           c_acq_type,

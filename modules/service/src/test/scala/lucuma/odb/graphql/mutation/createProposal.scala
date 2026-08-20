@@ -1974,4 +1974,47 @@ class createProposal extends OdbSuite with DatabaseOperations {
       _   <- go(cid, pid)
     yield ()
 
+  test("✓ explicit time request") {
+    createProgramAs(pi, "My Explicitly Timed Proposal").flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  category: COSMOLOGY
+                  explicitTimeRequest: { hours: 42.0 }
+                  gemini: {
+                    queue: {
+                      considerForBand3: DO_NOT_CONSIDER
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                explicitTimeRequest { hours }
+                timeRequest { value { maximum { program { hours } } } }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "explicitTimeRequest": { "hours": 42.000000 },
+                "timeRequest": {
+                  "value": { "maximum": { "program": { "hours": 42.000000 } } }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
+  }
+
 }

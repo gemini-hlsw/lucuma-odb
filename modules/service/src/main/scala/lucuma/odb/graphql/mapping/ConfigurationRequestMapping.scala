@@ -59,4 +59,3 @@ trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with
       query(using(s)).value
 
 }
-

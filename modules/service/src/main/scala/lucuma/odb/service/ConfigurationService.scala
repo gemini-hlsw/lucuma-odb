@@ -28,6 +28,8 @@ import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
+import lucuma.odb.data.Cone
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
 import lucuma.odb.data.OdbErrorExtensions.asWarning
@@ -59,6 +61,12 @@ trait ConfigurationService[F[_]] {
   /** Selects observations relevant to the given configuration requests, if any. The resulting map will contain every passed request id. */
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
 
+  /** Selects the ids of configuration requests whose target reference coordinates
+   *  lie within `cone` (exact great-circle match or angular distance), restricted to programs
+   *  visible to the current user. The caller injects every id into a rewritten query, so
+   *  the list bounds both the heap and the generated statement. */
+  def coneCandidates(cone: Cone, max: Int = ConfigurationService.MaxConeCandidates): F[Result[List[ConfigurationRequest.Id]]]
+
   /** Inserts (or selects) a `ConfigurationRequest` based on the configuration of `oid`. */
   def canonicalizeRequest(input: CreateConfigurationRequestInput)(using Transaction[F]): F[Result[ConfigurationRequest]]
 
@@ -77,6 +85,9 @@ trait ConfigurationService[F[_]] {
 }
 
 object ConfigurationService {
+
+  /** Cap on `coneCandidates` matches; see its scaladoc. */
+  val MaxConeCandidates: Int = ConeSearch.MaxCandidates
 
   extension [A](self: Result[A]) def suppressWarnings: Result[A] =
     self match
@@ -102,6 +113,14 @@ object ConfigurationService {
       override def deleteAll(pid: Program.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest.Id]]] =
         session.prepareR(Statements.DeleteRequests).use: pq =>
           pq.stream(pid, 1024).compile.toList.map(Result(_))
+
+      override def coneCandidates(cone: Cone, max: Int): F[Result[List[ConfigurationRequest.Id]]] =
+        val af = Statements.coneCandidates(user, cone, max)
+        session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
+          pq.stream(af.argument, 1024).compile.toList.map: ids =>
+            if ids.sizeIs > max then
+              OdbError.InvalidArgument(s"targetCoordinates matches more than $max configuration requests; narrow the cone.".some).asFailure
+            else Result(ids)
 
       override def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, where: AppliedFragment): F[Result[List[ConfigurationRequest.Id]]] =
         val doUpdate = impl.updateRequests(SET, where).value
@@ -384,6 +403,9 @@ object ConfigurationService {
                     flamingos2LongSlit {
                       disperser
                     }
+                    flamingos2Mos {
+                      disperser
+                    }
                     gnirsLongSlit {
                       grating
                       camera
@@ -464,6 +486,9 @@ object ConfigurationService {
                           filters
                         }
                         flamingos2LongSlit {
+                          disperser
+                        }
+                        flamingos2Mos {
                           disperser
                         }
                         gnirsLongSlit {
@@ -581,6 +606,9 @@ object ConfigurationService {
                   flamingos2LongSlit {
                     disperser
                   }
+                  flamingos2Mos {
+                    disperser
+                  }
                   gnirsLongSlit {
                     grating
                     camera
@@ -663,6 +691,9 @@ object ConfigurationService {
                         filters
                       }
                       flamingos2LongSlit {
+                        disperser
+                      }
+                      flamingos2Mos {
                         disperser
                       }
                       gnirsLongSlit {
@@ -769,6 +800,9 @@ object ConfigurationService {
                       filters
                     }
                     flamingos2LongSlit {
+                      disperser
+                    }
+                    flamingos2Mos {
                       disperser
                     }
                     gnirsLongSlit {
@@ -878,6 +912,9 @@ object ConfigurationService {
                         flamingos2LongSlit {
                           disperser
                         }
+                        flamingos2Mos {
+                          disperser
+                        }
                         gnirsLongSlit {
                           grating
                           camera
@@ -961,6 +998,9 @@ object ConfigurationService {
                       filters
                     }
                     flamingos2LongSlit {
+                      disperser
+                    }
+                    flamingos2Mos {
                       disperser
                     }
                     gnirsLongSlit {
@@ -1115,6 +1155,9 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
@@ -1202,31 +1245,34 @@ object ConfigurationService {
 
           }
       ).contramap[(Observation.Id, Configuration)] { (oid, cfg) =>
-        oid                                                                                                      *:
-        cfg.conditions.cloudExtinction                                                                           *:
-        cfg.conditions.imageQuality                                                                              *:
-        cfg.conditions.skyBackground                                                                             *:
-        cfg.conditions.waterVapor                                                                                *:
-        cfg.target.left.toOption.map(_.ra)                                                                       *:
-        cfg.target.left.toOption.map(_.dec)                                                                      *:
-        cfg.target.toOption.map(_.raArc.tag)                                                                     *:
-        cfg.target.toOption.flatMap(Region.raArcStart.getOption)                                                 *:
-        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)                                                   *:
-        cfg.target.toOption.map(_.decArc.tag)                                                                    *:
-        cfg.target.toOption.flatMap(Region.decArcStart.getOption)                                                *:
-        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)                                                  *:
-        cfg.observingMode.tpe                                                                                    *:
-        cfg.observingMode.flamingos2LongSlit.map(_.disperser)                                                    *:
-        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable)                                  *:
-        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable)                                  *:
-        cfg.observingMode.gmosNorthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosNorthMos.map(_.grating)) *:
-        cfg.observingMode.gmosSouthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosSouthMos.map(_.grating)) *:
-        cfg.observingMode.gnirsLongSlit.map(_.grating)                                                           *:
-        cfg.observingMode.gnirsLongSlit.map(_.camera)                                                            *:
-        cfg.observingMode.gnirsLongSlit.map(_.prism)                                                             *:
-        cfg.observingMode.visitor.map(_.radius)                                                                  *:
-        cfg.observingMode.gnirsIfu.map(_.grating)                                                                *:
-        cfg.observingMode.gnirsIfu.map(_.fpu)                                                                    *:
+        oid                                                                     *:
+        cfg.conditions.cloudExtinction                                          *:
+        cfg.conditions.imageQuality                                             *:
+        cfg.conditions.skyBackground                                            *:
+        cfg.conditions.waterVapor                                               *:
+        cfg.target.left.toOption.map(_.ra)                                      *:
+        cfg.target.left.toOption.map(_.dec)                                     *:
+        cfg.target.toOption.map(_.raArc.tag)                                    *:
+        cfg.target.toOption.flatMap(Region.raArcStart.getOption)                *:
+        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)                  *:
+        cfg.target.toOption.map(_.decArc.tag)                                   *:
+        cfg.target.toOption.flatMap(Region.decArcStart.getOption)               *:
+        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)                 *:
+        cfg.observingMode.tpe                                                   *:
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)
+          .orElse(cfg.observingMode.flamingos2Mos.map(_.disperser))             *:
+        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosNorthMos.map(_.grating))                *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosSouthMos.map(_.grating))                *:
+        cfg.observingMode.gnirsLongSlit.map(_.grating)                          *:
+        cfg.observingMode.gnirsLongSlit.map(_.camera)                           *:
+        cfg.observingMode.gnirsLongSlit.map(_.prism)                            *:
+        cfg.observingMode.visitor.map(_.radius)                                 *:
+        cfg.observingMode.gnirsIfu.map(_.grating)                               *:
+        cfg.observingMode.gnirsIfu.map(_.fpu)                                   *:
         EmptyTuple
       }
 
@@ -1383,6 +1429,11 @@ object ConfigurationService {
                   case (ObservingModeType.Flamingos2LongSlit, Some(d), _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Flamingos2LongSlit(d))
 
+                  // MOS reuses the long slit disperser column; the mode type
+                  // is what discriminates the two (see V1262).
+                  case (ObservingModeType.Flamingos2Mos, Some(d), _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Mos(d))
+
                   case (ObservingModeType.GmosNorthImaging, _, Some(fs), _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GmosNorthImaging(fs.toList))
 
@@ -1470,33 +1521,37 @@ object ConfigurationService {
 
           }
       ).contramap[(CreateConfigurationRequestInput, Configuration)] { (input, cfg) =>
-        input.oid                                                 *:
-        input.SET.justification                                   *:
-        cfg.conditions.cloudExtinction                            *:
-        cfg.conditions.imageQuality                               *:
-        cfg.conditions.skyBackground                              *:
-        cfg.conditions.waterVapor                                 *:
-        cfg.target.left.toOption.map(_.ra)                        *:
-        cfg.target.left.toOption.map(_.dec)                       *:
-        cfg.target.toOption.map(_.raArc.tag)                      *:
-        cfg.target.toOption.flatMap(Region.raArcStart.getOption)  *:
-        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)    *:
-        cfg.target.toOption.map(_.decArc.tag)                     *:
-        cfg.target.toOption.flatMap(Region.decArcStart.getOption) *:
-        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)   *:
-        cfg.observingMode.tpe                                     *:
-        cfg.observingMode.flamingos2LongSlit.map(_.disperser)     *:
+        input.oid                                                               *:
+        input.SET.justification                                                 *:
+        cfg.conditions.cloudExtinction                                          *:
+        cfg.conditions.imageQuality                                             *:
+        cfg.conditions.skyBackground                                            *:
+        cfg.conditions.waterVapor                                               *:
+        cfg.target.left.toOption.map(_.ra)                                      *:
+        cfg.target.left.toOption.map(_.dec)                                     *:
+        cfg.target.toOption.map(_.raArc.tag)                                    *:
+        cfg.target.toOption.flatMap(Region.raArcStart.getOption)                *:
+        cfg.target.toOption.flatMap(Region.raArcEnd.getOption)                  *:
+        cfg.target.toOption.map(_.decArc.tag)                                   *:
+        cfg.target.toOption.flatMap(Region.decArcStart.getOption)               *:
+        cfg.target.toOption.flatMap(Region.decArcEnd.getOption)                 *:
+        cfg.observingMode.tpe                                                   *:
+        // MOS shares the long slit disperser column (see V1262).
+        cfg.observingMode.flamingos2LongSlit.map(_.disperser)
+          .orElse(cfg.observingMode.flamingos2Mos.map(_.disperser))             *:
         cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         // MOS shares the long slit grating column (see V1235).
-        cfg.observingMode.gmosNorthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosNorthMos.map(_.grating)) *:
-        cfg.observingMode.gmosSouthLongSlit.map(_.grating).orElse(cfg.observingMode.gmosSouthMos.map(_.grating)) *:
-        cfg.observingMode.gnirsLongSlit.map(_.grating)            *:
-        cfg.observingMode.gnirsLongSlit.map(_.camera)             *:
-        cfg.observingMode.gnirsLongSlit.map(_.prism)              *:
-        cfg.observingMode.visitor.map(_.radius)                   *:
-        cfg.observingMode.gnirsIfu.map(_.grating)                 *:
-        cfg.observingMode.gnirsIfu.map(_.fpu)                     *:
+        cfg.observingMode.gmosNorthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosNorthMos.map(_.grating))                *:
+        cfg.observingMode.gmosSouthLongSlit.map(_.grating)
+          .orElse(cfg.observingMode.gmosSouthMos.map(_.grating))                *:
+        cfg.observingMode.gnirsLongSlit.map(_.grating)                          *:
+        cfg.observingMode.gnirsLongSlit.map(_.camera)                           *:
+        cfg.observingMode.gnirsLongSlit.map(_.prism)                            *:
+        cfg.observingMode.visitor.map(_.radius)                                 *:
+        cfg.observingMode.gnirsIfu.map(_.grating)                               *:
+        cfg.observingMode.gnirsIfu.map(_.fpu)                                   *:
         EmptyTuple
       }
 
@@ -1507,6 +1562,21 @@ object ConfigurationService {
         where c_program_id = $program_id
         returning c_configuration_request_id
       """.query(configuration_request_id)
+
+    /** AppliedFragment yielding the ids of configuration requests whose target
+     *  reference coordinates lie within `distance` of `center`; see
+     *  `ConeSearch.candidates` for the query shape. */
+    def coneCandidates(user: User, cone: Cone, max: Int): AppliedFragment =
+      ConeSearch.candidates(
+        relation        = "v_configuration_request",
+        idColumn        = "c_configuration_request_id",
+        raColumn        = "c_reference_ra",
+        decColumn       = "c_reference_dec",
+        programIdColumn = "v_configuration_request.c_program_id",
+        user            = user,
+        cone            = cone,
+        max             = max
+      )
 
     // applied fragment yielding a stream of ConfigurationRequest.Id
     def updateRequests(SET: ConfigurationRequestPropertiesInput.Update, which: AppliedFragment): AppliedFragment =

@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import lucuma.core.data.Zipper
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.TotalSN
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.util.Enumerated
@@ -19,6 +20,7 @@ import lucuma.odb.data.ItcScience.GhostIfu
 import lucuma.odb.data.ItcScience.GmosNorthImaging
 import lucuma.odb.data.ItcScience.GmosSouthImaging
 import lucuma.odb.data.ItcScience.GnirsImaging
+import lucuma.odb.data.ItcScience.GnirsSpectroscopy
 import lucuma.odb.data.ItcScience.Spectroscopy
 import lucuma.odb.data.ObservationValidationMap
 
@@ -36,9 +38,12 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
         val msg = f"Total S/N ${extra.foldMap(s => s"($s) ")} is ${sn.value.toBigDecimal}%4.3f (min. ${MinRecommended.value.toBigDecimal}%4.3f recommended)"
         ObservationValidationMap.singleton(ObservationValidation.genericWaning(msg))
 
-  def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(using e: Enumerated[A]): ObservationValidationMap =
+  def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(f: A => Option[String]): ObservationValidationMap =
     map.toNel.foldMap: (a, z) =>
-      warningsForZipper(z, e.tag(a).some)
+      warningsForZipper(z, f(a))
+
+  def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(using e: Enumerated[A]): ObservationValidationMap =
+    warningsForMap(map)(e.tag(_).some)
 
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
     itcFor(info.oid).foldMap: itc =>
@@ -49,4 +54,5 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
         case GmosSouthImaging(science)  => warningsForMap(science)
         case GnirsImaging(science)      => warningsForMap(science)
         case Spectroscopy(science)      => warningsForZipper(science)
+        case GnirsSpectroscopy(science) => warningsForMap(science) { w => f"${Wavelength.decimalNanometers.reverseGet(w)}%4.3f nm".some }
  

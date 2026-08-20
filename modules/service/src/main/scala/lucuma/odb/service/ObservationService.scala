@@ -16,14 +16,13 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.ExecutionRequirement
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapability
-import lucuma.core.enums.TooActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -43,8 +42,10 @@ import lucuma.core.model.ObservationReference
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.Cone
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
@@ -92,6 +93,11 @@ sealed trait ObservationService[F[_]] {
   def selectProgram(
     oid: Observation.Id
   )(using Transaction[F]): F[Result[Program.Id]]
+
+  /** Selects the ids of observations whose stored J2000 base position lies
+   *  within `cone` (exact great-circle match on angular distance).
+   */
+  def coneCandidates(cone: Cone, max: Int = ConeSearch.MaxCandidates): F[Result[List[Observation.Id]]]
 
   def createObservation(
     input: AccessControl.CheckedWithId[ObservationPropertiesInput.Create, Program.Id],
@@ -234,6 +240,14 @@ object ObservationService {
       )(using Transaction[F]): F[Result[Program.Id]] =
         session.option(Statements.selectPid)(oid).map: p =>
           p.fold(OdbError.InvalidObservation(oid, s"Program for observation $oid not found.".some).asFailure)(_.success)
+
+      override def coneCandidates(cone: Cone, max: Int): F[Result[List[Observation.Id]]] =
+        val af = Statements.coneCandidates(user, cone, max)
+        session.prepareR(af.fragment.query(observation_id)).use: pq =>
+          pq.stream(af.argument, 1024).compile.toList.map: ids =>
+            if ids.sizeIs > max then
+              OdbError.InvalidArgument(s"targetCoordinates matches more than $max observations; narrow the cone.".some).asFailure
+            else Result(ids)
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
@@ -737,6 +751,20 @@ object ObservationService {
          WHERE c_observation_id = $observation_id
       """.query(program_id)
 
+    /** AppliedFragment yielding the ids of observations whose stored J2000
+     *  base position lies within `distance` of `center` */
+    def coneCandidates(user: User, cone: Cone, max: Int): AppliedFragment =
+      ConeSearch.candidates(
+        relation        = "t_obscalc",
+        idColumn        = "c_observation_id",
+        raColumn        = "c_j2000_base_ra",
+        decColumn       = "c_j2000_base_dec",
+        programIdColumn = "t_obscalc.c_program_id",
+        user            = user,
+        cone            = cone,
+        max             = max
+      )
+
     def insertObservation(
       programId: Program.Id,
       SET:       ObservationPropertiesInput.Create,
@@ -762,8 +790,7 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           calibrationRole,
-          SET.scheduling.flatMap(_.tooActivation).getOrElse(TooActivation.None),
-          SET.scheduling.flatMap(_.explicitExecutionRequirement.toOption)
+          SET.scheduling.flatMap(_.schedulingMode).getOrElse(SchedulingMode.Unconstrained)
         )
       }
 
@@ -785,8 +812,7 @@ object ObservationService {
       useBlindOffset:      Boolean,
       blindOffsetType:     BlindOffsetType,
       calibrationRole:     Option[CalibrationRole],
-      tooActivation:       TooActivation,
-      executionRequirement: Option[ExecutionRequirement]
+      schedulingMode:      SchedulingMode
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -831,8 +857,7 @@ object ObservationService {
            useBlindOffset                                                                                                         ,
            blindOffsetType                                                                                                        ,
            calibrationRole                                                                                                        ,
-           tooActivation                                                                                                          ,
-           executionRequirement
+           schedulingMode
         )
       }
 
@@ -879,8 +904,7 @@ object ObservationService {
       Boolean                          ,
       BlindOffsetType                  ,
       Option[CalibrationRole]          ,
-      TooActivation                    ,
-      Option[ExecutionRequirement]
+      SchedulingMode
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -918,8 +942,7 @@ object ObservationService {
           c_use_blind_offset,
           c_blind_offset_type,
           c_calibration_role,
-          c_too_activation,
-          c_execution_requirement
+          c_scheduling_mode
         )
         SELECT
           $program_id,
@@ -956,8 +979,7 @@ object ObservationService {
           $bool,
           $blind_offset_type,
           ${calibration_role.opt},
-          $too_activation,
-          ${execution_requirement.opt}
+          $scheduling_mode
       """
 
     def selectObservingModes(
@@ -1107,8 +1129,7 @@ object ObservationService {
       val upScienceBand       = sql"c_science_band = ${science_band.opt}"
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
-      val upExecutionReq      = sql"c_execution_requirement = ${execution_requirement.opt}"
-      val upTooActivation     = sql"c_too_activation = $too_activation"
+      val upSchedulingMode    = sql"c_scheduling_mode = $scheduling_mode"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1117,8 +1138,7 @@ object ObservationService {
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
-          SET.scheduling.fold(Option(none[ExecutionRequirement]), none, _.explicitExecutionRequirement.foldPresent(identity)).map(upExecutionReq),
-          SET.scheduling.fold(TooActivation.None.some, none, _.tooActivation).map(upTooActivation)
+          SET.scheduling.fold(SchedulingMode.Unconstrained.some, none, _.schedulingMode).map(upSchedulingMode)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1240,8 +1260,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
-          c_too_activation,
-          c_execution_requirement
+          c_scheduling_mode
         )
         SELECT
           c_program_id,
@@ -1278,8 +1297,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
-          c_too_activation,
-          c_execution_requirement
+          c_scheduling_mode
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id

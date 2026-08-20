@@ -139,6 +139,24 @@ When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in 
 
 ## GraphQL Schema Pitfalls (Grackle)
 
+**The schema is compiled in, not read at runtime.** `SchemaStitcher.load` (`OdbMapping.scala`) is an **inline macro**: `SchemaStitcherMacros.fromResources` reads `OdbSchema.graphql` at *compile time* and bakes the parsed schema into `OdbMapping`'s bytecode. Editing `OdbSchema.graphql` alone therefore changes nothing at runtime — the service module must recompile. Zinc hashes file content rather than timestamps, so `touch OdbMapping.scala` does **not** force it either. Deleting the compiler's products for that one file is the cheapest fix — zinc recompiles a source whose class files are missing:
+
+```bash
+rm -f modules/service/target/scala-3.8.4/classes/lucuma/odb/graphql/OdbMapping*.class
+```
+
+Otherwise make a real edit to `OdbMapping.scala`, or `sbt service/clean` and pay for a full module rebuild. To check whether you are affected, compare timestamps: if `OdbMapping.class` is older than `OdbSchema.graphql`, the running schema is stale.
+
+The failure mode is silent and confusing: the server keeps serving the *old* schema, so a newly optional input field is still reported `NON_NULL` by introspection and mutations are rejected against the previous shape, while the `.graphql` on disk (and on the classpath — `getResource` will point at the updated file) plainly shows the change. Schema-only edits are the dangerous case; edits accompanied by Scala changes usually recompile `OdbMapping` as a side effect and appear to work.
+
+To confirm what the server actually has, introspect it rather than reading the file:
+
+```graphql
+query { __type(name: "OpportunityInput") { inputFields { name type { kind name ofType { kind name } } } } }
+```
+
+**GraphQL cannot express "optional but not nullable".** An input field is either `T!` (required) or `T` (optional *and* nullable). When a field may be omitted but must never be null — typically because absence means "leave it alone" and the value is constitutive, so there is no state for null to denote — declare it `T` in the schema and enforce it in the binding with `Matcher.NonNullable`, which rejects `NullValue` and maps `AbsentValue` to `None`. `OpportunityInput.region` works this way (contrast its `resolution`, which is genuinely `Nullable` because "unresolved" is a real state). When one input type serves both Create and Edit, the create binding must then enforce presence itself, since the schema no longer does.
+
 Grackle validates all type references at startup during schema introspection. A type referenced in the schema but not defined causes a `scala.MatchError` with the type name. The service will start but schema fetch will fail.
 
 **How to debug MatchErrors:**
@@ -225,6 +243,21 @@ All mode tables (`t_gmos_north_long_slit`, `t_flamingos_2_long_slit`, `t_igrins_
 - Computed/derived fields (from Scala logic) use `CursorField`.
 - JSON-typed columns (wavelengths, angles stored as pm/µas) require an implicit `Encoder`/`Decoder` in scope. Import the right given instance, e.g.: `import lucuma.odb.json.wavelength.query.given`.
 - Every type used in the schema (including input types) must either have a registered mapping or be a scalar/enum already known to Grackle.
+
+### Column budget
+
+Grackle compiles a whole GraphQL selection into a single SQL statement whose target list is capped
+at 1664 entries by Postgres, and it hoists every column once per usage path and per object level
+with no deduplication, so wide selections can hit the cap. Two rules keep mappings cheap:
+
+- **Never `Join` a view to itself** to map a sub-object whose fields live on the same row (nullable
+  variants discriminated by a `c_type`-style column). Use a plain `SqlObject("foo")` with the child
+  mapping keyed on a synthetic `CASE WHEN ... THEN id END` view column — null key ⇒ null object.
+  Each `Join` makes grackle emit a fresh aliased copy of the view per path.
+- **Give nested singleton objects exactly one `key = true` column.** Every key column is re-selected
+  at every object level of every path that reaches it; composite keys on wrapper objects (offsets,
+  angles, wavelengths) multiply fast. Grackle validation requires at least one key, so one it is.
+  Composite keys are only for list-element mappings, where they group rows.
 
 ## Skunk Codec Patterns
 

@@ -299,6 +299,8 @@ object GuideService {
           (Site.GN, c.mode, Wavelength.Min)
         case mode: flamingos2.longslit.Config                 =>
           (Site.GS, ObservingModeType.Flamingos2LongSlit, mode.filter.wavelength)
+        case mode: flamingos2.mos.Config                      =>
+          (Site.GS, ObservingModeType.Flamingos2Mos, mode.filter.wavelength)
         case flamingos2.imaging.Config(filters = filters) =>
           (Site.GS, ObservingModeType.Flamingos2Imaging, filters.map(_.filter.wavelength).maximum)
         case mode: ghost.ifu.Config                           =>
@@ -361,6 +363,12 @@ object GuideService {
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
           case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2)                                    =>
             AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
+          case (_: flamingos2.mos.Config, GuideProbe.Flamingos2OIWFS)                                       =>
+            AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).some
+          case (_: flamingos2.mos.Config, GuideProbe.PWFS1)                                                 =>
+            AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS1.some
+          case (_: flamingos2.mos.Config, GuideProbe.PWFS2)                                                 =>
+            AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS2.some
           case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.GmosOIWFS)  =>
             AgsParams.GmosImaging(PortDisposition.Side).some
           case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS1)      =>

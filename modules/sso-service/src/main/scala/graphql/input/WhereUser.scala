@@ -18,7 +18,7 @@ object WhereUser:
   def binding(path: Path): Matcher[Predicate] =
     val WhereUserId  = WhereOrder.binding[User.Id](path / "id", UserIdBinding)
     val WhereType    = WhereEq.binding[UserType](path / "type", UserTypeBinding)
-    val WhereOrcidId = WhereOptionString.binding(path / "orcidId")
+    val WhereOrcidId = WhereOptionString.bindingAs(path / "orcidId", OrcidIdBinding)
     val WhereProfile = WhereUserProfile.binding(path / "profile")
 
     lazy val WhereUserBinding = binding(path)

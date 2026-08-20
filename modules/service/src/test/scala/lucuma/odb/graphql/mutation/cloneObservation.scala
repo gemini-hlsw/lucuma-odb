@@ -51,9 +51,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       }
       schedulingConstraints {
         tooActivation
-        executionRequirement
-        defaultExecutionRequirement
-        explicitExecutionRequirement
+        schedulingMode
         isSplittable
         $TimingWindowsGraph
       }
@@ -320,6 +318,55 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
             }
           }
         }
+        flamingos2Mos {
+          disperser
+          filter
+          customMask {
+            slitWidth
+            attachmentId
+          }
+          exposureTimeMode {
+            signalToNoise {
+              value
+              at { nanometers }
+            }
+            timeAndCount {
+              time { seconds }
+              count
+              at { nanometers }
+            }
+          }
+          explicitReadMode
+          explicitReads
+          decker
+          defaultDecker
+          explicitDecker
+          readoutMode
+          defaultReadoutMode
+          explicitReadoutMode
+          telescopeConfigs {
+            offsetMode
+            alongSlit { q { arcseconds } guiding }
+            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+          }
+          defaultTelescopeConfigs {
+            offsetMode
+            alongSlit { q { arcseconds } guiding }
+            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+          }
+          explicitTelescopeConfigs {
+            offsetMode
+            alongSlit { q { arcseconds } guiding }
+            toSky { offset { p { arcseconds } q { arcseconds } } guiding }
+          }
+          telluricType {
+            tag
+            starTypes
+          }
+          initialDisperser
+          initialFilter
+          initialSlitWidth
+        }
         igrins2LongSlit {
           telescopeConfigs {
             offsetMode
@@ -396,9 +443,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     {
       schedulingConstraints {
         tooActivation
-        executionRequirement
-        defaultExecutionRequirement
-        explicitExecutionRequirement
+        schedulingMode
         isSplittable
       }
     }
@@ -434,23 +479,21 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
       """
     ).map(_.hcursor.downFields("cloneObservation", "newObservation", "schedulingConstraints").require[Json])
 
-  test("clone copies tooActivation and the explicit execution requirement") {
+  test("clone copies the scheduling mode") {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          // RAPID raises the default to UNINTERRUPTIBLE, so the explicit value
-          // (NO_SPLITTING) and the effective value differ -- which means a clone
-          // that merely recomputed defaults could not produce this result.
-          _ <- setScheduling(oid, "tooActivation: RAPID, explicitExecutionRequirement: NO_SPLITTING")
+          // The mode differs from its default, so a clone that recomputed it
+          // rather than copying could not produce this result.  The activation
+          // is derived and so is recomputed by definition.
+          _ <- setScheduling(oid, "schedulingMode: UNINTERRUPTIBLE")
           c <- cloneWith(oid)
         yield assertEquals(
           c,
           json"""
             {
-              "tooActivation": "RAPID",
-              "executionRequirement": "UNINTERRUPTIBLE",
-              "defaultExecutionRequirement": "UNINTERRUPTIBLE",
-              "explicitExecutionRequirement": "NO_SPLITTING",
+              "tooActivation": "NONE",
+              "schedulingMode": "UNINTERRUPTIBLE",
               "isSplittable": false
             }
           """
@@ -459,20 +502,18 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     }
   }
 
-  test("clone preserves an unset explicit execution requirement") {
+  test("clone copies a scheduling mode left at its default") {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          _ <- setScheduling(oid, "tooActivation: STANDARD")
+          _ <- setScheduling(oid, "schedulingMode: UNCONSTRAINED")
           c <- cloneWith(oid)
         yield assertEquals(
           c,
           json"""
             {
-              "tooActivation": "STANDARD",
-              "executionRequirement": "UNCONSTRAINED",
-              "defaultExecutionRequirement": "UNCONSTRAINED",
-              "explicitExecutionRequirement": null,
+              "tooActivation": "NONE",
+              "schedulingMode": "UNCONSTRAINED",
               "isSplittable": true
             }
           """
@@ -485,16 +526,14 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          _ <- setScheduling(oid, "tooActivation: INTERRUPTING, explicitExecutionRequirement: UNINTERRUPTIBLE")
-          c <- cloneWith(oid, "tooActivation: STANDARD, explicitExecutionRequirement: NO_SPLITTING".some)
+          _ <- setScheduling(oid, "schedulingMode: INTERRUPTING")
+          c <- cloneWith(oid, "schedulingMode: NO_SPLITTING".some)
         yield assertEquals(
           c,
           json"""
             {
-              "tooActivation": "STANDARD",
-              "executionRequirement": "NO_SPLITTING",
-              "defaultExecutionRequirement": "UNCONSTRAINED",
-              "explicitExecutionRequirement": "NO_SPLITTING",
+              "tooActivation": "NONE",
+              "schedulingMode": "NO_SPLITTING",
               "isSplittable": false
             }
           """
@@ -2686,7 +2725,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
         VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
         RETURNING c_attachment_id
       """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix(".fits")))
+    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix("_ODF.fits").toUpperCase))
 
   private def readMaskColumns(
     table: String,
@@ -2704,7 +2743,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetAs(pi, pid)
-      aid  <- insertMosMaskAttachment(pid, "mask.fits")
+      aid  <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits")
       mode  = s"""
         gmosNorthMos: {
           grating: R831_G5302
@@ -2795,6 +2834,136 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations {
                """.asRight
              )
       cols <- readMaskColumns("t_gmos_south_mos", coid)
+      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+    yield ()
+
+  test("clone F2 MOS observation preserves the mask and overrides"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      aid  <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits")
+      mode  = s"""
+        flamingos2Mos: {
+          disperser: R1200_HK
+          filter: Y
+          customMask: { slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: "$aid" }
+          explicitReadMode: MEDIUM
+          explicitReads: READS_4
+          explicitDecker: LONG_SLIT
+          explicitReadoutMode: ENGINEERING
+          explicitTelescopeConfigs: {
+            toSky: [
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 60.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds: 70.0 } }, guiding: DISABLED },
+              { offset: { p: { arcseconds: 0.0 }, q: { arcseconds:  0.0 } }, guiding: ENABLED }
+            ]
+          }
+        }
+      """
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), mode)
+      coid <- cloneObservationAs(pi, oid)
+      _    <- expect(
+               user  = pi,
+               query = s"""
+                 query {
+                   clone: observation(observationId: "$coid") {
+                     observingMode {
+                       flamingos2Mos {
+                         disperser
+                         filter
+                         customMask { slitWidth attachmentId }
+                         explicitReadMode
+                         explicitReads
+                         decker
+                         readoutMode
+                         explicitTelescopeConfigs {
+                           offsetMode
+                           toSky { offset { q { arcseconds } } guiding }
+                         }
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                 {
+                   "clone": {
+                     "observingMode": {
+                       "flamingos2Mos": {
+                         "disperser": "R1200_HK",
+                         "filter": "Y",
+                         "customMask": {
+                           "slitWidth": "CUSTOM_WIDTH_2_PIX",
+                           "attachmentId": ${aid.asJson}
+                         },
+                         "explicitReadMode": "MEDIUM",
+                         "explicitReads": "READS_4",
+                         "decker": "LONG_SLIT",
+                         "readoutMode": "ENGINEERING",
+                         "explicitTelescopeConfigs": {
+                           "offsetMode": "NOD_TO_SKY",
+                           "toSky": [
+                             { "offset": { "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" },
+                             { "offset": { "q": { "arcseconds": 60.000000 } }, "guiding": "DISABLED" },
+                             { "offset": { "q": { "arcseconds": 70.000000 } }, "guiding": "DISABLED" },
+                             { "offset": { "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }
+                           ]
+                         }
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      cols <- readMaskColumns("t_flamingos_2_mos", coid)
+      _    <- IO(assertEquals(cols, (aid.some, AttachmentType.MosMask.some)))
+    yield ()
+
+  test("clone F2 MOS observation with no mask defined keeps the empty mask"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetAs(pi, pid)
+      mode  = s"""
+        flamingos2Mos: {
+          disperser: R1200_HK
+          filter: Y
+          customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+        }
+      """
+      oid  <- createObservationWithModeAs(pi, pid, List(tid), mode)
+      coid <- cloneObservationAs(pi, oid)
+      _    <- expect(
+               user  = pi,
+               query = s"""
+                 query {
+                   clone: observation(observationId: "$coid") {
+                     observingMode {
+                       flamingos2Mos {
+                         customMask { slitWidth attachmentId }
+                         defaultDecker
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                 {
+                   "clone": {
+                     "observingMode": {
+                       "flamingos2Mos": {
+                         "customMask": {
+                           "slitWidth": "CUSTOM_WIDTH_2_PIX",
+                           "attachmentId": null
+                         },
+                         "defaultDecker": "MOS"
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      cols <- readMaskColumns("t_flamingos_2_mos", coid)
       _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
 

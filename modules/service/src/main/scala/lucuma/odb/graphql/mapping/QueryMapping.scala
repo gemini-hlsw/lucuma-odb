@@ -226,7 +226,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   // Elaborators below
 
   private lazy val AsterismGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    val WhereObservationBinding = WhereObservation.binding(AsterismGroupType / "observations" / "matches")
+    val WhereObservationBinding = WhereObservation.binding(AsterismGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "asterismGroup", List(
         ProgramIdBinding.Option("programId", rPid),
@@ -339,7 +339,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
 
   private lazy val Datasets: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    val WhereDatasetBinding = WhereDataset.binding(Path.from(DatasetType))
+    val WhereDatasetBinding = WhereDataset.binding(Path.from(DatasetType), allowCone = true)
     {
       case (QueryType, "datasets", List(
         WhereDatasetBinding.Option("WHERE", rWHERE),
@@ -407,7 +407,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val ConstraintSetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches")
+    val WhereObservationBinding = WhereObservation.binding(ConstraintSetGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "constraintSetGroup", List(
         ProgramIdBinding.Option("programId", rPid),
@@ -541,7 +541,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
 
   private lazy val Observations: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType))
+    val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType), allowCone = true)
     {
       case (QueryType, "observations", List(
         WhereObservationBinding.Option("WHERE", rWHERE),
@@ -574,7 +574,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   }
 
   private lazy val ConfigurationRequests: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(Path.from(ConfigurationRequestType))
+    val WhereConfigurationRequestsBinding = WhereConfigurationRequest.binding(Path.from(ConfigurationRequestType), allowCone = true)
     {
       case (QueryType, "configurationRequests", List(
         WhereConfigurationRequestsBinding.Option("WHERE", rWHERE),
@@ -602,7 +602,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     }
 
   private lazy val ObservingModeGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    val WhereObservationBinding = WhereObservation.binding(ObservingModeGroupType / "observations" / "matches")
+    val WhereObservationBinding = WhereObservation.binding(ObservingModeGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "observingModeGroup", List(
         ProgramIdBinding.Option("programId", rPid),
@@ -904,7 +904,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       }
 
   private lazy val TargetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
-    val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations" / "matches")
+    val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations" / "matches", allowCone = false)
     {
       case (QueryType, "targetGroup", List(
         ProgramIdBinding.Option("programId", rPid),

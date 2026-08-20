@@ -10,6 +10,7 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.GeminiCallForProposalsType
@@ -1784,6 +1785,91 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         user     = staff,
         query    = setCeiling(pid, "INTERRUPTING"),
         expected = ceilingSet("INTERRUPTING").asRight
+      )
+    }
+  }
+
+  private def setTimeRequest(pid: Program.Id, value: String): String =
+    s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: { explicitTimeRequest: $value }
+          }
+        ) {
+          proposal { explicitTimeRequest { hours } }
+        }
+      }
+    """
+
+  private def timeRequestSet(value: Json): Json =
+    json"""
+      {
+        "updateProposal": {
+          "proposal": { "explicitTimeRequest": $value }
+        }
+      }
+    """
+
+  test("✓ set the explicit time request") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      expect(
+        user     = pi,
+        query    = setTimeRequest(pid, "{ hours: 42.0 }"),
+        expected = timeRequestSet(json"""{ "hours": 42.000000 }""").asRight
+      )
+    }
+  }
+
+  test("✓ a null explicit time request returns it to the derived value") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      query(pi, setTimeRequest(pid, "{ hours: 42.0 }")) *>
+      expect(
+        user     = pi,
+        query    = setTimeRequest(pid, "null"),
+        expected = timeRequestSet(Json.Null).asRight
+      )
+    }
+  }
+
+  test("✓ the explicit time request survives a proposal type change") {
+    createProgramAs(pi).flatMap { pid =>
+      addProposal(pi, pid) *>
+      query(pi, setTimeRequest(pid, "{ hours: 42.0 }")) *>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    demoScience: { minPercentTime: 50 }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                explicitTimeRequest { hours }
+                gemini { scienceSubtype }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "explicitTimeRequest": { "hours": 42.000000 },
+                "gemini": { "scienceSubtype": "DEMO_SCIENCE" }
+              }
+            }
+          }
+        """.asRight
       )
     }
   }

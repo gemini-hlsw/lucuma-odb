@@ -59,6 +59,7 @@ schemaspy/out
 
 # vim
 *.swp
+*.swo
 
 setup_api.bash
 .direnv/
@@ -92,4 +93,3 @@ TASK_*.md
 .pi/
 .scratch/
 CONTEXT-MAP.md
-CONTEXT.md
