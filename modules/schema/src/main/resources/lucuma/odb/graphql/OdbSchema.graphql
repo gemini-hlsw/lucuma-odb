@@ -15942,11 +15942,13 @@ is set to the READY workflow state with a resolved opportunity target, and the
 database keeps the two in step, so the status can never disagree with the
 observation.  REQUESTED is the only non-terminal status.
 
-DECLINED, WITHDRAWN and SUPERSEDED are terminal, and for the purpose of
-triggering again all three are equivalent to never having been triggered: setting
+Every other status is terminal.  DECLINED, WITHDRAWN and SUPERSEDED are, for the
+purpose of triggering again, equivalent to never having been triggered: setting
 the observation READY once more produces a new trigger rather than transitioning
 out of a terminal status.  They are kept distinct because they answer different
-questions about what became of the request.
+questions about what became of the request.  ACCEPTED is terminal in a stronger
+sense -- the request was answered -- so a further attempt at the observation is a
+new request rather than a reopening of this one.
 """
 enum TooTriggerStatus {
 
@@ -15954,10 +15956,21 @@ enum TooTriggerStatus {
   Live: the observation is ready to be observed and the observatory has it under
   consideration.  The only non-terminal status, and the only one an outstanding
   request can hold -- at most one trigger per observation is REQUESTED at a time.
-  A trigger stays REQUESTED while its observation executes; that execution has
-  begun is reported by the execution events, not here.
+  A trigger stops being REQUESTED the moment its observation begins executing; see
+  ACCEPTED.
   """
   REQUESTED
+
+  """
+  The observatory acted on the request: recorded when execution begins, at the
+  observation's first observe visit.  This is the answer a request is asking for,
+  and it is not anyone's decision -- there is no mutation for it, and no way to
+  deny a trigger afterwards.  A failed acquisition is a fact about the
+  observation, carried by its visits and their steps, not about the request.
+  Accepting also returns the observation's user state to unset, so an ACCEPTED
+  request is out of reach of withdrawal and supersession.
+  """
+  ACCEPTED
 
   """
   An observer saw the request and chose not to act on it, with a reason in
@@ -16137,7 +16150,8 @@ input WhereOrderTooTriggerId {
 
 """
 Filters on equality or order comparisons of the TooTriggerStatus property.  Order
-follows the lifecycle declaration: REQUESTED < DECLINED < WITHDRAWN < SUPERSEDED,
+follows the lifecycle declaration: REQUESTED < ACCEPTED < DECLINED < WITHDRAWN <
+SUPERSEDED,
 so `GTE: REQUESTED` matches every status.
 """
 input WhereOrderTooTriggerStatus {

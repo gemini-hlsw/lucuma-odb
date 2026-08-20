@@ -262,13 +262,16 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
                           ).asLeft
                         )
       ts             <- allTriggers(oid)
-      (after, _, _)  <- requestedTrigger(oid)
+      ids            <- getTooTriggersAs(pi, oid).map(_.map(_.id))
     yield
       assertEquals(state, ObservationWorkflowState.Ongoing)
-      // The live request survives, at the activation it was made at: a running
-      // observation cannot have its trigger replaced out from under it.
-      assertEquals(ts, List(Requested -> Rapid))
-      assertEquals(after, before)
+      // The request survives at the activation it was made at, and by now it has
+      // been accepted -- execution is what accepts it.  A running observation
+      // cannot have its trigger replaced out from under it, and there is no longer
+      // a live request to replace.
+      assertEquals(ts, List(Accepted -> Rapid))
+      // Still the very same row, accepted rather than superseded by a successor.
+      assertEquals(ids, List(before))
 
   /** Lowers (or raises) the proposal's explicit ceiling, which only staff may do. */
   private def setCeiling(pid: Program.Id, ceiling: String): IO[Unit] =

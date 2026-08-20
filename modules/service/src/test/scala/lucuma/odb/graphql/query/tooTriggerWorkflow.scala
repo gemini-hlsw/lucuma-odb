@@ -11,11 +11,14 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SchedulingMode
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.data.TooTriggerStatus.*
+import lucuma.odb.util.Codecs.observation_id
+import skunk.implicits.*
 
 /**
  * The Target-of-Opportunity trigger, derived from the observation's workflow
@@ -344,3 +347,84 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       _             <- resolveOpportunityTargetAs(pi, tid)
       ts            <- triggers(oid)
     yield assertEquals(ts.map(_._1), List(Withdrawn, Requested))
+
+  // ACCEPTANCE (V1272/V1273).  A request ends in a "yes" when the observatory acts
+  // on it, which the database records at the first non-slew execution event -- the
+  // same boundary v_generator_params uses for not_started -> ongoing, so ACCEPTED
+  // and ONGOING land together.  Nobody sets it; there is no mutation.
+  /** The stored user state, which no query exposes. */
+  private def readyState(oid: Observation.Id): IO[Option[String]] =
+    withSession: session =>
+      session.unique(
+        sql"SELECT c_workflow_user_state::text FROM t_observation WHERE c_observation_id = $observation_id"
+          .query(skunk.codec.text.text.opt)
+      )(oid)
+
+  private def beginExecution(oid: Observation.Id): IO[Unit] =
+    for
+      vid <- recordVisitAs(serviceUser, oid)
+      _   <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+    yield ()
+
+  test("beginning execution accepts the trigger"):
+    for
+      (_, oid, _) <- createTooObservationAs(pi, staff)
+      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      before      <- triggers(oid)
+      _           <- beginExecution(oid)
+      after       <- triggers(oid)
+    yield
+      assertEquals(before, List((Requested, None)))
+      assertEquals(after,  List((Accepted, None)))
+
+  test("an accepted observation is Ongoing"):
+    for
+      (pid, oid, _) <- createTooObservationAs(pi, staff)
+      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _             <- beginExecution(oid)
+      s             <- getWorkflowState(pid, oid)
+    yield assertEquals(s, ObservationWorkflowState.Ongoing)
+
+  // A visit is not execution.  Recording one and going no further leaves the
+  // request live and the observation still asking, so a visit that is abandoned
+  // before any step costs the PI nothing.
+  test("a visit alone does not accept the trigger"):
+    for
+      (pid, oid, _) <- createTooObservationAs(pi, staff)
+      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _             <- recordVisitAs(serviceUser, oid)
+      ts            <- triggers(oid)
+      s             <- getWorkflowState(pid, oid)
+    yield
+      assertEquals(ts, List((Requested, None)))
+      assertEquals(s,  ObservationWorkflowState.Ready)
+
+  // Acceptance deliberately leaves the observation's ready state alone: the state
+  // means the PI asked, and that stays true once the ask has been answered.  What
+  // keeps a spent request from being replaced is the guard in V1275 -- supersession
+  // only replaces a request that actually existed -- rather than the state going
+  // away.  Asserted over a session because no query exposes the stored value, and
+  // the guard itself is unreachable from here: the mutations that would provoke it
+  // are refused once the observation is Ongoing.
+  test("acceptance leaves the observation's ready state alone"):
+    for
+      (_, oid, _) <- createTooObservationAs(pi, staff)
+      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- beginExecution(oid)
+      state       <- readyState(oid)
+      ts          <- triggers(oid)
+    yield
+      assertEquals(state, Some("ready"))
+      assertEquals(ts, List((Accepted, None)))
+
+  // Every later event finds nothing left in 'requested', so acceptance is
+  // idempotent and does not mint a second terminal row.
+  test("later execution events change nothing"):
+    for
+      (_, oid, _) <- createTooObservationAs(pi, staff)
+      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      vid         <- recordVisitAs(serviceUser, oid)
+      _           <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      _           <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Continue)
+      ts          <- triggers(oid)
+    yield assertEquals(ts, List((Accepted, None)))
