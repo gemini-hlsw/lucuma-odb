@@ -23,6 +23,6 @@ object ConditionsProbabilityValidator extends ObservationValidator:
       .map(info.constraintSet.likelihood)
       .filter(p => p.value.value < limit.value.value)
       .foldMap: percent =>
-        val w = ObservationValidation.genericWaning(s"Conditions likelihood is ${percent.toPercent.toInt}%.")
+        val w = ObservationValidation.genericWarning(s"Conditions likelihood is ${percent.toPercent.toInt}%.")
         ObservationValidationMap.singleton(w)
 
