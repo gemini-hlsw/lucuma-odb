@@ -5,12 +5,12 @@ package lucuma.odb.service.workflow
 package validator
 
 import cats.syntax.all.*
+import lucuma.core.enums.Site
+import lucuma.core.math.Declination
 import lucuma.core.math.Wavelength
 import lucuma.core.model.IntCentiPercent
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
-import lucuma.core.math.Declination
-import lucuma.core.enums.Site
 
 object ConditionsProbabilityValidator extends ObservationValidator:
 

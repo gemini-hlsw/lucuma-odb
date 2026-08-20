@@ -11,16 +11,19 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SkyBackground
+import lucuma.core.math.*
+import lucuma.core.math.Wavelength
+import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
-import lucuma.odb.graphql.mutation.UpdateObservationsOps
-import lucuma.core.math.Wavelength
 import lucuma.itc.SignalToNoiseAt
-import lucuma.core.math.*
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
 class observation_workflow_warnings
   extends ExecutionTestSupportForGmos
@@ -85,34 +88,12 @@ class observation_workflow_warnings
   test("conditions probability < 10%") {
 
     def updateConditions(oid: Observation.Id) =
-      updateObservation(
-        user = pi,
-        oid = oid, 
-        update =
-          """
-            constraintSet: {
-              cloudExtinction: POINT_ONE,
-              imageQuality: ONE_POINT_ZERO,
-              skyBackground: DARKEST
-            }
-          """,
-        query = 
-          """
-          observations {
-            id
-          }
-          """, 
-        expected = Right(
-          json"""
-          {
-            "updateObservations": {
-              "observations": [
-                { "id": $oid }
-              ]              
-            }
-          }
-          """
-        )
+      updateObservationConditions(
+        pi,
+        oid,
+        CloudExtinction.Preset.PointOne,
+        ImageQuality.Preset.OnePointZero,
+        SkyBackground.Darkest
       )
 
     val setup: IO[Observation.Id] =

@@ -11,17 +11,17 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.math.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
+import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
-import lucuma.core.math.*
-import lucuma.itc.SignalToNoiseAt
 
 class setObservationWorkflowState
   extends ExecutionTestSupportForGmos
