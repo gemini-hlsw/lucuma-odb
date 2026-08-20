@@ -442,14 +442,24 @@ class setObservationWorkflowState
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
     yield (pid, oid)
 
-  test("[Warnings]    Defined  <-> Inactive, ForReview (pi)"):
+  test("[Warnings]    Defined   <-> Inactive, ForReview (pi)"):
     createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
       assertIO(queryObservationWorkflowState(oid), Defined) >>
       testTransitionsAs(pi, pid, oid, Defined, Inactive, ForReview)
 
-  test("[Warnings]    Defined  <-> Inactive, ForReview, Ready (staff)"):
+  test("[Warnings]    Defined   <-> Inactive, ForReview, Ready (staff)"):
     createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
       assertIO(queryObservationWorkflowState(oid), Defined) >>
       testTransitionsAs(staff, pid, oid, Defined, Inactive, ForReview, Ready)
+
+  test("[Warnings]    ForReview <-> Inactive, Defined (pi)"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      assertIO(setObservationWorkflowState(pi, oid, ForReview), ForReview) >>
+      testTransitionsAs(pi, pid, oid, ForReview, Inactive, Defined)
+
+  test("[Warnings]    ForReview <-> Inactive, Defined, Ready (staff)"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      assertIO(setObservationWorkflowState(pi, oid, ForReview), ForReview) >>
+      testTransitionsAs(staff, pid, oid, ForReview, Inactive, Defined, Ready)
 
 }
