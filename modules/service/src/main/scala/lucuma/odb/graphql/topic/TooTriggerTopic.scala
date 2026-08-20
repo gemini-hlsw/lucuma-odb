@@ -7,6 +7,7 @@ import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
 import fs2.concurrent.Topic
+import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -29,6 +30,11 @@ object TooTriggerTopic:
    * @param observationId the observation the trigger is for
    * @param programId     the observation's program's id
    * @param status        the trigger's status after the edit
+   * @param activation    the ToO activation this request was made at.  Immutable,
+   *                      so this is both the activation at the instant of the
+   *                      event and the one the row will carry forever -- a
+   *                      supersession reports the predecessor's own activation on
+   *                      its closing event, not the successor's.
    * @param editType      creation vs update
    * @param users         users associated with the program (audience for scoping)
    */
@@ -37,23 +43,25 @@ object TooTriggerTopic:
     observationId: Observation.Id,
     programId:     Program.Id,
     status:        TooTriggerStatus,
+    activation:    TooActivation,
     editType:      EditType,
     users:         List[User.Id]
   ) extends TopicElement
 
   private val topic =
-    OdbTopic.define[(TooTrigger.Id, Observation.Id, Program.Id, TooTriggerStatus, EditType), Element](
+    OdbTopic.define[(TooTrigger.Id, Observation.Id, Program.Id, TooTriggerStatus, TooActivation, EditType), Element](
       "TooTrigger",
       id"ch_too_trigger_edit",
       _._3, // program id -> audience is anyone who can read the program
-      (u, users) => Element(u._1, u._2, u._3, u._4, u._5, users)
+      (u, users) => Element(u._1, u._2, u._3, u._4, u._5, u._6, users)
     ) {
-      case Array(_tid, _oid, _pid, _status, _tg_op) =>
+      case Array(_tid, _oid, _pid, _status, _activation, _tg_op) =>
         (
           TooTrigger.Id.parse(_tid),
           Gid[Observation.Id].fromString.getOption(_oid),
           Gid[Program.Id].fromString.getOption(_pid),
           Enumerated[TooTriggerStatus].fromTag(_status),
+          Enumerated[TooActivation].fromTag(_activation),
           EditType.fromTgOp(_tg_op)
         ).tupled
     }

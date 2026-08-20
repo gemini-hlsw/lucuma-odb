@@ -23,9 +23,13 @@ trait ChronTooTriggerUpdateTable[F[_]] extends BaseMapping[F]:
       val ProgramId        = col("c_mod_program_id",        bool)
       val Status           = col("c_mod_status",            bool)
       val ResolutionReason = col("c_mod_resolution_reason", bool)
+      val TooActivation    = col("c_mod_too_activation",    bool)
+      val Supersedes       = col("c_mod_supersedes",        bool)
 
     object New:
       val ObservationId    = col("c_new_observation_id",    observation_id.opt)
       val ProgramId        = col("c_new_program_id",        program_id.opt)
       val Status           = col("c_new_status",            too_trigger_status.opt)
       val ResolutionReason = col("c_new_resolution_reason", text_nonempty.opt)
+      val TooActivation    = col("c_new_too_activation",    too_activation.opt)
+      val Supersedes       = col("c_new_supersedes",        too_trigger_id.opt)

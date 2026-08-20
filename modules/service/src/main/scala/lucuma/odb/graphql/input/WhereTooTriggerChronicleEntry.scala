@@ -26,6 +26,8 @@ object WhereTooTriggerChronicleEntry:
     val WhereModProgramId        = WhereBoolean.binding(path / "modProgramId", BooleanBinding)
     val WhereModStatus           = WhereBoolean.binding(path / "modStatus", BooleanBinding)
     val WhereModResolutionReason = WhereBoolean.binding(path / "modResolutionReason", BooleanBinding)
+    val WhereModTooActivation    = WhereBoolean.binding(path / "modTooActivation", BooleanBinding)
+    val WhereModSupersedes       = WhereBoolean.binding(path / "modSupersedes", BooleanBinding)
 
     lazy val WhereTooTriggerChronicleEntryBinding = binding(path)
 
@@ -44,10 +46,12 @@ object WhereTooTriggerChronicleEntry:
         WhereModObservationId.Option("modObservationId", rModObservationId),
         WhereModProgramId.Option("modProgramId", rModProgramId),
         WhereModStatus.Option("modStatus", rModStatus),
-        WhereModResolutionReason.Option("modResolutionReason", rModResolutionReason)
+        WhereModResolutionReason.Option("modResolutionReason", rModResolutionReason),
+        WhereModTooActivation.Option("modTooActivation", rModTooActivation),
+        WhereModSupersedes.Option("modSupersedes", rModSupersedes)
       ) =>
-        (rAND, rOR, rNOT, rId, rUser, rOp, rTimestamp, rTooTriggerId, rModObservationId, rModProgramId, rModStatus, rModResolutionReason).parMapN:
-          (AND, OR, NOT, id, user, op, timestamp, tooTriggerId, modObservationId, modProgramId, modStatus, modResolutionReason) =>
+        (rAND, rOR, rNOT, rId, rUser, rOp, rTimestamp, rTooTriggerId, rModObservationId, rModProgramId, rModStatus, rModResolutionReason, rModTooActivation, rModSupersedes).parMapN:
+          (AND, OR, NOT, id, user, op, timestamp, tooTriggerId, modObservationId, modProgramId, modStatus, modResolutionReason, modTooActivation, modSupersedes) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -60,5 +64,7 @@ object WhereTooTriggerChronicleEntry:
               modObservationId,
               modProgramId,
               modStatus,
-              modResolutionReason
+              modResolutionReason,
+              modTooActivation,
+              modSupersedes
             ).flatten)

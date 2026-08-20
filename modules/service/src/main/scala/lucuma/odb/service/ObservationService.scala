@@ -509,6 +509,34 @@ object ObservationService {
                       .combineAllOption
                       .getOrElse(Result.unit)
 
+            // Checks that no observation is left deriving a ToO activation above
+            // the ceiling its proposal was granted.  Runs after the update, like
+            // the unsplittable check above, so it reads the activation the edit
+            // actually produced rather than predicting it; a failure rolls the
+            // transaction back.
+            //
+            // Only the explicit ceiling is enforced.  The derived default is the
+            // maximum activation among the program's own observations, so nothing
+            // can exceed it and a check against it would reject a PI raising the
+            // first observation's mode before the proposal is even submitted.
+            val validateTooActivationCeiling: ResultT[F, Unit] =
+              ResultT:
+                val af = Statements.validateTooActivationCeiling(which)
+                session
+                  .prepareR(af.fragment.query(observation_id *: too_activation *: too_activation))
+                  .use: p =>
+                    p.stream(af.argument, chunkSize = 1024)
+                     .compile
+                     .toList
+                  .map: problems =>
+                    problems
+                      .map: (oid, activation, ceiling) =>
+                        OdbError.InvalidArgument(
+                          s"Cannot set the scheduling mode for observation $oid: Target of Opportunity activation ${activation.tag.toScreamingSnakeCase} exceeds the maximum ${ceiling.tag.toScreamingSnakeCase} allowed by the proposal.".some
+                        ).asFailure.void
+                      .combineAllOption
+                      .getOrElse(Result.unit)
+
             // Observations in system groups (telluric, etc.) cannot be moved
             // by non-service callers.
             // doing so may introduce orphan groups, at least for tellurics.
@@ -557,6 +585,13 @@ object ObservationService {
                 // then ensure that any existing materialized sequence is compatible.
                 isSplittable = !SET.scheduling.toOption.exists(_.makesUnsplittable)
                 _ <- if isSplittable then ResultT.unit else validateUnsplittableStoredSequence
+
+                // A mode edit is the one path that can raise an observation over
+                // its program's ceiling in a single step, and the one worth
+                // refusing outright: allowing it would put a live request in front
+                // of an observer at an activation the TAC never granted.
+                setsMode = SET.scheduling.toOption.flatMap(_.schedulingMode).isDefined
+                _ <- if setsMode then validateTooActivationCeiling else ResultT.unit
 
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.scheduling.flatMap(_.timingWindows).foldPresent(_.orEmpty))))
@@ -1374,6 +1409,24 @@ object ObservationService {
           FROM v_observation
          WHERE c_observation_id = $observation_id
       """.query(bool)
+
+    // Observations whose derived ToO activation exceeds their proposal's explicit
+    // ceiling.  No join to the proposal's derived default is needed, and none to
+    // the asterism: c_too_activation is a generated column on t_observation.
+    def validateTooActivationCeiling(
+      which: AppliedFragment
+    ): AppliedFragment =
+      void"""
+        SELECT
+          o.c_observation_id,
+          o.c_too_activation,
+          p.c_too_activation
+        FROM t_observation o
+        JOIN t_proposal p ON p.c_program_id = o.c_program_id
+        WHERE o.c_observation_id IN (""" |+| which |+| void""")
+          AND p.c_too_activation IS NOT NULL
+          AND o.c_too_activation > p.c_too_activation
+      """
 
     def validateUnsplittableSequence(
       which: AppliedFragment,

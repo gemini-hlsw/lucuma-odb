@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.either.*
 import cats.syntax.option.*
 import io.circe.syntax.*
 import lucuma.core.enums.GeminiCallForProposalsType.RegularSemester
@@ -75,6 +76,46 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
         }
       """
     ).void
+
+  /** Sets the explicit ceiling, which after acceptance is what enforcement uses. */
+  private def setExplicitCeiling(pid: Program.Id, ceiling: String): IO[Unit] =
+    query(
+      staff,
+      s"""
+        mutation {
+          updateProposal(input: {
+            programId: "$pid"
+            SET: { gemini: { queue: { explicitTooActivationCeiling: $ceiling } } }
+          }) {
+            proposal { gemini { ... on Queue { explicitTooActivationCeiling } } }
+          }
+        }
+      """
+    ).void
+
+  private def setSchedulingModeQuery(oid: Observation.Id, mode: String): String =
+    s"""
+      mutation {
+        updateObservations(input: {
+          SET: { schedulingConstraints: { schedulingMode: $mode } }
+          WHERE: { id: { EQ: ${oid.asJson} } }
+        }) {
+          observations { id }
+        }
+      }
+    """
+
+  private def schedulingMode(oid: Observation.Id): IO[String] =
+    query(
+      pi,
+      s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            schedulingConstraints { schedulingMode }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("observation", "schedulingConstraints", "schedulingMode").require[String])
 
   private def proposalCeiling(pid: Program.Id): IO[String] =
     query(
@@ -184,17 +225,28 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
       before <- proposalCeiling(p)
       t      <- createTargetWithProfileAs(pi, p)
       o2     <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _      <- deriveTooActivation(p, o2, "INTERRUPTING")
+      // The mode goes first, while the asterism is still ordinary: the activation
+      // derives NONE, so the ceiling guard has nothing to object to.  Setting the
+      // mode after the opportunity target were added would be refused outright --
+      // which is the point of the guard, and why this reaches INTERRUPTING through
+      // the asterism instead.
+      _      <- setSchedulingMode(o2, "INTERRUPTING")
+      tid    <- createOpportunityTargetAs(pi, p)
+      _      <- resolveOpportunityTargetAs(pi, tid)
+      _      <- addOpportunityTargetToAsterism(o2, tid)
       after  <- proposalCeiling(p)
     yield
       assertEquals(before, "RAPID")
       assertEquals(after,  "RAPID") // frozen: the new observation does not raise its own ceiling
 
+  // Raising the mode over the ceiling is refused outright now, so the only way
+  // to reach this state is for the ceiling to move beneath a settled observation.
+  // The validator still matters: the ceiling is not the only thing that can move.
   test("an observation exceeding the frozen ceiling is flagged and cannot become ready"):
     for
       (p, o) <- setup("RAPID")
       _      <- acceptProposal(staff, p)
-      _      <- setSchedulingMode(o, "INTERRUPTING")
+      _      <- setExplicitCeiling(p, "STANDARD")
       _      <- runObscalcUpdateAs(service, p, o)
       codes  <- validationCodes(o)
       state  <- workflowState(o)
@@ -210,3 +262,87 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
       _      <- runObscalcUpdateAs(service, p, o)
       codes  <- validationCodes(o)
     yield assert(!codes.contains("TOO_ACTIVATION_UNAPPROVED"), s"unexpected ceiling violation: $codes")
+
+  test("a PI may lower the mode after the ceiling moves beneath them, recovering the observation"):
+    for
+      (p, o)  <- setup("RAPID")
+      _       <- acceptProposal(staff, p)
+      _       <- setExplicitCeiling(p, "STANDARD")
+      _       <- runObscalcUpdateAs(service, p, o)
+      before  <- validationCodes(o)
+      state   <- workflowState(o)
+      // UNAPPROVED is a pre-execution state, so the observation is still editable
+      // and the PI is not stranded above a ceiling they cannot come back under.
+      // It has to come all the way down to a compliant mode: while the derived
+      // activation is over the ceiling, any mode leaving it over is refused.
+      _       <- setSchedulingMode(o, "UNCONSTRAINED")
+      _       <- runObscalcUpdateAs(service, p, o)
+      after   <- validationCodes(o)
+    yield
+      assertEquals(state, "UNAPPROVED")
+      assert(before.contains("TOO_ACTIVATION_UNAPPROVED"), s"expected ceiling violation, got $before")
+      // The ceiling violation clears.  This fixture has no approved configuration,
+      // so the observation stays UNAPPROVED for that unrelated reason -- what is
+      // being pinned is that the ceiling no longer contributes.
+      assert(!after.contains("TOO_ACTIVATION_UNAPPROVED"), s"expected recovery, got $after")
+
+  // -- The guard on direct mode edits ---------------------------------------
+
+  private def ceilingRefusal(oid: Observation.Id, activation: String, ceiling: String) =
+    List(
+      s"Cannot set the scheduling mode for observation $oid: Target of Opportunity activation $activation exceeds the maximum $ceiling allowed by the proposal."
+    ).asLeft
+
+  test("raising the mode above the frozen ceiling is refused"):
+    for
+      (p, o) <- setup("RAPID")
+      _      <- acceptProposal(staff, p)
+      _      <- expect(pi, setSchedulingModeQuery(o, "INTERRUPTING"), ceilingRefusal(o, "INTERRUPTING", "RAPID"))
+    yield ()
+
+  test("the refusal leaves the observation untouched"):
+    for
+      (p, o) <- setup("RAPID")
+      _      <- acceptProposal(staff, p)
+      before <- schedulingMode(o)
+      _      <- expect(pi, setSchedulingModeQuery(o, "INTERRUPTING"), ceilingRefusal(o, "INTERRUPTING", "RAPID"))
+      after  <- schedulingMode(o)
+    yield
+      // The check runs after the update inside the transaction, so a violation
+      // has to roll the whole thing back rather than leave it half applied.
+      assertEquals(before, "UNINTERRUPTIBLE")
+      assertEquals(after, before)
+
+  test("a mode at or below the frozen ceiling is accepted"):
+    for
+      (p, o) <- setup("RAPID")
+      _      <- acceptProposal(staff, p)
+      _      <- setSchedulingMode(o, "UNCONSTRAINED")
+      mode   <- schedulingMode(o)
+    yield assertEquals(mode, "UNCONSTRAINED")
+
+  test("the ceiling does not constrain the mode before it is frozen"):
+    for
+      (p, o) <- setup("RAPID")
+      // No acceptance, so no explicit ceiling.  The derived one is the maximum
+      // over the program's own observations, which this edit is raising -- checking
+      // against it would refuse a PI for describing their own proposal.
+      _      <- setSchedulingMode(o, "INTERRUPTING")
+      mode   <- schedulingMode(o)
+      too    <- proposalCeiling(p)
+    yield
+      assertEquals(mode, "INTERRUPTING")
+      assertEquals(too, "INTERRUPTING")
+
+  test("a non-ToO observation may take any mode, whatever the ceiling"):
+    for
+      (p, o) <- setup("RAPID")
+      _      <- acceptProposal(staff, p)
+      t      <- createTargetWithProfileAs(pi, p)
+      o2     <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      // No opportunity target, so the activation derives NONE whatever the mode.
+      // INTERRUPTING is invalid for a different reason -- it needs a ToO target --
+      // but that is the workflow's business, not the ceiling's.
+      _      <- setSchedulingMode(o2, "UNINTERRUPTIBLE")
+      mode   <- schedulingMode(o2)
+    yield assertEquals(mode, "UNINTERRUPTIBLE")

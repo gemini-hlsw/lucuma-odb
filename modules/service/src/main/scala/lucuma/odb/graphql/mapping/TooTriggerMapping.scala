@@ -16,6 +16,11 @@ trait TooTriggerMapping[F[_]] extends TooTriggerTable[F] with ObservationView[F]
       SqlField("programId", TooTriggerTable.ProgramId, hidden = true),
       SqlObject("observation", Join(TooTriggerTable.ObservationId, ObservationView.Id)),
       SqlField("status", TooTriggerTable.Status),
+      SqlField("tooActivation", TooTriggerTable.TooActivation),
+      // Self-join: the request this one replaced.  Null for a first request, and
+      // the chain is finite -- a superseded row is terminal, so it is never itself
+      // superseded again.
+      SqlObject("supersedes", Join(TooTriggerTable.Supersedes, TooTriggerTable.Id)),
       SqlField("resolutionReason", TooTriggerTable.ResolutionReason),
       SqlField("requestedAt", TooTriggerTable.RequestedAt),
       SqlObject("requestedBy", Join(TooTriggerTable.RequestedBy, UserTable.UserId)),

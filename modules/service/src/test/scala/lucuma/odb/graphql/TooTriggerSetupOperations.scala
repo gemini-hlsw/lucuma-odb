@@ -5,13 +5,20 @@ package lucuma.odb.graphql
 
 import cats.effect.IO
 import cats.syntax.all.*
+import io.circe.Decoder
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SchedulingMode
+import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.core.syntax.string.*
+import lucuma.odb.data.TooTrigger
+import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 /**
@@ -26,13 +33,13 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
   /** The service user used to drive obscalc; not a GraphQL caller. */
   val tooObscalcUser = TestUsers.service(97)
 
-  def setSchedulingModeAs(user: User, oid: Observation.Id, mode: String): IO[Unit] =
+  def setSchedulingModeAs(user: User, oid: Observation.Id, mode: SchedulingMode): IO[Unit] =
     query(
       user,
       s"""
         mutation {
           updateObservations(input: {
-            SET: { schedulingConstraints: { schedulingMode: $mode } }
+            SET: { schedulingConstraints: { schedulingMode: ${mode.tag.toScreamingSnakeCase} } }
             WHERE: { id: { EQ: ${oid.asJson} } }
           }) {
             observations { id }
@@ -102,7 +109,7 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
     ).void
 
   /** Reads the observation's workflow state together with the transitions it is offered. */
-  def tooWorkflowStateAndTransitions(pid: Program.Id, oid: Observation.Id, user: User): IO[(String, List[String])] =
+  def tooWorkflowStateAndTransitions(pid: Program.Id, oid: Observation.Id, user: User): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
     runObscalcUpdateAs(tooObscalcUser, pid, oid) *>
     query(
       user,
@@ -115,10 +122,13 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
       """
     ).map: js =>
       val c = js.hcursor.downFields("observation", "workflow", "value")
-      (c.downField("state").require[String], c.downField("validTransitions").require[List[String]])
+      (
+        c.downField("state").require[ObservationWorkflowState],
+        c.downField("validTransitions").require[List[ObservationWorkflowState]]
+      )
 
   /** Recomputes obscalc, then reads the cached workflow state back. */
-  def tooWorkflowState(pid: Program.Id, oid: Observation.Id, user: User): IO[String] =
+  def tooWorkflowState(pid: Program.Id, oid: Observation.Id, user: User): IO[ObservationWorkflowState] =
     runObscalcUpdateAs(tooObscalcUser, pid, oid) *>
     query(
       user,
@@ -129,7 +139,7 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
           }
         }
       """
-    ).map(_.hcursor.downFields("observation", "workflow", "value", "state").require[String])
+    ).map(_.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState])
 
   /**
    * A program with an accepted proposal and one valid *ordinary* observation,
@@ -138,19 +148,19 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
    * activation and setting it `Ready` records no trigger.
    */
   def createTriggerableObservationAs(
-    pi:    User,
+    user:  User,
     staff: User
   ): IO[(Program.Id, Observation.Id)] =
     for
       cfp <- createGeminiCallForProposalsAs(staff)
-      pid <- createProgramWithNonPartnerPi(pi, "ToO")
-      _   <- addProposal(pi, pid, cfp.some, None)
-      tid <- createTargetWithProfileAs(pi, pid)
-      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
-      _   <- computeItcResultAs(pi, oid)
-      _   <- addPartnerSplits(pi, pid)
-      _   <- addCoisAs(pi, pid)
+      pid <- createProgramWithNonPartnerPi(user, "ToO")
+      _   <- addProposal(user, pid, cfp.some, None)
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      _   <- createConfigurationRequestAs(user, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(user, oid)
+      _   <- addPartnerSplits(user, pid)
+      _   <- addCoisAs(user, pid)
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       _   <- runObscalcUpdateAs(tooObscalcUser, pid, oid)
     yield (pid, oid)
@@ -170,25 +180,102 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
    * `Unapproved`.
    */
   def createTooObservationAs(
-    pi:       User,
+    user:     User,
     staff:    User,
     resolved: Boolean = true,
-    mode:     String  = "UNINTERRUPTIBLE"
+    mode:     SchedulingMode = SchedulingMode.Uninterruptible
   ): IO[(Program.Id, Observation.Id, Target.Id)] =
     for
       cfp <- createGeminiCallForProposalsAs(staff)
-      pid <- createProgramWithNonPartnerPi(pi, "ToO")
-      _   <- addProposal(pi, pid, cfp.some, None)
-      tid <- createOpportunityTargetAs(pi, pid)
-      _   <- resolveOpportunityTargetAs(pi, tid).whenA(resolved)
-      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
-      _   <- computeItcResultAs(pi, oid)
-      _   <- setSchedulingModeAs(pi, oid, mode)
-      _   <- addPartnerSplits(pi, pid)
-      _   <- addCoisAs(pi, pid)
+      pid <- createProgramWithNonPartnerPi(user, "ToO")
+      _   <- addProposal(user, pid, cfp.some, None)
+      tid <- createOpportunityTargetAs(user, pid)
+      _   <- resolveOpportunityTargetAs(user, tid).whenA(resolved)
+      oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      _   <- createConfigurationRequestAs(user, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(user, oid)
+      _   <- setSchedulingModeAs(user, oid, mode)
+      _   <- addPartnerSplits(user, pid)
+      _   <- addCoisAs(user, pid)
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       _   <- runObscalcUpdateAs(tooObscalcUser, pid, oid)
     yield (pid, oid, tid)
 
+  case class Trigger(
+    id:         TooTrigger.Id,
+    status:     TooTriggerStatus,
+    activation: TooActivation,
+    supersedes: Option[TooTrigger.Id],
+    resolution: Option[String]
+  )
+
+  object Trigger:
+    given Decoder[Trigger] =
+      Decoder.instance: c =>
+        for
+          id         <- c.downField("id").as[TooTrigger.Id]
+          status     <- c.downField("status").as[TooTriggerStatus]
+          activation <- c.downField("tooActivation").as[TooActivation]
+          s          <- c.downField("supersedes").as[Option[Json]]
+          supersedes <- s.traverse(_.hcursor.downField("id").as[TooTrigger.Id])
+          reason     <- c.downField("resolutionReason").as[Option[String]]
+        yield Trigger(id, status, activation, supersedes, reason)
+
+  def getTooTriggersAs(user: User, oid: Observation.Id): IO[List[Trigger]] =
+    query(
+      user,
+      s"""
+        query {
+          tooTriggers(WHERE: { observationId: { EQ: ${oid.asJson} } }) {
+            matches {
+              id
+              status
+              tooActivation
+              supersedes { id }
+              resolutionReason
+            }
+          }
+        }
+      """
+    ).map:
+      _.hcursor.downFields("tooTriggers", "matches").require[List[Json]].map: j =>
+        j.hcursor.require[Trigger]
+
+  /** The live request. */
+  def getRequestedTooTriggerAs(user: User, oid: Observation.Id): IO[Trigger] =
+    query(
+      user,
+      s"""
+        query {
+          tooTriggers(WHERE: { observationId: { EQ: ${oid.asJson} }, status: { EQ: REQUESTED } }) {
+            matches {
+              id
+              status
+              tooActivation
+              supersedes { id }
+              resolutionReason
+            }
+          }
+        }
+      """
+    ).map: js =>
+      js.hcursor.downFields("tooTriggers", "matches").require[List[Json]].head.hcursor.require[Trigger]
+
+  def declineQuery(rid: TooTrigger.Id, reason: Option[String] = None): String =
+    s"""
+      mutation {
+        declineTooTrigger(input: {
+          tooTriggerId: "$rid"
+          ${reason.fold("")(r => s"""reason: "$r"""")}
+        }) {
+          tooTrigger { status resolutionReason }
+        }
+      }
+    """
+
+  def declineTooTrigger(user: User, rid: TooTrigger.Id, reason: Option[String] = None): IO[Unit] =
+    query(
+      user  = user,
+      query = declineQuery(rid, reason)
+    ).void
 }
