@@ -120,7 +120,7 @@ class observation_workflow_warnings
             ObservationWorkflow(
               ObservationWorkflowState.Defined,
               List(ObservationWorkflowState.Inactive),
-              List(ObservationValidation.genericWaning("Conditions likelihood is 9%."))
+              List(ObservationValidation.genericWarning("Conditions likelihood is 9%."))
             )
           )
         ).asRight
@@ -164,7 +164,7 @@ class observation_workflow_warnings
             ObservationWorkflow(
               ObservationWorkflowState.Defined,
               List(ObservationWorkflowState.Inactive),
-              List(ObservationValidation.genericWaning("Total S/N  is 2.000 (min. 3.000 recommended)"))
+              List(ObservationValidation.genericWarning("Total S/N  is 2.000 (min. 3.000 recommended)"))
             )
           )
         ).asRight
@@ -203,7 +203,7 @@ class observation_workflow_warnings
                 ObservationWorkflowState.Inactive, 
                 ObservationWorkflowState.ForReview,
               ),
-              List(ObservationValidation.genericWaning("Total S/N  is 2.000 (min. 3.000 recommended)"))
+              List(ObservationValidation.genericWarning("Total S/N  is 2.000 (min. 3.000 recommended)"))
             )
           )
         ).asRight
