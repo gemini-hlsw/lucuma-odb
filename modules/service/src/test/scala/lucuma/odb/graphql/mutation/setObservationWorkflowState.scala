@@ -12,11 +12,13 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.math.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
+import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -54,18 +56,19 @@ class setObservationWorkflowState
     ).map: json =>
       json.hcursor.downFields("observation", "workflow", "value", "state").require[ObservationWorkflowState]
 
-  def testTransition(pid: Program.Id, oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
+  def testTransition(pid: Program.Id, oid: Observation.Id, state: ObservationWorkflowState): IO[String] =
     testTransitionAs(pi, pid, oid, state)
 
   /** Test that we can change to this specified state, and then back. */
-  def testTransitionAs(user: User, pid: Program.Id, oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
+  def testTransitionAs(user: User, pid: Program.Id, oid: Observation.Id, state: ObservationWorkflowState): IO[String] =
     queryObservationWorkflowState(oid).flatMap: current =>
       setObservationWorkflowState(user, oid, state) >>
       runObscalcUpdate(pid, oid) >>
       assertIO(queryObservationWorkflowStateAs(user, oid), state) >>
       setObservationWorkflowState(user, oid, current) >>
       runObscalcUpdate(pid, oid) >>
-      assertIO(queryObservationWorkflowStateAs(user, oid), current)
+      assertIO(queryObservationWorkflowStateAs(user, oid), current) >>
+      IO.pure(s"transitioned from $current to $state") // helps with failure cases
 
   def testTransitions(pid: Program.Id, oid: Observation.Id, allowedTransitions: ObservationWorkflowState*): IO[Unit] =
     testTransitionsAs(pi, pid, oid, allowedTransitions*)
@@ -255,7 +258,7 @@ class setObservationWorkflowState
       }
     """
 
-  test("[Visitor]      Defined <-> Inactive, Ready"):
+  test("[Visitor]     Defined <-> Inactive, Ready"):
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
@@ -272,7 +275,7 @@ class setObservationWorkflowState
     yield ()
 
   // N.B. you can't go from Inactive straight to ready, you have to go via Defined
-  test("[Visitor]      Ready -> Inactive -> Defined -> Ready"):
+  test("[Visitor]     Ready -> Inactive -> Defined -> Ready"):
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
@@ -291,7 +294,7 @@ class setObservationWorkflowState
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
     yield ()
 
-  test("[Visitor]      Ready -> Ongoing (disallowed for PIs)"):
+  test("[Visitor]     Ready -> Ongoing (disallowed for PIs)"):
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
@@ -309,7 +312,7 @@ class setObservationWorkflowState
               case OdbError.InvalidWorkflowTransition(Ready, Ongoing, _) => () // expected
     yield ()
 
-  test("[Visitor]      Ready -> Ongoing (allowed for Staff)"):
+  test("[Visitor]     Ready -> Ongoing (allowed for Staff)"):
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
@@ -328,7 +331,7 @@ class setObservationWorkflowState
       _   <- assertIO(queryObservationWorkflowState(oid), Ongoing)
     yield ()
 
-  test("[Visitor]      Ongoing -> Ready (allowed for staff)"):
+  test("[Visitor]     Ongoing -> Ready (allowed for staff)"):
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
@@ -349,8 +352,8 @@ class setObservationWorkflowState
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       _   <- assertIO(queryObservationWorkflowState(oid), Ready)
     yield ()
-
-  test("[Visitor]      Ongoing -> Ready (disallowed for staff)"):
+    
+  test("[Visitor]     Ongoing -> Ready (disallowed for staff)"):
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(pi)
@@ -393,7 +396,7 @@ class setObservationWorkflowState
       _   <- runObscalcUpdate(pid, oid)
     yield (pid, oid)
 
-  test("[Exchange]     Defined    <-> Inactive (proposal not accepted)"):
+  test("[Exchange]    Defined    <-> Inactive (proposal not accepted)"):
     for
       po        <- createExchangeKeckObs(accepted = false)
       (pid, oid) = po
@@ -403,12 +406,60 @@ class setObservationWorkflowState
 
   // Exchange has no Ready/Completed lifecycle: even when the proposal is accepted,
   // Ready must not be offered (a normal accepted observation would offer it).
-  test("[Exchange]     Defined    <-> Inactive (proposal accepted)"):
+  test("[Exchange]    Defined    <-> Inactive (proposal accepted)"):
     for
       po        <- createExchangeKeckObs(accepted = true)
       (pid, oid) = po
       _         <- assertIO(queryObservationWorkflowState(oid), Defined)
       _         <- testTransitions(pid, oid, Defined, Inactive)
     yield ()
+
+  // sorry
+  var HACK_ITC = false
+  override def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
+    if (HACK_ITC) then
+      SignalToNoiseAt(
+        w,
+        SingleSN(SignalToNoise.unsafeFromBigDecimalExact(1)),
+        TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2))
+      )
+    else super.fakeSignalToNoiseAt(w)
+
+  val createPhaseTwoObservationWithWarnings: IO[(Program.Id, Observation.Id)] =
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi, "Foo")
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- IO { HACK_ITC = true }
+      _   <- computeItcResultAs(pi, oid)
+      _   <- IO { HACK_ITC = false }
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+    yield (pid, oid)
+
+  test("[Warnings]    Defined   <-> Inactive, ForReview (pi)"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      assertIO(queryObservationWorkflowState(oid), Defined) >>
+      testTransitionsAs(pi, pid, oid, Defined, Inactive, ForReview)
+
+  test("[Warnings]    Defined   <-> Inactive, ForReview, Ready (staff)"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      assertIO(queryObservationWorkflowState(oid), Defined) >>
+      testTransitionsAs(staff, pid, oid, Defined, Inactive, ForReview, Ready)
+
+  test("[Warnings]    ForReview <-> Inactive, Defined (pi)"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      assertIO(setObservationWorkflowState(pi, oid, ForReview), ForReview) >>
+      testTransitionsAs(pi, pid, oid, ForReview, Inactive, Defined)
+
+  test("[Warnings]    ForReview <-> Inactive, Defined, Ready (staff)"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      assertIO(setObservationWorkflowState(pi, oid, ForReview), ForReview) >>
+      testTransitionsAs(staff, pid, oid, ForReview, Inactive, Defined, Ready)
 
 }

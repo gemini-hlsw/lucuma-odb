@@ -1074,6 +1074,7 @@ trait Codecs {
     observation_workflow_user_state.eimap[UserState] {
       case Inactive   => Right(Inactive)
       case Ready      => Right(Ready)
+      case ForReview  => Right(ForReview)
       case s          => Left(s"Invalid user state: $s")
     } (a => a: ObservationWorkflowState)
 

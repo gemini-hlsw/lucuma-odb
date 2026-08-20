@@ -738,15 +738,23 @@ trait AccessControl[F[_]] extends Predicates[F] {
               AccessControl.unchecked(CloneTargetInput(tid, input.SET, NonEmptyList.fromList(oids)), pid, program_id)
       .value
 
-
   def selectForUpdate(input: SetObservationWorkflowStateInput)(using Services[F], NoTransaction[F]): F[Result[CheckedWithId[(Option[ObservingModeType], Option[CalibrationRole], ObservationWorkflow, ObservationWorkflowState), Observation.Id]]] =
+    // do this before we turn into a superuser
+    val isStaffOrBetter = user.role.access >= Access.Staff
     verifyWritable(input.observationId) >>
     Services.asSuperUser:
       observationWorkflowService.getWorkflowsModesAndRoles(List(input.observationId))
         .map: res =>
           res.map(_(input.observationId)).flatMap:
             case (w, om, calibrationRole) =>
-              if w.state === input.state || w.validTransitions.contains(input.state)
+
+              // A special case here. If ForReview is a valid transition then also allow Ready, if you're staff or better
+              val validTransitions =
+                if isStaffOrBetter && w.validTransitions.contains(ObservationWorkflowState.ForReview) then
+                  ObservationWorkflowState.Ready :: w.validTransitions 
+                else w.validTransitions
+
+              if w.state === input.state || validTransitions.contains(input.state)
               then
                 Result(AccessControl.unchecked((om, calibrationRole, w, input.state), input.observationId, observation_id))
               else Result.failure(OdbError.InvalidWorkflowTransition(w.state, input.state).asProblem)
