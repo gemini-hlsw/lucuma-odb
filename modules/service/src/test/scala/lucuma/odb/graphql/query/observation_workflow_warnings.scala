@@ -87,6 +87,7 @@ class observation_workflow_warnings
 
   test("conditions probability < 10%") {
 
+    // better, but not best
     def updateConditions(oid: Observation.Id) =
       updateObservationConditions(
         pi,
