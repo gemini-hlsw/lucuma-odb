@@ -9,6 +9,8 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.IntCentiPercent
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
+import lucuma.core.math.Declination
+import lucuma.core.enums.Site
 
 object ConditionsProbabilityValidator extends ObservationValidator:
 
@@ -21,6 +23,6 @@ object ConditionsProbabilityValidator extends ObservationValidator:
       .map(info.constraintSet.likelihood)
       .filter(p => p.value.value < limit.value.value)
       .foldMap: percent =>
-        val w = ObservationValidation.genericWaning(s"Likelihood of execution is $percent")
+        val w = ObservationValidation.genericWaning(s"Conditions likelihood is ${percent.toPercent.toInt}%.")
         ObservationValidationMap.singleton(w)
 

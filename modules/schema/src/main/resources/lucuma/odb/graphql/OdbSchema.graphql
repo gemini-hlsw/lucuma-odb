@@ -15723,6 +15723,9 @@ enum ObservationValidationCode {
   program's accepted proposal.
   """
   TOO_ACTIVATION_UNAPPROVED
+
+  GENERIC_WARNING
+  
 }
 
 """
@@ -23012,6 +23015,7 @@ enum ObservationWorkflowState {
   READY
   ONGOING
   COMPLETED
+  FOR_REVIEW
 }
 
 type ObservationWorkflow {

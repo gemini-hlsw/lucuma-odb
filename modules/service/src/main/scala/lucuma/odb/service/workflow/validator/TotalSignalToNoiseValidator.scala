@@ -33,7 +33,7 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
       .map(_.total)
       .filter(_ < MinRecommended)
       .foldMap: sn =>
-        val msg = s"Total S/N ${extra.foldMap(s => s"($s) ")} is $sn (min. 3 recommended)"
+        val msg = f"Total S/N ${extra.foldMap(s => s"($s) ")} is ${sn.value.toBigDecimal}%4.3f (min. ${MinRecommended.value.toBigDecimal}%4.3f recommended)"
         ObservationValidationMap.singleton(ObservationValidation.genericWaning(msg))
 
   def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(using e: Enumerated[A]): ObservationValidationMap =

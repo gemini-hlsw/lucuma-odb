@@ -331,9 +331,9 @@ object ObservingModeSetupOperations {
   val ConstraintSet: String =
     """
       constraintSet: {
-        cloudExtinction: POINT_ONE,
-        imageQuality: POINT_ONE,
-        skyBackground: DARKEST
+        cloudExtinction: POINT_FIVE,
+        imageQuality: ONE_POINT_ZERO,
+        skyBackground: DARK
       }
     """
 
