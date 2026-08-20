@@ -32,7 +32,7 @@ class ConfigSuite extends FunSuite:
       explicitReadMode  = None,
       defaultWellDepth  = GnirsWellDepth.Shallow,
       explicitWellDepth = None,
-      acquisition       = AcquisitionConfig(None, None, etm(10.0), PosInt.unsafeFrom(1))
+      acquisition       = AcquisitionConfig(None, None, etm(10.0), true, PosInt.unsafeFrom(1))
     )
 
   private val j      = Filter(GnirsFilter.J, etm(10.0), PosInt.unsafeFrom(2))

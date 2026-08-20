@@ -27,24 +27,27 @@ import lucuma.odb.graphql.binding.*
  * fields may be cleared back to their automatic values.
  */
 case class GnirsAcquisitionInput(
-  explicitFilter:   Nullable[GnirsFilter],
-  explicitAcqType:  Nullable[GnirsAcquisitionType],
-  coadds:           Option[PosInt],
-  skyOffset:        Option[Offset],
-  exposureTimeMode: Option[ExposureTimeMode]
+  explicitFilter:           Nullable[GnirsFilter],
+  explicitAcqType:          Nullable[GnirsAcquisitionType],
+  coadds:                   Option[PosInt],
+  skyOffset:                Option[Offset],
+  explicitExposureTimeMode: Nullable[ExposureTimeMode]
 )
 
 object GnirsAcquisitionInput:
 
   // Signal-to-noise exposure time mode does not support coadds. When the ETM is set to
-  // signal-to-noise, force coadds to 1 so a previously-set value doesn't linger.
+  // signal-to-noise, force coadds to 1 so a previously-set value doesn't linger. Clearing
+  // the ETM back to automatic counts as signal-to-noise: a derived acquisition ETM is
+  // always a signal-to-noise mode.
   private def coaddsForEtm(
-    etm:    Option[ExposureTimeMode],
+    etm:    Nullable[ExposureTimeMode],
     coadds: Option[PosInt]
   ): Option[PosInt] =
     etm match
-      case Some(ExposureTimeMode.SignalToNoiseMode(_, _)) => PosInt.from(1).toOption
-      case _                                              => coadds
+      case Nullable.NonNull(ExposureTimeMode.SignalToNoiseMode(_, _)) => PosInt.from(1).toOption
+      case Nullable.Null                                             => PosInt.from(1).toOption
+      case _                                                         => coadds
 
   // A sky offset is valid exactly when the explicit acquisition type is FAINT:
   // FAINT requires one, and any other explicit type (or clearing to AUTO) forbids
@@ -68,7 +71,7 @@ object GnirsAcquisitionInput:
         GnirsAcquisitionTypeBinding.Nullable("explicitAcquisitionType", rAcqType),
         PosIntBinding.Option("coadds", rCoadds),
         OffsetInput.Binding.Option("skyOffset", rSkyOffset),
-        ExposureTimeModeInput.Binding.Option("exposureTimeMode", rEtm)
+        ExposureTimeModeInput.Binding.Nullable("explicitExposureTimeMode", rEtm)
       ) =>
         (
           rFilter.flatMap: n =>
@@ -78,5 +81,5 @@ object GnirsAcquisitionInput:
           ,
           rAcqType, rCoadds, rSkyOffset, rEtm
         ).parMapN(GnirsAcquisitionInput.apply)
-         .map(a => a.copy(coadds = coaddsForEtm(a.exposureTimeMode, a.coadds)))
+         .map(a => a.copy(coadds = coaddsForEtm(a.explicitExposureTimeMode, a.coadds)))
          .flatMap(validateSkyOffset)

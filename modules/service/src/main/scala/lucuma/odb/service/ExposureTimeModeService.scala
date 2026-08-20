@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
+import cats.syntax.applicative.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
@@ -13,6 +14,8 @@ import cats.syntax.traverse.*
 import grackle.Problem
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeId
@@ -24,6 +27,7 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.all.*
 import skunk.implicits.*
 
 /**
@@ -47,9 +51,10 @@ sealed trait ExposureTimeModeService[F[_]]:
   )(using Transaction[F]): F[ExposureTimeModeId]
 
   def insertMany(
-    oids: List[Observation.Id],
-    role: ExposureTimeModeRole,
-    etm:  ExposureTimeMode
+    oids:       List[Observation.Id],
+    role:       ExposureTimeModeRole,
+    etm:        ExposureTimeMode,
+    isExplicit: Boolean = true
   )(using Transaction[F]): F[List[(Observation.Id, ExposureTimeModeId)]]
 
   def deleteMany(
@@ -63,9 +68,37 @@ sealed trait ExposureTimeModeService[F[_]]:
   )(using Transaction[F]): F[Unit]
 
   def updateMany(
-    oids:   List[Observation.Id],
-    role:   ExposureTimeModeRole,
-    update: ExposureTimeMode
+    oids:       List[Observation.Id],
+    role:       ExposureTimeModeRole,
+    update:     ExposureTimeMode,
+    isExplicit: Boolean = true
+  )(using Transaction[F]): F[Unit]
+
+  /**
+   * Rewrites the signal-to-noise of *derived* exposure time modes only, leaving explicit
+   * ones untouched.  This is the interlock that keeps an automatic update -- the GNIRS
+   * acquisition S/N following the ITC brightness classification -- from ever overwriting a
+   * value the user set.  A no-op write is skipped so it does not fire the
+   * observation-edit and obscalc-invalidation triggers.
+   */
+  def updateDerivedSignalToNoise(
+    oids: List[Observation.Id],
+    role: ExposureTimeModeRole,
+    sn:   SignalToNoise
+  )(using Transaction[F]): F[Unit]
+
+  /**
+   * Marks the given observations' exposure time mode of the given role as derived.
+   *
+   * A derived mode is always signal-to-noise, so a time-and-count mode is converted, its
+   * time and count dropped and `defaultSignalToNoise` supplied.  An existing
+   * signal-to-noise value is kept as a prior until the next ITC pass rewrites it, which
+   * avoids a visible jump in the mode editor.  The wavelength is never touched.
+   */
+  def setDerived(
+    oids:                 List[Observation.Id],
+    role:                 ExposureTimeModeRole,
+    defaultSignalToNoise: SignalToNoise
   )(using Transaction[F]): F[Unit]
 
   /**
@@ -98,7 +131,8 @@ sealed trait ExposureTimeModeService[F[_]]:
     explicitAcquisition: Option[ExposureTimeMode],
     explicitScience:     NonEmptyList[(A, Option[ExposureTimeMode])],
     newRequirement:      Option[ExposureTimeMode],
-    which:               List[Observation.Id]
+    which:               List[Observation.Id],
+    acquisitionDefault:  Wavelength => ExposureTimeMode = ExposureTimeMode.forAcquisition
   )(using Transaction[F]): F[Result[Map[Observation.Id, (ExposureTimeMode, NonEmptyList[(A, ExposureTimeMode)])]]]
 
   /**
@@ -112,7 +146,8 @@ sealed trait ExposureTimeModeService[F[_]]:
    * Inserts acquisition and science exposure time modes and returns their ids.
    */
   def insertResolvedAcquisitionAndScience[A](
-    resolved: Map[Observation.Id, (ExposureTimeMode, NonEmptyList[(A, ExposureTimeMode)])]
+    resolved:                Map[Observation.Id, (ExposureTimeMode, NonEmptyList[(A, ExposureTimeMode)])],
+    acquisitionIsExplicit:   Boolean = true
   )(using Transaction[F]): F[Map[Observation.Id, (ExposureTimeModeId, NonEmptyList[(A, ExposureTimeModeId)])]]
 
   /**
@@ -201,11 +236,12 @@ object ExposureTimeModeService:
         session.unique(Statements.Insert)(oid, role, etm)
 
       override def insertMany(
-        oids: List[Observation.Id],
-        role: ExposureTimeModeRole,
-        etm:  ExposureTimeMode
+        oids:       List[Observation.Id],
+        role:       ExposureTimeModeRole,
+        etm:        ExposureTimeMode,
+        isExplicit: Boolean
       )(using Transaction[F]): F[List[(Observation.Id, ExposureTimeModeId)]] =
-        val af = Statements.InsertMany(oids, role, etm)
+        val af = Statements.InsertMany(oids, role, etm, isExplicit)
         session.prepareR(af.fragment.query(observation_id *: exposure_time_mode_id)).use: pq =>
           pq.stream(af.argument, chunkSize = 1024)
             .compile
@@ -224,14 +260,31 @@ object ExposureTimeModeService:
         session.execute(Statements.UpdateExposureTimeMode)(eid, update).void
 
       override def updateMany(
-        oids:   List[Observation.Id],
-        role:   ExposureTimeModeRole,
-        update: ExposureTimeMode
+        oids:       List[Observation.Id],
+        role:       ExposureTimeModeRole,
+        update:     ExposureTimeMode,
+        isExplicit: Boolean
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- session.exec(Statements.updateWherePresent(oids, role, update))
-          _ <- session.exec(Statements.insertWhereNotPresent(oids, role, update))
+          _ <- session.exec(Statements.updateWherePresent(oids, role, update, isExplicit))
+          _ <- session.exec(Statements.insertWhereNotPresent(oids, role, update, isExplicit))
         yield ()
+
+      override def updateDerivedSignalToNoise(
+        oids: List[Observation.Id],
+        role: ExposureTimeModeRole,
+        sn:   SignalToNoise
+      )(using Transaction[F]): F[Unit] =
+        if oids.isEmpty then ().pure[F]
+        else session.exec(Statements.updateDerivedSignalToNoise(oids, role, sn))
+
+      override def setDerived(
+        oids:                 List[Observation.Id],
+        role:                 ExposureTimeModeRole,
+        defaultSignalToNoise: SignalToNoise
+      )(using Transaction[F]): F[Unit] =
+        if oids.isEmpty then ().pure[F]
+        else session.exec(Statements.setDerived(oids, role, defaultSignalToNoise))
 
       override def clone(
         originalOid: Observation.Id,
@@ -269,7 +322,8 @@ object ExposureTimeModeService:
         explicitAcquisition: Option[ExposureTimeMode],
         explicitScience:     NonEmptyList[(A, Option[ExposureTimeMode])],
         newRequirement:      Option[ExposureTimeMode],
-        which:               List[Observation.Id]
+        which:               List[Observation.Id],
+        acquisitionDefault:  Wavelength => ExposureTimeMode
       )(using Transaction[F]): F[Result[Map[Observation.Id, (ExposureTimeMode, NonEmptyList[(A, ExposureTimeMode)])]]] =
 
         val science: F[Result[Map[Observation.Id, NonEmptyList[(A, ExposureTimeMode)]]]] =
@@ -297,7 +351,7 @@ object ExposureTimeModeService:
            // Add acquisition ETM.  When there are multiple science ETMs we
            // just pick the first for the `at`.
             m.fproductLeft: sci =>
-              explicitAcquisition.getOrElse(ExposureTimeMode.forAcquisition(sci.head._2.at))
+              explicitAcquisition.getOrElse(acquisitionDefault(sci.head._2.at))
           .value
 
       override def insertResolvedScienceOnly[A](
@@ -330,7 +384,8 @@ object ExposureTimeModeService:
           .map(_.foldMap { case (oid, nel) => Map(oid -> nel) })
 
       override def insertResolvedAcquisitionAndScience[A](
-        resolved: Map[Observation.Id, (ExposureTimeMode, NonEmptyList[(A, ExposureTimeMode)])]
+        resolved:              Map[Observation.Id, (ExposureTimeMode, NonEmptyList[(A, ExposureTimeMode)])],
+        acquisitionIsExplicit: Boolean
       )(using Transaction[F]): F[Map[Observation.Id, (ExposureTimeModeId, NonEmptyList[(A, ExposureTimeModeId)])]] =
 
         def insertAcquisition(
@@ -342,7 +397,7 @@ object ExposureTimeModeService:
             .flatTraverse: (etm, oids) =>
               services
                 .exposureTimeModeService
-                .insertMany(oids, ExposureTimeModeRole.Acquisition, etm)
+                .insertMany(oids, ExposureTimeModeRole.Acquisition, etm, acquisitionIsExplicit)
                 .map(_.toList)
             .map(_.toMap)
 
@@ -408,9 +463,10 @@ object ExposureTimeModeService:
            )
 
     def InsertMany(
-      oids: List[Observation.Id],
-      role: ExposureTimeModeRole,
-      etm:  ExposureTimeMode
+      oids:       List[Observation.Id],
+      role:       ExposureTimeModeRole,
+      etm:        ExposureTimeMode,
+      isExplicit: Boolean
     ): AppliedFragment =
       sql"""
         INSERT INTO t_exposure_time_mode (
@@ -420,7 +476,8 @@ object ExposureTimeModeService:
           c_signal_to_noise,
           c_signal_to_noise_at,
           c_exposure_time,
-          c_exposure_count
+          c_exposure_count,
+          c_is_explicit
         )
         SELECT
           c_observation_id,
@@ -429,7 +486,8 @@ object ExposureTimeModeService:
           ${signal_to_noise.opt},
           $wavelength_pm,
           ${time_span.opt},
-          ${int4_pos.opt}
+          ${int4_pos.opt},
+          $bool
         FROM unnest(ARRAY[${observation_id.list(oids.length)}]) AS c_observation_id
         RETURNING
           c_observation_id,
@@ -441,6 +499,7 @@ object ExposureTimeModeService:
             etm.at,
             etm.exposureTime,
             etm.exposureCount,
+            isExplicit,
             oids
           )
 
@@ -479,9 +538,10 @@ object ExposureTimeModeService:
           )
 
     def updateWherePresent(
-      oids:   List[Observation.Id],
-      role:   ExposureTimeModeRole,
-      update: ExposureTimeMode
+      oids:       List[Observation.Id],
+      role:       ExposureTimeModeRole,
+      update:     ExposureTimeMode,
+      isExplicit: Boolean
     ): AppliedFragment =
       sql"""
         UPDATE t_exposure_time_mode
@@ -489,7 +549,8 @@ object ExposureTimeModeService:
             c_signal_to_noise    = ${signal_to_noise.opt},
             c_signal_to_noise_at = $wavelength_pm,
             c_exposure_time      = ${time_span.opt},
-            c_exposure_count     = ${int4_pos.opt}
+            c_exposure_count     = ${int4_pos.opt},
+            c_is_explicit        = $bool
         WHERE c_observation_id IN ${observation_id.list(oids.length).values}
           AND c_role = $exposure_time_mode_role
       """.apply(
@@ -498,14 +559,52 @@ object ExposureTimeModeService:
         update.at,
         update.exposureTime,
         update.exposureCount,
+        isExplicit,
         oids,
         role
       )
 
+    def updateDerivedSignalToNoise(
+      oids: List[Observation.Id],
+      role: ExposureTimeModeRole,
+      sn:   SignalToNoise
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_exposure_time_mode
+           SET c_signal_to_noise = $signal_to_noise
+         WHERE c_observation_id IN ${observation_id.list(oids.length).values}
+           AND c_role = $exposure_time_mode_role
+           AND NOT c_is_explicit
+           AND c_signal_to_noise IS DISTINCT FROM $signal_to_noise
+      """.apply(sn, oids, role, sn)
+
+    // Flips a row to "derived".  A derived mode is always signal-to-noise (the
+    // t_exposure_time_mode_derived_is_sn CHECK enforces it), so a time-and-count row is
+    // converted and picks up the supplied default; a signal-to-noise row keeps its value
+    // as a prior until the next ITC pass rewrites it, which avoids a visible jump.  The
+    // wavelength is left alone in both cases.
+    def setDerived(
+      oids:                 List[Observation.Id],
+      role:                 ExposureTimeModeRole,
+      defaultSignalToNoise: SignalToNoise
+    ): AppliedFragment =
+      sql"""
+        UPDATE t_exposure_time_mode
+           SET c_is_explicit        = false,
+               c_exposure_time_mode = 'signal_to_noise',
+               c_signal_to_noise    = COALESCE(c_signal_to_noise, $signal_to_noise),
+               c_exposure_time      = NULL,
+               c_exposure_count     = NULL
+         WHERE c_observation_id IN ${observation_id.list(oids.length).values}
+           AND c_role = $exposure_time_mode_role
+           AND c_is_explicit
+      """.apply(defaultSignalToNoise, oids, role)
+
     def insertWhereNotPresent(
-      oids:   List[Observation.Id],
-      role:   ExposureTimeModeRole,
-      update: ExposureTimeMode
+      oids:       List[Observation.Id],
+      role:       ExposureTimeModeRole,
+      update:     ExposureTimeMode,
+      isExplicit: Boolean
     ): AppliedFragment =
       sql"""
         WITH obs_ids AS (
@@ -526,7 +625,8 @@ object ExposureTimeModeService:
           c_signal_to_noise,
           c_signal_to_noise_at,
           c_exposure_time,
-          c_exposure_count
+          c_exposure_count,
+          c_is_explicit
         )
         SELECT
           c_observation_id,
@@ -535,7 +635,8 @@ object ExposureTimeModeService:
           ${signal_to_noise.opt},
           $wavelength_pm,
           ${time_span.opt},
-          ${int4_pos.opt}
+          ${int4_pos.opt},
+          $bool
         FROM
           obs_ids
       """.apply(
@@ -546,7 +647,8 @@ object ExposureTimeModeService:
         update.signalToNoise,
         update.at,
         update.exposureTime,
-        update.exposureCount
+        update.exposureCount,
+        isExplicit
       )
 
     // (Original, New)

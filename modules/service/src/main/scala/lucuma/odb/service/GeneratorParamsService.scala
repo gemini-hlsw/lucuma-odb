@@ -322,10 +322,11 @@ object GeneratorParamsService {
          * the other spectroscopy modes have exactly one.
          */
         def gnirsSpectroscopyGeneratorParams(
-          obsMode:              ObservingMode,
-          acqMode:              InstrumentMode,
-          sciModes:             NonEmptyList[InstrumentMode],
-          gnirsAcqAutoClassify: Boolean
+          obsMode:                   ObservingMode,
+          acqMode:                   InstrumentMode,
+          sciModes:                  NonEmptyList[InstrumentMode],
+          gnirsAcqAutoClassify:      Boolean,
+          gnirsAcqAutoSignalToNoise: Boolean
         ): GeneratorParams =
 
           val consInput   = obsParams.constraints.toInput
@@ -343,7 +344,8 @@ object GeneratorParamsService {
                 regularTargetInputs,
                 blindOffsetTargetInput,
                 obsParams.signalToNoiseTargetId,
-                gnirsAcqAutoClassify
+                gnirsAcqAutoClassify,
+                gnirsAcqAutoSignalToNoise
               )
             }
             .leftMap(MissingParamSet.fromParams)
@@ -464,7 +466,7 @@ object GeneratorParamsService {
               ImagingParameters(
                 obsParams.constraints.toInput,
                 InstrumentMode.GnirsImaging(
-                  exposureTimeMode = gnm.acquisition.exposureTimeMode,
+                  exposureTimeMode = gnm.acquisition.itcExposureTimeMode,
                   filter           = acqFilter,
                   camera           = gnm.camera,
                   readMode         = GnirsReadMode.Bright,
@@ -480,11 +482,16 @@ object GeneratorParamsService {
               gnm.acquisition.explicitAcqMode.isEmpty &&
               gnm.acquisition.explicitFilter.isEmpty
 
+            // The acquisition S/N is derived from the same classification, which also
+            // requires the classification pass even when the filter is explicit.
+            val acqAutoSignalToNoise: Boolean =
+              gnm.acquisition.autoSignalToNoise
+
             val itcInput =
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, gnirsAcqAutoClassify = acqAutoClassify))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, gnirsAcqAutoClassify = acqAutoClassify, gnirsAcqAutoSignalToNoise = acqAutoSignalToNoise))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -650,10 +657,15 @@ object GeneratorParamsService {
               gn.acquisition.explicitAcqMode.isEmpty &&
               gn.acquisition.explicitFilter.isEmpty
 
+            // The acquisition S/N is derived from the same classification, which also
+            // requires the classification pass even when the filter is explicit.
+            val acqAutoSignalToNoise: Boolean =
+              gn.acquisition.autoSignalToNoise
+
             gnirsSpectroscopyGeneratorParams(
               obsMode = gn,
               acqMode = InstrumentMode.GnirsImaging(
-                exposureTimeMode = gn.acquisition.exposureTimeMode,
+                exposureTimeMode = gn.acquisition.itcExposureTimeMode,
                 filter           = acqFilter,
                 camera           = gn.acquisitionCamera,
                 readMode         = GnirsReadMode.Bright,
@@ -661,7 +673,8 @@ object GeneratorParamsService {
                 coadds           = gn.acquisition.coadds
               ),
               sciModes = sciModes,
-              gnirsAcqAutoClassify = acqAutoClassify
+              gnirsAcqAutoClassify = acqAutoClassify,
+              gnirsAcqAutoSignalToNoise = acqAutoSignalToNoise
             ).asRight
 
           case ig: igrins2.longslit.Config =>
