@@ -40,6 +40,7 @@
             pkgs.yq
             pkgs.direnv
             pkgs.redis
+            pkgs.github-cli
           ];
           typelevelShell = {
             nodejs.enable = true;
