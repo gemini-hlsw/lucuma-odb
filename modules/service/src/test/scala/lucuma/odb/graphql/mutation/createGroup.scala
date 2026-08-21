@@ -191,7 +191,7 @@ class createGroup extends OdbSuite {
       )
     }
 
-  test("cannot create group requiring all of its initial contents"):
+  test("cannot create group requiring more than its initial contents"):
     for
       pid <- createProgramAs(pi)
       o1  <- createObservationAs(pi, pid)
@@ -204,7 +204,7 @@ class createGroup extends OdbSuite {
                      input: {
                        programId: "$pid"
                        SET: {
-                         minimumRequired: 2
+                         minimumRequired: 3
                        }
                        initialContents: [
                          { observationId: "$o1" }
@@ -217,10 +217,19 @@ class createGroup extends OdbSuite {
                  }
                """,
                expected = {
-                 case OdbError.InvalidArgument(Some("Minimum required (2) must be less than the number of elements in the group (2).")) => ()
+                 case OdbError.InvalidArgument(Some("Minimum required (3) cannot exceed the number of elements in the group (2).")) => ()
                }
              )
     yield ()
+
+  test("can create group requiring all of its initial contents"):
+    for
+      pid <- createProgramAs(pi)
+      o1  <- createObservationAs(pi, pid)
+      o2  <- createObservationAs(pi, pid)
+      gid <- createGroupAs(pi, pid, minRequired = NonNegShort.unsafeFrom(2).some, initialContents = List(Right(o1), Right(o2)).some)
+      ids <- groupElementsAs(pi, pid, gid.some)
+    yield assertEquals(ids, List(Right(o1), Right(o2)))
 
   test("can create group requiring fewer than all of its initial contents"):
     for

@@ -14565,9 +14565,9 @@ input GroupPropertiesInput {
 
   """
   Minimum number of elements to be observed. If unspecified then all elements
-  will be observed. If specified it must be at least 1 and, for a group that
-  already has elements, fewer than the number of elements (requiring all of
-  them is the same as leaving this unspecified).
+  will be observed. If specified it must be at least 1, and may not exceed the
+  number of elements the group already has. It is lowered automatically if
+  elements are later removed, but is left alone once the group is empty.
   """
   minimumRequired: NonNegShort
 

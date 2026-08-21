@@ -84,13 +84,14 @@ object GroupService {
             )
         ).void
 
-      // An OR group must require fewer than all of its elements, since "N of N" is just an AND
-      // group. Empty groups are exempt: a group is always created before its contents are moved
-      // in (see `cloneGroupImpl`), so at that point the count says nothing about the final size.
+      // An OR group cannot require more elements than it has. Empty groups are exempt: a group is
+      // always created before its contents are moved in (see `cloneGroupImpl`), so at that point
+      // the count says nothing about the final size. Values that go stale as elements leave are
+      // clamped down by the database (see the `*_clamp_min_required` triggers).
       private def checkMinimumRequired(minimumRequired: Option[NonNegShort], elementCount: Long, gid: Option[Group.Id]): Result[Unit] =
-        minimumRequired.filter(m => elementCount > 0 && m.value >= elementCount).fold(Result.unit): m =>
+        minimumRequired.filter(m => elementCount > 0 && m.value > elementCount).fold(Result.unit): m =>
           val where: String = gid.fold("the group")(g => s"group $g")
-          OdbError.InvalidArgument(s"Minimum required (${m.value}) must be less than the number of elements in $where ($elementCount).".some).asFailure
+          OdbError.InvalidArgument(s"Minimum required (${m.value}) cannot exceed the number of elements in $where ($elementCount).".some).asFailure
 
       private def checkMinimumRequiredOf(minimumRequired: NonNegShort, which: AppliedFragment, accessPredicate: AppliedFragment): F[Result[Unit]] =
         val af: AppliedFragment = Statements.selectElementCounts(which, accessPredicate)
@@ -396,16 +397,13 @@ object GroupService {
 
     }
 
-    /** Count the present elements (observations and child groups) of each group selected by `which`. */
+    /** Count the present elements of each group selected by `which`, per `group_element_count`. */
     def selectElementCounts(which: AppliedFragment, accessPredicate: AppliedFragment): AppliedFragment =
-      sql"""
-        SELECT
-          g.c_group_id,
-          (SELECT count(*) FROM t_observation o WHERE o.c_group_id  = g.c_group_id AND o.c_existence = $existence) +
-          (SELECT count(*) FROM t_group       c WHERE c.c_parent_id = g.c_group_id AND c.c_existence = $existence)
-        FROM t_group g
-        WHERE g.c_group_id IN (
-      """.apply(Existence.Present, Existence.Present) |+| which |+| void")" |+| accessPredicate
+      void"""
+        SELECT c_group_id, group_element_count(c_group_id)
+        FROM t_group
+        WHERE c_group_id IN (
+      """ |+| which |+| void")" |+| accessPredicate
 
     def moveGroups(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment, access: AppliedFragment): AppliedFragment =
       sql"""
