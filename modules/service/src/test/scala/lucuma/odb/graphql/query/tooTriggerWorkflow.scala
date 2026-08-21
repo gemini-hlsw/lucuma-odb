@@ -348,7 +348,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       ts            <- triggers(oid)
     yield assertEquals(ts.map(_._1), List(Withdrawn, Requested))
 
-  // ACCEPTANCE (V1273/V1274).  A request ends in a "yes" when the observatory acts
+  // ACCEPTANCE (V1274/V1275).  A request ends in a "yes" when the observatory acts
   // on it, which the database records at the first non-slew execution event -- the
   // same boundary v_generator_params uses for not_started -> ongoing, so ACCEPTED
   // and ONGOING land together.  Nobody sets it; there is no mutation.
@@ -401,7 +401,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
 
   // Acceptance deliberately leaves the observation's ready state alone: the state
   // means the PI asked, and that stays true once the ask has been answered.  What
-  // keeps a spent request from being replaced is the guard in V1276 -- supersession
+  // keeps a spent request from being replaced is the guard in V1277 -- supersession
   // only replaces a request that actually existed -- rather than the state going
   // away.  Asserted over a session because no query exposes the stored value, and
   // the guard itself is unreachable from here: the mutations that would provoke it
