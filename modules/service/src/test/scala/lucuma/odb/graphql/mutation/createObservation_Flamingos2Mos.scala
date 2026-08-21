@@ -141,7 +141,7 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                 defaultFilter
                 explicitFilter
                 exposureTimeMode {
-                  signalToNoise { value at { nanometers } }
+                  timeAndCount { time { seconds } count at { nanometers } }
                 }
               }
               initialDisperser
@@ -184,8 +184,9 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                   "defaultFilter": "H",
                   "explicitFilter": null,
                   "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 10.000,
+                    "timeAndCount": {
+                      "time": { "seconds": 5.000000 },
+                      "count": 1,
                       "at": { "nanometers": 2100.000 }
                     }
                   }
@@ -251,7 +252,7 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                 defaultFilter
                 explicitFilter
                 exposureTimeMode {
-                  signalToNoise { value at { nanometers } }
+                  timeAndCount { time { seconds } count at { nanometers } }
                 }
               }
             }
@@ -269,7 +270,7 @@ class createObservation_Flamingos2Mos extends OdbSuite:
         acquisition: {
           explicitFilter: K_SHORT
           exposureTimeMode: {
-            signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+            timeAndCount: { time: { seconds: 25.0 }, count: 2, at: { nanometers: 2200 } }
           }
         }
       }
@@ -284,8 +285,9 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                   "defaultFilter": "H",
                   "explicitFilter": "K_SHORT",
                   "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 25.000,
+                    "timeAndCount": {
+                      "time": { "seconds": 25.000000 },
+                      "count": 2,
                       "at": { "nanometers": 2200.000 }
                     }
                   }
@@ -324,6 +326,41 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                  }
                """,
                expected = List("Argument 'input.SET.observingMode.flamingos2Mos.acquisition' is invalid: 'explicitFilter' must contain one of: J, H, K_SHORT").asLeft
+             )
+    yield ()
+
+  test("a signal-to-noise acquisition exposure time mode is rejected"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- expect(
+               user     = pi,
+               query    = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: {
+                         flamingos2Mos: {
+                           disperser: R1200_HK
+                           filter: H
+                           customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+                           acquisition: {
+                             exposureTimeMode: {
+                               signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = List("Argument 'input.SET.observingMode.flamingos2Mos.acquisition' is invalid: A Flamingos 2 MOS acquisition exposure time mode must be Time & Count.").asLeft
              )
     yield ()
 

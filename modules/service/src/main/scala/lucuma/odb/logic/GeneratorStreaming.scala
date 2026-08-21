@@ -318,10 +318,9 @@ object GeneratorStreaming:
         import lucuma.odb.sequence.flamingos2.mos.Mos
         (for
           cfg <- extractMode(ObservingMode.Flamingos2MosName, context)(_.asFlamingos2Mos)
-          acq  = acquisitionTime(context.oid, context.itcRes)
           sci  = spectroscopyScienceTime(context.oid, context.itcRes)
           rol  = context.params.calibrationRole
-          gen <- EitherT(Mos.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, acq, sci, rol))
+          gen <- EitherT(Mos.instantiate(context.oid, calculator.flamingos2Step, context.namespace, exp.flamingos2, cfg, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

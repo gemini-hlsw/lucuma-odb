@@ -168,7 +168,8 @@ sealed trait ExposureTimeModeService[F[_]]:
     explicitAcquisition: Option[ExposureTimeMode],
     explicitScience:     Option[ExposureTimeMode],
     newRequirement:      Option[ExposureTimeMode],
-    which:               List[Observation.Id]
+    which:               List[Observation.Id],
+    acquisitionDefault:  Wavelength => ExposureTimeMode = ExposureTimeMode.forAcquisition
   )(using Transaction[F]): F[Result[Map[Observation.Id, (ExposureTimeModeId, ExposureTimeModeId)]]]
 
   /**
@@ -297,10 +298,11 @@ object ExposureTimeModeService:
         explicitAcquisition: Option[ExposureTimeMode],
         explicitScience:     Option[ExposureTimeMode],
         newRequirement:      Option[ExposureTimeMode],
-        which:               List[Observation.Id]
+        which:               List[Observation.Id],
+        acquisitionDefault:  Wavelength => ExposureTimeMode
       )(using Transaction[F]): F[Result[Map[Observation.Id, (ExposureTimeModeId, ExposureTimeModeId)]]] =
         (for
-          r <- ResultT(resolve[Unit](observingModeName, explicitAcquisition, NonEmptyList.one(((), explicitScience)), newRequirement, which))
+          r <- ResultT(resolve[Unit](observingModeName, explicitAcquisition, NonEmptyList.one(((), explicitScience)), newRequirement, which, acquisitionDefault))
           m <- ResultT.liftF(insertResolvedAcquisitionAndScience(r))
         yield m.view.mapValues((acq, sci) => (acq, sci.head._2)).toMap).value
 

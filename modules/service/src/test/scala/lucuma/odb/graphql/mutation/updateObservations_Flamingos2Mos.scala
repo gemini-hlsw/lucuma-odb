@@ -193,7 +193,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
           defaultFilter
           explicitFilter
           exposureTimeMode {
-            signalToNoise { value at { nanometers } }
+            timeAndCount { time { seconds } count at { nanometers } }
           }
         }
       }
@@ -209,7 +209,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
                         acquisition: {
                           explicitFilter: J
                           exposureTimeMode: {
-                            signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+                            timeAndCount: { time: { seconds: 25.0 }, count: 2, at: { nanometers: 2200 } }
                           }
                         }
                       }
@@ -227,8 +227,9 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
                                   "defaultFilter": "H",
                                   "explicitFilter": "J",
                                   "exposureTimeMode": {
-                                    "signalToNoise": {
-                                      "value": 25.000,
+                                    "timeAndCount": {
+                                      "time": { "seconds": 25.000000 },
+                                      "count": 2,
                                       "at": { "nanometers": 2200.000 }
                                     }
                                   }
@@ -256,8 +257,9 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
                                   "defaultFilter": "H",
                                   "explicitFilter": null,
                                   "exposureTimeMode": {
-                                    "signalToNoise": {
-                                      "value": 25.000,
+                                    "timeAndCount": {
+                                      "time": { "seconds": 25.000000 },
+                                      "count": 2,
                                       "at": { "nanometers": 2200.000 }
                                     }
                                   }
