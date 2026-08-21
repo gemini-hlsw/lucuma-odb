@@ -6,11 +6,13 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.either.*
+import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.NonNegShort
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.model.Semester
+import lucuma.odb.data.OdbError
 
 class createGroup extends OdbSuite {
 
@@ -164,6 +166,78 @@ class createGroup extends OdbSuite {
       ids  <- groupElementsAs(pi, pid, Some(g2))
     } yield assertEquals(ids, List(Right(o1), Left(g1), Right(o2)))
   }
+
+  test("cannot create group with minimumRequired of zero"):
+    createProgramAs(pi).flatMap { pid =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createGroup(
+              input: {
+                programId: "$pid",
+                SET: {
+                  minimumRequired: 0
+                }
+              }
+            ) {
+              group { id }
+            }
+          }
+        """,
+        expected = List(
+          "Argument 'input.SET' is invalid: Minimum required must be at least 1."
+        ).asLeft
+      )
+    }
+
+  test("cannot create group requiring all of its initial contents"):
+    for
+      pid <- createProgramAs(pi)
+      o1  <- createObservationAs(pi, pid)
+      o2  <- createObservationAs(pi, pid)
+      _   <- expectOdbError(
+               user = pi,
+               query = s"""
+                 mutation {
+                   createGroup(
+                     input: {
+                       programId: "$pid"
+                       SET: {
+                         minimumRequired: 2
+                       }
+                       initialContents: [
+                         { observationId: "$o1" }
+                         { observationId: "$o2" }
+                       ]
+                     }
+                   ) {
+                     group { id }
+                   }
+                 }
+               """,
+               expected = {
+                 case OdbError.InvalidArgument(Some("Minimum required (2) must be less than the number of elements in the group (2).")) => ()
+               }
+             )
+    yield ()
+
+  test("can create group requiring fewer than all of its initial contents"):
+    for
+      pid <- createProgramAs(pi)
+      o1  <- createObservationAs(pi, pid)
+      o2  <- createObservationAs(pi, pid)
+      gid <- createGroupAs(pi, pid, minRequired = NonNegShort.unsafeFrom(1).some, initialContents = List(Right(o1), Right(o2)).some)
+      ids <- groupElementsAs(pi, pid, gid.some)
+    yield assertEquals(ids, List(Right(o1), Right(o2)))
+
+  // An empty group is exempt from the upper bound: groups are created before their contents
+  // are moved in, so at creation time the element count says nothing about the final size.
+  test("can create an empty group with any minimumRequired"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- createGroupAs(pi, pid, minRequired = NonNegShort.unsafeFrom(4).some)
+    yield ()
 
   test("cannot create group with sameNighte and maximumInterval"):
     createProgramAs(pi).flatMap { pid =>
