@@ -25,7 +25,7 @@ import lucuma.odb.util.Codecs.observation_id
 import skunk.Query
 import skunk.syntax.all.*
 
-class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
+class updateObservations_GmosMos extends OdbSuite with MosMaskSupport:
 
   val pi: StandardUser = TestUsers.Standard.pi(nextId, nextId)
 
@@ -176,8 +176,7 @@ class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
                  }
                }
              """.asRight)
-      cols <- readNorthMaskColumns(oid)
-      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _    <- readNorthMaskColumns(oid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
   // The mask is a whole value, so supplying it replaces it outright.
@@ -209,8 +208,7 @@ class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
                  }
                }
              """.asRight)
-      cols <- readNorthMaskColumns(oid)
-      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _    <- readNorthMaskColumns(oid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
   test("resending the attachment alongside a new slit width keeps it"):
@@ -415,9 +413,6 @@ class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
                )
     yield ()
 
-  // A mask plate is machined for one instrument, so the two GMOS arms are as
-  // distinct here as GMOS and Flamingos-2 are.
-
   private def mismatch(maskName: String, mask: Instrument, obs: Instrument): List[String] =
     List(AttachmentMetadataService.maskInstrumentMismatchMessage(
       NonEmptyString.unsafeFrom(maskName),
@@ -439,8 +434,7 @@ class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
                       expected = mismatch("GS2025AQ001-01", Instrument.GmosSouth, Instrument.GmosNorth).asLeft
                     )
       // The refused update leaves the observation without a mask.
-      cols       <- readNorthMaskColumns(oid)
-      _          <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _          <- readNorthMaskColumns(oid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
   test("creating with a GMOS South mask on a GMOS North observation is rejected"):
@@ -468,7 +462,9 @@ class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
              )
     yield ()
 
-  test("a batch update naming a mismatched mask fails as a whole"):
+  // The only mask mutation test with more than one observation, so the only one
+  // that exercises the pre-check's multi-id fragment.
+  test("a mask is validated against every observation in a batch update"):
     for
       (pid, oid1) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
       tid         <- createTargetAs(pi, pid)
@@ -491,13 +487,11 @@ class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
                        """,
                        expected = mismatch("GS2025AQ001-01", Instrument.GmosSouth, Instrument.GmosNorth).asLeft
                      )
-      cols1       <- readNorthMaskColumns(oid1)
-      cols2       <- readNorthMaskColumns(oid2)
-      _           <- IO(assertEquals(cols1, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
-      _           <- IO(assertEquals(cols2, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _           <- readNorthMaskColumns(oid1).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
+      _           <- readNorthMaskColumns(oid2).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
-  test("switching an observation to the other GMOS arm with its mask is rejected"):
+  test("switching an observation to the other GMOS instrument with its mask is rejected"):
     for
       (pid, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
       aid        <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)

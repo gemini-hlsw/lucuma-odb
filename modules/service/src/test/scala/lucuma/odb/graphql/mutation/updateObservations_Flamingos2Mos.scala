@@ -25,7 +25,7 @@ import lucuma.odb.util.Codecs.observation_id
 import skunk.Query
 import skunk.syntax.all.*
 
-class updateObservations_Flamingos2Mos extends OdbSuite with MosMaskOps:
+class updateObservations_Flamingos2Mos extends OdbSuite with MosMaskSupport:
 
   val pi: StandardUser = TestUsers.Standard.pi(nextId, nextId)
 
@@ -165,8 +165,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite with MosMaskOps:
                   }
                 }
               """.asRight)
-      cols <- readMaskColumns(oid)
-      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _    <- readMaskColumns(oid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
   private val AcquisitionSelection: String =
@@ -371,8 +370,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite with MosMaskOps:
                       ),
                       expected = List(Flamingos2MosService.MaskAttachmentViolationMessage).asLeft
                     )
-      cols       <- readMaskColumns(oid)
-      _          <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _          <- readMaskColumns(oid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
   test("an attachment from another program is rejected"):
@@ -423,6 +421,5 @@ class updateObservations_Flamingos2Mos extends OdbSuite with MosMaskOps:
                         Instrument.Flamingos2
                       )).asLeft
                     )
-      cols       <- readMaskColumns(oid)
-      _          <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _          <- readMaskColumns(oid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()

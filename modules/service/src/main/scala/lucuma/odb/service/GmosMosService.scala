@@ -213,9 +213,6 @@ object GmosMosService {
       ): ExposureTimeMode =
         explicit.getOrElse(defaultAcquisitionExposureTimeMode(at))
 
-      // The instrument the mask must match is the mode's own, not the
-      // observation's current one, so switching a MOS observation between
-      // instruments is covered by the same check.
       private def validateMask(
         mask:       GmosFpuMask.Custom,
         instrument: Instrument,

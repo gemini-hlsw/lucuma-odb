@@ -28,7 +28,7 @@ import skunk.Query
 import skunk.codec.text.text
 import skunk.syntax.all.*
 
-class createObservation_Flamingos2Mos extends OdbSuite with MosMaskOps:
+class createObservation_Flamingos2Mos extends OdbSuite with MosMaskSupport:
 
   val pi: StandardUser = TestUsers.Standard.pi(nextId, nextId)
 

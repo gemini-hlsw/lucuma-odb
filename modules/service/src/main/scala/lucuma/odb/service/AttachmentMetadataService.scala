@@ -34,15 +34,6 @@ trait AttachmentMetadataService [F[_]] {
   /**
    * Refuses a MOS mask attachment cut for an instrument other than the one the
    * given observations use.
-   *
-   * The widened mask foreign key on each MOS mode table is what actually
-   * guarantees this.  The lookup exists only so the common mistake -- picking
-   * the wrong plate -- gets a message naming the plate and both instruments,
-   * rather than the composite violation's list of four conditions.  A missing
-   * attachment, one of the wrong type, and one belonging to another program are
-   * all left to that violation, which is also why the lookup is scoped to the
-   * observations' program: it must not report the mask name of a plate the
-   * caller cannot see.
    */
   def validateMaskInstrument(
     attachmentId: Option[Attachment.Id],
@@ -124,8 +115,7 @@ object AttachmentMetadataService {
     val MaskNameAndInstrument: Decoder[(NonEmptyString, Instrument)] =
       text_nonempty *: instrument
 
-    // Joined through the program so a mask on another program simply yields no
-    // row, leaving that case to the mask foreign key.
+    // Joined through the program so a mask on another program simply yields no row.
     def selectMaskInstrument(
       aid:   Attachment.Id,
       which: NonEmptyList[Observation.Id]

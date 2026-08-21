@@ -32,7 +32,7 @@ import lucuma.odb.util.Codecs.observation_id
 import skunk.Query
 import skunk.syntax.all.*
 
-class cloneObservation extends OdbSuite with ObservingModeSetupOperations with MosMaskOps {
+class cloneObservation extends OdbSuite with ObservingModeSetupOperations with MosMaskSupport {
   val pi, pi2 = TestUsers.Standard.pi(nextId, nextId)
   val staff   = TestUsers.Standard.staff(nextId, nextId)
   lazy val validUsers = List(pi, pi2, staff)
@@ -2774,8 +2774,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                  }
                """.asRight
              )
-      cols <- readMaskColumns("t_gmos_north_mos", coid)
-      _    <- IO(assertEquals(cols, (aid.some, AttachmentType.MosMask.some)))
+      _    <- readMaskColumns("t_gmos_north_mos", coid).assertEquals((aid.some, AttachmentType.MosMask.some))
     yield ()
 
   test("clone GMOS South MOS observation with no mask defined keeps the empty mask"):
@@ -2822,8 +2821,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                  }
                """.asRight
              )
-      cols <- readMaskColumns("t_gmos_south_mos", coid)
-      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _    <- readMaskColumns("t_gmos_south_mos", coid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
   test("clone F2 MOS observation preserves the mask and overrides"):
@@ -2905,8 +2903,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                  }
                """.asRight
              )
-      cols <- readMaskColumns("t_flamingos_2_mos", coid)
-      _    <- IO(assertEquals(cols, (aid.some, AttachmentType.MosMask.some)))
+      _    <- readMaskColumns("t_flamingos_2_mos", coid).assertEquals((aid.some, AttachmentType.MosMask.some))
     yield ()
 
   test("clone F2 MOS observation with no mask defined keeps the empty mask"):
@@ -2952,8 +2949,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
                  }
                """.asRight
              )
-      cols <- readMaskColumns("t_flamingos_2_mos", coid)
-      _    <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _    <- readMaskColumns("t_flamingos_2_mos", coid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
 }

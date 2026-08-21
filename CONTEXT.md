@@ -81,7 +81,7 @@ The design parsed out of a Mask Attachment's file at upload and recorded on the 
 _Avoid_: mask metadata, mask blob (names the storage, not the concept), ODF (names the file format). Also beware the unrelated `lucuma.core.model.MaskDefinition`, which is the "assigned or not yet assigned" state of a Custom Mask's Mask Attachment, not a design at all.
 
 **Mask Instrument**:
-The instrument a Mask Attachment's plate was cut for — one of GMOS North, GMOS South or Flamingos-2, the three that do MOS at Gemini. Read from the mask file, so normally part of the Mask Definition, but known separately from it: a mask that predates parsing carries an instrument *inferred* from an observation that used it, and so has a Mask Instrument with no Mask Definition. The two GMOS arms are distinct answers, not one, because a plate is machined for one arm and cannot be mounted in the other. Always present on a Mask Attachment.
+The instrument a Mask Attachment's plate was cut for — one of GMOS North, GMOS South or Flamingos-2, the three that do MOS at Gemini. Read from the mask file, so always part of the Mask Definition and never entered. The two GMOS arms are distinct answers, not one, because a plate is machined for one arm and cannot be mounted in the other. Always present on a Mask Attachment: a design that names anything else is refused on upload.
 _Avoid_: mask site (the site does not distinguish GMOS from Flamingos-2), mask type.
 
 **Alignment Box**:

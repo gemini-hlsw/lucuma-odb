@@ -15,7 +15,7 @@ import lucuma.core.model.Observation
 
 // Shared by the suites below, which cannot be one suite because the delete test
 // additionally needs S3 for the attachment route.
-trait CustomMaskOps extends ReplaceSequenceOps with MosMaskOps:
+trait CustomMaskOps extends ReplaceSequenceOps with MosMaskSupport:
   self: query.ExecutionTestSupport =>
 
   protected val SlitWidth = "CUSTOM_WIDTH_0_50"

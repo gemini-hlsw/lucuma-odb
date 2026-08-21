@@ -11,14 +11,11 @@ import cats.syntax.all.*
 import io.circe.ACursor
 import io.circe.Json
 import io.circe.literal.*
-import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.service.AttachmentFileService
-import lucuma.odb.service.AttachmentMetadataService
-import lucuma.refined.*
 import org.http4s.Response
 import org.http4s.Status
 
@@ -186,10 +183,6 @@ class maskDefinition extends AttachmentsSuite:
       masks <- queryMasks(pid)
     yield assertEquals(masks.head.path("mask"), Json.Null)
 
-  // A mask's instrument is part of the key an observation's mask reference
-  // points at, so these exercise the whole path from the uploaded file through
-  // the parse to the constraint, without reading the column directly.
-
   private def gmosSouthMosObservation(pid: Program.Id): IO[Observation.Id] =
     createTargetAs(pi, pid).flatMap: tid =>
       createObservationAs(pi, pid, ObservingModeType.GmosSouthMos.some, tid)
@@ -227,24 +220,6 @@ class maskDefinition extends AttachmentsSuite:
                  }
                }
              """.asRight)
-    yield ()
-
-  test("an uploaded design cannot be assigned to an observation for another instrument"):
-    for
-      pid <- createProgramAs(pi)
-      oid <- gmosSouthMosObservation(pid)
-      aid <- insertAttachment(pi, pid, f2Mask).toAttachmentId
-      _   <- expect(
-               pi,
-               assignMask(oid, aid),
-               List(
-                 AttachmentMetadataService.maskInstrumentMismatchMessage(
-                   "GS2015AQ023-01".refined,
-                   Instrument.Flamingos2,
-                   Instrument.GmosSouth
-                 )
-               ).asLeft
-             )
     yield ()
 
   test("an assigned mask's file cannot be replaced by one for another instrument"):

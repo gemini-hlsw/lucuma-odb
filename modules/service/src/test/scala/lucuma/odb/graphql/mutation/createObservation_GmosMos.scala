@@ -19,7 +19,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.service.AttachmentMetadataService
 
-class createObservation_GmosMos extends OdbSuite with MosMaskOps:
+class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
 
   val pi: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
   val staff: StandardUser = TestUsers.Standard.staff(nextId, nextId)
@@ -501,8 +501,6 @@ class createObservation_GmosMos extends OdbSuite with MosMaskOps:
       _    <- assertIO(IO(rMos =!= rLs), true, "MOS and long slit shared a configuration request")
     yield ()
 
-  // The plate is machined for one GMOS arm, so the other arm's mask is refused
-  // at creation rather than discovered at the telescope.
   test("create GMOS South MOS with a GMOS North mask is rejected"):
     for
       pid <- createProgramAs(pi)
