@@ -11,12 +11,14 @@ import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SchedulingMode
+import lucuma.core.enums.TimingWindowInclusion
 import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -202,11 +204,12 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
     yield (pid, oid, tid)
 
   case class Trigger(
-    id:         TooTrigger.Id,
-    status:     TooTriggerStatus,
-    activation: TooActivation,
-    supersedes: Option[TooTrigger.Id],
-    resolution: Option[String]
+    id:          TooTrigger.Id,
+    status:      TooTriggerStatus,
+    activation:  TooActivation,
+    supersedes:  Option[TooTrigger.Id],
+    resolution:  Option[String],
+    requestedAt: Timestamp
   )
 
   object Trigger:
@@ -219,7 +222,8 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
           s          <- c.downField("supersedes").as[Option[Json]]
           supersedes <- s.traverse(_.hcursor.downField("id").as[TooTrigger.Id])
           reason     <- c.downField("resolutionReason").as[Option[String]]
-        yield Trigger(id, status, activation, supersedes, reason)
+          at         <- c.downField("requestedAt").as[Timestamp]
+        yield Trigger(id, status, activation, supersedes, reason, at)
 
   def getTooTriggersAs(user: User, oid: Observation.Id): IO[List[Trigger]] =
     query(
@@ -233,6 +237,7 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
               tooActivation
               supersedes { id }
               resolutionReason
+              requestedAt
             }
           }
         }
@@ -254,12 +259,75 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
               tooActivation
               supersedes { id }
               resolutionReason
+              requestedAt
             }
           }
         }
       """
     ).map: js =>
       js.hcursor.downFields("tooTriggers", "matches").require[List[Json]].head.hcursor.require[Trigger]
+
+  /**
+   * A timing window, reduced to what the default-window rule turns on: whether
+   * it includes or excludes, when it opens, and when (if ever) it closes.  Only
+   * the `at` flavour of end is read, since that is the one the default uses.
+   */
+  case class Window(inclusion: TimingWindowInclusion, start: Timestamp, end: Option[Timestamp])
+
+  object Window:
+    given Decoder[Window] =
+      Decoder.instance: c =>
+        for
+          i <- c.downField("inclusion").as[TimingWindowInclusion]
+          s <- c.downField("startUtc").as[Timestamp]
+          e <- c.downField("end").as[Option[Json]]
+          a <- e.flatTraverse(_.hcursor.downField("atUtc").as[Option[Timestamp]])
+        yield Window(i, s, a)
+
+  def getTimingWindowsAs(user: User, oid: Observation.Id): IO[List[Window]] =
+    query(
+      user,
+      s"""
+        query {
+          observation(observationId: ${oid.asJson}) {
+            schedulingConstraints {
+              timingWindows {
+                inclusion
+                startUtc
+                end { ... on TimingWindowEndAt { atUtc } }
+              }
+            }
+          }
+        }
+      """
+    ).map:
+      _.hcursor.downFields("observation", "schedulingConstraints", "timingWindows")
+       .require[List[Json]]
+       .map(_.hcursor.require[Window])
+
+  /** Replaces the observation's timing windows wholesale; `twis` is a GraphQL list literal. */
+  def setTimingWindowsAs(user: User, oid: Observation.Id, twis: String): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: { schedulingConstraints: { timingWindows: $twis } }
+            WHERE: { id: { EQ: ${oid.asJson} } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  /** Gives the observation one open-ended INCLUDE window of its own. */
+  def setTimingWindowAs(user: User, oid: Observation.Id, startUtc: String): IO[Unit] =
+    setTimingWindowsAs(user, oid, s"""[ { inclusion: INCLUDE, startUtc: "$startUtc" } ]""")
+
+  /** Removes every timing window, leaving the observation with none. */
+  def clearTimingWindowsAs(user: User, oid: Observation.Id): IO[Unit] =
+    setTimingWindowsAs(user, oid, "[]")
 
   def declineQuery(rid: TooTrigger.Id, reason: Option[String] = None): String =
     s"""
