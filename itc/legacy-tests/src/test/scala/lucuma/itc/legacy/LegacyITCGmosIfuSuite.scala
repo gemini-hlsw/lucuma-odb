@@ -24,8 +24,8 @@ import scala.concurrent.duration.*
  * End-to-end checks of GMOS IFU against the legacy recipe, running whatever
  * `ObservingMode.analysisMethod` produces rather than a hand-written analysis method. Getting the
  * sampling geometry wrong is silent: an element offset a few arcsec off target comes back with a
- * S/N of exactly zero, and a radius below one lenslet pitch comes back with no apertures at all,
- * so "it returned a result" is not enough on its own.
+ * S/N of exactly zero, and a radius below one lenslet pitch comes back with no apertures at all, so
+ * "it returned a result" is not enough on its own.
  */
 class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
 
@@ -101,8 +101,12 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
   private def assertRealSignal(mode: ObservingMode): IO[Unit] =
     run(mode).map: r =>
       r.ccds.toList.zipWithIndex.foreach: (ccd, i) =>
-        assert(ccd.singleSNRatio > 0, s"${mode.description} CCD $i single S/N was ${ccd.singleSNRatio}")
-        assert(ccd.totalSNRatio > 0, s"${mode.description} CCD $i total S/N was ${ccd.totalSNRatio}")
+        assert(ccd.singleSNRatio > 0,
+               s"${mode.description} CCD $i single S/N was ${ccd.singleSNRatio}"
+        )
+        assert(ccd.totalSNRatio > 0,
+               s"${mode.description} CCD $i total S/N was ${ccd.totalSNRatio}"
+        )
 
   test("gmos north ifu produces signal".tag(LegacyITCTest)):
     List(GmosNorthFpu.Ifu2Slits, GmosNorthFpu.IfuBlue, GmosNorthFpu.IfuRed)
@@ -129,11 +133,15 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
       for
         dflt   <- run(gnMode(f))
         single <- runWith(gnMode(f),
-                    ItcObservationDetails.AnalysisMethod.Ifu
-                      .Single(gnMode(f).ifuSky.get.fibres.value, 0.0)
+                          ItcObservationDetails.AnalysisMethod.Ifu
+                            .Single(gnMode(f).ifuSky.get.fibres.value, 0.0)
                   )
       yield
-        assertEqualsDouble(dflt.ccds.head.singleSNRatio, single.ccds.head.singleSNRatio, 1e-9, s"$f")
+        assertEqualsDouble(dflt.ccds.head.singleSNRatio,
+                           single.ccds.head.singleSNRatio,
+                           1e-9,
+                           s"$f"
+        )
         assertEqualsDouble(dflt.ccds.head.totalSNRatio, single.ccds.head.totalSNRatio, 1e-9, s"$f")
     }
 
