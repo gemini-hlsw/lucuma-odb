@@ -5,7 +5,6 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import io.circe.Json
@@ -152,17 +151,6 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
       }
     """
 
-  // The same observation as a long slit, for the setup time comparison.
-  private val EquivalentLongSlitMode: String =
-    """
-      flamingos2LongSlit: {
-        disperser: R1200_JH
-        filter: JH
-        fpu: LONG_SLIT_1
-      }
-    """
-
-  // A crowded field is asked for by writing the nod-to-sky configs explicitly.
   private val CrowdedFieldMode: String =
     """
       flamingos2Mos: {
@@ -253,7 +241,7 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
           """.asRight
       )
 
-  private def setupTime(pid: Program.Id, oid: Observation.Id): IO[TimeSpan] =
+  private def setupTimes(pid: Program.Id, oid: Observation.Id): IO[(TimeSpan, TimeSpan)] =
     runObscalcUpdate(pid, oid) *>
       query(
         pi,
@@ -263,7 +251,10 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
               execution {
                 digest {
                   value {
-                    setup { full { seconds } }
+                    setup {
+                      full { seconds }
+                      reacquisition { seconds }
+                    }
                   }
                 }
               }
@@ -271,17 +262,17 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
           }
         """
       ).map: json =>
-        json.hcursor
-          .downFields("observation", "execution", "digest", "value", "setup", "full")
-          .require[TimeSpan]
+        val setup = json.hcursor.downFields("observation", "execution", "digest", "value", "setup")
+        (setup.downField("full").require[TimeSpan], setup.downField("reacquisition").require[TimeSpan])
 
-  // No MOS setup time has been measured yet, so the digest borrows the long slit's.
-  test("the setup time is the long slit's"):
-    assertIOBoolean(
+  private val MosSetup: TimeSpan      = 30.minuteTimeSpan
+  private val Reacquisition: TimeSpan = 6.minuteTimeSpan
+
+  test("MOS setup and reacquisition time"):
+    assertIO(
       for
-        (pm, om) <- setupWithProgram(SparseFieldMode)
-        (pl, ol) <- setupWithProgram(EquivalentLongSlitMode)
-        mos      <- setupTime(pm, om)
-        ls       <- setupTime(pl, ol)
-      yield mos === ls
+        (p, o)        <- setupWithProgram(SparseFieldMode)
+        (full, reacq) <- setupTimes(p, o)
+      yield (full, reacq),
+      (MosSetup, Reacquisition)
     )

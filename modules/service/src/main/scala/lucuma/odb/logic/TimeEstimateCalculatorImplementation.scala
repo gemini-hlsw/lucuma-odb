@@ -75,6 +75,15 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.Flamingos2LongslitMaxVisit.time
       )
 
+    lazy val flamingos2MosSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.Flamingos2MosSetup.time,
+          ctx.enums.TimeEstimate.Flamingos2Reacquisition.time
+        ),
+        ctx.enums.TimeEstimate.Flamingos2MosMaxVisit.time
+      )
+
     lazy val flamingos2ImagingSetup: SetupTimeEstimateCalculator =
       flamingos2LongSlitSetup
 
