@@ -123,7 +123,8 @@ object ItcBenchmarkSetup:
         GmosAmpReadMode.Fast
       ).some,
       GmosRoi.FullFrame.some,
-      PortDisposition.Side
+      PortDisposition.Side,
+      none
     )
 
     val conditions = ItcObservingConditions(
