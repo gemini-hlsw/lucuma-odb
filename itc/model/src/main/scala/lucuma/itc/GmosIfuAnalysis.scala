@@ -7,8 +7,8 @@ import cats.Eq
 import lucuma.core.math.Angle
 
 /**
- * How to sample a GMOS IFU field. The number of fibres on sky is deliberately not part of this:
- * it follows from the focal plane unit, so the sampling geometry is all the caller chooses.
+ * How to sample a GMOS IFU field. The number of fibres on sky is deliberately not part of this: it
+ * follows from the focal plane unit, so the sampling geometry is all the caller chooses.
  */
 enum GmosIfuAnalysis:
   /** Sum every IFU element whose centre falls within `radius` of the field centre. */
