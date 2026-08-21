@@ -1,5 +1,5 @@
 #import PosInt, BigDecimal, TimeSpan, NonNegInt, Band, Wavelength, SignalToNoiseAt, SignalToNoise from "lucuma/odb/graphql/OdbSchema.graphql"
-#import WavelengthInput, ExposureTimeModeInput, TimeAndCountExposureTimeModeInput, PortDisposition from "lucuma/odb/graphql/OdbSchema.graphql"
+#import WavelengthInput, ExposureTimeModeInput, TimeAndCountExposureTimeModeInput, PortDisposition, AngleInput from "lucuma/odb/graphql/OdbSchema.graphql"
 #import ImageQualityPreset, CloudExtinctionPreset, SkyBackground, WaterVapor, ElevationRangeInput, SourceProfileInput, RadialVelocityInput from "lucuma/odb/graphql/OdbSchema.graphql"
 #import GmosSouthGrating, GmosSouthFpuInput, GmosSouthFilter, GmosCcdModeInput, GmosRoi, GmosNorthGrating, GmosNorthFpuInput, GmosNorthFilter from "lucuma/odb/graphql/OdbSchema.graphql"
 #import Flamingos2Disperser, Flamingos2FpuMaskInput, Flamingos2Filter, Flamingos2ReadMode from "lucuma/odb/graphql/OdbSchema.graphql"
@@ -88,6 +88,12 @@ input GmosSSpectroscopyInput {
   Instrument port disposition
   """
   port: PortDisposition = SIDE
+
+  """
+  How to sample the IFU field. Only meaningful when `fpu` selects an IFU; defaults to summing
+  within one lenslet pitch of the field centre.
+  """
+  ifuAnalysis: GmosIfuAnalysisInput
 }
 
 input GmosSImagingInput {
@@ -152,6 +158,12 @@ input GmosNSpectroscopyInput {
   Instrument port disposition
   """
   port: PortDisposition = SIDE
+
+  """
+  How to sample the IFU field. Only meaningful when `fpu` selects an IFU; defaults to summing
+  within one lenslet pitch of the field centre.
+  """
+  ifuAnalysis: GmosIfuAnalysisInput
 }
 
 input GmosNImagingInput {
@@ -174,6 +186,27 @@ input GmosNImagingInput {
   Instrument port disposition
   """
   port: PortDisposition = SIDE
+}
+
+"""
+How to sample a GMOS IFU field: exactly one of a summation radius or a single element offset.
+The number of fibres on sky is not settable — it follows from the focal plane unit.
+
+Omitting this on an IFU focal plane unit sums within one lenslet pitch (0.2 arcsec), which
+encloses only the element on the field centre. Supplying it with a non-IFU focal plane unit is
+an error.
+"""
+input GmosIfuAnalysisInput @oneOf {
+  """
+  Sum every IFU element whose centre falls within this radius of the field centre. Must be
+  greater than zero.
+  """
+  sumRadius: AngleInput
+
+  """
+  Measure the single IFU element sitting this far from the field centre.
+  """
+  singleOffset: AngleInput
 }
 
 input Flamingos2SpectroscopyInput {

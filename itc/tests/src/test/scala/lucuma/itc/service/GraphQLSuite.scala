@@ -45,6 +45,28 @@ trait GraphQLSuiteBase extends munit.CatsEffectSuite:
       .flatMap(_.as[Json])
       .assertEquals(expected)
 
+  /**
+   * Asserts only the `errors[].message` values. Grackle wraps a validation failure in an argument
+   * path and repeats it inside `extensions`, so comparing whole payloads buries the one string the
+   * test is actually about.
+   */
+  def queryErrors(query: String, expected: List[String]): IO[Unit] =
+    IO(itcFixture())
+      .flatMap: itc =>
+        itc.orNotFound
+          .run:
+            Request(method = Method.POST, uri = uri"/graphql")
+              .withEntity(Json.obj("query" -> Json.fromString(query)))
+      .flatMap(_.as[Json])
+      .map: json =>
+        json.hcursor
+          .downField("errors")
+          .values
+          .toList
+          .flatten
+          .flatMap(_.hcursor.downField("message").as[String].toOption)
+      .assertEquals(expected)
+
   def query(query: String, variables: String, expected: Json): IO[Unit] =
     IO(itcFixture())
       .flatMap: itc =>

@@ -136,10 +136,9 @@ object ItcImpl {
         T.span("calculate time and graphs")
           .surround:
             observingMode match
-              case s @ (SpectroscopyMode.GmosNorth(_, _, _, _, _, _, _) |
-                  SpectroscopyMode.GmosSouth(_, _, _, _, _, _, _) |
-                  SpectroscopyMode.Flamingos2(_, _, _, _, _) | SpectroscopyMode.Igrins2(_) |
-                  SpectroscopyMode.Ghost(_, _, _, _, _) |
+              case s @ (SpectroscopyMode.GmosNorth(centralWavelength = _) | SpectroscopyMode
+                    .GmosSouth(centralWavelength = _) | SpectroscopyMode.Flamingos2(_, _, _, _, _) |
+                  SpectroscopyMode.Igrins2(_) | SpectroscopyMode.Ghost(_, _, _, _, _) |
                   SpectroscopyMode.GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _)) =>
                 spectroscopyTimeAndGraphs(
                   target,

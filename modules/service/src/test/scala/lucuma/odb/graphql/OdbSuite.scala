@@ -322,9 +322,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         val signal = Wavelength.fromIntNanometers(666).get
         val igrins2Signal = Wavelength.fromIntNanometers(2200).get
         val wavelength = input.mode match
-          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(_, d, _, _, _, _)      => d.wavelength
-          case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(_, w, _, _, _, _, _, _) => w
-          case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(_, w, _, _, _, _, _, _) => w
+          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(disperser = d)        => d.wavelength
+          case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(centralWavelength = w) => w
+          case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(centralWavelength = w) => w
           case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy(_, _)                     => igrins2Signal
           case g: lucuma.itc.client.InstrumentMode.GnirsSpectroscopy                          => g.centralWavelength
           // If we need a wavelength for GHOST tests, we'll need to figure out one.
