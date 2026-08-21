@@ -718,7 +718,7 @@ class updateGroups extends OdbSuite {
           mutation {
             updateGroups(input: {
               SET: { sameNight: true },
-              WHERE: { id: { EQ: ${gid.asJson} } }
+              WHERE: { id: { IN: [${gid.asJson}] } }
             }) { groups { id sameNight } }
           }
         """,
@@ -766,6 +766,102 @@ class updateGroups extends OdbSuite {
       _   <- updateSameNight(pi, gid, "sameNight: true", None)
       _   <- updateSameNight(pi, gid, "maximumInterval: { hours: 1 }", sameNightDbError.some)
     } yield ()
+
+  private def updateMinimumRequired(gid: Group.Id, value: Int): String =
+    s"""
+      mutation {
+        updateGroups(input: {
+          SET: { minimumRequired: $value }
+          WHERE: { id: { EQ: ${gid.asJson} } }
+        }) {
+          groups { id minimumRequired }
+        }
+      }
+    """
+
+  test("cannot set minimumRequired to zero"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- expect(
+               user = pi,
+               query = updateMinimumRequired(gid, 0),
+               expected = List(
+                 "Argument 'input.SET' is invalid: Minimum required must be at least 1."
+               ).asLeft
+             )
+    yield ()
+
+  test("cannot set minimumRequired to the number of elements in the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expectOdbError(
+               user = pi,
+               query = updateMinimumRequired(gid, 2),
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) =>
+                   assertEquals(msg, s"Minimum required (2) must be less than the number of elements in group $gid (2).")
+               }
+             )
+    yield ()
+
+  test("cannot set minimumRequired above the number of elements in the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expectOdbError(
+               user = pi,
+               query = updateMinimumRequired(gid, 3),
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) =>
+                   assertEquals(msg, s"Minimum required (3) must be less than the number of elements in group $gid (1).")
+               }
+             )
+    yield ()
+
+  test("can set minimumRequired below the number of elements in the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expect(
+               user = pi,
+               query = updateMinimumRequired(gid, 1),
+               expected = Right(json"""
+                 {
+                   "updateGroups": {
+                     "groups": [
+                       {
+                         "id": $gid,
+                         "minimumRequired": 1
+                       }
+                     ]
+                   }
+                 }
+               """)
+             )
+    yield ()
+
+  // Child groups count as elements too.
+  test("child groups count toward the element total"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createGroupAs(pi, pid, gid.some)
+      _   <- expectOdbError(
+               user = pi,
+               query = updateMinimumRequired(gid, 1),
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) =>
+                   assertEquals(msg, s"Minimum required (1) must be less than the number of elements in group $gid (1).")
+               }
+             )
+    yield ()
 
   test("can set minimumRequired on a sameNight group"):
     for {
