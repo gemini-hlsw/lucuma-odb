@@ -1,6 +1,6 @@
 -- Closes a ToO trigger as 'accepted' when its observation begins executing.
 --
--- Part 2 of 2 (V1272 adds the status).
+-- Part 2 of 2 (V1273 adds the status).
 --
 -- WHY
 --
