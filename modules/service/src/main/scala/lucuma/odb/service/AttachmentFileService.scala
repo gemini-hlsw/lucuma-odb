@@ -17,7 +17,6 @@ import io.circe.syntax.*
 import lucuma.catalog.mos.MosMaskProblem
 import lucuma.catalog.mos.MosMaskReader
 import lucuma.core.enums.AttachmentType
-import lucuma.core.enums.Instrument
 import lucuma.core.model.Attachment
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -238,7 +237,7 @@ object AttachmentFileService {
       attachmentType: AttachmentType,
       fileName:       FileName,
       maskName:       Option[NonEmptyString],
-      maskDefinition: Option[MaskDefinition],
+      maskDefinition: Option[Json],
       description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
@@ -249,8 +248,7 @@ object AttachmentFileService {
                                                attachmentType,
                                                fileName.value,
                                                maskName,
-                                               maskDefinition.map(_.asJson),
-                                               maskDefinition.map(_.instrument),
+                                               maskDefinition,
                                                description,
                                                fileSize,
                                                remotePath
@@ -271,7 +269,7 @@ object AttachmentFileService {
       attachmentId:   Attachment.Id,
       fileName:       FileName,
       maskName:       Option[NonEmptyString],
-      maskDefinition: Option[MaskDefinition],
+      maskDefinition: Option[Json],
       description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
@@ -280,8 +278,7 @@ object AttachmentFileService {
         session
           .unique(Statements.UpdateAttachment)(fileName.value,
                                                maskName,
-                                               maskDefinition.map(_.asJson),
-                                               maskDefinition.map(_.instrument),
+                                               maskDefinition,
                                                description,
                                                fileSize,
                                                remotePath,
@@ -408,7 +405,7 @@ object AttachmentFileService {
     def parseMaskDefinition(
       maskName: NonEmptyString,
       data:     Stream[F, Byte]
-    ): F[Either[AttachmentException, (Stream[F, Byte], Option[MaskDefinition])]] =
+    ): F[Either[AttachmentException, (Stream[F, Byte], Option[Json])]] =
       T.span("parseMaskDefinition").surround:
         data.compile.to(Chunk).flatMap: bytes =>
           val buffered = Stream.chunk(bytes).covary[F]
@@ -421,7 +418,7 @@ object AttachmentFileService {
               result  = MaskDefinition
                           .fromMosMask(maskName, header, slits)
                           .toRight(InvalidRequest(MissingPositionAngleMsg))
-                          .map(d => (buffered, d.some))
+                          .map(d => (buffered, d.asJson.some))
             } yield result)
               .recover { case p: MosMaskProblem => InvalidRequest(invalidMaskFileMsg(p)).asLeft }
 
@@ -429,10 +426,10 @@ object AttachmentFileService {
       attachmentType: AttachmentType,
       maskName:       Option[NonEmptyString],
       data:           Stream[F, Byte]
-    ): F[Either[AttachmentException, (Stream[F, Byte], Option[MaskDefinition])]] =
+    ): F[Either[AttachmentException, (Stream[F, Byte], Option[Json])]] =
       maskName.filter(_ => attachmentType === AttachmentType.MosMask) match
         case Some(mn) => parseMaskDefinition(mn, data)
-        case None     => (data, none[MaskDefinition]).asRight.pure
+        case None     => (data, none[Json]).asRight.pure
 
     new AttachmentFileService[F] {
 
@@ -584,7 +581,7 @@ object AttachmentFileService {
   object Statements {
 
     val InsertAttachment: Query[
-      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Option[Json], Option[Instrument], Option[NonEmptyString], Long, NonEmptyString),
+      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Option[Json], Option[NonEmptyString], Long, NonEmptyString),
       Attachment.Id
     ] =
       sql"""
@@ -594,7 +591,6 @@ object AttachmentFileService {
           c_file_name,
           c_mask_name,
           c_mask_definition,
-          c_mask_instrument,
           c_description,
           c_file_size,
           c_remote_path
@@ -605,7 +601,6 @@ object AttachmentFileService {
           $text_nonempty,
           ${text_nonempty.opt},
           ${jsonb.opt},
-          ${instrument.opt},
           ${text_nonempty.opt},
           $int8,
           $text_nonempty
@@ -613,7 +608,7 @@ object AttachmentFileService {
       """.query(attachment_id)
 
     val UpdateAttachment: Query[
-      (NonEmptyString, Option[NonEmptyString], Option[Json], Option[Instrument], Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
+      (NonEmptyString, Option[NonEmptyString], Option[Json], Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
       Boolean
     ] =
       sql"""
@@ -621,7 +616,6 @@ object AttachmentFileService {
         SET c_file_name       = $text_nonempty,
             c_mask_name       = ${text_nonempty.opt},
             c_mask_definition = ${jsonb.opt},
-            c_mask_instrument = ${instrument.opt},
             c_description     = ${text_nonempty.opt},
             c_checked         = false,
             c_file_size       = $int8,
