@@ -1,20 +1,11 @@
--- Supersession replaces a live request; it must not invent one.
+-- "Supersession" replaces a live trigger request when an observation's ToO
+-- activation level changes.  For example, when triggered as a RAPID ToO followed
+-- by updating the scheduling mode to INTERRUPTING. These are considered
+-- distinct triggers.  The first, RAPID trigger becomes SUPERSEDED and a new
+-- INTERRUPTING trigger is inserted.
 --
--- V1267's supersession arm closes the outstanding request out and inserts its
--- successor.  The insert was unconditional, on the reasoning that was_triggered
--- guaranteed a row to supersede.  V1273 breaks that guarantee: acceptance closes
--- the request but leaves the observation's 'ready' state alone, so an accepted
--- observation is still "asking" and is_triggered stays true for good.  An
--- activation change under an executing or finished observation would then find
--- nothing to supersede and insert a brand new 'requested' row -- a live request
--- for work already done, and precisely the thing 'accepted' exists to prevent.
---
--- Guarding the insert on having actually superseded something is the whole fix.
--- The alternative was to clear 'ready' at acceptance, which restores the old
--- guarantee but writes t_observation from inside an execution-event trigger, in
--- the opposite lock order to every other writer of that pair; see V1273.
---
--- The withdrawal and creation arms are unchanged, and so is the trigger.
+-- This migration updates too_trigger_track_ready() to ensure that a live
+-- trigger actually exists before marking it superseded and adding a new request.
 
 CREATE OR REPLACE FUNCTION too_trigger_track_ready()
   RETURNS trigger AS $$
@@ -54,13 +45,6 @@ BEGIN
        AND c_status = 'requested'
     RETURNING c_too_trigger_id INTO superseded_id;
 
-    -- Only replace a request that actually existed.  superseded_id is null when
-    -- the observation is still asking but has no live request, which since V1273
-    -- is the ordinary state of an observation whose request has been accepted:
-    -- 'ready' survives acceptance, so is_triggered stays true for the rest of the
-    -- observation's life.  Inserting unconditionally would mint a fresh live
-    -- request every time the activation moved under an executing or finished
-    -- observation -- a request for work already done.
     IF superseded_id IS NOT NULL THEN
       INSERT INTO t_too_trigger (c_observation_id, c_program_id, c_too_activation, c_supersedes)
       VALUES (NEW.c_observation_id, NEW.c_program_id, NEW.c_too_activation, superseded_id)

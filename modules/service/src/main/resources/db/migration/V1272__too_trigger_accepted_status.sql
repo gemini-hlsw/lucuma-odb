@@ -1,34 +1,5 @@
 -- Adds the 'accepted' trigger status.
 --
--- Part 1 of 2.  Alone in its own migration because PostgreSQL forbids *using* an
--- enum value in the same transaction that adds it, and Flyway runs each migration
--- in one transaction.  V1273 is the first thing that may reference 'accepted'.
---
--- IF YOU HAVE JUST READ V1246
---
--- That migration carries a section headed "WHY THERE IS NO 'accepted'", rejecting
--- the per-trigger staff approval V1242 imagined.  Nothing here revives it.  That
--- reasoning stands: a second approval would duplicate the authorization the ToO
--- activation ceiling already grants at proposal acceptance, and would add latency
--- on exactly the observations where latency is the point.
---
--- This is a different thing wearing the same name.  V1242's 'accepted' was a
--- decision somebody made, and non-terminal -- "approved, still waiting".  This one
--- is nobody's decision and is terminal: it is what the database records when the
--- observatory acts on the request, which is to say when execution begins.  There
--- is no mutation for it, and there never should be.
---
--- ORDERING
---
--- Inserted after 'requested' rather than appended, so the ladder reads live, then
--- the yes, then the noes:
---
---   requested < accepted < declined < withdrawn < superseded
---
--- Inserting leaves the existing values' relative order untouched.  Unlike
--- e_too_activation -- where MAX() and the ceiling comparison genuinely depend on
--- ordinality (V1244) -- nothing compares statuses by order except clients using
--- WhereOrderTooTriggerStatus, so this is a presentation choice, not a load-bearing
--- one.
+-- Part 1 of 2 (V1273 uses the status).
 
 ALTER TYPE e_too_trigger_status ADD VALUE 'accepted' AFTER 'requested';
