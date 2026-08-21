@@ -8,7 +8,6 @@ import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -33,6 +32,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.json.time.decoder.given
 import lucuma.odb.sequence.flamingos2.mos.Acquisition.RepeatingAtomCount
+import lucuma.refined.*
 
 /**
  * The Flamingos 2 MOS sequences: the equivalent long slit science sequence with the
@@ -43,13 +43,13 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
 
   val ExposureTime: TimeSpan = 5.minuteTimeSpan
 
-  val AcqExposureTime: TimeSpan = 30.secTimeSpan
+  val AcqExposureTime: TimeSpan = 5.secTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
+    IntegrationTime(ExposureTime, 4.refined)
 
   override def fakeItcImagingResult: IntegrationTime =
-    IntegrationTime(AcqExposureTime, PosInt.unsafeFrom(1))
+    IntegrationTime(30.secTimeSpan, 1.refined)
 
   // CUSTOM_WIDTH_1_PIX is equivalent to LONG_SLIT_1, which is what f2_key_JH1 is keyed on.
   val SlitWidth: Flamingos2CustomSlitWidth =

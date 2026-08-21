@@ -6,6 +6,7 @@ package flamingos2
 package mos
 
 import cats.data.NonEmptyList
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -18,6 +19,7 @@ import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.SequenceType
 import lucuma.core.math.syntax.int.*
+import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
@@ -25,7 +27,6 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.optics.syntax.lens.*
 import lucuma.core.util.TimeSpan
-import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
@@ -111,17 +112,25 @@ object Acquisition:
                 builder.build(NonEmptyString.unapply("Fine Adjustments"), aix, 0, steps.repeatingAtom)
       yield Stream.emits(a0 :: as)).runA(StepTimeEstimateCalculator.Last.empty[F2]).value
 
+  private def exposureTime(
+    observationId: Observation.Id,
+    etm:           ExposureTimeMode
+  ): Either[OdbError, TimeSpan] =
+    etm match
+      case ExposureTimeMode.TimeAndCountMode(t, _, _) => t.asRight
+      case _                                          =>
+        OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: ${ObservingMode.Flamingos2MosName} acquisition requires a Time & Count exposure time mode.".some).asLeft
+
   def instantiate(
     observationId: Observation.Id,
     estimator:     StepTimeEstimateCalculator[Flamingos2StaticConfig, F2],
     static:        Flamingos2StaticConfig,
     namespace:     UUID,
-    config:        Config,
-    time:          Either[OdbError, IntegrationTime]
+    config:        Config
   ): Either[OdbError, SequenceGenerator[F2]] =
-    time
+    exposureTime(observationId, config.acquisition.exposureTimeMode)
       .filterOrElse(
-        _.exposureTime.toNonNegMicroseconds.value > 0,
+        _.toNonNegMicroseconds.value > 0,
         OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: Flamingos 2 MOS requires a positive exposure time.".some)
       )
       .map: t =>
@@ -132,5 +141,5 @@ object Acquisition:
             namespace,
             SequenceType.Acquisition
           ),
-          StepComputer.compute(t.exposureTime, config.acquisition, config.customMask)
+          StepComputer.compute(t, config.acquisition, config.customMask)
         )

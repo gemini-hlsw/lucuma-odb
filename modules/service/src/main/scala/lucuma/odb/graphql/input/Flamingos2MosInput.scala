@@ -48,6 +48,12 @@ object Flamingos2MosInput:
     else
       Result(m)
 
+  private def requireTimeAndCount(etm: ExposureTimeMode): Result[ExposureTimeMode] =
+    etm match
+      case ExposureTimeMode.TimeAndCountMode(_, _, _) => Result(etm)
+      case _                                          =>
+        OdbError.InvalidArgument("A Flamingos 2 MOS acquisition exposure time mode must be Time & Count.".some).asFailure
+
   case class Acquisition(
     filter:           Nullable[Flamingos2Filter],
     exposureTimeMode: Option[ExposureTimeMode]
@@ -68,7 +74,7 @@ object Flamingos2MosInput:
               if Flamingos2Filter.acquisition.exists(_ === f) then f.success
               else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${Flamingos2Filter.acquisition.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
           ,
-          rExposureTime
+          rExposureTime.flatMap(_.traverse(requireTimeAndCount))
         ).parMapN(apply)
 
   final case class Create(

@@ -10715,7 +10715,7 @@ type Flamingos2MosAcquisition {
   explicitFilter: Flamingos2Filter
 
   """
-  The exposure time mode used for ITC lookup for the acquisition sequence.
+  The Time & Count exposure time mode used for the acquisition sequence.
   """
   exposureTimeMode: ExposureTimeMode!
 
@@ -10737,8 +10737,9 @@ input Flamingos2MosAcquisitionInput {
   explicitFilter: Flamingos2Filter
 
   """
-  Exposure time mode for the acquisition sequence.  If not specified, a default
-  exposure time mode is used.
+  Exposure time mode for the acquisition sequence.  MOS acquisition must be
+  Time & Count; a signal-to-noise mode is rejected.  If not specified, the
+  default is 5 seconds with a count of 1.
   """
   exposureTimeMode: ExposureTimeModeInput
 
