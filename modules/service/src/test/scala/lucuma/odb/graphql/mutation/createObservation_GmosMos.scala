@@ -6,8 +6,10 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
@@ -15,36 +17,14 @@ import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.odb.util.Codecs.attachment_id
-import lucuma.odb.util.Codecs.program_id
-import skunk.Query
-import skunk.codec.text.text
-import skunk.syntax.all.*
+import lucuma.odb.service.AttachmentMetadataService
 
-class createObservation_GmosMos extends OdbSuite:
+class createObservation_GmosMos extends OdbSuite with MosMaskOps:
 
   val pi: StandardUser    = TestUsers.Standard.pi(nextId, nextId)
   val staff: StandardUser = TestUsers.Standard.staff(nextId, nextId)
 
   lazy val validUsers: List[User] = List(pi, staff)
-
-  // Insert the attachment directly rather than through the file service and S3,
-  // so the setup depends only on the database.
-  protected def insertMosMaskAttachment(pid: Program.Id, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String, String), Attachment.Id] =
-      sql"""
-        INSERT INTO t_attachment (
-          c_program_id,
-          c_attachment_type,
-          c_file_name,
-          c_file_size,
-          c_remote_path,
-          c_mask_name
-        )
-        VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
-        RETURNING c_attachment_id
-      """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix("_ODF.fits").toUpperCase))
 
   private def scienceRequirements: String =
     """
@@ -203,7 +183,7 @@ class createObservation_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits")
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
       oid <- create(pid, tid, s"""
                gmosNorthMos: {
                  grating: R831_G5302
@@ -519,4 +499,44 @@ class createObservation_GmosMos extends OdbSuite:
       rMos <- createConfigurationRequestAs(pi, mos)
       rLs  <- createConfigurationRequestAs(pi, ls)
       _    <- assertIO(IO(rMos =!= rLs), true, "MOS and long slit shared a configuration request")
+    yield ()
+
+  // The plate is machined for one GMOS arm, so the other arm's mask is refused
+  // at creation rather than discovered at the telescope.
+  test("create GMOS South MOS with a GMOS North mask is rejected"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
+      _   <- expect(
+               user     = pi,
+               query    = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: {
+                         gmosSouthMos: {
+                           grating: B1200_G5321
+                           customMask: {
+                             slitWidth: CUSTOM_WIDTH_0_50
+                             attachmentId: "$aid"
+                           }
+                           centralWavelength: { nanometers: 500 }
+                         }
+                       }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = List(AttachmentMetadataService.maskInstrumentMismatchMessage(
+                 NonEmptyString.unsafeFrom("GN2025AQ001-01"),
+                 Instrument.GmosNorth,
+                 Instrument.GmosSouth
+               )).asLeft
+             )
     yield ()

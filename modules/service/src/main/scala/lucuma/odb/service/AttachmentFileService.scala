@@ -17,6 +17,7 @@ import io.circe.syntax.*
 import lucuma.catalog.mos.MosMaskProblem
 import lucuma.catalog.mos.MosMaskReader
 import lucuma.core.enums.AttachmentType
+import lucuma.core.enums.Instrument
 import lucuma.core.model.Attachment
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
@@ -81,6 +82,16 @@ object AttachmentFileService {
   def duplicateMaskNameMsg(maskName: NonEmptyString): String =
     s"$DuplicateMaskNameMsg: ${maskName.value}"
 
+  val AttachmentInUseMsg = "The attachment is in use and cannot be deleted."
+
+  /**
+   * A MOS mask's instrument is part of the key an observation's mask reference
+   * points at, so replacing the file with one cut for a different instrument
+   * would leave the observation configured for a mask it cannot mount.
+   */
+  val MaskInstrumentInUseMsg =
+    "The attachment is in use by an observation and the replacement file is for a different instrument."
+
   sealed trait AttachmentException extends Exception {
     def asLeftT[F[_]: Applicative, A]: EitherT[F, AttachmentException, A] =
       EitherT.leftT(this)
@@ -90,7 +101,7 @@ object AttachmentFileService {
     case object Forbidden                      extends AttachmentException
     case class InvalidRequest(message: String) extends AttachmentException
     case object FileNotFound                   extends AttachmentException
-    case object AttachmentInUse                extends AttachmentException
+    case class AttachmentInUse(message: String) extends AttachmentException
   }
 
   import AttachmentException.*
@@ -227,7 +238,7 @@ object AttachmentFileService {
       attachmentType: AttachmentType,
       fileName:       FileName,
       maskName:       Option[NonEmptyString],
-      maskDefinition: Option[Json],
+      maskDefinition: Option[MaskDefinition],
       description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
@@ -238,7 +249,8 @@ object AttachmentFileService {
                                                attachmentType,
                                                fileName.value,
                                                maskName,
-                                               maskDefinition,
+                                               maskDefinition.map(_.asJson),
+                                               maskDefinition.map(_.instrument),
                                                description,
                                                fileSize,
                                                remotePath
@@ -259,7 +271,7 @@ object AttachmentFileService {
       attachmentId:   Attachment.Id,
       fileName:       FileName,
       maskName:       Option[NonEmptyString],
-      maskDefinition: Option[Json],
+      maskDefinition: Option[MaskDefinition],
       description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
@@ -268,7 +280,8 @@ object AttachmentFileService {
         session
           .unique(Statements.UpdateAttachment)(fileName.value,
                                                maskName,
-                                               maskDefinition,
+                                               maskDefinition.map(_.asJson),
+                                               maskDefinition.map(_.instrument),
                                                description,
                                                fileSize,
                                                remotePath,
@@ -284,6 +297,11 @@ object AttachmentFileService {
               InvalidRequest(DuplicateMaskNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_file_name")) =>
               InvalidRequest(DuplicateFileNameMsg).asLeft
+            // The mask's instrument is part of the key an observation's mask
+            // reference points at, so changing it while referenced violates the
+            // observation's foreign key rather than this table's own.
+            case SqlState.ForeignKeyViolation(e) if e.constraintName.exists(_.contains("mask_attachment_fkey")) =>
+              AttachmentInUse(MaskInstrumentInUseMsg).asLeft
           }
       }
 
@@ -312,7 +330,7 @@ object AttachmentFileService {
           .option(Statements.DeleteAttachment)(attachmentId)
           .map(_.toRight(FileNotFound))
           .recover:
-            case SqlState.ForeignKeyViolation(_) => AttachmentInUse.asLeft
+            case SqlState.ForeignKeyViolation(_) => AttachmentInUse(AttachmentInUseMsg).asLeft
       }
 
     def checkForDuplicateName(
@@ -390,7 +408,7 @@ object AttachmentFileService {
     def parseMaskDefinition(
       maskName: NonEmptyString,
       data:     Stream[F, Byte]
-    ): F[Either[AttachmentException, (Stream[F, Byte], Option[Json])]] =
+    ): F[Either[AttachmentException, (Stream[F, Byte], Option[MaskDefinition])]] =
       T.span("parseMaskDefinition").surround:
         data.compile.to(Chunk).flatMap: bytes =>
           val buffered = Stream.chunk(bytes).covary[F]
@@ -403,7 +421,7 @@ object AttachmentFileService {
               result  = MaskDefinition
                           .fromMosMask(maskName, header, slits)
                           .toRight(InvalidRequest(MissingPositionAngleMsg))
-                          .map(d => (buffered, d.asJson.some))
+                          .map(d => (buffered, d.some))
             } yield result)
               .recover { case p: MosMaskProblem => InvalidRequest(invalidMaskFileMsg(p)).asLeft }
 
@@ -411,10 +429,10 @@ object AttachmentFileService {
       attachmentType: AttachmentType,
       maskName:       Option[NonEmptyString],
       data:           Stream[F, Byte]
-    ): F[Either[AttachmentException, (Stream[F, Byte], Option[Json])]] =
+    ): F[Either[AttachmentException, (Stream[F, Byte], Option[MaskDefinition])]] =
       maskName.filter(_ => attachmentType === AttachmentType.MosMask) match
         case Some(mn) => parseMaskDefinition(mn, data)
-        case None     => (data, none[Json]).asRight.pure
+        case None     => (data, none[MaskDefinition]).asRight.pure
 
     new AttachmentFileService[F] {
 
@@ -566,7 +584,7 @@ object AttachmentFileService {
   object Statements {
 
     val InsertAttachment: Query[
-      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Option[Json], Option[NonEmptyString], Long, NonEmptyString),
+      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Option[Json], Option[Instrument], Option[NonEmptyString], Long, NonEmptyString),
       Attachment.Id
     ] =
       sql"""
@@ -576,6 +594,7 @@ object AttachmentFileService {
           c_file_name,
           c_mask_name,
           c_mask_definition,
+          c_mask_instrument,
           c_description,
           c_file_size,
           c_remote_path
@@ -586,6 +605,7 @@ object AttachmentFileService {
           $text_nonempty,
           ${text_nonempty.opt},
           ${jsonb.opt},
+          ${instrument.opt},
           ${text_nonempty.opt},
           $int8,
           $text_nonempty
@@ -593,7 +613,7 @@ object AttachmentFileService {
       """.query(attachment_id)
 
     val UpdateAttachment: Query[
-      (NonEmptyString, Option[NonEmptyString], Option[Json], Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
+      (NonEmptyString, Option[NonEmptyString], Option[Json], Option[Instrument], Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
       Boolean
     ] =
       sql"""
@@ -601,6 +621,7 @@ object AttachmentFileService {
         SET c_file_name       = $text_nonempty,
             c_mask_name       = ${text_nonempty.opt},
             c_mask_definition = ${jsonb.opt},
+            c_mask_instrument = ${instrument.opt},
             c_description     = ${text_nonempty.opt},
             c_checked         = false,
             c_file_size       = $int8,

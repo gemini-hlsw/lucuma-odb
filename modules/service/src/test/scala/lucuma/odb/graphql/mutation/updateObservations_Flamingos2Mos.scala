@@ -6,46 +6,30 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.AttachmentType
+import lucuma.core.enums.Instrument
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.service.AttachmentMetadataService
 import lucuma.odb.service.Flamingos2MosService
 import lucuma.odb.util.Codecs.attachment_id
 import lucuma.odb.util.Codecs.attachment_type
 import lucuma.odb.util.Codecs.observation_id
-import lucuma.odb.util.Codecs.program_id
 import skunk.Query
-import skunk.codec.text.text
 import skunk.syntax.all.*
 
-class updateObservations_Flamingos2Mos extends OdbSuite:
+class updateObservations_Flamingos2Mos extends OdbSuite with MosMaskOps:
 
   val pi: StandardUser = TestUsers.Standard.pi(nextId, nextId)
 
   lazy val validUsers: List[User] = List(pi)
-
-  private def insertAttachment(pid: Program.Id, tpe: String, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String, String, Option[String]), Attachment.Id] =
-      sql"""
-        INSERT INTO t_attachment (
-          c_program_id,
-          c_attachment_type,
-          c_file_name,
-          c_file_size,
-          c_remote_path,
-          c_mask_name
-        )
-        VALUES ($program_id, $text::e_attachment_type, $text, 42, 'unused', ${text.opt})
-        RETURNING c_attachment_id
-      """.query(attachment_id)
-    val maskName = Option.when(tpe === "mos_mask")(fileName.stripSuffix("_ODF.fits").toUpperCase)
-    withSession(_.unique(q)(pid, tpe, fileName, maskName))
 
   // The mask attachment is stored as two columns (id + type) pinned together
   // by a composite foreign key, and the type column is not exposed via GraphQL,
@@ -128,7 +112,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
   test("attach a mask to a maskless observation"):
     for
       (pid, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
-      aid        <- insertAttachment(pid, "mos_mask", "GS2025AQ001-01_ODF.fits")
+      aid        <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.Flamingos2)
       _          <- expect(pi, updateMutation(
                       oid,
                       s"""flamingos2Mos: { customMask: { slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: "$aid" } }""",
@@ -157,7 +141,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
     for
       pid  <- createProgramAs(pi)
       tid  <- createTargetAs(pi, pid)
-      aid  <- insertAttachment(pid, "mos_mask", "GS2025AQ001-01_ODF.fits")
+      aid  <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.Flamingos2)
       oid  <- create(pid, tid, mode(s"""slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: "$aid""""))
       _    <- expect(pi, updateMutation(
                 oid,
@@ -377,7 +361,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
   test("an attachment of the wrong type is rejected"):
     for
       (pid, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
-      aid        <- insertAttachment(pid, "finder", "finder.fits")
+      aid        <- insertObsAttachment(pid, "finder", "finder.fits")
       _          <- expect(
                       user     = pi,
                       query    = updateMutation(
@@ -395,7 +379,7 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
     for
       (_, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
       other    <- createProgramAs(pi)
-      aid      <- insertAttachment(other, "mos_mask", "GS2025AQ001-01_ODF.fits")
+      aid      <- insertMosMaskAttachment(other, "GS2025AQ001-01_ODF.fits", Instrument.Flamingos2)
       _        <- expect(
                     user     = pi,
                     query    = updateMutation(
@@ -419,4 +403,26 @@ class updateObservations_Flamingos2Mos extends OdbSuite:
                     ),
                     expected = List("Argument 'input.SET.observingMode.flamingos2Mos' is invalid: Flamingos 2 MOS does not support the 'OTHER' custom slit width.").asLeft
                   )
+    yield ()
+
+  // Flamingos-2 plates and GMOS plates are not interchangeable either.
+  test("a GMOS mask is rejected on a Flamingos 2 observation"):
+    for
+      (pid, oid) <- setup("slitWidth: CUSTOM_WIDTH_2_PIX")
+      aid        <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.GmosSouth)
+      _          <- expect(
+                      user     = pi,
+                      query    = updateMutation(
+                        oid,
+                        s"""flamingos2Mos: { customMask: { slitWidth: CUSTOM_WIDTH_2_PIX, attachmentId: "$aid" } }""",
+                        "flamingos2Mos { customMask { attachmentId } }"
+                      ),
+                      expected = List(AttachmentMetadataService.maskInstrumentMismatchMessage(
+                        NonEmptyString.unsafeFrom("GS2025AQ001-01"),
+                        Instrument.GmosSouth,
+                        Instrument.Flamingos2
+                      )).asLeft
+                    )
+      cols       <- readMaskColumns(oid)
+      _          <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
     yield ()
