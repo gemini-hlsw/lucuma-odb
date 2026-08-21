@@ -243,8 +243,7 @@ object Generator:
             case ObservingModeType.Flamingos2Imaging  =>
               EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx)).flatMap(digest(_, calculator.flamingos2ImagingSetup))
             case ObservingModeType.Flamingos2Mos      =>
-              // No MOS setup time has been measured yet, so the long slit's stands in.
-              EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
+              EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx)).flatMap(digest(_, calculator.flamingos2MosSetup))
             case ObservingModeType.Flamingos2LongSlit =>
               EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx)).flatMap(digest(_, calculator.flamingos2LongSlitSetup))
             case ObservingModeType.GhostIfu           =>
