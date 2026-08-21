@@ -7649,6 +7649,11 @@ type AirMassRange {
   max: PosBigDecimal!
 }
 
+"""
+An angle in a variety of units.  Values are normalized to [0, 360°) unless
+the field documents a signed quantity, in which case negative values are
+rendered negative (as with `Declination`) rather than wrapped.
+"""
 type Angle {
   """
   Angle in µas
@@ -7811,7 +7816,15 @@ type Attachment {
   `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.
   Not settable.  Null when the attachment is not a MOS_MASK, always present when it is.
   """
-  maskName: NonEmptyString
+  maskName: NonEmptyString @deprecated(reason: "Use `mask.name` instead.")
+
+  """
+  The design read from a MOS mask attachment's file when it was uploaded.
+  Null when the attachment is not a MOS_MASK, and null for MOS_MASK
+  attachments uploaded before mask parsing was introduced (re-uploading the
+  file populates it).  Not settable.
+  """
+  mask: MaskDefinition
   description: NonEmptyString
   checked: Boolean!
   fileSize: Long!
@@ -7829,6 +7842,182 @@ input AttachmentPropertiesInput {
   The checked status can be set, or ignored by skipping it altogether
   """
   checked: Boolean
+}
+
+"""
+The design read from a MOS mask attachment's file (ODF/MDF): the instrument
+the mask was cut for, the position angle it must be observed at, and its
+slits.
+"""
+type MaskDefinition {
+  """
+  The mask name of the attachment.
+  """
+  name: NonEmptyString!
+
+  """
+  The instrument the mask was designed for.
+  """
+  instrument: Instrument!
+
+  """
+  Nominal plate scale of the pre-image, in arcseconds per pixel.
+  """
+  pixelScale: BigDecimal!
+
+  """
+  Pointing centre of the pre-image the mask was designed on.
+  """
+  pointing: Coordinates!
+
+  """
+  The position angle the mask must be observed at.
+  """
+  positionAngle: Angle!
+
+  """
+  Axis along which the instrument spreads a spectrum, in pre-image detector
+  coordinates.  It decides how the design's x and y columns were read: a
+  slit's width is its extent along the dispersion direction, its length the
+  extent across it.
+  """
+  dispersionDirection: MosDispersionDirection!
+
+  """
+  Every aperture in the design, acquisition boxes included.
+  """
+  slits: [MaskSlit!]!
+
+  """
+  Number of science slits in the design, alignment-star boxes excluded.
+  """
+  scienceSlitCount: Int!
+
+  """
+  Number of alignment-star boxes in the design.
+  """
+  acquisitionSlitCount: Int!
+
+  """
+  Mean width of the science slits.  Alignment-star boxes are excluded so
+  their wide boxes do not skew the mean, and a design with no science slits
+  has no average.
+  """
+  averageSlitWidth: Angle
+}
+
+"""
+One aperture of a MOS mask design.  The width is always the extent along the
+dispersion direction (horizontal for GMOS-S/N, vertical for FLAMINGOS2) and
+the length the extent across it.
+"""
+type MaskSlit {
+  """
+  Object identifier, unique within the mask.
+  """
+  id: Int!
+
+  """
+  Sky position of the object the slit targets.
+  """
+  coordinates: Coordinates!
+
+  """
+  Object centroid on the pre-image along the detector x axis, in pixels
+  (`x_ccd` in the design file).  Fractional: it is a measured centroid, not a
+  pixel index.
+  """
+  x: BigDecimal!
+
+  """
+  Object centroid on the pre-image along the detector y axis, in pixels
+  (`y_ccd` in the design file).
+  """
+  y: BigDecimal!
+
+  """
+  Extent along the dispersion direction.
+  """
+  width: Angle!
+
+  """
+  Extent across the dispersion direction.
+  """
+  length: Angle!
+
+  """
+  Displacement of the slit from the object along the slit's length.  A signed
+  quantity: the slit may be slid either way, and negative displacements are
+  rendered in the signed representation (-1.5 arcseconds reads as -1.5), not
+  wrapped to just under a full turn.
+  """
+  offsetAlongSlit: Angle!
+
+  """
+  Displacement of the slit from the object across its width.  A non-zero value
+  drives a point source off the slit and loses flux.  A signed quantity,
+  rendered in the signed representation like `offsetAlongSlit`.
+  """
+  offsetAcrossSlit: Angle!
+
+  """
+  Slit position angle, counter-clockwise positive.  A signed quantity bounded
+  to 45 degrees either way, rendered in the signed representation like
+  `offsetAlongSlit`.
+  """
+  tilt: Angle!
+
+  """
+  Placement priority of the object.  ACQUISITION marks an alignment-star box
+  rather than a science slit.
+  """
+  priority: MosSlitPriority!
+}
+
+"""
+Axis along which an instrument spreads a spectrum, in pre-image detector
+coordinates.
+"""
+enum MosDispersionDirection {
+  """
+  GMOS-N and GMOS-S: the x axis is the dispersion axis.
+  """
+  HORIZONTAL
+
+  """
+  Flamingos-2: the y axis is the dispersion axis.
+  """
+  VERTICAL
+}
+
+"""
+Placement priority of an object in a MOS mask design.
+"""
+enum MosSlitPriority {
+  """
+  Acquisition star, used to align the mask on sky rather than to take a spectrum.
+  """
+  ACQUISITION
+
+  """
+  Highest science priority.
+  """
+  HIGH
+
+  """
+  Medium science priority.
+  """
+  MEDIUM
+
+  """
+  Lowest science priority.
+  """
+  LOW
+
+  """
+  Not a priority level: marks the object as excluded from the design.
+  """
+  IGNORE
 }
 
 """

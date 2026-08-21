@@ -7,6 +7,7 @@ package table
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
+import skunk.circe.codec.all.*
 import skunk.codec.all.*
 
 trait AttachmentTable[F[_]] extends BaseMapping[F] {
@@ -17,6 +18,7 @@ trait AttachmentTable[F[_]] extends BaseMapping[F] {
     val AttachmentType = col("c_attachment_type", attachment_type)
     val FileName       = col("c_file_name", text_nonempty)
     val MaskName       = col("c_mask_name", text_nonempty.opt)
+    val MaskDefinition = col("c_mask_definition", jsonb.opt)
     val Description    = col("c_description", text_nonempty.opt)
     val Checked        = col("c_checked", bool)
     val FileSize       = col("c_file_size", int8)
