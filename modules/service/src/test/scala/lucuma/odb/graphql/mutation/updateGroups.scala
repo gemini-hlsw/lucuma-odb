@@ -718,7 +718,7 @@ class updateGroups extends OdbSuite {
           mutation {
             updateGroups(input: {
               SET: { sameNight: true },
-              WHERE: { id: { EQ: ${gid.asJson} } }
+              WHERE: { id: { IN: [${gid.asJson}] } }
             }) { groups { id sameNight } }
           }
         """,
@@ -766,6 +766,209 @@ class updateGroups extends OdbSuite {
       _   <- updateSameNight(pi, gid, "sameNight: true", None)
       _   <- updateSameNight(pi, gid, "maximumInterval: { hours: 1 }", sameNightDbError.some)
     } yield ()
+
+  private def updateMinimumRequired(gid: Group.Id, value: Int): String =
+    s"""
+      mutation {
+        updateGroups(input: {
+          SET: { minimumRequired: $value }
+          WHERE: { id: { EQ: ${gid.asJson} } }
+        }) {
+          groups { id minimumRequired }
+        }
+      }
+    """
+
+  test("cannot set minimumRequired to zero"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- expect(
+               user = pi,
+               query = updateMinimumRequired(gid, 0),
+               expected = List(
+                 "Argument 'input.SET' is invalid: Minimum required must be at least 1."
+               ).asLeft
+             )
+    yield ()
+
+  test("can set minimumRequired to the number of elements in the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expect(
+               user = pi,
+               query = updateMinimumRequired(gid, 2),
+               expected = Right(json"""
+                 {
+                   "updateGroups": {
+                     "groups": [
+                       {
+                         "id": $gid,
+                         "minimumRequired": 2
+                       }
+                     ]
+                   }
+                 }
+               """)
+             )
+    yield ()
+
+  test("cannot set minimumRequired above the number of elements in the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expectOdbError(
+               user = pi,
+               query = updateMinimumRequired(gid, 3),
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) =>
+                   assertEquals(msg, s"Minimum required (3) cannot exceed the number of elements in group $gid (1).")
+               }
+             )
+    yield ()
+
+  test("can set minimumRequired below the number of elements in the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expect(
+               user = pi,
+               query = updateMinimumRequired(gid, 1),
+               expected = Right(json"""
+                 {
+                   "updateGroups": {
+                     "groups": [
+                       {
+                         "id": $gid,
+                         "minimumRequired": 1
+                       }
+                     ]
+                   }
+                 }
+               """)
+             )
+    yield ()
+
+  // Child groups count as elements too.
+  test("child groups count toward the element total"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createGroupAs(pi, pid, gid.some)
+      _   <- expectOdbError(
+               user = pi,
+               query = updateMinimumRequired(gid, 2),
+               expected = {
+                 case OdbError.InvalidArgument(Some(msg)) =>
+                   assertEquals(msg, s"Minimum required (2) cannot exceed the number of elements in group $gid (1).")
+               }
+             )
+    yield ()
+
+  private def minimumRequiredAs(gid: Group.Id): IO[Option[Int]] =
+    query(pi, s"""query { group(groupId: "$gid") { minimumRequired } }""")
+      .map(_.hcursor.downFields("group", "minimumRequired").require[Option[Int]])
+
+  // The database clamps a stale minimumRequired down as elements leave; see the
+  // *_clamp_min_required triggers.
+  test("minimumRequired is clamped when an observation is moved out of the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expect(user = pi, query = updateMinimumRequired(gid, 3), expected = Right(json"""
+               { "updateGroups": { "groups": [ { "id": $gid, "minimumRequired": 3 } ] } }
+             """))
+      _   <- moveObservationAs(pi, o1, none)
+      m   <- minimumRequiredAs(gid)
+    yield assertEquals(m, 2.some)
+
+  test("minimumRequired is clamped when an observation in the group is deleted"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expect(user = pi, query = updateMinimumRequired(gid, 2), expected = Right(json"""
+               { "updateGroups": { "groups": [ { "id": $gid, "minimumRequired": 2 } ] } }
+             """))
+      _   <- deleteObservation(pi, o1)
+      m   <- minimumRequiredAs(gid)
+    yield assertEquals(m, 1.some)
+
+  // Reordering must not look like a removal, even though the move parks the observation outside
+  // the group before landing it.
+  test("minimumRequired survives a reorder within the group"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expect(user = pi, query = updateMinimumRequired(gid, 2), expected = Right(json"""
+               { "updateGroups": { "groups": [ { "id": $gid, "minimumRequired": 2 } ] } }
+             """))
+      _   <- moveObservationAs(pi, o1, gid.some)
+      m   <- minimumRequiredAs(gid)
+    yield assertEquals(m, 2.some)
+
+  // An emptied group keeps its value: minimumRequired is the only marker of OR-ness, so clearing
+  // it would silently turn the group into an AND group.
+  test("minimumRequired is left alone when the group is emptied"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- expect(user = pi, query = updateMinimumRequired(gid, 1), expected = Right(json"""
+               { "updateGroups": { "groups": [ { "id": $gid, "minimumRequired": 1 } ] } }
+             """))
+      _   <- moveObservationAs(pi, o1, none)
+      m   <- minimumRequiredAs(gid)
+    yield assertEquals(m, 1.some)
+
+  // An AND group must never be turned into an OR group by the clamp.
+  test("a null minimumRequired is never populated by the clamp"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      o1  <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- moveObservationAs(pi, o1, none)
+      m   <- minimumRequiredAs(gid)
+    yield assertEquals(m, none)
+
+  test("minimumRequired is clamped when a child group is moved out"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      c1  <- createGroupAs(pi, pid, gid.some)
+      _   <- createGroupAs(pi, pid, gid.some)
+      _   <- expect(user = pi, query = updateMinimumRequired(gid, 2), expected = Right(json"""
+               { "updateGroups": { "groups": [ { "id": $gid, "minimumRequired": 2 } ] } }
+             """))
+      _   <- expect(
+               user = pi,
+               query = s"""
+                 mutation {
+                   updateGroups(input: {
+                     SET: { parentGroup: null }
+                     WHERE: { id: { IN: [${c1.asJson}] } }
+                   }) {
+                     groups { id }
+                   }
+                 }
+               """,
+               expected = Right(json"""{ "updateGroups": { "groups": [ { "id": $c1 } ] } }""")
+             )
+      m   <- minimumRequiredAs(gid)
+    yield assertEquals(m, 1.some)
 
   test("can set minimumRequired on a sameNight group"):
     for {

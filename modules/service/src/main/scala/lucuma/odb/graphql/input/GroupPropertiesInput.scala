@@ -62,6 +62,12 @@ object GroupPropertiesInput {
   val Empty: Create =
     Create(None, None, None, false, None, None, false, None, None, Existence.Default)
 
+  // "Observe 0 of N" is never meaningful, so an OR group must require at least one element.
+  // The complementary upper bound (fewer than all elements, which would just be an AND group)
+  // needs the element count and so lives in `GroupService`.
+  val MinimumRequiredTooSmall: String =
+    "Minimum required must be at least 1."
+
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap {
       case List(
@@ -82,6 +88,8 @@ object GroupPropertiesInput {
               case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
               case _ if sameNight.contains(true) && maximumInterval.isDefined =>
                 Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
+              case _ if minimumRequired.exists(_.value < 1) =>
+                Matcher.validationFailure(MinimumRequiredTooSmall)
               case _ =>
                 Result(Create(
                   name,
@@ -118,6 +126,8 @@ object GroupPropertiesInput {
               case (Some(min), Some(max)) if max < min => Matcher.validationFailure("Minimum interval must be less than or equal maximum interval.")
               case _ if sameNight.contains(true) && maximumInterval.toOption.isDefined =>
                 Matcher.validationFailure("Same night and maximum interval are mutually exclusive.")
+              case _ if minimumRequired.toOption.exists(_.value < 1) =>
+                Matcher.validationFailure(MinimumRequiredTooSmall)
               case _ =>
                 Result(Edit(
                   name,
