@@ -6,46 +6,30 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.AttachmentType
+import lucuma.core.enums.Instrument
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.StandardUser
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.service.AttachmentMetadataService
 import lucuma.odb.service.GmosMosService
 import lucuma.odb.util.Codecs.attachment_id
 import lucuma.odb.util.Codecs.attachment_type
 import lucuma.odb.util.Codecs.observation_id
-import lucuma.odb.util.Codecs.program_id
 import skunk.Query
-import skunk.codec.text.text
 import skunk.syntax.all.*
 
-class updateObservations_GmosMos extends OdbSuite:
+class updateObservations_GmosMos extends OdbSuite with MosMaskOps:
 
   val pi: StandardUser = TestUsers.Standard.pi(nextId, nextId)
 
   lazy val validUsers: List[User] = List(pi)
-
-  private def insertAttachment(pid: Program.Id, tpe: String, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String, String, Option[String]), Attachment.Id] =
-      sql"""
-        INSERT INTO t_attachment (
-          c_program_id,
-          c_attachment_type,
-          c_file_name,
-          c_file_size,
-          c_remote_path,
-          c_mask_name
-        )
-        VALUES ($program_id, $text::e_attachment_type, $text, 42, 'unused', ${text.opt})
-        RETURNING c_attachment_id
-      """.query(attachment_id)
-    val maskName = Option.when(tpe === "mos_mask")(fileName.stripSuffix("_ODF.fits").toUpperCase)
-    withSession(_.unique(q)(pid, tpe, fileName, maskName))
 
   // The mask attachment is stored as two columns (id + type) pinned together
   // by a composite foreign key, and the type column is not exposed via GraphQL,
@@ -139,7 +123,7 @@ class updateObservations_GmosMos extends OdbSuite:
   test("attach a mask to a maskless observation"):
     for
       (pid, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
-      aid        <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
+      aid        <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
       _          <- expect(pi, updateMutation(
                       oid,
                       s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" } }""",
@@ -168,7 +152,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
       oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
       _   <- expect(pi, updateMutation(
                oid,
@@ -201,7 +185,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
       oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
       _   <- expect(pi, updateMutation(
                oid,
@@ -233,7 +217,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
       oid <- create(pid, tid, northMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""))
       _   <- expect(pi, updateMutation(
                oid,
@@ -311,7 +295,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertAttachment(pid, "mos_mask", "GN2025AQ001-01_ODF.fits")
+      aid <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosSouth)
       oid <- create(pid, tid, southMode("slitWidth: CUSTOM_WIDTH_1_00"))
       _   <- expect(pi, updateMutation(
                oid,
@@ -340,7 +324,7 @@ class updateObservations_GmosMos extends OdbSuite:
   test("an attachment of the wrong type is rejected"):
     for
       (pid, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
-      aid        <- insertAttachment(pid, "finder", "finder.fits")
+      aid        <- insertObsAttachment(pid, "finder", "finder.fits")
       _          <- expect(
                       user     = pi,
                       query    = updateMutation(
@@ -355,7 +339,7 @@ class updateObservations_GmosMos extends OdbSuite:
   test("a rejected attachment leaves the observation unchanged"):
     for
       (pid, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
-      aid        <- insertAttachment(pid, "finder", "finder.fits")
+      aid        <- insertObsAttachment(pid, "finder", "finder.fits")
       _          <- expect(
                       user     = pi,
                       query    = updateMutation(
@@ -393,7 +377,7 @@ class updateObservations_GmosMos extends OdbSuite:
     for
       (_, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
       other    <- createProgramAs(pi)
-      aid      <- insertAttachment(other, "mos_mask", "GN2025AQ001-01_ODF.fits")
+      aid      <- insertMosMaskAttachment(other, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
       _        <- expect(
                     user     = pi,
                     query    = updateMutation(
@@ -410,7 +394,7 @@ class updateObservations_GmosMos extends OdbSuite:
       pid   <- createProgramAs(pi)
       tid   <- createTargetAs(pi, pid)
       other <- createProgramAs(pi)
-      aid   <- insertAttachment(other, "mos_mask", "GN2025AQ001-01_ODF.fits")
+      aid   <- insertMosMaskAttachment(other, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
       _     <- expect(
                  user     = pi,
                  query    = s"""
@@ -429,4 +413,106 @@ class updateObservations_GmosMos extends OdbSuite:
                  """,
                  expected = List(GmosMosService.MaskAttachmentViolationMessage).asLeft
                )
+    yield ()
+
+  // A mask plate is machined for one instrument, so the two GMOS arms are as
+  // distinct here as GMOS and Flamingos-2 are.
+
+  private def mismatch(maskName: String, mask: Instrument, obs: Instrument): List[String] =
+    List(AttachmentMetadataService.maskInstrumentMismatchMessage(
+      NonEmptyString.unsafeFrom(maskName),
+      mask,
+      obs
+    ))
+
+  test("a GMOS South mask is rejected on a GMOS North observation"):
+    for
+      (pid, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
+      aid        <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.GmosSouth)
+      _          <- expect(
+                      user     = pi,
+                      query    = updateMutation(
+                        oid,
+                        s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" } }""",
+                        "gmosNorthMos { customMask { attachmentId } }"
+                      ),
+                      expected = mismatch("GS2025AQ001-01", Instrument.GmosSouth, Instrument.GmosNorth).asLeft
+                    )
+      // The refused update leaves the observation without a mask.
+      cols       <- readNorthMaskColumns(oid)
+      _          <- IO(assertEquals(cols, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+    yield ()
+
+  test("creating with a GMOS South mask on a GMOS North observation is rejected"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      aid <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.GmosSouth)
+      _   <- expect(
+               user     = pi,
+               query    = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: { ${northMode(s"slitWidth: CUSTOM_WIDTH_1_00, attachmentId: \"$aid\"")} }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = mismatch("GS2025AQ001-01", Instrument.GmosSouth, Instrument.GmosNorth).asLeft
+             )
+    yield ()
+
+  test("a batch update naming a mismatched mask fails as a whole"):
+    for
+      (pid, oid1) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
+      tid         <- createTargetAs(pi, pid)
+      oid2        <- create(pid, tid, northMode("slitWidth: CUSTOM_WIDTH_1_00"))
+      aid         <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.GmosSouth)
+      _           <- expect(
+                       user     = pi,
+                       query    = s"""
+                         mutation {
+                           updateObservations(input: {
+                             WHERE: { id: { IN: ["$oid1", "$oid2"] } }
+                             SET: { observingMode: { gmosNorthMos: { customMask: {
+                               slitWidth: CUSTOM_WIDTH_1_00
+                               attachmentId: "$aid"
+                             } } } }
+                           }) {
+                             observations { id }
+                           }
+                         }
+                       """,
+                       expected = mismatch("GS2025AQ001-01", Instrument.GmosSouth, Instrument.GmosNorth).asLeft
+                     )
+      cols1       <- readNorthMaskColumns(oid1)
+      cols2       <- readNorthMaskColumns(oid2)
+      _           <- IO(assertEquals(cols1, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+      _           <- IO(assertEquals(cols2, (Option.empty[Attachment.Id], Option.empty[AttachmentType])))
+    yield ()
+
+  test("switching an observation to the other GMOS arm with its mask is rejected"):
+    for
+      (pid, oid) <- setupNorth("slitWidth: CUSTOM_WIDTH_1_00")
+      aid        <- insertMosMaskAttachment(pid, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)
+      _          <- query(pi, updateMutation(
+                      oid,
+                      s"""gmosNorthMos: { customMask: { slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid" } }""",
+                      "gmosNorthMos { customMask { attachmentId } }"
+                    ))
+      _          <- expect(
+                      user     = pi,
+                      query    = updateMutation(
+                        oid,
+                        southMode(s"""slitWidth: CUSTOM_WIDTH_1_00, attachmentId: "$aid""""),
+                        "gmosSouthMos { customMask { attachmentId } }"
+                      ),
+                      expected = mismatch("GN2025AQ001-01", Instrument.GmosNorth, Instrument.GmosSouth).asLeft
+                    )
     yield ()

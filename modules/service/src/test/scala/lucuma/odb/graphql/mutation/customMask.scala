@@ -12,37 +12,13 @@ import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
-import lucuma.core.model.Program
-import lucuma.odb.util.Codecs.attachment_id
-import lucuma.odb.util.Codecs.program_id
-import skunk.Query
-import skunk.codec.text.text
-import skunk.syntax.all.*
 
 // Shared by the suites below, which cannot be one suite because the delete test
 // additionally needs S3 for the attachment route.
-trait CustomMaskOps extends ReplaceSequenceOps:
+trait CustomMaskOps extends ReplaceSequenceOps with MosMaskOps:
   self: query.ExecutionTestSupport =>
 
   protected val SlitWidth = "CUSTOM_WIDTH_0_50"
-
-  // Insert a mos_mask attachment directly rather than going through the file
-  // service and S3, so the setup depends only on the database.
-  protected def insertMosMaskAttachment(pid: Program.Id, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String, String), Attachment.Id] =
-      sql"""
-        INSERT INTO t_attachment (
-          c_program_id,
-          c_attachment_type,
-          c_file_name,
-          c_file_size,
-          c_remote_path,
-          c_mask_name
-        )
-        VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
-        RETURNING c_attachment_id
-      """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix("_ODF.fits").toUpperCase))
 
   protected def gmosStep(customMask: String): String =
     s"""
@@ -136,7 +112,7 @@ class customMask extends query.ExecutionTestSupportForGmos with CustomMaskOps:
         p   <- createProgram
         t   <- createTargetWithProfileAs(pi, p)
         o   <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-        a   <- Option.when(defined)(insertMosMaskAttachment(p, "GN2025AQ001-01_ODF.fits")).sequence
+        a   <- Option.when(defined)(insertMosMaskAttachment(p, "GN2025AQ001-01_ODF.fits", Instrument.GmosNorth)).sequence
         // Pending simply omits the attachment id; the slit width alone marks
         // the custom mask as present.
         cm   = a.fold(s"""{ slitWidth: $SlitWidth }""")(id => s"""{ attachmentId: "$id", slitWidth: $SlitWidth }""")

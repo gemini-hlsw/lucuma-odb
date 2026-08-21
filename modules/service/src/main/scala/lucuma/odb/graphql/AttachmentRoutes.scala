@@ -102,8 +102,7 @@ object AttachmentRoutes {
         case AttachmentException.Forbidden           => Forbidden()
         case AttachmentException.FileNotFound        => NotFound()
         case AttachmentException.InvalidRequest(msg) => BadRequest(msg)
-        case AttachmentException.AttachmentInUse     =>
-          Conflict("The attachment is in use and cannot be deleted.")
+        case AttachmentException.AttachmentInUse(msg) => Conflict(msg)
 
     extension[A](fe: F[Either[AttachmentException, A]])
       def toResponse(fa: A => F[Response[F]]): F[Response[F]] =

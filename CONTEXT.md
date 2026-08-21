@@ -67,7 +67,7 @@ _Avoid_: MDF (that names the file, not the FPU), mask FPU, custom FPU.
 The representative width of the slitlets cut into a Custom Mask, from `GmosCustomSlitWidth`. Always known — it is how the mode is chosen at Phase 0 — and so is required even when the mask itself has not been made. In 1:1 correspondence with the builtin long slit FPU widths, which is what lets a MOS observation be calibrated as a long slit.
 
 **Mask Attachment**:
-The uploaded file describing a Custom Mask's actual slitlet layout, an attachment of type `mos_mask`. Optional and absent by default: the mask is usually only designed during Phase 2, from pre-imaging. Its absence is the normal early state of a valid MOS observation, not an error. Carries a Mask Name.
+The uploaded file describing a Custom Mask's actual slitlet layout, an attachment of type `mos_mask`. Optional and absent by default: the mask is usually only designed during Phase 2, from pre-imaging. Its absence is the normal early state of a valid MOS observation, not an error. Carries a Mask Name and a Mask Instrument, and may only be assigned to a MOS observation whose instrument matches it.
 _Avoid_: mask file, MDF, mask id.
 
 **Mask Name**:
@@ -77,8 +77,12 @@ _Avoid_: MDF name, mask file name, mask id.
 ### Mask Designs
 
 **Mask Definition**:
-The design parsed out of a Mask Attachment's file at upload and recorded on the attachment: instrument, pixel scale, pointing, position angle, dispersion direction and the slit list. Names the *design*, where the Mask Attachment names the file, the Mask Name the plate and the Custom Mask the FPU. Derived data — the uploaded file remains the source of truth and the definition can always be rebuilt from it. A file that cannot be parsed, or that records no position angle, rejects the upload, so a definition exists exactly for masks accepted since parsing began.
-_Avoid_: mask metadata, mask blob (names the storage, not the concept), ODF (names the file format).
+The design parsed out of a Mask Attachment's file at upload and recorded on the attachment: Mask Instrument, pixel scale, pointing, position angle, dispersion direction and the slit list. Names the *design*, where the Mask Attachment names the file, the Mask Name the plate and the Custom Mask the FPU. Derived data — the uploaded file remains the source of truth and the definition can always be rebuilt from it. A file that cannot be parsed, or that records no position angle, rejects the upload, so a definition exists exactly for masks accepted since parsing began.
+_Avoid_: mask metadata, mask blob (names the storage, not the concept), ODF (names the file format). Also beware the unrelated `lucuma.core.model.MaskDefinition`, which is the "assigned or not yet assigned" state of a Custom Mask's Mask Attachment, not a design at all.
+
+**Mask Instrument**:
+The instrument a Mask Attachment's plate was cut for — one of GMOS North, GMOS South or Flamingos-2, the three that do MOS at Gemini. Read from the mask file, so normally part of the Mask Definition, but known separately from it: a mask that predates parsing carries an instrument *inferred* from an observation that used it, and so has a Mask Instrument with no Mask Definition. The two GMOS arms are distinct answers, not one, because a plate is machined for one arm and cannot be mounted in the other. Always present on a Mask Attachment.
+_Avoid_: mask site (the site does not distinguish GMOS from Flamingos-2), mask type.
 
 **Alignment Box**:
 An aperture in a Mask Definition cut for a bright star and used to position the mask on sky during acquisition, not to take a spectrum. Distinguished from science slits by its ACQUISITION placement priority — never by shape or slit type, which do not discriminate.

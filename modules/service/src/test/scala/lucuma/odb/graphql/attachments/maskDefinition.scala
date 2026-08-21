@@ -10,7 +10,15 @@ import cats.effect.Resource
 import cats.syntax.all.*
 import io.circe.ACursor
 import io.circe.Json
+import io.circe.literal.*
+import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Attachment
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.odb.service.AttachmentFileService
+import lucuma.odb.service.AttachmentMetadataService
+import lucuma.refined.*
 import org.http4s.Response
 import org.http4s.Status
 
@@ -177,3 +185,87 @@ class maskDefinition extends AttachmentsSuite:
       _     <- insertAttachment(pi, pid, finder).toAttachmentId
       masks <- queryMasks(pid)
     yield assertEquals(masks.head.path("mask"), Json.Null)
+
+  // A mask's instrument is part of the key an observation's mask reference
+  // points at, so these exercise the whole path from the uploaded file through
+  // the parse to the constraint, without reading the column directly.
+
+  private def gmosSouthMosObservation(pid: Program.Id): IO[Observation.Id] =
+    createTargetAs(pi, pid).flatMap: tid =>
+      createObservationAs(pi, pid, ObservingModeType.GmosSouthMos.some, tid)
+
+  private def assignMask(oid: Observation.Id, aid: Attachment.Id): String =
+    s"""
+      mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: { observingMode: { gmosSouthMos: { customMask: {
+            slitWidth: CUSTOM_WIDTH_0_50
+            attachmentId: "$aid"
+          } } } }
+        }) {
+          observations { observingMode { gmosSouthMos { customMask { attachmentId } } } }
+        }
+      }
+    """
+
+  test("an uploaded design can be assigned to an observation for its instrument"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- gmosSouthMosObservation(pid)
+      aid <- insertAttachment(pi, pid, gmosMask).toAttachmentId
+      _   <- expect(pi, assignMask(oid, aid), json"""
+               {
+                 "updateObservations": {
+                   "observations": [
+                     {
+                       "observingMode": {
+                         "gmosSouthMos": { "customMask": { "attachmentId": $aid } }
+                       }
+                     }
+                   ]
+                 }
+               }
+             """.asRight)
+    yield ()
+
+  test("an uploaded design cannot be assigned to an observation for another instrument"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- gmosSouthMosObservation(pid)
+      aid <- insertAttachment(pi, pid, f2Mask).toAttachmentId
+      _   <- expect(
+               pi,
+               assignMask(oid, aid),
+               List(
+                 AttachmentMetadataService.maskInstrumentMismatchMessage(
+                   "GS2015AQ023-01".refined,
+                   Instrument.Flamingos2,
+                   Instrument.GmosSouth
+                 )
+               ).asLeft
+             )
+    yield ()
+
+  test("an assigned mask's file cannot be replaced by one for another instrument"):
+    for
+      pid   <- createProgramAs(pi)
+      oid   <- gmosSouthMosObservation(pid)
+      aid   <- insertAttachment(pi, pid, gmosMask).toAttachmentId
+      _     <- query(pi, assignMask(oid, aid))
+      _     <- updateAttachment(pi, aid, f2Mask)
+                 .withExpectation(Status.Conflict, AttachmentFileService.MaskInstrumentInUseMsg)
+      // The refused replace leaves the original file and definition in place.
+      _     <- getAttachment(pi, aid).expectBodyBytes(gmosMask.bytes)
+      masks <- queryMasks(pid)
+    yield assertEquals(masks.head.decodePath[String]("mask", "instrument"), "GMOS_SOUTH")
+
+  test("an assigned mask's file can be replaced by one for the same instrument"):
+    for
+      pid   <- createProgramAs(pi)
+      oid   <- gmosSouthMosObservation(pid)
+      aid   <- insertAttachment(pi, pid, gmosMask).toAttachmentId
+      _     <- query(pi, assignMask(oid, aid))
+      _     <- updateAttachment(pi, aid, gmosMask).expectOk
+      masks <- queryMasks(pid)
+    yield assertEquals(masks.head.decodePath[String]("mask", "instrument"), "GMOS_SOUTH")
