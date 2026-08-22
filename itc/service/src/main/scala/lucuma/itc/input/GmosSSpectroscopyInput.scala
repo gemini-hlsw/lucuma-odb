@@ -13,6 +13,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.itc.GmosIfuAnalysis
 import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
@@ -26,7 +27,8 @@ case class GmosSSpectroscopyInput(
   filter:            Option[GmosSouthFilter],
   ccdMode:           Option[GmosCcdMode],
   roi:               Option[GmosRoi],
-  port:              PortDisposition
+  port:              PortDisposition,
+  ifuAnalysis:       Option[GmosIfuAnalysis]
 ) extends InstrumentModesInput
 
 object GmosSSpectroscopyInput {
@@ -41,10 +43,19 @@ object GmosSSpectroscopyInput {
             GmosSouthFilterBinding.Option("filter", filter),
             GmosCcdModeInput.Binding.Option("ccdMode", ccdMode),
             GmosRoiBinding.Option("roi", roi),
-            PortDispositionBinding("port", portDisposition)
+            PortDispositionBinding("port", portDisposition),
+            GmosIfuAnalysisInput.Binding.Option("ifuAnalysis", ifuAnalysis)
           ) =>
-        (exposureTimeMode, centralWavelength, grating, fpu, filter, ccdMode, roi, portDisposition)
-          .parMapN(apply)
+        (exposureTimeMode,
+         centralWavelength,
+         grating,
+         fpu,
+         filter,
+         ccdMode,
+         roi,
+         portDisposition,
+         ifuAnalysis
+        ).parMapN(apply)
     }
 
 }

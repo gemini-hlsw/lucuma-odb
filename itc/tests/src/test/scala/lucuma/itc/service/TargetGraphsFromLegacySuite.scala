@@ -5,6 +5,7 @@ package lucuma.itc.service
 
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
+import cats.syntax.all.*
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -16,6 +17,7 @@ import lucuma.itc.ItcGraphGroup
 import lucuma.itc.ItcSeries
 import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
+import lucuma.itc.TargetGraphs
 import lucuma.itc.legacy.ItcRemoteCcd
 
 class TargetGraphsFromLegacySuite extends munit.FunSuite:
@@ -121,4 +123,48 @@ class TargetGraphsFromLegacySuite extends munit.FunSuite:
     assertEquals(result.ccds.last.maxSingleSNRatio, Some(7.0))
     assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(70.0)))
     assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(7.0)))
+  }
+
+  private def slitSeries(slit: String, tpe: SeriesDataType, peak: Double): ItcSeries =
+    ItcSeries(
+      s"$slit Slit S/N",
+      tpe,
+      NonEmptyList.of(0.0, peak),
+      ItcXAxis(1000.0, 1001.0, 2)
+    )
+
+  // The GMOS two-slit IFU reports a blue and a red slit series per CCD, so the series arrive
+  // in CCD-major pairs. Pairing by plain index would give CCD 2 a CCD 0 series and never read
+  // the last CCD's own data at all.
+  test("GMOS two-slit IFU pairs each CCD with its blue/red series pair") {
+    // per CCD: (blue, red) final peak
+    val peaks: List[(Double, Double)] = List((10.0, 50.0), (12.0, 90.0), (11.0, 60.0))
+    val graph: ItcGraph               =
+      ItcGraph(
+        GraphType.S2NGraph,
+        peaks.flatMap: (blue, red) =>
+          List(
+            slitSeries("Blue", SeriesDataType.SingleS2NData, blue / 2),
+            slitSeries("Blue", SeriesDataType.FinalS2NData, blue),
+            slitSeries("Red", SeriesDataType.SingleS2NData, red / 2),
+            slitSeries("Red", SeriesDataType.FinalS2NData, red)
+          )
+      )
+
+    val result: TargetGraphs =
+      Conversions.targetGraphsFromLegacy(
+        NonEmptyChain.of(ccd(45.0, 90.0), ccd(45.0, 90.0), ccd(45.0, 90.0)),
+        NonEmptyChain.one(ItcGraphGroup(NonEmptyChain.one(graph))),
+        at
+      )
+
+    assertEquals(result.ccds.length.toInt, 3)
+    assertEquals(result.ccds.toList.map(_.maxTotalSNRatio),
+                 List(Some(50.0), Some(90.0), Some(60.0))
+    )
+    assertEquals(result.ccds.toList.map(_.maxSingleSNRatio),
+                 List(Some(25.0), Some(45.0), Some(30.0))
+    )
+    assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(90.0)))
+    assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(45.0)))
   }
