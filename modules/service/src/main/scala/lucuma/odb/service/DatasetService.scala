@@ -93,6 +93,9 @@ object DatasetService {
         def stepNotExecuted: Result[Dataset.Id] =
           OdbError.InvalidStep(input.stepId, s"Step id '${input.stepId}' has not been started".some).asFailure
 
+        def visitNotFound: Result[Dataset.Id] =
+          OdbError.InvalidVisit(input.visitId, s"Visit id '${input.visitId}' not found".some).asFailure
+
         val insert: F[Result[Dataset.Id]] =
           session
             .unique(Statements.InsertDataset)(input)
@@ -103,6 +106,10 @@ object DatasetService {
                 val clean   = Ansi.replaceAllIn(ex.getMessage, "")
                 val Detail  = """.*Detail:\s*(.*)""".r
                 filenameDuplicated(clean.linesIterator.collectFirst { case Detail(d) => d })
+              // Match the constraint, not the column: the message embeds the statement,
+              // which mentions c_visit_id on every insert.
+              case SqlState.ForeignKeyViolation(ex) if ex.getMessage.contains("c_visit_id_fkey") =>
+                visitNotFound
               case SqlState.ForeignKeyViolation(_) => stepNotFound
               case SqlState.CheckViolation(_)      => stepNotExecuted
               case SqlState.NotNullViolation(ex) if ex.getMessage.contains("c_observation_id") => stepNotFound
@@ -158,6 +165,7 @@ object DatasetService {
       sql"""
         INSERT INTO t_dataset (
           c_step_id,
+          c_visit_id,
           c_file_site,
           c_file_date,
           c_file_index,
@@ -167,6 +175,7 @@ object DatasetService {
         )
         SELECT
           $step_id,
+          $visit_id,
           $dataset_filename,
           ${dataset_qa_state.opt},
           ${text_nonempty.opt},
@@ -177,6 +186,7 @@ object DatasetService {
           c_dataset_id
       """.query(dataset_id).contramap { input => (
         input.stepId,
+        input.visitId,
         input.filename,
         input.qaState,
         input.comment,

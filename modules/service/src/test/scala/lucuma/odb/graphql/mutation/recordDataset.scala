@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.eq.*
 import cats.syntax.option.*
+import cats.syntax.traverse.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.ObservingModeType
@@ -20,6 +21,7 @@ import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.IdempotencyKey
+import lucuma.odb.data.StepExecutionState
 
 class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
 
@@ -240,6 +242,167 @@ class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
       """,
       (_, _) => "Step id 's-d506e5d9-e5d1-4fcc-964c-90afedabc9e8' not found".asLeft
     )
+  }
+
+  // Before V1279 these failed with "has not been started": a dataset could only be
+  // recorded for a step the ODB had already seen an event for. A dataset now
+  // stands in for the step event it implies.
+  private def setupWithoutStepEvent(
+    mode: ObservingModeType,
+    user: User
+  ): IO[(Observation.Id, Visit.Id, Step.Id)] =
+    for
+      pid <- createProgramAs(user)
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createObservationAs(user, pid, mode.some, tid)
+      vid <- recordVisitAs(user, oid)
+      ids <- scienceSequenceIds(user, oid).map(_.head)
+      sid  = ids._2.head
+    yield (oid, vid, sid)
+
+  test("recordDataset - step with no events yet") {
+    setupWithoutStepEvent(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (oid, vid, sid) =>
+      expect(
+        serviceUser,
+        s"""
+          mutation {
+            recordDataset(input: {
+              stepId: "$sid"
+              visitId: "$vid"
+              filename: "N18630101S0010.fits"
+            }) {
+              dataset {
+                index
+                observation { id }
+                filename
+              }
+            }
+          }
+        """,
+        json"""
+          {
+            "recordDataset": {
+              "dataset": {
+                "index": 1,
+                "observation": { "id": $oid },
+                "filename": "N18630101S0010.fits"
+              }
+            }
+          }
+        """.asRight
+      )
+  }
+
+  private def stepStates(user: User, oid: Observation.Id): IO[List[StepExecutionState]] =
+    query(
+      user  = user,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              atomRecords { matches { steps { matches { executionState } } } }
+            }
+          }
+        }
+      """
+    ).flatMap: js =>
+      js.hcursor
+        .downFields("observation", "execution", "atomRecords", "matches")
+        .values
+        .toList
+        .flatTraverse(_.toList.flatTraverse: js =>
+          js.hcursor
+            .downFields("steps", "matches")
+            .values
+            .toList
+            .flatTraverse(_.toList.traverse: js =>
+              js.hcursor
+                .downField("executionState")
+                .as[StepExecutionState]
+                .leftMap(f => new RuntimeException(f.message))
+                .liftTo[IO]
+            )
+        )
+
+  test("recordDataset - a dataset makes its step ongoing") {
+    setupWithoutStepEvent(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (oid, vid, sid) =>
+      for
+        _ <- recordDatasetAs(serviceUser, sid, vid, "N18630101S0012.fits")
+        _ <- assertIO(stepStates(serviceUser, oid), List(StepExecutionState.Ongoing))
+      yield ()
+  }
+
+  test("recordDataset - a dataset for a new step abandons the previous ongoing one") {
+    setupWithoutStepEvent(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (oid, vid, _) =>
+      for
+        ids   <- scienceSequenceIds(serviceUser, oid).map(_.head)
+        sids   = ids._2
+        _     <- recordDatasetAs(serviceUser, sids(0), vid, "N18630101S0013.fits")
+        _     <- recordDatasetAs(serviceUser, sids(1), vid, "N18630101S0014.fits")
+        states <- stepStates(serviceUser, oid)
+      yield assertEquals(states, List(StepExecutionState.Abandoned, StepExecutionState.Ongoing))
+  }
+
+  test("recordDataset - a late dataset does not reopen a completed step") {
+    setupWithoutStepEvent(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (oid, vid, sid) =>
+      for
+        _      <- addEndStepEvent(sid, vid)
+        _      <- recordDatasetAs(serviceUser, sid, vid, "N18630101S0015.fits")
+        states <- stepStates(serviceUser, oid)
+      yield assertEquals(states, List(StepExecutionState.Completed))
+  }
+
+  test("recordDataset - a step event arriving after the dataset still completes the step") {
+    setupWithoutStepEvent(ObservingModeType.GmosNorthLongSlit, serviceUser).flatMap: (oid, vid, sid) =>
+      for
+        _ <- recordDatasetAs(serviceUser, sid, vid, "N18630101S0011.fits")
+        _ <- addEndStepEvent(sid, vid)
+        _ <- expect(
+               serviceUser,
+               s"""
+                 query {
+                   observation(observationId: "$oid") {
+                     execution {
+                       atomRecords {
+                         matches {
+                           steps {
+                             matches {
+                               executionState
+                               datasets { matches { filename } }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               """,
+               json"""
+                 {
+                   "observation": {
+                     "execution": {
+                       "atomRecords": {
+                         "matches": [
+                           {
+                             "steps": {
+                               "matches": [
+                                 {
+                                   "executionState": "COMPLETED",
+                                   "datasets": {
+                                     "matches": [ { "filename": "N18630101S0011.fits" } ]
+                                   }
+                                 }
+                               ]
+                             }
+                           }
+                         ]
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+      yield ()
   }
 
   test("chronicle auditing"):
