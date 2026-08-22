@@ -15938,48 +15938,44 @@ scalar TooTriggerId
 Lifecycle status of a Target-of-Opportunity trigger.
 
 A trigger is not requested directly.  It comes into being when a ToO observation
-is set to the READY workflow state with a resolved opportunity target, and the
-database keeps the two in step, so the status can never disagree with the
-observation.  REQUESTED is the only non-terminal status.
-
-DECLINED, WITHDRAWN and SUPERSEDED are terminal, and for the purpose of
-triggering again all three are equivalent to never having been triggered: setting
-the observation READY once more produces a new trigger rather than transitioning
-out of a terminal status.  They are kept distinct because they answer different
-questions about what became of the request.
+is set to the READY workflow state with a resolved opportunity target.  REQUESTED
+is the only non-terminal status.
 """
 enum TooTriggerStatus {
 
   """
-  Live: the observation is ready to be observed and the observatory has it under
-  consideration.  The only non-terminal status, and the only one an outstanding
-  request can hold -- at most one trigger per observation is REQUESTED at a time.
-  A trigger stays REQUESTED while its observation executes; that execution has
-  begun is reported by the execution events, not here.
+  A live, open, request. The observation is ready to be observed and the
+  observatory has it under consideration.  The only non-terminal status. At most
+  one trigger per observation is REQUESTED at a time. A trigger stops being
+  REQUESTED the moment its observation begins executing (see ACCEPTED).
   """
   REQUESTED
 
   """
-  An observer saw the request and chose not to act on it, with a reason in
-  `resolutionReason`.  Distinct from a request simply sitting there: DECLINED says
-  somebody looked, where REQUESTED says nothing about whether anyone has.
-  Declining also returns the observation to DEFINED.
+  An ACCEPTED request is one that the observatory has acted upon.  A ToO trigger
+  is marked ACCEPTED recorded when execution begins. Specifically, when its
+  first non-slew execution event arrives.
+  """
+  ACCEPTED
+
+  """
+  A DECLINED request is one that the observer has rejected for a reason, perhaps
+  setting a `resolutionReason` to explain why. Declining also returns the
+  observation to a DEFINED workflow state so it may be re-triggered in the
+  future.
   """
   DECLINED
 
   """
-  The request was taken back before it was acted on -- the PI cleared the READY
-  workflow state, cleared the target's resolution, or the observation stopped
-  being a Target of Opportunity.  Nobody at the observatory need have seen it.
+  A WITHDRAWN ToO is one that has been rescinded before it was acted upon,
+  typically by the PI marking the observation DEFINED.
   """
   WITHDRAWN
 
   """
-  Replaced by a request at a different `tooActivation`.  A trigger's activation is
-  fixed when it is created, so a change of activation on an outstanding request
-  closes it out and creates a successor rather than amending it in place -- the
-  successor's `supersedes` points back here.  Unlike WITHDRAWN, nothing was taken
-  back: the observation is still live, under the successor.
+  When the observation's scheduling mode is adjusted after a trigger has already
+  been fired, any existing ToOs in REQUESTED status are SUPERSEDED by a new
+  ToO trigger record.
   """
   SUPERSEDED
 }
@@ -16137,7 +16133,8 @@ input WhereOrderTooTriggerId {
 
 """
 Filters on equality or order comparisons of the TooTriggerStatus property.  Order
-follows the lifecycle declaration: REQUESTED < DECLINED < WITHDRAWN < SUPERSEDED,
+follows the lifecycle declaration: REQUESTED < ACCEPTED < DECLINED < WITHDRAWN <
+SUPERSEDED,
 so `GTE: REQUESTED` matches every status.
 """
 input WhereOrderTooTriggerStatus {
