@@ -19,6 +19,7 @@ import lucuma.core.math.WavelengthDither
 import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
+import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
 import lucuma.odb.sequence.gmos.spectroscopy
 import lucuma.odb.sequence.gmos.spectroscopy.Config.Common
 import lucuma.odb.sequence.syntax.hash.*
@@ -67,14 +68,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectro
    */
   override def defaultSpatialOffsets: List[Q] =
     Config.DefaultSpatialOffsets
-
-  /**
-   * The dither is fixed rather than sized to the chip gaps: with two slits the
-   * usable range is what the blocking filter passes, which the long slit
-   * gap-filling dithers would walk straight out of.
-   */
-  override def defaultWavelengthDithers: List[WavelengthDither] =
-    Config.DefaultWavelengthDithers
 
   def acquisition: AcquisitionConfig[L]
 
@@ -125,6 +118,9 @@ object Config:
     override def builtinFpu: GmosNorthFpu =
       fpu.fpu
 
+    override def defaultWavelengthDithers: List[WavelengthDither] =
+      LongSlitConfig.defaultWavelengthDithersNorth(this.grating)
+
     override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosNorth =
       copy(common = common.copy(explicitWavelengthDithers = dithers))
 
@@ -159,6 +155,9 @@ object Config:
     override def builtinFpu: GmosSouthFpu =
       fpu.fpu
 
+    override def defaultWavelengthDithers: List[WavelengthDither] =
+      LongSlitConfig.defaultWavelengthDithersSouth(this.grating)
+
     override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosSouth =
       copy(common = common.copy(explicitWavelengthDithers = dithers))
 
@@ -177,17 +176,6 @@ object Config:
           a.acquisition,
           a.common
         )
-
-  /**
-   * OCS template library `GMOS_N_BP.xml` obs {37}, whose science iterators sit
-   * at the central wavelength and 10 nm either side of it.
-   */
-  val DefaultWavelengthDithers: List[WavelengthDither] =
-    List(
-      WavelengthDither.Zero,
-      WavelengthDither.decimalNanometers.getOption(BigDecimal( 10)).get,
-      WavelengthDither.decimalNanometers.getOption(BigDecimal(-10)).get
-    )
 
   val DefaultSpatialOffsets: List[Q] =
     List.empty

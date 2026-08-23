@@ -161,6 +161,10 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gmos_north_filter, "t_gmos_north_filter"),
           checkPostgresLookupTable(gmos_north_fpu, "t_gmos_north_fpu"),
           checkPostgresLookupTable(gmos_north_grating, "t_gmos_north_disperser"),
+          // Both IFU FPU enums are backed by the one shared table, so checking
+          // each also catches the two drifting apart.
+          checkPostgresLookupTable(gmos_north_ifu_fpu, "t_gmos_ifu_fpu"),
+          checkPostgresLookupTable(gmos_south_ifu_fpu, "t_gmos_ifu_fpu"),
           checkPostgresLookupTable(gmos_north_stage_mode, "t_gmos_north_stage_mode"),
           checkPostgresLookupTable(gmos_roi, "t_gmos_roi"),
           checkPostgresLookupTable(gmos_south_detector, "t_gmos_south_detector"),

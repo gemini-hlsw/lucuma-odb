@@ -6,6 +6,7 @@ package lucuma.odb.sequence.gmos.spectroscopy
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
+import cats.syntax.option.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosRoi
@@ -127,6 +128,22 @@ trait Config[G, L, U] extends Product with Serializable:
       ampGain,
       ampReadMode
     )
+
+  /**
+   * The telescope configuration for each spatial position the science steps
+   * cycle through.  Long slit and MOS nod along the slit, so theirs are q-only
+   * and always guided; the IFU dithers within its field and stores full
+   * configurations, guide state included.
+   */
+  def telescopeConfigs: List[TelescopeConfig] =
+    spatialOffsets.map(q => TelescopeConfig(Offset(Offset.P.Zero, q), StepGuideState.Enabled))
+
+  /**
+   * Replaces the telescope configurations, preserving the concrete mode.  The
+   * slit modes keep only the q component, which is all they can express.
+   */
+  def withTelescopeConfigs(tcs: List[TelescopeConfig]): Config[G, L, U] =
+    withSpatialOffsets(tcs.map(_.offset.q).some)
 
   /**
    * Replaces the explicit wavelength dithers, preserving the concrete mode.
