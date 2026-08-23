@@ -15,8 +15,10 @@ import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosNorthIfuFpu
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosSouthIfuFpu
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsGrating
@@ -85,6 +87,18 @@ object configurationrequest:
     val DecodeGmosSouthMos: Decoder[GmosSouthMos] = hc =>
       hc.downField("grating").as[GmosSouthGrating].map(GmosSouthMos(_))
 
+    val DecodeGmosNorthIfu: Decoder[GmosNorthIfu] = hc =>
+      for
+        grating <- hc.downField("grating").as[GmosNorthGrating]
+        fpu     <- hc.downField("fpu").as[GmosNorthIfuFpu]
+      yield GmosNorthIfu(grating, fpu)
+
+    val DecodeGmosSouthIfu: Decoder[GmosSouthIfu] = hc =>
+      for
+        grating <- hc.downField("grating").as[GmosSouthGrating]
+        fpu     <- hc.downField("fpu").as[GmosSouthIfuFpu]
+      yield GmosSouthIfu(grating, fpu)
+
     val DecodeGnirsLongSlit: Decoder[GnirsLongSlit] = hc =>
       for
         grating <- hc.downField("grating").as[GnirsGrating]
@@ -114,6 +128,8 @@ object configurationrequest:
       hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
       hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit) orElse
       hc.downField("gmosSouthMos").as(using DecodeGmosSouthMos) orElse
+      hc.downField("gmosNorthIfu").as(using DecodeGmosNorthIfu) orElse
+      hc.downField("gmosSouthIfu").as(using DecodeGmosSouthIfu) orElse
       hc.downField("gnirsLongSlit").as(using DecodeGnirsLongSlit) orElse
       hc.downField("gnirsIfu").as(using DecodeGnirsIfu) orElse
       // GhostIfu and Igrins2LongSlit don't have parameters, so decode by name
@@ -133,6 +149,8 @@ object configurationrequest:
         "gmosSouthImaging"   -> Json.Null, // one of these will be replaced below
         "gmosSouthLongSlit"  -> Json.Null, // one of these will be replaced below
         "gmosSouthMos"       -> Json.Null, // one of these will be replaced below
+        "gmosNorthIfu"       -> Json.Null, // one of these will be replaced below
+        "gmosSouthIfu"       -> Json.Null, // one of these will be replaced below
         "gnirsLongSlit"      -> Json.Null,
         "gnirsIfu"           -> Json.Null,
         "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
@@ -147,6 +165,8 @@ object configurationrequest:
           case GmosSouthImaging(filters)             => "gmosSouthImaging"   -> Json.obj("filters" -> filters.asJson)
           case GmosSouthLongSlit(grating)            => "gmosSouthLongSlit"  -> Json.obj("grating" -> grating.asJson)
           case GmosSouthMos(grating)                 => "gmosSouthMos"       -> Json.obj("grating" -> grating.asJson)
+          case GmosNorthIfu(grating, fpu)            => "gmosNorthIfu"       -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
+          case GmosSouthIfu(grating, fpu)            => "gmosSouthIfu"       -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
           case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit"      -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
           case GnirsIfu(grating, fpu)                => "gnirsIfu"           -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
           // GMOS IFU configuration requests will be implemented in a future PR.

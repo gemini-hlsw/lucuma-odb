@@ -41,6 +41,7 @@ import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2ImagingConfig
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
 import lucuma.odb.sequence.ghost.ifu.Config as GhostConfig
+import lucuma.odb.sequence.gmos.ifu.Config as IfuConfig
 import lucuma.odb.sequence.gmos.imaging.Config as ImagingConfig
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.mos.Config as MosConfig
@@ -290,6 +291,16 @@ object CalibrationConfigSubset:
   ) extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GnirsImaging
 
+  /**
+   * The IFU is calibrated through the IFU, not through the equivalent long slit,
+   * so unlike MOS it does not reuse [[GmosNConfigs]] / [[GmosSConfigs]].
+   */
+  case class GmosNIfuConfigs(config: IfuConfig.GmosNorth) extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.GmosNorthIfu
+
+  case class GmosSIfuConfigs(config: IfuConfig.GmosSouth) extends CalibrationConfigSubset derives Eq:
+    def modeType: ObservingModeType = ObservingModeType.GmosSouthIfu
+
   case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit
 
@@ -380,6 +391,12 @@ object CalibrationConfigSubset:
             gsm.ampGain,
             gsm.roi
           )
+
+        case gni: IfuConfig.GmosNorth =>
+          GmosNIfuConfigs(gni)
+
+        case gsi: IfuConfig.GmosSouth =>
+          GmosSIfuConfigs(gsi)
 
         case gni: ImagingConfig.GmosNorth =>
           GmosNImagingConfigs(

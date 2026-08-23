@@ -274,6 +274,8 @@ object Generator:
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, calculator.gnirsLongSlitSetup))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
+            case m @ (ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu) =>
+              EitherT.leftT(GeneratorError.modeNotImplemented(ctx.oid, m))
             case vis: VisitorObservingModeType        =>
               // There is no sequence for visitors we calculate the digest directly
               val state = ctx.params.declaredState.getOrElse(ExecutionState.Completed)
@@ -336,6 +338,8 @@ object Generator:
           case ObservingModeType.GnirsImaging       => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
+          case m @ (ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu) =>
+            EitherT.leftT(GeneratorError.modeNotImplemented(ctx.oid, m))
           case _: VisitorObservingModeType          =>
             EitherT.rightT[F, OdbError]:
               StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
@@ -461,6 +465,9 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.Igrins2.apply)
 
+            case m @ (ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu) =>
+              EitherT.leftT(GeneratorError.modeNotImplemented(ctx.oid, m))
+
             case v: VisitorObservingModeType =>
               EitherT.rightT(InstrumentExecutionConfig.Visitor(v.instrument))
 
@@ -540,6 +547,9 @@ object Generator:
                   case ObservingModeType.Igrins2LongSlit    =>
                     EitherT.pure(())
 
+                  case m @ (ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu) =>
+                    EitherT.leftT(GeneratorError.modeNotImplemented(ctxʹ.oid, m))
+
                   case _: VisitorObservingModeType          =>
                     EitherT.pure(())
           .value
@@ -613,6 +623,9 @@ object Generator:
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.generateIgrins2LongSlit(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeIgrins2ExecutionConfig(oid, s)))
+
+            case m @ (ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu) =>
+              EitherT.leftT(GeneratorError.modeNotImplemented(oid, m))
 
             case _: VisitorObservingModeType          =>
               EitherT.pure(())

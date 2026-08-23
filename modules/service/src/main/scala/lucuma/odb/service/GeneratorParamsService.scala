@@ -580,6 +580,48 @@ object GeneratorParamsService {
 
             scienceOnlySpectroscopyGeneratorParams(gsm, sciMode).asRight
 
+          case gni @ gmos.ifu.Config.GmosNorth(grating = g, filter = f, acquisition = a, common = c) =>
+            val sciMode = InstrumentMode.GmosNorthSpectroscopy(
+              c.exposureTimeMode,
+              c.centralWavelength,
+              g,
+              f,
+              GmosFpu.North.builtin(gni.builtinFpu),
+              gni.ccdMode.some,
+              gni.roi.some,
+              ifuAnalysis = gni.ifuAnalysis.some
+            )
+            spectroscopyGeneratorParams(
+              obsMode = gni,
+              acqMode = InstrumentMode.GmosNorthImaging(
+                exposureTimeMode = a.exposureTimeMode,
+                filter  = a.filter,
+                ccdMode = sciMode.ccdMode
+              ),
+              sciMode  = sciMode
+            ).asRight
+
+          case gsi @ gmos.ifu.Config.GmosSouth(grating = g, filter = f, acquisition = a, common = c) =>
+            val sciMode = InstrumentMode.GmosSouthSpectroscopy(
+              c.exposureTimeMode,
+              c.centralWavelength,
+              g,
+              f,
+              GmosFpu.South.builtin(gsi.builtinFpu),
+              gsi.ccdMode.some,
+              gsi.roi.some,
+              ifuAnalysis = gsi.ifuAnalysis.some
+            )
+            spectroscopyGeneratorParams(
+              obsMode = gsi,
+              acqMode = InstrumentMode.GmosSouthImaging(
+                exposureTimeMode = a.exposureTimeMode,
+                filter  = a.filter,
+                ccdMode = sciMode.ccdMode
+              ),
+              sciMode  = sciMode
+            ).asRight
+
           case gn @ gmos.imaging.Config.GmosNorth(_, fs, _) =>
             // An input per filter.
             val inputs = fs.map: f =>
