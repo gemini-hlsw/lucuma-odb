@@ -55,7 +55,8 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
         GmosAmpReadMode.Fast
       ).some,
       GmosRoi.FullFrame.some,
-      PortDisposition.Side
+      PortDisposition.Side,
+      none
     )
   )
 
@@ -76,7 +77,8 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
       GmosAmpReadMode.Fast
     ).some,
     GmosRoi.FullFrame.some,
-    PortDisposition.Side
+    PortDisposition.Side,
+    none
   )
 
   test("gmos north grating".tag(LegacyITCTest)):
@@ -109,7 +111,8 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             sourceDefinition,
             obs,
             gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Builtin(f))),
-            if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
+            // Exercise the analysis method production would pick, IFU included.
+            gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Builtin(f))).analysisMethod
           ).asJson.noSpaces
         )
 
@@ -138,7 +141,8 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
       GmosAmpReadMode.Fast
     ).some,
     GmosRoi.FullFrame.some,
-    PortDisposition.Side
+    PortDisposition.Side,
+    none
   )
 
   test("gmos south grating".tag(LegacyITCTest)):
@@ -171,7 +175,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
             sourceDefinition,
             obs,
             gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Builtin(f))),
-            if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
+            gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Builtin(f))).analysisMethod
           ).asJson.noSpaces
         )
 

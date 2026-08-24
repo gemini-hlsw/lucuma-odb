@@ -9,6 +9,7 @@ import cats.derived.*
 import cats.syntax.all.*
 import grackle.*
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.itc.*
 import lucuma.itc.input.*
 import lucuma.itc.service.GmosNorthFpuParam
@@ -47,48 +48,47 @@ object AsterismSpectroscopyTimeRequest:
 
     val exposureTimeMode = mode.exposureTimeMode
 
+    // The legacy recipe rejects an IFU analysis without an IFU focal plane unit, so catch the
+    // contradiction here and say which half to change rather than passing it through.
+    def ifuAnalysisFor(
+      isIfu:    Boolean,
+      analysis: Option[GmosIfuAnalysis]
+    ): Result[Option[GmosIfuAnalysis]] =
+      if !isIfu && analysis.isDefined then
+        Result.failure:
+          "'ifuAnalysis' applies only to an IFU focal plane unit; remove it or select an IFU."
+      else Result.success(analysis)
+
     val modeResult: Result[ObservingMode.SpectroscopyMode] =
       mode match
         case GmosNSpectroscopyInput(
-              _,
-              centralWavelength,
-              grating,
-              fpu,
-              filter,
-              ccdMode,
-              roi,
-              port
+              centralWavelength = centralWavelength,
+              grating = grating,
+              fpu = fpu,
+              filter = filter,
+              ccdMode = ccdMode,
+              roi = roi,
+              port = port,
+              ifuAnalysis = ifuAnalysis
             ) =>
-          Result.success:
+          val fpuParam = GmosNorthFpuParam(fpu)
+          ifuAnalysisFor(fpuParam.isIfu, ifuAnalysis).map: analysis =>
             ObservingMode.SpectroscopyMode
-              .GmosNorth(centralWavelength,
-                         grating,
-                         GmosNorthFpuParam(fpu),
-                         filter,
-                         ccdMode,
-                         roi,
-                         port
-              )
+              .GmosNorth(centralWavelength, grating, fpuParam, filter, ccdMode, roi, port, analysis)
         case GmosSSpectroscopyInput(
-              _,
-              centralWavelength,
-              grating,
-              fpu,
-              filter,
-              ccdMode,
-              roi,
-              port
+              centralWavelength = centralWavelength,
+              grating = grating,
+              fpu = fpu,
+              filter = filter,
+              ccdMode = ccdMode,
+              roi = roi,
+              port = port,
+              ifuAnalysis = ifuAnalysis
             ) =>
-          Result.success:
+          val fpuParam = GmosSouthFpuParam(fpu)
+          ifuAnalysisFor(fpuParam.isIfu, ifuAnalysis).map: analysis =>
             ObservingMode.SpectroscopyMode
-              .GmosSouth(centralWavelength,
-                         grating,
-                         GmosSouthFpuParam(fpu),
-                         filter,
-                         ccdMode,
-                         roi,
-                         port
-              )
+              .GmosSouth(centralWavelength, grating, fpuParam, filter, ccdMode, roi, port, analysis)
         case Flamingos2SpectroscopyInput(
               _,
               disperser,

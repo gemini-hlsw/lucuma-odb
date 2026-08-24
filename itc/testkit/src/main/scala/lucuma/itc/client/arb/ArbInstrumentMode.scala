@@ -16,9 +16,12 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.PortDisposition
+import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.math.arb.ArbAngle
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.arb.ArbGmosCcdMode
@@ -29,6 +32,7 @@ import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbInstrumentMode {
+  import ArbAngle.given
   import ArbEnumerated.given
   import ArbExposureTimeMode.given
   import ArbFlamingos2FpuMask.given
@@ -46,6 +50,21 @@ trait ArbInstrumentMode {
   import InstrumentMode.Igrins2Spectroscopy
   import InstrumentMode.GhostSpectroscopy
 
+  // Radii and offsets are unconstrained here: these arbitraries feed Eq and Prism laws, and the
+  // positive-radius rule is enforced at the GraphQL boundary rather than by the type.
+  given Arbitrary[GmosIfuAnalysis] =
+    Arbitrary {
+      Gen.oneOf(
+        arbitrary[Angle].map(GmosIfuAnalysis.Sum(_)),
+        arbitrary[Angle].map(GmosIfuAnalysis.Single(_))
+      )
+    }
+
+  given Cogen[GmosIfuAnalysis] =
+    Cogen[(Int, Long)].contramap:
+      case GmosIfuAnalysis.Sum(radius)    => (0, radius.toMicroarcseconds)
+      case GmosIfuAnalysis.Single(offset) => (1, offset.toMicroarcseconds)
+
   given Arbitrary[GmosNorthSpectroscopy] =
     Arbitrary {
       for {
@@ -57,7 +76,8 @@ trait ArbInstrumentMode {
         c  <- arbitrary[Option[GmosCcdMode]]
         r  <- arbitrary[Option[GmosRoi]]
         p  <- arbitrary[PortDisposition]
-      } yield GmosNorthSpectroscopy(et, cw, g, f, u, c, r, p)
+        ia <- arbitrary[Option[GmosIfuAnalysis]]
+      } yield GmosNorthSpectroscopy(et, cw, g, f, u, c, r, p, ia)
     }
 
   given Cogen[GmosNorthSpectroscopy] =
@@ -92,7 +112,8 @@ trait ArbInstrumentMode {
         c  <- arbitrary[Option[GmosCcdMode]]
         r  <- arbitrary[Option[GmosRoi]]
         p  <- arbitrary[PortDisposition]
-      } yield GmosSouthSpectroscopy(et, cw, g, f, u, c, r, p)
+        ia <- arbitrary[Option[GmosIfuAnalysis]]
+      } yield GmosSouthSpectroscopy(et, cw, g, f, u, c, r, p, ia)
     }
 
   given Cogen[GmosSouthSpectroscopy] =

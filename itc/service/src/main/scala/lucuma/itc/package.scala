@@ -88,22 +88,45 @@ object Conversions:
         .map(_.wavelengthAtMaxAndMax)
         .flattenOption
 
-    // Find the SN of the first series that provides a value at the given wavelength
+    // The S/N at the requested wavelength. More than one series can cover that wavelength — the
+    // two-slit IFU's blue and red slits both do — so report the best of them rather than whichever
+    // happens to come first. That matches how each CCD's peak is taken below, and the slit the
+    // legacy exposure time solve optimises for, which is likewise the highest S/N there.
     def signalToNoiseAtWv(graph: ItcGraph, seriesDataType: SeriesDataType): Option[SignalToNoise] =
       graph.series
         .filter(_.seriesType === seriesDataType)
         .map(_.yValueAtWavelength(atWavelength))
         .flattenOption
-        .headOption
+        .maximumOption
         .flatMap(v => SignalToNoise.FromBigDecimalRounding.getOption(v))
 
     // Calculate the wavelengths at where the peaks happen.
     //
-    // Most modes report one S/N series per CCD, so each CCD is paired with the series
-    // at its own index. GNIRS cross-dispersed is different: it reports a single CCD but
-    // one Final S/N series per spectral order, and no single-exposure S/N series at all.
-    // In that case the single CCD aggregates the peak across all of its series, and the
-    // missing single-exposure S/N is simply left absent.
+    // Most modes report one S/N series per CCD, and each CCD takes the series at its own
+    // index. Two shapes report several series per CCD, and both order them with the CCD
+    // varying slowest — all of CCD 0's series, then all of CCD 1's — so each CCD takes the
+    // peak over its own contiguous run of them:
+    //   - GNIRS cross-dispersed reports a single CCD with one series per spectral order, so
+    //     that run is the whole list and the one CCD aggregates the peak across every order.
+    //   - The GMOS two-slit IFU reports a blue and a red slit series per CCD, so each CCD
+    //     takes the better of its own pair. The two slits see the same target through
+    //     slightly shifted wavelength windows, so the higher of the two is the peak for
+    //     that CCD.
+    //
+    // Only those two shapes have a surplus of series. Measured against the ocslib jars, this
+    // is every spectroscopy mode that reaches here — recheck it after a jar refresh, since
+    // the counts are upstream behaviour and do change (cross-dispersed gained its
+    // single-exposure series that way):
+    //
+    //   mode                 ccds  series per graph  pairing
+    //   GMOS longslit          3          3          by index
+    //   GMOS one-slit IFU      3          3          by index
+    //   GMOS two-slit IFU      3          6          2 per CCD
+    //   GHOST                  2          1          by index, one group per detector
+    //   IGRINS-2               2          1          by index, one group per detector
+    //   Flamingos 2            1          1          by index
+    //   GNIRS longslit         1          1          by index
+    //   GNIRS cross-dispersed  1          6          6 per CCD, i.e. the whole list
     val calculatedCCDs: Chain[ItcCcd] =
       graphs
         .flatMap(_.graphs)
@@ -112,10 +135,16 @@ object Conversions:
           val finalSN  = wavelengthAtMaxSN(graph, SeriesDataType.FinalS2NData)
           val singleSN = wavelengthAtMaxSN(graph, SeriesDataType.SingleS2NData)
 
-          // Select the (wavelength, value) peak for the CCD at the given index. When a
-          // single CCD is paired with multiple series, aggregate the peak over all of them.
+          // Select the (wavelength, value) peak for the CCD at the given index. A surplus of
+          // series is taken as one run per CCD only when it divides evenly; a surplus that
+          // does not is left to pair by index, since without knowing its layout there is
+          // nothing better to do than what we did before.
+          val ccdCount: Int = ccds.length.toInt
+
           def peakFor(series: List[(Wavelength, Double)], i: Int): Option[(Wavelength, Double)] =
-            if (ccds.length.toInt === 1 && series.sizeIs > 1) series.maxByOption(_._2)
+            val seriesPerCcd: Int = series.size / ccdCount
+            if series.sizeIs > ccdCount && series.size % ccdCount === 0 then
+              series.slice(i * seriesPerCcd, (i + 1) * seriesPerCcd).maxByOption(_._2)
             else series.lift(i)
 
           ccds.zipWithIndex
@@ -156,11 +185,12 @@ object Conversions:
       .flatten
     val peakSingleSNRatio: SignalToNoise = maxSingleSNRatio
       .flatMap(SignalToNoise.FromBigDecimalRounding.getOption(_))
-      // GNIRS cross-dispersed doesn't produce a single-exposure S/N series; fall back
+      // A mode that reports no single-exposure S/N series leaves no peak to take; fall back
       // to the per-CCD single S/N reported by the ITC rather than failing the request.
       .orElse(calculatedCCDs.map(_.singleSNRatio.value).maximumOption)
       .getOrElse(throw UpstreamException(List("Peak Single SN is not available")))
 
+    // Picks between graph groups, not series; only methods that return one series are supported (individual; sum).
     def wvAtRatio(seriesType: SeriesDataType): Option[SignalToNoise] =
       graphs
         .flatMap(_.graphs)

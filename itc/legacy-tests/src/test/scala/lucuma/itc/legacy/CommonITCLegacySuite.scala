@@ -152,9 +152,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
   )
 
   // Common analysis methods - these will be used in tests
-  def lsAnalysisMethod  = ItcObservationDetails.AnalysisMethod.Aperture.Auto(5)
-  def ifuAnalysisMethod =
-    ItcObservationDetails.AnalysisMethod.Ifu.Single(skyFibres = 250, offset = 5.0)
+  def lsAnalysisMethod = ItcObservationDetails.AnalysisMethod.Aperture.Auto(5)
 
   // The production GNIRS IFU analysis method: "sum of 2x2 elements at the center"
   // with a single sky fibre (see lucuma.itc.service.ObservingMode).

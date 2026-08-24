@@ -84,7 +84,8 @@ class LegacyITCGmosR150BlueSuite extends munit.CatsEffectSuite:
       )
     ),
     Some(GmosRoi.FullFrame),
-    PortDisposition.Side
+    PortDisposition.Side,
+    ifuAnalysis = none
   )
 
   lazy val conditions = ItcObservingConditions(
