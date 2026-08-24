@@ -138,7 +138,7 @@ class observation_configurationRequests
       case ObservingModeType.GmosSouthImaging   => Mutation.forGmosSouthImaging(user, oid, List(GmosSouthFilter.CaT, GmosSouthFilter.GG455))
       case ObservingModeType.GmosSouthMos       => IO.unit
       // GMOS IFU support will be implemented in a future PR.
-      case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => throw new NotImplementedError("GMOS IFU observing mode")
+      case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => IO.unit
       case ObservingModeType.GnirsImaging       => IO.unit
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.unit // TODO implement Gnirs
       case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodAlongSlit)
