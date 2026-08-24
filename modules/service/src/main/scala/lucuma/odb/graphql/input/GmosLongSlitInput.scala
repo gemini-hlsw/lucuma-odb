@@ -33,13 +33,15 @@ import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Access
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.optics.Format
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
-import lucuma.odb.format.spatialOffsets.*
+import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.binding.*
 
 import scala.util.Try
@@ -76,7 +78,6 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       _.map(_.toNanometers.value.bigDecimal.toPlainString).intercalate(",")
     )
 
-  val SpatialOffsetsFormat: Format[String, List[Q]] = OffsetsQFormat
 
   final case class NorthAcquisition(
     filter:           Nullable[GmosNorthFilter],
@@ -138,16 +139,20 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       explicitAmpReadMode: Option[GmosAmpReadMode],
       explicitAmpGain:     Option[GmosAmpGain],
       explicitRoi:         Option[GmosRoi],
-      explicitλDithers:    Option[List[WavelengthDither]],
-      explicitOffsets:     Option[List[Q]]
+      explicitλDithers:         Option[List[WavelengthDither]],
+      explicitTelescopeConfigs: Option[SlitTelescopeConfigs]
     ):
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Option[String] =
         explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
-      val formattedOffsets: Option[String] =
-        explicitOffsets.map(SpatialOffsetsFormat.reverseGet)
+      // The two columns a SlitTelescopeConfigs persists as.
+      private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
+
+      val explicitSlitOffsetMode: Option[SlitOffsetMode] = stored.map(_.slitOffsetMode)
+
+      val formattedTelescopeConfigs: Option[String] = stored.map(_.telescopeConfigs)
 
     final case class North(
       grating:     GmosNorthGrating,
@@ -258,8 +263,8 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       explicitAmpReadMode:  Nullable[GmosAmpReadMode],
       explicitAmpGain:      Nullable[GmosAmpGain],
       explicitRoi:          Nullable[GmosRoi],
-      explicitλDithers:     Nullable[List[WavelengthDither]],
-      explicitOffsets:      Nullable[List[Q]]
+      explicitλDithers:         Nullable[List[WavelengthDither]],
+      explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs]
     ) derives Eq:
 
       def toCreate(site: Site): Result[Create.Common] =
@@ -273,15 +278,18 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
             explicitAmpGain.toOption,
             explicitRoi.toOption,
             explicitλDithers.toOption,
-            explicitOffsets.toOption
+            explicitTelescopeConfigs.toOption
           )
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Nullable[String] =
         explicitλDithers.map(WavelengthDithersFormat.reverseGet)
 
-      val formattedOffsets: Nullable[String] =
-        explicitOffsets.map(SpatialOffsetsFormat.reverseGet)
+      private val stored = explicitTelescopeConfigs.map(storedSlitTelescopeConfigs)
+
+      val explicitSlitOffsetMode: Nullable[SlitOffsetMode] = stored.map(_.slitOffsetMode)
+
+      val formattedTelescopeConfigs: Nullable[String] = stored.map(_.telescopeConfigs)
 
     private def required[A](site: Site, oa: Option[A], itemName: String): Result[A] =
       val siteName = site match
@@ -437,7 +445,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
     Nullable[GmosAmpGain],
     Nullable[GmosRoi],
     Nullable[List[WavelengthDither]],
-    Nullable[List[Q]],
+    Nullable[SlitTelescopeConfigs],
     Option[NorthAcquisition]
   )] =
     ObjectFieldsBinding.rmap:
@@ -453,8 +461,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets),
+        SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
         NorthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
@@ -468,9 +475,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         rExplicitAmpGain,
         rExplicitRoi,
         rWavelengthDithers,
-        (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
-          offsets.orElse(spatialOffsets)
-        },
+        rTelescopeConfigs,
         rAcquisition
       ).parTupled
 
@@ -486,7 +491,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
     Nullable[GmosAmpGain],
     Nullable[GmosRoi],
     Nullable[List[WavelengthDither]],
-    Nullable[List[Q]],
+    Nullable[SlitTelescopeConfigs],
     Option[SouthAcquisition]
   )] =
     ObjectFieldsBinding.rmap:
@@ -502,8 +507,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitSpatialOffsets", rSpatialOffsets),
+        SlitTelescopeConfigsInput.Binding.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
         SouthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
@@ -517,8 +521,6 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
         rExplicitAmpGain,
         rExplicitRoi,
         rWavelengthDithers,
-        (rOffsets, rSpatialOffsets).parMapN { (offsets, spatialOffsets) =>
-          offsets.orElse(spatialOffsets)
-        },
+        rTelescopeConfigs,
         rAcquisition
       ).parTupled

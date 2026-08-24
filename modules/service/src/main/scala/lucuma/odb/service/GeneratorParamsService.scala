@@ -514,7 +514,7 @@ object GeneratorParamsService {
 
               scienceOnlySpectroscopyGeneratorParams(gh, sciMode)
 
-          case gn @ gmos.longslit.Config.GmosNorth(g, f, u, c, a) =>
+          case gn @ gmos.longslit.Config.GmosNorth(grating = g, filter = f, fpu = u, common = c, acquisition = a) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,
@@ -534,7 +534,7 @@ object GeneratorParamsService {
               sciMode  = sciMode
             ).asRight
 
-          case gs @ gmos.longslit.Config.GmosSouth(g, f, u, c, a) =>
+          case gs @ gmos.longslit.Config.GmosSouth(grating = g, filter = f, fpu = u, common = c, acquisition = a) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,
@@ -554,7 +554,7 @@ object GeneratorParamsService {
               sciMode  = sciMode
             ).asRight
 
-          case gnm @ gmos.mos.Config.GmosNorth(g, f, m, _, _, c) =>
+          case gnm @ gmos.mos.Config.GmosNorth(grating = g, filter = f, customMask = m, common = c) =>
             val sciMode = InstrumentMode.GmosNorthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,
@@ -567,7 +567,7 @@ object GeneratorParamsService {
 
             scienceOnlySpectroscopyGeneratorParams(gnm, sciMode).asRight
 
-          case gsm @ gmos.mos.Config.GmosSouth(g, f, m, _, _, c) =>
+          case gsm @ gmos.mos.Config.GmosSouth(grating = g, filter = f, customMask = m, common = c) =>
             val sciMode = InstrumentMode.GmosSouthSpectroscopy(
               c.exposureTimeMode,
               c.centralWavelength,

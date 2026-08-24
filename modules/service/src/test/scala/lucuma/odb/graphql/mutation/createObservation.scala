@@ -1724,12 +1724,14 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                   { nanometers:  7.1},
                   { nanometers: -7.5}
                 ],
-                explicitSpatialOffsets: [
-                  { arcseconds: -10.0 },
-                  { arcseconds:  10.0 },
-                  { arcseconds:  10.0 },
-                  { arcseconds: -10.0 }
-                ]
+                explicitTelescopeConfigs: {
+                  alongSlit: [
+                    { q: { arcseconds: -10.0 }, guiding: ENABLED },
+                    { q: { arcseconds: 10.0 }, guiding: ENABLED },
+                    { q: { arcseconds: 10.0 }, guiding: ENABLED },
+                    { q: { arcseconds: -10.0 }, guiding: ENABLED }
+                  ]
+                }
               }
             }
           }
@@ -1761,25 +1763,17 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
                 defaultWavelengthDithers {
                   nanometers
                 }
-                offsets {
-                  arcseconds
+                telescopeConfigs {
+                  offsetMode
+                  alongSlit { q { arcseconds } guiding }
                 }
-                explicitOffsets {
-                  microarcseconds
-                  arcseconds
+                explicitTelescopeConfigs {
+                  offsetMode
+                  alongSlit { q { microarcseconds arcseconds } guiding }
                 }
-                defaultOffsets {
-                  arcseconds
-                }
-                spatialOffsets {
-                  arcseconds
-                }
-                explicitSpatialOffsets {
-                  microarcseconds
-                  arcseconds
-                }
-                defaultSpatialOffsets {
-                  arcseconds
+                defaultTelescopeConfigs {
+                  offsetMode
+                  alongSlit { q { arcseconds } guiding }
                 }
               }
             }
@@ -1848,46 +1842,26 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
           )
         ) *>
         assertIO(
-          (IO(longSlit.downField("offsets").values.toList.flatMap(_.toList)),
-           IO(longSlit.downField("explicitOffsets").values.map(_.toList)),
-           IO(longSlit.downField("defaultOffsets").values.toList.flatMap(_.toList)),
-           IO(longSlit.downField("spatialOffsets").values.toList.flatMap(_.toList)),
-           IO(longSlit.downField("explicitSpatialOffsets").values.map(_.toList)),
-           IO(longSlit.downField("defaultSpatialOffsets").values.toList.flatMap(_.toList))
+          (IO(longSlit.downField("telescopeConfigs").downField("alongSlit").values.toList.flatMap(_.toList)),
+           IO(longSlit.downField("explicitTelescopeConfigs").downField("alongSlit").values.map(_.toList)),
+           IO(longSlit.downField("defaultTelescopeConfigs").downField("alongSlit").values.toList.flatMap(_.toList))
           ).tupled,
           (List(
-             json"""{ "arcseconds": -10.000000}""",
-             json"""{ "arcseconds":  10.000000}""",
-             json"""{ "arcseconds":  10.000000}""",
-             json"""{ "arcseconds": -10.000000}"""
+             json"""{ "q": { "arcseconds":  -10.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "arcseconds":   10.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "arcseconds":   10.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "arcseconds":  -10.000000 }, "guiding": "ENABLED" }"""
            ),
            Some(List(
-             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }""",
-             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
-             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
-             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }"""
+             json"""{ "q": { "microarcseconds": -10000000, "arcseconds":  -10.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "microarcseconds":  10000000, "arcseconds":   10.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "microarcseconds":  10000000, "arcseconds":   10.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "microarcseconds": -10000000, "arcseconds":  -10.000000 }, "guiding": "ENABLED" }"""
            )),
            List(
-             json"""{ "arcseconds":  0.000000}""",
-             json"""{ "arcseconds": 15.000000}""",
-             json"""{ "arcseconds": -15.000000}"""
-           ),
-           List(
-             json"""{ "arcseconds": -10.000000}""",
-             json"""{ "arcseconds":  10.000000}""",
-             json"""{ "arcseconds":  10.000000}""",
-             json"""{ "arcseconds": -10.000000}"""
-           ),
-           Some(List(
-             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }""",
-             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
-             json"""{ "microarcseconds":  10000000, "arcseconds":  10.000000 }""",
-             json"""{ "microarcseconds": -10000000, "arcseconds": -10.000000 }"""
-           )),
-           List(
-             json"""{ "arcseconds":  0.000000}""",
-             json"""{ "arcseconds": 15.000000}""",
-             json"""{ "arcseconds": -15.000000}"""
+             json"""{ "q": { "arcseconds":    0.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "arcseconds":   15.000000 }, "guiding": "ENABLED" }""",
+             json"""{ "q": { "arcseconds":  -15.000000 }, "guiding": "ENABLED" }"""
            )
           )
         )

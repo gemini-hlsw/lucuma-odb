@@ -88,15 +88,15 @@ object CalibrationConfigSubset:
 
     def longSlitCommonInput: GmosLongSlitInput.Create.Common =
       GmosLongSlitInput.Create.Common(
-        centralWavelength   = centralWavelength,
-        exposureTimeMode    = none,
-        explicitXBin        = xBin.some,
-        explicitYBin        = yBin.some,
-        explicitAmpReadMode = ampReadMode.some,
-        explicitAmpGain     = ampGain.some,
-        explicitRoi         = roi.some,
-        explicitλDithers    = none,
-        explicitOffsets     = none
+        centralWavelength        = centralWavelength,
+        exposureTimeMode         = none,
+        explicitXBin             = xBin.some,
+        explicitYBin             = yBin.some,
+        explicitAmpReadMode      = ampReadMode.some,
+        explicitAmpGain          = ampGain.some,
+        explicitRoi              = roi.some,
+        explicitλDithers         = none,
+        explicitTelescopeConfigs = none
       )
 
     def toLongSlitInput: ObservingModeInput.Create

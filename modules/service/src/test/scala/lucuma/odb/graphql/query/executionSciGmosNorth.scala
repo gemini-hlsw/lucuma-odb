@@ -267,11 +267,13 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos with UpdateObser
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 },
               explicitYBin: TWO,
-              explicitSpatialOffsets: [
-                { arcseconds: -20.0 },
-                { arcseconds:   0.0 },
-                { arcseconds:  20.0 }
-              ]
+              explicitTelescopeConfigs: {
+                alongSlit: [
+                  { q: { arcseconds: -20.0 }, guiding: ENABLED },
+                  { q: { arcseconds: 0.0 }, guiding: ENABLED },
+                  { q: { arcseconds: 20.0 }, guiding: ENABLED }
+                ]
+              }
             }
           """
         )
@@ -608,11 +610,13 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos with UpdateObser
               fpu:     LONG_SLIT_0_50,
               centralWavelength: { nanometers: 500 },
               explicitYBin: TWO,
-              explicitSpatialOffsets: [
-                { arcseconds: 0.0 },
-                { arcseconds: 0.0 },
-                { arcseconds: 0.0 }
-              ],
+              explicitTelescopeConfigs: {
+                alongSlit: [
+                  { q: { arcseconds: 0.0 }, guiding: ENABLED },
+                  { q: { arcseconds: 0.0 }, guiding: ENABLED },
+                  { q: { arcseconds: 0.0 }, guiding: ENABLED }
+                ]
+              },
               explicitWavelengthDithers: [
                 { nanometers: 5.0 },
                 { nanometers: 5.0 },

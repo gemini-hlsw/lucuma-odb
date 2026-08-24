@@ -105,32 +105,38 @@ object Science:
     def minusCalValidityPeriod: Timestamp =
       t -| CalValidityPeriod
 
-  // Lens from the step to its telescope offset in q.
+  // Lens from the step to its telescope offset.
   private def protoStepOffset[D]: Lens[ProtoStep[D], Offset] =
     ProtoStep.telescopeConfig andThen TelescopeConfig.offset
 
-  private def protoStepQ[D]: Lens[ProtoStep[D], Offset.Q] =
-    protoStepOffset andThen Offset.q
-
   extension [D](p: ProtoStep[D])
-    def q: Offset.Q =
-      protoStepQ.get(p)
-
     def withZeroOffset: ProtoStep[D] =
       protoStepOffset.replace(Offset.Zero)(p)
+
+    /**
+     * Moves the step to a spatial position.  A step built without guiding stays
+     * unguided: that covers the arcs and flats, which are never guided, and the
+     * science steps of a calibration whose role forbids it.  Everything else
+     * takes the guide state the position asks for.
+     */
+    def at(tc: TelescopeConfig): ProtoStep[D] =
+      val guiding =
+        if p.telescopeConfig.guiding === StepGuideState.Disabled then StepGuideState.Disabled
+        else tc.guiding
+      (ProtoStep.telescopeConfig[D]).replace(TelescopeConfig(tc.offset, guiding))(p)
 
   /**
    * Science exposure count goals for a given wavelength dither.
    *
    * @param Δλ          the wavelength dither itself
    * @param index       order in which this wavelength block is executed
-   * @param requirement number of science steps per spatial offset at this
+   * @param requirement number of science steps per spatial position at this
    *                    wavelength dither
    */
   case class Goal(
     Δλ:          WavelengthDither,
     index:       NonNegInt,
-    requirement: Remaining[Offset.Q]
+    requirement: Remaining[TelescopeConfig]
   ):
     def description: NonEmptyString =
       NonEmptyString.unsafeFrom(s"${Δλ.toNanometers.value} nm")
@@ -139,7 +145,7 @@ object Science:
 
     def compute(
       dithers:   List[WavelengthDither],
-      offsets:   List[Offset.Q],
+      positions: List[TelescopeConfig],
       expTimeμs: PosLong,
       expCount:  PosInt
     ): NonEmptyList[Goal] =
@@ -175,9 +181,9 @@ object Science:
                 case GreaterThan => 0
               base + extra
 
-      // Now spread the offsets around as well as possible across the dithers.
+      // Now spread the positions around as well as possible across the dithers.
 
-      val qs      = nel(offsets, Offset.Q.Zero)
+      val qs      = nel(positions, TelescopeConfig(Offset.Zero, StepGuideState.Enabled))
       val qCount  = qs.size
 
       val runningSums =
@@ -291,7 +297,7 @@ object Science:
         val isTwilight   = calRole.contains(CalibrationRole.Twilight)
         val includeFlats = !isTwilight
         val includeArcs  = calRole.isEmpty
-        val goals        = Goal.compute(config.wavelengthDithers, config.spatialOffsets, expTimeμs, expCount)
+        val goals        = Goal.compute(config.wavelengthDithers, config.telescopeConfigs.toList, expTimeμs, expCount)
         val gcalClass    = calRole.gcalClass
         val sciClass     = calRole.sciClass
         val sciGuiding   = calRole.sciGuiding
@@ -333,32 +339,32 @@ object Science:
    */
   case class Dither[D](
     definition: StepDefinition[D],
-    remaining:  Remaining[Offset.Q]
+    remaining:  Remaining[TelescopeConfig]
   ):
     /** The description of this block (as taken from the goal / adjustment). */
     def desc: NonEmptyString =
       definition.goal.description
 
-    /** Decreases the remaining count for each offset in the map. */
-    def complete(m: Map[Offset.Q, Int]): Dither[D] =
+    /** Decreases the remaining count for each position in the map. */
+    def complete(m: Map[TelescopeConfig, Int]): Dither[D] =
       copy(remaining = remaining.decrementAll(m))
 
     /**
      * Generates a full wavelength block.
      */
     def generateFullBlock(blockSize: PosInt): (Dither[D], List[ProtoStep[D]]) =
-      // When we generate a step, it is for a particular offset which must be
+      // When we generate a step, it is for a particular position which must be
       // set.  In the step definition, cals and science datasets are stored
       // with zero offsets.
-      def setQ(steps: List[(ProtoStep[D], Offset.Q)]): List[ProtoStep[D]] =
-        steps.map((step, q) => protoStepQ.replace(q)(step))
+      def setTc(steps: List[(ProtoStep[D], TelescopeConfig)]): List[ProtoStep[D]] =
+        steps.map((step, tc) => step.at(tc))
 
       val (qs, remainingʹ) = remaining.take(blockSize.value)
       (
         copy(remaining = remainingʹ),
          qs.headOption match
            case None    => List.empty[ProtoStep[D]]
-           case Some(q) => setQ(definition.allCals.tupleRight(q) ++ List.fill(qs.size)(definition.science).zip(qs))
+           case Some(q) => setTc(definition.allCals.tupleRight(q) ++ List.fill(qs.size)(definition.science).zip(qs))
       )
 
   end Dither
@@ -411,7 +417,7 @@ object Science:
       val dithers = if c.wavelengthDithers.exists(_.toPicometers.value.abs > limit) then c.wavelengthDithers
                     else List(WavelengthDither.Zero)
       c.withWavelengthDithers(dithers.some)
-       .withSpatialOffsets(List(Offset.Q.Zero).some)
+       .withTelescopeConfigs(NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled)))
 
     def instantiate[F[_]: Monad, S, D, G, L, U](
       oid:       Observation.Id,

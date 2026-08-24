@@ -29,7 +29,7 @@ trait GmosMosView[F[_]] extends BaseMapping[F]:
     val Roi: ColumnRef                      = col("c_roi", gmos_roi.opt)
 
     val WavelengthDithers: ColumnRef        = col("c_wavelength_dithers", text.opt)
-    val Offsets: ColumnRef                  = col("c_offsets", text.opt)
+    val TelescopeConfigs: ColumnRef         = col("c_telescope_configs", text.opt)
 
     val InitialSlitWidth: ColumnRef         = col("c_initial_slit_width", gmos_custom_slit_width)
     val InitialCentralWavelength: ColumnRef = col("c_initial_central_wavelength", wavelength_pm)

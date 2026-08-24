@@ -23,6 +23,8 @@ import lucuma.core.math.arb.ArbOffset
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.math.arb.ArbWavelengthDither
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
+import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
@@ -49,7 +51,7 @@ trait ArbGmosLongSlitInput:
         g <- arbitrary[Option[GmosAmpGain]]
         r <- arbitrary[Option[GmosRoi]]
         d <- arbitrary[Option[List[WavelengthDither]]]
-        s <- arbitrary[Option[List[Q]]]
+        s <- arbitrary[Option[SlitTelescopeConfigs]]
       yield GmosLongSlitInput.Create.Common(
         w,
         c,

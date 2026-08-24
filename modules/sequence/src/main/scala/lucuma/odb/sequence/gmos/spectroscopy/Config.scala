@@ -4,6 +4,7 @@
 package lucuma.odb.sequence.gmos.spectroscopy
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -15,6 +16,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.longslit.*
@@ -111,14 +113,12 @@ trait Config[G, L, U] extends Product with Serializable:
   def explicitWavelengthDithers: Option[List[WavelengthDither]] =
     common.explicitWavelengthDithers
 
-  def spatialOffsets: List[Q] =
-    explicitSpatialOffsets.getOrElse(defaultSpatialOffsets)
-
-  def defaultSpatialOffsets: List[Q] =
-    Config.DefaultSpatialOffsets
-
-  def explicitSpatialOffsets: Option[List[Q]] =
-    common.explicitSpatialOffsets
+  /**
+   * The telescope configuration for each spatial position the science steps
+   * cycle through, already resolved from the explicit value and the default:
+   * the modes differ in how they store it, not in what the generator reads.
+   */
+  def telescopeConfigs: NonEmptyList[TelescopeConfig]
 
   def ccdMode: GmosCcdMode =
     GmosCcdMode(
@@ -135,9 +135,9 @@ trait Config[G, L, U] extends Product with Serializable:
   def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): Config[G, L, U]
 
   /**
-   * Replaces the explicit spatial offsets, preserving the concrete mode.
+   * Replaces the telescope configurations, preserving the concrete mode.
    */
-  def withSpatialOffsets(offsets: Option[List[Q]]): Config[G, L, U]
+  def withTelescopeConfigs(tcs: NonEmptyList[TelescopeConfig]): Config[G, L, U]
 
 object Config:
 
@@ -151,14 +151,12 @@ object Config:
     explicitAmpReadMode:       Option[GmosAmpReadMode],
     explicitAmpGain:           Option[GmosAmpGain],
     explicitRoi:               Option[GmosRoi],
-    explicitWavelengthDithers: Option[List[WavelengthDither]],
-    explicitSpatialOffsets:    Option[List[Q]]
+    explicitWavelengthDithers: Option[List[WavelengthDither]]
   ) derives Eq
 
-  // ShortCut 3374
-  val DefaultSpatialOffsets: List[Q] =
-    List(
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(  0)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal( 15)),
-      Q.signedDecimalArcseconds.reverseGet(BigDecimal(-15))
-    )
+  /**
+   * The q offsets of a set of telescope configurations, which is all the
+   * deprecated `spatialOffsets` GraphQL fields can report.
+   */
+  def spatialOffsetsOf(tcs: NonEmptyList[TelescopeConfig]): List[Q] =
+    tcs.toList.map(_.offset.q)

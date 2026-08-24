@@ -33,6 +33,7 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.math.Region
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.model.Ephemeris
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SiderealTracking
@@ -101,9 +102,9 @@ class GoaQueryPolicySuite extends FunSuite:
         explicitAmpReadMode       = none[GmosAmpReadMode],
         explicitAmpGain           = none[GmosAmpGain],
         explicitRoi               = GmosRoi.CentralSpectrum.some,
-        explicitWavelengthDithers = none,
-        explicitSpatialOffsets    = none
+        explicitWavelengthDithers = none
       ),
+      telescopeConfigs = DefaultSlitTelescopeConfigs.telescopeConfigs,
       acquisition = AcquisitionConfig.GmosNorth(
         exposureTimeMode = exposureTimeMode,
         defaultFilter    = GmosNorthFilter.GPrime,

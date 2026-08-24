@@ -23,20 +23,19 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
+import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
-import lucuma.odb.sequence.gmos.mos.Config as MosConfig
 
 trait GmosMosMapping[F[_]]
   extends GmosMosView[F]
+     with SlitTelescopeConfigsMapping[F]
      with ExposureTimeModeMapping[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
@@ -78,31 +77,17 @@ trait GmosMosMapping[F[_]]
         List("wavelengthDithersString")
       )
 
-    val offsetsString: FieldMapping =
-      SqlField("offsetsString", cc.Offsets, hidden = true)
+    val telescopeConfigsRaw: FieldMapping =
+      SqlField("telescopeConfigsRaw", cc.TelescopeConfigs, hidden = true)
 
-    val offsets: FieldMapping =
-      CursorFieldJson("offsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.getOrElse(defaultSpatialOffsetsJson)),
-        List("explicitOffsets", "defaultOffsets")
-      )
+    val telescopeConfigs: FieldMapping =
+      effectiveTelescopeConfigsField("telescopeConfigs", "telescopeConfigsRaw", DefaultTelescopeConfigs)
 
-    val explicitOffsets: FieldMapping =
-      CursorFieldJson("explicitOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.asJson),
-        List("offsetsString")
-      )
+    val defaultTelescopeConfigs: FieldMapping =
+      CursorFieldJson("defaultTelescopeConfigs", _ => Result(telescopeConfigsJson(DefaultTelescopeConfigs)), Nil)
 
-    val defaultOffsets: FieldMapping =
-      CursorFieldJson("defaultOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
+    val explicitTelescopeConfigs: FieldMapping =
+      explicitTelescopeConfigsField("explicitTelescopeConfigs", "telescopeConfigsRaw")
 
   lazy val GmosNorthMosCustomMaskMapping: ObjectMapping =
     ObjectMapping(GmosNorthMosType / "customMask")(
@@ -193,10 +178,10 @@ trait GmosMosMapping[F[_]]
         List("grating")
       ),
 
-      common.offsetsString,
-      common.offsets,
-      common.explicitOffsets,
-      common.defaultOffsets,
+      common.telescopeConfigsRaw,
+      common.telescopeConfigs,
+      common.explicitTelescopeConfigs,
+      common.defaultTelescopeConfigs,
 
       // Read-only snapshot of what the mode was created with.  The mask
       // attachment has no counterpart here: it is expected to arrive later.
@@ -281,10 +266,10 @@ trait GmosMosMapping[F[_]]
         List("grating")
       ),
 
-      common.offsetsString,
-      common.offsets,
-      common.explicitOffsets,
-      common.defaultOffsets,
+      common.telescopeConfigsRaw,
+      common.telescopeConfigs,
+      common.explicitTelescopeConfigs,
+      common.defaultTelescopeConfigs,
 
       SqlField("initialGrating",   GmosSouthMosView.InitialGrating),
       SqlField("initialFilter",    GmosSouthMosView.InitialFilter),
@@ -334,8 +319,3 @@ object GmosMosMapping:
   private def defaultWavelengthDithersSouthJson(g: GmosSouthGrating): Json =
     LongSlitConfig.defaultWavelengthDithersSouth(g).map(_.asJson).asJson
 
-  private def decodeSpatialOffsets(s: String): Json =
-    parseCsvBigDecimals(s).map(arcsec => Q.signedDecimalArcseconds.reverseGet(arcsec).asJson).asJson
-
-  private val defaultSpatialOffsetsJson: Json =
-    MosConfig.DefaultSpatialOffsets.map(_.asJson).asJson

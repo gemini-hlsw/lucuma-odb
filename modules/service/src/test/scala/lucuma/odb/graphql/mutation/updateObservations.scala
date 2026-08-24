@@ -2505,12 +2505,14 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             { nanometers:  7.1 },
             { nanometers: -7.5 }
           ],
-          explicitSpatialOffsets: [
-            { arcseconds: -10.0 },
-            { arcseconds:  10.0 },
-            { arcseconds:  10.0 },
-            { arcseconds: -10.0 }
-          ],
+          explicitTelescopeConfigs: {
+            alongSlit: [
+              { q: { arcseconds: -10.0 }, guiding: ENABLED },
+              { q: { arcseconds: 10.0 }, guiding: ENABLED },
+              { q: { arcseconds: 10.0 }, guiding: ENABLED },
+              { q: { arcseconds: -10.0 }, guiding: ENABLED }
+            ]
+          },
           acquisition: {
             exposureTimeMode: {
               signalToNoise: {
@@ -2548,17 +2550,13 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             explicitWavelengthDithers {
               picometers
             }
-            explicitOffsets {
-              arcseconds
+            explicitTelescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
             }
-            explicitSpatialOffsets {
-              arcseconds
-            }
-            offsets {
-              arcseconds
-            }
-            spatialOffsets {
-              arcseconds
+            telescopeConfigs {
+              offsetMode
+              alongSlit { q { arcseconds } guiding }
             }
             acquisition {
               exposureTimeMode {
@@ -2605,30 +2603,42 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     { "picometers":  7100 },
                     { "picometers": -7500 }
                   ],
-                  "explicitOffsets": [
-                    { "arcseconds": -10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds": -10.000000 }
-                  ],
-                  "explicitSpatialOffsets": [
-                    { "arcseconds": -10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds": -10.000000 }
-                  ],
-                  "offsets": [
-                    { "arcseconds": -10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds": -10.000000 }
-                  ],
-                  "spatialOffsets": [
-                    { "arcseconds": -10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds":  10.000000 },
-                    { "arcseconds": -10.000000 }
-                  ],
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
                   "acquisition": {
                     "exposureTimeMode": {
                       "signalToNoise": {
@@ -2670,12 +2680,14 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             { nanometers: -10 },
             { nanometers:  10 }
           ],
-          explicitSpatialOffsets: [
-            { arcseconds: -2.0 },
-            { arcseconds:  2.0 },
-            { arcseconds:  2.0 },
-            { arcseconds: -2.0 }
-          ],
+          explicitTelescopeConfigs: {
+            alongSlit: [
+              { q: { arcseconds: -2.0 }, guiding: ENABLED },
+              { q: { arcseconds: 2.0 }, guiding: ENABLED },
+              { q: { arcseconds: 2.0 }, guiding: ENABLED },
+              { q: { arcseconds: -2.0 }, guiding: ENABLED }
+            ]
+          },
           acquisition: {
             exposureTimeMode: {
               signalToNoise: {
@@ -2717,30 +2729,42 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     { "picometers": -10000 },
                     { "picometers":  10000 }
                   ],
-                  "explicitOffsets": [
-                    { "arcseconds": -2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds": -2.000000 }
-                  ],
-                  "explicitSpatialOffsets": [
-                    { "arcseconds": -2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds": -2.000000 }
-                  ],
-                  "offsets": [
-                    { "arcseconds": -2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds": -2.000000 }
-                  ],
-                  "spatialOffsets": [
-                    { "arcseconds": -2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds":  2.000000 },
-                    { "arcseconds": -2.000000 }
-                  ],
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "explicitTelescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
+                  "telescopeConfigs": {
+                    "offsetMode": "NOD_ALONG_SLIT",
+                    "alongSlit": [
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" }
+                    ]
+                  },
                   "acquisition": {
                     "exposureTimeMode": {
                       "signalToNoise": {
@@ -4078,81 +4102,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   }
                 """.asRight)
     } yield ()
-
-  test("field precedence: new offset fields take priority over deprecated ones"):
-
-    val update = """
-      observingMode: {
-        gmosNorthLongSlit: {
-          grating: B1200_G5301
-          filter: G_PRIME
-          fpu: LONG_SLIT_0_25
-          centralWavelength: {
-            nanometers: 500
-          }
-          explicitSpatialOffsets: [
-            { arcseconds: 100.0 },
-            { arcseconds: 200.0 }
-          ]
-          explicitOffsets: [
-            { arcseconds: 1.0 },
-            { arcseconds: 2.0 },
-            { arcseconds: 3.0 }
-          ]
-        }
-      }
-    """
-
-    val query = """
-      observations {
-        observingMode {
-          gmosNorthLongSlit {
-            explicitOffsets { arcseconds }
-            explicitSpatialOffsets { arcseconds }
-            offsets { arcseconds }
-            spatialOffsets { arcseconds }
-          }
-        }
-      }
-    """
-
-    val expected =
-      json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "observingMode": {
-                "gmosNorthLongSlit": {
-                  "explicitOffsets": [
-                    { "arcseconds": 1.000000 },
-                    { "arcseconds": 2.000000 },
-                    { "arcseconds": 3.000000 }
-                  ],
-                  "explicitSpatialOffsets": [
-                    { "arcseconds": 1.000000 },
-                    { "arcseconds": 2.000000 },
-                    { "arcseconds": 3.000000 }
-                  ],
-                  "offsets": [
-                    { "arcseconds": 1.000000 },
-                    { "arcseconds": 2.000000 },
-                    { "arcseconds": 3.000000 }
-                  ],
-                  "spatialOffsets": [
-                    { "arcseconds": 1.000000 },
-                    { "arcseconds": 2.000000 },
-                    { "arcseconds": 3.000000 }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-      """.asRight
-
-    oneUpdateTest(pi, update, query, expected, Some(ObservingModeType.GmosNorthLongSlit))
 
   test("useBlindOffset field updates"):
     def updateBlindOffsetTest(user: User, value: Boolean): IO[Unit] =

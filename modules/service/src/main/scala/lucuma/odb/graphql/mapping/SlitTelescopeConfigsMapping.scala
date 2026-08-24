@@ -26,7 +26,7 @@ import lucuma.odb.json.stepconfig.given
  * - and a JSON blob (`c_telescope_configs`). 
  *
  * Mixed into every long-slit mapping that exposes telescope configs (GNIRS, Flamingos2,
- * IGRINS-2) so the JSON shaping and cursor-field wiring live in one place. GMOS is pending.
+ * IGRINS-2, GMOS) so the JSON shaping and cursor-field wiring live in one place.
  */
 trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
 
@@ -88,6 +88,74 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
           json <- mode.fold(Result(Json.Null))(slitTelescopeConfigsJson(_, tc))
         yield json,
       List(modeCol, tcCol)
+    )
+
+  /**
+   * Cursor field for an effective `SlitTelescopeConfigs!` resolved against a constant default.
+   * GMOS keeps its defaults in Scala rather than computing them in the view, so unlike the other
+   * instruments there is no `_effective` column to read: the explicit columns are used when set,
+   * and the default otherwise.
+   */
+  protected def effectiveSlitTelescopeConfigsField(
+    name:    String,
+    modeCol: String,
+    tcCol:   String,
+    default: => SlitTelescopeConfigs
+  ): CursorFieldJson =
+    CursorFieldJson(
+      name,
+      cursor =>
+        for
+          modeOpt <- cursor.field(modeCol, None).flatMap(_.as[Option[SlitOffsetMode]])
+          jsonOpt <- cursor.field(tcCol, None).flatMap(_.as[Option[String]])
+          json    <- (modeOpt, jsonOpt)
+                       .mapN(slitTelescopeConfigsJson)
+                       .getOrElse(Result(slitTelescopeConfigsJsonOf(default)))
+        yield json,
+      List(modeCol, tcCol)
+    )
+
+  /** The same encoding as [[slitTelescopeConfigsJson]], for a value already in hand. */
+  protected def slitTelescopeConfigsJsonOf(stc: SlitTelescopeConfigs): Json =
+    stc match
+      case SlitTelescopeConfigs.AlongSlit(nel) =>
+        Json.obj(
+          "offsetMode" -> SlitOffsetMode.NodAlongSlit.asJson,
+          "alongSlit"  -> nel.toList.map(c => telescopeConfigAlongSlitJson(c.offset, c.guiding)).asJson,
+          "toSky"      -> Json.Null
+        )
+      case SlitTelescopeConfigs.ToSky(nel) =>
+        Json.obj(
+          "offsetMode" -> SlitOffsetMode.NodToSky.asJson,
+          "alongSlit"  -> Json.Null,
+          "toSky"      -> nel.toList.asJson
+        )
+
+  /**
+   * Cursor field for a plain `[TelescopeConfig!]!` resolved against a constant default, for the
+   * modes with no slit to nod along (GMOS MOS).
+   */
+  protected def effectiveTelescopeConfigsField(
+    name:    String,
+    tcCol:   String,
+    default: => NonEmptyList[TelescopeConfig]
+  ): CursorFieldJson =
+    CursorFieldJson(
+      name,
+      cursor =>
+        cursor.field(tcCol, None).flatMap(_.as[Option[String]]).flatMap:
+          _.fold(Result(telescopeConfigsJson(default)))(ifuTelescopeConfigsJson),
+      List(tcCol)
+    )
+
+  /** Cursor field for a nullable explicit plain `[TelescopeConfig!]`. */
+  protected def explicitTelescopeConfigsField(name: String, tcCol: String): CursorFieldJson =
+    CursorFieldJson(
+      name,
+      cursor =>
+        cursor.field(tcCol, None).flatMap(_.as[Option[String]]).flatMap:
+          _.fold(Result(Json.Null))(ifuTelescopeConfigsJson),
+      List(tcCol)
     )
 
   /**

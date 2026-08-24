@@ -9,6 +9,8 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
+import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
@@ -27,12 +29,12 @@ class ScienceSuite extends ScalaCheckSuite:
   ): List[List[(Int, Int)]] =
     val max  = (SciencePeriod.toMicroseconds / μs).toInt
 
-    def go(reqs: List[Remaining[Offset.Q]], idx: Int, acc: List[List[(Int, Int)]]): List[List[(Int, Int)]] =
+    def go(reqs: List[Remaining[TelescopeConfig]], idx: Int, acc: List[List[(Int, Int)]]): List[List[(Int, Int)]] =
       if reqs.foldMap(_.total.value) === 0 then acc.reverse
       else
         val (qs, req) = reqs(idx % reqs.size).take(max)
         val block =
-          qs.map(q => (Angle.signedMicroarcseconds.get(q.toAngle) / 1000000).toInt)
+          qs.map(tc => (Angle.signedMicroarcseconds.get(tc.offset.q.toAngle) / 1000000).toInt)
             .tupleLeft(500 + goals.get(idx % reqs.size).get.Δλ.toPicometers.value / 1000)
         go(reqs.updated(idx % reqs.size, req), idx + 1, block :: acc)
 
@@ -57,7 +59,11 @@ class ScienceSuite extends ScalaCheckSuite:
     val μs    = exptime * 1000000L
     val goals = Goal.compute(
       spectral.map(d => WavelengthDither.intPicometers.get((d - 500) * 1000)),
-      spatial.map(q => Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))),
+      spatial.map: q =>
+        TelescopeConfig(
+          Offset(Offset.P.Zero, Offset.Q.signedDecimalArcseconds.reverseGet(BigDecimal(q))),
+          StepGuideState.Enabled
+        ),
       PosLong.unsafeFrom(μs),
       PosInt.unsafeFrom(num)
     )

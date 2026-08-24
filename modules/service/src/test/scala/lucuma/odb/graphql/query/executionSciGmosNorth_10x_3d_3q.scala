@@ -64,20 +64,14 @@ class executionSciGmosNorth_10x_3d_3q extends ExecutionTestSupportForGmos:
           centralWavelength: {
             nanometers: 500
           }
-          explicitSpatialOffsets: [
-            {
-              arcseconds: 10.0
-            },
-            {
-              arcseconds: -10.0
-            },
-            {
-              arcseconds: -10.0
-            },
-            {
-              arcseconds: 10.0
-            }
-          ]
+          explicitTelescopeConfigs: {
+            alongSlit: [
+              { q: { arcseconds: 10.0 }, guiding: ENABLED },
+              { q: { arcseconds: -10.0 }, guiding: ENABLED },
+              { q: { arcseconds: -10.0 }, guiding: ENABLED },
+              { q: { arcseconds: 10.0 }, guiding: ENABLED }
+            ]
+          }
         }
       """
     )

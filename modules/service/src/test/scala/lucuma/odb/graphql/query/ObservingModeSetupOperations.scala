@@ -18,7 +18,9 @@ import ObservingModeSetupOperations.*
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
   private def formatExplicitSpatialOffsetsInput(arcsecs: List[Int]): String =
-    arcsecs.map(a => s"{ arcseconds: $a }").mkString("explicitSpatialOffsets: [", ", ", "]")
+    arcsecs
+      .map(a => s"{ q: { arcseconds: $a }, guiding: ENABLED }")
+      .mkString("explicitTelescopeConfigs: { alongSlit: [", ", ", "] }")
 
   def createFlamingos2LongSlitObservationAs(
     user:         User,
