@@ -30,6 +30,10 @@
 ALTER TABLE t_timing_window
   ADD COLUMN c_automatic boolean NOT NULL DEFAULT false;
 
+-- Without this index, every lookup by observation requires a sequential scan.
+CREATE INDEX i_timing_window_observation
+  ON t_timing_window (c_observation_id);
+
 -- At most one automatic window per observation.  The trigger below maintains
 -- this on its own -- it adds a window only to an observation that has none --
 -- and saying so here is what lets the deletion speak of "the" automatic window.
