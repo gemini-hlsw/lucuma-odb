@@ -166,6 +166,7 @@ object ObservationWorkflowService {
             case ObservationValidationCode.ConfigurationRequestDenied => 6
             case ObservationValidationCode.ConfigurationRequestPending => 7
             case ObservationValidationCode.TooActivationUnapproved => 8
+            case ObservationValidationCode.GenericWarning => 9 // warnings sort after the errors
 
         val validationStatus: ValidationState =
           if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined
@@ -178,6 +179,7 @@ object ObservationWorkflowService {
                   ObservationValidationCode.ConfigurationRequestDenied       |
                   ObservationValidationCode.ConfigurationRequestPending      |
                   ObservationValidationCode.TooActivationUnapproved          => Unapproved
+            case ObservationValidationCode.GenericWarning                    => Defined
 
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:
@@ -224,7 +226,7 @@ object ObservationWorkflowService {
               // rather than being replaced by an ordinary one.
               List(Inactive) ++
                 Option.when((!info.isExchange) && (!info.hasUnresolvedTooTarget) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
-            case Ready      => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
+            case Ready | ForReview => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 

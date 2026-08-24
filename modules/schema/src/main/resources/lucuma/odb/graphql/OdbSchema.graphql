@@ -16690,6 +16690,12 @@ enum ObservationValidationCode {
   program's accepted proposal.
   """
   TOO_ACTIVATION_UNAPPROVED
+
+  """
+  A non-fatal condition worth the submitter's attention.  It does not prevent
+  the observation from being executed.
+  """
+  GENERIC_WARNING
 }
 
 """
@@ -24084,6 +24090,7 @@ enum ObservationWorkflowState {
   UNDEFINED
   UNAPPROVED
   DEFINED
+  FOR_REVIEW
   READY
   ONGOING
   COMPLETED
