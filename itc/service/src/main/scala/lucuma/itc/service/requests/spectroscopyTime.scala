@@ -9,6 +9,7 @@ import cats.derived.*
 import cats.syntax.all.*
 import grackle.*
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.itc.*
 import lucuma.itc.input.*
 import lucuma.itc.service.GmosNorthFpuParam

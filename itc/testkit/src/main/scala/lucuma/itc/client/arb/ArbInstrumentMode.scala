@@ -21,11 +21,11 @@ import lucuma.core.math.Wavelength
 import lucuma.core.math.arb.ArbAngle
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.arb.ArbExposureTimeMode
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.arb.ArbGmosCcdMode
 import lucuma.core.util.arb.ArbEnumerated
-import lucuma.itc.GmosIfuAnalysis
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.arb.ArbItcGhostDetector
 import org.scalacheck.*

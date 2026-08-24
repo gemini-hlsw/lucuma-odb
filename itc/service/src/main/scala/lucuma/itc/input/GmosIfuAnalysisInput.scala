@@ -6,7 +6,7 @@ package lucuma.itc.input
 import cats.syntax.parallel.*
 import grackle.Result
 import lucuma.core.math.Angle
-import lucuma.itc.GmosIfuAnalysis
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
 

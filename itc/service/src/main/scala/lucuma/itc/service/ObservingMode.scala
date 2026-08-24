@@ -10,10 +10,10 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
-import lucuma.itc.GmosIfuAnalysis
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.service.ItcObservationDetails.AnalysisMethod
 import lucuma.itc.service.hashes.given

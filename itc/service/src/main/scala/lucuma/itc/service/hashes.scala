@@ -15,6 +15,7 @@ import lucuma.core.math.Redshift
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Attachment
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.NonNegDuration
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
@@ -22,7 +23,6 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
-import lucuma.itc.GmosIfuAnalysis
 
 import java.time.Duration
 

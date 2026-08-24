@@ -9,9 +9,9 @@ import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.itc.GmosIfuAnalysis
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.GmosNorthFpuParam
 import lucuma.itc.service.GmosSouthFpuParam

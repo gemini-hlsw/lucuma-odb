@@ -7,9 +7,9 @@ import cats.syntax.all.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.itc.GmosIfuAnalysis
 import lucuma.itc.service.ItcObservationDetails.AnalysisMethod
 
 /**

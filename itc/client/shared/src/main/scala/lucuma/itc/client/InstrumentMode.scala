@@ -31,9 +31,9 @@ import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
-import lucuma.itc.GmosIfuAnalysis
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.json.encoders.given
 import lucuma.itc.client.json.syntax.*

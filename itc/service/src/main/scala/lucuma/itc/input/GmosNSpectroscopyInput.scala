@@ -11,9 +11,9 @@ import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.itc.GmosIfuAnalysis
 import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
