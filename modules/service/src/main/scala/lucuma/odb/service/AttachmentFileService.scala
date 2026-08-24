@@ -80,6 +80,8 @@ object AttachmentFileService {
   val DuplicateMaskNameMsg                         = "Duplicate mask name"
   def duplicateMaskNameMsg(maskName: NonEmptyString): String =
     s"$DuplicateMaskNameMsg: ${maskName.value}"
+  def odbGeneratedMsg(at: AttachmentType): String =
+    s"${at.shortName} attachments cannot be uploaded, replaced or deleted."
 
   val AttachmentInUseMsg = "The attachment is in use and cannot be deleted."
 
@@ -99,6 +101,23 @@ object AttachmentFileService {
   }
 
   import AttachmentException.*
+
+  /**
+   * Attachments the ODB generates for itself rather than accepting from a user.
+   * These have no write path through the attachment routes: they can be read and
+   * downloaded, but not created, replaced or deleted.
+   *
+   * This is an explicit match rather than a test on `purpose` so that adding a
+   * future proposal attachment type does not silently make it unwritable.
+   */
+  extension (at: AttachmentType)
+    def isOdbGenerated: Boolean = at match
+      case AttachmentType.Summary => true
+      case _                      => false
+
+  def checkNotOdbGenerated(at: AttachmentType): Either[AttachmentException, Unit] =
+    if at.isOdbGenerated then InvalidRequest(odbGeneratedMsg(at)).asLeft
+    else ().asRight
 
   protected type FileName = FileName.Type
   protected object FileName extends NewType[NonEmptyString] {
@@ -370,13 +389,6 @@ object AttachmentFileService {
     ): Either[AttachmentException, Unit] =
       checkExtension(fileName, attachmentType.fileExtensions)
 
-    def validateFileExtensionById(
-      attachmentId: Attachment.Id,
-      fileName:     FileName
-    ): F[Either[AttachmentException, AttachmentType]] =
-      getAttachmentTypeById(attachmentId)
-        .map(_.flatMap(at => checkExtension(fileName, at.fileExtensions).as(at)))
-
     // This can only be an issue on insert
     def checkForDuplicateType(
       programId:      Program.Id,
@@ -454,6 +466,7 @@ object AttachmentFileService {
               fn     <- FileName.fromString(fileName).liftF
               mn     <- services.transactionallyEitherT:
                           for {
+                            _  <- checkNotOdbGenerated(attachmentType).liftF
                             _  <- checkAccess(user, programId, AccessRequired.Write, Forbidden)
                             _  <- validateFileExtensionByType(attachmentType, fn).liftF
                             mn <- deriveMaskName(attachmentType, fn).liftF
@@ -506,7 +519,9 @@ object AttachmentFileService {
             (pid, at, mn, oldPath) <- services.transactionallyEitherT {
                 for {
                   (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
-                  at             <- validateFileExtensionById(attachmentId, fn).asEitherT
+                  at             <- getAttachmentTypeById(attachmentId).asEitherT
+                  _              <- checkNotOdbGenerated(at).liftF
+                  _              <- checkExtension(fn, at.fileExtensions).liftF
                   mn             <- deriveMaskName(at, fn).liftF
                   _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT
                   _              <- checkForDuplicateMaskName(pid, mn, attachmentId.some).asEitherT
@@ -549,6 +564,8 @@ object AttachmentFileService {
           path <- services.transactionallyEitherT {
               for {
                 (_, path) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
+                at        <- getAttachmentTypeById(attachmentId).asEitherT
+                _         <- checkNotOdbGenerated(at).liftF
                 _         <- deleteAttachmentFromDB(attachmentId).asEitherT
               } yield path
             }

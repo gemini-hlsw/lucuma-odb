@@ -7808,6 +7808,11 @@ enum AttachmentType {
   A target attachment for custom SEDs
   """
   CUSTOM_SED
+
+  """
+  A proposal attachment for the ODB-generated proposal summary
+  """
+  SUMMARY
 }
 
 """
