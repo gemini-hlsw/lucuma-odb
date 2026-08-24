@@ -167,4 +167,59 @@ class TargetGraphsFromLegacySuite extends munit.FunSuite:
     )
     assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(90.0)))
     assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(45.0)))
+
+    // Both slits cover the requested wavelength, so the value there is the better of them and not
+    // the blue slit merely for coming first.
+    assertEquals(
+      result.atWavelengthFinalSNRatio,
+      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(90.0)).some
+    )
+    assertEquals(
+      result.atWavelengthSingleSNRatio,
+      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(45.0)).some
+    )
+  }
+
+  private def slitSeriesAt(
+    slit:    String,
+    tpe:     SeriesDataType,
+    atStart: Double,
+    atEnd:   Double
+  ): ItcSeries =
+    ItcSeries(s"$slit Slit S/N", tpe, NonEmptyList.of(atStart, atEnd), ItcXAxis(1000.0, 1001.0, 2))
+
+  // The peak and the value at the requested wavelength are found by separate code paths, and a
+  // slit can win one without winning the other. Here blue peaks higher overall but red is higher
+  // at the wavelength, so reporting blue's value there would be wrong in a way that agreeing
+  // peaks would hide.
+  test("two-slit IFU takes the at-wavelength value from the better slit, not the first") {
+    val graph: ItcGraph =
+      ItcGraph(
+        GraphType.S2NGraph,
+        List(
+          slitSeriesAt("Blue", SeriesDataType.SingleS2NData, 50.0, 10.0),
+          slitSeriesAt("Blue", SeriesDataType.FinalS2NData, 100.0, 20.0),
+          slitSeriesAt("Red", SeriesDataType.SingleS2NData, 2.0, 40.0),
+          slitSeriesAt("Red", SeriesDataType.FinalS2NData, 5.0, 80.0)
+        )
+      )
+
+    val result: TargetGraphs =
+      Conversions.targetGraphsFromLegacy(
+        NonEmptyChain.one(ccd(50.0, 100.0)),
+        NonEmptyChain.one(ItcGraphGroup(NonEmptyChain.one(graph))),
+        at
+      )
+
+    // Peak: blue wins, at 1000 nm rather than at the requested wavelength.
+    assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(100.0)))
+    assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(50.0)))
+
+    // At 1001 nm: red wins, even though blue is the first series of its type.
+    assertEquals(result.atWavelengthFinalSNRatio,
+                 TotalSN(SignalToNoise.unsafeFromBigDecimalExact(80.0)).some
+    )
+    assertEquals(result.atWavelengthSingleSNRatio,
+                 SingleSN(SignalToNoise.unsafeFromBigDecimalExact(40.0)).some
+    )
   }

@@ -88,13 +88,16 @@ object Conversions:
         .map(_.wavelengthAtMaxAndMax)
         .flattenOption
 
-    // Find the SN of the first series that provides a value at the given wavelength
+    // The S/N at the requested wavelength. More than one series can cover that wavelength — the
+    // two-slit IFU's blue and red slits both do — so report the best of them rather than whichever
+    // happens to come first. That matches how each CCD's peak is taken below, and the slit the
+    // legacy exposure time solve optimises for, which is likewise the highest S/N there.
     def signalToNoiseAtWv(graph: ItcGraph, seriesDataType: SeriesDataType): Option[SignalToNoise] =
       graph.series
         .filter(_.seriesType === seriesDataType)
         .map(_.yValueAtWavelength(atWavelength))
         .flattenOption
-        .headOption
+        .maximumOption
         .flatMap(v => SignalToNoise.FromBigDecimalRounding.getOption(v))
 
     // Calculate the wavelengths at where the peaks happen.
@@ -187,6 +190,7 @@ object Conversions:
       .orElse(calculatedCCDs.map(_.singleSNRatio.value).maximumOption)
       .getOrElse(throw UpstreamException(List("Peak Single SN is not available")))
 
+    // Picks between graph groups, not series; only methods that return one series are supported (individual; sum).
     def wvAtRatio(seriesType: SeriesDataType): Option[SignalToNoise] =
       graphs
         .flatMap(_.graphs)
