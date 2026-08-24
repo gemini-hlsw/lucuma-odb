@@ -84,9 +84,28 @@ object GroupService {
             )
         ).void
 
+      // An OR group cannot require more elements than it has. Empty groups are exempt: a group is
+      // always created before its contents are moved in (see `cloneGroupImpl`), so at that point
+      // the count says nothing about the final size. Values that go stale as elements leave are
+      // clamped down by the database (see the `*_clamp_min_required` triggers).
+      private def checkMinimumRequired(minimumRequired: Option[NonNegShort], elementCount: Long, gid: Option[Group.Id]): Result[Unit] =
+        minimumRequired.filter(m => elementCount > 0 && m.value > elementCount).fold(Result.unit): m =>
+          val where: String = gid.fold("the group")(g => s"group $g")
+          OdbError.InvalidArgument(s"Minimum required (${m.value}) cannot exceed the number of elements in $where ($elementCount).".some).asFailure
+
+      private def checkMinimumRequiredOf(minimumRequired: NonNegShort, which: AppliedFragment, accessPredicate: AppliedFragment): F[Result[Unit]] =
+        val af: AppliedFragment = Statements.selectElementCounts(which, accessPredicate)
+        session.prepareR(af.fragment.query(group_id *: int8)).use: pq =>
+          pq.stream(af.argument, 512).compile.toList.map: counts =>
+            counts.traverse_((gid, n) => checkMinimumRequired(minimumRequired.some, n, gid.some))
+
       override def createGroup(input: CreateGroupInput, system: Boolean, calibrationRoles: List[CalibrationRole])(using Transaction[F]): F[Result[Group.Id]] =
-        programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
-          r.traverse(createGroupImpl(_, input.SET, input.initialContents, system, calibrationRoles))
+        val create: F[Result[Group.Id]] =
+          programService.resolvePid(input.programId, input.proposalReference, input.programReference).flatMap: r =>
+            r.traverse(createGroupImpl(_, input.SET, input.initialContents, system, calibrationRoles))
+        checkMinimumRequired(input.SET.minimumRequired, input.initialContents.size.toLong, none)
+          .traverse(_ => create)
+          .map(_.flatten)
 
       // This saves a bit of annoyance below
       extension [A](self: List[A]) private def traverseNel_[F[_]: Applicative, B](f: NonEmptyList[A] => F[B]): F[Unit] =
@@ -224,19 +243,25 @@ object GroupService {
           case Access.Service => void""
           case _              => void" AND c_system = FALSE"
 
-        session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
-        moveGroups(SET.parentGroupId, SET.parentGroupIndex, which, movePredicate).flatMap: ids =>
-          Statements.updateGroups(SET, which, accessPredicate).traverse: af =>
-            session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
-          .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
-          .recoverWith { case SqlState.CheckViolation(ex) =>
-            val msg = ex.constraintName match
-              case Some("group_same_night_check") =>
-                "Same night and maximum interval are mutually exclusive."
-              case _ =>
-                "Minimum interval must be less than or equal maximum interval."
-            Result.failure(msg).pure
-          }
+        val update: F[Result[List[Group.Id]]] =
+          session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command) >>
+          moveGroups(SET.parentGroupId, SET.parentGroupIndex, which, movePredicate).flatMap: ids =>
+            Statements.updateGroups(SET, which, accessPredicate).traverse: af =>
+              session.prepareR(af.fragment.query(group_id)).use { pq => pq.stream(af.argument, 512).compile.toList }
+            .map(moreIds => Result(moreIds.foldLeft(ids)((a, b) => (a ++ b).distinct)))
+            .recoverWith { case SqlState.CheckViolation(ex) =>
+              val msg = ex.constraintName match
+                case Some("group_same_night_check") =>
+                  "Same night and maximum interval are mutually exclusive."
+                case _ =>
+                  "Minimum interval must be less than or equal maximum interval."
+              Result.failure(msg).pure
+            }
+
+        // Validate against the groups' current contents before touching anything.
+        SET.minimumRequired.toOption
+          .fold(Result.unit.pure[F])(checkMinimumRequiredOf(_, which, accessPredicate))
+          .flatMap(_.traverse(_ => update).map(_.flatten))
 
       def openHole(pid: Program.Id, gid: Option[Group.Id], index: Option[NonNegShort]): F[NonNegShort] =
         session.prepareR(Statements.OpenHole).use(_.unique(pid, gid, index))
@@ -371,6 +396,14 @@ object GroupService {
       }
 
     }
+
+    /** Count the present elements of each group selected by `which`, per `group_element_count`. */
+    def selectElementCounts(which: AppliedFragment, accessPredicate: AppliedFragment): AppliedFragment =
+      void"""
+        SELECT c_group_id, group_element_count(c_group_id)
+        FROM t_group
+        WHERE c_group_id IN (
+      """ |+| which |+| void")" |+| accessPredicate
 
     def moveGroups(gid: Option[Group.Id], index: Option[NonNegShort], which: AppliedFragment, access: AppliedFragment): AppliedFragment =
       sql"""
