@@ -5963,14 +5963,24 @@ input ObservingModeInput @oneOf {
   gmosSouthMos: GmosSouthMosInput
 
   """
+  The gnirsIfu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gnirsIfu: GnirsIfuInput
+
+  """
   The gnirsImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gnirsImaging: GnirsImagingInput
 
   """
+  The gnirsLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gnirsLongSlit: GnirsLongSlitInput
+
+  """
   The gnirsSpectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  gnirsSpectroscopy: GnirsSpectroscopyInput
+  gnirsSpectroscopy: GnirsSpectroscopyInput @deprecated(reason: "Use 'gnirsLongSlit' or 'gnirsIfu' instead.")
 
   """
   The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -11902,13 +11912,13 @@ type GnirsSpectroscopy {
   Long-slit configuration (FPU + along-slit telescope configs), when this is a
   long-slit observation. Exactly one of `slit` / `ifu` is present.
   """
-  slit: GnirsSlit
+  slit: GnirsSpectroscopyLongSlit
 
   """
   IFU configuration (FPU + p/q telescope configs), when this is an integral field
   unit observation. Exactly one of `slit` / `ifu` is present.
   """
-  ifu: GnirsIfu
+  ifu: GnirsSpectroscopyIfu
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
@@ -11939,7 +11949,7 @@ GNIRS long-slit-specific configuration: the slit FPU plus the telescope configs
 taken along the slit. Present on `GnirsSpectroscopy.slit` iff the observation is a
 long slit; null for IFU.
 """
-type GnirsSlit {
+type GnirsSpectroscopyLongSlit {
   fpu: GnirsFpuSlit!
   initialFpu: GnirsFpuSlit!
 
@@ -11954,7 +11964,7 @@ GNIRS IFU-specific configuration: the IFU FPU plus the telescope configs as full
 p/q offsets. Present on `GnirsSpectroscopy.ifu` iff the observation is an IFU; null
 for long slit.
 """
-type GnirsIfu {
+type GnirsSpectroscopyIfu {
   fpu: GnirsFpuIfu!
   initialFpu: GnirsFpuIfu!
 
@@ -11964,6 +11974,130 @@ type GnirsIfu {
   """
   telescopeConfigs: [TelescopeConfig!]!
 }
+
+"""
+GNIRS Long Slit mode.
+"""
+type GnirsLongSlit {
+
+  grating: GnirsGrating!
+  explicitGrating: GnirsGrating
+  initialGrating: GnirsGrating!
+
+  prism: GnirsPrism!
+  explicitPrism: GnirsPrism
+  initialPrism: GnirsPrism!
+
+  """
+  The central wavelengths at which spectra are taken, in increasing wavelength
+  order.  Each one is a separate configuration with its own exposure time mode,
+  coadds, ITC calculation and calibrations.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  """
+  The central wavelengths as they were configured when the observing mode was
+  created.
+  """
+  initialCentralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  camera: GnirsCamera!
+  initialCamera: GnirsCamera!
+
+  fpu: GnirsFpuSlit!
+  initialFpu: GnirsFpuSlit!
+
+  "Effective telescope configs (explicit override coalesced with the default)."
+  telescopeConfigs: SlitTelescopeConfigs!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+  explicitTelescopeConfigs: SlitTelescopeConfigs
+
+  filter: GnirsFilter!
+  initialFilter: GnirsFilter!
+
+  decker: GnirsDecker!
+  explicitDecker: GnirsDecker
+  defaultDecker: GnirsDecker!
+
+  explicitReadMode: GnirsReadMode
+
+  wellDepth: GnirsWellDepth!
+  explicitWellDepth: GnirsWellDepth
+  defaultWellDepth: GnirsWellDepth!
+
+  explicitFocusMotorSteps: Int
+
+  acquisition: GnirsSpectroscopyAcquisition!
+
+  """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
+}
+
+"""
+GNIRS IFU (integral field unit) mode.
+"""
+type GnirsIfu {
+
+  grating: GnirsGrating!
+  explicitGrating: GnirsGrating
+  initialGrating: GnirsGrating!
+
+  prism: GnirsPrism!
+  explicitPrism: GnirsPrism
+  initialPrism: GnirsPrism!
+
+  """
+  The central wavelengths at which spectra are taken, in increasing wavelength
+  order.  Each one is a separate configuration with its own exposure time mode,
+  coadds, ITC calculation and calibrations.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  """
+  The central wavelengths as they were configured when the observing mode was
+  created.
+  """
+  initialCentralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  camera: GnirsCamera!
+  initialCamera: GnirsCamera!
+
+  fpu: GnirsFpuIfu!
+  initialFpu: GnirsFpuIfu!
+
+  """
+  Telescope configs (full p/q offsets). Unlike the long slit these have no derived
+  default: they are seeded from the FPU at creation and then edited in place.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
+
+  filter: GnirsFilter!
+  initialFilter: GnirsFilter!
+
+  decker: GnirsDecker!
+  explicitDecker: GnirsDecker
+  defaultDecker: GnirsDecker!
+
+  explicitReadMode: GnirsReadMode
+
+  wellDepth: GnirsWellDepth!
+  explicitWellDepth: GnirsWellDepth
+  defaultWellDepth: GnirsWellDepth!
+
+  explicitFocusMotorSteps: Int
+
+  acquisition: GnirsSpectroscopyAcquisition!
+
+  """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
+}
+
 
 input GnirsSpectroscopyAcquisitionInput {
   explicitFilter: GnirsFilter
@@ -12010,7 +12144,7 @@ input SlitTelescopeConfigsInput {
 """
 GNIRS long-slit-specific configuration input. `fpu` is required on create.
 """
-input GnirsSlitInput {
+input GnirsSpectroscopyLongSlitInput {
   fpu: GnirsFpuSlit
 
   "Long-slit telescope configs. Null clears an explicit override back to the default."
@@ -12021,7 +12155,7 @@ input GnirsSlitInput {
 GNIRS IFU-specific configuration input. `fpu` is required on create. A missing
 `telescopeConfigs` is left unedited (and on create is seeded from the FPU).
 """
-input GnirsIfuInput {
+input GnirsSpectroscopyIfuInput {
   fpu: GnirsFpuIfu
 
   telescopeConfigs: [TelescopeConfigInput!]
@@ -12042,10 +12176,10 @@ input GnirsSpectroscopyInput {
   filter: GnirsFilter
 
   "Long-slit configuration. On create, exactly one of `slit` / `ifu` is required."
-  slit: GnirsSlitInput
+  slit: GnirsSpectroscopyLongSlitInput
 
   "IFU configuration. On create, exactly one of `slit` / `ifu` is required."
-  ifu: GnirsIfuInput
+  ifu: GnirsSpectroscopyIfuInput
 
   camera: GnirsCamera
 
@@ -12074,6 +12208,106 @@ input GnirsSpectroscopyInput {
   telluricType: TelluricTypeInput
 
 }
+
+"""
+Edit or create GNIRS Long Slit configuration.
+"""
+input GnirsLongSlitInput {
+
+  """
+  The central wavelengths at which spectra are taken.  Required on create, and
+  must contain at least one entry with no duplicated wavelength.  When given on
+  edit, it replaces the existing list wholesale.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfigInput!]
+
+  filter: GnirsFilter
+
+  "The FPU. Required on create."
+  fpu: GnirsFpuSlit
+
+  "Long-slit telescope configs. Null clears an explicit override back to the default."
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
+
+  camera: GnirsCamera
+
+  grating: GnirsGrating
+
+  prism: GnirsPrism
+
+  explicitDecker: GnirsDecker
+
+  explicitGrating: GnirsGrating
+
+  explicitPrism: GnirsPrism
+
+  explicitFocusMotorSteps: Int
+
+  explicitReadMode: GnirsReadMode
+
+  explicitWellDepth: GnirsWellDepth
+
+  acquisition: GnirsSpectroscopyAcquisitionInput
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
+  """
+  telluricType: TelluricTypeInput
+
+}
+
+"""
+Edit or create GNIRS IFU configuration.
+"""
+input GnirsIfuInput {
+
+  """
+  The central wavelengths at which spectra are taken.  Required on create, and
+  must contain at least one entry with no duplicated wavelength.  When given on
+  edit, it replaces the existing list wholesale.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfigInput!]
+
+  filter: GnirsFilter
+
+  "The FPU. Required on create."
+  fpu: GnirsFpuIfu
+
+  """
+  Telescope configs. A missing value is left unedited; on create it is seeded
+  from the FPU.
+  """
+  telescopeConfigs: [TelescopeConfigInput!]
+
+  camera: GnirsCamera
+
+  grating: GnirsGrating
+
+  prism: GnirsPrism
+
+  explicitDecker: GnirsDecker
+
+  explicitGrating: GnirsGrating
+
+  explicitPrism: GnirsPrism
+
+  explicitFocusMotorSteps: Int
+
+  explicitReadMode: GnirsReadMode
+
+  explicitWellDepth: GnirsWellDepth
+
+  acquisition: GnirsSpectroscopyAcquisitionInput
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
+  """
+  telluricType: TelluricTypeInput
+
+}
+
 
 """
 Time and Count exposure time mode.
@@ -15938,48 +16172,44 @@ scalar TooTriggerId
 Lifecycle status of a Target-of-Opportunity trigger.
 
 A trigger is not requested directly.  It comes into being when a ToO observation
-is set to the READY workflow state with a resolved opportunity target, and the
-database keeps the two in step, so the status can never disagree with the
-observation.  REQUESTED is the only non-terminal status.
-
-DECLINED, WITHDRAWN and SUPERSEDED are terminal, and for the purpose of
-triggering again all three are equivalent to never having been triggered: setting
-the observation READY once more produces a new trigger rather than transitioning
-out of a terminal status.  They are kept distinct because they answer different
-questions about what became of the request.
+is set to the READY workflow state with a resolved opportunity target.  REQUESTED
+is the only non-terminal status.
 """
 enum TooTriggerStatus {
 
   """
-  Live: the observation is ready to be observed and the observatory has it under
-  consideration.  The only non-terminal status, and the only one an outstanding
-  request can hold -- at most one trigger per observation is REQUESTED at a time.
-  A trigger stays REQUESTED while its observation executes; that execution has
-  begun is reported by the execution events, not here.
+  A live, open, request. The observation is ready to be observed and the
+  observatory has it under consideration.  The only non-terminal status. At most
+  one trigger per observation is REQUESTED at a time. A trigger stops being
+  REQUESTED the moment its observation begins executing (see ACCEPTED).
   """
   REQUESTED
 
   """
-  An observer saw the request and chose not to act on it, with a reason in
-  `resolutionReason`.  Distinct from a request simply sitting there: DECLINED says
-  somebody looked, where REQUESTED says nothing about whether anyone has.
-  Declining also returns the observation to DEFINED.
+  An ACCEPTED request is one that the observatory has acted upon.  A ToO trigger
+  is marked ACCEPTED recorded when execution begins. Specifically, when its
+  first non-slew execution event arrives.
+  """
+  ACCEPTED
+
+  """
+  A DECLINED request is one that the observer has rejected for a reason, perhaps
+  setting a `resolutionReason` to explain why. Declining also returns the
+  observation to a DEFINED workflow state so it may be re-triggered in the
+  future.
   """
   DECLINED
 
   """
-  The request was taken back before it was acted on -- the PI cleared the READY
-  workflow state, cleared the target's resolution, or the observation stopped
-  being a Target of Opportunity.  Nobody at the observatory need have seen it.
+  A WITHDRAWN ToO is one that has been rescinded before it was acted upon,
+  typically by the PI marking the observation DEFINED.
   """
   WITHDRAWN
 
   """
-  Replaced by a request at a different `tooActivation`.  A trigger's activation is
-  fixed when it is created, so a change of activation on an outstanding request
-  closes it out and creates a successor rather than amending it in place -- the
-  successor's `supersedes` points back here.  Unlike WITHDRAWN, nothing was taken
-  back: the observation is still live, under the successor.
+  When the observation's scheduling mode is adjusted after a trigger has already
+  been fired, any existing ToOs in REQUESTED status are SUPERSEDED by a new
+  ToO trigger record.
   """
   SUPERSEDED
 }
@@ -16137,7 +16367,8 @@ input WhereOrderTooTriggerId {
 
 """
 Filters on equality or order comparisons of the TooTriggerStatus property.  Order
-follows the lifecycle declaration: REQUESTED < DECLINED < WITHDRAWN < SUPERSEDED,
+follows the lifecycle declaration: REQUESTED < ACCEPTED < DECLINED < WITHDRAWN <
+SUPERSEDED,
 so `GTE: REQUESTED` matches every status.
 """
 input WhereOrderTooTriggerStatus {
@@ -17687,6 +17918,11 @@ type ObservingMode {
   gmosSouthMos: GmosSouthMos
 
   """
+  GNIRS IFU mode
+  """
+  gnirsIfu: GnirsIfu
+
+  """
   GNIRS Imaging mode
   """
   gnirsImaging: GnirsImaging
@@ -17694,7 +17930,12 @@ type ObservingMode {
   """
   GNIRS Long Slit mode
   """
-  gnirsSpectroscopy: GnirsSpectroscopy
+  gnirsLongSlit: GnirsLongSlit
+
+  """
+  GNIRS spectroscopy mode, long slit and IFU combined.
+  """
+  gnirsSpectroscopy: GnirsSpectroscopy @deprecated(reason: "Use 'gnirsLongSlit' or 'gnirsIfu' instead.")
 
   """
   IGRINS-2 Long Slit mode
