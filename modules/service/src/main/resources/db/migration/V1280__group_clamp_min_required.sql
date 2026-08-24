@@ -62,12 +62,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Clamp the group itself when its own c_min_required is written. This closes a TOCTOU gap: the
+-- API-level range check reads the element count and then writes c_min_required in a later
+-- statement, so a concurrent membership change committing in between could leave the write stale.
+-- Because both this clamp and the membership clamp above UPDATE the same t_group row, they
+-- serialize on that row lock, and whichever transaction commits second re-clamps against the
+-- fully committed count.
+CREATE OR REPLACE FUNCTION t_group_clamp_own_min_required() RETURNS TRIGGER AS $$
+BEGIN
+  CALL group_clamp_min_required(NEW.c_group_id);
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Deferred, like the other group triggers: a move parks the element outside the group before
 -- landing it, and an immediate trigger would clamp against that intermediate state (which would
 -- decrement c_min_required on a plain reorder within the group).
 --
--- These fire only on membership columns, so the c_min_required update above does not re-trigger
--- them.
+-- The membership triggers fire only on membership columns; the self-clamp trigger fires only on
+-- c_min_required. The clamp UPDATE lowers c_min_required to the count only when it currently
+-- exceeds it, so the self-clamp trigger's own UPDATE re-fires the trigger at most once more, where
+-- the value already equals the count and the UPDATE matches no rows. No infinite recursion.
 CREATE CONSTRAINT TRIGGER clamp_min_required_observations
 AFTER INSERT OR DELETE OR UPDATE OF c_group_id, c_existence ON t_observation
 DEFERRABLE
@@ -80,6 +95,12 @@ DEFERRABLE
 FOR EACH ROW
 EXECUTE FUNCTION t_group_clamp_min_required();
 
+CREATE CONSTRAINT TRIGGER clamp_own_min_required
+AFTER UPDATE OF c_min_required ON t_group
+DEFERRABLE
+FOR EACH ROW
+EXECUTE FUNCTION t_group_clamp_own_min_required();
+
 -- Fix up any existing rows that are already out of range.
 UPDATE t_group g
 SET    c_min_required = e.n::int2
@@ -89,8 +110,14 @@ AND    g.c_min_required IS NOT NULL
 AND    e.n              > 0
 AND    g.c_min_required > e.n;
 
--- 0 is no longer a legal value (see story sc-10033); an emptied OR group keeps its old value and
--- an AND group is null, so nothing needs 0 to mean anything.
+-- A positive c_min_required is now the lower-bound invariant (see story sc-10033): an emptied OR
+-- group keeps its old value and an AND group is null, so nothing needs a non-positive value to
+-- mean anything. Fix up any existing rows, then enforce it on every write path with a constraint
+-- so no direct or internal write can reintroduce 0 (or a negative).
 UPDATE t_group
 SET    c_min_required = 1
-WHERE  c_min_required = 0;
+WHERE  c_min_required <= 0;
+
+ALTER TABLE t_group
+ADD CONSTRAINT group_min_required_positive
+CHECK (c_min_required IS NULL OR c_min_required > 0);

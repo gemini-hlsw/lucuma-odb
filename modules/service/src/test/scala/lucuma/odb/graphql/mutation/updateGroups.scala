@@ -18,6 +18,9 @@ import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Existence
 import lucuma.odb.data.OdbError
+import lucuma.odb.util.Codecs.*
+import skunk.codec.all.*
+import skunk.syntax.all.*
 
 class updateGroups extends OdbSuite {
 
@@ -943,6 +946,25 @@ class updateGroups extends OdbSuite {
       _   <- moveObservationAs(pi, o1, none)
       m   <- minimumRequiredAs(gid)
     yield assertEquals(m, none)
+
+  // Simulate the losing side of a TOCTOU race: the API range-check reads the element count and
+  // writes c_min_required in a later statement, so a concurrent element removal could leave the
+  // written value stale (above the count). A direct write reproduces that outcome; the
+  // clamp_own_min_required trigger must bring it back within range.
+  private def forceMinimumRequired(gid: Group.Id, value: Short): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"update t_group set c_min_required = $int2 where c_group_id = $group_id".command
+      )((value, gid)).void
+
+  test("a stale minimumRequired write above the element count is clamped by the trigger"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      _   <- createObservationInGroupAs(pi, pid, gid.some)
+      _   <- forceMinimumRequired(gid, 5)
+      m   <- minimumRequiredAs(gid)
+    yield assertEquals(m, 1.some)
 
   test("minimumRequired is clamped when a child group is moved out"):
     for

@@ -63,8 +63,8 @@ object GroupPropertiesInput {
     Create(None, None, None, false, None, None, false, None, None, Existence.Default)
 
   // "Observe 0 of N" is never meaningful, so an OR group must require at least one element.
-  // The complementary upper bound (fewer than all elements, which would just be an AND group)
-  // needs the element count and so lives in `GroupService`.
+  // The complementary upper bound (no more than the element count) needs that count and so
+  // lives in `GroupService`.
   val MinimumRequiredTooSmall: String =
     "Minimum required must be at least 1."
 
