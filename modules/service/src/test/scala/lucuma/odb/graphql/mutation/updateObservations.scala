@@ -2612,24 +2612,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                         { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" }
                     ]
                   },
-                  "explicitTelescopeConfigs": {
-                    "offsetMode": "NOD_ALONG_SLIT",
-                    "alongSlit": [
-                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" }
-                    ]
-                  },
-                  "telescopeConfigs": {
-                    "offsetMode": "NOD_ALONG_SLIT",
-                    "alongSlit": [
-                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" }
-                    ]
-                  },
                   "telescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
@@ -2730,24 +2712,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     { "picometers":  10000 }
                   ],
                   "explicitTelescopeConfigs": {
-                    "offsetMode": "NOD_ALONG_SLIT",
-                    "alongSlit": [
-                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" }
-                    ]
-                  },
-                  "explicitTelescopeConfigs": {
-                    "offsetMode": "NOD_ALONG_SLIT",
-                    "alongSlit": [
-                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 2.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" }
-                    ]
-                  },
-                  "telescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
                         { "q": { "arcseconds": -2.000000 }, "guiding": "ENABLED" },

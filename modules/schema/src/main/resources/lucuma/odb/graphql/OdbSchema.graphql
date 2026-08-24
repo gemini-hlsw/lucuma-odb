@@ -2538,8 +2538,6 @@ input GmosNorthLongSlitInput {
   """
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
-
-
   """
   The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
@@ -2549,8 +2547,6 @@ input GmosNorthLongSlitInput {
   Parameters that override acquisition defaults.
   """
   acquisition: GmosNorthLongSlitAcquisitionInput
-
-
 }
 
 """
@@ -3012,8 +3008,6 @@ input GmosSouthLongSlitInput {
   """
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
-
-
   """
   The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
@@ -3023,8 +3017,6 @@ input GmosSouthLongSlitInput {
   Parameters that override acquisition defaults.
   """
   acquisition: GmosSouthLongSlitAcquisitionInput
-
-
 }
 
 """
@@ -3094,7 +3086,6 @@ input GmosNorthMosInput {
   """
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
-
   """
   The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
@@ -3104,8 +3095,6 @@ input GmosNorthMosInput {
   Parameters that override acquisition defaults.
   """
   acquisition: GmosNorthMosAcquisitionInput
-
-
 }
 
 """
@@ -3197,7 +3186,6 @@ input GmosSouthMosInput {
   """
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
-
   """
   The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
@@ -3207,8 +3195,6 @@ input GmosSouthMosInput {
   Parameters that override acquisition defaults.
   """
   acquisition: GmosSouthMosAcquisitionInput
-
-
 }
 
 """
@@ -13005,11 +12991,23 @@ type GmosNorthLongSlit {
   """
   explicitWavelengthDithers: [WavelengthDither!]
 
+  """
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.
+  """
+  telescopeConfigs: SlitTelescopeConfigs!
 
+  """
+  Default telescope configurations: three guided positions along the slit.
+  """
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
-
-
-
+  """
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
+  """
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Settings that apply to the acquisition sequence.
@@ -13039,24 +13037,6 @@ type GmosNorthLongSlit {
   field for the wavelength that will be used in the observation.
   """
   initialCentralWavelength: Wavelength!
-  """
-  The telescope configuration at each spatial position the science steps cycle
-  through, either explicitly specified in explicitTelescopeConfigs or else
-  taken from defaultTelescopeConfigs.
-  """
-  telescopeConfigs: SlitTelescopeConfigs!
-
-  """
-  Default telescope configurations: three guided positions along the slit.
-  """
-  defaultTelescopeConfigs: SlitTelescopeConfigs!
-
-  """
-  Optional explicitly specified telescope configurations. If set it overrides
-  the default.
-  """
-  explicitTelescopeConfigs: SlitTelescopeConfigs
-
 }
 
 """
@@ -13854,11 +13834,23 @@ type GmosSouthLongSlit {
   """
   explicitWavelengthDithers: [WavelengthDither!]
 
+  """
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.
+  """
+  telescopeConfigs: SlitTelescopeConfigs!
 
+  """
+  Default telescope configurations: three guided positions along the slit.
+  """
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
-
-
-
+  """
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
+  """
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Settings that apply to the acquisition sequence.
@@ -13888,24 +13880,6 @@ type GmosSouthLongSlit {
   field for the wavelength that will be used in the observation.
   """
   initialCentralWavelength: Wavelength!
-  """
-  The telescope configuration at each spatial position the science steps cycle
-  through, either explicitly specified in explicitTelescopeConfigs or else
-  taken from defaultTelescopeConfigs.
-  """
-  telescopeConfigs: SlitTelescopeConfigs!
-
-  """
-  Default telescope configurations: three guided positions along the slit.
-  """
-  defaultTelescopeConfigs: SlitTelescopeConfigs!
-
-  """
-  Optional explicitly specified telescope configurations. If set it overrides
-  the default.
-  """
-  explicitTelescopeConfigs: SlitTelescopeConfigs
-
 }
 
 """
@@ -14078,8 +14052,24 @@ type GmosNorthMos {
   """
   explicitWavelengthDithers: [WavelengthDither!]
 
+  """
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
+  along, so these are plain offsets rather than slit telescope configurations.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
 
+  """
+  Default telescope configurations: a single guided position on target.
+  """
+  defaultTelescopeConfigs: [TelescopeConfig!]!
 
+  """
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
+  """
+  explicitTelescopeConfigs: [TelescopeConfig!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -14111,25 +14101,6 @@ type GmosNorthMos {
   Parameters that override acquisition defaults.
   """
   acquisition: GmosNorthMosAcquisition!
-  """
-  The telescope configuration at each spatial position the science steps cycle
-  through, either explicitly specified in explicitTelescopeConfigs or else
-  taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
-  along, so these are plain offsets rather than slit telescope configurations.
-  """
-  telescopeConfigs: [TelescopeConfig!]!
-
-  """
-  Default telescope configurations: a single guided position on target.
-  """
-  defaultTelescopeConfigs: [TelescopeConfig!]!
-
-  """
-  Optional explicitly specified telescope configurations. If set it overrides
-  the default.
-  """
-  explicitTelescopeConfigs: [TelescopeConfig!]
-
 }
 
 """
@@ -14303,8 +14274,24 @@ type GmosSouthMos {
   """
   explicitWavelengthDithers: [WavelengthDither!]
 
+  """
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
+  along, so these are plain offsets rather than slit telescope configurations.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
 
+  """
+  Default telescope configurations: a single guided position on target.
+  """
+  defaultTelescopeConfigs: [TelescopeConfig!]!
 
+  """
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
+  """
+  explicitTelescopeConfigs: [TelescopeConfig!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -14336,25 +14323,6 @@ type GmosSouthMos {
   Parameters that override acquisition defaults.
   """
   acquisition: GmosSouthMosAcquisition!
-  """
-  The telescope configuration at each spatial position the science steps cycle
-  through, either explicitly specified in explicitTelescopeConfigs or else
-  taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
-  along, so these are plain offsets rather than slit telescope configurations.
-  """
-  telescopeConfigs: [TelescopeConfig!]!
-
-  """
-  Default telescope configurations: a single guided position on target.
-  """
-  defaultTelescopeConfigs: [TelescopeConfig!]!
-
-  """
-  Optional explicitly specified telescope configurations. If set it overrides
-  the default.
-  """
-  explicitTelescopeConfigs: [TelescopeConfig!]
-
 }
 
 """

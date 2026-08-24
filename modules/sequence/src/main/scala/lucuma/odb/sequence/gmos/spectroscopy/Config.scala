@@ -11,7 +11,6 @@ import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
@@ -153,10 +152,3 @@ object Config:
     explicitRoi:               Option[GmosRoi],
     explicitWavelengthDithers: Option[List[WavelengthDither]]
   ) derives Eq
-
-  /**
-   * The q offsets of a set of telescope configurations, which is all the
-   * deprecated `spatialOffsets` GraphQL fields can report.
-   */
-  def spatialOffsetsOf(tcs: NonEmptyList[TelescopeConfig]): List[Q] =
-    tcs.toList.map(_.offset.q)

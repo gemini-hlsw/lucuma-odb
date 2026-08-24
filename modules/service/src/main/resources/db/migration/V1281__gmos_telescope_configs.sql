@@ -135,6 +135,10 @@ ALTER TABLE t_gmos_south_long_slit
 -- Regenerate the mode keys off the telescope configs.  Long slit folds in the
 -- slit offset mode: two configurations with the same positions but different
 -- shapes are different configurations.
+-- The effective value is keyed, so that spelling out the default groups with
+-- falling through to it.  The function's own NULL fallback is the old CSV.
+-- ATTENTION: duplicated from lucuma-core gmos.longslit.DefaultSlitTelescopeConfigs
+-- and gmos.mos.DefaultTelescopeConfigs (transport codec).  Keep in sync.
 ALTER TABLE t_gmos_north_long_slit
   ADD COLUMN c_mode_key text NOT NULL GENERATED ALWAYS AS (
     format_gmos_long_slit_mode_group(
@@ -153,7 +157,8 @@ ALTER TABLE t_gmos_north_long_slit
       c_amp_gain,
       c_roi,
       c_wavelength_dithers,
-      COALESCE(c_slit_offset_mode, '') || ':' || COALESCE(c_telescope_configs, '')
+      COALESCE(c_slit_offset_mode, 'nod_along_slit') || ':' ||
+      COALESCE(c_telescope_configs, '[{"q":{"microarcseconds":0},"guiding":"ENABLED"},{"q":{"microarcseconds":15000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-15000000},"guiding":"ENABLED"}]')
     )
   ) STORED;
 
@@ -175,7 +180,8 @@ ALTER TABLE t_gmos_south_long_slit
       c_amp_gain,
       c_roi,
       c_wavelength_dithers,
-      COALESCE(c_slit_offset_mode, '') || ':' || COALESCE(c_telescope_configs, '')
+      COALESCE(c_slit_offset_mode, 'nod_along_slit') || ':' ||
+      COALESCE(c_telescope_configs, '[{"q":{"microarcseconds":0},"guiding":"ENABLED"},{"q":{"microarcseconds":15000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-15000000},"guiding":"ENABLED"}]')
     )
   ) STORED;
 
@@ -197,7 +203,7 @@ ALTER TABLE t_gmos_north_mos
       c_amp_gain,
       c_roi,
       c_wavelength_dithers,
-      c_telescope_configs
+      COALESCE(c_telescope_configs, '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]')
     )
   ) STORED;
 
@@ -219,7 +225,7 @@ ALTER TABLE t_gmos_south_mos
       c_amp_gain,
       c_roi,
       c_wavelength_dithers,
-      c_telescope_configs
+      COALESCE(c_telescope_configs, '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]')
     )
   ) STORED;
 
