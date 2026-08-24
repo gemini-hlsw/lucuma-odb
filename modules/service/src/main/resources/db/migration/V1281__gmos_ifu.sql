@@ -6,10 +6,10 @@
 -- the IFU samples a field rather than a slit: it reads out unbinned, and it
 -- carries the sampling geometry the ITC integrates over.
 
--- The two apertures the mode offers.  The instrument also has a left (blue)
--- slit and, in the South, nod & shuffle units, but neither is offered: a
--- one-slit observation always takes the right (red) slit, as in OCS.  The
--- values are the same at both sites, so one table backs both.
+-- The apertures the mode offers: both pseudo-slits, or either one alone.  The
+-- South also carries nod & shuffle units, which are not offered because nothing
+-- generates a nod & shuffle sequence yet.  The values are the same at both
+-- sites, so one table backs both.
 CREATE TABLE t_gmos_ifu_fpu (
   c_tag         d_tag  PRIMARY KEY,
   c_short_name  text   NOT NULL,
@@ -20,8 +20,9 @@ CREATE TABLE t_gmos_ifu_fpu (
 COMMENT ON TABLE  t_gmos_ifu_fpu IS 'GMOS IFU focal plane units offered by the IFU observing mode';
 COMMENT ON COLUMN t_gmos_ifu_fpu.c_field_width IS 'Width of the target lenslet field across p; masking to one pseudo-slit halves it.';
 
-INSERT INTO t_gmos_ifu_fpu VALUES ('TwoSlits', 'IFU-2', 'IFU 2 Slits',          7000000);
-INSERT INTO t_gmos_ifu_fpu VALUES ('OneSlit',  'IFU-R', 'IFU Right Slit (red)', 3500000);
+INSERT INTO t_gmos_ifu_fpu VALUES ('TwoSlits',    'IFU-2', 'IFU 2 Slits',           7000000);
+INSERT INTO t_gmos_ifu_fpu VALUES ('OneSlitRed',  'IFU-R', 'IFU Right Slit (red)',  3500000);
+INSERT INTO t_gmos_ifu_fpu VALUES ('OneSlitBlue', 'IFU-B', 'IFU Left Slit (blue)',  3500000);
 
 CREATE TABLE t_gmos_north_ifu (
 

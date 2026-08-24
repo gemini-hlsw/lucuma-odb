@@ -43,9 +43,8 @@ import java.io.DataOutputStream
 sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectroscopy.Config[G, L, U]:
 
   /**
-   * The builtin FPU for the chosen IFU aperture.  The mode offers only the two
-   * the OCS template factory offers, two slits or the right (red) slit alone,
-   * so this is always one of those.
+   * The builtin FPU for the chosen IFU aperture: both pseudo-slits, or either one
+   * alone.  Never a nod & shuffle unit, which the mode does not offer.
    */
   def builtinFpu: U
 
