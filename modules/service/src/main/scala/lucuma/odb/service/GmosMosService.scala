@@ -22,6 +22,7 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.Instrument
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
@@ -212,15 +213,28 @@ object GmosMosService {
       ): ExposureTimeMode =
         explicit.getOrElse(defaultAcquisitionExposureTimeMode(at))
 
+      private def validateMask(
+        mask:       GmosFpuMask.Custom,
+        instrument: Instrument,
+        which:      List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        attachmentMetadataService.validateMaskInstrument(
+          MaskDefinition.defined.getOption(mask.mask).map(_.id),
+          instrument,
+          which
+        )
+
       private def insert(
-        name:  String,
-        input: GmosMosInput.Create[?, ?],
-        acq:   ExposureTimeMode,
-        req:   Option[ExposureTimeMode],
-        which: List[Observation.Id],
-        stmt:  Observation.Id => AppliedFragment
+        name:       String,
+        input:      GmosMosInput.Create[?, ?],
+        instrument: Instrument,
+        acq:        ExposureTimeMode,
+        req:        Option[ExposureTimeMode],
+        which:      List[Observation.Id],
+        stmt:       Observation.Id => AppliedFragment
       )(using Transaction[F]): F[Result[Unit]] =
         (for
+          _ <- ResultT(validateMask(input.customMask, instrument, which))
           _ <- ResultT(exposureTimeModeService.insertOneWithDefaults(name, acq.some, input.common.exposureTimeMode, req, which).map(_.void))
           _ <- ResultT(translateMaskViolation(which.traverse(oid => session.exec(stmt(oid))).void))
         yield ()).value
@@ -233,6 +247,7 @@ object GmosMosService {
         insert(
           "GMOS North MOS",
           input,
+          Instrument.GmosNorth,
           acquisitionEtm(input.acquisition.flatMap(_.exposureTimeMode), input.common.centralWavelength),
           req,
           which,
@@ -247,6 +262,7 @@ object GmosMosService {
         insert(
           "GMOS South MOS",
           input,
+          Instrument.GmosSouth,
           acquisitionEtm(input.acquisition.flatMap(_.exposureTimeMode), input.common.centralWavelength),
           req,
           which,
@@ -274,23 +290,45 @@ object GmosMosService {
           _ <- update(sci, ExposureTimeModeRole.Science)
         yield ()
 
+      private def update(
+        mask:       Option[GmosFpuMask.Custom],
+        instrument: Instrument,
+        acq:        Option[ExposureTimeMode],
+        sci:        Option[ExposureTimeMode],
+        which:      List[Observation.Id],
+        stmt:       Option[AppliedFragment]
+      )(using Transaction[F]): F[Result[Unit]] =
+        (for
+          _ <- ResultT(mask.fold(Result.unit.pure[F])(validateMask(_, instrument, which)))
+          _ <- ResultT(updateExposureTimeMode(acq, sci, which).map(Result.success))
+          _ <- ResultT(translateMaskViolation(stmt.fold(Applicative[F].unit)(session.exec)))
+        yield ()).value
+
       override def updateNorth(
         SET:   GmosMosInput.Edit.North,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        for
-          _ <- updateExposureTimeMode(SET.acquisition.flatMap(_.exposureTimeMode), SET.common.exposureTimeMode, which)
-          r <- translateMaskViolation(Statements.updateGmosNorthMos(SET, which).fold(Applicative[F].unit)(session.exec))
-        yield r
+        update(
+          SET.customMask,
+          Instrument.GmosNorth,
+          SET.acquisition.flatMap(_.exposureTimeMode),
+          SET.common.exposureTimeMode,
+          which,
+          Statements.updateGmosNorthMos(SET, which)
+        )
 
       override def updateSouth(
         SET:   GmosMosInput.Edit.South,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        for
-          _ <- updateExposureTimeMode(SET.acquisition.flatMap(_.exposureTimeMode), SET.common.exposureTimeMode, which)
-          r <- translateMaskViolation(Statements.updateGmosSouthMos(SET, which).fold(Applicative[F].unit)(session.exec))
-        yield r
+        update(
+          SET.customMask,
+          Instrument.GmosSouth,
+          SET.acquisition.flatMap(_.exposureTimeMode),
+          SET.common.exposureTimeMode,
+          which,
+          Statements.updateGmosSouthMos(SET, which)
+        )
 
       override def cloneNorth(
         originalId: Observation.Id,

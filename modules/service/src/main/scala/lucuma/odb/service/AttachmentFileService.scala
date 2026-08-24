@@ -81,6 +81,11 @@ object AttachmentFileService {
   def duplicateMaskNameMsg(maskName: NonEmptyString): String =
     s"$DuplicateMaskNameMsg: ${maskName.value}"
 
+  val AttachmentInUseMsg = "The attachment is in use and cannot be deleted."
+
+  val MaskInstrumentInUseMsg =
+    "The attachment is in use by an observation and the replacement file is for a different instrument."
+
   sealed trait AttachmentException extends Exception {
     def asLeftT[F[_]: Applicative, A]: EitherT[F, AttachmentException, A] =
       EitherT.leftT(this)
@@ -90,7 +95,7 @@ object AttachmentFileService {
     case object Forbidden                      extends AttachmentException
     case class InvalidRequest(message: String) extends AttachmentException
     case object FileNotFound                   extends AttachmentException
-    case object AttachmentInUse                extends AttachmentException
+    case class AttachmentInUse(message: String) extends AttachmentException
   }
 
   import AttachmentException.*
@@ -284,6 +289,9 @@ object AttachmentFileService {
               InvalidRequest(DuplicateMaskNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_file_name")) =>
               InvalidRequest(DuplicateFileNameMsg).asLeft
+            // Triggered in case the mask instrument changes and it is in use with a different one.
+            case SqlState.ForeignKeyViolation(e) if e.constraintName.exists(_.contains("mask_attachment_fkey")) =>
+              AttachmentInUse(MaskInstrumentInUseMsg).asLeft
           }
       }
 
@@ -312,7 +320,7 @@ object AttachmentFileService {
           .option(Statements.DeleteAttachment)(attachmentId)
           .map(_.toRight(FileNotFound))
           .recover:
-            case SqlState.ForeignKeyViolation(_) => AttachmentInUse.asLeft
+            case SqlState.ForeignKeyViolation(_) => AttachmentInUse(AttachmentInUseMsg).asLeft
       }
 
     def checkForDuplicateName(
