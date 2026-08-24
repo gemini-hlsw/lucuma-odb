@@ -296,11 +296,12 @@ object ArchiveDuplicationSearchService:
      * PostgreSQL takes on `t_program` to enforce the foreign key of every child
      * row inserted, so holding it would block those inserts for the duration.
      *
-     * It still serializes against submission, by a wider margin than the mode
-     * name suggests: `c_proposal_status` feeds `c_program_reference`, a STORED
-     * generated column carrying a UNIQUE constraint (V0845), so submission
-     * changes a key column and its `UPDATE` takes `FOR UPDATE` — which conflicts
-     * with every mode, this one included.
+     * It still serializes against submission: `FOR NO KEY UPDATE` conflicts with
+     * itself, and submission updates the program row, so it waits here.  (Before
+     * V1280 it waited for a stronger reason -- `c_program_reference` was a STORED
+     * generated column under a UNIQUE constraint, which made every program
+     * `UPDATE` a key update taking `FOR UPDATE`.  That is exactly the lock V1280
+     * removed, for the same reason given here.)
      */
     val LockProposalStatus: Query[Observation.Id, ProposalStatus] =
       sql"""
