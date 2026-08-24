@@ -258,6 +258,9 @@ object Generator:
               EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx)).flatMap(digest(_, calculator.gmosSouthImagingSetup))
             case ObservingModeType.GmosSouthLongSlit  =>
               EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx)).flatMap(digest(_, calculator.gmosSouthLongSlitSetup))
+            // GMOS IFU sequence generation will be implemented in a future PR.
+            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu =>
+              throw new NotImplementedError("GMOS IFU sequence generation")
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, calculator.gnirsImagingSetup))
             case ObservingModeType.GmosSouthMos       =>
@@ -324,6 +327,8 @@ object Generator:
           case ObservingModeType.GmosSouthImaging   => EitherT(streaming.selectOrGenerateGmosSouthImaging(ctx))
           case ObservingModeType.GmosSouthLongSlit  => EitherT(streaming.selectOrGenerateGmosSouthLongSlit(ctx))
           case ObservingModeType.GmosSouthMos       => EitherT(streaming.selectOrGenerateGmosSouthMos(ctx))
+          // GMOS IFU sequence generation will be implemented in a future PR.
+          case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => throw new NotImplementedError("GMOS IFU sequence generation")
           case ObservingModeType.GnirsImaging       => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
@@ -435,6 +440,9 @@ object Generator:
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
                 .map(InstrumentExecutionConfig.GmosSouth.apply)
 
+            // GMOS IFU sequence generation will be implemented in a future PR.
+            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu =>
+              throw new NotImplementedError("GMOS IFU sequence generation")
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
                 .flatMap(s => EitherT.liftF(executionConfig(s)))
@@ -518,6 +526,9 @@ object Generator:
                   case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
                     EitherT.pure(())
 
+                  // GMOS IFU sequence generation will be implemented in a future PR.
+                  case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu =>
+                    throw new NotImplementedError("GMOS IFU sequence generation")
                   case ObservingModeType.GnirsImaging       =>
                     EitherT.pure(())
 
@@ -587,6 +598,9 @@ object Generator:
               EitherT(streaming.generateGmosSouthMos(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGmosSouthExecutionConfig(oid, s)))
 
+            // GMOS IFU sequence generation will be implemented in a future PR.
+            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu =>
+              throw new NotImplementedError("GMOS IFU sequence generation")
             case ObservingModeType.GnirsImaging       =>
               EitherT(streaming.generateGnirsImaging(ctx))
                 .flatMap(s => EitherT.liftF(sequenceService.materializeGnirsExecutionConfig(oid, s)))

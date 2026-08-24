@@ -130,6 +130,10 @@ object ObservingModeServices:
               .selectSouth(oids)
               .map(_.widen[ObservingMode])
 
+          // GMOS IFU support will be implemented in a future PR.
+          case (GmosNorthIfu | GmosSouthIfu, _) =>
+            throw new NotImplementedError("GMOS IFU observing mode")
+
           case (GnirsImaging, oids) =>
             gnirsImagingService
               .select(oids)
@@ -220,6 +224,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.GmosSouthMos       => gmosMosService.deleteSouth(which)
+            // GMOS IFU support will be implemented in a future PR.
+            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => throw new NotImplementedError("GMOS IFU observing mode")
             case ObservingModeType.GnirsImaging       => gnirsImagingService.delete(which)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
@@ -278,6 +284,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthMos       => gmosMosService.cloneSouth(origOid, newOid)
+            // GMOS IFU support will be implemented in a future PR.
+            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => throw new NotImplementedError("GMOS IFU observing mode")
             case ObservingModeType.GnirsImaging       => gnirsImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)
