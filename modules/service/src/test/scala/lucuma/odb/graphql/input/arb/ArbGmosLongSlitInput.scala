@@ -16,7 +16,6 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.arb.ArbOffset
@@ -24,8 +23,8 @@ import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.math.arb.ArbWavelengthDither
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
-import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.core.model.arb.ArbExposureTimeMode
+import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.arb.ArbNullable
@@ -35,7 +34,6 @@ import org.scalacheck.Arbitrary.arbitrary
 trait ArbGmosLongSlitInput:
   import ArbEnumerated.given
   import ArbNullable.given
-  import ArbOffset.given
   import ArbExposureTimeMode.given
   import ArbWavelength.given
   import ArbWavelengthDither.given

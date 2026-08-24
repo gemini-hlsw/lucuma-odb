@@ -33,7 +33,6 @@ import lucuma.core.math.Coordinates
 import lucuma.core.math.Offset
 import lucuma.core.math.Region
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.model.Ephemeris
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SiderealTracking
@@ -45,6 +44,7 @@ import lucuma.core.model.TelluricType
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.TestCoordinates.coords

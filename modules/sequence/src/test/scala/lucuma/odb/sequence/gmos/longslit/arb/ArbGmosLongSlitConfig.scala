@@ -6,8 +6,6 @@ package gmos
 package longslit
 package arb
 
-import lucuma.core.model.SlitTelescopeConfigs
-import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
@@ -27,7 +25,9 @@ import lucuma.core.math.arb.ArbOffset
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.math.arb.ArbWavelengthDither
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.arb.ArbExposureTimeMode
+import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.core.util.arb.ArbEnumerated
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary

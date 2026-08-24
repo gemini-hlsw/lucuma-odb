@@ -29,10 +29,10 @@ import lucuma.core.model.Defined
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.MaskDefinition
 import lucuma.core.model.Observation
-import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.model.ToBeDefined
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*

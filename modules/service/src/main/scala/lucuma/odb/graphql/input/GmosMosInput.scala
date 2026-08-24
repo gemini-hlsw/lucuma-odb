@@ -4,8 +4,8 @@
 package lucuma.odb.graphql
 package input
 
-import cats.data.NonEmptyList
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*

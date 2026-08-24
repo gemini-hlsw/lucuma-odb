@@ -9,11 +9,11 @@ import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
-import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
 import lucuma.core.math.WavelengthDither
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.TimeSpan
 import munit.Location
 import munit.ScalaCheckSuite

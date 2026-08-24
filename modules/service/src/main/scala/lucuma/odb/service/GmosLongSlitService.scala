@@ -20,8 +20,8 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
-import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation

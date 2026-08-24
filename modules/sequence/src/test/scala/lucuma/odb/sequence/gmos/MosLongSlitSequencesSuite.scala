@@ -23,8 +23,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.math.Offset
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
-import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.ToBeDefined
@@ -35,6 +33,8 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
+import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.SmartGcalExpander

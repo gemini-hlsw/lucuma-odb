@@ -25,8 +25,8 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
-import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.model.sequence.gmos.longslit.*
+import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*

@@ -29,11 +29,10 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
-import lucuma.core.math.Offset.Q
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Access
-import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.optics.Format

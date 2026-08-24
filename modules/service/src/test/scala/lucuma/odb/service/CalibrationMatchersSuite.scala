@@ -8,8 +8,8 @@ import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosRoi
 import lucuma.core.math.Wavelength
-import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
