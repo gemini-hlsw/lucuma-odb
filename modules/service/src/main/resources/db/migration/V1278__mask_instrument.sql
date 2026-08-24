@@ -62,6 +62,8 @@ UPDATE t_flamingos_2_mos m
           AND a.c_mask_instrument = m.c_instrument
     );
 
+SET CONSTRAINTS ALL IMMEDIATE;
+
 -- The instrument is present exactly for MOS masks, mirroring c_mask_name.
 
 ALTER TABLE t_attachment
