@@ -5005,6 +5005,14 @@ type Classical implements GeminiProposalType {
   aeonMultiFacility: Boolean!
 
   """
+  The instruments whose requested Gemini time is required for this
+  multi-facility project to be feasible.  Instruments not listed are not
+  required, which is the default.  Always empty unless `aeonMultiFacility`
+  is set.
+  """
+  aeonRequiredInstruments: [Instrument!]!
+
+  """
   Whether this proposal has JWST synergy.
   """
   jwstSynergy: Boolean!
@@ -5206,6 +5214,14 @@ type LargeProgram implements GeminiProposalType {
   aeonMultiFacility: Boolean!
 
   """
+  The instruments whose requested Gemini time is required for this
+  multi-facility project to be feasible.  Instruments not listed are not
+  required, which is the default.  Always empty unless `aeonMultiFacility`
+  is set.
+  """
+  aeonRequiredInstruments: [Instrument!]!
+
+  """
   Whether this proposal has JWST synergy.
   """
   jwstSynergy: Boolean!
@@ -5283,6 +5299,14 @@ type Queue implements GeminiProposalType {
   Whether this proposal is part of the AEON/Multi-facility program.
   """
   aeonMultiFacility: Boolean!
+
+  """
+  The instruments whose requested Gemini time is required for this
+  multi-facility project to be feasible.  Instruments not listed are not
+  required, which is the default.  Always empty unless `aeonMultiFacility`
+  is set.
+  """
+  aeonRequiredInstruments: [Instrument!]!
 
   """
   Whether this proposal has JWST synergy.
@@ -5422,6 +5446,15 @@ input ClassicalInput {
   aeonMultiFacility: Boolean
 
   """
+  The instruments whose requested Gemini time is required for the
+  multi-facility project to be feasible.  Only valid when `aeonMultiFacility`
+  is set, and each instrument must be in use by an active observation in the
+  program.  The whole list is cleared when `aeonMultiFacility` is unset.
+  When editing, may be set to null (or empty) to clear.
+  """
+  aeonRequiredInstruments: [Instrument!]
+
+  """
   Whether this proposal has JWST synergy.
   """
   jwstSynergy: Boolean
@@ -5526,6 +5559,15 @@ input LargeProgramInput {
   "Whether this proposal is part of the AEON/Multi-facility program."
   aeonMultiFacility: Boolean
 
+  """
+  The instruments whose requested Gemini time is required for the
+  multi-facility project to be feasible.  Only valid when `aeonMultiFacility`
+  is set, and each instrument must be in use by an active observation in the
+  program.  The whole list is cleared when `aeonMultiFacility` is unset.
+  When editing, may be set to null (or empty) to clear.
+  """
+  aeonRequiredInstruments: [Instrument!]
+
   "Whether this proposal has JWST synergy."
   jwstSynergy: Boolean
 }
@@ -5611,6 +5653,15 @@ input QueueInput {
 
   "Whether this proposal is part of the AEON/Multi-facility program."
   aeonMultiFacility: Boolean
+
+  """
+  The instruments whose requested Gemini time is required for the
+  multi-facility project to be feasible.  Only valid when `aeonMultiFacility`
+  is set, and each instrument must be in use by an active observation in the
+  program.  The whole list is cleared when `aeonMultiFacility` is unset.
+  When editing, may be set to null (or empty) to clear.
+  """
+  aeonRequiredInstruments: [Instrument!]
 
   "Whether this proposal has JWST synergy."
   jwstSynergy: Boolean

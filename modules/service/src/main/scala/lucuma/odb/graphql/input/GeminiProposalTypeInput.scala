@@ -14,6 +14,7 @@ import grackle.Result
 import grackle.syntax.*
 import lucuma.core.enums.ConsiderForBand3
 import lucuma.core.enums.ExchangePartner
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.TooActivation
@@ -60,19 +61,20 @@ object GeminiProposalTypeInput:
       .whenA(exchangePartner.isDefined && partnerSplits.exists(_.nonEmpty))
 
   case class Create(
-    scienceSubtype:       ScienceSubtype,
-    tooActivationCeiling: Option[TooActivation]    = none,
-    minPercentTime:       IntPercent               = HundredPercent,
-    minPercentTotal:      Option[IntPercent]       = none,
-    totalTime:            Option[TimeSpan]         = none,
-    partnerSplits:        Map[Partner, IntPercent] = Map.empty,
-    exchangePartner:      Option[ExchangePartner]  = none,
-    reviewerId:           Option[ProgramUser.Id]   = none,
-    mentorId:             Option[ProgramUser.Id]   = none,
-    aeonMultiFacility:    Boolean                  = false,
-    jwstSynergy:          Boolean                  = false,
-    usLongTerm:           Boolean                  = false,
-    considerForBand3:     ConsiderForBand3         = ConsiderForBand3.Unset
+    scienceSubtype:          ScienceSubtype,
+    tooActivationCeiling:    Option[TooActivation]    = none,
+    minPercentTime:          IntPercent               = HundredPercent,
+    minPercentTotal:         Option[IntPercent]       = none,
+    totalTime:               Option[TimeSpan]         = none,
+    partnerSplits:           Map[Partner, IntPercent] = Map.empty,
+    exchangePartner:         Option[ExchangePartner]  = none,
+    reviewerId:              Option[ProgramUser.Id]   = none,
+    mentorId:                Option[ProgramUser.Id]   = none,
+    aeonMultiFacility:       Boolean                  = false,
+    aeonRequiredInstruments: List[Instrument]         = Nil,
+    jwstSynergy:             Boolean                  = false,
+    usLongTerm:              Boolean                  = false,
+    considerForBand3:        ConsiderForBand3         = ConsiderForBand3.Unset
   ):
     def asEdit: Edit =
       Edit(
@@ -86,6 +88,7 @@ object GeminiProposalTypeInput:
         Nullable.orNull(reviewerId),
         Nullable.orNull(mentorId),
         aeonMultiFacility.some,
+        Nullable.NonNull(aeonRequiredInstruments),
         jwstSynergy.some,
         usLongTerm.some,
         considerForBand3.some
@@ -109,16 +112,17 @@ object GeminiProposalTypeInput:
 
     val tooActivationCeiling: Lens[Create, Option[TooActivation]] = Focus[Create](_.tooActivationCeiling)
     val minPercentTime: Lens[Create, IntPercent]                  = Focus[Create](_.minPercentTime)
-    val minPercentTotal: Lens[Create, Option[IntPercent]]      = Focus[Create](_.minPercentTotal)
-    val totalTime: Lens[Create, Option[TimeSpan]]              = Focus[Create](_.totalTime)
-    val partnerSplits: Lens[Create, Map[Partner, IntPercent]]  = Focus[Create](_.partnerSplits)
-    val exchangePartner: Lens[Create, Option[ExchangePartner]] = Focus[Create](_.exchangePartner)
-    val reviewerId: Lens[Create, Option[ProgramUser.Id]]       = Focus[Create](_.reviewerId)
-    val mentorId: Lens[Create, Option[ProgramUser.Id]]         = Focus[Create](_.mentorId)
-    val aeonMultiFacility: Lens[Create, Boolean]               = Focus[Create](_.aeonMultiFacility)
-    val jwstSynergy: Lens[Create, Boolean]                     = Focus[Create](_.jwstSynergy)
-    val usLongTerm: Lens[Create, Boolean]                      = Focus[Create](_.usLongTerm)
-    val considerForBand3: Lens[Create, ConsiderForBand3]       = Focus[Create](_.considerForBand3)
+    val minPercentTotal: Lens[Create, Option[IntPercent]]         = Focus[Create](_.minPercentTotal)
+    val totalTime: Lens[Create, Option[TimeSpan]]                 = Focus[Create](_.totalTime)
+    val partnerSplits: Lens[Create, Map[Partner, IntPercent]]     = Focus[Create](_.partnerSplits)
+    val exchangePartner: Lens[Create, Option[ExchangePartner]]    = Focus[Create](_.exchangePartner)
+    val reviewerId: Lens[Create, Option[ProgramUser.Id]]          = Focus[Create](_.reviewerId)
+    val mentorId: Lens[Create, Option[ProgramUser.Id]]            = Focus[Create](_.mentorId)
+    val aeonMultiFacility: Lens[Create, Boolean]                  = Focus[Create](_.aeonMultiFacility)
+    val aeonRequiredInstruments: Lens[Create, List[Instrument]]   = Focus[Create](_.aeonRequiredInstruments)
+    val jwstSynergy: Lens[Create, Boolean]                        = Focus[Create](_.jwstSynergy)
+    val usLongTerm: Lens[Create, Boolean]                         = Focus[Create](_.usLongTerm)
+    val considerForBand3: Lens[Create, ConsiderForBand3]          = Focus[Create](_.considerForBand3)
 
     private def simpleCreateBinding(s: ScienceSubtype): Matcher[Create] =
       ObjectFieldsBinding.rmap:
@@ -129,7 +133,7 @@ object GeminiProposalTypeInput:
           Create(s).update(
             for
               _ <- tooActivationCeiling := too
-              _ <- minPercentTime := min
+              _ <- minPercentTime       := min
             yield ()
           )
 
@@ -140,18 +144,20 @@ object GeminiProposalTypeInput:
           PartnerSplitInput.BindingAll.Option("partnerSplits", rSplits),
           ExchangePartnerBinding.Option("exchangePartner", rExchange),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
+          InstrumentBinding.List.Option("aeonRequiredInstruments", rAeonInstruments),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+        ) => (rMin, rSplits, rExchange, rAeon, rAeonInstruments, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, aeonInstruments, jwst, usLong) =>
           exchangeXorSplits(exchange, splits).as(
             Create(ScienceSubtype.Classical).update(
               for
-                _ <- minPercentTime     := min
-                _ <- partnerSplits      := splits
-                _ <- exchangePartner    := exchange
-                _ <- aeonMultiFacility  := aeon
-                _ <- jwstSynergy        := jwst
-                _ <- usLongTerm         := usLong
+                _ <- minPercentTime          := min
+                _ <- partnerSplits           := splits
+                _ <- exchangePartner         := exchange
+                _ <- aeonMultiFacility       := aeon
+                _ <- aeonRequiredInstruments := aeonInstruments
+                _ <- jwstSynergy             := jwst
+                _ <- usLongTerm              := usLong
               yield ()
             )
           )
@@ -163,7 +169,7 @@ object GeminiProposalTypeInput:
     private val DirectorsTime: Matcher[Create] =
       simpleCreateBinding(ScienceSubtype.DirectorsTime)
 
-    private val FastTurnaround: Matcher[Create] =
+    private val FastTurnaround: Matcher[Create]  =
       ObjectFieldsBinding.rmap:
         case List(
           TooActivationBinding.Option("explicitTooActivationCeiling", rToo),
@@ -174,13 +180,13 @@ object GeminiProposalTypeInput:
           Create(ScienceSubtype.FastTurnaround).update(
             for
               _ <- tooActivationCeiling := too
-              _ <- minPercentTime := min
-              _ <- reviewerId     := reviewer
-              _ <- mentorId       := mentor
+              _ <- minPercentTime       := min
+              _ <- reviewerId           := reviewer
+              _ <- mentorId             := mentor
             yield ()
           )
 
-    private val LargeProgram: Matcher[Create] =
+    private val LargeProgram: Matcher[Create]  =
       ObjectFieldsBinding.rmap:
         case List(
           TooActivationBinding.Option("explicitTooActivationCeiling", rToo),
@@ -188,16 +194,18 @@ object GeminiProposalTypeInput:
           IntPercentBinding.Option("minPercentTotalTime", rMinTotal),
           TimeSpanInput.Binding.Option("totalTime", rTotal),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
+          InstrumentBinding.List.Option("aeonRequiredInstruments", rAeonInstruments),
           BooleanBinding.Option("jwstSynergy", rJwst)
-        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN: (too, min, minTotal, total, aeon, jwst) =>
+        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rAeonInstruments, rJwst).parMapN: (too, min, minTotal, total, aeon, aeonInstruments, jwst) =>
           Create(ScienceSubtype.LargeProgram).update:
             for
-              _ <- tooActivationCeiling := too
-              _ <- minPercentTime    := min
-              _ <- minPercentTotal   := minTotal.orElse(HundredPercent.some)
-              _ <- totalTime         := total.orElse(TimeSpan.Zero.some)
-              _ <- aeonMultiFacility := aeon
-              _ <- jwstSynergy       := jwst
+              _ <- tooActivationCeiling    := too
+              _ <- minPercentTime          := min
+              _ <- minPercentTotal         := minTotal.orElse(HundredPercent.some)
+              _ <- totalTime               := total.orElse(TimeSpan.Zero.some)
+              _ <- aeonMultiFacility       := aeon
+              _ <- aeonRequiredInstruments := aeonInstruments
+              _ <- jwstSynergy             := jwst
             yield ()
 
     private val PoorWeather: Matcher[Create] =
@@ -206,7 +214,7 @@ object GeminiProposalTypeInput:
           EnumBinding.Option("ignore", rIgnore)
         ) => rIgnore.as(Create(ScienceSubtype.PoorWeather, minPercentTime = ZeroPercent))
 
-    private val Queue: Matcher[Create] =
+    private val Queue: Matcher[Create]        =
       ObjectFieldsBinding.rmap:
         case List(
           TooActivationBinding.Option("explicitTooActivationCeiling", rToo),
@@ -215,24 +223,26 @@ object GeminiProposalTypeInput:
           ExchangePartnerBinding.Option("exchangePartner", rExchange),
           ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
+          InstrumentBinding.List.Option("aeonRequiredInstruments", rAeonInstruments),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap { case (too, min, splits, exchange, band3, aeon, jwst, usLong) =>
-          exchangeXorSplits(exchange, splits).as(
-            Create(ScienceSubtype.Queue).update(
-              for
-                _ <- tooActivationCeiling := too
-                _ <- minPercentTime    := min
-                _ <- partnerSplits     := splits
-                _ <- exchangePartner   := exchange
-                _ <- considerForBand3  := band3
-                _ <- aeonMultiFacility := aeon
-                _ <- jwstSynergy       := jwst
-                _ <- usLongTerm        := usLong
-              yield ()
+        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rAeonInstruments, rJwst, rUsLong).parTupled.flatMap:
+          case (too, min, splits, exchange, band3, aeon, aeonInstruments, jwst, usLong) =>
+            exchangeXorSplits(exchange, splits).as(
+              Create(ScienceSubtype.Queue).update(
+                for
+                  _ <- tooActivationCeiling    := too
+                  _ <- minPercentTime          := min
+                  _ <- partnerSplits           := splits
+                  _ <- exchangePartner         := exchange
+                  _ <- considerForBand3        := band3
+                  _ <- aeonMultiFacility       := aeon
+                  _ <- aeonRequiredInstruments := aeonInstruments
+                  _ <- jwstSynergy             := jwst
+                  _ <- usLongTerm              := usLong
+                yield ()
+              )
             )
-          )
-        }
 
     private val SystemVerification: Matcher[Create] =
       simpleCreateBinding(ScienceSubtype.SystemVerification)
@@ -250,35 +260,37 @@ object GeminiProposalTypeInput:
       )
 
   case class Edit(
-    scienceSubtype:       ScienceSubtype,
-    tooActivationCeiling: Nullable[TooActivation]            = Nullable.Null,
-    minPercentTime:       Option[IntPercent]                 = None,
-    minPercentTotal:      Nullable[IntPercent]               = Nullable.Null,
-    totalTime:            Nullable[TimeSpan]                 = Nullable.Null,
-    partnerSplits:        Nullable[Map[Partner, IntPercent]] = Nullable.Null,
-    exchangePartner:      Nullable[ExchangePartner]          = Nullable.Null,
-    reviewerId:           Nullable[ProgramUser.Id]           = Nullable.Null,
-    mentorId:             Nullable[ProgramUser.Id]           = Nullable.Null,
-    aeonMultiFacility:    Option[Boolean]                    = None,
-    jwstSynergy:          Option[Boolean]                    = None,
-    usLongTerm:           Option[Boolean]                    = None,
-    considerForBand3:     Option[ConsiderForBand3]           = None
+    scienceSubtype:          ScienceSubtype,
+    tooActivationCeiling:    Nullable[TooActivation]            = Nullable.Null,
+    minPercentTime:          Option[IntPercent]                 = None,
+    minPercentTotal:         Nullable[IntPercent]               = Nullable.Null,
+    totalTime:               Nullable[TimeSpan]                 = Nullable.Null,
+    partnerSplits:           Nullable[Map[Partner, IntPercent]] = Nullable.Null,
+    exchangePartner:         Nullable[ExchangePartner]          = Nullable.Null,
+    reviewerId:              Nullable[ProgramUser.Id]           = Nullable.Null,
+    mentorId:                Nullable[ProgramUser.Id]           = Nullable.Null,
+    aeonMultiFacility:       Option[Boolean]                    = None,
+    aeonRequiredInstruments: Nullable[List[Instrument]]         = Nullable.Absent,
+    jwstSynergy:             Option[Boolean]                    = None,
+    usLongTerm:              Option[Boolean]                    = None,
+    considerForBand3:        Option[ConsiderForBand3]           = None
   ):
     def asCreate: Create =
       Create.DefaultFor(scienceSubtype).update:
         for
-          _ <- Create.tooActivationCeiling := tooActivationCeiling.toOptionOption
-          _ <- Create.minPercentTime    := minPercentTime
-          _ <- Create.minPercentTotal   := minPercentTotal.toOptionOption
-          _ <- Create.totalTime         := totalTime.toOptionOption
-          _ <- Create.partnerSplits     := partnerSplits.toOption
-          _ <- Create.exchangePartner   := exchangePartner.toOptionOption
-          _ <- Create.reviewerId        := reviewerId.toOptionOption
-          _ <- Create.mentorId          := mentorId.toOptionOption
-          _ <- Create.aeonMultiFacility := aeonMultiFacility
-          _ <- Create.jwstSynergy       := jwstSynergy
-          _ <- Create.usLongTerm        := usLongTerm
-          _ <- Create.considerForBand3  := considerForBand3
+          _ <- Create.tooActivationCeiling    := tooActivationCeiling.toOptionOption
+          _ <- Create.minPercentTime          := minPercentTime
+          _ <- Create.minPercentTotal         := minPercentTotal.toOptionOption
+          _ <- Create.totalTime               := totalTime.toOptionOption
+          _ <- Create.partnerSplits           := partnerSplits.toOption
+          _ <- Create.exchangePartner         := exchangePartner.toOptionOption
+          _ <- Create.reviewerId              := reviewerId.toOptionOption
+          _ <- Create.mentorId                := mentorId.toOptionOption
+          _ <- Create.aeonMultiFacility       := aeonMultiFacility
+          _ <- Create.aeonRequiredInstruments := aeonRequiredInstruments.toOption
+          _ <- Create.jwstSynergy             := jwstSynergy
+          _ <- Create.usLongTerm              := usLongTerm
+          _ <- Create.considerForBand3        := considerForBand3
         yield ()
 
   object Edit:
@@ -297,11 +309,12 @@ object GeminiProposalTypeInput:
           PartnerSplitInput.BindingAll.Nullable("partnerSplits", rSplits),
           ExchangePartnerBinding.Nullable("exchangePartner", rExchange),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
+          InstrumentBinding.List.Nullable("aeonRequiredInstruments", rAeonInstruments),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rMin, rSplits, rExchange, rAeon, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, jwst, usLong) =>
+        ) => (rMin, rSplits, rExchange, rAeon, rAeonInstruments, rJwst, rUsLong).parTupled.flatMap { case (min, splits, exchange, aeon, aeonInstruments, jwst, usLong) =>
           exchangeXorSplits(exchange.toOption, splits.toOption).as(
-            Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, exchangePartner = exchange, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+            Edit(ScienceSubtype.Classical, minPercentTime = min, partnerSplits = splits, exchangePartner = exchange, aeonMultiFacility = aeon, aeonRequiredInstruments = aeonInstruments, jwstSynergy = jwst, usLongTerm = usLong)
           )
         }
 
@@ -329,9 +342,10 @@ object GeminiProposalTypeInput:
           IntPercentBinding.Nullable("minPercentTotalTime", rMinTotal),
           TimeSpanInput.Binding.Nullable("totalTime", rTotal),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
+          InstrumentBinding.List.Nullable("aeonRequiredInstruments", rAeonInstruments),
           BooleanBinding.Option("jwstSynergy", rJwst)
-        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rJwst).parMapN: (too, min, minTotal, total, aeon, jwst) =>
-          Edit(ScienceSubtype.LargeProgram, too, min, minTotal, total, aeonMultiFacility = aeon, jwstSynergy = jwst)
+        ) => (rToo, rMin, rMinTotal, rTotal, rAeon, rAeonInstruments, rJwst).parMapN: (too, min, minTotal, total, aeon, aeonInstruments, jwst) =>
+          Edit(ScienceSubtype.LargeProgram, too, min, minTotal, total, aeonMultiFacility = aeon, aeonRequiredInstruments = aeonInstruments, jwstSynergy = jwst)
 
     private val PoorWeather: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
@@ -348,11 +362,12 @@ object GeminiProposalTypeInput:
           ExchangePartnerBinding.Nullable("exchangePartner", rExchange),
           ConsiderForBand3Binding.Option("considerForBand3", rBand3),
           BooleanBinding.Option("aeonMultiFacility", rAeon),
+          InstrumentBinding.List.Nullable("aeonRequiredInstruments", rAeonInstruments),
           BooleanBinding.Option("jwstSynergy", rJwst),
           BooleanBinding.Option("usLongTerm", rUsLong)
-        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap { case (too, min, splits, exchange, band3, aeon, jwst, usLong) =>
+        ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rAeonInstruments, rJwst, rUsLong).parTupled.flatMap { case (too, min, splits, exchange, band3, aeon, aeonInstruments, jwst, usLong) =>
           exchangeXorSplits(exchange.toOption, splits.toOption).as(
-            Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, exchangePartner = exchange, considerForBand3 = band3, aeonMultiFacility = aeon, jwstSynergy = jwst, usLongTerm = usLong)
+            Edit(ScienceSubtype.Queue, too, min, partnerSplits = splits, exchangePartner = exchange, considerForBand3 = band3, aeonMultiFacility = aeon, aeonRequiredInstruments = aeonInstruments, jwstSynergy = jwst, usLongTerm = usLong)
           )
         }
 

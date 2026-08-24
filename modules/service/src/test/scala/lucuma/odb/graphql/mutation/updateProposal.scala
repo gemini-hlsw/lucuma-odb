@@ -14,9 +14,12 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.GeminiCallForProposalsType
+import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.ScienceBand
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.DateInterval
@@ -1873,4 +1876,344 @@ class updateProposal extends OdbSuite with DatabaseOperations {
       )
     }
   }
+
+  // A queue proposal marked AEON/multi-facility, with GMOS-N required and
+  // backed by a single GMOS-N long-slit observation.
+  private def setupAeonProposal: IO[(Program.Id, Observation.Id)] =
+    for
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid)
+      tid <- createTargetAs(pi, pid)
+      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonMultiFacility: true
+                      aeonRequiredInstruments: [GMOS_NORTH]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """
+      )
+    yield (pid, oid)
+
+  private def expectAeonRequiredInstruments(pid: Program.Id, expected: Json): IO[Unit] =
+    expect(
+      user = pi,
+      query = s"""
+        query {
+          program(programId: "$pid") {
+            proposal {
+              gemini {
+                ... on Queue {
+                  aeonRequiredInstruments
+                }
+              }
+            }
+          }
+        }
+      """,
+      expected = json"""
+        {
+          "program": {
+            "proposal": {
+              "gemini": {
+                "aeonRequiredInstruments": $expected
+              }
+            }
+          }
+        }
+      """.asRight
+    )
+
+  test("✓ update queue proposal with aeonRequiredInstruments"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid)
+      tid <- createTargetAs(pi, pid)
+      _   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonMultiFacility: true
+                      aeonRequiredInstruments: [GMOS_NORTH]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini {
+                  ... on Queue {
+                    aeonMultiFacility
+                    aeonRequiredInstruments
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "gemini": {
+                  "aeonMultiFacility": true,
+                  "aeonRequiredInstruments": [ "GMOS_NORTH" ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+  test("✓ setting aeonRequiredInstruments to null clears them"):
+    setupAeonProposal.flatMap: (pid, _) =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonRequiredInstruments: null
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini {
+                  ... on Queue {
+                    aeonMultiFacility
+                    aeonRequiredInstruments
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "gemini": {
+                  "aeonMultiFacility": true,
+                  "aeonRequiredInstruments": []
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("✓ unsetting aeonMultiFacility clears aeonRequiredInstruments"):
+    setupAeonProposal.flatMap: (pid, _) =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonMultiFacility: false
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini {
+                  ... on Queue {
+                    aeonMultiFacility
+                    aeonRequiredInstruments
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "updateProposal": {
+              "proposal": {
+                "gemini": {
+                  "aeonMultiFacility": false,
+                  "aeonRequiredInstruments": []
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("✓ deactivating the backing observation removes the required instrument"):
+    setupAeonProposal.flatMap: (pid, oid) =>
+      setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive) *>
+      expectAeonRequiredInstruments(pid, json"""[]""")
+
+  test("⨯ aeonRequiredInstruments must be backed by an observation"):
+    setupAeonProposal.flatMap: (pid, _) =>
+      expect(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonRequiredInstruments: [GMOS_SOUTH]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected =
+          List("Instrument GmosSouth cannot be marked required because no active observation in the program uses it.").asLeft
+      )
+
+  test("✓ omitting aeonRequiredInstruments leaves them unchanged"):
+    setupAeonProposal.flatMap: (pid, _) =>
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      jwstSynergy: true
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """
+      ) *>
+      expectAeonRequiredInstruments(pid, json"""[ "GMOS_NORTH" ]""")
+
+  test("✓ switching the proposal type clears aeonRequiredInstruments"):
+    setupAeonProposal.flatMap: (pid, _) =>
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    demoScience: {
+                      minPercentTime: 50
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """
+      ) *>
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """
+      ) *>
+      expectAeonRequiredInstruments(pid, json"""[]""")
+
+  test("✓ changing the observing mode of the backing observation removes the required instrument"):
+    setupAeonProposal.flatMap: (pid, oid) =>
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateObservations(
+              input: {
+                WHERE: {
+                  id: { EQ: "$oid" }
+                }
+                SET: {
+                  observingMode: {
+                    gmosSouthLongSlit: {
+                      grating: R831_G5322
+                      fpu: LONG_SLIT_0_25
+                      centralWavelength: {
+                        nanometers: 234.56
+                      }
+                    }
+                  }
+                }
+              }
+            ) {
+              observations { instrument }
+            }
+          }
+        """
+      ) *>
+      expectAeonRequiredInstruments(pid, json"""[]""")
+
+  test("✓ the required instrument survives deletion while a clone still backs it, and is pruned with the last one"):
+    setupAeonProposal.flatMap: (pid, oid) =>
+      for
+        clone <- cloneObservationAs(pi, oid)
+        _     <- expectAeonRequiredInstruments(pid, json"""[ "GMOS_NORTH" ]""")
+        _     <- deleteObservation(pi, oid)
+        _     <- expectAeonRequiredInstruments(pid, json"""[ "GMOS_NORTH" ]""")
+        _     <- deleteObservation(pi, clone)
+        _     <- expectAeonRequiredInstruments(pid, json"""[]""")
+      yield ()
 }

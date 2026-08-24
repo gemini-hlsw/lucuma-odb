@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.GeminiCallForProposalsType
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
@@ -2016,5 +2017,83 @@ class createProposal extends OdbSuite with DatabaseOperations {
       )
     }
   }
+
+  test("✓ queue proposal with aeonRequiredInstruments"):
+    for
+      pid <- createProgramAs(pi, "AEON Queue Proposal")
+      tid <- createTargetAs(pi, pid)
+      _   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonMultiFacility: true
+                      aeonRequiredInstruments: [GMOS_NORTH]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini {
+                  ... on Queue {
+                    aeonMultiFacility
+                    aeonRequiredInstruments
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "gemini": {
+                  "aeonMultiFacility": true,
+                  "aeonRequiredInstruments": [ "GMOS_NORTH" ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+  test("⨯ aeonRequiredInstruments without aeonMultiFacility"):
+    for
+      pid <- createProgramAs(pi, "Non-AEON Queue Proposal")
+      tid <- createTargetAs(pi, pid)
+      _   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonRequiredInstruments: [GMOS_NORTH]
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected =
+          List("Required instruments may only be set on AEON/multi-facility proposals.").asLeft
+      )
+    yield ()
 
 }

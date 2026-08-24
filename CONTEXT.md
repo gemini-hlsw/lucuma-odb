@@ -126,3 +126,16 @@ _Avoid_: telluric standard (names the target star, not the observation).
 **Declined Telluric**:
 A telluric a PI has explicitly declined, held inactive so it will not be observed even when its science observation is active. Reversible — reinstating the telluric resumes its science observation's lifecycle.
 _Avoid_: disabled telluric, skipped telluric, deleted telluric, opted-out telluric.
+
+### AEON / Multi-Facility Proposals
+
+**AEON Multi-Facility Proposal**:
+A Gemini proposal (Queue, Classical, or Large Program) flagged as part of the AEON/multi-facility program, meaning the project also requests time at non-Gemini facilities.
+_Avoid_: AEON proposal (AEON is the network, not the proposal), MF proposal.
+
+**AEON Required Instrument**:
+An instrument an AEON Multi-Facility Proposal declares indispensable: the project is infeasible without its requested Gemini time. Scheduling information only. Expressed as a set — an instrument is required by being in the set, and every other instrument is not required, which is the default. Site is never stated; it follows from the instrument.
+_Avoid_: required configuration ("configuration" means something else in the ODB), required time flag.
+
+**Backing Observation**:
+An observation that makes an instrument eligible to be an AEON Required Instrument: it is present (not deleted), active (not user-deactivated), and its observing mode maps to that instrument. An instrument may only be marked required while it has a Backing Observation, and the mark is removed the moment its last Backing Observation goes away — by deletion, deactivation, or a mode change. Turning off the multi-facility flag (directly or by switching proposal type) likewise clears the whole set.
