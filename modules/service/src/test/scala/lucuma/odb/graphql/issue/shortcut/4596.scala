@@ -15,6 +15,7 @@ import lucuma.ags.GuideStarName
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservationWorkflowState.Completed
 import lucuma.core.enums.ObservationWorkflowState.Ongoing
+import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -29,7 +30,8 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 class ShortCut_4596 extends OdbSuite
   with ExecutionTestSupportForGmos
   with ObservingModeSetupOperations
-  with UpdateObservationsOps {
+  with UpdateObservationsOps
+  with MosMaskSupport {
 
   val guideTargetName: String = GuideStarName.gaiaSourceId.reverseGet(1L).value.value
 
@@ -184,6 +186,79 @@ class ShortCut_4596 extends OdbSuite
     """,
     expected
   )
+
+  def tryUpdateAttachmentsAs(
+    user: User,
+    oid: Observation.Id,
+    aid: Attachment.Id,
+    expected: Ior[List[String], Json]
+  ) = expectIor(
+    user,
+    s"""
+      mutation {
+        updateObservations(input: {
+          SET: {
+            attachments: [${aid.asJson}]
+          }
+          WHERE: {
+            id: {
+              EQ: ${oid.asJson}
+            }
+          }
+        }) {
+          observations {
+            id
+          }
+        }
+      }
+    """,
+    expected
+  )
+
+  test(s"Ongoing observations *should* allow attachment edits (PI)"):
+    val setup: IO[(Observation.Id, Attachment.Id)] =
+      for
+        pid <- createProgramAs(pi)
+        oid <- createExecutedObservation(pid, Ongoing)
+        aid <- insertObsAttachment(pid, "finder", "chart.jpg")
+      yield (oid, aid)
+    setup.flatMap: (oid, aid) =>
+      tryUpdateAttachmentsAs(pi, oid, aid,
+        Ior.Right(
+          json"""
+            {
+              "updateObservations": {
+                "observations": [
+                  {
+                    "id": $oid
+                  }
+                ]
+              }
+            }
+          """
+        )
+      )
+
+  test(s"Completed observations should not allow attachment edits"):
+    val setup: IO[(Observation.Id, Attachment.Id)] =
+      for
+        pid <- createProgramAs(pi)
+        oid <- createExecutedObservation(pid, Completed)
+        aid <- insertObsAttachment(pid, "finder", "chart.jpg")
+      yield (oid, aid)
+    setup.flatMap: (oid, aid) =>
+      tryUpdateAttachmentsAs(pi, oid, aid,
+        Ior.Both(
+          List(s"Observation $oid is ineligible for this operation due to its workflow state (Completed)."),
+          json"""
+            {
+              "updateObservations": {
+                "observations": []
+              }
+            }
+          """
+        )
+      )
 
   test(s"Ongoing observations should not be editable"):
     val setup: IO[(Observation.Id, Observation.Id)] =

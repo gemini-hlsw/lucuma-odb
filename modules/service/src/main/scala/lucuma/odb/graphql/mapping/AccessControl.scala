@@ -357,16 +357,17 @@ trait AccessControl[F[_]] extends Predicates[F] {
           SET.targetEnvironment.exists(_.limitToPreExecution(access)) ||
           SET.constraintSet.isDefined       ||
           SET.scheduling.isDefined          ||
-          SET.attachments.isDefined         ||
           SET.scienceRequirements.isDefined ||
           SET.observingMode.exists(_.limitToPreExecution(access)) ||
           SET.existence.isDefined           ||
           SET.observerNotes.isDefined
         then ObservationWorkflowState.preExecutionSet // ok prior to execution
         else if
-          // staff can edit blind offsets for ongoing observations and some acquisition info
+          // staff can edit blind offsets for ongoing observations and some acquisition info;
+          // attachments (e.g. finder charts) may be linked while ongoing
           SET.targetEnvironment.isDefined ||
-            SET.observingMode.isDefined
+            SET.observingMode.isDefined   ||
+            SET.attachments.isDefined
         then ObservationWorkflowState.allButComplete
         else ObservationWorkflowState.fullSet         // always ok
 
