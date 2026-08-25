@@ -29,9 +29,11 @@ trait ArchiveDuplicationMapping[F[_]]
     ObjectMapping(ArchiveDuplicationType)(
       SqlField("id", ArchiveDuplicationView.ObservationId, key = true, hidden = true),
       SqlField("state", ArchiveDuplicationView.State),
+      SqlField("stale", ArchiveDuplicationView.Stale),
       SqlField("matchCount", ArchiveDuplicationView.MatchCount),
       SqlField("saturated", ArchiveDuplicationView.Saturated),
       SqlField("lastCheckedAt", ArchiveDuplicationView.LastCheckedAt),
+      SqlField("attemptedAt", ArchiveDuplicationView.LastAttemptedAt),
       SqlField("error", ArchiveDuplicationView.Error),
       SqlObject("searchCoordinates"),
       SqlField("searchTargetName", ArchiveDuplicationView.SearchTargetName),

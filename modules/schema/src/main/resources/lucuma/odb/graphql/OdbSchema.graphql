@@ -15901,9 +15901,10 @@ enum ArchiveDuplicationState {
   NOT_CHECKED
 
   """
-  The search ran, but this observation is one the archive cannot be asked about:
-  an instrument it does not know, or no resolvable pointing and no usable target
-  name.  Re-running will report the same thing until the observation changes.
+  The archive cannot be asked about this observation as it stands: it has no
+  observing mode now, or the search ran and found an instrument the archive
+  does not know, or no resolvable pointing and no usable target name.
+  Re-running will report the same thing until the observation changes.
   """
   NOT_APPLICABLE
 
@@ -16055,7 +16056,24 @@ describe the last search that succeeded, and `lastCheckedAt` says when that was.
 """
 type ArchiveDuplication {
 
+  """
+  State of the stored snapshot, in part derived from the present: an
+  observation that currently has no observing mode reads NOT_APPLICABLE
+  whatever was stored, because the search cannot be asked for it today.
+  """
   state: ArchiveDuplicationState!
+
+  """
+  Whether the snapshot no longer describes the observation as it now stands:
+  something could be searched today, and it is not what was searched.  Judged
+  by the same limits a configuration request grants without re-approval —
+  pointing within the mode's field of view, identity-defining mode options
+  unchanged — with observing conditions excluded, since the archive query never
+  uses them.  Never true when nothing was searched or nothing can be searched.
+  Computed in the background, so it can briefly lag an edit; a successful
+  refresh clears it immediately.
+  """
+  stale: Boolean!
 
   """
   Number of matching archive files.  Counted per file rather than per archived
@@ -16072,10 +16090,18 @@ type ArchiveDuplication {
   saturated: Boolean!
 
   """
-  When the reported matches were gathered.  Null exactly when `state` is
-  NOT_CHECKED, since every other state follows an attempt.
+  When the reported matches were gathered, i.e. when the last successful
+  search ran.  Null when no search ever succeeded.
   """
   lastCheckedAt: Timestamp
+
+  """
+  When a search last ran, successfully or not.  Equal to `lastCheckedAt` after
+  a success and later than it when the most recent attempt failed, so a client
+  can tell a fresh failure from one it has already reacted to.  Null when the
+  search never ran.
+  """
+  attemptedAt: Timestamp
 
   "Why the most recent attempt failed.  Set when `state` is ERROR."
   error: NonEmptyString

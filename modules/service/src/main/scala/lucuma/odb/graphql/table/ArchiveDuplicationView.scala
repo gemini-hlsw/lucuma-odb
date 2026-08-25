@@ -15,6 +15,8 @@ trait ArchiveDuplicationView[F[_]] extends BaseMapping[F]:
     val MatchCount: ColumnRef       = col("c_match_count",     int4_nonneg)
     val Saturated: ColumnRef        = col("c_saturated",       bool)
     val LastCheckedAt: ColumnRef    = col("c_last_checked_at", core_timestamp.opt)
+    val LastAttemptedAt: ColumnRef  = col("c_last_attempted_at", core_timestamp.opt)
+    val Stale: ColumnRef            = col("c_stale",           bool)
     val Error: ColumnRef            = col("c_error",           text_nonempty.opt)
     val SearchTargetName: ColumnRef = col("c_search_target",   text_nonempty.opt)
     val QueryUrls: ColumnRef        = col("c_query_urls",      text_list)
