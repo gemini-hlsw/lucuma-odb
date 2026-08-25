@@ -82,9 +82,9 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                   "observation" : {
                     "configuration" : {
                       "conditions" : {
-                        "imageQuality" : "POINT_ONE",
-                        "cloudExtinction" : "POINT_ONE",
-                        "skyBackground" : "DARKEST",
+                        "imageQuality" : "ONE_POINT_ZERO",
+                        "cloudExtinction" : "POINT_FIVE",
+                        "skyBackground" : "DARK",
                         "waterVapor" : "WET"
                       },
                       "target" : {
@@ -188,9 +188,9 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                   "observation" : {
                     "configuration" : {
                       "conditions" : {
-                        "imageQuality" : "POINT_ONE",
-                        "cloudExtinction" : "POINT_ONE",
-                        "skyBackground" : "DARKEST",
+                        "imageQuality" : "ONE_POINT_ZERO",
+                        "cloudExtinction" : "POINT_FIVE",
+                        "skyBackground" : "DARK",
                         "waterVapor" : "WET"
                       },
                       "target" : {
@@ -608,9 +608,9 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                   "observation" : {
                     "configuration" : {
                       "conditions" : {
-                        "imageQuality" : "POINT_ONE",
-                        "cloudExtinction" : "POINT_ONE",
-                        "skyBackground" : "DARKEST",
+                        "imageQuality" : "ONE_POINT_ZERO",
+                        "cloudExtinction" : "POINT_FIVE",
+                        "skyBackground" : "DARK",
                         "waterVapor" : "WET"
                       },
                       "target" : {
@@ -802,9 +802,9 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                   "observation" : {
                     "configuration" : {
                       "conditions" : {
-                        "imageQuality" : "POINT_ONE",
-                        "cloudExtinction" : "POINT_ONE",
-                        "skyBackground" : "DARKEST",
+                        "imageQuality" : "ONE_POINT_ZERO",
+                        "cloudExtinction" : "POINT_FIVE",
+                        "skyBackground" : "DARK",
                         "waterVapor" : "WET"
                       },
                       "target" : {
@@ -911,9 +911,9 @@ class observation_configuration extends OdbSuite with ObservingModeSetupOperatio
                   "observation" : {
                     "configuration" : {
                       "conditions" : {
-                        "imageQuality" : "POINT_ONE",
-                        "cloudExtinction" : "POINT_ONE",
-                        "skyBackground" : "DARKEST",
+                        "imageQuality" : "ONE_POINT_ZERO",
+                        "cloudExtinction" : "POINT_FIVE",
+                        "skyBackground" : "DARK",
                         "waterVapor" : "WET"
                       },
                       "target" : {

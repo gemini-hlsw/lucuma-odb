@@ -15,9 +15,11 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
 class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
-                              with GuideEnvironmentSuite:
+                              with GuideEnvironmentSuite
+                              with UpdateObservationsOps:
 
   override val fullTimeEstimate: TimeSpan = TimeSpan.fromMinutes(40).get
 
@@ -249,6 +251,7 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
         t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
         o   <- createFlamingos2MosObservationAs(pi, p, List(t))
         _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _   <- setBestConditionsAs(pi, o)
       yield o
 
     setup.flatMap: oid =>

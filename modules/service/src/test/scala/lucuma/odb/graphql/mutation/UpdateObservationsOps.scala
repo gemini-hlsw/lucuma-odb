@@ -7,8 +7,12 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SkyBackground
+import lucuma.core.model.CloudExtinction
+import lucuma.core.model.ImageQuality
 import lucuma.core.model.Observation
 import lucuma.core.model.User
 
@@ -45,6 +49,46 @@ trait UpdateObservationsOps { this: OdbSuite =>
       query    = updateObservationsMutation(oid, update, query),
       expected = expected.leftMap(msg => List(msg))
     )
+
+  def updateObservationConditions(
+    user: User,
+    oid: Observation.Id,
+    cloudExtinction: CloudExtinction.Preset,
+    imageQuality: ImageQuality.Preset,
+    skyBackground: SkyBackground
+  ): IO[Unit] =
+    updateObservation(
+      user = user,
+      oid = oid, 
+      update =
+        s"""
+          constraintSet: {
+            cloudExtinction: ${cloudExtinction.tag.toUpperCase()},
+            imageQuality: ${imageQuality.tag.toUpperCase()},
+            skyBackground: ${skyBackground.tag.toUpperCase()}
+          }
+        """,
+      query = 
+        """
+        observations {
+          id
+        }
+        """, 
+      expected = Right(
+        json"""
+        {
+          "updateObservations": {
+            "observations": [
+              { "id": $oid }
+            ]              
+          }
+        }
+        """
+      )
+    )
+
+  def setBestConditionsAs(user: User, oid: Observation.Id): IO[Unit] =
+    updateObservationConditions(user, oid, CloudExtinction.Preset.PointOne, ImageQuality.Preset.PointOne, SkyBackground.Dark)
 
   def updateObservationsTimesMutation(
     oid:    Observation.Id,

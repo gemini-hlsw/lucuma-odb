@@ -90,15 +90,16 @@ object ObservationWorkflowService {
 
   // Construct some finer-grained types to make it harder to do something dumb in the status computation.
   import ObservationWorkflowState.*
-  type UserState       = Inactive.type  | Ready.type
+  type UserState       = Inactive.type  | Ready.type | ForReview.type
   type ExecutionState  = Ongoing.type   | Completed.type
   type ValidationState = Undefined.type | Unapproved.type | Defined.type
 
   extension (ws: ObservationWorkflowState) def asUserState: Option[UserState] =
     ws match
-      case Inactive => Some(Inactive)
-      case Ready    => Some(Ready)
-      case _        => None
+      case Inactive  => Some(Inactive)
+      case Ready     => Some(Ready)
+      case ForReview => Some(ForReview)
+      case _         => None
 
   extension (ws: ObservationWorkflowState) def isUserState: Boolean =
     ws.asUserState.isDefined
@@ -179,16 +180,16 @@ object ObservationWorkflowService {
                   ObservationValidationCode.ConfigurationRequestDenied       |
                   ObservationValidationCode.ConfigurationRequestPending      |
                   ObservationValidationCode.TooActivationUnapproved          => Unapproved
-            case ObservationValidationCode.GenericWarning                    => Defined
+            case ObservationValidationCode.GenericWarning                    => Defined // with warnings
 
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:
             case Inactive => Some(Inactive)       // Inactive overrides validation errors
-            case Ready    =>
-              validationStatus match              // Validation errors override Ready
+            case s@(Ready | ForReview)   =>
+              validationStatus match              // Validation errors override Ready and ForReview
                 case Undefined  => None
                 case Unapproved => None
-                case Defined    => Some(Ready)
+                case Defined    => Some(s)
 
         // Our final state is the execution state (if any), else the user state (if any), else the validation state,
         val state: ObservationWorkflowState =
@@ -216,6 +217,11 @@ object ObservationWorkflowService {
             case Undefined  => List(Inactive)
             case Unapproved => List(Inactive)
             case Defined    =>
+
+              // From defined we can transition to Ready, or to ForReview if there are warnings
+              val hasWarnings = codes.map(_.severity).contains(ObservationValidationCode.Severity.Nonfatal)
+              val userState = if hasWarnings then ForReview else Ready
+
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
               //
@@ -225,8 +231,9 @@ object ObservationWorkflowService {
               // trigger -- the target keeps its identity after the alert arrives
               // rather than being replaced by an ordinary one.
               List(Inactive) ++
-                Option.when((!info.isExchange) && (!info.hasUnresolvedTooTarget) && (info.isAccepted || !info.tpe.hasProposal))(Ready)
-            case Ready | ForReview => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
+                Option.when((!info.isExchange) && (!info.hasUnresolvedTooTarget) && (info.isAccepted || !info.tpe.hasProposal))(userState)
+
+            case Ready | ForReview  => List(Inactive, validationStatus) ++ Option.when(canUpdateExecutionState)(Ongoing)
             case Ongoing    => List(Completed) ++ Option.when(canUpdateExecutionState)(Ready)
             case Completed  => if info.isDeclaredComplete then List(Ongoing) else Nil
 

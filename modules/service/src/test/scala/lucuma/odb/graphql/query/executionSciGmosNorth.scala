@@ -21,8 +21,9 @@ import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 
-class executionSciGmosNorth extends ExecutionTestSupportForGmos:
+class executionSciGmosNorth extends ExecutionTestSupportForGmos with UpdateObservationsOps:
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(
@@ -538,6 +539,7 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos:
                  }
                """
              )
+        _  <- setBestConditionsAs(pi, o)
       yield o
 
     val step: Json =
