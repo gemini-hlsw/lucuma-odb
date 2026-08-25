@@ -103,7 +103,16 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
   private def sidereal(count: Int): ArchiveDuplication.Summary =
     summary(count, ArchiveSearchPointing.Sidereal(searchPointing).some)
 
+  /** The stored state only shows through for an observation with a mode. */
   private def newObservation: IO[Observation.Id] =
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+    yield oid
+
+  /** No observing mode, so the view derives NOT_APPLICABLE whatever is stored. */
+  private def modelessObservation: IO[Observation.Id] =
     createProgramAs(pi).flatMap(createObservationAs(pi, _))
 
   private def run[A](f: Transaction[IO] ?=> ArchiveDuplicationService[IO] => IO[A]): IO[A] =
@@ -124,7 +133,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     val ms = List(fullRecord, sparseRecord)
     for
       oid <- newObservation
-      _   <- run(_.store(oid, h, ms))
+      _   <- run(_.store(oid, h, ms, none))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary, h)
@@ -135,15 +144,15 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     val h    = summary(0, ArchiveSearchPointing.NonSidereal(name).some)
     for
       oid <- newObservation
-      _   <- run(_.store(oid, h, Nil))
+      _   <- run(_.store(oid, h, Nil, none))
       s   <- run(_.select(oid))
     yield assertEquals(s.summary.searchArea.center, ArchiveSearchPointing.NonSidereal(name).some)
 
   test("storing replaces the previous snapshot rather than appending to it"):
     for
       oid <- newObservation
-      _   <- run(_.store(oid, sidereal(2), List(fullRecord, sparseRecord)))
-      _   <- run(_.store(oid, sidereal(1), List(sparseRecord)))
+      _   <- run(_.store(oid, sidereal(2), List(fullRecord, sparseRecord), none))
+      _   <- run(_.store(oid, sidereal(1), List(sparseRecord), none))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.matchCount.value, 1)
@@ -152,8 +161,8 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
   test("an error leaves the previous matches and last checked time intact"):
     for
       oid <- newObservation
-      _   <- run(_.store(oid, sidereal(1), List(fullRecord)))
-      _   <- run(_.storeError(oid, "GOA is down".refined))
+      _   <- run(_.store(oid, sidereal(1), List(fullRecord), none))
+      _   <- run(_.storeError(oid, "GOA is down".refined, checkedAt))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.state, ArchiveDuplication.State.Error)
@@ -165,7 +174,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
   test("an error with no previous snapshot reports the error and no matches"):
     for
       oid <- newObservation
-      _   <- run(_.storeError(oid, "GOA is down".refined))
+      _   <- run(_.storeError(oid, "GOA is down".refined, checkedAt))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.state, ArchiveDuplication.State.Error)
@@ -177,9 +186,26 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     val h = ArchiveDuplication.Summary.notApplicable(checkedAt, ArchiveDuplication.SearchArea.Empty)
     for
       oid <- newObservation
-      _   <- run(_.store(oid, h, Nil))
+      _   <- run(_.store(oid, h, Nil, none))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
       assertEquals(s.summary.lastCheckedAt, checkedAt.some)
       assertEquals(s.matches, Nil)
+
+  test("an observation with no observing mode reads as not applicable before any search"):
+    for
+      oid <- modelessObservation
+      s   <- run(_.select(oid))
+    yield assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
+
+  test("an observation with no observing mode reads as not applicable whatever is stored"):
+    for
+      oid <- modelessObservation
+      _   <- run(_.store(oid, sidereal(1), List(fullRecord), none))
+      s   <- run(_.select(oid))
+    yield
+      // The stored evidence is untouched; only its interpretation is derived.
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
+      assertEquals(s.summary.matchCount.value, 1)
+      assertEquals(s.matches, List(fullRecord))

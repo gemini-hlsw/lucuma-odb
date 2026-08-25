@@ -21,6 +21,7 @@ import lucuma.core.enums.ProposalStatus
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
+import lucuma.core.model.Configuration
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
@@ -85,7 +86,8 @@ object ArchiveDuplicationSearchService:
         mode:          Option[ObservingMode],
         explicitBase:  Option[Coordinates],
         referenceTime: Option[Timestamp],
-        asterism:      List[Target]
+        asterism:      List[Target],
+        configuration: Option[Configuration]
       ):
         lazy val pointings: List[GoaQueryPolicy.TargetPointing] =
           asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
@@ -126,7 +128,10 @@ object ArchiveDuplicationSearchService:
                               observingModeServices.selectObservingMode(List((observationId, t)))
                             ).map(_.flatMap(_.get(observationId)))
                 asterism <- Services.asSuperUser(asterismService.getAsterism(observationId))
-              yield Result(Context(mode, explicitBase, refTime, asterism.map(_._2)))
+                // Configuration needs a mode, so don't bother asking without one.
+                cfg      <- omt.fold(none[Configuration].pure[F]): _ =>
+                              Services.asSuperUser(configurationService.selectConfiguration(observationId)).map(_.toOption)
+              yield Result(Context(mode, explicitBase, refTime, asterism.map(_._2), cfg))
 
       /**
        * The asterism center, resolved only when the search actually depends on
@@ -157,8 +162,8 @@ object ArchiveDuplicationSearchService:
           ctx.mode.toList.flatMap(GoaQueryPolicy.queries(_, ctx.explicitBase, center, ctx.pointings))
 
         params match
-          case Nil => storeNotApplicable(observationId, searchArea)
-          case ps  => runQueries(observationId, searchArea, ps)
+          case Nil => storeNotApplicable(observationId, searchArea, ctx.configuration)
+          case ps  => runQueries(observationId, searchArea, ps, ctx.configuration)
 
       /**
        * Records that the search ran and found nothing to ask GOA, which is a
@@ -166,18 +171,20 @@ object ArchiveDuplicationSearchService:
        */
       private def storeNotApplicable(
         observationId: Observation.Id,
-        searchArea:    ArchiveDuplication.SearchArea
+        searchArea:    ArchiveDuplication.SearchArea,
+        searched:      Option[Configuration]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         now.flatMap: t =>
           val summary = ArchiveDuplication.Summary.notApplicable(t, searchArea)
           storeUnlessFrozen(observationId):
-            archiveDuplicationService.store(observationId, summary, Nil)
+            archiveDuplicationService.store(observationId, summary, Nil, searched)
               .as(ArchiveDuplication.Snapshot(summary, Nil))
 
       private def runQueries(
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea,
-        params:        List[GoaParams]
+        params:        List[GoaParams],
+        searched:      Option[Configuration]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         info"$observationId: Archive Duplication Search querying GOA: ${params.mkString(" | ")}" *>
           runner.run(params).flatMap:
@@ -186,7 +193,7 @@ object ArchiveDuplicationSearchService:
                 storeError(observationId, errors)
             case Right(byQuery) =>
               info"$observationId: Archive Duplication Search returned ${byQuery.map(_.size).mkString(" + ")} record(s)" *>
-                storeMatches(observationId, searchArea, byQuery, queryUrlsOf(params))
+                storeMatches(observationId, searchArea, byQuery, queryUrlsOf(params), searched)
 
       /**
        * The GOA query URLs for these params, in order.
@@ -206,15 +213,17 @@ object ArchiveDuplicationSearchService:
           NonEmptyString
             .from(errors.toList.map(_.message).mkString("; "))
             .getOrElse("The Archive Duplication Search failed for an unreported reason.".refined)
-        storeUnlessFrozen(observationId):
-          archiveDuplicationService.storeError(observationId, message) >>
-          archiveDuplicationService.select(observationId)
+        now.flatMap: t =>
+          storeUnlessFrozen(observationId):
+            archiveDuplicationService.storeError(observationId, message, t) >>
+            archiveDuplicationService.select(observationId)
 
       private def storeMatches(
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea,
         byQuery:       List[List[GoaSummaryRecord]],
-        queryUrls:     List[String]
+        queryUrls:     List[String],
+        searched:      Option[Configuration]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         // A file returned by more than one query in the group is one duplicate,
         // not several, so the count is of distinct files.
@@ -232,7 +241,7 @@ object ArchiveDuplicationSearchService:
               queryUrls     = queryUrls
             )
           storeUnlessFrozen(observationId):
-            archiveDuplicationService.store(observationId, summary, matches)
+            archiveDuplicationService.store(observationId, summary, matches, searched)
               .as(ArchiveDuplication.Snapshot(summary, matches))
 
       /**

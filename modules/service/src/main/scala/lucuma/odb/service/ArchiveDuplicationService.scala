@@ -7,15 +7,20 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
+import io.circe.syntax.*
 import lucuma.catalog.goa.GoaObservationClass
 import lucuma.catalog.goa.GoaObservationType
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.math.Coordinates
+import lucuma.core.model.Configuration
 import lucuma.core.model.Observation
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.ArchiveSearchPointing
+import lucuma.odb.json.configurationrequest.query.given
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.circe.codec.json.jsonb
 import skunk.codec.boolean.bool
 import skunk.codec.numeric.float8
 import skunk.codec.temporal.date
@@ -41,20 +46,22 @@ trait ArchiveDuplicationService[F[_]]:
 
   /**
    * Replaces any existing snapshot with this one.  There is no history: the
-   * previous matches are discarded.
+   * previous matches are discarded.  The configuration the search ran against
+   * is stored with it.
    */
   def store(
     observationId: Observation.Id,
-    summary:        ArchiveDuplication.Summary,
-    matches:       List[GoaSummaryRecord]
+    summary:       ArchiveDuplication.Summary,
+    matches:       List[GoaSummaryRecord],
+    searched:      Option[Configuration]
   )(using Transaction[F]): F[Unit]
 
   /**
    * Records that the most recent attempt failed, leaving any previously stored
    * matches and headline values in place so a GOA outage cannot destroy a good
-   * snapshot.
+   * snapshot.  The error time is stored beside the message.
    */
-  def storeError(observationId: Observation.Id, message: NonEmptyString)(using Transaction[F]): F[Unit]
+  def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit]
 
 object ArchiveDuplicationService:
 
@@ -74,18 +81,21 @@ object ArchiveDuplicationService:
 
       override def store(
         observationId: Observation.Id,
-        summary:        ArchiveDuplication.Summary,
-        matches:       List[GoaSummaryRecord]
+        summary:       ArchiveDuplication.Summary,
+        matches:       List[GoaSummaryRecord],
+        searched:      Option[Configuration]
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- session.execute(Statements.UpsertSummary)(observationId, summary)
+          _ <- session.execute(Statements.UpsertSummary)(observationId, summary, searched)
           _ <- session.execute(Statements.DeleteMatches)(observationId)
           _ <- NonEmptyList.fromList(matches).traverse_ : nel =>
                  session.execute(Statements.insertMatches(nel))(observationId, nel)
+          // A snapshot stored just now describes the observation as it stands,
+          _ <- session.execute(Statements.ResetStale)(observationId)
         yield ()
 
-      override def storeError(observationId: Observation.Id, message: NonEmptyString)(using Transaction[F]): F[Unit] =
-        session.execute(Statements.UpsertError)(observationId, message).void
+      override def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit] =
+        session.execute(Statements.UpsertError)(observationId, message, erroredAt).void
 
   object Statements:
 
@@ -243,7 +253,15 @@ object ArchiveDuplicationService:
         ORDER BY c_file_name
       """.query(goa_match)
 
-    val UpsertSummary: Command[(Observation.Id, ArchiveDuplication.Summary)] =
+    /** The Configuration a search ran against, as configuration-request JSON. */
+    private val configuration: Codec[Configuration] =
+      jsonb.eimap(_.as[Configuration].leftMap(f => s"Could not decode Configuration: ${f.message}"))(_.asJson)
+
+    /**
+     * A successful store clears the error timestamp along with the message, so
+     * the derived attempt time falls back to the checked time it just set.
+     */
+    val UpsertSummary: Command[(Observation.Id, ArchiveDuplication.Summary, Option[Configuration])] =
       sql"""
         INSERT INTO t_archive_duplication (
           c_observation_id,
@@ -255,34 +273,52 @@ object ArchiveDuplicationService:
           c_search_dec,
           c_search_target,
           c_search_radius,
-          c_query_urls
-        ) VALUES ($observation_id, $archive_duplication_summary_write)
+          c_query_urls,
+          c_searched_configuration
+        ) VALUES ($observation_id, $archive_duplication_summary_write, ${configuration.opt})
         ON CONFLICT (c_observation_id) DO UPDATE SET
-          c_state           = EXCLUDED.c_state,
-          c_saturated       = EXCLUDED.c_saturated,
-          c_last_checked_at = EXCLUDED.c_last_checked_at,
-          c_error           = EXCLUDED.c_error,
-          c_search_ra       = EXCLUDED.c_search_ra,
-          c_search_dec      = EXCLUDED.c_search_dec,
-          c_search_target   = EXCLUDED.c_search_target,
-          c_search_radius   = EXCLUDED.c_search_radius,
-          c_query_urls      = EXCLUDED.c_query_urls
+          c_state                  = EXCLUDED.c_state,
+          c_saturated              = EXCLUDED.c_saturated,
+          c_last_checked_at        = EXCLUDED.c_last_checked_at,
+          c_error                  = EXCLUDED.c_error,
+          c_error_at               = NULL,
+          c_search_ra              = EXCLUDED.c_search_ra,
+          c_search_dec             = EXCLUDED.c_search_dec,
+          c_search_target          = EXCLUDED.c_search_target,
+          c_search_radius          = EXCLUDED.c_search_radius,
+          c_query_urls             = EXCLUDED.c_query_urls,
+          c_searched_configuration = EXCLUDED.c_searched_configuration
       """.command
 
     /**
-     * Flags a failed attempt.  Only the state and message are touched, so a
-     * previously good snapshot survives a GOA outage intact.
+     * A fresh snapshot trivially describes the observation it was just taken
+     * from, so the materialized flag resets here rather than waiting out the
+     * recalculation the upsert trigger scheduled.  No row is fine: obscalc
+     * creates one with the same default when it first hears of the observation.
      */
-    val UpsertError: Command[(Observation.Id, NonEmptyString)] =
+    val ResetStale: Command[Observation.Id] =
+      sql"""
+        UPDATE t_obscalc
+        SET c_archive_stale = false
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    /**
+     * Flags a failed attempt.  Only the state, message and error time are
+     * touched, so a previously good snapshot survives a GOA outage intact.
+     */
+    val UpsertError: Command[(Observation.Id, NonEmptyString, Timestamp)] =
       sql"""
         INSERT INTO t_archive_duplication (
           c_observation_id,
           c_state,
-          c_error
-        ) VALUES ($observation_id, 'error', $text_nonempty)
+          c_error,
+          c_error_at
+        ) VALUES ($observation_id, 'error', $text_nonempty, $core_timestamp)
         ON CONFLICT (c_observation_id) DO UPDATE SET
-          c_state = 'error',
-          c_error = EXCLUDED.c_error
+          c_state    = 'error',
+          c_error    = EXCLUDED.c_error,
+          c_error_at = EXCLUDED.c_error_at
       """.command
 
     val DeleteMatches: Command[Observation.Id] =
