@@ -6,6 +6,7 @@ package lucuma.odb.graphql
 import cats.effect.*
 import com.dimafeng.testcontainers.LocalStackV2Container
 import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Stream
 import fs2.aws.s3.S3
 import fs2.aws.s3.models.Models.BucketName
 import fs2.aws.s3.models.Models.FileKey
@@ -82,6 +83,18 @@ abstract class OdbSuiteWithS3 extends OdbSuite {
 
     Resource.fromAutoCloseable(IO.delay(builder.build()))
   }
+
+  // Puts bytes in the bucket without going through the attachment routes, for
+  // attachment types the routes deliberately refuse to create.
+  def uploadS3Bytes(fileKey: FileKey, bytes: Array[Byte]): IO[Unit] =
+    s3ClientOpsResource.use(s3Ops =>
+      val s3 = S3.create[IO](s3Ops)
+      Stream
+        .emits(bytes)
+        .through(s3.uploadFileMultipart(bucketName, fileKey, 5.refined))
+        .compile
+        .drain
+    )
 
   def assertS3(fileKey: FileKey, expected: String): IO[Unit] =
     s3ClientOpsResource.use(s3Ops =>
