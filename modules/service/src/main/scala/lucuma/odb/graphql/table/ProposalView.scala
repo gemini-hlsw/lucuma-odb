@@ -43,7 +43,7 @@ trait ProposalView[F[_]] extends BaseMapping[F]:
 
     object Classical:
       val Id                      = col("c_program_id_c", program_id.embedded)
-      val AeonMultiFacility       = col("c_aeon_multi_facility", bool)
+      val AeonMultiFacilityId     = col("c_aeon_multi_facility_id", program_id.embedded)
       val AeonRequiredInstruments = col("c_aeon_required_instruments", _instrument)
       val JwstSynergy             = col("c_jwst_synergy", bool)
       val UsLongTerm              = col("c_us_long_term", bool)
@@ -63,7 +63,7 @@ trait ProposalView[F[_]] extends BaseMapping[F]:
       val Id                      = col("c_program_id_l", program_id.embedded)
       val MinPercentTotal         = col("c_min_percent_total", int_percent)
       val TotalTime               = col("c_total_time", time_span)
-      val AeonMultiFacility       = col("c_aeon_multi_facility", bool)
+      val AeonMultiFacilityId     = col("c_aeon_multi_facility_id", program_id.embedded)
       val AeonRequiredInstruments = col("c_aeon_required_instruments", _instrument)
       val JwstSynergy             = col("c_jwst_synergy", bool)
 
@@ -72,7 +72,7 @@ trait ProposalView[F[_]] extends BaseMapping[F]:
 
     object Queue:
       val Id                      = col("c_program_id_q", program_id.embedded)
-      val AeonMultiFacility       = col("c_aeon_multi_facility", bool)
+      val AeonMultiFacilityId     = col("c_aeon_multi_facility_id", program_id.embedded)
       val AeonRequiredInstruments = col("c_aeon_required_instruments", _instrument)
       val JwstSynergy             = col("c_jwst_synergy", bool)
       val UsLongTerm              = col("c_us_long_term", bool)

@@ -6,6 +6,7 @@ package mapping
 
 import eu.timepit.refined.cats.*
 import grackle.Cursor
+import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.Const
 import grackle.Predicate.Eql
@@ -75,13 +76,12 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val ClassicalMapping: ObjectMapping =
     ObjectMapping(ClassicalType)(
       SqlField("id", ProposalView.Classical.Id, key = true, hidden = true),
-      SqlField("minPercentTime",          ProposalView.MinPercent),
-      SqlField("aeonMultiFacility",       ProposalView.Classical.AeonMultiFacility),
-      SqlField("aeonRequiredInstruments", ProposalView.Classical.AeonRequiredInstruments),
-      SqlField("jwstSynergy",             ProposalView.Classical.JwstSynergy),
-      SqlField("usLongTerm",              ProposalView.Classical.UsLongTerm),
-      SqlField("exchangePartner",    ProposalView.ExchangePartner),
-      SqlObject("partnerSplits",     Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
+      SqlField("minPercentTime",    ProposalView.MinPercent),
+      SqlObject("aeonMultiFacility"),
+      SqlField("jwstSynergy",       ProposalView.Classical.JwstSynergy),
+      SqlField("usLongTerm",        ProposalView.Classical.UsLongTerm),
+      SqlField("exchangePartner",   ProposalView.ExchangePartner),
+      SqlObject("partnerSplits",    Join(ProposalView.Classical.Id, PartnerSplitTable.ProgramId))
     )
 
   lazy val DemoScienceMapping: ObjectMapping =
@@ -120,10 +120,9 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
       SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",      ProposalView.MinPercent),
-      SqlField("minPercentTotalTime",     ProposalView.LargeProgram.MinPercentTotal),
-      SqlField("aeonMultiFacility",       ProposalView.LargeProgram.AeonMultiFacility),
-      SqlField("aeonRequiredInstruments", ProposalView.LargeProgram.AeonRequiredInstruments),
-      SqlField("jwstSynergy",             ProposalView.LargeProgram.JwstSynergy),
+      SqlField("minPercentTotalTime", ProposalView.LargeProgram.MinPercentTotal),
+      SqlObject("aeonMultiFacility"),
+      SqlField("jwstSynergy",         ProposalView.LargeProgram.JwstSynergy),
       SqlObject("totalTime")
     )
 
@@ -138,14 +137,13 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("tooActivationCeiling", ProposalView.TooActivationCeilingEffective),
       SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
       SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
-      SqlField("minPercentTime",          ProposalView.MinPercent),
-      SqlField("aeonMultiFacility",       ProposalView.Queue.AeonMultiFacility),
-      SqlField("aeonRequiredInstruments", ProposalView.Queue.AeonRequiredInstruments),
-      SqlField("jwstSynergy",             ProposalView.Queue.JwstSynergy),
-      SqlField("usLongTerm",              ProposalView.Queue.UsLongTerm),
-      SqlField("considerForBand3",        ProposalView.Queue.ConsiderForBand3),
-      SqlField("exchangePartner",         ProposalView.ExchangePartner),
-      SqlObject("partnerSplits",          Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
+      SqlField("minPercentTime",    ProposalView.MinPercent),
+      SqlObject("aeonMultiFacility"),
+      SqlField("jwstSynergy",       ProposalView.Queue.JwstSynergy),
+      SqlField("usLongTerm",        ProposalView.Queue.UsLongTerm),
+      SqlField("considerForBand3",  ProposalView.Queue.ConsiderForBand3),
+      SqlField("exchangePartner",   ProposalView.ExchangePartner),
+      SqlObject("partnerSplits",    Join(ProposalView.Queue.Id, PartnerSplitTable.ProgramId))
     )
 
   lazy val SystemVerificationMapping: ObjectMapping =
@@ -155,6 +153,21 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
       SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
       SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",  ProposalView.MinPercent)
+    )
+
+  // The object's presence is the multi-facility flag: its key column is null
+  // unless the proposal is in the program, so the whole object renders as null.
+  private def aeonMultiFacilityMappingAtPath(path: Path, id: ColumnRef, instruments: ColumnRef): ObjectMapping =
+    ObjectMapping(path)(
+      SqlField("id", id, key = true, hidden = true),
+      SqlField("requiredInstruments", instruments)
+    )
+
+  lazy val AeonMultiFacilityMappings: List[TypeMapping] =
+    List(
+      aeonMultiFacilityMappingAtPath(ClassicalType    / "aeonMultiFacility", ProposalView.Classical.AeonMultiFacilityId,    ProposalView.Classical.AeonRequiredInstruments),
+      aeonMultiFacilityMappingAtPath(LargeProgramType / "aeonMultiFacility", ProposalView.LargeProgram.AeonMultiFacilityId, ProposalView.LargeProgram.AeonRequiredInstruments),
+      aeonMultiFacilityMappingAtPath(QueueType        / "aeonMultiFacility", ProposalView.Queue.AeonMultiFacilityId,        ProposalView.Queue.AeonRequiredInstruments)
     )
 
   val SortSplits: Elab[Unit] =

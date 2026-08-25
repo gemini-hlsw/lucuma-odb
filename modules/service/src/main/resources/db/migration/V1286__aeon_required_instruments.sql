@@ -121,6 +121,9 @@ CREATE VIEW v_proposal AS
         WHERE r.c_program_id = p.c_program_id),
       '{}'
     )                                                                        AS c_aeon_required_instruments,
+    -- Key for the AEON/multi-facility object: null unless the proposal is in the
+    -- program, so the GraphQL object is null rather than an empty shell.
+    CASE WHEN p.c_aeon_multi_facility                  THEN c_program_id END AS c_aeon_multi_facility_id,
     -- Key for the nullable explicit time request: null when no request was
     -- stated, so the GraphQL object is null rather than a zero TimeSpan.
     CASE WHEN p.c_time_request IS NOT NULL              THEN c_program_id END AS c_time_request_id,

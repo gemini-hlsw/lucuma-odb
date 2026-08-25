@@ -613,6 +613,7 @@ object OdbMapping {
                 VisitorMapping,
                 VisitSelectResultMapping,
               ) ++ List(
+                AeonMultiFacilityMappings,
                 AngleMappings,
                 ArcMappings,
                 AtomRecordSelectResultMappings,

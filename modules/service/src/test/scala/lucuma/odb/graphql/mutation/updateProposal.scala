@@ -1275,7 +1275,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                     classical: {
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
-                      aeonMultiFacility: true
+                      aeonMultiFacility: {}
                       jwstSynergy: true
                       usLongTerm: true
                     }
@@ -1287,7 +1287,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   ... on Classical {
                     minPercentTime
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                   }
@@ -1302,7 +1302,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               "proposal": {
                 "gemini": {
                   "minPercentTime": 80,
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true,
                   "usLongTerm": true
                 }
@@ -1327,7 +1327,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                     classical: {
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
-                      aeonMultiFacility: false
+                      aeonMultiFacility: null
                       jwstSynergy: false
                       usLongTerm: false
                     }
@@ -1338,7 +1338,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 gemini {
                   ... on Classical {
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                   }
@@ -1352,7 +1352,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "aeonMultiFacility": false,
+                  "aeonMultiFacility": null,
                   "jwstSynergy": false,
                   "usLongTerm": false
                 }
@@ -1379,7 +1379,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                       minPercentTime: 80
                       minPercentTotalTime: 90
                       totalTime: { hours: 120.0 }
-                      aeonMultiFacility: true
+                      aeonMultiFacility: {}
                       jwstSynergy: true
                     }
                   }
@@ -1393,7 +1393,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                     minPercentTime
                     minPercentTotalTime
                     totalTime { hours }
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                   }
                 }
@@ -1410,7 +1410,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   "minPercentTime": 80,
                   "minPercentTotalTime": 90,
                   "totalTime": { "hours": 120.000000 },
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true
                 }
               }
@@ -1435,7 +1435,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                       explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
-                      aeonMultiFacility: true
+                      aeonMultiFacility: {}
                       jwstSynergy: true
                       usLongTerm: true
                       considerForBand3: CONSIDER
@@ -1449,7 +1449,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                   ... on Queue {
                     tooActivationCeiling
                     minPercentTime
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                     considerForBand3
@@ -1466,7 +1466,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 "gemini": {
                   "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true,
                   "usLongTerm": true,
                   "considerForBand3": "CONSIDER"
@@ -1493,7 +1493,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                       explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
-                      aeonMultiFacility: true
+                      aeonMultiFacility: {}
                       jwstSynergy: true
                       usLongTerm: true
                       considerForBand3: UNSET
@@ -1505,7 +1505,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 gemini {
                   ... on Queue {
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                     considerForBand3
@@ -1520,7 +1520,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true,
                   "usLongTerm": true,
                   "considerForBand3": "UNSET"
@@ -1582,7 +1582,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     createProgramAs(pi).flatMap: pid =>
       addProposal(
         pi, pid,
-        callProps = "queue: { considerForBand3: DO_NOT_CONSIDER, aeonMultiFacility: true, jwstSynergy: true, usLongTerm: true }".some
+        callProps = "queue: { considerForBand3: DO_NOT_CONSIDER, aeonMultiFacility: {}, jwstSynergy: true, usLongTerm: true }".some
       ) *>
       expect(
         user = pi,
@@ -1604,7 +1604,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   ... on Queue {
                     minPercentTime
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                     considerForBand3
@@ -1620,7 +1620,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               "proposal": {
                 "gemini": {
                   "minPercentTime": 50,
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true,
                   "usLongTerm": true,
                   "considerForBand3": "DO_NOT_CONSIDER"
@@ -1895,8 +1895,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      aeonMultiFacility: true
-                      aeonRequiredInstruments: [GMOS_NORTH]
+                      aeonMultiFacility: { requiredInstruments: [GMOS_NORTH] }
                     }
                   }
                 }
@@ -1909,7 +1908,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
       )
     yield (pid, oid)
 
-  private def expectAeonRequiredInstruments(pid: Program.Id, expected: Json): IO[Unit] =
+  private def expectAeonMultiFacility(pid: Program.Id, expected: Json): IO[Unit] =
     expect(
       user = pi,
       query = s"""
@@ -1918,7 +1917,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             proposal {
               gemini {
                 ... on Queue {
-                  aeonRequiredInstruments
+                  aeonMultiFacility { requiredInstruments }
                 }
               }
             }
@@ -1930,7 +1929,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           "program": {
             "proposal": {
               "gemini": {
-                "aeonRequiredInstruments": $expected
+                "aeonMultiFacility": $expected
               }
             }
           }
@@ -1938,7 +1937,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
       """.asRight
     )
 
-  test("✓ update queue proposal with aeonRequiredInstruments"):
+  test("✓ update queue proposal with required instruments"):
     for
       pid <- createProgramAs(pi)
       _   <- addProposal(pi, pid)
@@ -1954,8 +1953,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      aeonMultiFacility: true
-                      aeonRequiredInstruments: [GMOS_NORTH]
+                      aeonMultiFacility: { requiredInstruments: [GMOS_NORTH] }
                     }
                   }
                 }
@@ -1964,8 +1962,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 gemini {
                   ... on Queue {
-                    aeonMultiFacility
-                    aeonRequiredInstruments
+                    aeonMultiFacility { requiredInstruments }
                   }
                 }
               }
@@ -1977,8 +1974,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "aeonMultiFacility": true,
-                  "aeonRequiredInstruments": [ "GMOS_NORTH" ]
+                  "aeonMultiFacility": { "requiredInstruments": [ "GMOS_NORTH" ] }
                 }
               }
             }
@@ -1987,7 +1983,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
       )
     yield ()
 
-  test("✓ setting aeonRequiredInstruments to null clears them"):
+  test("✓ setting requiredInstruments to null clears them"):
     setupAeonProposal.flatMap: (pid, _) =>
       expect(
         user = pi,
@@ -1999,7 +1995,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      aeonRequiredInstruments: null
+                      aeonMultiFacility: { requiredInstruments: null }
                     }
                   }
                 }
@@ -2008,8 +2004,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 gemini {
                   ... on Queue {
-                    aeonMultiFacility
-                    aeonRequiredInstruments
+                    aeonMultiFacility { requiredInstruments }
                   }
                 }
               }
@@ -2021,8 +2016,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "aeonMultiFacility": true,
-                  "aeonRequiredInstruments": []
+                  "aeonMultiFacility": { "requiredInstruments": [] }
                 }
               }
             }
@@ -2030,7 +2024,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
         """.asRight
       )
 
-  test("✓ unsetting aeonMultiFacility clears aeonRequiredInstruments"):
+  test("✓ nulling aeonMultiFacility clears the required instruments"):
     setupAeonProposal.flatMap: (pid, _) =>
       expect(
         user = pi,
@@ -2042,7 +2036,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      aeonMultiFacility: false
+                      aeonMultiFacility: null
                     }
                   }
                 }
@@ -2051,8 +2045,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
               proposal {
                 gemini {
                   ... on Queue {
-                    aeonMultiFacility
-                    aeonRequiredInstruments
+                    aeonMultiFacility { requiredInstruments }
                   }
                 }
               }
@@ -2064,8 +2057,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "aeonMultiFacility": false,
-                  "aeonRequiredInstruments": []
+                  "aeonMultiFacility": null
                 }
               }
             }
@@ -2076,9 +2068,9 @@ class updateProposal extends OdbSuite with DatabaseOperations {
   test("✓ deactivating the backing observation removes the required instrument"):
     setupAeonProposal.flatMap: (pid, oid) =>
       setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive) *>
-      expectAeonRequiredInstruments(pid, json"""[]""")
+      expectAeonMultiFacility(pid, json"""{ "requiredInstruments": [] }""")
 
-  test("⨯ aeonRequiredInstruments must be backed by an observation"):
+  test("⨯ required instruments must be backed by an observation"):
     setupAeonProposal.flatMap: (pid, _) =>
       expect(
         user = pi,
@@ -2090,7 +2082,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      aeonRequiredInstruments: [GMOS_SOUTH]
+                      aeonMultiFacility: { requiredInstruments: [GMOS_SOUTH] }
                     }
                   }
                 }
@@ -2104,7 +2096,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           List("Instrument GmosSouth cannot be marked required because no active observation in the program uses it.").asLeft
       )
 
-  test("✓ omitting aeonRequiredInstruments leaves them unchanged"):
+  test("✓ omitting aeonMultiFacility leaves the required instruments unchanged"):
     setupAeonProposal.flatMap: (pid, _) =>
       query(
         user = pi,
@@ -2127,9 +2119,34 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """
       ) *>
-      expectAeonRequiredInstruments(pid, json"""[ "GMOS_NORTH" ]""")
+      expectAeonMultiFacility(pid, json"""{ "requiredInstruments": [ "GMOS_NORTH" ] }""")
 
-  test("✓ switching the proposal type clears aeonRequiredInstruments"):
+  test("✓ omitting requiredInstruments within aeonMultiFacility leaves them unchanged"):
+    setupAeonProposal.flatMap: (pid, _) =>
+      query(
+        user = pi,
+        query = s"""
+          mutation {
+            updateProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonMultiFacility: {}
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """
+      ) *>
+      expectAeonMultiFacility(pid, json"""{ "requiredInstruments": [ "GMOS_NORTH" ] }""")
+
+  test("✓ switching the proposal type takes the proposal out of the program"):
     setupAeonProposal.flatMap: (pid, _) =>
       query(
         user = pi,
@@ -2173,7 +2190,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """
       ) *>
-      expectAeonRequiredInstruments(pid, json"""[]""")
+      expectAeonMultiFacility(pid, json"""null""")
 
   test("✓ changing the observing mode of the backing observation removes the required instrument"):
     setupAeonProposal.flatMap: (pid, oid) =>
@@ -2204,16 +2221,16 @@ class updateProposal extends OdbSuite with DatabaseOperations {
           }
         """
       ) *>
-      expectAeonRequiredInstruments(pid, json"""[]""")
+      expectAeonMultiFacility(pid, json"""{ "requiredInstruments": [] }""")
 
   test("✓ the required instrument survives deletion while a clone still backs it, and is pruned with the last one"):
     setupAeonProposal.flatMap: (pid, oid) =>
       for
         clone <- cloneObservationAs(pi, oid)
-        _     <- expectAeonRequiredInstruments(pid, json"""[ "GMOS_NORTH" ]""")
+        _     <- expectAeonMultiFacility(pid, json"""{ "requiredInstruments": [ "GMOS_NORTH" ] }""")
         _     <- deleteObservation(pi, oid)
-        _     <- expectAeonRequiredInstruments(pid, json"""[ "GMOS_NORTH" ]""")
+        _     <- expectAeonMultiFacility(pid, json"""{ "requiredInstruments": [ "GMOS_NORTH" ] }""")
         _     <- deleteObservation(pi, clone)
-        _     <- expectAeonRequiredInstruments(pid, json"""[]""")
+        _     <- expectAeonMultiFacility(pid, json"""{ "requiredInstruments": [] }""")
       yield ()
 }
