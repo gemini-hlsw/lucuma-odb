@@ -17,6 +17,7 @@ import lucuma.core.model.User
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
+import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.exception.PostgresErrorException
@@ -29,7 +30,9 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
   val pi: User    = TestUsers.Standard.pi(1, 30)
   val staff: User = TestUsers.Standard.staff(2, 31)
 
-  override val validUsers: List[User] = List(pi, staff)
+  private val serviceUser = TestUsers.service(3)
+
+  override val validUsers: List[User] = List(pi, staff, serviceUser)
 
   /**
    * GOA's summary records carry only `name`, `instrument` and
@@ -299,3 +302,159 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       case Left(ex: PostgresErrorException) => assertEquals(ex.code, LockNotAvailable)
       case Left(ex)                         => fail(s"expected a lock timeout, got $ex")
       case Right(_)                         => fail("a submission slipped past the snapshot lock")
+
+  // --- staleness ---
+
+  /**
+   * Configuration needs reference coordinates, which are resolved at the CfP
+   * reference time, so these observations live in a program with a proposal.
+   */
+  private def configuredObservation: IO[Observation.Id] =
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+    yield oid
+
+  /**
+   * Refresh with a mapping-backed Services, as the mutation has in production:
+   * assembling the searched configuration runs an internal GraphQL query, and
+   * without a mapping the refresh stores a snapshot with no provenance.
+   */
+  private def refreshStoringProvenance(client: GoaClient[IO])(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
+    withServicesForObscalc(serviceUser): services =>
+      given Services[IO] = services
+      ArchiveDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get)
+
+  private def staleness(oid: Observation.Id): IO[Boolean] =
+    withServicesForObscalc(serviceUser): services =>
+      services.transactionally(services.archiveDuplicationService.isStale(oid))
+
+  private def setLongSlitMode(oid: Observation.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gmosNorthLongSlit: {
+                  grating: B1200_G5301
+                  filter: G_PRIME
+                  fpu: LONG_SLIT_0_25
+                  centralWavelength: { nanometers: 500 }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def unsetMode(oid: Observation.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: { observingMode: null }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def worsenCloudExtinction(oid: Observation.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: { constraintSet: { cloudExtinction: THREE_POINT_ZERO } }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  test("an observation that has never been searched is not stale"):
+    for
+      oid <- configuredObservation
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("a fresh search is not stale"):
+    for
+      oid <- configuredObservation
+      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("replacing the observing mode after a search is stale"):
+    for
+      oid <- configuredObservation
+      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      s   <- staleness(oid)
+    yield assert(s)
+
+  test("unsetting the observing mode after a search is not stale: nothing can be searched"):
+    for
+      oid <- configuredObservation
+      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      _   <- unsetMode(oid)
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("a conditions change does not stale a search: the GOA query never uses them"):
+    for
+      oid <- configuredObservation
+      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      _   <- worsenCloudExtinction(oid)
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("a snapshot stored without provenance is stale once something can be searched"):
+    for
+      oid <- configuredObservation
+      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      // Simulate a row from before c_searched_configuration existed.
+      _   <- withFreshSession: s =>
+               s.execute(
+                 sql"update t_archive_duplication set c_searched_configuration = null where c_observation_id = $observation_id".command
+               )(oid).void
+      s   <- staleness(oid)
+    yield assert(s)
+
+  private def storedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
+    withFreshSession: s =>
+      s.option(sql"select c_archive_stale from t_obscalc where c_observation_id = $observation_id".query(skunk.codec.boolean.bool))(oid)
+
+  private def runObscalc(oid: Observation.Id): IO[Unit] =
+    withServicesForObscalc(serviceUser): services =>
+      given Services[IO] = services
+      val svc = ObscalcService.instantiate[IO]
+      services.transactionally(svc.loadObs(oid)).flatMap:
+        _.traverse_(svc.calculateAndUpdate)
+
+  test("the obscalc worker materializes staleness, and a refresh resets it"):
+    for
+      oid <- configuredObservation
+      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- runObscalc(oid)
+      s1  <- storedStaleFlag(oid)
+      // The refresh searched the new mode, so its snapshot reads not-stale at
+      // once rather than waiting for the recalculation it scheduled.
+      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      s2  <- storedStaleFlag(oid)
+    yield
+      assertEquals(s1, true.some)
+      assertEquals(s2, false.some)

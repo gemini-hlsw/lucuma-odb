@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
+import io.circe.Json
 import io.circe.syntax.*
 import lucuma.catalog.goa.GoaObservationClass
 import lucuma.catalog.goa.GoaObservationType
@@ -63,6 +64,16 @@ trait ArchiveDuplicationService[F[_]]:
    */
   def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit]
 
+  /**
+   * Whether the stored snapshot no longer describes the observation as it now
+   * stands: something could be searched today, and it is not what was searched
+   * (per `Configuration.subsumes`, conditions excluded because the GOA query
+   * never uses them).  False when nothing was ever searched or nothing can be
+   * searched now; true for a snapshot whose searched configuration is missing
+   * or unreadable, so pre-provenance rows self-heal on their first re-check.
+   */
+  def isStale(observationId: Observation.Id)(using Transaction[F]): F[Boolean]
+
 object ArchiveDuplicationService:
 
   def instantiate[F[_]: Concurrent](using Services[F]): ArchiveDuplicationService[F] =
@@ -96,6 +107,18 @@ object ArchiveDuplicationService:
 
       override def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit] =
         session.execute(Statements.UpsertError)(observationId, message, erroredAt).void
+
+      override def isStale(observationId: Observation.Id)(using Transaction[F]): F[Boolean] =
+        session.option(Statements.SelectSearchedConfiguration)(observationId).flatMap:
+          case None           => false.pure[F]  // never searched, so nothing to go stale
+          case Some(searched) =>
+            Services.asSuperUser(configurationService.selectConfiguration(observationId)).map: current =>
+              current.toOption match
+                case None      => false  // nothing can be searched now; the derived state says so
+                case Some(cur) =>
+                  searched.flatMap(_.as[Configuration].toOption) match
+                    case None      => true  // searched, but against what is unknown
+                    case Some(old) => !old.copy(conditions = cur.conditions).subsumes(cur)
 
   object Statements:
 
@@ -224,6 +247,17 @@ object ArchiveDuplicationService:
         FROM v_archive_duplication
         WHERE c_observation_id = $observation_id
       """.query(archive_duplication_summary)
+
+    /**
+     * Raw JSON rather than the decoded Configuration, so an unreadable stored
+     * value reads as stale instead of failing the whole calculation.
+     */
+    val SelectSearchedConfiguration: Query[Observation.Id, Option[Json]] =
+      sql"""
+        SELECT c_searched_configuration
+        FROM t_archive_duplication
+        WHERE c_observation_id = $observation_id
+      """.query(jsonb.opt)
 
     val SelectMatches: Query[Observation.Id, GoaSummaryRecord] =
       sql"""
