@@ -50,6 +50,19 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
       """
     ).void
 
+  /** The same mutation as a query string, for tests that expect it to be refused. */
+  def schedulingModeQuery(oid: Observation.Id, mode: SchedulingMode): String =
+    s"""
+      mutation {
+        updateObservations(input: {
+          SET: { schedulingConstraints: { schedulingMode: ${mode.tag.toScreamingSnakeCase} } }
+          WHERE: { id: { EQ: ${oid.asJson} } }
+        }) {
+          observations { id }
+        }
+      }
+    """
+
   /** Adds or removes asterism members, which is what makes an observation a ToO or stops it being one. */
   def editAsterismAs(user: User, oid: Observation.Id, add: List[Target.Id], del: List[Target.Id]): IO[Unit] =
     query(

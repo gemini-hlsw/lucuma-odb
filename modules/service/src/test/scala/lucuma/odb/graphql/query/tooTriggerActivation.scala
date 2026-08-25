@@ -16,7 +16,6 @@ import lucuma.core.enums.TooActivation.Rapid
 import lucuma.core.enums.TooActivation.Standard
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.syntax.string.*
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.data.TooTriggerStatus.*
@@ -49,18 +48,6 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
   private def allTriggers(oid: Observation.Id): IO[List[(TooTriggerStatus, TooActivation)]] =
     getTooTriggersAs(pi, oid).map: ts =>
       ts.map(t => (t.status, t.activation))
-
-  private def schedulingModeQuery(oid: Observation.Id, mode: SchedulingMode): String =
-    s"""
-      mutation {
-        updateObservations(input: {
-          SET: { schedulingConstraints: { schedulingMode: ${mode.tag.toScreamingSnakeCase} } }
-          WHERE: { id: { EQ: ${oid.asJson} } }
-        }) {
-          observations { id }
-        }
-      }
-    """
 
   test("a trigger records the activation it was requested at"):
     for
