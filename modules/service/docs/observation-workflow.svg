@@ -10,6 +10,9 @@
 
     Undefined 250   Unapproved 430   Defined 610   Ready 900   Ongoing 1130   Completed 1350
 
+  ForReview appears only in the Phase 2 panel, in the Ready column below the row
+  (x 900, y 430), the way Unapproved sits below its row.
+
   Panel bands (y):  Phase 1  16-206     Phase 2  230-660
                     Phase 2 (Target of Opportunity)  690-980
                     Calibrations (program-level)  1010-1240
@@ -56,6 +59,7 @@
     .leg    { font-size:11px; fill:#111111; font-weight:700; text-anchor:start; }
     .foot   { font-size:11px; fill:#666666; font-style:italic; text-anchor:start; }
     .black  { stroke:#111111; stroke-width:2; fill:none; }
+    .dash   { stroke:#111111; stroke-width:2; fill:none; stroke-dasharray:6 4; }
     .blue   { stroke:#1f8fe0; stroke-width:2; fill:none; }
     .green  { stroke:#2e9b3f; stroke-width:2; fill:none; }
     .red    { stroke:#e03b2f; stroke-width:2; fill:none; }
@@ -145,6 +149,7 @@
   <text class="el" x="811" y="340">PI verifies the sequence</text>
   <text class="el" x="811" y="353">/ reopens it</text>
   <text class="note" x="811" y="378">Ready needs an accepted proposal</text>
+  <text class="note" x="811" y="391">and no warnings</text>
 
   <rect class="inact" x="906" y="274" width="100" height="30"/>
   <text class="si" x="956" y="294">Inactive</text>
@@ -168,6 +173,25 @@
   <rect class="box" x="1350" y="342" width="112" height="36"/>
   <text class="st" x="1406" y="365">Completed</text>
 
+  <!-- ForReview: offered from Defined in place of Ready when warnings are present -->
+  <path class="black" d="M714,382 L714,448 L896,448" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <text class="el" x="800" y="427">warnings — PI flags for review</text>
+  <text class="el" x="800" y="440">/ reopens it</text>
+
+  <rect class="box" x="900" y="430" width="112" height="36"/>
+  <text class="st" x="956" y="453">ForReview</text>
+
+  <line class="black" x1="956" y1="466" x2="956" y2="494" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <rect class="inact" x="906" y="498" width="100" height="30"/>
+  <text class="si" x="956" y="518">Inactive</text>
+
+  <path class="black" d="M1016,448 L1186,448 L1186,382" marker-end="url(#ab-e)"/>
+  <text class="note" x="1100" y="440">staff, visitor modes</text>
+
+  <!-- Staff may set Ready whenever ForReview is offered; never in allowedTransitions. -->
+  <path class="dash" d="M690,342 L690,318 L920,318 L920,338" marker-end="url(#ab-e)"/>
+  <text class="note" x="795" y="312">staff may force Ready</text>
+
   <!-- Legend -->
   <line class="black" x1="1130" y1="470" x2="1248" y2="470" marker-end="url(#ab-e)"/>
   <text class="leg" x="1260" y="474">PI / staff action</text>
@@ -177,8 +201,10 @@
   <text class="leg" x="1260" y="544">Staff approval</text>
   <line class="red" x1="1130" y1="575" x2="1248" y2="575" marker-end="url(#ar-e)"/>
   <text class="leg" x="1260" y="579">Staff rejection</text>
+  <line class="dash" x1="1130" y1="610" x2="1248" y2="610" marker-end="url(#ab-e)"/>
+  <text class="leg" x="1260" y="614">Staff-only, not advertised</text>
 
-  <text class="foot" x="40" y="634">Ongoing and Completed cannot be deactivated — Inactive is reachable only from Undefined, Unapproved, Defined and Ready.</text>
+  <text class="foot" x="40" y="634">Ongoing and Completed cannot be deactivated — Inactive is reachable only from Undefined, Unapproved, Defined, Ready and ForReview.</text>
 
   <!-- ============ Phase 2: Target of Opportunity ============ -->
   <rect class="cont" x="20" y="690" width="1480" height="290" rx="14"/>
@@ -206,6 +232,7 @@
   <text class="el" x="811" y="803">/ clears it — withdraws</text>
   <text class="note" x="811" y="840">needs an accepted proposal,</text>
   <text class="note" x="811" y="853">no placeholder target</text>
+  <text class="note" x="811" y="866">no warnings, else ForReview</text>
 
   <rect class="inact" x="906" y="738" width="100" height="30"/>
   <text class="si" x="956" y="758">Inactive</text>
@@ -243,7 +270,8 @@
   <text class="si" x="1181" y="922">one REQUESTED row</text>
   <text class="sub" x="1181" y="936">persists through execution — no approval step, no separate withdrawal</text>
 
-  <text class="foot" x="40" y="968">Setting Ready is the trigger request; the database keeps the row in step, so the state and the trigger cannot disagree. Unapproved, and the routes in and out of it, behave exactly as in Phase 2 above.</text>
+  <text class="foot" x="40" y="956">Setting Ready is the trigger request; the database keeps the row in step, so the state and the trigger cannot disagree. Unapproved, and the routes in and out of it, behave exactly as in Phase 2 above.</text>
+  <text class="foot" x="40" y="972">A warned ToO offers only ForReview, which does not fire the trigger; staff can still force Ready via the unadvertised override.</text>
 
   <!-- ============ Calibrations: program-level ============ -->
   <rect class="cont" x="20" y="1010" width="1480" height="230" rx="14"/>
@@ -286,7 +314,7 @@
   <rect class="box" x="1350" y="1132" width="112" height="36"/>
   <text class="st" x="1406" y="1155">Completed</text>
 
-  <text class="foot" x="40" y="1218">Undefined and Unapproved are unreachable: validationStatus is pinned to Defined, which is both the entry point and the floor.</text>
+  <text class="foot" x="40" y="1218">Undefined and Unapproved are unreachable: validationStatus is pinned to Defined, which is both the entry point and the floor. Warnings never occur, so neither is ForReview.</text>
 
   <!-- ============ Calibrations: per-observation ============ -->
   <rect class="cont" x="20" y="1265" width="1480" height="255" rx="14"/>
@@ -296,7 +324,7 @@
   <text class="grp" x="58" y="1332">Telluric</text>
 
   <rect class="box" x="90" y="1360" width="220" height="44"/>
-  <text class="st" x="200" y="1378">Defined / Ready</text>
+  <text class="st" x="200" y="1378">Defined / ForReview / Ready</text>
   <text class="sub" x="200" y="1394">inherited from science obs</text>
 
   <line class="black" x1="314" y1="1372" x2="516" y2="1372" marker-end="url(#ab-e)"/>
@@ -321,7 +349,7 @@
   <text class="grp" x="988" y="1332">DaytimePinhole</text>
 
   <rect class="locked" x="1010" y="1360" width="410" height="44"/>
-  <text class="si" x="1215" y="1378">Defined / Ready / Inactive</text>
+  <text class="si" x="1215" y="1378">Defined / ForReview / Ready / Inactive</text>
   <text class="sub" x="1215" y="1394">inherited — no transitions of its own</text>
   <text class="foot" x="1010" y="1450">allowedTransitions is always empty</text>
   <text class="foot" x="1010" y="1466">while state ≤ Ready.</text>
