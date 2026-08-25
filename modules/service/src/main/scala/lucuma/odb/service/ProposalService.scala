@@ -622,6 +622,18 @@ object ProposalService {
       def deferConstraints: F[Unit] =
         session.execute(sql"SET CONSTRAINTS ALL DEFERRED".command).void
 
+      // Replaces the AEON required-instrument set.  The table's insert trigger
+      // enforces the AEON/multi-facility and backing-observation invariants.
+      def setAeonRequiredInstruments(pid: Program.Id, instruments: List[Instrument]): F[Result[Unit]] =
+        val delete = session.execute(Statements.DeleteAeonRequiredInstruments)(pid).void
+        val insert = NonEmptyList.fromList(instruments.distinct).traverse_ { nel =>
+          session.prepareR(Statements.insertAeonRequiredInstruments(nel)).use(_.execute(pid, nel)).void
+        }
+        (delete *> insert).as(Result.unit).recover {
+          case SqlState.RaiseException(ex) =>
+            OdbError.InvalidArgument(ex.message.some).asFailure
+        }
+
       def createProposal(
         input: CreateProposalInput
       )(using Transaction[F], Services.PiAccess): F[Result[Program.Id]] = {
@@ -660,6 +672,13 @@ object ProposalService {
               partnerSplitsService.insertSplits(input.SET.partnerSplits, input.programId)
           )
 
+        val insertRequiredInstruments: ResultT[F, Unit] =
+          input.SET.gemini
+            .map(_.aeonRequiredInstruments)
+            .filter(_.nonEmpty)
+            .fold(ResultT.pure[F, Unit](())): instruments =>
+              ResultT(setAeonRequiredInstruments(input.programId, instruments))
+
         (for {
           c <- lookupCfpProperties
           _ <- checkCfpCompatibility(c)
@@ -668,6 +687,7 @@ object ProposalService {
           _ <- updateProgram(p, c)
           _ <- insert
           _ <- insertSplits
+          _ <- insertRequiredInstruments
         } yield input.programId).value
 
       }
@@ -727,6 +747,14 @@ object ProposalService {
               partnerSplitsService.updateSplits(splits.getOrElse(Map.empty), pid)
           ).sequence.void)
 
+        // Replace-the-whole-list semantics: absent leaves the set alone, null
+        // and empty both clear it.
+        def updateRequiredInstruments(pid: Program.Id, set: ProposalPropertiesInput.Edit): ResultT[F, Unit] =
+          set.gemini
+            .flatMap(_.aeonRequiredInstruments.foldPresent(identity))
+            .fold(ResultT.pure[F, Unit](())): instruments =>
+              ResultT(setAeonRequiredInstruments(pid, instruments.getOrElse(Nil)))
+
         // The time-request trigger fires immediately and rejects a proposal that has
         // both an exchange partner and partner splits, so an edit that swaps one for
         // the other has to give up what it holds before taking on the other.  Only
@@ -747,6 +775,7 @@ object ProposalService {
           set     = handleTypeChange(before)
           _      <- updateSplits(pid, set).whenA(splitsFirst(set))
           _      <- updateProposal(pid, set)
+          _      <- updateRequiredInstruments(pid, set)
           _      <- updateProgram(pid, before, after)
           _      <- updateSplits(pid, set).unlessA(splitsFirst(set))
         } yield pid).value
@@ -849,6 +878,19 @@ object ProposalService {
       sql"""
         DELETE FROM t_proposal WHERE c_program_id = $program_id
       """.command
+
+    val DeleteAeonRequiredInstruments: Command[Program.Id] =
+      sql"""
+        DELETE FROM t_proposal_aeon_required_instrument
+        WHERE c_program_id = $program_id
+      """.command
+
+    def insertAeonRequiredInstruments(instruments: NonEmptyList[Instrument]): Command[(Program.Id, instruments.type)] =
+      sql"""
+        INSERT INTO t_proposal_aeon_required_instrument (c_program_id, c_instrument)
+        VALUES ${(program_id *: instrument).values.list(instruments.size)}
+      """.command
+        .contramap { case (pid, is) => is.toList.map(i => (pid, i)) }
 
     // Removing a proposal reverts an exchange (keck/subaru) program back to a
     // plain Gemini science program.

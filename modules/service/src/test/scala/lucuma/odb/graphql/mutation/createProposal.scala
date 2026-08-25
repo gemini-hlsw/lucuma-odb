@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.GeminiCallForProposalsType
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.Program
@@ -46,7 +47,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   ... on Queue {
                     tooActivationCeiling
                     minPercentTime
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                     considerForBand3
@@ -65,7 +66,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "scienceSubtype": "QUEUE",
                   "tooActivationCeiling": "NONE",
                   "minPercentTime": 100,
-                  "aeonMultiFacility": false,
+                  "aeonMultiFacility": null,
                   "jwstSynergy": false,
                   "usLongTerm": false,
                   "considerForBand3": "UNSET"
@@ -458,7 +459,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   scienceSubtype
                   ... on Classical {
                     minPercentTime
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                   }
@@ -475,7 +476,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "gemini": {
                   "scienceSubtype": "CLASSICAL",
                   "minPercentTime": 100,
-                  "aeonMultiFacility": false,
+                  "aeonMultiFacility": null,
                   "jwstSynergy": false,
                   "usLongTerm": false
                 }
@@ -1518,7 +1519,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                     classical: {
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
-                      aeonMultiFacility: true
+                      aeonMultiFacility: {}
                       jwstSynergy: true
                       usLongTerm: true
                     }
@@ -1531,7 +1532,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 gemini {
                   ... on Classical {
                     minPercentTime
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                   }
@@ -1547,7 +1548,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "category": "SMALL_BODIES",
                 "gemini": {
                   "minPercentTime": 80,
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true,
                   "usLongTerm": true
                 }
@@ -1574,7 +1575,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                       minPercentTime: 80
                       minPercentTotalTime: 90
                       totalTime: { hours: 120.0 }
-                      aeonMultiFacility: true
+                      aeonMultiFacility: {}
                       jwstSynergy: true
                     }
                   }
@@ -1589,7 +1590,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                     minPercentTime
                     minPercentTotalTime
                     totalTime { hours }
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                   }
                 }
@@ -1607,7 +1608,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "minPercentTime": 80,
                   "minPercentTotalTime": 90,
                   "totalTime": { "hours": 120.000000 },
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true
                 }
               }
@@ -1632,7 +1633,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                       explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
-                      aeonMultiFacility: true
+                      aeonMultiFacility: {}
                       jwstSynergy: true
                       usLongTerm: true
                       considerForBand3: CONSIDER
@@ -1647,7 +1648,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   ... on Queue {
                     tooActivationCeiling
                     minPercentTime
-                    aeonMultiFacility
+                    aeonMultiFacility { requiredInstruments }
                     jwstSynergy
                     usLongTerm
                     considerForBand3
@@ -1665,7 +1666,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                 "gemini": {
                   "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
-                  "aeonMultiFacility": true,
+                  "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true,
                   "usLongTerm": true,
                   "considerForBand3": "CONSIDER"
@@ -2016,5 +2017,125 @@ class createProposal extends OdbSuite with DatabaseOperations {
       )
     }
   }
+
+  test("✓ queue proposal with required instruments"):
+    for
+      pid <- createProgramAs(pi, "AEON Queue Proposal")
+      tid <- createTargetAs(pi, pid)
+      _   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonMultiFacility: { requiredInstruments: [GMOS_NORTH] }
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini {
+                  ... on Queue {
+                    aeonMultiFacility { requiredInstruments }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "gemini": {
+                  "aeonMultiFacility": { "requiredInstruments": [ "GMOS_NORTH" ] }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
+
+  test("⨯ required instruments must be backed by an observation"):
+    for
+      pid <- createProgramAs(pi, "AEON Queue Proposal")
+      tid <- createTargetAs(pi, pid)
+      _   <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      aeonMultiFacility: { requiredInstruments: [GMOS_SOUTH] }
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal { category }
+            }
+          }
+        """,
+        expected =
+          List("Instrument GmosSouth cannot be marked required because no active observation in the program uses it.").asLeft
+      )
+    yield ()
+
+  // A non-multi-facility proposal simply has no `aeonMultiFacility` object, so a
+  // required-instrument list cannot accompany a false flag.
+  test("✓ queue proposal without the AEON object has no required instruments"):
+    for
+      pid <- createProgramAs(pi, "Non-AEON Queue Proposal")
+      _   <- expect(
+        user = pi,
+        query = s"""
+          mutation {
+            createProposal(
+              input: {
+                programId: "$pid"
+                SET: {
+                  gemini: {
+                    queue: {
+                      minPercentTime: 50
+                    }
+                  }
+                }
+              }
+            ) {
+              proposal {
+                gemini {
+                  ... on Queue {
+                    aeonMultiFacility { requiredInstruments }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createProposal": {
+              "proposal": {
+                "gemini": {
+                  "aeonMultiFacility": null
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    yield ()
 
 }

@@ -4939,6 +4939,21 @@ input ProperMotionInput {
 }
 
 """
+The AEON/Multi-facility aspects of a Gemini proposal.  Its presence is what
+marks the proposal as part of the program.
+"""
+type AeonMultiFacility {
+
+  """
+  The instruments whose requested Gemini time is required for this
+  multi-facility project to be feasible.  Instruments not listed are not
+  required, which is the default.
+  """
+  requiredInstruments: [Instrument!]!
+
+}
+
+"""
 Proposal properties that depend on the particular call for proposals associated
 with this proposal.
 """
@@ -5000,9 +5015,10 @@ type Classical implements GeminiProposalType {
   exchangePartner: ExchangePartner
 
   """
-  Whether this proposal is part of the AEON/Multi-facility program.
+  The AEON/Multi-facility aspects of this proposal.  Null unless the proposal
+  is part of the AEON/Multi-facility program.
   """
-  aeonMultiFacility: Boolean!
+  aeonMultiFacility: AeonMultiFacility
 
   """
   Whether this proposal has JWST synergy.
@@ -5201,9 +5217,10 @@ type LargeProgram implements GeminiProposalType {
   totalTime: TimeSpan!
 
   """
-  Whether this proposal is part of the AEON/Multi-facility program.
+  The AEON/Multi-facility aspects of this proposal.  Null unless the proposal
+  is part of the AEON/Multi-facility program.
   """
-  aeonMultiFacility: Boolean!
+  aeonMultiFacility: AeonMultiFacility
 
   """
   Whether this proposal has JWST synergy.
@@ -5280,9 +5297,10 @@ type Queue implements GeminiProposalType {
   considerForBand3: ConsiderForBand3!
 
   """
-  Whether this proposal is part of the AEON/Multi-facility program.
+  The AEON/Multi-facility aspects of this proposal.  Null unless the proposal
+  is part of the AEON/Multi-facility program.
   """
-  aeonMultiFacility: Boolean!
+  aeonMultiFacility: AeonMultiFacility
 
   """
   Whether this proposal has JWST synergy.
@@ -5334,6 +5352,22 @@ type SystemVerification implements GeminiProposalType {
   successful.
   """
   minPercentTime: IntPercent!
+}
+
+"""
+The AEON/Multi-facility aspects of a Gemini proposal.
+"""
+input AeonMultiFacilityInput {
+
+  """
+  The instruments whose requested Gemini time is required for the
+  multi-facility project to be feasible.  Each instrument must be in use by an
+  active observation in the program.  Setting it replaces the whole list; null
+  (or empty) clears it.  When editing, leave it out to keep the list as it
+  stands.
+  """
+  requiredInstruments: [Instrument!]
+
 }
 
 """
@@ -5417,9 +5451,12 @@ input ClassicalInput {
   exchangePartner: ExchangePartner
 
   """
-  Whether this proposal is part of the AEON/Multi-facility program.
+  The AEON/Multi-facility aspects of the proposal.  Supply the object to place
+  the proposal in the AEON/Multi-facility program, null to take it out (which
+  also clears the required instruments).  When editing, leave it out to keep
+  the proposal as it stands.
   """
-  aeonMultiFacility: Boolean
+  aeonMultiFacility: AeonMultiFacilityInput
 
   """
   Whether this proposal has JWST synergy.
@@ -5523,8 +5560,13 @@ input LargeProgramInput {
   """
   totalTime: TimeSpanInput
 
-  "Whether this proposal is part of the AEON/Multi-facility program."
-  aeonMultiFacility: Boolean
+  """
+  The AEON/Multi-facility aspects of the proposal.  Supply the object to place
+  the proposal in the AEON/Multi-facility program, null to take it out (which
+  also clears the required instruments).  When editing, leave it out to keep
+  the proposal as it stands.
+  """
+  aeonMultiFacility: AeonMultiFacilityInput
 
   "Whether this proposal has JWST synergy."
   jwstSynergy: Boolean
@@ -5609,8 +5651,13 @@ input QueueInput {
   """
   considerForBand3: ConsiderForBand3
 
-  "Whether this proposal is part of the AEON/Multi-facility program."
-  aeonMultiFacility: Boolean
+  """
+  The AEON/Multi-facility aspects of the proposal.  Supply the object to place
+  the proposal in the AEON/Multi-facility program, null to take it out (which
+  also clears the required instruments).  When editing, leave it out to keep
+  the proposal as it stands.
+  """
+  aeonMultiFacility: AeonMultiFacilityInput
 
   "Whether this proposal has JWST synergy."
   jwstSynergy: Boolean
