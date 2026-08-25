@@ -19,10 +19,11 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import org.http4s.Request
 import org.http4s.Response
 
-class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnvironmentSuite {
+class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnvironmentSuite with UpdateObservationsOps {
 
   val gaiaEmpty: Timestamp = Timestamp.FromString.getOption("3000-01-30T04:00:00Z").get
   val gaiaError: Timestamp = Timestamp.FromString.getOption("4000-12-30T20:00:00Z").get
@@ -408,6 +409,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         eph  = createNonsiderealEphemeris
         t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
         o   <- createGmosNorthMosObservationAs(pi, p, List(t))
+        _   <- setBestConditionsAs(pi, o)
         _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       } yield o
     setup.flatMap { oid =>
@@ -422,6 +424,7 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         t   <- createNonsiderealTargetWithUserSuppliedEphemerisAs(pi, p, eph, name = "Nonsidereal Target")
         o   <- createGmosSouthMosObservationAs(pi, p, List(t))
         _   <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _   <- setBestConditionsAs(pi, o)
       } yield o
     setup.flatMap { oid =>
       expect(pi, guideEnvironmentQuery(oid), expected = pwfs2MosResult)

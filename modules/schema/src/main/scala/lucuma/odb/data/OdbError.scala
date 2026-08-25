@@ -161,7 +161,7 @@ object OdbError:
       case InconsistentGroupError(_)          => "Group hierarchy is inconsistent, or a deleted group contains a non-deleted element."
       case ProgramResourceLimitExceeded(_)    => "The program has reached its maximum number of associated resources (observations, groups, targets, attachments, and program notes)."
       case InvalidConfiguration(_)            => "Observation configuration is incomplete."
-      case InvalidWorkflowTransition(a, b, _) => s"Workflow state cannot be chanegd from $a to $b."
+      case InvalidWorkflowTransition(a, b, _) => s"Workflow state cannot be changed from $a to $b."
       case RemoteServiceCallError(_)          => "Error attempting to call a remote service."
 
   private def data(e: OdbError): JsonObject =

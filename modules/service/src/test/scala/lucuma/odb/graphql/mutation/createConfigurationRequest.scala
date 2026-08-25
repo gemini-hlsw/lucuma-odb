@@ -74,9 +74,9 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                     "justification" : "Because I said so.",
                     "configuration" : {
                       "conditions" : {
-                        "imageQuality" : "POINT_ONE",
-                        "cloudExtinction" : "POINT_ONE",
-                        "skyBackground" : "DARKEST",
+                        "imageQuality" : "ONE_POINT_ZERO",
+                        "cloudExtinction" : "POINT_FIVE",
+                        "skyBackground" : "DARK",
                         "waterVapor" : "WET"
                       },
                       "target" : {
