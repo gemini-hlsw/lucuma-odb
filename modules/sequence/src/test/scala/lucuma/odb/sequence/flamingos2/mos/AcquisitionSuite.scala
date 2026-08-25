@@ -3,9 +3,7 @@
 
 package lucuma.odb.sequence.flamingos2.mos
 
-import cats.syntax.either.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Decker
@@ -31,13 +29,12 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
-import lucuma.itc.IntegrationTime
-import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.flamingos2.Static
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
+import lucuma.refined.*
 import munit.FunSuite
 
 import java.util.UUID
@@ -72,12 +69,18 @@ class AcquisitionSuite extends FunSuite:
       telluricType        = TelluricType.Hot
     )
 
-  private def config(explicitFilter: Option[Flamingos2Filter] = none): Config =
+  private def acqEtm(time: TimeSpan): ExposureTimeMode =
+    ExposureTimeMode.TimeAndCountMode(time, 1.refined, Wavelength.fromIntNanometers(2000).get)
+
+  private def config(
+    explicitFilter: Option[Flamingos2Filter] = none,
+    exposureTime:   TimeSpan                 = ExposureTime
+  ): Config =
     Config(
       Disperser,
       Filter,
       CustomMask,
-      AcquisitionConfig(common.exposureTimeMode, AcqFilter, explicitFilter),
+      AcquisitionConfig(acqEtm(exposureTime), AcqFilter, explicitFilter),
       common
     ).fold(m => fail(s"could not build the MOS config: $m"), identity)
 
@@ -89,12 +92,9 @@ class AcquisitionSuite extends FunSuite:
         next:   ProtoStep[Flamingos2DynamicConfig]
       ): StepEstimate = StepEstimate.Zero
 
-  private def generate(
-    cfg:  Config   = config(),
-    time: TimeSpan = ExposureTime
-  ): List[Atom[Flamingos2DynamicConfig]] =
+  private def generate(cfg: Config = config()): List[Atom[Flamingos2DynamicConfig]] =
     Acquisition
-      .instantiate(Oid, estimator, Static, Namespace, cfg, IntegrationTime(time, PosInt.unsafeFrom(1)).asRight)
+      .instantiate(Oid, estimator, Static, Namespace, cfg)
       .fold(e => fail(s"could not generate: $e"), _.generate.toList)
 
   private def qArcsec(s: Step[Flamingos2DynamicConfig]): Double =
@@ -123,7 +123,7 @@ class AcquisitionSuite extends FunSuite:
 
     assertEquals(steps.map(_.instrumentConfig.decker), List(Flamingos2Decker.Imaging, Flamingos2Decker.Imaging, Flamingos2Decker.MOS, Flamingos2Decker.MOS))
 
-  test("every step takes the ITC exposure, the acquisition filter and no disperser"):
+  test("every step takes the acquisition exposure, the acquisition filter and no disperser"):
     val steps = generate().head.steps.toList
 
     assertEquals(steps.map(_.instrumentConfig.exposure).toSet, Set(ExposureTime))
@@ -150,7 +150,7 @@ class AcquisitionSuite extends FunSuite:
       assertEquals(ss.map(_.breakpoint), List(Breakpoint.Enabled, Breakpoint.Disabled))
 
   test("a short exposure still takes both sky nods"):
-    val steps = generate(time = 1.secondTimeSpan).head.steps.toList
+    val steps = generate(config(exposureTime = 1.secondTimeSpan)).head.steps.toList
 
     assertEquals(steps.length, 4)
     assertEquals(steps.map(qArcsec), List(0.0, 10.0, 0.0, 10.0))
@@ -158,15 +158,22 @@ class AcquisitionSuite extends FunSuite:
   test("a zero exposure time is an error"):
     assert(
       Acquisition
-        .instantiate(Oid, estimator, Static, Namespace, config(), IntegrationTime(TimeSpan.Zero, PosInt.unsafeFrom(1)).asRight)
+        .instantiate(Oid, estimator, Static, Namespace, config(exposureTime = TimeSpan.Zero))
         .isLeft
     )
 
-  test("an ITC error is passed through"):
-    val err = OdbError.SequenceUnavailable(Oid, "boom".some)
-    assertEquals(
+  test("a signal-to-noise exposure time mode is an error"):
+    val cfg =
+      Config(
+        Disperser,
+        Filter,
+        CustomMask,
+        AcquisitionConfig(common.exposureTimeMode, AcqFilter, none),
+        common
+      ).fold(m => fail(s"could not build the MOS config: $m"), identity)
+
+    assert(
       Acquisition
-        .instantiate(Oid, estimator, Static, Namespace, config(), err.asLeft)
-        .leftMap(_ => "left"),
-      "left".asLeft
+        .instantiate(Oid, estimator, Static, Namespace, cfg)
+        .isLeft
     )

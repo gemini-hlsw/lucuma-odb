@@ -5,7 +5,6 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.option.*
 import io.circe.Json
 import io.circe.literal.*
@@ -21,7 +20,6 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.InstrumentMode
-import lucuma.odb.sequence.gnirs.AcquisitionClassificationSignalToNoise
 import lucuma.odb.sequence.gnirs.imaging.Acquisition.RepeatingAtomCount
 import lucuma.refined.*
 
@@ -30,17 +28,21 @@ import lucuma.refined.*
 // filter, exactly as for spectroscopy.
 class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
 
-  // The acquisition ITC keys on the (fixed) classification S/N and the filter:
-  //   - first-filter classification pass sizes the exposure and picks the type;
+  // The acquisition ITC keys on the filter alone, deliberately ignoring the requested
+  // signal-to-noise:
+  //   - the first-filter classification pass sizes the exposure and picks the type;
   //   - Very Bright additionally re-images the target through H2.
+  // Being S/N-independent means the second pass -- which runs at the *derived* S/N
+  // (Very Bright 30, Bright 20, Faint 10) -- returns the same per-filter exposure as the
+  // classification pass, so these tests stay focused on the type and filter selection.
+  // See executionAcqGnirsDerivedSignalToNoise for the derived S/N itself.
   // Different first filters drive different types across the tests:
   //   J  → 2s × 3 = 6s   → Bright
   //   K  → 30s × 1 = 30s → Faint
   //   Y  → 0.3s × 1      → Very Bright (with an H2 pass of 2s × 3)
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
-      case InstrumentMode.GnirsImaging(ExposureTimeMode.SignalToNoiseMode(sn, _), filter, _, _, _, _, _)
-          if sn === AcquisitionClassificationSignalToNoise =>
+      case InstrumentMode.GnirsImaging(ExposureTimeMode.SignalToNoiseMode(_, _), filter, _, _, _, _, _) =>
         filter match
           case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined).some
           case GnirsFilter.K      => IntegrationTime(30.secTimeSpan, 1.refined).some
@@ -259,7 +261,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
         """{
           explicitAcquisitionType: FAINT
           skyOffset: { p: { arcseconds: 0.0 }, q: { arcseconds: 10.0 } }
-          exposureTimeMode: {
+          explicitExposureTimeMode: {
             timeAndCount: { time: { seconds: 4.0 }, count: 1, at: { nanometers: 1250.0 } }
           }
           coadds: 5

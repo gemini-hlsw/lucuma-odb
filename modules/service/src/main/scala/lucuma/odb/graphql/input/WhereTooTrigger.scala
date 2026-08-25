@@ -7,6 +7,7 @@ import cats.syntax.all.*
 import grackle.Path
 import grackle.Predicate
 import grackle.Predicate.*
+import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
@@ -21,6 +22,7 @@ object WhereTooTrigger:
     val WhereObservationIdBinding  = WhereOrder.binding[Observation.Id](path / "observation" / "id", ObservationIdBinding)
     val WhereProgramIdBinding      = WhereOrder.binding[Program.Id](path / "programId", ProgramIdBinding)
     val WhereStatusBinding         = WhereOrder.binding[TooTriggerStatus](path / "status", enumeratedBinding[TooTriggerStatus])
+    val WhereActivationBinding     = WhereOrder.binding[TooActivation](path / "tooActivation", enumeratedBinding[TooActivation])
     val WhereRequestedAtBinding    = WhereOrder.binding[Timestamp](path / "requestedAt", TimestampBinding)
     val WhereRequestedByBinding    = WhereUser.binding(path / "requestedBy")
     val WhereUpdatedAtBinding      = WhereOrder.binding[Timestamp](path / "updatedAt", TimestampBinding)
@@ -36,12 +38,13 @@ object WhereTooTrigger:
         WhereObservationIdBinding.Option("observationId", rObs),
         WhereProgramIdBinding.Option("programId", rProgram),
         WhereStatusBinding.Option("status", rStatus),
+        WhereActivationBinding.Option("tooActivation", rActivation),
         WhereRequestedAtBinding.Option("requestedAt", rRequestedAt),
         WhereRequestedByBinding.Option("requestedBy", rRequestedBy),
         WhereUpdatedAtBinding.Option("updatedAt", rUpdatedAt)
       ) =>
-        (rAND, rOR, rNOT, rId, rObs, rProgram, rStatus, rRequestedAt, rRequestedBy, rUpdatedAt).parMapN:
-          (AND, OR, NOT, id, obs, program, status, requestedAt, requestedBy, updatedAt) =>
+        (rAND, rOR, rNOT, rId, rObs, rProgram, rStatus, rActivation, rRequestedAt, rRequestedBy, rUpdatedAt).parMapN:
+          (AND, OR, NOT, id, obs, program, status, activation, requestedAt, requestedBy, updatedAt) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -50,6 +53,7 @@ object WhereTooTrigger:
               obs,
               program,
               status,
+              activation,
               requestedAt,
               requestedBy,
               updatedAt

@@ -35,7 +35,7 @@ object GnirsSpectroscopyInput:
    * returned sorted by increasing wavelength, which is the order the sequence
    * executes them in.
    */
-  private def resolveWavelengths(
+  private[input] def resolveWavelengths(
     ws: List[GnirsCentralWavelengthConfigInput]
   ): Result[NonEmptyList[GnirsCentralWavelengthConfigInput]] =
     val duplicates = ws.groupBy(_.centralWavelength).filter(_._2.sizeIs > 1).keys.toList
@@ -58,8 +58,8 @@ object GnirsSpectroscopyInput:
   // On create, exactly one of slit / ifu is required and must carry its FPU. The nested
   // structure makes a slit-config-with-ifu-FPU (and vice versa) mismatch impossible.
   private def resolveCreate(
-    slit: Option[GnirsSlitInput.Value],
-    ifu:  Option[GnirsIfuInput.Value]
+    slit: Option[GnirsSpectroscopyLongSlitInput.Value],
+    ifu:  Option[GnirsSpectroscopyIfuInput.Value]
   ): Result[(GnirsFpu.Spectroscopy, Option[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfig]])] =
     (slit, ifu) match
       case (Some(s), None) =>
@@ -74,8 +74,8 @@ object GnirsSpectroscopyInput:
   // On edit, at most one of slit / ifu may be present. A missing telescopeConfigs (IFU) or
   // absent explicitTelescopeConfigs (slit) is left unedited.
   private def resolveEdit(
-    slit: Option[GnirsSlitInput.Value],
-    ifu:  Option[GnirsIfuInput.Value]
+    slit: Option[GnirsSpectroscopyLongSlitInput.Value],
+    ifu:  Option[GnirsSpectroscopyIfuInput.Value]
   ): Result[(Option[GnirsFpu.Spectroscopy], Nullable[SlitTelescopeConfigs], Option[NonEmptyList[TelescopeConfig]])] =
     (slit, ifu) match
       case (None, None)    => Result((None, Nullable.Absent, None))
@@ -83,8 +83,8 @@ object GnirsSpectroscopyInput:
       case (None, Some(i)) => Result((i.fpu.map(GnirsFpu.Spectroscopy.Ifu(_)), Nullable.Absent, i.telescopeConfigs))
       case _               => Matcher.validationFailure("Only one of 'slit' or 'ifu' may be provided.")
 
-  // GnirsSlitInput: fpu (required on create) + a clearable explicit telescope-config override.
-  object GnirsSlitInput:
+  // GnirsSpectroscopyLongSlitInput: fpu (required on create) + a clearable explicit telescope-config override.
+  object GnirsSpectroscopyLongSlitInput:
     case class Value(fpu: Option[GnirsFpuSlit], explicitTelescopeConfigs: Nullable[SlitTelescopeConfigs])
     val Binding: Matcher[Value] =
       ObjectFieldsBinding.rmap:
@@ -94,9 +94,9 @@ object GnirsSpectroscopyInput:
         ) =>
           (rFpu, rTc).parMapN(Value.apply)
 
-  // GnirsIfuInput: fpu (required on create) + telescope configs (missing = unedited; on
+  // GnirsSpectroscopyIfuInput: fpu (required on create) + telescope configs (missing = unedited; on
   // create a missing value is seeded from the FPU in the service).
-  object GnirsIfuInput:
+  object GnirsSpectroscopyIfuInput:
     case class Value(fpu: Option[GnirsFpuIfu], telescopeConfigs: Option[NonEmptyList[TelescopeConfig]])
     val Binding: Matcher[Value] =
       ObjectFieldsBinding.rmap:
@@ -144,8 +144,8 @@ object GnirsSpectroscopyInput:
         case List(
           GnirsCentralWavelengthConfigInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
           GnirsFilterBinding("filter", rFilter),
-          GnirsSlitInput.Binding.Option("slit", rSlit),
-          GnirsIfuInput.Binding.Option("ifu", rIfu),
+          GnirsSpectroscopyLongSlitInput.Binding.Option("slit", rSlit),
+          GnirsSpectroscopyIfuInput.Binding.Option("ifu", rIfu),
           GnirsCameraBinding("camera", rCamera),
           GnirsGratingBinding("grating", rGrating),
           GnirsPrismBinding("prism", rPrism),
@@ -224,8 +224,8 @@ object GnirsSpectroscopyInput:
         case List(
           GnirsCentralWavelengthConfigInput.Binding.List.Option("centralWavelengths", rCentralWavelengths),
           GnirsFilterBinding.Option("filter", rFilter),
-          GnirsSlitInput.Binding.Option("slit", rSlit),
-          GnirsIfuInput.Binding.Option("ifu", rIfu),
+          GnirsSpectroscopyLongSlitInput.Binding.Option("slit", rSlit),
+          GnirsSpectroscopyIfuInput.Binding.Option("ifu", rIfu),
           GnirsCameraBinding.Option("camera", rCamera),
           GnirsGratingBinding.Nullable("grating", rGrating),
           GnirsPrismBinding.Nullable("prism", rPrism),

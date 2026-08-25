@@ -10,7 +10,7 @@ ThisBuild / resolvers +=
 val awsJavaSdkVersion            = "1.12.797"
 val boopickleVersion             = "1.5.0"
 val bouncycastleVersion          = "1.85"
-val catsEffectVersion            = "3.7.0"
+val catsEffectVersion            = "3.7.1"
 val catsParseVersion             = "1.1.0"
 val catsScalacheckVersion        = "0.3.2"
 val catsTimeVersion              = "0.6.0"
@@ -18,7 +18,7 @@ val catsVersion                  = "2.13.0"
 val circeVersion                 = "0.14.16"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.0"
-val clueVersion                  = "0.57.0"
+val clueVersion                  = "0.58.0"
 val declineVersion               = "2.6.2"
 val flywayVersion                = "13.2.0"
 val fs2AwsVersion                = "6.2.0"
@@ -34,8 +34,8 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.3"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.235.1"
-val lucumaGraphQLRoutesVersion   = "0.13.11"
+val lucumaCoreVersion            = "0.236.1"
+val lucumaGraphQLRoutesVersion   = "0.14.1"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.5"
@@ -59,13 +59,13 @@ val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 
-ThisBuild / tlBaseVersion      := "0.93"
+ThisBuild / tlBaseVersion      := "0.94"
 ThisBuild / scalaVersion       := "3.8.4"
 ThisBuild / crossScalaVersions := Seq("3.8.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
 
 ThisBuild / Test / fork              := false
-ThisBuild / Test / parallelExecution := false
+ThisBuild / Test / parallelExecution := true
 
 ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=debug")
 
@@ -134,14 +134,17 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
   case step => step
 })
 
-// Swap the test-shard checkout for a shallow no-LFS variant
+// Swap the test-shard checkout for a shallow no-LFS variant, and drop the
+// plugin-injected githubWorkflowCheck step from the shards. The check costs a
+// separate sbt start per shard; the `checks` job runs it once instead.
 ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
       job
-        .withSteps(job.steps.map {
-          case s if s.name.contains("Checkout current branch") => CheckoutShallow
-          case s                                               => s
+        .withSteps(job.steps.flatMap {
+          case s if s.name.contains("Checkout current branch")            => List(CheckoutShallow)
+          case s if s.name.contains("Check that workflows are up to date") => Nil
+          case s                                                          => List(s)
         })
         .withMatrixFailFast(Some(false))
     else job
@@ -292,6 +295,7 @@ def allConds(conds: String*) = conds.mkString("(", " && ", ")")
 lazy val sbtStaticChecks =
   WorkflowStep.Sbt(
     List(
+      "githubWorkflowCheck",
       "headerCheckAll",
       "scalafmtCheckAll",
       "project /",
@@ -475,9 +479,7 @@ lazy val ssoBackendExample = project
 
 // START ITC
 
-lazy val itcCommonSettings = lucumaGlobalSettings ++ Seq(
-  Test / parallelExecution := false // tests run fine in parallel but output is nicer this way
-)
+lazy val itcCommonSettings = lucumaGlobalSettings
 
 // Basic ITC model classes
 lazy val itcModel = crossProject(JVMPlatform, JSPlatform)

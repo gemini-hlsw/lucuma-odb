@@ -1456,6 +1456,9 @@ trait DatabaseOperations { this: OdbSuite =>
             centralWavelength: { nanometers: 500 }
           }
         }"""
+      // GMOS IFU support will be implemented in a future PR.
+      case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu =>
+        throw new NotImplementedError("GMOS IFU observing mode")
       case ObservingModeType.GnirsImaging =>
         s"""{
           gnirsImaging: {

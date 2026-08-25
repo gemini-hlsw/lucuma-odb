@@ -93,6 +93,16 @@ abstract class OdbSuiteWithS3 extends OdbSuite {
         .assertEquals(expected)
     )
 
+  def assertS3Bytes(fileKey: FileKey, expected: Array[Byte]): IO[Unit] =
+    s3ClientOpsResource.use(s3Ops =>
+      val s3 = S3.create[IO](s3Ops)
+      s3.readFile(bucketName, fileKey)
+        .compile
+        .to(Array)
+        .map(_.toList)
+        .assertEquals(expected.toList)
+    )
+
   def assertS3NotThere(fileKey: FileKey): IO[Unit] =
     s3ClientOpsResource.use(s3Ops =>
       val s3 = S3.create[IO](s3Ops)

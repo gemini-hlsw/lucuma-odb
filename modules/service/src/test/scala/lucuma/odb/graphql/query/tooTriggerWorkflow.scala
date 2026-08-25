@@ -10,8 +10,15 @@ import cats.syntax.option.*
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.SchedulingMode
+import lucuma.core.enums.SequenceCommand
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.odb.data.TooTrigger
+import lucuma.odb.data.TooTriggerStatus
+import lucuma.odb.data.TooTriggerStatus.*
+import lucuma.odb.util.Codecs.observation_id
+import skunk.implicits.*
 
 /**
  * The Target-of-Opportunity trigger, derived from the observation's workflow
@@ -21,105 +28,71 @@ import lucuma.core.model.Program
  */
 class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetupOperations:
 
-  private def triggers(oid: Observation.Id): IO[List[(String, Option[String])]] =
-    query(
-      pi,
-      s"""
-        query {
-          tooTriggers(WHERE: { observationId: { EQ: ${oid.asJson} } }) {
-            matches { status resolutionReason }
-          }
-        }
-      """
-    ).map:
-      _.hcursor.downFields("tooTriggers", "matches").require[List[io.circe.Json]].map: j =>
-        (
-          j.hcursor.downField("status").require[String],
-          j.hcursor.downField("resolutionReason").require[Option[String]]
-        )
+  private def triggers(oid: Observation.Id): IO[List[(TooTriggerStatus, Option[String])]] =
+    getTooTriggersAs(pi, oid).map: ts =>
+      ts.map(t => (t.status, t.resolution))
 
-  private def triggerId(oid: Observation.Id): IO[String] =
-    query(
-      pi,
-      s"""
-        query {
-          tooTriggers(WHERE: { observationId: { EQ: ${oid.asJson} }, status: { EQ: REQUESTED } }) {
-            matches { id }
-          }
-        }
-      """
-    ).map(_.hcursor.downFields("tooTriggers", "matches").require[List[io.circe.Json]].head.hcursor.downField("id").require[String])
+  private def triggerId(oid: Observation.Id): IO[TooTrigger.Id] =
+    getRequestedTooTriggerAs(pi, oid).map(_._1)
 
-  private def declineQuery(rid: String, reason: Option[String] = None): String =
-    s"""
-      mutation {
-        declineTooTrigger(input: {
-          tooTriggerId: "$rid"
-          ${reason.fold("")(r => s"""reason: "$r"""")}
-        }) {
-          tooTrigger { status resolutionReason }
-        }
-      }
-    """
-
-  private def state(pid: Program.Id, oid: Observation.Id): IO[String] =
+  private def getWorkflowState(pid: Program.Id, oid: Observation.Id): IO[ObservationWorkflowState] =
     tooWorkflowState(pid, oid, pi)
 
-  private def setState(oid: Observation.Id, s: ObservationWorkflowState): IO[Unit] =
+  private def setWorkflowState(oid: Observation.Id, s: ObservationWorkflowState): IO[Unit] =
     setTooWorkflowState(pi, oid, s)
 
   test("setting a ToO observation Ready requests a trigger"):
     for
       (pid, oid, _) <- createTooObservationAs(pi, staff)
       before     <- triggers(oid)
-      _          <- setState(oid, ObservationWorkflowState.Ready)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       after      <- triggers(oid)
-      s          <- state(pid, oid)
+      s          <- getWorkflowState(pid, oid)
     yield
       assertEquals(before, Nil)
-      assertEquals(after, List(("REQUESTED", None)))
-      assertEquals(s, "READY")
+      assertEquals(after, List((Requested, None)))
+      assertEquals(s, ObservationWorkflowState.Ready)
 
   test("clearing Ready withdraws the trigger"):
     for
       (pid, oid, _) <- createTooObservationAs(pi, staff)
-      _          <- setState(oid, ObservationWorkflowState.Ready)
-      _          <- setState(oid, ObservationWorkflowState.Defined)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Defined)
       ts         <- triggers(oid)
-      s          <- state(pid, oid)
+      s          <- getWorkflowState(pid, oid)
     yield
-      assertEquals(ts, List(("WITHDRAWN", None)))
-      assertEquals(s, "DEFINED")
+      assertEquals(ts, List((Withdrawn, None)))
+      assertEquals(s, ObservationWorkflowState.Defined)
 
   test("marking a triggered observation Inactive withdraws the trigger"):
     for
       (pid, oid, _) <- createTooObservationAs(pi, staff)
-      _          <- setState(oid, ObservationWorkflowState.Ready)
-      _          <- setState(oid, ObservationWorkflowState.Inactive)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Inactive)
       ts         <- triggers(oid)
-      s          <- state(pid, oid)
+      s          <- getWorkflowState(pid, oid)
     yield
-      assertEquals(ts, List(("WITHDRAWN", None)))
-      assertEquals(s, "INACTIVE")
+      assertEquals(ts, List((Withdrawn, None)))
+      assertEquals(s, ObservationWorkflowState.Inactive)
 
   test("re-triggering after a withdrawal creates a second trigger, keeping the first as history"):
     for
       (_, oid, _) <- createTooObservationAs(pi, staff)
-      _        <- setState(oid, ObservationWorkflowState.Ready)
-      _        <- setState(oid, ObservationWorkflowState.Defined)
-      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _        <- setWorkflowState(oid, ObservationWorkflowState.Defined)
+      _        <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       ts       <- triggers(oid)
-    yield assertEquals(ts.map(_._1).sorted, List("REQUESTED", "WITHDRAWN"))
+    yield assertEquals(ts.map(_._1), List(Withdrawn, Requested))
 
   test("a non-ToO observation set Ready records no trigger"):
     for
       (pid, oid) <- createTriggerableObservationAs(pi, staff)
-      _          <- setState(oid, ObservationWorkflowState.Ready)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       ts         <- triggers(oid)
-      s          <- state(pid, oid)
+      s          <- getWorkflowState(pid, oid)
     yield
       assertEquals(ts, Nil)
-      assertEquals(s, "READY")
+      assertEquals(s, ObservationWorkflowState.Ready)
 
   // The activation is derived from the asterism now, so what used to be
   // "lower the activation" is "remove the opportunity target" -- the
@@ -127,25 +100,25 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
   test("removing the opportunity target while Ready withdraws the trigger"):
     for
       (_, oid, tid) <- createTooObservationAs(pi, staff)
-      _             <- setState(oid, ObservationWorkflowState.Ready)
+      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       _             <- editAsterismAs(pi, oid, add = Nil, del = List(tid))
       ts            <- triggers(oid)
-    yield assertEquals(ts, List(("WITHDRAWN", None)))
+    yield assertEquals(ts, List((Withdrawn, None)))
 
   test("adding a resolved opportunity target while Ready requests a trigger"):
     for
       (pid, oid) <- createTriggerableObservationAs(pi, staff)
       tid        <- createOpportunityTargetAs(pi, pid)
       _          <- resolveOpportunityTargetAs(pi, tid)
-      _          <- setState(oid, ObservationWorkflowState.Ready)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       _          <- editAsterismAs(pi, oid, add = List(tid), del = Nil)
       ts         <- triggers(oid)
-    yield assertEquals(ts, List(("REQUESTED", None)))
+    yield assertEquals(ts, List((Requested, None)))
 
   test("declining records the reason and returns the observation to Defined"):
     for
       (pid, oid, _) <- createTooObservationAs(pi, staff)
-      _          <- setState(oid, ObservationWorkflowState.Ready)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       rid        <- triggerId(oid)
       _          <- expect(
                       staff,
@@ -162,26 +135,26 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
                       """.asRight
                     )
       ts         <- triggers(oid)
-      s          <- state(pid, oid)
+      s          <- getWorkflowState(pid, oid)
     yield
       // Declined, not withdrawn: the reason survives the user-state clear.
-      assertEquals(ts, List(("DECLINED", Some("weathered out"))))
-      assertEquals(s, "DEFINED")
+      assertEquals(ts, List((Declined, Some("weathered out"))))
+      assertEquals(s, ObservationWorkflowState.Defined)
 
   test("a declined trigger does not block a fresh request"):
     for
       (_, oid, _) <- createTooObservationAs(pi, staff)
-      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       rid      <- triggerId(oid)
       _        <- query(staff, declineQuery(rid))
-      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       ts       <- triggers(oid)
-    yield assertEquals(ts.map(_._1).sorted, List("DECLINED", "REQUESTED"))
+    yield assertEquals(ts.map(_._1), List(Declined, Requested))
 
   test("a PI cannot decline"):
     for
       (_, oid, _) <- createTooObservationAs(pi, staff)
-      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       rid      <- triggerId(oid)
       _        <- expect(
                     pi,
@@ -193,7 +166,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
   test("an already-declined trigger cannot be declined again"):
     for
       (_, oid, _) <- createTooObservationAs(pi, staff)
-      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       rid      <- triggerId(oid)
       _        <- query(staff, declineQuery(rid))
       _        <- expect(
@@ -214,8 +187,8 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       _   <- addProposal(pi, pid, cfp.some, None)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- setSchedulingModeAs(pi, oid, "INTERRUPTING")
-      s   <- state(pid, oid)
+      _   <- setSchedulingModeAs(pi, oid, SchedulingMode.Interrupting)
+      s   <- getWorkflowState(pid, oid)
       ms  <- query(
                pi,
                s"""
@@ -229,7 +202,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
                      .require[List[io.circe.Json]]
                      .flatMap(_.hcursor.downField("messages").require[List[String]]))
     yield
-      assertEquals(s, "UNDEFINED")
+      assertEquals(s, ObservationWorkflowState.Undefined)
       assert(ms.exists(_.contains("may only interrupt executing science")), s"expected the interrupting message, got $ms")
 
   test("an observation still holding an unresolved opportunity target cannot be triggered"):
@@ -239,7 +212,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       _   <- addProposal(pi, pid, cfp.some, None)
       tid <- createOpportunityTargetAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- state(pid, oid)
+      _   <- getWorkflowState(pid, oid)
       // Defined -> Ready excludes an unresolved opportunity target, so there is
       // no way to request a trigger while it is still waiting on the alert.
       r   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Ready).attempt
@@ -259,24 +232,24 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       (pid, oid, _) <- createTooObservationAs(pi, staff, resolved = true)
       (s, ts)       <- tooWorkflowStateAndTransitions(pid, oid, pi)
     yield
-      assertEquals(s, "DEFINED")
-      assert(ts.contains("READY"), s"expected READY among the transitions, got $ts")
+      assertEquals(s, ObservationWorkflowState.Defined)
+      assert(ts.contains(ObservationWorkflowState.Ready), s"expected READY among the transitions, got $ts")
 
   test("an unresolved opportunity target is not offered Ready"):
     for
       (pid, oid, _) <- createTooObservationAs(pi, staff, resolved = false)
       (_, ts)       <- tooWorkflowStateAndTransitions(pid, oid, pi)
-    yield assert(!ts.contains("READY"), s"expected READY to be withheld, got $ts")
+    yield assert(!ts.contains(ObservationWorkflowState.Ready), s"expected READY to be withheld, got $ts")
 
   test("setting a resolved opportunity ToO Ready requests a trigger"):
     for
       (_, oid, _) <- createTooObservationAs(pi, staff, resolved = true)
       before      <- triggers(oid)
-      _           <- setState(oid, ObservationWorkflowState.Ready)
+      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       after       <- triggers(oid)
     yield
       assertEquals(before, Nil)
-      assertEquals(after, List(("REQUESTED", None)))
+      assertEquals(after, List((Requested, None)))
 
   test("resolving an opportunity target unblocks triggering"):
     for
@@ -286,12 +259,12 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       // resolving inside that region leaves the approval covering it.
       _               <- resolveOpportunityTargetAs(pi, tid)
       (_, after)      <- tooWorkflowStateAndTransitions(pid, oid, pi)
-      _               <- setState(oid, ObservationWorkflowState.Ready)
+      _               <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       ts              <- triggers(oid)
     yield
-      assert(!before.contains("READY"), s"expected READY to be withheld, got $before")
-      assert(after.contains("READY"), s"expected READY once resolved, got $after")
-      assertEquals(ts, List(("REQUESTED", None)))
+      assert(!before.contains(ObservationWorkflowState.Ready), s"expected READY to be withheld, got $before")
+      assert(after.contains(ObservationWorkflowState.Ready), s"expected READY once resolved, got $after")
+      assertEquals(ts, List((Requested, None)))
 
   // The approval is against the region, so the resolution has to land inside it.  This is the
   // one place a ToO's region is enforced today, and it enforces it through the approval rather
@@ -301,7 +274,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       (pid, oid, tid) <- createTooObservationAs(pi, staff, resolved = false)
       _               <- resolveOpportunityTargetAs(pi, tid, "30:00:00.00")
       state           <- tooWorkflowState(pid, oid, pi)
-    yield assertEquals(state, "DEFINED")
+    yield assertEquals(state, ObservationWorkflowState.Defined)
 
   test("resolving outside the approved region unapproves the observation"):
     for
@@ -310,8 +283,8 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       _               <- resolveOpportunityTargetAs(pi, tid, "-00:06:04.89")
       (state, trans)  <- tooWorkflowStateAndTransitions(pid, oid, pi)
     yield
-      assertEquals(state, "UNAPPROVED")
-      assert(!trans.contains("READY"), s"expected READY to be withheld, got $trans")
+      assertEquals(state, ObservationWorkflowState.Unapproved)
+      assert(!trans.contains(ObservationWorkflowState.Ready), s"expected READY to be withheld, got $trans")
 
   // The region outlives resolution, so the approval keeps being checked against it: moving a
   // resolved target out of its region later is caught exactly as resolving outside it would be.
@@ -325,9 +298,9 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       _               <- resolveOpportunityTargetAs(pi, tid, "45:00:00.00")
       back            <- tooWorkflowState(pid, oid, pi)
     yield
-      assertEquals(inside,  "DEFINED")
-      assertEquals(outside, "UNAPPROVED")
-      assertEquals(back,    "DEFINED")
+      assertEquals(inside,  ObservationWorkflowState.Defined)
+      assertEquals(outside, ObservationWorkflowState.Unapproved)
+      assertEquals(back,    ObservationWorkflowState.Defined)
 
   private def unresolveTargetAs(tid: lucuma.core.model.Target.Id): IO[Unit] =
     query(pi,
@@ -349,7 +322,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
     for
       (pid, oid) <- createTriggerableObservationAs(pi, staff)
       tid        <- createOpportunityTargetAs(pi, pid)
-      _          <- setState(oid, ObservationWorkflowState.Ready)
+      _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       _          <- editAsterismAs(pi, oid, add = List(tid), del = Nil)
       ts         <- triggers(oid)
     yield assertEquals(ts, Nil)
@@ -357,20 +330,101 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
   test("clearing the resolution of a triggered ToO withdraws the trigger"):
     for
       (_, oid, tid) <- createTooObservationAs(pi, staff, resolved = true)
-      _             <- setState(oid, ObservationWorkflowState.Ready)
+      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       before        <- triggers(oid)
       _             <- unresolveTargetAs(tid)
       after         <- triggers(oid)
     yield
-      assertEquals(before, List(("REQUESTED", None)))
-      assertEquals(after,  List(("WITHDRAWN", None)))
+      assertEquals(before, List((Requested, None)))
+      assertEquals(after,  List((Withdrawn, None)))
 
   // ... and resolving it again asks afresh, so the round trip is not one-way.
   test("re-resolving a withdrawn trigger requests it again"):
     for
       (_, oid, tid) <- createTooObservationAs(pi, staff, resolved = true)
-      _             <- setState(oid, ObservationWorkflowState.Ready)
+      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       _             <- unresolveTargetAs(tid)
       _             <- resolveOpportunityTargetAs(pi, tid)
       ts            <- triggers(oid)
-    yield assertEquals(ts.map(_._1).sorted, List("REQUESTED", "WITHDRAWN"))
+    yield assertEquals(ts.map(_._1), List(Withdrawn, Requested))
+
+  // ACCEPTANCE (V1274/V1275).  A request ends in a "yes" when the observatory acts
+  // on it, which the database records at the first non-slew execution event -- the
+  // same boundary v_generator_params uses for not_started -> ongoing, so ACCEPTED
+  // and ONGOING land together.  Nobody sets it; there is no mutation.
+  /** The stored user state, which no query exposes. */
+  private def readyState(oid: Observation.Id): IO[Option[String]] =
+    withSession: session =>
+      session.unique(
+        sql"SELECT c_workflow_user_state::text FROM t_observation WHERE c_observation_id = $observation_id"
+          .query(skunk.codec.text.text.opt)
+      )(oid)
+
+  private def beginExecution(oid: Observation.Id): IO[Unit] =
+    for
+      vid <- recordVisitAs(serviceUser, oid)
+      _   <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+    yield ()
+
+  test("beginning execution accepts the trigger"):
+    for
+      (_, oid, _) <- createTooObservationAs(pi, staff)
+      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      before      <- triggers(oid)
+      _           <- beginExecution(oid)
+      after       <- triggers(oid)
+    yield
+      assertEquals(before, List((Requested, None)))
+      assertEquals(after,  List((Accepted, None)))
+
+  test("an accepted observation is Ongoing"):
+    for
+      (pid, oid, _) <- createTooObservationAs(pi, staff)
+      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _             <- beginExecution(oid)
+      s             <- getWorkflowState(pid, oid)
+    yield assertEquals(s, ObservationWorkflowState.Ongoing)
+
+  // A visit is not execution.  Recording one and going no further leaves the
+  // request live and the observation still asking, so a visit that is abandoned
+  // before any step costs the PI nothing.
+  test("a visit alone does not accept the trigger"):
+    for
+      (pid, oid, _) <- createTooObservationAs(pi, staff)
+      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _             <- recordVisitAs(serviceUser, oid)
+      ts            <- triggers(oid)
+      s             <- getWorkflowState(pid, oid)
+    yield
+      assertEquals(ts, List((Requested, None)))
+      assertEquals(s,  ObservationWorkflowState.Ready)
+
+  // Acceptance deliberately leaves the observation's ready state alone: the state
+  // means the PI asked, and that stays true once the ask has been answered.  What
+  // keeps a spent request from being replaced is the guard in V1277 -- supersession
+  // only replaces a request that actually existed -- rather than the state going
+  // away.  Asserted over a session because no query exposes the stored value, and
+  // the guard itself is unreachable from here: the mutations that would provoke it
+  // are refused once the observation is Ongoing.
+  test("acceptance leaves the observation's ready state alone"):
+    for
+      (_, oid, _) <- createTooObservationAs(pi, staff)
+      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      _           <- beginExecution(oid)
+      state       <- readyState(oid)
+      ts          <- triggers(oid)
+    yield
+      assertEquals(state, Some("ready"))
+      assertEquals(ts, List((Accepted, None)))
+
+  // Every later event finds nothing left in 'requested', so acceptance is
+  // idempotent and does not mint a second terminal row.
+  test("later execution events change nothing"):
+    for
+      (_, oid, _) <- createTooObservationAs(pi, staff)
+      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      vid         <- recordVisitAs(serviceUser, oid)
+      _           <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      _           <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Continue)
+      ts          <- triggers(oid)
+    yield assertEquals(ts, List((Accepted, None)))

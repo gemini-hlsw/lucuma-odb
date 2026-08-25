@@ -45,6 +45,36 @@ import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import java.nio.file.Paths
 import scala.jdk.CollectionConverters.MapHasAsJava
 
+object SsoTestDb:
+  val dbImageEnv: Map[String, String] = Map(
+    "POSTGRES_USER"     -> PostgreSQLContainer.defaultUsername,
+    "POSTGRES_PASSWORD" -> PostgreSQLContainer.defaultPassword,
+    "POSTGRES_DB"       -> PostgreSQLContainer.defaultDatabaseName
+  )
+
+  /**
+   * A single image instance shared by all suites in the JVM. Concurrent suites would otherwise
+   * each run `docker build` against the same `lucuma-sso-test-db` tag and race on tagging it.
+   * `ImageFromDockerfile` memoizes its build result (double-checked in `LazyFuture`), so with a
+   * shared instance the first suite builds and the rest block on the same build.
+   */
+  val dbImage: ImageFromDockerfile =
+    // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
+    // start in the root directory of the project. In that case, the dockerfile is in the
+    // modules/sso-service/src directory.
+    // However, using vscode test explorer with sbt, the tests start in 'modules/sso-service'.
+    // We'll handle both cases here.
+    val dockerPrefix = Paths.get("modules", "sso-service")
+    val dockerSuffix = Paths.get("src", "Dockerfile")
+    val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
+      dockerSuffix
+    else
+      dockerPrefix.resolve(dockerSuffix)
+
+    new ImageFromDockerfile("lucuma-sso-test-db")
+      .withDockerfile(dockerPath)
+      .withBuildArgs(dbImageEnv.asJava)
+
 trait SsoSimulator extends TestContainerForAll { self: Suite =>
 
   val debug = true
@@ -55,33 +85,11 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
   var container: Containers = null
   override def afterContainersStart(c: GenericContainer): Unit =
     container = c
-    
+
   override val containerDef: GenericContainer.Def[GenericContainer] =
-    val env = Map(
-      "POSTGRES_USER"     -> PostgreSQLContainer.defaultUsername,
-      "POSTGRES_PASSWORD" -> PostgreSQLContainer.defaultPassword,
-      "POSTGRES_DB"       -> PostgreSQLContainer.defaultDatabaseName
-    )
-
-    // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
-    // start in the root directory of the project. In that case, the dockerfile is in the
-    // modules/service/src directory.
-    // However, using vscode test explorer with sbt, the tests start in 'modulues/service'.
-    // We'll handle both cases here.
-    val dockerPrefix = Paths.get("modules", "sso-service")
-    val dockerSuffix = Paths.get("src", "Dockerfile")
-    val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
-      dockerSuffix
-    else
-      dockerPrefix.resolve(dockerSuffix)
-
-    val image = new ImageFromDockerfile("lucuma-sso-test-db")
-      .withDockerfile(dockerPath)
-      .withBuildArgs(env.asJava)
-
     val dbContainer = GenericContainer(
-      image,
-      env = env,
+      SsoTestDb.dbImage,
+      env = SsoTestDb.dbImageEnv,
       exposedPorts = Seq(POSTGRESQL_PORT),
       waitStrategy = Wait
         .forLogMessage(".*database system is ready to accept connections.*", 1)

@@ -13,6 +13,403 @@ import lucuma.core.util.Enumerated
 
 class spectroscopySignalToNoiseSuite extends GraphQLSuite:
 
+  test("gmos ifu accepts an explicit summation radius") {
+    query(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
+                centralWavelength: {
+                  nanometers: 60
+                },
+                fpu: {
+                  builtin: IFU2_SLITS
+                },
+                grating: B1200_G5301,
+                ifuAnalysis: { sumRadius: { arcseconds: 0.5 } }
+              }
+            }
+          }) {
+            brightest {
+              selected {
+                exposureCount
+              }
+              band
+            }
+          }
+        }
+        """,
+      json"""
+        {
+          "data": {
+            "spectroscopy" : {
+              "brightest": {
+                "selected" : {
+                  "exposureCount" : 10
+                },
+                "band": "R"
+              }
+            }
+          }
+        }
+        """
+    )
+  }
+
+  test("gmos ifu accepts a single element offset") {
+    query(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
+                centralWavelength: {
+                  nanometers: 60
+                },
+                fpu: {
+                  builtin: IFU_BLUE
+                },
+                grating: B1200_G5301,
+                ifuAnalysis: { singleOffset: { arcseconds: -0.4 } }
+              }
+            }
+          }) {
+            brightest {
+              selected {
+                exposureCount
+              }
+              band
+            }
+          }
+        }
+        """,
+      json"""
+        {
+          "data": {
+            "spectroscopy" : {
+              "brightest": {
+                "selected" : {
+                  "exposureCount" : 10
+                },
+                "band": "R"
+              }
+            }
+          }
+        }
+        """
+    )
+  }
+
+  // Zero or negative builds no apertures at all upstream, which surfaces as a bare
+  // IndexOutOfBounds rather than anything a caller could act on.
+  test("gmos ifu rejects a non-positive summation radius") {
+    queryErrors(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
+                centralWavelength: {
+                  nanometers: 60
+                },
+                fpu: {
+                  builtin: IFU2_SLITS
+                },
+                grating: B1200_G5301,
+                ifuAnalysis: { sumRadius: { arcseconds: 0 } }
+              }
+            }
+          }) {
+            brightest {
+              selected {
+                exposureCount
+              }
+              band
+            }
+          }
+        }
+        """,
+      List(
+        "Argument 'input.mode.gmosNSpectroscopy.ifuAnalysis' is invalid: IFU summation radius must be greater than zero, got 0.000000 arcsec."
+      )
+    )
+  }
+
+  test("gmos ifu rejects an analysis on a non-IFU focal plane unit") {
+    queryErrors(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
+                centralWavelength: {
+                  nanometers: 60
+                },
+                fpu: {
+                  builtin: LONG_SLIT_0_25
+                },
+                grating: B1200_G5301,
+                ifuAnalysis: { sumRadius: { arcseconds: 0.5 } }
+              }
+            }
+          }) {
+            brightest {
+              selected {
+                exposureCount
+              }
+              band
+            }
+          }
+        }
+        """,
+      // Unwrapped, unlike the radius check above: this one is raised in the request layer rather
+      // than in the argument binding, so grackle does not prefix it with the argument path.
+      List("'ifuAnalysis' applies only to an IFU focal plane unit; remove it or select an IFU.")
+    )
+  }
+
+  // GMOS IFU focal plane units must be accepted alongside longslit and custom masks; the
+  // analysis method they select is covered by GmosIfuAnalysisMethodSuite.
+  test("gmos north ifu case") {
+    query(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      }
+                      brightnesses: [ {
+                        band: R
+                        value: 3
+                        units: ERG_PER_S_PER_CM_SQUARED_PER_A
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 1000
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: POINT_THREE
+              },
+              cloudExtinction: {
+                preset: POINT_FIVE
+              },
+              skyBackground: DARK,
+              waterVapor: DRY,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 2, at: { nanometers: 60 } } },
+                centralWavelength: {
+                  nanometers: 60
+                },
+                fpu: {
+                  builtin: IFU2_SLITS
+                },
+                grating: B1200_G5301
+              }
+            }
+          }) {
+            brightest {
+              selected {
+                exposureCount
+                exposureTime {
+                  seconds
+                }
+              }
+              band
+            }
+          }
+        }
+        """,
+      json"""
+        {
+          "data": {
+            "spectroscopy" : {
+              "brightest": {
+                "selected" : {
+                  "exposureCount" : 10,
+                  "exposureTime" : {
+                    "seconds" : 1.000000
+                  }
+                },
+                "band": "R"
+              }
+            }
+          }
+        }
+        """
+    )
+  }
+
   test("gmos north case") {
     query(
       """

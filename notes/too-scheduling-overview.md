@@ -166,8 +166,19 @@ without filling in a second form.
 
 At **acceptance the ceiling is frozen**. From that point it is an authorization rather
 than a description — the TAC saying in advance how much disruption this program may
-cause. An observation that exceeds it is flagged as *unapproved* and cannot reach
-`Ready` until either the mode comes down or the ceiling goes up.
+cause.
+
+Once frozen, it is enforced in two places. **A scheduling mode that would take an
+observation over the ceiling is refused outright**, so a PI cannot deliberately step over
+the line and discover the problem later. And **if the ceiling is lowered beneath an
+observation that already has an outstanding trigger, that request is withdrawn** — the
+observatory should not be looking at a live request for a disruption the program is no
+longer permitted to cause.
+
+An observation can still end up over the ceiling by a less direct route — gaining a Target
+of Opportunity target while its mode is already high, for instance. Those are flagged as
+*unapproved* and cannot reach `Ready` until either the mode comes down or the ceiling goes
+up.
 
 This is the only approval step. There is no second, per-trigger sign-off: requiring one
 would add latency to exactly the observations where latency is the whole point.
@@ -198,12 +209,26 @@ came with its own timing windows keeps them.
 ```mermaid
 stateDiagram-v2
     [*] --> Requested: observation is Ready with a resolved target
-    Requested --> Withdrawn: PI clears Ready, clears the resolution,<br/>or lowers the mode
+    Requested --> Withdrawn: PI clears Ready, clears the resolution,<br/>or stops it being a ToO
     Requested --> Declined: observer says no, with a reason
+    Requested --> Superseded: activation changes, replaced by a new request
     Requested --> [*]: observation executes
     Withdrawn --> [*]
     Declined --> [*]
+    Superseded --> [*]
 ```
+
+**A trigger is a prompt, not a promise that the observation can run right now.** If the
+observation is later edited into a state where it cannot be executed — a configuration
+falls out of approval, something required goes missing — the request stays outstanding.
+Nothing bad follows from that: the scheduler weighs the observation when it picks one up,
+and an observation that cannot execute does not execute. Clients that care can read the
+observation's workflow state alongside the trigger.
+
+The reasoning is that a request stops being a request when the PI takes it back, or when
+the observatory revokes what it granted — not when the observation is temporarily broken.
+A broken observation still has a PI waiting on it, and the request records when *they*
+asked, which is the number that matters when the point is promptness.
 
 `Requested` is the only non-terminal state, and a requested trigger simply stays
 requested while the observation executes. Nothing here records "execution has begun" —
@@ -214,18 +239,38 @@ Every attempt is its own record, so the full history accumulates: a PI who sets 
 again after a decline gets a fresh trigger, and the earlier one remains as a record of
 what happened. Every transition is attributed and timestamped.
 
+**A trigger records the activation it was requested at, and that never changes.**
+Triggering a standard ToO, a rapid one and an interrupting one are effectively different
+requests — who is told, how fast, and what they are expected to drop all differ. So if
+the observation's activation moves while a request is outstanding, the request is
+**superseded**: it closes out, and a successor takes its place carrying the new
+activation. The successor's `supersedes` points back at what it replaced, so the chain is
+walkable and the root of it answers "when did this observation first go live at any
+activation" — which the successor's own `requestedAt` deliberately does not, being the
+age of *this* request at *this* activation.
+
 ---
 
 ## 6. What clients can do
 
 **Watch for triggers as they happen.** The `tooTriggerEdit` subscription delivers every
-creation and lifecycle transition, filterable by program, observation, or a single
-trigger. This is what an observer's dashboard would sit on — a ToO appearing mid-night
-shows up without polling.
+creation and lifecycle transition, filterable by program, observation, a single trigger,
+or the activation the request was made at. The activation filter is ordered, so a
+dashboard that only cares about the ones that cannot wait can subscribe with
+`tooActivation: { GTE: RAPID }` and be told about nothing else. This is what an observer's
+dashboard would sit on — a ToO appearing mid-night shows up without polling.
+
+A supersession arrives as two ordinary events: the predecessor closing out, then the
+successor appearing. The closing event reports the predecessor's *own* activation rather
+than the new one, since that is what the record says — so a client filtered to one
+activation sees a request leave its view and, if it moved into scope, arrive again under
+its new identity.
 
 **Query them.** `tooTrigger(tooTriggerId:)` for one, `tooTriggers(WHERE:)` for many,
-filtered by status among other things. Each carries its observation, status, the time
-and user of the request, and the reason accompanying any terminal transition.
+filtered by status and by activation among other things — the activation filter is
+ordered, so "at least rapid" is expressible. Each carries its observation, status,
+activation, the request it superseded if any, the time and user of the request, and the
+reason accompanying any terminal transition.
 
 **Decline one.** `declineTooTrigger(tooTriggerId:, reason:)` records that an observer
 saw a trigger and chose not to act on it, with a reason, and returns the observation to
@@ -283,6 +328,9 @@ That earlier design was dropped rather than extended.
 | Opportunity target survives resolution, resolvable to sidereal or nonsidereal | built |
 | `SchedulingMode` replacing the two earlier observation-level fields | built |
 | Derived ToO activation | built |
+| Trigger records its activation; a change supersedes it | built |
+| Ceiling enforced on mode edits; lowering it withdraws over-ceiling triggers | built |
+| Trigger withdrawn when an observation becomes invalid for any other reason | **not done** — deliberately; see [§5](#5-triggering) |
 | Region enforced at the resolved position, via configuration approval | built |
 | Default scheduling window applied at trigger time | designed, not yet built |
 | Region enforced over a path, and who may edit a region | **deferred** — needs science staff input, see [§2](#2-the-target-of-opportunity-target) |

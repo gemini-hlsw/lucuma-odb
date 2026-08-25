@@ -167,7 +167,7 @@ object ObservationWorkflowService {
             case ObservationValidationCode.ConfigurationRequestDenied => 6
             case ObservationValidationCode.ConfigurationRequestPending => 7
             case ObservationValidationCode.TooActivationUnapproved => 8
-            case ObservationValidationCode.GenericWarning => 9 // warnings should come last
+            case ObservationValidationCode.GenericWarning => 9 // warnings sort after the errors
 
         val validationStatus: ValidationState =
           if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined

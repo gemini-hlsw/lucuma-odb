@@ -26,9 +26,13 @@ trait TooTriggerChronicleEntryMapping[F[_]] extends ChronTooTriggerUpdateTable[F
       SqlField("modProgramId",        ChronTooTriggerUpdateTable.Mod.ProgramId),
       SqlField("modStatus",           ChronTooTriggerUpdateTable.Mod.Status),
       SqlField("modResolutionReason", ChronTooTriggerUpdateTable.Mod.ResolutionReason),
+      SqlField("modTooActivation",    ChronTooTriggerUpdateTable.Mod.TooActivation),
+      SqlField("modSupersedes",       ChronTooTriggerUpdateTable.Mod.Supersedes),
 
       SqlField("newObservationId",    ChronTooTriggerUpdateTable.New.ObservationId),
       SqlField("newProgramId",        ChronTooTriggerUpdateTable.New.ProgramId),
       SqlField("newStatus",           ChronTooTriggerUpdateTable.New.Status),
-      SqlField("newResolutionReason", ChronTooTriggerUpdateTable.New.ResolutionReason)
+      SqlField("newResolutionReason", ChronTooTriggerUpdateTable.New.ResolutionReason),
+      SqlField("newTooActivation",    ChronTooTriggerUpdateTable.New.TooActivation),
+      SqlField("newSupersedes",       ChronTooTriggerUpdateTable.New.Supersedes)
     )

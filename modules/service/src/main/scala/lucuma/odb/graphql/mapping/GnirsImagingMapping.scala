@@ -104,7 +104,11 @@ trait GnirsImagingMapping[F[_]]
         List("acqSkyOffPRaw", "acqSkyOffQRaw")
       ),
 
+      // The effective acquisition exposure time mode, and the explicit override.
+      // Both read the same t_exposure_time_mode row; the explicit one is keyed on the
+      // view's c_explicit_* columns so it is null when the mode is derived.
       SqlObject("exposureTimeMode", Join(GnirsImagingView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("explicitExposureTimeMode", Join(GnirsImagingView.ObservationId, ExposureTimeModeView.ObservationId)),
     )
 
   lazy val GnirsImagingMapping: ObjectMapping =
@@ -150,7 +154,7 @@ trait GnirsImagingMapping[F[_]]
         ObservingModeRowVersion.Initial
       )
 
-    case (GnirsImagingAcquisitionType, "exposureTimeMode", Nil) =>
+    case (GnirsImagingAcquisitionType, "exposureTimeMode" | "explicitExposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(

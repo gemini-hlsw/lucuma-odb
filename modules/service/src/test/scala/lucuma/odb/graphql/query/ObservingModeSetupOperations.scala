@@ -231,6 +231,12 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
    * program's observations and frozen when the proposal is accepted, and several
    * fixtures accept the proposal before the observation exists, which would
    * freeze it at NONE.
+   *
+   * It goes to the *top* of the ladder rather than a middle rung.  This used to
+   * write 'rapid', which is one short: an observation whose mode is INTERRUPTING
+   * derives INTERRUPTING, exceeds the ceiling, and lands `Unapproved` -- so it can
+   * never be offered `Ready`, and any fixture built at that mode is untriggerable
+   * for a reason that has nothing to do with what the test is about.
    */
   private def raiseTooCeilingForOpportunityTargets(
     oid:  Observation.Id,
@@ -253,7 +259,7 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
         s.prepareR(
           sql"""
             UPDATE t_proposal
-            SET c_too_activation = 'rapid'
+            SET c_too_activation = 'interrupting'
             WHERE c_program_id = (
               SELECT c_program_id FROM t_observation WHERE c_observation_id = $observation_id
             )

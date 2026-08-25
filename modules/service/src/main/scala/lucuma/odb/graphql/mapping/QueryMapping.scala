@@ -107,14 +107,14 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       SqlObject("programNote"),
       SqlObject("programNotes"),
       SqlObject("programUsers"),
-      SqlObject("tooTrigger"),
-      SqlObject("tooTriggers"),
-      SqlObject("tooTriggerChronicleEntries"),
       SqlObject("spectroscopyConfigOptions"),
       SqlObject("imagingConfigOptions"),
       SqlObject("target"),
       SqlObject("targetGroup"),
       SqlObject("targets"),
+      SqlObject("tooTrigger"),
+      SqlObject("tooTriggers"),
+      SqlObject("tooTriggerChronicleEntries")
     )
 
   lazy val QueryElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -140,13 +140,13 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ProgramNote,
       ProgramNotes,
       ProgramUsers,
-      TooTrigger_,
-      TooTriggers,
-      TooTriggerChronicleEntries,
       SpectroscopyConfigOptions,
       Target,
       TargetGroup,
       Targets,
+      TooTrigger_,
+      TooTriggers,
+      TooTriggerChronicleEntries
     ).combineAll
 
   import Services.Syntax.*

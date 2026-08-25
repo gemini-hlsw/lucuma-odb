@@ -27,6 +27,9 @@ import java.util.UUID
  * as it would be for the equivalent long slit but carrying the custom mask.  The
  * acquisition images the field with the mask out of the beam before confirming
  * the alignment through it.
+ *
+ * Only the science sequence consults the ITC.  The acquisition is sized directly
+ * from its Time & Count exposure time mode.
  */
 object Mos:
 
@@ -43,11 +46,10 @@ object Mos:
     namespace:      UUID,
     expander:       SmartGcalExpander[F, F2Static, F2Dynamic],
     config:         Config,
-    acquisitionItc: Either[OdbError, IntegrationTime],
     scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
     (for
-       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, acquisitionItc))
+       a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config))
        s <- EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2MosName, MaxSciencePeriod, config, scienceItc, calRole))
     yield StreamingExecutionConfig(Static, a.generate, s.generate)).value

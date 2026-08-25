@@ -90,6 +90,14 @@ class MosLongSlitSequencesSuite extends FunSuite:
   private val acquisition: AcquisitionConfig =
     AcquisitionConfig(common.exposureTimeMode, Filter, none)
 
+  // Unlike long slit, MOS acquisition is sized directly from a Time & Count mode.
+  private val mosAcquisition: AcquisitionConfig =
+    AcquisitionConfig(
+      ExposureTimeMode.TimeAndCountMode(30.secondTimeSpan, PosInt.unsafeFrom(1), Wavelength.fromIntNanometers(2000).get),
+      Filter,
+      none
+    )
+
   private val longSlit: longslit.Config =
     longslit.Config(
       Disperser,
@@ -104,7 +112,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
       Disperser,
       Filter,
       Flamingos2FpuMask.Custom(ToBeDefined, SlitWidth),
-      acquisition,
+      mosAcquisition,
       common
     ).fold(m => fail(s"could not build the MOS config: $m"), identity)
 
@@ -136,7 +144,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
     science(longslit.LongSlit.instantiate[Eval](Oid, estimator, Namespace, expander, longSlit, itc(cycles), itc(cycles), none))
 
   private def generateMos(cycles: Int): List[Atom[Flamingos2DynamicConfig]] =
-    science(mos.Mos.instantiate[Eval](Oid, estimator, Namespace, expander, mosConfig, itc(cycles), itc(cycles), none))
+    science(mos.Mos.instantiate[Eval](Oid, estimator, Namespace, expander, mosConfig, itc(cycles), none))
 
   // The aperture and the decker that follows from it are what the two modes differ in.
   private def normalized(a: Atom[Flamingos2DynamicConfig]): Atom[Flamingos2DynamicConfig] =

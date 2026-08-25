@@ -28,8 +28,10 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
+import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.itc.ItcGhostDetector
@@ -60,7 +62,8 @@ object InstrumentMode {
     fpu:               GmosFpu.North,
     ccdMode:           Option[GmosCcdMode],
     roi:               Option[GmosRoi],
-    port:              PortDisposition = PortDisposition.Side
+    port:              PortDisposition = PortDisposition.Side,
+    ifuAnalysis:       Option[GmosIfuAnalysis] = None
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GMOS North Spectroscopy"
@@ -78,6 +81,7 @@ object InstrumentMode {
           "roi"               -> a.roi.asJson,
           "port"              -> a.port.asScreamingJson
         ) ++ a.filter.map(_.asScreamingJson).tupleLeft("filter").toList
+          ++ a.ifuAnalysis.map(ifuAnalysisJson).tupleLeft("ifuAnalysis").toList
       )
 
   }
@@ -90,7 +94,8 @@ object InstrumentMode {
     fpu:               GmosFpu.South,
     ccdMode:           Option[GmosCcdMode],
     roi:               Option[GmosRoi],
-    port:              PortDisposition = PortDisposition.Side
+    port:              PortDisposition = PortDisposition.Side,
+    ifuAnalysis:       Option[GmosIfuAnalysis] = None
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GMOS South Spectroscopy"
@@ -108,6 +113,7 @@ object InstrumentMode {
           "roi"               -> a.roi.asJson,
           "port"              -> a.port.asScreamingJson
         ) ++ a.filter.map(_.asScreamingJson).tupleLeft("filter").toList
+          ++ a.ifuAnalysis.map(ifuAnalysisJson).tupleLeft("ifuAnalysis").toList
       )
 
   case class Flamingos2Spectroscopy(
@@ -332,9 +338,9 @@ object InstrumentMode {
 
   given Encoder[InstrumentMode] = a =>
     a match
-      case a @ GmosNorthSpectroscopy(_, _, _, _, _, _, _, _)      =>
+      case a @ GmosNorthSpectroscopy(centralWavelength = _)       =>
         Json.obj("gmosNSpectroscopy" -> a.asJson)
-      case a @ GmosSouthSpectroscopy(_, _, _, _, _, _, _, _)      =>
+      case a @ GmosSouthSpectroscopy(centralWavelength = _)       =>
         Json.obj("gmosSSpectroscopy" -> a.asJson)
       case a @ GmosNorthImaging(_, _, _, _)                       =>
         Json.obj("gmosNImaging" -> a.asJson)
@@ -352,4 +358,13 @@ object InstrumentMode {
         Json.obj("gnirsSpectroscopy" -> a.asJson)
       case a @ GnirsImaging(_, _, _, _, _, _, _)                  =>
         Json.obj("gnirsImaging" -> a.asJson)
+
+  // `ifuAnalysis` is a @oneOf input: exactly one of `sumRadius` / `singleOffset`, each an
+  // AngleInput. Arcseconds are signed, since an element offset may sit either side of centre.
+  private def ifuAnalysisJson(a: GmosIfuAnalysis): Json =
+    def arcsec(x: Angle): Json =
+      Json.obj("arcseconds" -> Angle.signedDecimalArcseconds.get(x).asJson)
+    a match
+      case GmosIfuAnalysis.Sum(radius)    => Json.obj("sumRadius" -> arcsec(radius))
+      case GmosIfuAnalysis.Single(offset) => Json.obj("singleOffset" -> arcsec(offset))
 }

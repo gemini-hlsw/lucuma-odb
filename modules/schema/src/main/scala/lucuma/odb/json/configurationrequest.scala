@@ -149,6 +149,9 @@ object configurationrequest:
           case GmosSouthMos(grating)                 => "gmosSouthMos"       -> Json.obj("grating" -> grating.asJson)
           case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit"      -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
           case GnirsIfu(grating, fpu)                => "gnirsIfu"           -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
+          // GMOS IFU configuration requests will be implemented in a future PR.
+          case GmosNorthIfu(grating = _)             => throw new NotImplementedError("gmosNorthIfu")
+          case GmosSouthIfu(grating = _)             => throw new NotImplementedError("gmosSouthIfu")
           case Igrins2LongSlit                       => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
           case Visitor(mode, radius)                 => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
       )

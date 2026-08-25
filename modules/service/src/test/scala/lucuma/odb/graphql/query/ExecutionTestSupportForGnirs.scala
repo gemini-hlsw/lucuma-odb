@@ -425,7 +425,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
               observingMode: {
                 gnirsSpectroscopy: {
                   acquisition: {
-                    exposureTimeMode: {
+                    explicitExposureTimeMode: {
                       timeAndCount: {
                         time:  { seconds: $seconds }
                         count: $count
@@ -454,7 +454,7 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
               observingMode: {
                 gnirsSpectroscopy: {
                   acquisition: {
-                    exposureTimeMode: {
+                    explicitExposureTimeMode: {
                       signalToNoise: {
                         value: $value
                         at:    { nanometers: $atNm }

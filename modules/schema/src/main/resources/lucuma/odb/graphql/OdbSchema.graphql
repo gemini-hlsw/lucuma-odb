@@ -5963,14 +5963,24 @@ input ObservingModeInput @oneOf {
   gmosSouthMos: GmosSouthMosInput
 
   """
+  The gnirsIfu field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gnirsIfu: GnirsIfuInput
+
+  """
   The gnirsImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gnirsImaging: GnirsImagingInput
 
   """
+  The gnirsLongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  gnirsLongSlit: GnirsLongSlitInput
+
+  """
   The gnirsSpectroscopy field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
-  gnirsSpectroscopy: GnirsSpectroscopyInput
+  gnirsSpectroscopy: GnirsSpectroscopyInput @deprecated(reason: "Use 'gnirsLongSlit' or 'gnirsIfu' instead.")
 
   """
   The igrins2LongSlit field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -7649,6 +7659,11 @@ type AirMassRange {
   max: PosBigDecimal!
 }
 
+"""
+An angle in a variety of units.  Values are normalized to [0, 360°) unless
+the field documents a signed quantity, in which case negative values are
+rendered negative (as with `Declination`) rather than wrapped.
+"""
 type Angle {
   """
   Angle in µas
@@ -7811,7 +7826,15 @@ type Attachment {
   `GYYYY(A|B)PPPP<type>-XX_ODF.fits`.
   Not settable.  Null when the attachment is not a MOS_MASK, always present when it is.
   """
-  maskName: NonEmptyString
+  maskName: NonEmptyString @deprecated(reason: "Use `mask.name` instead.")
+
+  """
+  The design read from a MOS mask attachment's file when it was uploaded.
+  Null when the attachment is not a MOS_MASK, and null for MOS_MASK
+  attachments uploaded before mask parsing was introduced (re-uploading the
+  file populates it).  Not settable.
+  """
+  mask: MaskDefinition
   description: NonEmptyString
   checked: Boolean!
   fileSize: Long!
@@ -7829,6 +7852,182 @@ input AttachmentPropertiesInput {
   The checked status can be set, or ignored by skipping it altogether
   """
   checked: Boolean
+}
+
+"""
+The design read from a MOS mask attachment's file (ODF/MDF): the instrument
+the mask was cut for, the position angle it must be observed at, and its
+slits.
+"""
+type MaskDefinition {
+  """
+  The mask name of the attachment.
+  """
+  name: NonEmptyString!
+
+  """
+  The instrument the mask was designed for.
+  """
+  instrument: Instrument!
+
+  """
+  Nominal plate scale of the pre-image, in arcseconds per pixel.
+  """
+  pixelScale: BigDecimal!
+
+  """
+  Pointing centre of the pre-image the mask was designed on.
+  """
+  pointing: Coordinates!
+
+  """
+  The position angle the mask must be observed at.
+  """
+  positionAngle: Angle!
+
+  """
+  Axis along which the instrument spreads a spectrum, in pre-image detector
+  coordinates.  It decides how the design's x and y columns were read: a
+  slit's width is its extent along the dispersion direction, its length the
+  extent across it.
+  """
+  dispersionDirection: MosDispersionDirection!
+
+  """
+  Every aperture in the design, acquisition boxes included.
+  """
+  slits: [MaskSlit!]!
+
+  """
+  Number of science slits in the design, alignment-star boxes excluded.
+  """
+  scienceSlitCount: Int!
+
+  """
+  Number of alignment-star boxes in the design.
+  """
+  acquisitionSlitCount: Int!
+
+  """
+  Mean width of the science slits.  Alignment-star boxes are excluded so
+  their wide boxes do not skew the mean, and a design with no science slits
+  has no average.
+  """
+  averageSlitWidth: Angle
+}
+
+"""
+One aperture of a MOS mask design.  The width is always the extent along the
+dispersion direction (horizontal for GMOS-S/N, vertical for FLAMINGOS2) and
+the length the extent across it.
+"""
+type MaskSlit {
+  """
+  Object identifier, unique within the mask.
+  """
+  id: Int!
+
+  """
+  Sky position of the object the slit targets.
+  """
+  coordinates: Coordinates!
+
+  """
+  Object centroid on the pre-image along the detector x axis, in pixels
+  (`x_ccd` in the design file).  Fractional: it is a measured centroid, not a
+  pixel index.
+  """
+  x: BigDecimal!
+
+  """
+  Object centroid on the pre-image along the detector y axis, in pixels
+  (`y_ccd` in the design file).
+  """
+  y: BigDecimal!
+
+  """
+  Extent along the dispersion direction.
+  """
+  width: Angle!
+
+  """
+  Extent across the dispersion direction.
+  """
+  length: Angle!
+
+  """
+  Displacement of the slit from the object along the slit's length.  A signed
+  quantity: the slit may be slid either way, and negative displacements are
+  rendered in the signed representation (-1.5 arcseconds reads as -1.5), not
+  wrapped to just under a full turn.
+  """
+  offsetAlongSlit: Angle!
+
+  """
+  Displacement of the slit from the object across its width.  A non-zero value
+  drives a point source off the slit and loses flux.  A signed quantity,
+  rendered in the signed representation like `offsetAlongSlit`.
+  """
+  offsetAcrossSlit: Angle!
+
+  """
+  Slit position angle, counter-clockwise positive.  A signed quantity bounded
+  to 45 degrees either way, rendered in the signed representation like
+  `offsetAlongSlit`.
+  """
+  tilt: Angle!
+
+  """
+  Placement priority of the object.  ACQUISITION marks an alignment-star box
+  rather than a science slit.
+  """
+  priority: MosSlitPriority!
+}
+
+"""
+Axis along which an instrument spreads a spectrum, in pre-image detector
+coordinates.
+"""
+enum MosDispersionDirection {
+  """
+  GMOS-N and GMOS-S: the x axis is the dispersion axis.
+  """
+  HORIZONTAL
+
+  """
+  Flamingos-2: the y axis is the dispersion axis.
+  """
+  VERTICAL
+}
+
+"""
+Placement priority of an object in a MOS mask design.
+"""
+enum MosSlitPriority {
+  """
+  Acquisition star, used to align the mask on sky rather than to take a spectrum.
+  """
+  ACQUISITION
+
+  """
+  Highest science priority.
+  """
+  HIGH
+
+  """
+  Medium science priority.
+  """
+  MEDIUM
+
+  """
+  Lowest science priority.
+  """
+  LOW
+
+  """
+  Not a priority level: marks the object as excluded from the design.
+  """
+  IGNORE
 }
 
 """
@@ -10526,7 +10725,7 @@ type Flamingos2MosAcquisition {
   explicitFilter: Flamingos2Filter
 
   """
-  The exposure time mode used for ITC lookup for the acquisition sequence.
+  The Time & Count exposure time mode used for the acquisition sequence.
   """
   exposureTimeMode: ExposureTimeMode!
 
@@ -10548,8 +10747,9 @@ input Flamingos2MosAcquisitionInput {
   explicitFilter: Flamingos2Filter
 
   """
-  Exposure time mode for the acquisition sequence.  If not specified, a default
-  exposure time mode is used.
+  Exposure time mode for the acquisition sequence.  MOS acquisition must be
+  Time & Count; a signal-to-noise mode is rejected.  If not specified, the
+  default is 5 seconds with a count of 1.
   """
   exposureTimeMode: ExposureTimeModeInput
 
@@ -11481,7 +11681,16 @@ automatic choice.
 """
 type GnirsImagingAcquisition {
 
+  """
+  The effective acquisition exposure time mode.  When `explicitExposureTimeMode` is
+  null this is a signal-to-noise mode whose value follows the ITC brightness
+  classification -- VERY_BRIGHT 30, BRIGHT 20, FAINT 10 -- and is maintained
+  automatically.
+  """
   exposureTimeMode: ExposureTimeMode!
+
+  "An explicitly specified acquisition exposure time mode.  When null the mode is derived from the acquisition type (see `exposureTimeMode`)."
+  explicitExposureTimeMode: ExposureTimeMode
 
   coadds: PosInt!
 
@@ -11560,7 +11769,13 @@ input GnirsImagingAcquisitionInput {
   explicitAcquisitionType: GnirsAcquisitionType
   coadds: PosInt
   skyOffset: OffsetInput
-  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  An explicitly specified acquisition exposure time mode.  Assign null to revert to
+  the mode derived from the acquisition brightness classification, or skip it
+  altogether to leave it alone.
+  """
+  explicitExposureTimeMode: ExposureTimeModeInput
 }
 
 """
@@ -11604,7 +11819,16 @@ input GnirsImagingInput {
 }
 
 type GnirsSpectroscopyAcquisition {
+  """
+  The effective acquisition exposure time mode.  When `explicitExposureTimeMode` is
+  null this is a signal-to-noise mode whose value follows the ITC brightness
+  classification -- VERY_BRIGHT 30, BRIGHT 20, FAINT 10 -- and is maintained
+  automatically.
+  """
   exposureTimeMode: ExposureTimeMode!
+
+  "An explicitly specified acquisition exposure time mode.  When null the mode is derived from the acquisition type (see `exposureTimeMode`)."
+  explicitExposureTimeMode: ExposureTimeMode
 
   coadds: PosInt!
 
@@ -11688,13 +11912,13 @@ type GnirsSpectroscopy {
   Long-slit configuration (FPU + along-slit telescope configs), when this is a
   long-slit observation. Exactly one of `slit` / `ifu` is present.
   """
-  slit: GnirsSlit
+  slit: GnirsSpectroscopyLongSlit
 
   """
   IFU configuration (FPU + p/q telescope configs), when this is an integral field
   unit observation. Exactly one of `slit` / `ifu` is present.
   """
-  ifu: GnirsIfu
+  ifu: GnirsSpectroscopyIfu
 
   filter: GnirsFilter!
   initialFilter: GnirsFilter!
@@ -11725,7 +11949,7 @@ GNIRS long-slit-specific configuration: the slit FPU plus the telescope configs
 taken along the slit. Present on `GnirsSpectroscopy.slit` iff the observation is a
 long slit; null for IFU.
 """
-type GnirsSlit {
+type GnirsSpectroscopyLongSlit {
   fpu: GnirsFpuSlit!
   initialFpu: GnirsFpuSlit!
 
@@ -11740,7 +11964,7 @@ GNIRS IFU-specific configuration: the IFU FPU plus the telescope configs as full
 p/q offsets. Present on `GnirsSpectroscopy.ifu` iff the observation is an IFU; null
 for long slit.
 """
-type GnirsIfu {
+type GnirsSpectroscopyIfu {
   fpu: GnirsFpuIfu!
   initialFpu: GnirsFpuIfu!
 
@@ -11751,12 +11975,142 @@ type GnirsIfu {
   telescopeConfigs: [TelescopeConfig!]!
 }
 
+"""
+GNIRS Long Slit mode.
+"""
+type GnirsLongSlit {
+
+  grating: GnirsGrating!
+  explicitGrating: GnirsGrating
+  initialGrating: GnirsGrating!
+
+  prism: GnirsPrism!
+  explicitPrism: GnirsPrism
+  initialPrism: GnirsPrism!
+
+  """
+  The central wavelengths at which spectra are taken, in increasing wavelength
+  order.  Each one is a separate configuration with its own exposure time mode,
+  coadds, ITC calculation and calibrations.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  """
+  The central wavelengths as they were configured when the observing mode was
+  created.
+  """
+  initialCentralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  camera: GnirsCamera!
+  initialCamera: GnirsCamera!
+
+  fpu: GnirsFpuSlit!
+  initialFpu: GnirsFpuSlit!
+
+  "Effective telescope configs (explicit override coalesced with the default)."
+  telescopeConfigs: SlitTelescopeConfigs!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
+  explicitTelescopeConfigs: SlitTelescopeConfigs
+
+  filter: GnirsFilter!
+  initialFilter: GnirsFilter!
+
+  decker: GnirsDecker!
+  explicitDecker: GnirsDecker
+  defaultDecker: GnirsDecker!
+
+  explicitReadMode: GnirsReadMode
+
+  wellDepth: GnirsWellDepth!
+  explicitWellDepth: GnirsWellDepth
+  defaultWellDepth: GnirsWellDepth!
+
+  explicitFocusMotorSteps: Int
+
+  acquisition: GnirsSpectroscopyAcquisition!
+
+  """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
+}
+
+"""
+GNIRS IFU (integral field unit) mode.
+"""
+type GnirsIfu {
+
+  grating: GnirsGrating!
+  explicitGrating: GnirsGrating
+  initialGrating: GnirsGrating!
+
+  prism: GnirsPrism!
+  explicitPrism: GnirsPrism
+  initialPrism: GnirsPrism!
+
+  """
+  The central wavelengths at which spectra are taken, in increasing wavelength
+  order.  Each one is a separate configuration with its own exposure time mode,
+  coadds, ITC calculation and calibrations.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  """
+  The central wavelengths as they were configured when the observing mode was
+  created.
+  """
+  initialCentralWavelengths: [GnirsCentralWavelengthConfig!]!
+
+  camera: GnirsCamera!
+  initialCamera: GnirsCamera!
+
+  fpu: GnirsFpuIfu!
+  initialFpu: GnirsFpuIfu!
+
+  """
+  Telescope configs (full p/q offsets). Unlike the long slit these have no derived
+  default: they are seeded from the FPU at creation and then edited in place.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
+
+  filter: GnirsFilter!
+  initialFilter: GnirsFilter!
+
+  decker: GnirsDecker!
+  explicitDecker: GnirsDecker
+  defaultDecker: GnirsDecker!
+
+  explicitReadMode: GnirsReadMode
+
+  wellDepth: GnirsWellDepth!
+  explicitWellDepth: GnirsWellDepth
+  defaultWellDepth: GnirsWellDepth!
+
+  explicitFocusMotorSteps: Int
+
+  acquisition: GnirsSpectroscopyAcquisition!
+
+  """
+  Telluric type configuration for this observation.
+  """
+  telluricType: TelluricType!
+
+}
+
+
 input GnirsSpectroscopyAcquisitionInput {
   explicitFilter: GnirsFilter
   explicitAcquisitionType: GnirsAcquisitionType
   coadds: PosInt
   skyOffset: OffsetInput
-  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  An explicitly specified acquisition exposure time mode.  Assign null to revert to
+  the mode derived from the acquisition brightness classification, or skip it
+  altogether to leave it alone.
+  """
+  explicitExposureTimeMode: ExposureTimeModeInput
 }
 
 """
@@ -11790,7 +12144,7 @@ input SlitTelescopeConfigsInput {
 """
 GNIRS long-slit-specific configuration input. `fpu` is required on create.
 """
-input GnirsSlitInput {
+input GnirsSpectroscopyLongSlitInput {
   fpu: GnirsFpuSlit
 
   "Long-slit telescope configs. Null clears an explicit override back to the default."
@@ -11801,7 +12155,7 @@ input GnirsSlitInput {
 GNIRS IFU-specific configuration input. `fpu` is required on create. A missing
 `telescopeConfigs` is left unedited (and on create is seeded from the FPU).
 """
-input GnirsIfuInput {
+input GnirsSpectroscopyIfuInput {
   fpu: GnirsFpuIfu
 
   telescopeConfigs: [TelescopeConfigInput!]
@@ -11822,10 +12176,10 @@ input GnirsSpectroscopyInput {
   filter: GnirsFilter
 
   "Long-slit configuration. On create, exactly one of `slit` / `ifu` is required."
-  slit: GnirsSlitInput
+  slit: GnirsSpectroscopyLongSlitInput
 
   "IFU configuration. On create, exactly one of `slit` / `ifu` is required."
-  ifu: GnirsIfuInput
+  ifu: GnirsSpectroscopyIfuInput
 
   camera: GnirsCamera
 
@@ -11854,6 +12208,106 @@ input GnirsSpectroscopyInput {
   telluricType: TelluricTypeInput
 
 }
+
+"""
+Edit or create GNIRS Long Slit configuration.
+"""
+input GnirsLongSlitInput {
+
+  """
+  The central wavelengths at which spectra are taken.  Required on create, and
+  must contain at least one entry with no duplicated wavelength.  When given on
+  edit, it replaces the existing list wholesale.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfigInput!]
+
+  filter: GnirsFilter
+
+  "The FPU. Required on create."
+  fpu: GnirsFpuSlit
+
+  "Long-slit telescope configs. Null clears an explicit override back to the default."
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
+
+  camera: GnirsCamera
+
+  grating: GnirsGrating
+
+  prism: GnirsPrism
+
+  explicitDecker: GnirsDecker
+
+  explicitGrating: GnirsGrating
+
+  explicitPrism: GnirsPrism
+
+  explicitFocusMotorSteps: Int
+
+  explicitReadMode: GnirsReadMode
+
+  explicitWellDepth: GnirsWellDepth
+
+  acquisition: GnirsSpectroscopyAcquisitionInput
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
+  """
+  telluricType: TelluricTypeInput
+
+}
+
+"""
+Edit or create GNIRS IFU configuration.
+"""
+input GnirsIfuInput {
+
+  """
+  The central wavelengths at which spectra are taken.  Required on create, and
+  must contain at least one entry with no duplicated wavelength.  When given on
+  edit, it replaces the existing list wholesale.
+  """
+  centralWavelengths: [GnirsCentralWavelengthConfigInput!]
+
+  filter: GnirsFilter
+
+  "The FPU. Required on create."
+  fpu: GnirsFpuIfu
+
+  """
+  Telescope configs. A missing value is left unedited; on create it is seeded
+  from the FPU.
+  """
+  telescopeConfigs: [TelescopeConfigInput!]
+
+  camera: GnirsCamera
+
+  grating: GnirsGrating
+
+  prism: GnirsPrism
+
+  explicitDecker: GnirsDecker
+
+  explicitGrating: GnirsGrating
+
+  explicitPrism: GnirsPrism
+
+  explicitFocusMotorSteps: Int
+
+  explicitReadMode: GnirsReadMode
+
+  explicitWellDepth: GnirsWellDepth
+
+  acquisition: GnirsSpectroscopyAcquisitionInput
+
+  """
+  The telluricType field must be either specified or skipped altogether. It cannot be unset with a null value.
+  On create the default is HOT.
+  """
+  telluricType: TelluricTypeInput
+
+}
+
 
 """
 Time and Count exposure time mode.
@@ -14109,7 +14563,13 @@ input GroupPropertiesInput {
   "Group description (optional)."
   description: NonEmptyString
 
-  "Minimum number of elements to be observed. If unspecified then all elements will be observed."
+  """
+  Minimum number of elements to be observed. If unspecified then all elements
+  will be observed. If specified it must be at least 1. For a non-empty group it
+  may not exceed the number of elements the group already has; an empty group
+  accepts any positive value. It is lowered automatically if elements are later
+  removed, but is left alone once the group is empty.
+  """
   minimumRequired: NonNegShort
 
   "If true, elements will be observed in order. Defaults to false if left unspecified."
@@ -15715,17 +16175,49 @@ enum ConfigurationRequestStatus {
 scalar TooTriggerId
 
 """
-Lifecycle status of a Target-of-Opportunity trigger.  A trigger is REQUESTED
-while its observation carries the READY workflow state, and WITHDRAWN when that
-state is cleared; DECLINED records that an observer saw it and chose not to
-observe.  Both terminal statuses are equivalent to never having been triggered:
-setting the observation READY again produces a new trigger, never a transition
-out of a terminal state.
+Lifecycle status of a Target-of-Opportunity trigger.
+
+A trigger is not requested directly.  It comes into being when a ToO observation
+is set to the READY workflow state with a resolved opportunity target.  REQUESTED
+is the only non-terminal status.
 """
 enum TooTriggerStatus {
+
+  """
+  A live, open, request. The observation is ready to be observed and the
+  observatory has it under consideration.  The only non-terminal status. At most
+  one trigger per observation is REQUESTED at a time. A trigger stops being
+  REQUESTED the moment its observation begins executing (see ACCEPTED).
+  """
   REQUESTED
+
+  """
+  An ACCEPTED request is one that the observatory has acted upon.  A ToO trigger
+  is marked ACCEPTED recorded when execution begins. Specifically, when its
+  first non-slew execution event arrives.
+  """
+  ACCEPTED
+
+  """
+  A DECLINED request is one that the observer has rejected for a reason, perhaps
+  setting a `resolutionReason` to explain why. Declining also returns the
+  observation to a DEFINED workflow state so it may be re-triggered in the
+  future.
+  """
   DECLINED
+
+  """
+  A WITHDRAWN ToO is one that has been rescinded before it was acted upon,
+  typically by the PI marking the observation DEFINED.
+  """
   WITHDRAWN
+
+  """
+  When the observation's scheduling mode is adjusted after a trigger has already
+  been fired, any existing ToOs in REQUESTED status are SUPERSEDED by a new
+  ToO trigger record.
+  """
+  SUPERSEDED
 }
 
 """
@@ -15769,6 +16261,16 @@ input TooTriggerEditInput {
   If provided, only edits for this specific trigger are delivered.
   """
   tooTriggerId: TooTriggerId
+
+  """
+  If provided, only edits for triggers requested at a matching activation are
+  delivered.  Ordered, so `EQ: INTERRRUPTING` follows just the requests that
+  cannot wait for the ordinary queue.  Matched against the activation the
+  trigger carries, which is fixed when it is created -- so a supersession
+  reports the predecessor's own activation on its closing event, not the
+  successor's.
+  """
+  tooActivation: WhereOrderTooActivation
 }
 
 """
@@ -15784,6 +16286,23 @@ type TooTrigger {
 
   "The trigger's lifecycle status."
   status: TooTriggerStatus!
+
+  """
+  The ToO activation this request was made at.  Fixed when the trigger is created
+  and never changed: a request at a different activation is a different request,
+  since who is notified, how fast, and what they are expected to drop all differ.
+  If the observation's activation moves while this request is outstanding, this
+  trigger becomes SUPERSEDED and a successor carries the new value.  Never NONE.
+  """
+  tooActivation: TooActivation!
+
+  """
+  The request this one replaced, null for a first request.  Following the chain
+  back gives the moment the observation first went live at any activation, which
+  `requestedAt` deliberately does not -- it is the age of this request, at this
+  activation.
+  """
+  supersedes: TooTrigger
 
   "Reason accompanying a terminal transition (e.g. a denial or withdrawal), if any."
   resolutionReason: NonEmptyString
@@ -15854,8 +16373,9 @@ input WhereOrderTooTriggerId {
 
 """
 Filters on equality or order comparisons of the TooTriggerStatus property.  Order
-follows the lifecycle declaration: REQUESTED < ACCEPTED < DENIED < WITHDRAWN, so
-`GTE: REQUESTED` matches every status.
+follows the lifecycle declaration: REQUESTED < ACCEPTED < DECLINED < WITHDRAWN <
+SUPERSEDED,
+so `GTE: REQUESTED` matches every status.
 """
 input WhereOrderTooTriggerStatus {
   "Matches if the property is exactly the supplied value."
@@ -15883,6 +16403,39 @@ input WhereOrderTooTriggerStatus {
   LTE: TooTriggerStatus
 }
 
+"""
+Filters on equality or order comparisons of the TooActivation property.  Order
+follows the declaration NONE < STANDARD < RAPID < INTERRUPTING, so `GTE: RAPID`
+matches the activations that cannot wait for the ordinary queue.  Note that only
+INTERRUPTING may displace work already under way; RAPID is observed as soon as
+possible but takes its turn.
+"""
+input WhereOrderTooActivation {
+  "Matches if the property is exactly the supplied value."
+  EQ: TooActivation
+
+  "Matches if the property is not the supplied value."
+  NEQ: TooActivation
+
+  "Matches if the property value is any of the supplied options."
+  IN: [TooActivation!]
+
+  "Matches if the property value is none of the supplied values."
+  NIN: [TooActivation!]
+
+  "Matches if the property is ordered after (>) the supplied value."
+  GT: TooActivation
+
+  "Matches if the property is ordered before (<) the supplied value."
+  LT: TooActivation
+
+  "Matches if the property is ordered after or equal (>=) the supplied value."
+  GTE: TooActivation
+
+  "Matches if the property is ordered before or equal (<=) the supplied value."
+  LTE: TooActivation
+}
+
 input WhereTooTrigger {
   "A list of nested trigger filters that all must match."
   AND: [WhereTooTrigger!]
@@ -15904,6 +16457,12 @@ input WhereTooTrigger {
 
   "Matches the trigger status."
   status: WhereOrderTooTriggerStatus
+
+  """
+  Matches the activation the trigger was requested at.  Ordered, so
+  `EQ: INTERRUPTING` selects the requests that cannot wait for the ordinary queue.
+  """
+  tooActivation: WhereOrderTooActivation
 
   "Matches the request (creation) time."
   requestedAt: WhereOrderTimestamp
@@ -15940,10 +16499,21 @@ type TooTriggerChronicleEntry {
   modStatus: Boolean!
   modResolutionReason: Boolean!
 
+  """
+  Always false on an update -- a trigger's activation never changes -- so this is
+  true exactly on the row that recorded the trigger's creation.
+  """
+  modTooActivation: Boolean!
+
+  "As `modTooActivation`: only ever true on a creation."
+  modSupersedes: Boolean!
+
   newObservationId: ObservationId
   newProgramId: ProgramId
   newStatus: TooTriggerStatus
   newResolutionReason: NonEmptyString
+  newTooActivation: TooActivation
+  newSupersedes: TooTriggerId
 }
 
 """
@@ -15979,6 +16549,8 @@ input WhereTooTriggerChronicleEntry {
   modProgramId: WhereBoolean
   modStatus: WhereBoolean
   modResolutionReason: WhereBoolean
+  modTooActivation: WhereBoolean
+  modSupersedes: WhereBoolean
 }
 
 """
@@ -16125,8 +16697,11 @@ enum ObservationValidationCode {
   """
   TOO_ACTIVATION_UNAPPROVED
 
+  """
+  A non-fatal condition worth the submitter's attention.  It does not prevent
+  the observation from being executed.
+  """
   GENERIC_WARNING
-  
 }
 
 """
@@ -17355,6 +17930,11 @@ type ObservingMode {
   gmosSouthMos: GmosSouthMos
 
   """
+  GNIRS IFU mode
+  """
+  gnirsIfu: GnirsIfu
+
+  """
   GNIRS Imaging mode
   """
   gnirsImaging: GnirsImaging
@@ -17362,7 +17942,12 @@ type ObservingMode {
   """
   GNIRS Long Slit mode
   """
-  gnirsSpectroscopy: GnirsSpectroscopy
+  gnirsLongSlit: GnirsLongSlit
+
+  """
+  GNIRS spectroscopy mode, long slit and IFU combined.
+  """
+  gnirsSpectroscopy: GnirsSpectroscopy @deprecated(reason: "Use 'gnirsLongSlit' or 'gnirsIfu' instead.")
 
   """
   IGRINS-2 Long Slit mode
@@ -23511,10 +24096,10 @@ enum ObservationWorkflowState {
   UNDEFINED
   UNAPPROVED
   DEFINED
+  FOR_REVIEW
   READY
   ONGOING
   COMPLETED
-  FOR_REVIEW
 }
 
 type ObservationWorkflow {

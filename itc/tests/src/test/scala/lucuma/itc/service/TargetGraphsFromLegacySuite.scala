@@ -5,6 +5,7 @@ package lucuma.itc.service
 
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
+import cats.syntax.all.*
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
@@ -16,6 +17,7 @@ import lucuma.itc.ItcGraphGroup
 import lucuma.itc.ItcSeries
 import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
+import lucuma.itc.TargetGraphs
 import lucuma.itc.legacy.ItcRemoteCcd
 
 class TargetGraphsFromLegacySuite extends munit.FunSuite:
@@ -121,4 +123,103 @@ class TargetGraphsFromLegacySuite extends munit.FunSuite:
     assertEquals(result.ccds.last.maxSingleSNRatio, Some(7.0))
     assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(70.0)))
     assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(7.0)))
+  }
+
+  private def slitSeries(slit: String, tpe: SeriesDataType, peak: Double): ItcSeries =
+    ItcSeries(
+      s"$slit Slit S/N",
+      tpe,
+      NonEmptyList.of(0.0, peak),
+      ItcXAxis(1000.0, 1001.0, 2)
+    )
+
+  // The GMOS two-slit IFU reports a blue and a red slit series per CCD, so the series arrive
+  // in CCD-major pairs. Pairing by plain index would give CCD 2 a CCD 0 series and never read
+  // the last CCD's own data at all.
+  test("GMOS two-slit IFU pairs each CCD with its blue/red series pair") {
+    // per CCD: (blue, red) final peak
+    val peaks: List[(Double, Double)] = List((10.0, 50.0), (12.0, 90.0), (11.0, 60.0))
+    val graph: ItcGraph               =
+      ItcGraph(
+        GraphType.S2NGraph,
+        peaks.flatMap: (blue, red) =>
+          List(
+            slitSeries("Blue", SeriesDataType.SingleS2NData, blue / 2),
+            slitSeries("Blue", SeriesDataType.FinalS2NData, blue),
+            slitSeries("Red", SeriesDataType.SingleS2NData, red / 2),
+            slitSeries("Red", SeriesDataType.FinalS2NData, red)
+          )
+      )
+
+    val result: TargetGraphs =
+      Conversions.targetGraphsFromLegacy(
+        NonEmptyChain.of(ccd(45.0, 90.0), ccd(45.0, 90.0), ccd(45.0, 90.0)),
+        NonEmptyChain.one(ItcGraphGroup(NonEmptyChain.one(graph))),
+        at
+      )
+
+    assertEquals(result.ccds.length.toInt, 3)
+    assertEquals(result.ccds.toList.map(_.maxTotalSNRatio),
+                 List(Some(50.0), Some(90.0), Some(60.0))
+    )
+    assertEquals(result.ccds.toList.map(_.maxSingleSNRatio),
+                 List(Some(25.0), Some(45.0), Some(30.0))
+    )
+    assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(90.0)))
+    assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(45.0)))
+
+    // Both slits cover the requested wavelength, so the value there is the better of them and not
+    // the blue slit merely for coming first.
+    assertEquals(
+      result.atWavelengthFinalSNRatio,
+      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(90.0)).some
+    )
+    assertEquals(
+      result.atWavelengthSingleSNRatio,
+      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(45.0)).some
+    )
+  }
+
+  private def slitSeriesAt(
+    slit:    String,
+    tpe:     SeriesDataType,
+    atStart: Double,
+    atEnd:   Double
+  ): ItcSeries =
+    ItcSeries(s"$slit Slit S/N", tpe, NonEmptyList.of(atStart, atEnd), ItcXAxis(1000.0, 1001.0, 2))
+
+  // The peak and the value at the requested wavelength are found by separate code paths, and a
+  // slit can win one without winning the other. Here blue peaks higher overall but red is higher
+  // at the wavelength, so reporting blue's value there would be wrong in a way that agreeing
+  // peaks would hide.
+  test("two-slit IFU takes the at-wavelength value from the better slit, not the first") {
+    val graph: ItcGraph =
+      ItcGraph(
+        GraphType.S2NGraph,
+        List(
+          slitSeriesAt("Blue", SeriesDataType.SingleS2NData, 50.0, 10.0),
+          slitSeriesAt("Blue", SeriesDataType.FinalS2NData, 100.0, 20.0),
+          slitSeriesAt("Red", SeriesDataType.SingleS2NData, 2.0, 40.0),
+          slitSeriesAt("Red", SeriesDataType.FinalS2NData, 5.0, 80.0)
+        )
+      )
+
+    val result: TargetGraphs =
+      Conversions.targetGraphsFromLegacy(
+        NonEmptyChain.one(ccd(50.0, 100.0)),
+        NonEmptyChain.one(ItcGraphGroup(NonEmptyChain.one(graph))),
+        at
+      )
+
+    // Peak: blue wins, at 1000 nm rather than at the requested wavelength.
+    assertEquals(result.peakFinalSNRatio, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(100.0)))
+    assertEquals(result.peakSingleSNRatio, SingleSN(SignalToNoise.unsafeFromBigDecimalExact(50.0)))
+
+    // At 1001 nm: red wins, even though blue is the first series of its type.
+    assertEquals(result.atWavelengthFinalSNRatio,
+                 TotalSN(SignalToNoise.unsafeFromBigDecimalExact(80.0)).some
+    )
+    assertEquals(result.atWavelengthSingleSNRatio,
+                 SingleSN(SignalToNoise.unsafeFromBigDecimalExact(40.0)).some
+    )
   }

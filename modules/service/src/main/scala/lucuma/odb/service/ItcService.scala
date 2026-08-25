@@ -15,6 +15,7 @@ import cats.effect.Resource
 import cats.effect.syntax.spawn.*
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
@@ -53,6 +54,7 @@ import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcClient
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.itc.client.SpectroscopyParameters
+import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.ItcPeakPixel
@@ -165,9 +167,15 @@ sealed trait ItcService[F[_]] {
    * result, leaving the science part and the frozen flag untouched.  Used by
    * resetAcquisition to keep the cached/frozen snapshot consistent with the
    * newly generated acquisition sequence.  A no-op if there is no stored row.
+   *
+   * `input` is the ITC input the acquisition was computed from; it says whether the
+   * acquisition signal-to-noise is derived, in which case the published value is brought
+   * in line with the classification here too, so the sequence just written and the value
+   * the science user reads cannot disagree.
    */
   def updateAcquisition(
     observationId: Observation.Id,
+    input:         ItcInput,
     acquisition:   ItcAcquisition
   )(using Transaction[F]): F[Unit]
 
@@ -396,13 +404,14 @@ object ItcService {
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
       //
-      // The returned acquisition type is set only on the GNIRS S/N-mode two-pass path
-      // (see below); it pins the mode the sequence uses.
+      // The returned acquisition type is set only on the GNIRS two-pass path (see
+      // below); it pins the mode the sequence uses.
       private def safeAcquisitionCall(
-        oid:          Observation.Id,
-        input:        ImagingInput,
-        targets:      NonEmptyList[ItcInput.TargetDefinition],
-        autoClassify: Boolean
+        oid:               Observation.Id,
+        input:             ImagingInput,
+        targets:           NonEmptyList[ItcInput.TargetDefinition],
+        autoClassify:      Boolean,
+        autoSignalToNoise: Boolean
       ): EitherT[F, OdbError, (Zipper[ItcResult], Option[GnirsAcquisitionType])] =
         def go(imInput: ImagingInput, min: TimeSpan, max: TimeSpan): EitherT[F, OdbError, Zipper[ItcResult]] =
           EitherT:
@@ -447,16 +456,16 @@ object ItcService {
             val min: TimeSpan = gnirs.MinAcquisitionExposureTime
             val max: TimeSpan = gnirs.MaxAcquisitionExposureTime
             etm match
-              case _ if autoClassify =>
+              case _ if autoClassify || autoSignalToNoise =>
                 // Two-pass. The acquisition mode (Very Bright / Bright / Faint) is a
                 // function of exposure time, but the exposure time depends on the filter
                 // (Very Bright images in H2) which depends on the mode — and, in S/N mode,
                 // a low requested S/N would shorten the exposure and misclassify a Bright
                 // target as Very Bright. So classify from a fixed brightness measurement
                 // (broadband filter, classification S/N) first, then compute the real
-                // exposure at the user's ETM in the mode-appropriate filter. The
-                // classification must not depend on the user's acquisition ETM, so it
-                // always runs at the classification S/N — the user ETM's own wavelength
+                // exposure at the resolved ETM in the mode-appropriate filter. The
+                // classification must not depend on the acquisition ETM, so it always
+                // runs at the classification S/N — the acquisition ETM's own wavelength
                 // (`etm.at`, present on both S/N and time-and-count modes) locates it.
                 def gnirsInput(f: GnirsFilter, e: ExposureTimeMode): ImagingInput =
                   ImagingInput.parameters
@@ -470,17 +479,23 @@ object ItcService {
                   t1:      IntegrationTime           = z1.focus.value
                   acqType: GnirsAcquisitionType      = GnirsAcquisitionMode.defaultFor(t1.exposureTime, t1.exposureCount).acquisitionType
                   // Very Bright images through the acquisition filter in H2; the other
-                  // classifications keep the broadband filter (already `filter`).
-                  f2:      GnirsFilter               = if acqType === GnirsAcquisitionType.VeryBright then GnirsFilter.H2 else filter
+                  // classifications keep the broadband filter (already `filter`). Only
+                  // when the filter is itself automatic — an explicitly chosen filter is
+                  // never overridden, even though we still classify for the S/N.
+                  f2:      GnirsFilter               = if autoClassify && acqType === GnirsAcquisitionType.VeryBright then GnirsFilter.H2 else filter
+                  // When the S/N is derived, the second pass runs at the S/N the
+                  // classification calls for rather than at the placeholder carried in
+                  // the input (see AcquisitionConfig.itcExposureTimeMode).
+                  etm2:    ExposureTimeMode          = if autoSignalToNoise then ExposureTimeMode.SignalToNoiseMode(gnirs.acquisitionSignalToNoise(acqType), etm.at)
+                                                       else etm
                   // Skip the second call only when it would be identical to the first:
-                  // same filter and the user's ETM is itself the classification S/N
-                  // request. Time-and-count always needs the second call (the first ran
-                  // at the classification S/N, not the user's time/count).
-                  skip:    Boolean                   = f2 === filter && (etm match
-                                                         case ExposureTimeMode.SignalToNoiseMode(sn, _) => sn === classifySN
-                                                         case _                                         => false)
+                  // same filter and the same S/N request. A derived Faint lands exactly
+                  // there, since Faint's S/N *is* the classification S/N. Time-and-count
+                  // always needs the second call (the first ran at the classification
+                  // S/N, not the requested time/count).
+                  skip:    Boolean                   = f2 === filter && etm2 === classifyEtm
                   z2                                <- if skip then EitherT.pure[F, OdbError](z1)
-                                                       else go(gnirsInput(f2, etm), min, max)
+                                                       else go(gnirsInput(f2, etm2), min, max)
                 yield (z2, acqType.some)
               case _ =>
                 noType(go(input, min, max))
@@ -494,13 +509,14 @@ object ItcService {
       // A transient failure (RemoteServiceCallError) or an invalid observation
       // stays a fatal Left so it is not cached and the obscalc worker retries.
       private def acquisitionResult(
-        oid:          Observation.Id,
-        input:        ImagingInput,
-        targets:      NonEmptyList[ItcInput.TargetDefinition],
-        autoClassify: Boolean
+        oid:               Observation.Id,
+        input:             ImagingInput,
+        targets:           NonEmptyList[ItcInput.TargetDefinition],
+        autoClassify:      Boolean,
+        autoSignalToNoise: Boolean
       ): EitherT[F, OdbError, ItcAcquisition] =
         EitherT:
-          safeAcquisitionCall(oid, input, targets, autoClassify).value.map:
+          safeAcquisitionCall(oid, input, targets, autoClassify, autoSignalToNoise).value.map:
             case Right((z, t))                  => ItcAcquisition.Available(z, t).asRight
             case Left(e @ OdbError.ItcError(_)) => ItcAcquisition.Failed(e.detail.getOrElse("")).asRight
             case Left(other)                    => other.asLeft
@@ -711,14 +727,14 @@ object ItcService {
             case Some(input) =>
               for
                 sci <- science
-                acq <- acquisitionResult(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify)
+                acq <- acquisitionResult(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
               yield sci.copy(acquisition = acq)
 
         def spectroscopy(sp: ItcInput.Spectroscopy): EitherT[F, OdbError, Itc] =
           for
             cr  <- callSpectroscopy(sp.scienceInput)
             sci <- EitherT.fromEither(toTargetResults(sp.targets, NonEmptyList.one(cr), sp.signalToNoiseTargetId).map(_.head))
-            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
+            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
           yield Itc(acq, ItcScience.Spectroscopy(sci))
 
         // GNIRS spectroscopy: one science call per central wavelength, plus the
@@ -734,7 +750,7 @@ object ItcService {
                      Keyed.GnirsSpectroscopy,
                      client.spectroscopy(_, useCache = false)
                    )
-            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
+            acq <- acquisitionResult(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
           yield Itc(acq, sci)
 
         // Modes with no acquisition sequence: the science call is the whole result.
@@ -745,11 +761,11 @@ object ItcService {
           yield Itc(ItcAcquisition.NotApplicable, ItcScience.Spectroscopy(sci))
 
         (input match
-          case im @ ItcInput.Imaging(_, _, _, _, _) =>
+          case im @ ItcInput.Imaging(_, _, _, _, _, _) =>
             imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _, _, _) =>
+          case sp @ ItcInput.Spectroscopy(_, _, _, _, _, _, _) =>
             spectroscopy(sp)
-          case sp @ ItcInput.GnirsSpectroscopy(_, _, _, _, _, _) =>
+          case sp @ ItcInput.GnirsSpectroscopy(_, _, _, _, _, _, _) =>
             gnirsSpectroscopy(sp)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets, _) =>
             ghost(gh, targets)
@@ -770,14 +786,55 @@ object ItcService {
         oid:     Observation.Id,
         input:   ItcInput,
         results: Itc
-      ): F[Unit] =
+      )(using Transaction[F]): F[Unit] =
         val h = Md5Hash.unsafeFromByteArray(input.md5)
         session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results)
           .void
           .recoverWith {
             case SqlState.ForeignKeyViolation(ex) =>
               L.info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
-          }
+          } *> updateDerivedAcquisitionSignalToNoise(oid, input, results.acquisition)
+
+      /**
+       * Publishes the GNIRS acquisition signal-to-noise that follows from the brightness
+       * classification the ITC just computed.
+       *
+       * This runs in the same transaction as the ITC result, so the stored acquisition
+       * exposure time mode and the sequence sized from it can never disagree.  The write
+       * only touches a *derived* row, so a value the user set is never overwritten, and it
+       * is skipped when the value is unchanged -- which matters, because
+       * t_exposure_time_mode carries both an observation-edit notify trigger and
+       * etm_obscalc_invalidate_trigger.  A changed classification therefore costs exactly
+       * one extra obscalc round: the next pass finds the ITC result cached (the derived S/N
+       * is deliberately absent from the input hash -- see
+       * AcquisitionConfig.itcExposureTimeMode), derives the same value, writes nothing, and
+       * settles.
+       */
+      private def updateDerivedAcquisitionSignalToNoise(
+        oid:         Observation.Id,
+        input:       ItcInput,
+        acquisition: ItcAcquisition
+      )(using Transaction[F]): F[Unit] =
+        val auto: Boolean =
+          input match
+            case i: ItcInput.Imaging                 => i.gnirsAcqAutoSignalToNoise
+            case i: ItcInput.Spectroscopy            => i.gnirsAcqAutoSignalToNoise
+            case i: ItcInput.GnirsSpectroscopy       => i.gnirsAcqAutoSignalToNoise
+            case _: ItcInput.ScienceOnlySpectroscopy => false
+
+        val acqType: Option[GnirsAcquisitionType] =
+          acquisition match
+            case ItcAcquisition.Available(_, t) => t
+            case _                              => none
+
+        acqType
+          .filter(_ => auto)
+          .fold(F.unit): t =>
+            exposureTimeModeService.updateDerivedSignalToNoise(
+              List(oid),
+              ExposureTimeModeRole.Acquisition,
+              gnirs.acquisitionSignalToNoise(t)
+            )
 
       override def freeze(
         oid:    Observation.Id,
@@ -790,6 +847,9 @@ object ItcService {
           .recoverWith:
             case SqlState.ForeignKeyViolation(ex) =>
               L.info(ex)(s"Failed to freeze ITC result for observation $oid. Probably due to a deleted observation.")
+          // Pin the derived acquisition S/N to the frozen classification, so the published
+          // value and the sequence being executed agree from here on.
+          *> updateDerivedAcquisitionSignalToNoise(oid, input, result.acquisition)
 
       override def callRemoteAcquisition(
         oid: Observation.Id
@@ -809,13 +869,13 @@ object ItcService {
           .flatMap: params =>
             params.itcInput match
               case ItcInputDerivation.Ready(sp: ItcInput.Spectroscopy)           =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
+                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
                   .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
               // GNIRS spectroscopy has a single acquisition pass regardless of how
               // many central wavelengths the science side has.
               case ItcInputDerivation.Ready(sp: ItcInput.GnirsSpectroscopy)      =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify)
+                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
                   .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
               // GNIRS imaging has an acquisition sequence; other imaging modes don't
@@ -824,7 +884,7 @@ object ItcService {
                 im.acquisitionInput match
                   case None        => NotApplicable
                   case Some(input) =>
-                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify)
+                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
                       .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
               // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
@@ -844,6 +904,7 @@ object ItcService {
 
       override def updateAcquisition(
         oid:         Observation.Id,
+        input:       ItcInput,
         acquisition: ItcAcquisition
       )(using Transaction[F]): F[Unit] =
         session.execute(Statements.UpdateItcAcquisition)(oid, acquisition)
@@ -851,6 +912,7 @@ object ItcService {
           .recoverWith:
             case SqlState.ForeignKeyViolation(ex) =>
               L.info(ex)(s"Failed to update ITC acquisition for observation $oid. Probably due to a deleted observation.")
+          *> updateDerivedAcquisitionSignalToNoise(oid, input, acquisition)
 
       private def insertOrUpdateFailure(
         pid:   Program.Id,

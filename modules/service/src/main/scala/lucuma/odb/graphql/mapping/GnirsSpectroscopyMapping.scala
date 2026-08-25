@@ -58,7 +58,11 @@ trait GnirsSpectroscopyMapping[F[_]]
         List("acqSkyOffPRaw", "acqSkyOffQRaw")
       ),
 
+      // The effective acquisition exposure time mode, and the explicit override.
+      // Both read the same t_exposure_time_mode row; the explicit one is keyed on the
+      // view's c_explicit_* columns so it is null when the mode is derived.
       SqlObject("exposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
+      SqlObject("explicitExposureTimeMode", Join(GnirsSpectroscopyView.ObservationId, ExposureTimeModeView.ObservationId)),
     )
 
   /**
@@ -78,8 +82,12 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlObject("exposureTimeMode", Join(GnirsCentralWavelengthConfigTable.ExposureTimeModeId, ExposureTimeModeView.Id))
     )
 
-  lazy val GnirsSpectroscopyMapping: ObjectMapping =
-    ObjectMapping(GnirsSpectroscopyType)(
+  /**
+   * Everything long slit and IFU have in common.  Shared by the two per-mode
+   * types and by the deprecated combined `GnirsSpectroscopy`.
+   */
+  private def commonFields: List[FieldMapping] =
+    List(
 
       SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
 
@@ -101,11 +109,6 @@ trait GnirsSpectroscopyMapping[F[_]]
       // Camera + Filter
       SqlField("camera",        GnirsSpectroscopyView.Camera),
       SqlField("initialCamera", GnirsSpectroscopyView.InitialCamera),
-      // FPU + telescope configs are grouped, by variant, into the slit / ifu
-      // sub-objects. Exactly one is non-null per row (discriminated by which FPU
-      // column is set); see GnirsSlitMapping / GnirsIfuMapping.
-      SqlObject("slit"),
-      SqlObject("ifu"),
       SqlField("filter",        GnirsSpectroscopyView.Filter),
       SqlField("initialFilter", GnirsSpectroscopyView.InitialFilter),
 
@@ -134,12 +137,14 @@ trait GnirsSpectroscopyMapping[F[_]]
 
     )
 
-  // Long-slit variant. Keyed on c_fpu_slit (embedded): null for IFU rows, so the
-  // whole object resolves to null on `GnirsSpectroscopy.slit` for IFU observations.
-  lazy val GnirsSlitMapping: ObjectMapping =
-    ObjectMapping(GnirsSlitType)(
-
-      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
+  /**
+   * FPU and telescope configs for the long slit.  `fpu` is a key on the embedded
+   * (FailedJoin-on-null) column alias, so the object resolves to null on an IFU
+   * row -- whether it appears as `GnirsSpectroscopy.slit` or as the whole
+   * `ObservingMode.gnirsLongSlit`.
+   */
+  private def longSlitFields: List[FieldMapping] =
+    List(
 
       SqlField("fpu",        GnirsSpectroscopyView.FpuSlitConfig, key = true),
       SqlField("initialFpu", GnirsSpectroscopyView.InitialFpuSlitConfig),
@@ -158,25 +163,47 @@ trait GnirsSpectroscopyMapping[F[_]]
       slitTelescopeConfigsField("defaultTelescopeConfigs", "slitOffsetModeDefRaw", "tcDefRaw"),
       // explicit (nullable): present only when an explicit override is set.
       explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "tcExpRaw"),
+
     )
 
-  // IFU variant. Keyed on c_fpu_ifu (embedded): null for long slit rows, so the
-  // whole object resolves to null on `GnirsSpectroscopy.ifu` for long slit observations.
-  lazy val GnirsIfuMapping: ObjectMapping =
-    ObjectMapping(GnirsIfuType)(
-
-      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true),
+  /** The IFU counterpart of `longSlitFields`, keyed on c_fpu_ifu. */
+  private def ifuFields: List[FieldMapping] =
+    List(
 
       SqlField("fpu",        GnirsSpectroscopyView.FpuIfuConfig, key = true),
       SqlField("initialFpu", GnirsSpectroscopyView.InitialFpuIfuConfig),
 
       // IFU configs are a single stored value (seeded at creation), a plain
-      // [TelescopeConfig] with no slit offset mode — no default / explicit split.
+      // [TelescopeConfig] with no slit offset mode -- no default / explicit split.
       SqlField("tcRaw", GnirsSpectroscopyView.TelescopeConfigsEffective, hidden = true),
       CursorFieldJson("telescopeConfigs",
         cursor => cursor.field("tcRaw", None).flatMap(_.as[String]).flatMap(ifuTelescopeConfigsJson),
         List("tcRaw")
       ),
+
+    )
+
+  lazy val GnirsLongSlitMapping: ObjectMapping =
+    ObjectMapping(GnirsLongSlitType)(commonFields ++ longSlitFields*)
+
+  lazy val GnirsIfuMapping: ObjectMapping =
+    ObjectMapping(GnirsIfuType)(commonFields ++ ifuFields*)
+
+  /**
+   * The deprecated combined view of the two modes, which keeps the FPU and
+   * telescope configs behind `slit` / `ifu` sub-objects instead of inlining them.
+   */
+  lazy val GnirsSpectroscopyMapping: ObjectMapping =
+    ObjectMapping(GnirsSpectroscopyType)(commonFields ++ List(SqlObject("slit"), SqlObject("ifu"))*)
+
+  lazy val GnirsSpectroscopyLongSlitMapping: ObjectMapping =
+    ObjectMapping(GnirsSpectroscopyLongSlitType)(
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true) +: longSlitFields*
+    )
+
+  lazy val GnirsSpectroscopyIfuMapping: ObjectMapping =
+    ObjectMapping(GnirsSpectroscopyIfuType)(
+      SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true) +: ifuFields*
     )
 
   // Order the central wavelengths by increasing wavelength -- the order the
@@ -189,13 +216,13 @@ trait GnirsSpectroscopyMapping[F[_]]
       )
 
   lazy val GnirsSpectroscopyElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
-    case (GnirsSpectroscopyType, "centralWavelengths", Nil) =>
+    case (GnirsLongSlitType | GnirsIfuType | GnirsSpectroscopyType, "centralWavelengths", Nil) =>
       wavelengthElaborator(ObservingModeRowVersion.Current)
 
-    case (GnirsSpectroscopyType, "initialCentralWavelengths", Nil) =>
+    case (GnirsLongSlitType | GnirsIfuType | GnirsSpectroscopyType, "initialCentralWavelengths", Nil) =>
       wavelengthElaborator(ObservingModeRowVersion.Initial)
 
-    case (GnirsSpectroscopyAcquisitionType, "exposureTimeMode", Nil) =>
+    case (GnirsSpectroscopyAcquisitionType, "exposureTimeMode" | "explicitExposureTimeMode", Nil) =>
       Elab.transformChild: child =>
         Unique(
           Filter(

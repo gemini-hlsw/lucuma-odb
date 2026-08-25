@@ -35,12 +35,14 @@ import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.defaultIfuTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.data.Nullable
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GnirsCentralWavelengthConfigInput
 import lucuma.odb.graphql.input.GnirsSpectroscopyInput
+import lucuma.odb.sequence.gnirs as gnirs
 import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.gnirs.spectroscopy.Acquisition
 import lucuma.odb.sequence.gnirs.spectroscopy.CentralWavelengthConfig
@@ -127,7 +129,8 @@ object GnirsSpectroscopyService:
         gnirs_filter.opt                 *: // c_acq_filter (explicit override; None => mode default)
         angle_µas.opt                    *: // c_acq_sky_offset_p
         angle_µas.opt                    *: // c_acq_sky_offset_q
-        exposure_time_mode               *: // acquisition ETM
+        exposure_time_mode               *: // acquisition ETM (effective)
+        bool                             *: // c_is_explicit
         telluric_type                       // c_telluric_type
       ).emap:
         case (centralWav *: sciEtm *: coadds *:
@@ -139,7 +142,7 @@ object GnirsSpectroscopyService:
               focusMotorSteps *:
               slitOffsetModeEff *: tcEff *:
               acqType *: acqCoadds *: acqFilterExp *: acqSkyOffP *: acqSkyOffQ *:
-              acqEtm *: telluricType *: EmptyTuple) =>
+              acqEtm *: acqEtmExplicit *: telluricType *: EmptyTuple) =>
           // IFU (slit offset mode NULL) carries a plain [TelescopeConfig]; long slit resolves
           // its SlitTelescopeConfigs to the same.
           val telescopeConfigs: Either[String, NonEmptyList[TelescopeConfig]] =
@@ -166,7 +169,7 @@ object GnirsSpectroscopyService:
                             .getOrElse(Acquisition.defaultFaintSkyOffset(fpu))
                         val explicitAcqMode: Option[GnirsAcquisitionMode] =
                           acqType.map(GnirsAcquisitionMode.forTypeAndOffset(_, acqSkyOffset))
-                        val acq = AcquisitionConfig(explicitAcqMode, acqFilterExp, acqEtm, acqCoaddsP)
+                        val acq = AcquisitionConfig(explicitAcqMode, acqFilterExp, acqEtm, acqEtmExplicit, acqCoaddsP)
                         val focus = focusMotorSteps.fold(GnirsFocus.Best): n =>
                           GnirsFocus.Custom(GnirsFocusMotorStepsValue.unsafeFrom(n).withUnit[GnirsFocusMotorStep])
                         val sw = CentralWavelengthConfig(centralWav, sciEtm, coaddsP)
@@ -241,7 +244,7 @@ object GnirsSpectroscopyService:
         req:    Option[ExposureTimeMode],
         which:  List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
-        val acqEtm: Option[ExposureTimeMode] = input.acquisition.flatMap(_.exposureTimeMode)
+        val acqEtm: Option[ExposureTimeMode] = input.acquisition.flatMap(_.explicitExposureTimeMode.toOption)
         (for
           _   <- ResultT.liftF:
                    which.traverse: oid =>
@@ -249,10 +252,19 @@ object GnirsSpectroscopyService:
                    .void
 
           // Resolve the ETMs for acquisition and each central wavelength.  An explicit
-          // acquisition ETM wins; otherwise it is derived from the first science ETM.
-          r   <- ResultT(exposureTimeModeService.resolve("GNIRS Spectroscopy", acqEtm, input.centralWavelengths.map(resolveKey), req, which))
+          // acquisition ETM wins; otherwise it is derived from the brightness
+          // classification, at the first science ETM's wavelength, and the ITC maintains it
+          // from there.
+          r   <- ResultT(exposureTimeModeService.resolve(
+                   "GNIRS Spectroscopy",
+                   acqEtm,
+                   input.centralWavelengths.map(resolveKey),
+                   req,
+                   which,
+                   gnirs.derivedAcquisitionExposureTimeMode(input.acquisition.flatMap(_.explicitAcqType.toOption), _)
+                 ))
 
-          ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r))
+          ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r, acquisitionIsExplicit = acqEtm.isDefined))
           _   <- ResultT.liftF(insertWavelengths(input.centralWavelengths, stripAcquisition(ids), ObservingModeRowVersion.Initial))
 
           // The 'current' rows need their own ETM rows (each wavelength row backs
@@ -282,12 +294,25 @@ object GnirsSpectroscopyService:
             _   <- ResultT.liftF(insertWavelengths(ws, cur, ObservingModeRowVersion.Current))
           yield ()
 
+      // Absent leaves the acquisition ETM alone, an explicit mode replaces it, and null
+      // reverts it to derived (keeping the current value as a prior until the next ITC
+      // pass).  When the acquisition *type* is set explicitly the S/N follows from it with
+      // no ITC involvement, so apply that immediately -- but only to a derived row.
       private def updateAcquisitionExposureTimeMode(
         input: GnirsSpectroscopyInput.Edit,
         which: List[Observation.Id]
       )(using Transaction[F]): F[Unit] =
-        input.acquisition.flatMap(_.exposureTimeMode).fold(().pure[F]): e =>
-          services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Acquisition, e)
+        val etmUpdate =
+          input.acquisition.map(_.explicitExposureTimeMode) match
+            case Some(Nullable.NonNull(e)) => services.exposureTimeModeService.updateMany(which, ExposureTimeModeRole.Acquisition, e, isExplicit = true)
+            case Some(Nullable.Null)       => services.exposureTimeModeService.setDerived(which, ExposureTimeModeRole.Acquisition, gnirs.acquisitionSignalToNoise(GnirsAcquisitionType.Faint))
+            case _                         => ().pure[F]
+
+        val snUpdate =
+          input.acquisition.flatMap(_.explicitAcqType.toOption).fold(().pure[F]): t =>
+            services.exposureTimeModeService.updateDerivedSignalToNoise(which, ExposureTimeModeRole.Acquisition, gnirs.acquisitionSignalToNoise(t))
+
+        etmUpdate *> snUpdate
 
       // A NonNull telescope-config override of a specific kind must match the persisted FPU.
       // The input validates this against an edited FPU; when the FPU is unchanged we check the
@@ -369,6 +394,7 @@ object GnirsSpectroscopyService:
           acq.c_signal_to_noise,
           acq.c_exposure_time,
           acq.c_exposure_count,
+          acq.c_is_explicit,
           ls.c_telluric_type
         FROM v_gnirs_spectroscopy ls
         JOIN t_gnirs_central_wavelength_config w

@@ -33,9 +33,9 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.otel.*
 import lucuma.odb.otel.given
+import lucuma.odb.sequence.gnirs as gnirs
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
-import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
@@ -374,12 +374,13 @@ object PerScienceObservationCalibrationsService:
         // inserts where none does, so the end state is the same for every other
         // mode.
         def replaceEtm(
-          role:    ExposureTimeModeRole,
-          newEtm:  ExposureTimeMode,
-          current: Option[ExposureTimeMode]
+          role:       ExposureTimeModeRole,
+          newEtm:     ExposureTimeMode,
+          current:    Option[ExposureTimeMode],
+          isExplicit: Boolean = true
         ): F[Unit] =
           exposureTimeModeService
-            .updateMany(List(telluricOid), role, newEtm)
+            .updateMany(List(telluricOid), role, newEtm, isExplicit)
             .unlessA(current.contains(newEtm))
             .void
 
@@ -394,11 +395,18 @@ object PerScienceObservationCalibrationsService:
                             oid -> roles(ExposureTimeModeRole.Acquisition).head
           scienceEtm  = allSciEtm.get(scienceOid)
           _          <- scienceEtm.traverse_ : etm =>
-                          // Normally there is a single acq etm but is safe to go over all of them
-                          val acqEtm = allAcqEtm.get(scienceOid).map(a => ExposureTimeMode.forAcquisition(a.at))
+                          // Normally there is a single acq etm but is safe to go over all of them.
+                          //
+                          // The telluric's acquisition is *reset*, not copied: the standard is a
+                          // different (much brighter) star, so the science target's acquisition
+                          // S/N means nothing for it.  Writing it as derived lets the telluric's
+                          // own ITC brightness classification set the S/N, which is the whole
+                          // point of the derivation.  Tellurics only exist for cross-dispersed
+                          // GNIRS, so this is always a GNIRS acquisition.
+                          val acqEtm = allAcqEtm.get(scienceOid).map(a => gnirs.derivedAcquisitionExposureTimeMode(none, a.at))
 
                           replaceEtm(ExposureTimeModeRole.Science, telluricEtm(etm), allSciEtm.get(telluricOid)) *>
-                            acqEtm.traverse_(replaceEtm(ExposureTimeModeRole.Acquisition, _, allAcqEtm.get(telluricOid)))
+                            acqEtm.traverse_(replaceEtm(ExposureTimeModeRole.Acquisition, _, allAcqEtm.get(telluricOid), isExplicit = false))
         } yield ()
 
       private def syncConfiguration(

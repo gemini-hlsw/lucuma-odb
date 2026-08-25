@@ -67,9 +67,6 @@ jobs:
       - name: Docker compose up
         run: docker compose up -d
 
-      - name: Check that workflows are up to date
-        run: sbt -v -J-Xmx6g githubWorkflowCheck
-
       - name: Test
         env:
           TEST_SHARD_COUNT: 8
@@ -190,7 +187,7 @@ jobs:
         run: sbt -v -J-Xmx6g +update
 
       - name: Static checks
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck 'scalafixAll --check' mimaReportBinaryIssues doc
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck 'scalafixAll --check' mimaReportBinaryIssues doc
 
       - name: Install npm dependencies
         if: github.event_name == 'pull_request'

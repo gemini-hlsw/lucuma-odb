@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
 import lucuma.core.enums.AttachmentType
@@ -16,14 +17,18 @@ import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.SlitOffsetMode
+import lucuma.core.math.Wavelength
 import lucuma.core.model.Attachment
 import lucuma.core.model.Defined
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.MaskDefinition
 import lucuma.core.model.Observation
 import lucuma.core.model.TelluricType
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2MosInput
@@ -33,6 +38,7 @@ import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
 import lucuma.odb.sequence.flamingos2.spectroscopy.Config.Common
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.refined.*
 import skunk.*
 import skunk.codec.text.text
 import skunk.implicits.*
@@ -64,6 +70,12 @@ object Flamingos2MosService:
 
   val MaskAttachmentViolationMessage: String =
     "The MOS mask attachment must exist, be of type 'mos_mask', and belong to the same program as the observation."
+
+  private val DefaultAcquisitionCount: PosInt = 1.refined
+
+  /** Default MOS acquisition exposure time mode: Time & Count, 5 seconds, count 1. */
+  def defaultAcquisitionExposureTimeMode(at: Wavelength): ExposureTimeMode =
+    ExposureTimeMode.TimeAndCountMode(5.secondTimeSpan, DefaultAcquisitionCount, at)
 
   def instantiate[F[_]: {Concurrent as F, Services}]: Flamingos2MosService[F] =
 
@@ -128,13 +140,24 @@ object Flamingos2MosService:
           case SqlState.ForeignKeyViolation(e) if e.constraintName.exists(_.contains("mask_attachment_fkey")) =>
             Result.failure(MaskAttachmentViolationMessage)
 
+      private def validateMask(
+        mask:  Flamingos2FpuMask.Custom,
+        which: List[Observation.Id]
+      )(using Transaction[F]): F[Result[Unit]] =
+        attachmentMetadataService.validateMaskInstrument(
+          MaskDefinition.defined.getOption(mask.mask).map(_.id),
+          Instrument.Flamingos2,
+          which
+        )
+
       override def insert(
         input: Flamingos2MosInput.Create,
         req:   Option[ExposureTimeMode],
         which: List[Observation.Id]
       )(using Transaction[F]): F[Result[Unit]] =
         (for
-          _ <- ResultT(exposureTimeModeService.insertOneWithDefaults("Flamingos 2 MOS", input.acquisition.flatMap(_.exposureTimeMode), input.exposureTimeMode, req, which).map(_.void))
+          _ <- ResultT(validateMask(input.customMask, which))
+          _ <- ResultT(exposureTimeModeService.insertOneWithDefaults("Flamingos 2 MOS", input.acquisition.flatMap(_.exposureTimeMode), input.exposureTimeMode, req, which, defaultAcquisitionExposureTimeMode).map(_.void))
           _ <- ResultT(translateMaskViolation(which.traverse(oid => session.exec(Statements.insertFlamingos2Mos(oid, input))).void))
         yield ()).value
 
@@ -149,11 +172,12 @@ object Flamingos2MosService:
           etm.fold(F.unit): e =>
             services.exposureTimeModeService.updateMany(which, role, e)
 
-        for
-          _ <- updateEtm(SET.common.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition)
-          _ <- updateEtm(SET.common.exposureTimeMode, ExposureTimeModeRole.Science)
-          r <- translateMaskViolation(Statements.updateFlamingos2Mos(SET, which).fold(F.unit)(session.exec))
-        yield r
+        (for
+          _ <- ResultT(SET.customMask.fold(Result.unit.pure[F])(validateMask(_, which)))
+          _ <- ResultT(updateEtm(SET.common.acquisition.flatMap(_.exposureTimeMode), ExposureTimeModeRole.Acquisition).map(Result.success))
+          _ <- ResultT(updateEtm(SET.common.exposureTimeMode, ExposureTimeModeRole.Science).map(Result.success))
+          _ <- ResultT(translateMaskViolation(Statements.updateFlamingos2Mos(SET, which).fold(F.unit)(session.exec)))
+        yield ()).value
 
       override def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit] =
         session.exec(Statements.cloneFlamingos2Mos(originalId, newId))

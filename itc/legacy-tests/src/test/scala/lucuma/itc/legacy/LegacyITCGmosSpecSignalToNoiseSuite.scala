@@ -51,7 +51,8 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
         GmosAmpReadMode.Fast
       ).some,
       GmosRoi.FullFrame.some,
-      PortDisposition.Side
+      PortDisposition.Side,
+      none
     )
   )
 
@@ -70,7 +71,8 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
                 GmosAmpReadMode.Fast
     ).some,
     GmosRoi.FullFrame.some,
-    PortDisposition.Side
+    PortDisposition.Side,
+    none
   )
 
   test("gmos north grating".tag(LegacyITCTest)):
@@ -91,10 +93,12 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
     assertAllValid(Enumerated[GmosNorthFpu].all): f =>
       localItc
         .calculate(
-          bodyConf(sourceDefinition,
-                   obs,
-                   gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Builtin(f))),
-                   analysis = if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
+          bodyConf(
+            sourceDefinition,
+            obs,
+            gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Builtin(f))),
+            // Exercise the analysis method production would pick, IFU included.
+            analysis = gnConf.copy(fpu = GmosNorthFpuParam(GmosFpuMask.Builtin(f))).analysisMethod
           ).asJson.noSpaces
         )
 
@@ -121,7 +125,8 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
                 GmosAmpReadMode.Fast
     ).some,
     GmosRoi.FullFrame.some,
-    PortDisposition.Side
+    PortDisposition.Side,
+    none
   )
 
   test("gmos south grating".tag(LegacyITCTest)):
@@ -142,10 +147,11 @@ class LegacyITCGmosSpecSignalToNoiseSuite extends CommonITCLegacySuite:
     assertAllValid(Enumerated[GmosSouthFpu].all): f =>
       localItc
         .calculate(
-          bodyConf(sourceDefinition,
-                   obs,
-                   gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Builtin(f))),
-                   analysis = if (f.isIFU) ifuAnalysisMethod else lsAnalysisMethod
+          bodyConf(
+            sourceDefinition,
+            obs,
+            gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Builtin(f))),
+            analysis = gsConf.copy(fpu = GmosSouthFpuParam(GmosFpuMask.Builtin(f))).analysisMethod
           ).asJson.noSpaces
         )
 

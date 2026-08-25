@@ -142,12 +142,43 @@ object OdbSuite:
     val (scheduler, _) = IORuntime.createDefaultScheduler()
     IORuntime(compute, blocking, scheduler, () => (), IORuntimeConfig())
 
+  val dbImageEnv: Map[String, String] = Map(
+    "POSTGRES_USER"     -> PostgreSQLContainer.defaultUsername,
+    "POSTGRES_PASSWORD" -> PostgreSQLContainer.defaultPassword,
+    "POSTGRES_DB"       -> PostgreSQLContainer.defaultDatabaseName
+  )
+
+  /**
+   * A single image instance shared by all suites in the JVM. Concurrent suites would otherwise
+   * each run `docker build` against the same `lucuma-odb-test-db` tag and race on tagging it.
+   * `ImageFromDockerfile` memoizes its build result (double-checked in `LazyFuture`), so with a
+   * shared instance the first suite builds and the rest block on the same build.
+   */
+  val dbImage: ImageFromDockerfile =
+    // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
+    // start in the root directory of the project. In that case, the dockerfile is in the
+    // modules/service/src directory.
+    // However, using vscode test explorer with sbt, the tests start in 'modulues/service'.
+    // We'll handle both cases here.
+    val dockerPrefix = Paths.get("modules", "service")
+    val dockerSuffix = Paths.get("src", "Dockerfile")
+    val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
+      dockerSuffix
+    else
+      dockerPrefix.resolve(dockerSuffix)
+
+    new ImageFromDockerfile("lucuma-odb-test-db")
+      .withDockerfile(dockerPath)
+      .withBuildArgs(dbImageEnv.asJava)
+
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
  * among all tests.
  */
 abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with TestContainerForAll with DatabaseOperations with ServiceOperations with TestSsoClient with ChronicleOperations with RetryFlakyTests {
   override implicit def munitIoRuntime: IORuntime = OdbSuite.runtime
+
+  override def munitIOTimeout: Duration = 1.minute
 
   // This is generally useful so put it here
   given EntityEncoder[IO, Json] = jsonEncoderOf
@@ -203,34 +234,12 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     /**
      * Build a single PostgreSQL container for test suites. Runs all migrations and database initialization in the image build.
      *
-     * The image is built for the first suite, and the Docker cache will be used for subsequent suites. Skipping the long db initialization.
+     * The shared [[OdbSuite.dbImage]] is built once per JVM, for the first suite that needs it; subsequent (and concurrent) suites reuse it. Skipping the long db initialization.
      */
   override val containerDef: GenericContainer.Def[GenericContainer] =
-    val env = Map(
-      "POSTGRES_USER"     -> PostgreSQLContainer.defaultUsername,
-      "POSTGRES_PASSWORD" -> PostgreSQLContainer.defaultPassword,
-      "POSTGRES_DB"       -> PostgreSQLContainer.defaultDatabaseName
-    )
-
-    // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
-    // start in the root directory of the project. In that case, the dockerfile is in the
-    // modules/service/src directory.
-    // However, using vscode test explorer with sbt, the tests start in 'modulues/service'.
-    // We'll handle both cases here.
-    val dockerPrefix = Paths.get("modules", "service")
-    val dockerSuffix = Paths.get("src", "Dockerfile")
-    val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
-      dockerSuffix
-    else
-      dockerPrefix.resolve(dockerSuffix)
-
-    val image = new ImageFromDockerfile("lucuma-odb-test-db")
-      .withDockerfile(dockerPath)
-      .withBuildArgs(env.asJava)
-
     val dbContainer = GenericContainer(
-      image,
-      env = env,
+      OdbSuite.dbImage,
+      env = OdbSuite.dbImageEnv,
       exposedPorts = Seq(POSTGRESQL_PORT),
       waitStrategy = Wait
         .forLogMessage(".*database system is ready to accept connections.*", 1)
@@ -322,9 +331,9 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         val signal = Wavelength.fromIntNanometers(666).get
         val igrins2Signal = Wavelength.fromIntNanometers(2200).get
         val wavelength = input.mode match
-          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(_, d, _, _, _, _)      => d.wavelength
-          case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(_, w, _, _, _, _, _, _) => w
-          case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(_, w, _, _, _, _, _, _) => w
+          case lucuma.itc.client.InstrumentMode.Flamingos2Spectroscopy(disperser = d)        => d.wavelength
+          case lucuma.itc.client.InstrumentMode.GmosNorthSpectroscopy(centralWavelength = w) => w
+          case lucuma.itc.client.InstrumentMode.GmosSouthSpectroscopy(centralWavelength = w) => w
           case lucuma.itc.client.InstrumentMode.Igrins2Spectroscopy(_, _)                     => igrins2Signal
           case g: lucuma.itc.client.InstrumentMode.GnirsSpectroscopy                          => g.centralWavelength
           // If we need a wavelength for GHOST tests, we'll need to figure out one.

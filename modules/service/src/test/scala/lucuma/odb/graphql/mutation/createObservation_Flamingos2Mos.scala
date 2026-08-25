@@ -6,9 +6,11 @@ package mutation
 
 import cats.effect.IO
 import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.Flamingos2MosOffsetPreset
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
@@ -19,37 +21,18 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.flamingos2.defaultMosTelescopeConfigs
 import lucuma.odb.format.telescopeConfigs.*
-import lucuma.odb.util.Codecs.attachment_id
+import lucuma.odb.service.AttachmentMetadataService
 import lucuma.odb.util.Codecs.observation_id
-import lucuma.odb.util.Codecs.program_id
 import lucuma.odb.util.Codecs.slit_offset_mode
 import skunk.Query
 import skunk.codec.text.text
 import skunk.syntax.all.*
 
-class createObservation_Flamingos2Mos extends OdbSuite:
+class createObservation_Flamingos2Mos extends OdbSuite with MosMaskSupport:
 
   val pi: StandardUser = TestUsers.Standard.pi(nextId, nextId)
 
   lazy val validUsers: List[User] = List(pi)
-
-  // Insert the attachment directly rather than through the file service and S3,
-  // so the setup depends only on the database.
-  protected def insertMosMaskAttachment(pid: Program.Id, fileName: String): IO[Attachment.Id] =
-    val q: Query[(Program.Id, String, String), Attachment.Id] =
-      sql"""
-        INSERT INTO t_attachment (
-          c_program_id,
-          c_attachment_type,
-          c_file_name,
-          c_file_size,
-          c_remote_path,
-          c_mask_name
-        )
-        VALUES ($program_id, 'mos_mask', $text, 42, 'unused', $text)
-        RETURNING c_attachment_id
-      """.query(attachment_id)
-    withSession(_.unique(q)(pid, fileName, fileName.stripSuffix("_ODF.fits").toUpperCase))
 
   private def scienceRequirements: String =
     """
@@ -141,7 +124,7 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                 defaultFilter
                 explicitFilter
                 exposureTimeMode {
-                  signalToNoise { value at { nanometers } }
+                  timeAndCount { time { seconds } count at { nanometers } }
                 }
               }
               initialDisperser
@@ -184,8 +167,9 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                   "defaultFilter": "H",
                   "explicitFilter": null,
                   "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 10.000,
+                    "timeAndCount": {
+                      "time": { "seconds": 5.000000 },
+                      "count": 1,
                       "at": { "nanometers": 2100.000 }
                     }
                   }
@@ -203,7 +187,7 @@ class createObservation_Flamingos2Mos extends OdbSuite:
     for
       pid <- createProgramAs(pi)
       tid <- createTargetAs(pi, pid)
-      aid <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits")
+      aid <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.Flamingos2)
       oid <- create(pid, tid, s"""
                flamingos2Mos: {
                  disperser: R1200_HK
@@ -251,7 +235,7 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                 defaultFilter
                 explicitFilter
                 exposureTimeMode {
-                  signalToNoise { value at { nanometers } }
+                  timeAndCount { time { seconds } count at { nanometers } }
                 }
               }
             }
@@ -269,7 +253,7 @@ class createObservation_Flamingos2Mos extends OdbSuite:
         acquisition: {
           explicitFilter: K_SHORT
           exposureTimeMode: {
-            signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+            timeAndCount: { time: { seconds: 25.0 }, count: 2, at: { nanometers: 2200 } }
           }
         }
       }
@@ -284,8 +268,9 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                   "defaultFilter": "H",
                   "explicitFilter": "K_SHORT",
                   "exposureTimeMode": {
-                    "signalToNoise": {
-                      "value": 25.000,
+                    "timeAndCount": {
+                      "time": { "seconds": 25.000000 },
+                      "count": 2,
                       "at": { "nanometers": 2200.000 }
                     }
                   }
@@ -324,6 +309,41 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                  }
                """,
                expected = List("Argument 'input.SET.observingMode.flamingos2Mos.acquisition' is invalid: 'explicitFilter' must contain one of: J, H, K_SHORT").asLeft
+             )
+    yield ()
+
+  test("a signal-to-noise acquisition exposure time mode is rejected"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- expect(
+               user     = pi,
+               query    = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: {
+                         flamingos2Mos: {
+                           disperser: R1200_HK
+                           filter: H
+                           customMask: { slitWidth: CUSTOM_WIDTH_2_PIX }
+                           acquisition: {
+                             exposureTimeMode: {
+                               signalToNoise: { value: 25.0, at: { nanometers: 2200 } }
+                             }
+                           }
+                         }
+                       }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = List("Argument 'input.SET.observingMode.flamingos2Mos.acquisition' is invalid: A Flamingos 2 MOS acquisition exposure time mode must be Time & Count.").asLeft
              )
     yield ()
 
@@ -517,5 +537,43 @@ class createObservation_Flamingos2Mos extends OdbSuite:
                  }
                """,
                expected = List("Argument 'input.SET.observingMode.flamingos2Mos' is invalid: Flamingos 2 MOS does not support the 'OTHER' custom slit width.").asLeft
+             )
+    yield ()
+
+  test("create Flamingos 2 MOS with a GMOS mask is rejected"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      aid <- insertMosMaskAttachment(pid, "GS2025AQ001-01_ODF.fits", Instrument.GmosSouth)
+      _   <- expect(
+               user     = pi,
+               query    = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                     SET: {
+                       targetEnvironment: { asterism: ${List(tid).asJson} }
+                       scienceRequirements: { $scienceRequirements }
+                       observingMode: {
+                         flamingos2Mos: {
+                           disperser: R1200_HK
+                           filter: H
+                           customMask: {
+                             slitWidth: CUSTOM_WIDTH_4_PIX
+                             attachmentId: "$aid"
+                           }
+                         }
+                       }
+                     }
+                   }) {
+                     observation { id }
+                   }
+                 }
+               """,
+               expected = List(AttachmentMetadataService.maskInstrumentMismatchMessage(
+                 NonEmptyString.unsafeFrom("GS2025AQ001-01"),
+                 Instrument.GmosSouth,
+                 Instrument.Flamingos2
+               )).asLeft
              )
     yield ()

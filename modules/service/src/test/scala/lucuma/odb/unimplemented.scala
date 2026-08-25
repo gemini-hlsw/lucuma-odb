@@ -16,7 +16,9 @@ val UnImplementedModes: Set[ObservingModeType] =
     ObservingModeType.Flamingos2Imaging,
     ObservingModeType.GnirsImaging,
     ObservingModeType.GnirsLongSlit,
-    ObservingModeType.GnirsIfu
+    ObservingModeType.GnirsIfu,
+    ObservingModeType.GmosNorthIfu,
+    ObservingModeType.GmosSouthIfu
   )
 
 extension (mode: ObservingModeType)

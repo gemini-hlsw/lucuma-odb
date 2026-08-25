@@ -263,7 +263,12 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
           e.canRead(user) &&
           input.flatMap(_.programId).forall(_ === e.programId) &&
           input.flatMap(_.observationId).forall(_ === e.observationId) &&
-          input.flatMap(_.tooTriggerId).forall(_ === e.triggerId)
+          input.flatMap(_.tooTriggerId).forall(_ === e.triggerId) &&
+          // Matched in memory, as obscalcUpdate matches its calculation states.
+          // The activation the event carries is the trigger's own, fixed at
+          // creation -- so a supersession is matched by the predecessor's
+          // activation on the way out and the successor's on the way in.
+          input.flatMap(_.tooActivation).forall(_.matches(e.activation))
         }
         .map { e =>
           Result(

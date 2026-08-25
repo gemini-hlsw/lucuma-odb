@@ -9,18 +9,26 @@ import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
+import fs2.Chunk
 import fs2.Stream
 import fs2.io.file.Path
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.catalog.mos.MosMaskProblem
+import lucuma.catalog.mos.MosMaskReader
 import lucuma.core.enums.AttachmentType
 import lucuma.core.model.Attachment
 import lucuma.core.model.GuestUser
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.NewType
+import lucuma.odb.data.MaskDefinition
+import lucuma.odb.json.maskDefinition.given
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
+import skunk.circe.codec.all.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
 
@@ -73,6 +81,11 @@ object AttachmentFileService {
   def duplicateMaskNameMsg(maskName: NonEmptyString): String =
     s"$DuplicateMaskNameMsg: ${maskName.value}"
 
+  val AttachmentInUseMsg = "The attachment is in use and cannot be deleted."
+
+  val MaskInstrumentInUseMsg =
+    "The attachment is in use by an observation and the replacement file is for a different instrument."
+
   sealed trait AttachmentException extends Exception {
     def asLeftT[F[_]: Applicative, A]: EitherT[F, AttachmentException, A] =
       EitherT.leftT(this)
@@ -82,7 +95,7 @@ object AttachmentFileService {
     case object Forbidden                      extends AttachmentException
     case class InvalidRequest(message: String) extends AttachmentException
     case object FileNotFound                   extends AttachmentException
-    case object AttachmentInUse                extends AttachmentException
+    case class AttachmentInUse(message: String) extends AttachmentException
   }
 
   import AttachmentException.*
@@ -176,9 +189,17 @@ object AttachmentFileService {
         case GppMaskFileName(root) => maskName(root)
         case _                     => InvalidRequest(InvalidMaskFileNameMsg).asLeft
 
+  val EmptyFileMsg = "File cannot be empty"
+
   def checkForEmptyFile(fileSize: Long): Either[AttachmentException, Unit] =
-    if (fileSize <= 0) InvalidRequest("File cannot be empty").asLeft
+    if (fileSize <= 0) InvalidRequest(EmptyFileMsg).asLeft
     else ().asRight
+
+  def invalidMaskFileMsg(problem: MosMaskProblem): String =
+    s"Invalid MOS mask file. ${problem.displayValue}"
+
+  val MissingPositionAngleMsg =
+    "Invalid MOS mask file. The design records no position angle (MASK_PA), so it cannot be observed."
 
   def instantiate[F[_]: {Concurrent, Tracer as T, UUIDGen}](
     s3FileSvc: S3FileService[F]
@@ -211,6 +232,7 @@ object AttachmentFileService {
       attachmentType: AttachmentType,
       fileName:       FileName,
       maskName:       Option[NonEmptyString],
+      maskDefinition: Option[Json],
       description:    Option[NonEmptyString],
       fileSize:       Long,
       remotePath:     NonEmptyString
@@ -221,6 +243,7 @@ object AttachmentFileService {
                                                attachmentType,
                                                fileName.value,
                                                maskName,
+                                               maskDefinition,
                                                description,
                                                fileSize,
                                                remotePath
@@ -237,18 +260,20 @@ object AttachmentFileService {
       }
 
     def updateAttachmentInDB(
-      programId:    Program.Id,
-      attachmentId: Attachment.Id,
-      fileName:     FileName,
-      maskName:     Option[NonEmptyString],
-      description:  Option[NonEmptyString],
-      fileSize:     Long,
-      remotePath:   NonEmptyString
+      programId:      Program.Id,
+      attachmentId:   Attachment.Id,
+      fileName:       FileName,
+      maskName:       Option[NonEmptyString],
+      maskDefinition: Option[Json],
+      description:    Option[NonEmptyString],
+      fileSize:       Long,
+      remotePath:     NonEmptyString
     ): F[Either[AttachmentException, Unit]] =
       T.span("updateAttachment").surround {
         session
           .unique(Statements.UpdateAttachment)(fileName.value,
                                                maskName,
+                                               maskDefinition,
                                                description,
                                                fileSize,
                                                remotePath,
@@ -264,6 +289,9 @@ object AttachmentFileService {
               InvalidRequest(DuplicateMaskNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_file_name")) =>
               InvalidRequest(DuplicateFileNameMsg).asLeft
+            // Triggered in case the mask instrument changes and it is in use with a different one.
+            case SqlState.ForeignKeyViolation(e) if e.constraintName.exists(_.contains("mask_attachment_fkey")) =>
+              AttachmentInUse(MaskInstrumentInUseMsg).asLeft
           }
       }
 
@@ -292,7 +320,7 @@ object AttachmentFileService {
           .option(Statements.DeleteAttachment)(attachmentId)
           .map(_.toRight(FileNotFound))
           .recover:
-            case SqlState.ForeignKeyViolation(_) => AttachmentInUse.asLeft
+            case SqlState.ForeignKeyViolation(_) => AttachmentInUse(AttachmentInUseMsg).asLeft
       }
 
     def checkForDuplicateName(
@@ -363,6 +391,39 @@ object AttachmentFileService {
     def filePath(programId: Program.Id, remoteId: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString =
       s3FileSvc.filePath(programId, remoteId, fileName)
 
+    // A MOS mask file is parsed at upload so its design can be recorded on
+    // the attachment.
+    // Mask files are small, so the body is buffered in memory to parse and
+    // upload from the same bytes.
+    def parseMaskDefinition(
+      maskName: NonEmptyString,
+      data:     Stream[F, Byte]
+    ): F[Either[AttachmentException, (Stream[F, Byte], Option[Json])]] =
+      T.span("parseMaskDefinition").surround:
+        data.compile.to(Chunk).flatMap: bytes =>
+          val buffered = Stream.chunk(bytes).covary[F]
+          if bytes.isEmpty then
+            InvalidRequest(EmptyFileMsg).asLeft.pure
+          else
+            (for {
+              header <- buffered.through(MosMaskReader.header[F]).compile.lastOrError
+              slits  <- buffered.through(MosMaskReader.slits[F]).compile.toList
+              result  = MaskDefinition
+                          .fromMosMask(maskName, header, slits)
+                          .toRight(InvalidRequest(MissingPositionAngleMsg))
+                          .map(d => (buffered, d.asJson.some))
+            } yield result)
+              .recover { case p: MosMaskProblem => InvalidRequest(invalidMaskFileMsg(p)).asLeft }
+
+    def maybeParseMaskDefinition(
+      attachmentType: AttachmentType,
+      maskName:       Option[NonEmptyString],
+      data:           Stream[F, Byte]
+    ): F[Either[AttachmentException, (Stream[F, Byte], Option[Json])]] =
+      maskName.filter(_ => attachmentType === AttachmentType.MosMask) match
+        case Some(mn) => parseMaskDefinition(mn, data)
+        case None     => (data, none[Json]).asRight.pure
+
     new AttachmentFileService[F] {
 
       def getAttachment(
@@ -416,16 +477,18 @@ object AttachmentFileService {
           .asEitherT
           .flatMap((fn, mn, path) =>
             for {
-              size   <- Services.asSuperUser(s3FileSvc.upload(path, data)).right
-              _      <- checkForEmptyFile(size).liftF
-              result <- insertAttachmentInDB(programId,
-                                             attachmentType,
-                                             fn,
-                                             mn,
-                                             description,
-                                             size,
-                                             path
-                        ).asEitherT
+              (upload, md) <- maybeParseMaskDefinition(attachmentType, mn, data).asEitherT
+              size         <- Services.asSuperUser(s3FileSvc.upload(path, upload)).right
+              _            <- checkForEmptyFile(size).liftF
+              result       <- insertAttachmentInDB(programId,
+                                                   attachmentType,
+                                                   fn,
+                                                   mn,
+                                                   md,
+                                                   description,
+                                                   size,
+                                                   path
+                              ).asEitherT
             } yield result
           )
           .value
@@ -440,18 +503,18 @@ object AttachmentFileService {
         (
           for {
             fn                 <- FileName.fromString(fileName).liftF
-            (pid, mn, oldPath) <- services.transactionallyEitherT {
+            (pid, at, mn, oldPath) <- services.transactionallyEitherT {
                 for {
                   (pid, oldPath) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Write)
                   at             <- validateFileExtensionById(attachmentId, fn).asEitherT
                   mn             <- deriveMaskName(at, fn).liftF
                   _              <- checkForDuplicateName(pid, fn, attachmentId.some).asEitherT
                   _              <- checkForDuplicateMaskName(pid, mn, attachmentId.some).asEitherT
-                } yield (pid, mn, oldPath)
+                } yield (pid, at, mn, oldPath)
               }
             uuid               <- UUIDGen[F].randomUUID.right
             newPath            = Services.asSuperUser(filePath(pid, uuid, fn.value))
-          } yield (fn, mn, pid, oldPath, newPath)
+          } yield (fn, at, mn, pid, oldPath, newPath)
         ).value
         .flatTap {
           // See comment in similar location in insertAttachment.
@@ -459,19 +522,21 @@ object AttachmentFileService {
           case _ => ().pure
         }
         .asEitherT
-        .flatMap((fn, mn, pid, oldPath, newPath) =>
+        .flatMap((fn, at, mn, pid, oldPath, newPath) =>
           for {
-            size    <- Services.asSuperUser(s3FileSvc.upload(newPath, data)).right
-            _       <- checkForEmptyFile(size).liftF
-            _       <- updateAttachmentInDB(pid,
-                                            attachmentId,
-                                            fn,
-                                            mn,
-                                            description,
-                                            size,
-                                            newPath
-                        ).asEitherT
-            _       <- Services.asSuperUser(s3FileSvc.delete(oldPath)).right
+            (upload, md) <- maybeParseMaskDefinition(at, mn, data).asEitherT
+            size         <- Services.asSuperUser(s3FileSvc.upload(newPath, upload)).right
+            _            <- checkForEmptyFile(size).liftF
+            _            <- updateAttachmentInDB(pid,
+                                                 attachmentId,
+                                                 fn,
+                                                 mn,
+                                                 md,
+                                                 description,
+                                                 size,
+                                                 newPath
+                            ).asEitherT
+            _            <- Services.asSuperUser(s3FileSvc.delete(oldPath)).right
           } yield ()
         )
         .value
@@ -509,7 +574,7 @@ object AttachmentFileService {
   object Statements {
 
     val InsertAttachment: Query[
-      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Option[NonEmptyString], Long, NonEmptyString),
+      (Program.Id, AttachmentType, NonEmptyString, Option[NonEmptyString], Option[Json], Option[NonEmptyString], Long, NonEmptyString),
       Attachment.Id
     ] =
       sql"""
@@ -518,6 +583,7 @@ object AttachmentFileService {
           c_attachment_type,
           c_file_name,
           c_mask_name,
+          c_mask_definition,
           c_description,
           c_file_size,
           c_remote_path
@@ -527,6 +593,7 @@ object AttachmentFileService {
           $attachment_type,
           $text_nonempty,
           ${text_nonempty.opt},
+          ${jsonb.opt},
           ${text_nonempty.opt},
           $int8,
           $text_nonempty
@@ -534,17 +601,18 @@ object AttachmentFileService {
       """.query(attachment_id)
 
     val UpdateAttachment: Query[
-      (NonEmptyString, Option[NonEmptyString], Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
+      (NonEmptyString, Option[NonEmptyString], Option[Json], Option[NonEmptyString], Long, NonEmptyString, Program.Id, Attachment.Id),
       Boolean
     ] =
       sql"""
         UPDATE t_attachment
-        SET c_file_name   = $text_nonempty,
-            c_mask_name   = ${text_nonempty.opt},
-            c_description = ${text_nonempty.opt},
-            c_checked     = false,
-            c_file_size   = $int8,
-            c_remote_path = $text_nonempty
+        SET c_file_name       = $text_nonempty,
+            c_mask_name       = ${text_nonempty.opt},
+            c_mask_definition = ${jsonb.opt},
+            c_description     = ${text_nonempty.opt},
+            c_checked         = false,
+            c_file_size       = $int8,
+            c_remote_path     = $text_nonempty
         WHERE c_program_id = $program_id AND c_attachment_id = $attachment_id
         RETURNING true
       """.query(bool)

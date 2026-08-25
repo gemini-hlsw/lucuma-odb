@@ -5,10 +5,8 @@ package lucuma.odb.graphql.query
 
 import cats.effect.IO
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
-import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -33,6 +31,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.odb.graphql.ACursorOps
 import lucuma.odb.json.time.decoder.given
 import lucuma.odb.sequence.flamingos2.mos.Acquisition.RepeatingAtomCount
+import lucuma.refined.*
 
 /**
  * The Flamingos 2 MOS sequences: the equivalent long slit science sequence with the
@@ -43,13 +42,13 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
 
   val ExposureTime: TimeSpan = 5.minuteTimeSpan
 
-  val AcqExposureTime: TimeSpan = 30.secTimeSpan
+  val AcqExposureTime: TimeSpan = 5.secTimeSpan
 
   override def fakeItcSpectroscopyResult: IntegrationTime =
-    IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
+    IntegrationTime(ExposureTime, 4.refined)
 
   override def fakeItcImagingResult: IntegrationTime =
-    IntegrationTime(AcqExposureTime, PosInt.unsafeFrom(1))
+    IntegrationTime(30.secTimeSpan, 1.refined)
 
   // CUSTOM_WIDTH_1_PIX is equivalent to LONG_SLIT_1, which is what f2_key_JH1 is keyed on.
   val SlitWidth: Flamingos2CustomSlitWidth =
@@ -152,17 +151,6 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
       }
     """
 
-  // The same observation as a long slit, for the setup time comparison.
-  private val EquivalentLongSlitMode: String =
-    """
-      flamingos2LongSlit: {
-        disperser: R1200_JH
-        filter: JH
-        fpu: LONG_SLIT_1
-      }
-    """
-
-  // A crowded field is asked for by writing the nod-to-sky configs explicitly.
   private val CrowdedFieldMode: String =
     """
       flamingos2Mos: {
@@ -253,7 +241,7 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
           """.asRight
       )
 
-  private def setupTime(pid: Program.Id, oid: Observation.Id): IO[TimeSpan] =
+  private def setupTimes(pid: Program.Id, oid: Observation.Id): IO[(TimeSpan, TimeSpan)] =
     runObscalcUpdate(pid, oid) *>
       query(
         pi,
@@ -263,7 +251,10 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
               execution {
                 digest {
                   value {
-                    setup { full { seconds } }
+                    setup {
+                      full { seconds }
+                      reacquisition { seconds }
+                    }
                   }
                 }
               }
@@ -271,17 +262,17 @@ class executionSciFlamingos2Mos extends ExecutionTestSupportForFlamingos2:
           }
         """
       ).map: json =>
-        json.hcursor
-          .downFields("observation", "execution", "digest", "value", "setup", "full")
-          .require[TimeSpan]
+        val setup = json.hcursor.downFields("observation", "execution", "digest", "value", "setup")
+        (setup.downField("full").require[TimeSpan], setup.downField("reacquisition").require[TimeSpan])
 
-  // No MOS setup time has been measured yet, so the digest borrows the long slit's.
-  test("the setup time is the long slit's"):
-    assertIOBoolean(
+  private val MosSetup: TimeSpan      = 30.minuteTimeSpan
+  private val Reacquisition: TimeSpan = 6.minuteTimeSpan
+
+  test("MOS setup and reacquisition time"):
+    assertIO(
       for
-        (pm, om) <- setupWithProgram(SparseFieldMode)
-        (pl, ol) <- setupWithProgram(EquivalentLongSlitMode)
-        mos      <- setupTime(pm, om)
-        ls       <- setupTime(pl, ol)
-      yield mos === ls
+        (p, o)        <- setupWithProgram(SparseFieldMode)
+        (full, reacq) <- setupTimes(p, o)
+      yield (full, reacq),
+      (MosSetup, Reacquisition)
     )

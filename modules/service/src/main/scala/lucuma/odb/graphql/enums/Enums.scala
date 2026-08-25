@@ -51,6 +51,8 @@ final class Enums(
     case Flamingos2LongslitSetup    extends TimeEstimate("f2_longslit_setup")
     case Flamingos2LongslitMaxVisit extends TimeEstimate("f2_longslit_max_visit")
     case Flamingos2MediumReadout    extends TimeEstimate("f2_medium_readout")
+    case Flamingos2MosSetup         extends TimeEstimate("f2_mos_setup")
+    case Flamingos2MosMaxVisit      extends TimeEstimate("f2_mos_max_visit")
     case Flamingos2Reacquisition    extends TimeEstimate("f2_reacquisition")
     case Flamingos2Write            extends TimeEstimate("f2_write")
 
