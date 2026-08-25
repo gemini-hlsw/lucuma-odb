@@ -109,6 +109,37 @@ ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   ) ++ steps
 }
 
+// Prebuild the test database images with GitHub Actions cache, so
+// that the test suites skip the docker build that runs all migrations.
+def prebuildTestDbImage(name: String, context: String): WorkflowStep =
+  WorkflowStep.Use(
+    UseRef.Public("docker", "build-push-action", "v7"),
+    name = Some(s"Build $name image"),
+    params = Map(
+      "context"    -> context,
+      "load"       -> "true",
+      "tags"       -> s"$name:ci",
+      "build-args" -> List(
+        "POSTGRES_USER=test",
+        "POSTGRES_PASSWORD=test",
+        "POSTGRES_DB=test"
+      ).mkString("\n"),
+      "cache-from" -> s"type=gha,scope=$name",
+      // The image is identical across shards, so only one shard saves the cache
+      "cache-to"   -> s"$${{ matrix.shard == '0' && 'type=gha,scope=$name,mode=max' || '' }}"
+    )
+  )
+
+ThisBuild / githubWorkflowBuildPreamble ++= Seq(
+  WorkflowStep.Use(
+    UseRef.Public("docker", "setup-buildx-action", "v4"),
+    name = Some("Set up Docker Buildx")
+  ),
+  prebuildTestDbImage("lucuma-odb-test-db", "modules/service/src"),
+  prebuildTestDbImage("lucuma-sso-test-db", "modules/sso-service/src")
+)
+
+
 // Temporary disable to ignore the change from v119 to V119
 //ThisBuild / githubWorkflowBuildPreamble +=
 //  WorkflowStep.Use(
@@ -127,8 +158,11 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
   case step if step.name.contains("Test") =>
     step.withEnv(
       Map(
-        "TEST_SHARD_COUNT" -> nTestJobShards.toString(),
-        "TEST_SHARD"       -> "${{ matrix.shard }}"
+        "TEST_SHARD_COUNT"  -> nTestJobShards.toString(),
+        "TEST_SHARD"        -> "${{ matrix.shard }}",
+        // Prebuilt test database images, see githubWorkflowBuildPreamble
+        "ODB_TEST_DB_IMAGE" -> "lucuma-odb-test-db:ci",
+        "SSO_TEST_DB_IMAGE" -> "lucuma-sso-test-db:ci"
       )
     )
   case step => step

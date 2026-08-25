@@ -149,27 +149,35 @@ object OdbSuite:
   )
 
   /**
-   * A single image instance shared by all suites in the JVM. Concurrent suites would otherwise
-   * each run `docker build` against the same `lucuma-odb-test-db` tag and race on tagging it.
-   * `ImageFromDockerfile` memoizes its build result (double-checked in `LazyFuture`), so with a
-   * shared instance the first suite builds and the rest block on the same build.
+   * CI prebuilds this image with a cached docker build and points ODB_TEST_DB_IMAGE at it (see githubWorkflowBuildPreamble in build.sbt).
+   * When the variable is not set, build the image locally.
+   *
+   * When built locally, a single image instance is shared by all suites in the JVM.
+   * Concurrent suites would otherwise each run `docker build` against the same
+   * `lucuma-odb-test-db` tag and race on tagging it. `ImageFromDockerfile` memoizes its
+   * build result (double-checked in `LazyFuture`), so with a shared instance the first
+   * suite builds and the rest block on the same build.
    */
-  val dbImage: ImageFromDockerfile =
-    // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
-    // start in the root directory of the project. In that case, the dockerfile is in the
-    // modules/service/src directory.
-    // However, using vscode test explorer with sbt, the tests start in 'modulues/service'.
-    // We'll handle both cases here.
-    val dockerPrefix = Paths.get("modules", "service")
-    val dockerSuffix = Paths.get("src", "Dockerfile")
-    val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
-      dockerSuffix
-    else
-      dockerPrefix.resolve(dockerSuffix)
+  val dbImage: GenericContainer.DockerImage =
+    sys.env.get("ODB_TEST_DB_IMAGE") match
+      case Some(prebuilt) =>
+        prebuilt
+      case None           =>
+        // in CI, while running tests from sbt cli, or using vscode test explorer with bloop, the tests
+        // start in the root directory of the project. In that case, the dockerfile is in the
+        // modules/service/src directory.
+        // However, using vscode test explorer with sbt, the tests start in 'modulues/service'.
+        // We'll handle both cases here.
+        val dockerPrefix = Paths.get("modules", "service")
+        val dockerSuffix = Paths.get("src", "Dockerfile")
+        val dockerPath = if (Paths.get(".").toAbsolutePath.normalize.endsWith(dockerPrefix))
+          dockerSuffix
+        else
+          dockerPrefix.resolve(dockerSuffix)
 
-    new ImageFromDockerfile("lucuma-odb-test-db")
-      .withDockerfile(dockerPath)
-      .withBuildArgs(dbImageEnv.asJava)
+        new ImageFromDockerfile("lucuma-odb-test-db")
+          .withDockerfile(dockerPath)
+          .withBuildArgs(dbImageEnv.asJava)
 
 /**
  * Mixin that allows execution of GraphQL operations on a per-suite instance of the Odb, shared
