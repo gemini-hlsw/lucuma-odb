@@ -65,7 +65,7 @@ ThisBuild / crossScalaVersions := Seq("3.8.4")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
 
 ThisBuild / Test / fork              := false
-ThisBuild / Test / parallelExecution := false
+ThisBuild / Test / parallelExecution := true
 
 ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=debug")
 
@@ -479,9 +479,7 @@ lazy val ssoBackendExample = project
 
 // START ITC
 
-lazy val itcCommonSettings = lucumaGlobalSettings ++ Seq(
-  Test / parallelExecution := false // tests run fine in parallel but output is nicer this way
-)
+lazy val itcCommonSettings = lucumaGlobalSettings
 
 // Basic ITC model classes
 lazy val itcModel = crossProject(JVMPlatform, JSPlatform)
