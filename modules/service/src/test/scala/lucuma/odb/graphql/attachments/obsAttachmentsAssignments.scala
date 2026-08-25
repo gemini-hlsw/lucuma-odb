@@ -213,7 +213,7 @@ class obsAttachmentsAssignments extends AttachmentsSuite {
   val finder  = TestAttachment("file2.jpg", "finder", "jpg file".some, "A finder JPG file")
   val preImaging  = TestAttachment("preImaging.fits", "pre_imaging", none, "A pre imaging file")
   val science = TestAttachment("science.pdf", "science", none, "science file")
-  val team = TestAttachment("team.pdf", "science", none, "team file")
+  val team = TestAttachment("team.pdf", "team", none, "team file")
   val customSed = TestAttachment("sed.dat", "custom_sed", none, "custom sed file")
 
   val updateEmpty: UpdateInput.Values = UpdateInput.Values(List.empty)

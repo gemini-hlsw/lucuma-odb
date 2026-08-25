@@ -13,6 +13,7 @@ import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.odb.FMain
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.util.Codecs.*
@@ -20,7 +21,11 @@ import org.http4s.*
 import org.typelevel.otel4s.metrics.Meter.Implicits.noop
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.*
+import skunk.codec.all.*
+import skunk.exception.PostgresErrorException
 import skunk.syntax.all.*
+
+import java.util.UUID
 
 class attachments extends AttachmentsSuite {
 
@@ -90,6 +95,39 @@ class attachments extends AttachmentsSuite {
     )
   }
 
+  // ODB-generated attachment types have no write path through the routes, so a
+  // row has to be planted directly to test reading and rejection of writes.
+  // The remote path mirrors what S3FileService.filePath would have produced.
+  def insertAttachmentInDb(pid: Program.Id, ta: TestAttachment): IO[Attachment.Id] = {
+    val query =
+      sql"""
+        insert into t_attachment (
+          c_program_id,
+          c_attachment_type,
+          c_file_name,
+          c_description,
+          c_file_size,
+          c_remote_path
+        )
+        select $program_id, $attachment_type, $text_nonempty, ${text_nonempty.opt}, $int8, $text_nonempty
+        returning c_attachment_id
+      """.query(attachment_id)
+    val at   = Enumerated[AttachmentType].fromTag(ta.attachmentType).get
+    val path = NonEmptyString.unsafeFrom(s"$pid/${UUID.randomUUID()}/${ta.fileName}")
+    FMain.databasePoolResource[IO](databaseConfig).flatten
+      .use(_.prepareR(query).use(_.unique(
+        (pid, at, NonEmptyString.unsafeFrom(ta.fileName), ta.description.flatMap(NonEmptyString.from(_).toOption), ta.bytes.length.toLong, path)
+      )))
+  }
+
+  // Plants the row *and* its bytes in S3, so the read paths have something to serve.
+  def insertAttachmentDirectly(pid: Program.Id, ta: TestAttachment): IO[Attachment.Id] =
+    for {
+      aid  <- insertAttachmentInDb(pid, ta)
+      path <- getRemotePathFromDb(aid)
+      _    <- uploadS3Bytes(awsConfig.fileKey(path), ta.bytes)
+    } yield aid
+
   // TODO: science, team and custom_sed file tests
   val mosMask1A         = TestAttachment("GS2015AQ023-01_ODF.fits", "mos_mask", "A description".some, "Hopeful", maskName = "GS2015AQ023-01".some, binary = gmosOdfFits.some)
   val mosMask1B         = TestAttachment("GS2015AQ023-01_ODF.fits", "mos_mask", None, "New contents", maskName = "GS2015AQ023-01".some, binary = flamingos2OdfFits.some)
@@ -103,6 +141,9 @@ class attachments extends AttachmentsSuite {
   val science2          = TestAttachment("science2.pdf", "science", none, "A second science file")
   val team1             = TestAttachment("team1.pdf", "team", none, "A team file")
   val team2             = TestAttachment("team2.pdf", "team", none, "A second team file")
+  val summaryPDF        = TestAttachment("summary.pdf", "summary", none, "A summary file")
+  val summaryPDF2       = TestAttachment("summary2.pdf", "summary", none, "A replacement summary file")
+  val summaryJPG        = TestAttachment("summary.jpg", "summary", none, "Doesn't matter")
   val customSedSED      = TestAttachment("sed.sed", "custom_sed", "It's custom".some, "A custom SED file")
   val customSedTXT      = TestAttachment("sed.TXT", "custom_sed", "It's custom".some, "Another custom SED file")
   val customSedDAT      = TestAttachment("sed.dat", "custom_sed", "It's custom".some, "A third custom SED file")
@@ -234,6 +275,94 @@ class attachments extends AttachmentsSuite {
       _    <- assertAttachmentsGql(pi, pid, (aid1, team1))
       aid2 <- insertAttachment(pi, pid, team2).withExpectation(Status.BadRequest, AttachmentFileService.duplicateTypeMsg(AttachmentType.Team))
       _    <- assertAttachmentsGql(pi, pid, (aid1, team1))
+    } yield ()
+  }
+
+  // Guards the OdbMapping recompile trap: the schema is baked into the mapping's
+  // bytecode at compile time, so a stale build would still serve the old enum.
+  test("SUMMARY is a member of the AttachmentType enum in the served schema") {
+    expect(
+      user = pi,
+      query = """
+        query {
+          __type(name: "AttachmentType") {
+            enumValues { name }
+          }
+        }
+      """,
+      expected = Right(
+        Json.obj(
+          "__type" -> Json.obj(
+            "enumValues" -> Json.fromValues(
+              List("SCIENCE", "TEAM", "FINDER", "MOS_MASK", "PRE_IMAGING", "CUSTOM_SED", "SUMMARY")
+                .map(n => Json.obj("name" -> Json.fromString(n)))
+            )
+          )
+        )
+      )
+    )
+  }
+
+  test("summary cannot be uploaded") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, summaryPDF)
+               .withExpectation(Status.BadRequest, AttachmentFileService.odbGeneratedMsg(AttachmentType.Summary))
+      _   <- assertAttachmentsGql(pi, pid)
+    } yield ()
+  }
+
+  test("summary cannot be uploaded by staff or service users either") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(staff, pid, summaryPDF)
+               .withExpectation(Status.BadRequest, AttachmentFileService.odbGeneratedMsg(AttachmentType.Summary))
+      _   <- insertAttachment(service, pid, summaryPDF)
+               .withExpectation(Status.BadRequest, AttachmentFileService.odbGeneratedMsg(AttachmentType.Summary))
+      _   <- assertAttachmentsGql(pi, pid)
+    } yield ()
+  }
+
+  test("summary cannot be replaced or deleted") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachmentDirectly(pid, summaryPDF)
+      _   <- updateAttachment(pi, aid, summaryPDF2)
+               .withExpectation(Status.BadRequest, AttachmentFileService.odbGeneratedMsg(AttachmentType.Summary))
+      _   <- deleteAttachment(pi, aid)
+               .withExpectation(Status.BadRequest, AttachmentFileService.odbGeneratedMsg(AttachmentType.Summary))
+      // still there, and unchanged
+      _   <- assertAttachmentsGql(pi, pid, (aid, summaryPDF))
+    } yield ()
+  }
+
+  test("summary replacement is rejected for being a summary, not for its extension") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachmentDirectly(pid, summaryPDF)
+      _   <- updateAttachment(pi, aid, summaryJPG)
+               .withExpectation(Status.BadRequest, AttachmentFileService.odbGeneratedMsg(AttachmentType.Summary))
+    } yield ()
+  }
+
+  test("summary can be read and appears under program attachments") {
+    for {
+      pid <- createProgramAs(pi)
+      aid <- insertAttachmentDirectly(pid, summaryPDF)
+      _   <- assertAttachmentsGql(pi, pid, (aid, summaryPDF))
+      _   <- getAttachment(pi, aid).expectBodyBytes(summaryPDF.bytes)
+      url <- getPresignedUrl(pi, aid).toNonEmptyString
+      _   <- getViaPresignedUrl(url).expectBodyBytes(summaryPDF.bytes)
+    } yield ()
+  }
+
+  test("only one summary allowed per program") {
+    for {
+      pid <- createProgramAs(pi)
+      _   <- insertAttachmentInDb(pid, summaryPDF)
+      // the routes cannot create these, so the partial unique index is what
+      // actually enforces one-per-program
+      _   <- insertAttachmentInDb(pid, summaryPDF2).intercept[PostgresErrorException]
     } yield ()
   }
 
