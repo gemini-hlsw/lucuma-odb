@@ -1,0 +1,5 @@
+# The test database image only needs the migration scripts
+*
+# docker-java (used by Testcontainers) requires the Dockerfile to not be excluded
+!Dockerfile
+!main/resources/db/migration

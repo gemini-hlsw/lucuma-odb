@@ -13,12 +13,15 @@ ENV POSTGRES_DB=$POSTGRES_DB
 # Custom PGDATA directory to avoid volume mount issues
 ENV PGDATA=/var/lib/postgresql/odb-data
 
+# The database is throwaway, so durability is not needed: skip fsync during initdb
+ENV POSTGRES_INITDB_ARGS="--no-sync"
+
 # Copy migration scripts into the image
 COPY ./main/resources/db/migration/ /docker-entrypoint-initdb.d/
 
-# Remove the Postgres daemon from the entrypoint script to only run the init scripts
-RUN sed -i 's/exec "$@"/echo "skipping..."/' /usr/local/bin/docker-entrypoint.sh && \
-  # Run the init scripts
-  /usr/local/bin/docker-entrypoint.sh postgres && \
-  # Put everything back again
-  sed -i 's/echo "skipping..."/exec "$@"/' /usr/local/bin/docker-entrypoint.sh
+# Run initdb and the init scripts (migrations) without leaving a server running.
+# The server args disable durability to speed up the migrations.
+RUN docker-ensure-initdb.sh -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+
+# Also disable durability at test time, to speed up database writes in tests
+CMD ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]

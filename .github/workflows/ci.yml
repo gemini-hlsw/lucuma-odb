@@ -67,10 +67,41 @@ jobs:
       - name: Docker compose up
         run: docker compose up -d
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build lucuma-odb-test-db image
+        uses: docker/build-push-action@v7
+        with:
+          cache-from: type=gha,scope=lucuma-odb-test-db
+          tags: 'lucuma-odb-test-db:ci'
+          context: modules/service/src
+          load: true
+          build-args: |
+            POSTGRES_USER=test
+            POSTGRES_PASSWORD=test
+            POSTGRES_DB=test
+          cache-to: ${{ matrix.shard == '0' && 'type=gha,scope=lucuma-odb-test-db,mode=max' || '' }}
+
+      - name: Build lucuma-sso-test-db image
+        uses: docker/build-push-action@v7
+        with:
+          cache-from: type=gha,scope=lucuma-sso-test-db
+          tags: 'lucuma-sso-test-db:ci'
+          context: modules/sso-service/src
+          load: true
+          build-args: |
+            POSTGRES_USER=test
+            POSTGRES_PASSWORD=test
+            POSTGRES_DB=test
+          cache-to: ${{ matrix.shard == '0' && 'type=gha,scope=lucuma-sso-test-db,mode=max' || '' }}
+
       - name: Test
         env:
           TEST_SHARD_COUNT: 8
           TEST_SHARD: ${{ matrix.shard }}
+          ODB_TEST_DB_IMAGE: 'lucuma-odb-test-db:ci'
+          SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
 
       - name: Docker compose down
