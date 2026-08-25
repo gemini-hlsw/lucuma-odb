@@ -134,14 +134,17 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
   case step => step
 })
 
-// Swap the test-shard checkout for a shallow no-LFS variant
+// Swap the test-shard checkout for a shallow no-LFS variant, and drop the
+// plugin-injected githubWorkflowCheck step from the shards. The check costs a
+// separate sbt start per shard; the `checks` job runs it once instead.
 ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
       job
-        .withSteps(job.steps.map {
-          case s if s.name.contains("Checkout current branch") => CheckoutShallow
-          case s                                               => s
+        .withSteps(job.steps.flatMap {
+          case s if s.name.contains("Checkout current branch")            => List(CheckoutShallow)
+          case s if s.name.contains("Check that workflows are up to date") => Nil
+          case s                                                          => List(s)
         })
         .withMatrixFailFast(Some(false))
     else job
@@ -292,6 +295,7 @@ def allConds(conds: String*) = conds.mkString("(", " && ", ")")
 lazy val sbtStaticChecks =
   WorkflowStep.Sbt(
     List(
+      "githubWorkflowCheck",
       "headerCheckAll",
       "scalafmtCheckAll",
       "project /",
