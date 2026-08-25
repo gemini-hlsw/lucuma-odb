@@ -168,8 +168,13 @@ object ProgramService {
                 .InvalidSemester(input.semester)
                 .failure
             case SqlState.UniqueViolation(ex) =>
-              // See if we can parse out the duplicate reference string.
-              val pat = """\(c_program_reference\)=\(([^)]+)\)""".r
+              // See if we can parse out the duplicate reference string.  The
+              // constraint is i_program_reference_unique, a unique index over
+              // the generating expression rather than over the column (V1280),
+              // so the key named in the error detail is the whole
+              // `format_program_reference(...)` call; the value is still the
+              // reference itself.
+              val pat = """format_program_reference\([^)]*\)\)=\(([^)]+)\)""".r
               UpdateProgramsError
                 .DuplicateReference(pat.findFirstMatchIn(ex.getMessage).map(_.group(1)))
                 .failure
