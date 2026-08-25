@@ -4,7 +4,9 @@
 package lucuma.itc.client
 
 import cats.effect.Async
+import cats.effect.Sync
 import cats.syntax.all.*
+import clue.FetchClient
 import clue.http4s.Http4sHttpBackend
 import clue.http4s.Http4sHttpClient
 import clue.syntax.*
@@ -41,9 +43,22 @@ trait ItcClient[F[_]] {
 object ItcClient {
   def apply[F[_]](using ev: ItcClient[F]): ItcClient[F] = ev
 
+  /**
+   * Creates an ITC client that talks to the ITC service over http4s.
+   */
   def create[F[_]: Async: Logger](
     uri:    Uri,
     client: Client[F]
+  ): F[ItcClient[F]] =
+    Http4sHttpClient
+      .of[F, Unit](uri)(using Async[F], Http4sHttpBackend(client), Logger[F])
+      .flatMap(create(_))
+
+  /**
+   * Creates an ITC client on top of an existing Clue client.
+   */
+  def create[F[_]: Sync: Logger](
+    http: FetchClient[F, Unit]
   ): F[ItcClient[F]] =
     for
       specCache         <- ItcCache.simple[F, SpectroscopyInput, ClientCalculationResult]
@@ -53,8 +68,6 @@ object ItcClient {
                         SpectroscopyIntegrationTimeAndGraphsInput,
                         SpectroscopyIntegrationTimeAndGraphsResult
         ]
-      http              <-
-        Http4sHttpClient.of[F, Unit](uri)(using Async[F], Http4sHttpBackend(client), Logger[F])
     yield new ItcClient[F] {
 
       override def spectroscopy(
