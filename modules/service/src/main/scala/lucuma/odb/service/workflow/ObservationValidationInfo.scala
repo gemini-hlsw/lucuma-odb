@@ -68,7 +68,7 @@ case class ObservationValidationInfo(
   proposalStatus:         ProposalStatus,
   tooActivation:          TooActivation,      // derived from the asterism and the scheduling mode; not declared
   schedulingMode:         SchedulingMode,
-  tooCeiling:             Option[TooActivation], // effective proposal ceiling; None when the program has no proposal
+  tooCeiling:             Option[TooActivation], // effective proposal ceiling; None when there is none to enforce
   cfpid:                  Option[CallForProposals.Id],
   scienceBand:            Option[ScienceBand],
   asterism:               List[Target],
