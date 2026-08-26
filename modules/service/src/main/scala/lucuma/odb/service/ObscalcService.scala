@@ -326,12 +326,15 @@ object ObscalcService:
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
           ns  = lu.map: (lastInvalidation, timeAccountingDirty) =>
                   // Re-invalidated during the calculation: go back to 'pending'.
-                  if lastInvalidation =!= pending.lastInvalidation then CalculationState.Pending
-                  // The obscalc result is fine but time accounting didn't get
-                  // updated (its recompute failed); retry so it is attempted again.
-                  else if timeAccountingDirty                      then CalculationState.Retry
-                  else                                                  expected
-          af  = ns.map(newState => Statements.storeResult(pending, result, basePosition, archiveStale, newState))
+                  val reinvalidated = lastInvalidation =!= pending.lastInvalidation
+                  val newState      =
+                    if reinvalidated            then CalculationState.Pending
+                    // The obscalc result is fine but time accounting didn't get
+                    // updated (its recompute failed); retry so it is attempted again.
+                    else if timeAccountingDirty then CalculationState.Retry
+                    else                             expected
+                  (newState, Option.unless(reinvalidated)(archiveStale).flatten)
+          af  = ns.map((newState, stale) => Statements.storeResult(pending, result, basePosition, stale, newState))
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
 

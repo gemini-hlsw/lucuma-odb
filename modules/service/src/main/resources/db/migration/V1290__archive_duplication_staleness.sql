@@ -59,8 +59,10 @@ CREATE VIEW v_archive_duplication AS
     CASE WHEN d.c_search_ra     IS NOT NULL THEN o.c_observation_id END AS c_search_center_id,
     CASE WHEN d.c_search_radius IS NOT NULL THEN o.c_observation_id END AS c_search_radius_id,
     COALESCE(d.c_query_urls, ARRAY[]::text[])                   AS c_query_urls,
-    COALESCE(oc.c_archive_stale, FALSE)                         AS c_stale
+    (COALESCE(oc.c_archive_stale, FALSE)
+      AND p.c_proposal_status = 'not_submitted')                AS c_stale
   FROM t_observation o
+  JOIN t_program p ON p.c_program_id = o.c_program_id
   LEFT JOIN t_archive_duplication d ON d.c_observation_id = o.c_observation_id
   LEFT JOIN t_obscalc oc ON oc.c_observation_id = o.c_observation_id
   LEFT JOIN (

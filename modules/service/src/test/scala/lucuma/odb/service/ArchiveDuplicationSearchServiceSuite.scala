@@ -14,9 +14,11 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
+import lucuma.odb.util.Codecs.calculation_state
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
@@ -452,6 +454,28 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       s   <- staleness(oid)
     yield assert(!s)
 
+  private def servedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
+    withFreshSession: s =>
+      s.option(sql"select c_stale from v_archive_duplication where c_observation_id = $observation_id".query(skunk.codec.boolean.bool))(oid)
+
+  test("a materialized stale flag is masked once the proposal is submitted"):
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- runObscalc(oid)
+      s1  <- servedStaleFlag(oid)
+      _   <- markSubmitted(pid)
+      s2  <- servedStaleFlag(oid)
+      m   <- storedStaleFlag(oid)
+    yield
+      assertEquals(s1, true.some)
+      assertEquals(s2, false.some)
+      // The stored flag is untouched; the view derives the answer.
+      assertEquals(m, true.some)
+
   private def storedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
     withFreshSession: s =>
       s.option(sql"select c_archive_stale from t_obscalc where c_observation_id = $observation_id".query(skunk.codec.boolean.bool))(oid)
@@ -476,6 +500,51 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
     yield
       assertEquals(s1, true.some)
       assertEquals(s2, false.some)
+
+  private def storedCalcState(oid: Observation.Id): IO[Option[CalculationState]] =
+    withFreshSession: s =>
+      s.option(
+        sql"select c_obscalc_state from t_obscalc where c_observation_id = $observation_id"
+          .query(calculation_state)
+      )(oid)
+
+  /**
+   * Loads the pending entry, runs `between`, and only then calculates and
+   * stores.  The entry carries the invalidation timestamp it was loaded with,
+   * so `between` occupies the window a concurrent write lands in.
+   */
+  private def runObscalcAfter(oid: Observation.Id)(between: IO[Unit]): IO[Unit] =
+    withServicesForObscalc(serviceUser): services =>
+      given Services[IO] = services
+      val svc = ObscalcService.instantiate[IO]
+      services.transactionally(svc.loadObs(oid)).flatMap:
+        _.traverse_(p => between *> svc.calculateAndUpdate(p).void)
+
+  /**
+   * Stands in for a refresh landing mid-calculation: it resets the flag and
+   * schedules a recalculation just as the snapshot trigger does, but leaves the
+   * stored queries alone so the in-flight calculation still derives `true`.
+   */
+  private def resetFlagAndInvalidate(oid: Observation.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_obscalc set c_archive_stale = false where c_observation_id = $observation_id".command
+      )(oid) >>
+      s.execute(sql"call invalidate_obscalc($observation_id)".command)(oid).void
+
+  test("a re-invalidated calculation does not write the staleness it derived"):
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- runObscalcAfter(oid)(resetFlagAndInvalidate(oid))
+      m   <- storedStaleFlag(oid)
+      st  <- storedCalcState(oid)
+    yield
+      // The reset survives; overwriting it would show a stale observation as
+      // stale again until the next worker pass.
+      assertEquals(m, false.some)
+      assertEquals(st, CalculationState.Pending.some)
 
   test("a mixed sidereal and non-sidereal asterism is reported as not applicable"):
     // Declines rather than report a false zero.
