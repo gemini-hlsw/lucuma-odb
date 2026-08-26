@@ -209,6 +209,24 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       assertEquals(db.summary.matchCount.value, 2)
       assertEquals(db.matches.map(_.name), List("a.fits", "b.fits"))
 
+  test("unsetting the observing mode hides the stored error along with the state"):
+    // `error` is documented as accompanying the ERROR state, so the overridden
+    // state cannot keep serving it.
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- refresh(brokenMock)(oid)
+      e   <- stored(oid)
+      _   <- unsetMode(oid)
+      na  <- stored(oid)
+    yield
+      assertEquals(e.summary.state, ArchiveDuplication.State.Error)
+      assert(e.summary.error.isDefined)
+      assertEquals(na.summary.state, ArchiveDuplication.State.NotApplicable)
+      assertEquals(na.summary.error, none)
+      // The attempt itself is still reported.
+      assert(na.summary.lastCheckedAt.isDefined)
+
   test("a GOA failure with no previous snapshot is still not a failed call"):
     for
       oid <- gmosObservation

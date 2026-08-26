@@ -35,7 +35,9 @@ CREATE TRIGGER archive_duplication_invalidate_obscalc_trigger
   EXECUTE FUNCTION archive_duplication_obscalc_invalidate();
 
 -- An observation with no observing mode reads NOT_APPLICABLE, whatever was
--- stored: the search cannot be asked for it today.
+-- stored: the search cannot be asked for it today.  The stored error is hidden
+-- with it, since `error` is documented as accompanying the ERROR state;
+-- c_last_attempted_at still reports the failed attempt.
 --
 -- DROP rather than REPLACE: c_last_attempted_at goes in mid-list.
 DROP VIEW v_archive_duplication;
@@ -51,7 +53,10 @@ CREATE VIEW v_archive_duplication AS
     COALESCE(d.c_saturated, FALSE)                              AS c_saturated,
     d.c_last_checked_at,
     COALESCE(d.c_error_at, d.c_last_checked_at)                 AS c_last_attempted_at,
-    d.c_error,
+    CASE WHEN o.c_observing_mode_type IS NULL
+         THEN NULL
+         ELSE d.c_error
+    END                                                         AS c_error,
     d.c_search_ra,
     d.c_search_dec,
     d.c_search_target,
