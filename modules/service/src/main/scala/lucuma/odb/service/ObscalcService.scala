@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.EitherT
 import cats.data.Nested
 import cats.data.NonEmptyList
+import cats.effect.Clock
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
@@ -152,7 +153,7 @@ object ObscalcService:
     Nil
   )
 
-  def instantiate[F[_]: Concurrent: Logger: Services]: ObscalcService[F] =
+  def instantiate[F[_]: Concurrent: Clock: Logger: Services]: ObscalcService[F] =
 
     new ObscalcService[F]:
       override def selectOne(
@@ -318,18 +319,22 @@ object ObscalcService:
         pending:      Obscalc.PendingCalc,
         result:       Obscalc.Result,
         basePosition: Option[Option[Coordinates]],
+        archiveStale: Option[Boolean],
         expected:     CalculationState
       )(using ServiceAccess): F[Option[Obscalc.Meta]] =
         for
           lu <- session.option(Statements.SelectLastInvalidationForUpdate)(pending.observationId)
           ns  = lu.map: (lastInvalidation, timeAccountingDirty) =>
                   // Re-invalidated during the calculation: go back to 'pending'.
-                  if lastInvalidation =!= pending.lastInvalidation then CalculationState.Pending
-                  // The obscalc result is fine but time accounting didn't get
-                  // updated (its recompute failed); retry so it is attempted again.
-                  else if timeAccountingDirty                      then CalculationState.Retry
-                  else                                                  expected
-          af  = ns.map(newState => Statements.storeResult(pending, result, basePosition, newState))
+                  val reinvalidated = lastInvalidation =!= pending.lastInvalidation
+                  val newState      =
+                    if reinvalidated            then CalculationState.Pending
+                    // The obscalc result is fine but time accounting didn't get
+                    // updated (its recompute failed); retry so it is attempted again.
+                    else if timeAccountingDirty then CalculationState.Retry
+                    else                             expected
+                  (newState, Option.unless(reinvalidated)(archiveStale).flatten)
+          af  = ns.map((newState, stale) => Statements.storeResult(pending, result, basePosition, stale, newState))
           m  <- af.traverse(f => session.unique(f.fragment.query(Statements.obscalc_meta))(f.argument))
         yield m
 
@@ -345,13 +350,15 @@ object ObscalcService:
               .flatMap: (result, atomDigests) =>
                 services.transactionally:
                   sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
-                  (result.odbError match
-                    case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, basePosition, CalculationState.Retry)
-                    case _                                        => storeResult(pending, result, basePosition, CalculationState.Ready))
+                  isArchiveSearchStale(pending.observationId).flatMap: stale =>
+                    (result.odbError match
+                      case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, basePosition, stale.some, CalculationState.Retry)
+                      case _                                        => storeResult(pending, result, basePosition, stale.some, CalculationState.Ready))
               .handleErrorWith: e =>
                 val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
                 services.transactionally:
-                  storeResult(pending, result, basePosition, CalculationState.Retry)
+                  // Staleness is left as it was: this path cannot evaluate it.
+                  storeResult(pending, result, basePosition, none, CalculationState.Retry)
 
   object Statements:
     val pending_obscalc: Codec[Obscalc.PendingCalc] =
@@ -598,7 +605,11 @@ object ObscalcService:
         WHERE  c_observation_id = $observation_id
       """.query(coordinates.opt)
 
-    private def updatesForResult(r: Obscalc.Result, basePosition: Option[Option[Coordinates]]): NonEmptyList[AppliedFragment] =
+    private def updatesForResult(
+      r:            Obscalc.Result,
+      basePosition: Option[Option[Coordinates]],
+      archiveStale: Option[Boolean]
+    ): NonEmptyList[AppliedFragment] =
 
       // Don't inline these or sorting could be incorrect
       val acqConfigs = r.digest.map(_.acquisition.telescopeConfigs.toList)
@@ -643,6 +654,10 @@ object ObscalcService:
           sql"c_j2000_base_ra        = ${right_ascension.opt}"(p.map(_.ra)),
           sql"c_j2000_base_dec       = ${declination.opt}"(p.map(_.dec))
         )
+      ++
+      // Archive Duplication staleness; skipped when it could not be derived
+      archiveStale.toList.map: b =>
+        sql"c_archive_stale        = ${bool}"(b)
 
     // Along with the last invalidation timestamp, reports whether any of the
     // observation's visits still has dirty time accounting (its recompute failed
@@ -666,6 +681,7 @@ object ObscalcService:
       pending:      Obscalc.PendingCalc,
       result:       Obscalc.Result,
       basePosition: Option[Option[Coordinates]],
+      archiveStale: Option[Boolean],
       newState:     CalculationState
     ): AppliedFragment =
 
@@ -677,7 +693,7 @@ object ObscalcService:
       val upRetryAt      = void"c_retry_at      = " |+|
                            (if isRetry then void"now() + (interval '1 minute' * POWER(2, LEAST(c_failure_count, 5)))" else void"NULL")
 
-      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: updatesForResult(result, basePosition)
+      val updates = upState :: upLastUpdate :: upFailureCount :: upRetryAt :: updatesForResult(result, basePosition, archiveStale)
 
       void"UPDATE t_obscalc " |+|
         void"SET " |+| updates.intercalate(void", ") |+| void" " |+|

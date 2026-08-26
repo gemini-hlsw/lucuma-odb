@@ -12,6 +12,7 @@ import lucuma.catalog.goa.GoaObservationType
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.math.Coordinates
 import lucuma.core.model.Observation
+import lucuma.core.util.Timestamp
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.ArchiveSearchPointing
 import lucuma.odb.util.Codecs.*
@@ -45,7 +46,7 @@ trait ArchiveDuplicationService[F[_]]:
    */
   def store(
     observationId: Observation.Id,
-    summary:        ArchiveDuplication.Summary,
+    summary:       ArchiveDuplication.Summary,
     matches:       List[GoaSummaryRecord]
   )(using Transaction[F]): F[Unit]
 
@@ -54,7 +55,7 @@ trait ArchiveDuplicationService[F[_]]:
    * matches and headline values in place so a GOA outage cannot destroy a good
    * snapshot.
    */
-  def storeError(observationId: Observation.Id, message: NonEmptyString)(using Transaction[F]): F[Unit]
+  def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit]
 
 object ArchiveDuplicationService:
 
@@ -74,7 +75,7 @@ object ArchiveDuplicationService:
 
       override def store(
         observationId: Observation.Id,
-        summary:        ArchiveDuplication.Summary,
+        summary:       ArchiveDuplication.Summary,
         matches:       List[GoaSummaryRecord]
       )(using Transaction[F]): F[Unit] =
         for
@@ -82,10 +83,11 @@ object ArchiveDuplicationService:
           _ <- session.execute(Statements.DeleteMatches)(observationId)
           _ <- NonEmptyList.fromList(matches).traverse_ : nel =>
                  session.execute(Statements.insertMatches(nel))(observationId, nel)
+          _ <- session.execute(Statements.ResetStale)(observationId)
         yield ()
 
-      override def storeError(observationId: Observation.Id, message: NonEmptyString)(using Transaction[F]): F[Unit] =
-        session.execute(Statements.UpsertError)(observationId, message).void
+      override def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit] =
+        session.execute(Statements.UpsertError)(observationId, message, erroredAt).void
 
   object Statements:
 
@@ -243,6 +245,7 @@ object ArchiveDuplicationService:
         ORDER BY c_file_name
       """.query(goa_match)
 
+    /** Clears the error timestamp too, so the attempt time falls back to the checked time. */
     val UpsertSummary: Command[(Observation.Id, ArchiveDuplication.Summary)] =
       sql"""
         INSERT INTO t_archive_duplication (
@@ -262,6 +265,7 @@ object ArchiveDuplicationService:
           c_saturated       = EXCLUDED.c_saturated,
           c_last_checked_at = EXCLUDED.c_last_checked_at,
           c_error           = EXCLUDED.c_error,
+          c_error_at        = NULL,
           c_search_ra       = EXCLUDED.c_search_ra,
           c_search_dec      = EXCLUDED.c_search_dec,
           c_search_target   = EXCLUDED.c_search_target,
@@ -270,19 +274,29 @@ object ArchiveDuplicationService:
       """.command
 
     /**
-     * Flags a failed attempt.  Only the state and message are touched, so a
-     * previously good snapshot survives a GOA outage intact.
+     * A fresh snapshot is trivially not stale, so reset now rather than wait
+     * for the recalculation the trigger scheduled.  A missing row is fine.
      */
-    val UpsertError: Command[(Observation.Id, NonEmptyString)] =
+    val ResetStale: Command[Observation.Id] =
+      sql"""
+        UPDATE t_obscalc
+        SET c_archive_stale = false
+        WHERE c_observation_id = $observation_id
+      """.command
+
+    /** Flags a failed attempt, leaving the previously stored matches intact. */
+    val UpsertError: Command[(Observation.Id, NonEmptyString, Timestamp)] =
       sql"""
         INSERT INTO t_archive_duplication (
           c_observation_id,
           c_state,
-          c_error
-        ) VALUES ($observation_id, 'error', $text_nonempty)
+          c_error,
+          c_error_at
+        ) VALUES ($observation_id, 'error', $text_nonempty, $core_timestamp)
         ON CONFLICT (c_observation_id) DO UPDATE SET
-          c_state = 'error',
-          c_error = EXCLUDED.c_error
+          c_state    = 'error',
+          c_error    = EXCLUDED.c_error,
+          c_error_at = EXCLUDED.c_error_at
       """.command
 
     val DeleteMatches: Command[Observation.Id] =

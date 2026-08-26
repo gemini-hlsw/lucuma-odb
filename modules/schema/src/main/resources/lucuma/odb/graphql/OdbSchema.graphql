@@ -15901,9 +15901,10 @@ enum ArchiveDuplicationState {
   NOT_CHECKED
 
   """
-  The search ran, but this observation is one the archive cannot be asked about:
-  an instrument it does not know, or no resolvable pointing and no usable target
-  name.  Re-running will report the same thing until the observation changes.
+  The archive cannot be asked about this observation as it stands: it has no
+  observing mode now, or the search ran and found an instrument the archive
+  does not know, or no resolvable pointing and no usable target name.
+  Re-running will report the same thing until the observation changes.
   """
   NOT_APPLICABLE
 
@@ -16055,7 +16056,19 @@ describe the last search that succeeded, and `lastCheckedAt` says when that was.
 """
 type ArchiveDuplication {
 
+  """
+  State of the stored snapshot.  Partly derived: an observation with no
+  observing mode reads NOT_APPLICABLE whatever was stored.
+  """
   state: ArchiveDuplicationState!
+
+  """
+  Whether the snapshot no longer describes the observation as it now stands:
+  the archive queries the search would run today differ from `queryUrls`.
+  Never true when nothing was searched, when nothing can be searched now, or
+  after submission.
+  """
+  stale: Boolean!
 
   """
   Number of matching archive files.  Counted per file rather than per archived
@@ -16072,10 +16085,16 @@ type ArchiveDuplication {
   saturated: Boolean!
 
   """
-  When the reported matches were gathered.  Null exactly when `state` is
-  NOT_CHECKED, since every other state follows an attempt.
+  When the reported matches were gathered, i.e. when the last successful
+  search ran.  Null when no search ever succeeded.
   """
   lastCheckedAt: Timestamp
+
+  """
+  When a search last ran, successfully or not.  Later than `lastCheckedAt`
+  exactly when the most recent attempt failed.  Null when the search never ran.
+  """
+  attemptedAt: Timestamp
 
   "Why the most recent attempt failed.  Set when `state` is ERROR."
   error: NonEmptyString

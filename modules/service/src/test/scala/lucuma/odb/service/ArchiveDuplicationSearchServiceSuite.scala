@@ -14,9 +14,12 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.graphql.OdbSuite
 import lucuma.odb.graphql.TestUsers
+import lucuma.odb.util.Codecs.calculation_state
+import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.program_id
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.exception.PostgresErrorException
@@ -29,7 +32,9 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
   val pi: User    = TestUsers.Standard.pi(1, 30)
   val staff: User = TestUsers.Standard.staff(2, 31)
 
-  override val validUsers: List[User] = List(pi, staff)
+  private val serviceUser = TestUsers.service(3)
+
+  override val validUsers: List[User] = List(pi, staff, serviceUser)
 
   /**
    * GOA's summary records carry only `name`, `instrument` and
@@ -204,6 +209,24 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       assertEquals(db.summary.matchCount.value, 2)
       assertEquals(db.matches.map(_.name), List("a.fits", "b.fits"))
 
+  test("unsetting the observing mode hides the stored error along with the state"):
+    // `error` is documented as accompanying the ERROR state, so the overridden
+    // state cannot keep serving it.
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- refresh(brokenMock)(oid)
+      e   <- stored(oid)
+      _   <- unsetMode(oid)
+      na  <- stored(oid)
+    yield
+      assertEquals(e.summary.state, ArchiveDuplication.State.Error)
+      assert(e.summary.error.isDefined)
+      assertEquals(na.summary.state, ArchiveDuplication.State.NotApplicable)
+      assertEquals(na.summary.error, none)
+      // The attempt itself is still reported.
+      assert(na.summary.lastCheckedAt.isDefined)
+
   test("a GOA failure with no previous snapshot is still not a failed call"):
     for
       oid <- gmosObservation
@@ -299,3 +322,254 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       case Left(ex: PostgresErrorException) => assertEquals(ex.code, LockNotAvailable)
       case Left(ex)                         => fail(s"expected a lock timeout, got $ex")
       case Right(_)                         => fail("a submission slipped past the snapshot lock")
+
+  // --- staleness ---
+
+  private def staleness(oid: Observation.Id): IO[Boolean] =
+    withServices(pi): services =>
+      services.transactionally(isArchiveSearchStale(oid))
+
+  private def setLongSlitMode(oid: Observation.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              scienceRequirements: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 75
+                    at: { nanometers: 500 }
+                  }
+                }
+              }
+              observingMode: {
+                gmosNorthLongSlit: {
+                  grating: B1200_G5301
+                  filter: G_PRIME
+                  fpu: LONG_SLIT_0_25
+                  centralWavelength: { nanometers: 500 }
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def unsetMode(oid: Observation.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: { observingMode: null }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def worsenCloudExtinction(oid: Observation.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: { constraintSet: { cloudExtinction: THREE_POINT_ZERO } }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def renameTarget(tid: lucuma.core.model.Target.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: { name: "Encke" }
+            WHERE: { id: { EQ: "$tid" } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
+
+  test("an observation that has never been searched is not stale"):
+    for
+      oid <- gmosObservation
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("a fresh search is not stale"):
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("replacing the observing mode after a search is stale"):
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      s   <- staleness(oid)
+    yield assert(s)
+
+  test("unsetting the observing mode after a search is not stale: nothing can be searched"):
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- unsetMode(oid)
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("a conditions change does not stale a search: the GOA query never uses them"):
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- worsenCloudExtinction(oid)
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  test("renaming a non-sidereal target after a search is stale: its query searches by name"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createNonsiderealTargetAs(pi, pid, name = "Halley")
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- renameTarget(tid)
+      s   <- staleness(oid)
+    yield assert(s)
+
+  test("a not-applicable snapshot goes stale once something can be searched"):
+    for
+      oid <- visitorObservation
+      _   <- refresh(mockOf())(oid)
+      _   <- setLongSlitMode(oid)
+      s   <- staleness(oid)
+    yield assert(s)
+
+  test("a frozen snapshot is never stale: its refresh is rejected, so the flag could prompt nothing"):
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- markSubmitted(pid)
+      s   <- staleness(oid)
+    yield assert(!s)
+
+  private def servedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
+    withFreshSession: s =>
+      s.option(sql"select c_stale from v_archive_duplication where c_observation_id = $observation_id".query(skunk.codec.boolean.bool))(oid)
+
+  test("a materialized stale flag is masked once the proposal is submitted"):
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- runObscalc(oid)
+      s1  <- servedStaleFlag(oid)
+      _   <- markSubmitted(pid)
+      s2  <- servedStaleFlag(oid)
+      m   <- storedStaleFlag(oid)
+    yield
+      assertEquals(s1, true.some)
+      assertEquals(s2, false.some)
+      // The stored flag is untouched; the view derives the answer.
+      assertEquals(m, true.some)
+
+  private def storedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
+    withFreshSession: s =>
+      s.option(sql"select c_archive_stale from t_obscalc where c_observation_id = $observation_id".query(skunk.codec.boolean.bool))(oid)
+
+  private def runObscalc(oid: Observation.Id): IO[Unit] =
+    withServicesForObscalc(serviceUser): services =>
+      given Services[IO] = services
+      val svc = ObscalcService.instantiate[IO]
+      services.transactionally(svc.loadObs(oid)).flatMap:
+        _.traverse_(svc.calculateAndUpdate)
+
+  test("the obscalc worker materializes staleness, and a refresh resets it"):
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- runObscalc(oid)
+      s1  <- storedStaleFlag(oid)
+      // A refresh resets the flag at once, without waiting for obscalc.
+      _   <- refresh(mockOf("a.fits"))(oid)
+      s2  <- storedStaleFlag(oid)
+    yield
+      assertEquals(s1, true.some)
+      assertEquals(s2, false.some)
+
+  private def storedCalcState(oid: Observation.Id): IO[Option[CalculationState]] =
+    withFreshSession: s =>
+      s.option(
+        sql"select c_obscalc_state from t_obscalc where c_observation_id = $observation_id"
+          .query(calculation_state)
+      )(oid)
+
+  /**
+   * Loads the pending entry, runs `between`, and only then calculates and
+   * stores.  The entry carries the invalidation timestamp it was loaded with,
+   * so `between` occupies the window a concurrent write lands in.
+   */
+  private def runObscalcAfter(oid: Observation.Id)(between: IO[Unit]): IO[Unit] =
+    withServicesForObscalc(serviceUser): services =>
+      given Services[IO] = services
+      val svc = ObscalcService.instantiate[IO]
+      services.transactionally(svc.loadObs(oid)).flatMap:
+        _.traverse_(p => between *> svc.calculateAndUpdate(p).void)
+
+  /**
+   * Stands in for a refresh landing mid-calculation: it resets the flag and
+   * schedules a recalculation just as the snapshot trigger does, but leaves the
+   * stored queries alone so the in-flight calculation still derives `true`.
+   */
+  private def resetFlagAndInvalidate(oid: Observation.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_obscalc set c_archive_stale = false where c_observation_id = $observation_id".command
+      )(oid) >>
+      s.execute(sql"call invalidate_obscalc($observation_id)".command)(oid).void
+
+  test("a re-invalidated calculation does not write the staleness it derived"):
+    for
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- runObscalcAfter(oid)(resetFlagAndInvalidate(oid))
+      m   <- storedStaleFlag(oid)
+      st  <- storedCalcState(oid)
+    yield
+      // The reset survives; overwriting it would show a stale observation as
+      // stale again until the next worker pass.
+      assertEquals(m, false.some)
+      assertEquals(st, CalculationState.Pending.some)
+
+  test("a mixed sidereal and non-sidereal asterism is reported as not applicable"):
+    // Declines rather than report a false zero.
+    for
+      pid <- createProgramAs(pi)
+      t1  <- createTargetAs(pi, pid)
+      t2  <- createNonsiderealTargetAs(pi, pid, name = "Halley")
+      oid <- createGmosNorthImagingObservationAs(pi, pid, t1, t2)
+      s   <- refresh(mockOf("a.fits"))(oid)
+    yield assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)

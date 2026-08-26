@@ -103,7 +103,16 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
   private def sidereal(count: Int): ArchiveDuplication.Summary =
     summary(count, ArchiveSearchPointing.Sidereal(searchPointing).some)
 
+  /** The stored state only shows through for an observation with a mode. */
   private def newObservation: IO[Observation.Id] =
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+    yield oid
+
+  /** No observing mode, so the view derives NOT_APPLICABLE whatever is stored. */
+  private def modelessObservation: IO[Observation.Id] =
     createProgramAs(pi).flatMap(createObservationAs(pi, _))
 
   private def run[A](f: Transaction[IO] ?=> ArchiveDuplicationService[IO] => IO[A]): IO[A] =
@@ -153,7 +162,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     for
       oid <- newObservation
       _   <- run(_.store(oid, sidereal(1), List(fullRecord)))
-      _   <- run(_.storeError(oid, "GOA is down".refined))
+      _   <- run(_.storeError(oid, "GOA is down".refined, checkedAt))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.state, ArchiveDuplication.State.Error)
@@ -165,7 +174,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
   test("an error with no previous snapshot reports the error and no matches"):
     for
       oid <- newObservation
-      _   <- run(_.storeError(oid, "GOA is down".refined))
+      _   <- run(_.storeError(oid, "GOA is down".refined, checkedAt))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.state, ArchiveDuplication.State.Error)
@@ -183,3 +192,20 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
       assertEquals(s.summary.lastCheckedAt, checkedAt.some)
       assertEquals(s.matches, Nil)
+
+  test("an observation with no observing mode reads as not applicable before any search"):
+    for
+      oid <- modelessObservation
+      s   <- run(_.select(oid))
+    yield assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
+
+  test("an observation with no observing mode reads as not applicable whatever is stored"):
+    for
+      oid <- modelessObservation
+      _   <- run(_.store(oid, sidereal(1), List(fullRecord)))
+      s   <- run(_.select(oid))
+    yield
+      // The stored evidence is untouched; only its interpretation is derived.
+      assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
+      assertEquals(s.summary.matchCount.value, 1)
+      assertEquals(s.matches, List(fullRecord))

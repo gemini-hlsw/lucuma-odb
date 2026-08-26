@@ -92,8 +92,10 @@ object GoaQueryPolicy:
 
   /**
    * Where to search.  An explicit base wins; otherwise a wholly non-sidereal
-   * asterism is searched by target name and anything else by the asterism
-   * center evaluated at the observation's reference time.
+   * asterism is searched by target name and a wholly sidereal one by the
+   * asterism center at the reference time.  A mixed asterism is not searched:
+   * a cone around the composite center would miss the moving member and read
+   * back as a false all-clear.
    *
    * `None` means the observation has no resolvable pointing and no usable name.
    */
@@ -111,7 +113,22 @@ object GoaQueryPolicy:
 
     explicitBase.map(ArchiveSearchPointing.Sidereal(_))
       .orElse(movingTargetName.map(ArchiveSearchPointing.NonSidereal(_)))
-      .orElse(asterismCenter.map(ArchiveSearchPointing.Sidereal(_)))
+      .orElse(asterismCenter.filterNot(_ => hasMovingTarget(asterism)).map(ArchiveSearchPointing.Sidereal(_)))
+
+  /**
+   * Whether resolving the asterism center could change `searchPointing`'s
+   * answer, letting callers skip the tracking lookup otherwise.
+   */
+  def centerRequired(
+    explicitBase: Option[Coordinates],
+    asterism:     List[TargetPointing]
+  ): Boolean =
+    searchPointing(explicitBase, none, asterism).isEmpty && !hasMovingTarget(asterism)
+
+  private def hasMovingTarget(asterism: List[TargetPointing]): Boolean =
+    asterism.exists:
+      case TargetPointing.NonSidereal(_) => true
+      case _                             => false
 
   private def scienceAreas(mode: ObservingMode): List[ShapeExpression] =
     val pa  = Angle.Angle0

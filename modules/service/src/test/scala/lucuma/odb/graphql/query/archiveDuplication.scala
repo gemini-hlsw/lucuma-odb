@@ -422,3 +422,36 @@ class archiveDuplication extends OdbSuite:
       js,
       json"""{ "matchCount": 1, "matches": [ { "name": "a.fits" } ] }"""
     )
+
+  test("an observation that has never been searched is not stale and never attempted"):
+    for
+      oid <- siderealObservation
+      j   <- archiveDuplication(oid, "stale attemptedAt")
+    yield assertEquals(j, json"""{ "stale": false, "attemptedAt": null }""")
+
+  test("after a successful search attemptedAt equals lastCheckedAt"):
+    for
+      oid <- siderealObservation
+      _   <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
+      j   <- archiveDuplication(oid, "stale lastCheckedAt attemptedAt")
+    yield
+      assertEquals(j.hcursor.downField("stale").as[Boolean], Right(false))
+      assert(!j.hcursor.downField("lastCheckedAt").focus.contains(Json.Null))
+      assertEquals(
+        j.hcursor.downField("attemptedAt").focus,
+        j.hcursor.downField("lastCheckedAt").focus
+      )
+
+  test("a failed attempt moves attemptedAt while lastCheckedAt keeps the last good search"):
+    for
+      oid <- siderealObservation
+      _   <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
+      _   <- refresh(GoaClientMock.fromJson[IO]("this is not JSON"))(oid)
+      j   <- archiveDuplication(oid, "state lastCheckedAt attemptedAt")
+    yield
+      assertEquals(j.hcursor.downField("state").as[String], Right("ERROR"))
+      val checked   = j.hcursor.downField("lastCheckedAt").as[String].toOption
+      val attempted = j.hcursor.downField("attemptedAt").as[String].toOption
+      assert(checked.isDefined)
+      assert(attempted.isDefined)
+      assertNotEquals(attempted, checked)

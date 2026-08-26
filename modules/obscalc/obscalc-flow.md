@@ -2,7 +2,7 @@
 
 ## Overview
 
-`t_obscalc` caches the expensive per-observation derived values — ITC results, execution digest, workflow state, J2000 base position — that the ODB serves to clients. A daemon recomputes entries asynchronously: database triggers mark rows `pending` whenever input data changes, the daemon picks them up, runs ITC + generator + workflow (plus the base-position lookup), and writes results back. PostgreSQL `NOTIFY` is used both to wake the daemon and to publish updates to GraphQL subscribers.
+`t_obscalc` caches the expensive per-observation derived values — ITC results, execution digest, workflow state, J2000 base position, archive-duplication staleness — that the ODB serves to clients. A daemon recomputes entries asynchronously: database triggers mark rows `pending` whenever input data changes, the daemon picks them up, runs ITC + generator + workflow (plus the base-position lookup), and writes results back. PostgreSQL `NOTIFY` is used both to wake the daemon and to publish updates to GraphQL subscribers.
 
 ## Trigger Chain
 
@@ -53,6 +53,7 @@ Composite primary key `(c_program_id, c_observation_id)`; cascades from `t_obser
 - Digests: `c_acq_*`, `c_sci_*` (obs class, charged/non-charged time, offsets, atom count, execution state).
 - Workflow: `c_workflow_state`, `c_workflow_transitions`, `c_workflow_validations`.
 - J2000 base position: `c_j2000_base_ra`, `c_j2000_base_dec` — indexed, backing the `targetCoordinates` cone WHERE filter. The explicit base if set, otherwise the asterism composite PM-corrected to J2000; null when the asterism has a non-sidereal or opportunity target (and no explicit base) or the entry has not been computed yet.
+- Archive Duplication staleness: `c_archive_stale` — whether the GOA queries the search policy would run today differ from the snapshot's stored `c_query_urls` (`isArchiveSearchStale`); false when nothing was searched, nothing is searchable now, or the proposal is frozen. Read through `v_archive_duplication`; a successful `refreshArchiveDuplication` resets it to false directly, without waiting for the recalculation its write schedules.
 
 ## Invalidation
 
@@ -74,6 +75,7 @@ All write paths funnel through one procedure: `invalidate_obscalc(observation_id
 | `cfp_edit_invalidate_obscalc_trigger` | `t_cfp` | CfP edits |
 | `cfp_instrument_invalidate_obscalc_trigger` | `t_gemini_cfp_instrument` | INSERT/UPDATE/DELETE |
 | `configreq_invalidate_obscalc_trigger` | `t_configuration_request` | INSERT/UPDATE/DELETE |
+| `archive_duplication_invalidate_obscalc_trigger` | `t_archive_duplication` | INSERT/UPDATE/DELETE — a new snapshot must have its staleness (re)evaluated |
 
 ## Notification: `ch_obscalc_update`
 
@@ -122,7 +124,7 @@ flowchart TD
 
 ## `ObscalcService.calculateAndUpdate`
 
-`ObscalcService.scala:127, 298`
+`ObscalcService.scala:130, 337`
 
 ```mermaid
 flowchart TD
@@ -137,6 +139,7 @@ flowchart TD
     W --> R
     R --> T{transaction}
     T --> S1[sequenceService.insertAtomDigests]
+    T --> S15[isArchiveSearchStale<br/>→ c_archive_stale]
     T --> S2[storeResult]
     S2 --> CK{c_last_invalidation == pending.lastInvalidation?}
     CK -->|no| BP[state = pending — recompute]
@@ -153,16 +156,19 @@ flowchart TD
 | `Generator.obscalc` (`Generator.scala:299`) | `ExecutionDigest` (acq + sci) and per-atom `AtomDigest` stream |
 | `ObservationWorkflowService.getCalculatedWorkflow` (`ObservationWorkflowService.scala:87`) | Workflow state, allowed transitions, validation errors |
 | `ObscalcService.computeBasePosition` | Stored J2000 base position: explicit base, else the all-sidereal asterism composite PM-corrected to J2000; `None` when undefined. Computed independently of ITC success so a misconfigured observation still gets a position |
+| `isArchiveSearchStale` (`ArchiveDuplicationSearchService.scala:128`) | Whether the GOA queries the search policy would generate today (same `QueryContext` inputs as the search itself) still equal the snapshot's stored query URLs. False when nothing was searched, nothing is searchable now, or the proposal is frozen — a frozen snapshot cannot be re-checked, so flagging it could prompt nothing |
 
 ### Result Storage Guard
 
-`storeResult` (`ObscalcService.scala:286`) locks the row and re-reads `c_last_invalidation`. If it changed during calculation, the result is *still* written but the state is forced back to `pending` so the next pickup re-runs against the newer inputs. It also checks whether any of the observation's visits is still time-accounting-dirty (a recompute that failed): if so — and `c_last_invalidation` is unchanged — the state is forced to `retry` so the time-accounting update is attempted again. See [`time-accounting-flow.md`](time-accounting-flow.md).
+`storeResult` (`ObscalcService.scala:317`) locks the row and re-reads `c_last_invalidation`. If it changed during calculation, the result is *still* written but the state is forced back to `pending` so the next pickup re-runs against the newer inputs. It also checks whether any of the observation's visits is still time-accounting-dirty (a recompute that failed): if so — and `c_last_invalidation` is unchanged — the state is forced to `retry` so the time-accounting update is attempted again. See [`time-accounting-flow.md`](time-accounting-flow.md).
 
 The J2000 base position columns are written only when the computation ran: a *computed absence* (non-sidereal or opportunity target, no explicit base) clears them, but a *failure reading the inputs* skips the two column updates so the previously stored position is kept rather than silently nulled.
 
+`c_archive_stale` follows the same pattern: it is computed inside the store transaction on the normal path, but the catch-all error path (`Result.Error` from a thrown exception) skips the column update, since it cannot tell whether the failure would have changed the answer.
+
 ### Retry Backoff
 
-`Statements.storeResult` (`ObscalcService.scala:597`, formula at `:609`): on `retry`, `c_failure_count` is incremented and `c_retry_at = now() + interval '1 minute' * POWER(2, LEAST(c_failure_count, 5))` — capped at 32 minutes.
+`Statements.storeResult` (`ObscalcService.scala:677`, formula at `:691`): on `retry`, `c_failure_count` is incremented and `c_retry_at = now() + interval '1 minute' * POWER(2, LEAST(c_failure_count, 5))` — capped at 32 minutes.
 
 ## State Transitions
 
