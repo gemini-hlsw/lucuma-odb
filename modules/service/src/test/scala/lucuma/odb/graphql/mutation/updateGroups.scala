@@ -248,6 +248,29 @@ class updateGroups extends OdbSuite {
     }
   }
 
+  // Reordering within a parent, mirroring the observation reorder tests. A drop at the bottom
+  // of a list of five arrives as index 5 because the client counts the element being dragged.
+
+  private def groupReorderTest(name: String, nested: Boolean)(from: Int, to: Int)(expected: List[Group.Id] => List[Group.Id]): Unit =
+    test(s"reorder groups $name (${if nested then "in a group" else "at the top level"})") {
+      for {
+        pid <- createProgramAs(pi)
+        par <- if nested then createGroupAs(pi, pid).map(_.some) else none[Group.Id].pure[IO]
+        gs  <- List.range(0, 5).traverse(_ => createGroupAs(pi, pid, par, None))
+        _   <- moveGroupsAs(pi, List(gs(from)), par, Some(NonNegShort.unsafeFrom(to.toShort)))
+        es  <- groupElementsAs(pi, pid, par)
+      } yield assertEquals(es, expected(gs).map(_.asLeft[Observation.Id]))
+    }
+
+  groupReorderTest("top to bottom", nested = true)(0, 5)(gs => List(gs(1), gs(2), gs(3), gs(4), gs(0)))
+  groupReorderTest("top to bottom", nested = false)(0, 5)(gs => List(gs(1), gs(2), gs(3), gs(4), gs(0)))
+
+  groupReorderTest("middle downward", nested = true)(1, 4)(gs => List(gs(0), gs(2), gs(3), gs(1), gs(4)))
+  groupReorderTest("middle downward", nested = false)(1, 4)(gs => List(gs(0), gs(2), gs(3), gs(1), gs(4)))
+
+  groupReorderTest("bottom to top", nested = true)(4, 0)(gs => List(gs(4), gs(0), gs(1), gs(2), gs(3)))
+  groupReorderTest("bottom to top", nested = false)(4, 0)(gs => List(gs(4), gs(0), gs(1), gs(2), gs(3)))
+
   test("Hugo's example, with groups") {
     for {
       pid <- createProgramAs(pi)

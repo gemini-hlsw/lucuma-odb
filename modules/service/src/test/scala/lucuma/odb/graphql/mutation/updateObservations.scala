@@ -3314,6 +3314,39 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     }
   }
 
+  // Reordering within a group. Clients compute the drop position against the list they are
+  // looking at, which still contains the element being dragged, so a drop at the bottom of a
+  // group of five arrives as index 5. The move renumbers as it removes the element, so these
+  // check that it lands where it was dropped rather than one slot low (or off the end, which
+  // used to leave a hole and trip the group index triggers).
+
+  private def reorderTest(name: String, inGroup: Boolean)(from: Int, to: Int)(expected: List[Observation.Id] => List[Observation.Id]): Unit =
+    test(s"grouping: reorder $name (${if inGroup then "in a group" else "at the top level"})") {
+      for {
+        pid <- createProgramAs(pi)
+        gid <- if inGroup then createGroupAs(pi, pid).map(_.some) else none[Group.Id].pure[IO]
+        os  <- List.range(0, 5).traverse(_ => createObservationInGroupAs(pi, pid, gid, None))
+        _   <- moveObservationsAs(pi, List(os(from)), gid, Some(NonNegShort.unsafeFrom(to.toShort)))
+        es  <- groupElementsAs(pi, pid, gid)
+      } yield assertEquals(es, expected(os).map(_.asRight[Group.Id]))
+    }
+
+  // The reported bug: dragging the top observation to the bottom.
+  reorderTest("top to bottom", inGroup = true)(0, 5)(os => List(os(1), os(2), os(3), os(4), os(0)))
+  reorderTest("top to bottom", inGroup = false)(0, 5)(os => List(os(1), os(2), os(3), os(4), os(0)))
+
+  // Silently landed one slot too low before the fix.
+  reorderTest("middle downward", inGroup = true)(1, 4)(os => List(os(0), os(2), os(3), os(1), os(4)))
+  reorderTest("middle downward", inGroup = false)(1, 4)(os => List(os(0), os(2), os(3), os(1), os(4)))
+
+  // Upward moves were already correct; make sure we didn't over-correct them.
+  reorderTest("bottom to top", inGroup = true)(4, 0)(os => List(os(4), os(0), os(1), os(2), os(3)))
+  reorderTest("bottom to top", inGroup = false)(4, 0)(os => List(os(4), os(0), os(1), os(2), os(3)))
+
+  // An index past the end (a stale client view, say) is clamped rather than left as a hole.
+  reorderTest("past the end", inGroup = true)(0, 99)(os => List(os(1), os(2), os(3), os(4), os(0)))
+  reorderTest("past the end", inGroup = false)(0, 99)(os => List(os(1), os(2), os(3), os(4), os(0)))
+
   test("grouping: Hugo's example") {
     for {
       pid <- createProgramAs(pi)
