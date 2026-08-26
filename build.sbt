@@ -136,7 +136,8 @@ ThisBuild / githubWorkflowBuildPreamble ++= Seq(
     name = Some("Set up Docker Buildx")
   ),
   prebuildTestDbImage("lucuma-odb-test-db", "modules/service/src"),
-  prebuildTestDbImage("lucuma-sso-test-db", "modules/sso-service/src")
+  prebuildTestDbImage("lucuma-sso-test-db", "modules/sso-service/src"),
+  prebuildTestDbImage("lucuma-resource-test-db", "resource/service/src")
 )
 
 
@@ -161,8 +162,9 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
         "TEST_SHARD_COUNT"  -> nTestJobShards.toString(),
         "TEST_SHARD"        -> "${{ matrix.shard }}",
         // Prebuilt test database images, see githubWorkflowBuildPreamble
-        "ODB_TEST_DB_IMAGE" -> "lucuma-odb-test-db:ci",
-        "SSO_TEST_DB_IMAGE" -> "lucuma-sso-test-db:ci"
+        "ODB_TEST_DB_IMAGE"      -> "lucuma-odb-test-db:ci",
+        "SSO_TEST_DB_IMAGE"      -> "lucuma-sso-test-db:ci",
+        "RESOURCE_TEST_DB_IMAGE" -> "lucuma-resource-test-db:ci"
       )
     )
   case step => step

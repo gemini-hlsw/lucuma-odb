@@ -96,12 +96,26 @@ jobs:
             POSTGRES_DB=test
           cache-to: ${{ matrix.shard == '0' && 'type=gha,scope=lucuma-sso-test-db,mode=max' || '' }}
 
+      - name: Build lucuma-resource-test-db image
+        uses: docker/build-push-action@v7
+        with:
+          cache-from: type=gha,scope=lucuma-resource-test-db
+          tags: 'lucuma-resource-test-db:ci'
+          context: resource/service/src
+          load: true
+          build-args: |
+            POSTGRES_USER=test
+            POSTGRES_PASSWORD=test
+            POSTGRES_DB=test
+          cache-to: ${{ matrix.shard == '0' && 'type=gha,scope=lucuma-resource-test-db,mode=max' || '' }}
+
       - name: Test
         env:
-          TEST_SHARD_COUNT: 8
           TEST_SHARD: ${{ matrix.shard }}
           ODB_TEST_DB_IMAGE: 'lucuma-odb-test-db:ci'
+          TEST_SHARD_COUNT: 8
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
+          RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' test
 
       - name: Docker compose down
