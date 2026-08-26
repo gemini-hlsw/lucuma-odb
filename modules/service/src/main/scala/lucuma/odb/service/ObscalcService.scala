@@ -347,7 +347,7 @@ object ObscalcService:
               .flatMap: (result, atomDigests) =>
                 services.transactionally:
                   sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
-                  ArchiveDuplicationSearchService.isStale(pending.observationId).flatMap: stale =>
+                  isArchiveSearchStale(pending.observationId).flatMap: stale =>
                     (result.odbError match
                       case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, basePosition, stale.some, CalculationState.Retry)
                       case _                                        => storeResult(pending, result, basePosition, stale.some, CalculationState.Ready))

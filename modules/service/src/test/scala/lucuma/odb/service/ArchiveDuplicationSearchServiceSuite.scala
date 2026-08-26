@@ -307,7 +307,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   private def staleness(oid: Observation.Id): IO[Boolean] =
     withServices(pi): services =>
-      services.transactionally(ArchiveDuplicationSearchService.isStale(oid))
+      services.transactionally(isArchiveSearchStale(oid))
 
   private def setLongSlitMode(oid: Observation.Id): IO[Unit] =
     query(

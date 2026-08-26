@@ -61,87 +61,88 @@ trait ArchiveDuplicationSearchService[F[_]]:
    */
   def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[ArchiveDuplication.Snapshot]]
 
-object ArchiveDuplicationSearchService:
+import ArchiveDuplicationSearchService.Statements
+import Services.Syntax.*
 
-  import Services.Syntax.*
+/**
+ * Submission freezes the snapshot, so that the count the TAC and the proposal
+ * PDF see is the one the PI last saw.
+ */
+extension (ps: ProposalStatus)
+  def isFrozen: Boolean =
+    ps >= ProposalStatus.Submitted
 
-  /**
-   * Submission freezes the snapshot, so that the count the TAC and the proposal
-   * PDF see is the one the PI last saw.
-   */
-  extension (ps: ProposalStatus)
-    private[service] def isFrozen: Boolean =
-      ps >= ProposalStatus.Submitted
+/** What the query policy needs, as loaded from the database. */
+final case class QueryContext(
+  mode:           Option[ObservingMode],
+  explicitBase:   Option[Coordinates],
+  referenceTime:  Option[Timestamp],
+  asterism:       List[Target],
+  proposalStatus: ProposalStatus
+):
+  lazy val pointings: List[GoaQueryPolicy.TargetPointing] =
+    asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
 
-  /** What the query policy needs, as loaded from the database. */
-  final case class QueryContext(
-    mode:           Option[ObservingMode],
-    explicitBase:   Option[Coordinates],
-    referenceTime:  Option[Timestamp],
-    asterism:       List[Target],
-    proposalStatus: ProposalStatus
-  ):
-    lazy val pointings: List[GoaQueryPolicy.TargetPointing] =
-      asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
+object QueryContext:
 
-  private[service] object QueryContext:
-
-    /** None when the observation does not exist. */
-    def load[F[_]: Concurrent](
-      observationId: Observation.Id
-    )(using Services[F], Transaction[F]): F[Option[QueryContext]] =
-      session.option(Statements.SelectObservation)(observationId).flatMap:
-        case None                              => none.pure
-        case Some((omt, ra, dec, refTime, ps)) =>
-          val explicitBase = (ra, dec).mapN(Coordinates.apply)
-          for
-            mode     <- Services.asSuperUser(omt.traverse: t =>
-                          observingModeServices.selectObservingMode(List((observationId, t)))
-                        ).map(_.flatMap(_.get(observationId)))
-            asterism <- Services.asSuperUser(asterismService.getAsterism(observationId))
-          yield QueryContext(mode, explicitBase, refTime, asterism.map(_._2), ps).some
-
-  /** The asterism center, resolved only when the search actually uses it. */
-  private[service] def resolveCenter[F[_]: {Concurrent, Clock}](
-    observationId: Observation.Id,
-    ctx:           QueryContext
-  )(using Services[F]): F[Option[Coordinates]] =
-    if !GoaQueryPolicy.centerRequired(ctx.explicitBase, ctx.pointings) then none.pure
-    else
-      ctx.referenceTime.fold(nowTimestamp)(_.pure[F]).flatMap: t =>
-        trackingService
-          .getCoordinatesSnapshot(observationId, t, false)
-          .map(_.toOption.map(_.base))
-
-  private[service] def queriesFor(ctx: QueryContext, center: Option[Coordinates]): List[GoaParams] =
-    ctx.mode.toList.flatMap(GoaQueryPolicy.queries(_, ctx.explicitBase, center, ctx.pointings))
-
-  /** The GOA query URLs for these params, in order. */
-  private[service] def queryUrlsOf(params: List[GoaParams]): List[String] =
-    params.mapFilter(p => GoaParams.toUri(p).map(_.renderString))
-
-  /**
-   * Whether the stored snapshot is out of date: the GOA queries the policy
-   * would run today differ from the stored `queryUrls`.  False when nothing
-   * was ever searched, nothing can be searched now, or the proposal is
-   * frozen, since a refresh would be rejected anyway.
-   */
-  private[service] def isStale[F[_]: {Concurrent, Clock}](
+  /** None when the observation does not exist. */
+  def load[F[_]: Concurrent](
     observationId: Observation.Id
-  )(using Services[F], Transaction[F]): F[Boolean] =
-    session.option(Statements.SelectStoredQueryUrls)(observationId).flatMap:
-      case None             => false.pure[F]  // never searched
-      case Some(storedUrls) =>
-        QueryContext.load(observationId).flatMap:
-          case None                                     => false.pure[F]  // observation gone
-          case Some(ctx) if ctx.proposalStatus.isFrozen => false.pure[F]
-          case Some(ctx)                                =>
-            resolveCenter(observationId, ctx).map: center =>
-              val urls = queryUrlsOf(queriesFor(ctx, center))
-              urls.nonEmpty && urls =!= storedUrls
+  )(using Services[F], Transaction[F]): F[Option[QueryContext]] =
+    session.option(Statements.SelectObservation)(observationId).flatMap:
+      case None                              => none.pure
+      case Some((omt, ra, dec, refTime, ps)) =>
+        val explicitBase = (ra, dec).mapN(Coordinates.apply)
+        for
+          mode     <- Services.asSuperUser(omt.traverse: t =>
+                        observingModeServices.selectObservingMode(List((observationId, t)))
+                      ).map(_.flatMap(_.get(observationId)))
+          asterism <- Services.asSuperUser(asterismService.getAsterism(observationId))
+        yield QueryContext(mode, explicitBase, refTime, asterism.map(_._2), ps).some
 
-  private def nowTimestamp[F[_]: {Applicative, Clock}]: F[Timestamp] =
-    Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
+/** The asterism center, resolved only when the search actually uses it. */
+def resolveCenter[F[_]: {Concurrent, Clock}](
+  observationId: Observation.Id,
+  ctx:           QueryContext
+)(using Services[F]): F[Option[Coordinates]] =
+  if !GoaQueryPolicy.centerRequired(ctx.explicitBase, ctx.pointings) then none.pure
+  else
+    ctx.referenceTime.fold(nowTimestamp)(_.pure[F]).flatMap: t =>
+      trackingService
+        .getCoordinatesSnapshot(observationId, t, false)
+        .map(_.toOption.map(_.base))
+
+def queriesFor(ctx: QueryContext, center: Option[Coordinates]): List[GoaParams] =
+  ctx.mode.toList.flatMap(GoaQueryPolicy.queries(_, ctx.explicitBase, center, ctx.pointings))
+
+/** The GOA query URLs for these params, in order. */
+def queryUrlsOf(params: List[GoaParams]): List[String] =
+  params.mapFilter(p => GoaParams.toUri(p).map(_.renderString))
+
+/**
+ * Whether the stored snapshot is out of date: the GOA queries the policy
+ * would run today differ from the stored `queryUrls`.  False when nothing
+ * was ever searched, nothing can be searched now, or the proposal is
+ * frozen, since a refresh would be rejected anyway.
+ */
+def isArchiveSearchStale[F[_]: {Concurrent, Clock}](
+  observationId: Observation.Id
+)(using Services[F], Transaction[F]): F[Boolean] =
+  session.option(Statements.SelectStoredQueryUrls)(observationId).flatMap:
+    case None             => false.pure[F]  // never searched
+    case Some(storedUrls) =>
+      QueryContext.load(observationId).flatMap:
+        case None                                     => false.pure[F]  // observation gone
+        case Some(ctx) if ctx.proposalStatus.isFrozen => false.pure[F]
+        case Some(ctx)                                =>
+          resolveCenter(observationId, ctx).map: center =>
+            val urls = queryUrlsOf(queriesFor(ctx, center))
+            urls.nonEmpty && urls =!= storedUrls
+
+def nowTimestamp[F[_]: {Applicative, Clock}]: F[Timestamp] =
+  Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
+
+object ArchiveDuplicationSearchService:
 
   def instantiate[F[_]: {Concurrent, Parallel, Clock, Tracer as T, LoggerFactory as LF}](
     goaClient: GoaClient[F]
