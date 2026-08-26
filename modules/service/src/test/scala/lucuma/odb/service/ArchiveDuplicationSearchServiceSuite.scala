@@ -477,3 +477,14 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
     yield
       assertEquals(s1, true.some)
       assertEquals(s2, false.some)
+
+  test("a mixed sidereal and non-sidereal asterism is reported as not applicable"):
+    // A cone around the composite center would miss the moving member's
+    // archive history, so the search declines rather than report a false zero.
+    for
+      pid <- createProgramAs(pi)
+      t1  <- createTargetAs(pi, pid)
+      t2  <- createNonsiderealTargetAs(pi, pid, name = "Halley")
+      oid <- createGmosNorthImagingObservationAs(pi, pid, t1, t2)
+      s   <- refresh(mockOf("a.fits"))(oid)
+    yield assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)

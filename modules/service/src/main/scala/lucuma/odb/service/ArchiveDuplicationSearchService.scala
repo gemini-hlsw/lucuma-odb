@@ -74,13 +74,9 @@ object ArchiveDuplicationSearchService:
       ps >= ProposalStatus.Submitted
 
   /**
-   * Everything the query policy needs, as loaded from the database.  Shared
-   * with `ArchiveDuplicationService.isStale`, which regenerates the queries
-   * from these same inputs to compare against the stored ones: an input read
-   * by the search but not here would leave a kind of change staleness cannot
-   * see.
+   * Everything the query policy needs to make a query, as loaded from the database.
    */
-  private[service] final case class QueryContext(
+  final case class QueryContext(
     mode:           Option[ObservingMode],
     explicitBase:   Option[Coordinates],
     referenceTime:  Option[Timestamp],
@@ -109,15 +105,14 @@ object ArchiveDuplicationSearchService:
 
   /**
    * The asterism center, resolved only when the search actually depends on
-   * it.  An explicit base or a wholly non-sidereal asterism answers the
-   * question on its own, and resolving anyway would mean an ephemeris
-   * lookup we do not need.
+   * it.  An explicit base or a non-sidereal asterism answers the question on
+   * its own, and a mixed asterism cannot use a center at all.
    */
   private[service] def resolveCenter[F[_]: {Concurrent, Clock}](
     observationId: Observation.Id,
     ctx:           QueryContext
   )(using Services[F]): F[Option[Coordinates]] =
-    if GoaQueryPolicy.searchPointing(ctx.explicitBase, none, ctx.pointings).isDefined then none.pure
+    if !GoaQueryPolicy.centerRequired(ctx.explicitBase, ctx.pointings) then none.pure
     else
       ctx.referenceTime.fold(nowTimestamp)(_.pure[F]).flatMap: t =>
         trackingService

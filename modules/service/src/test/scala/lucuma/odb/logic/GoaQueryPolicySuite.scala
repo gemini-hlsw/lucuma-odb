@@ -234,12 +234,34 @@ class GoaQueryPolicySuite extends FunSuite:
       ArchiveSearchPointing.Sidereal(base).some
     )
 
-  test("an asterism only partly non-sidereal falls back to the center"):
+  test("a mixed asterism has no search pointing, even with a resolved center"):
+    // A cone around the composite center would miss the moving member's
+    // archive history and read back as a false all-clear.
     assertEquals(
       GoaQueryPolicy.searchPointing(
         none,
         center.some,
         List(TargetPointing.NonSidereal(name("Halley")), TargetPointing.Sidereal)
+      ),
+      none
+    )
+
+  test("an explicit base still wins over a mixed asterism"):
+    assertEquals(
+      GoaQueryPolicy.searchPointing(
+        base.some,
+        none,
+        List(TargetPointing.NonSidereal(name("Halley")), TargetPointing.Sidereal)
+      ),
+      ArchiveSearchPointing.Sidereal(base).some
+    )
+
+  test("an unresolved member does not block the center: only a moving one does"):
+    assertEquals(
+      GoaQueryPolicy.searchPointing(
+        none,
+        center.some,
+        List(TargetPointing.Sidereal, TargetPointing.Unresolvable)
       ),
       ArchiveSearchPointing.Sidereal(center).some
     )
@@ -248,6 +270,15 @@ class GoaQueryPolicySuite extends FunSuite:
     assertEquals(GoaQueryPolicy.searchPointing(none, none, Nil), none)
     assertEquals(GoaQueryPolicy.searchPointing(none, none, List(TargetPointing.Sidereal)), none)
     assertEquals(GoaQueryPolicy.searchPointing(none, none, List(TargetPointing.Unresolvable)), none)
+
+  test("the center is required exactly when searchPointing could use it"):
+    val moving = TargetPointing.NonSidereal(name("Halley"))
+    assert(GoaQueryPolicy.centerRequired(none, List(TargetPointing.Sidereal)))
+    // Already answered without a center.
+    assert(!GoaQueryPolicy.centerRequired(base.some, List(TargetPointing.Sidereal)))
+    assert(!GoaQueryPolicy.centerRequired(none, List(moving)))
+    // A center could never be used, so resolving one would be wasted work.
+    assert(!GoaQueryPolicy.centerRequired(none, List(moving, TargetPointing.Sidereal)))
 
   test("targets are classified by how they can be pointed at"):
     val sidereal    = Target.Sidereal(name("Star"), SiderealTracking.const(base), sourceProfile, none)
