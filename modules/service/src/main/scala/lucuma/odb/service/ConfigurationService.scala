@@ -53,9 +53,6 @@ import Services.Syntax.*
 trait ConfigurationService[F[_]] {
 
   /** Selects all configuration requests that subsume this observation's configuration. */
-  /** The observation's current Configuration, failing when it is incomplete. */
-  def selectConfiguration(oid: Observation.Id)(using Transaction[F]): F[Result[Configuration]]
-
   def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]]
 
   /** Selects configuration requests relevant to the given program + observation pairs. The resulting map will contain every passed key. */
@@ -104,9 +101,6 @@ object ConfigurationService {
     new ConfigurationService[F] {
       val impl = Impl[F]
 
-      override def selectConfiguration(oid: Observation.Id)(using Transaction[F]): F[Result[Configuration]] =
-        impl.selectConfiguration(oid).value
-
       override def selectRequests(oid: Observation.Id)(using Transaction[F]): F[Result[List[ConfigurationRequest]]] =
         impl.selectRequests(oid).value
 
@@ -152,7 +146,7 @@ object ConfigurationService {
   /** An implementation with unwrapped parameters and results in more natural types. */
   private class Impl[F[_]: Concurrent](using Services[F]) {
 
-    def selectConfiguration(oid: Observation.Id)(using Transaction[F]): ResultT[F, Configuration] =
+    private def selectConfiguration(oid: Observation.Id)(using Transaction[F]): ResultT[F, Configuration] =
       ResultT:
         selectConfigurations(List(oid)).value.map: result =>
           result.flatMap: map =>

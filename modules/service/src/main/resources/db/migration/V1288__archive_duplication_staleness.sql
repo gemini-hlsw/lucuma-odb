@@ -3,21 +3,16 @@
 -- The stored snapshot is frozen evidence of a search that ran and no changes
 -- are taken into account.
 --
--- The Configuration the search actually ran against, so staleness compares the
--- present against what was asked, not against a reconstruction.
---
--- No stored attempt time: a successful attempt's time is c_last_checked_at and
--- a failed one's is c_error_at, so the view derives it as the coalesce of the
--- two.  Clients need it to avoid re-firing a refresh that just failed.
-ALTER TABLE t_archive_duplication
-  ADD COLUMN c_searched_configuration jsonb NULL,
-  ADD COLUMN c_error_at               timestamp NULL,
-  -- One-directional because rows stored before this migration may carry an
-  -- error with no timestamp; a successful store clears both together.
-  ADD CONSTRAINT archive_duplication_error_at CHECK (c_error_at IS NULL OR c_error IS NOT NULL);
+-- We can drop the current set of results, this feature is not yet in active use,
+-- and we can simplify the migration this way.
+DELETE FROM t_archive_duplication;
 
-COMMENT ON COLUMN t_archive_duplication.c_searched_configuration IS
-  'The Configuration the snapshot''s search ran against (configuration-request JSON encoding).  Frozen provenance: staleness is derived by comparing it with the observation''s current configuration.';
+ALTER TABLE t_archive_duplication
+  ADD COLUMN c_error_at timestamp NULL,
+  -- A failed attempt sets both the message and the time; a successful store
+  -- clears both together.
+  ADD CONSTRAINT archive_duplication_error_at CHECK ((c_error_at IS NULL) = (c_error IS NULL));
+
 COMMENT ON COLUMN t_archive_duplication.c_error_at IS
   'When the most recent failed search ran; cleared by a successful one, whose time is c_last_checked_at.';
 
@@ -27,11 +22,11 @@ ALTER TABLE t_obscalc
   ADD COLUMN c_archive_stale boolean NOT NULL DEFAULT false;
 
 COMMENT ON COLUMN t_obscalc.c_archive_stale IS
-  'Whether the Archive Duplication snapshot''s searched configuration no longer subsumes the observation''s current one.  Computed by the obscalc worker; false when there is nothing stored to go stale.';
+  'Whether the Archive Duplication snapshot''s stored GOA queries differ from the ones the search policy would run today.';
 
--- Writing a snapshot must schedule a staleness recalculation, both so a fresh
--- search reads not-stale once the worker catches up and so a first search is
--- evaluated at all.
+-- Every snapshot write schedules a staleness recalculation.  The other obscalc
+-- triggers only see observation edits, so nothing else would evaluate a new
+-- snapshot.
 CREATE OR REPLACE FUNCTION archive_duplication_obscalc_invalidate()
 RETURNS trigger AS $$
 BEGIN
@@ -45,13 +40,10 @@ CREATE TRIGGER archive_duplication_invalidate_obscalc_trigger
   FOR EACH ROW
   EXECUTE FUNCTION archive_duplication_obscalc_invalidate();
 
--- The state an observation reads is now derived: no observing mode means the
--- search cannot be asked today, whatever was stored.  A stored NOT_APPLICABLE
--- with a mode now present still reads NOT_APPLICABLE; c_stale is what flags it
--- for a re-check.
+-- An observation with no observing mode reads NOT_APPLICABLE, whatever was
+-- stored: the search cannot be asked for it today.
 --
--- Dropped and recreated because c_last_attempted_at sits beside
--- c_last_checked_at, and REPLACE cannot insert a column mid-list.
+-- DROP rather than REPLACE: c_last_attempted_at goes in mid-list.
 DROP VIEW v_archive_duplication;
 
 CREATE VIEW v_archive_duplication AS
@@ -82,15 +74,3 @@ CREATE VIEW v_archive_duplication AS
     FROM t_archive_match
     GROUP BY c_observation_id
   ) m ON m.c_observation_id = o.c_observation_id;
-
--- Existing snapshots were stored before c_searched_configuration existed, so
--- have their staleness evaluated now rather than on the next unrelated edit.
-DO $$
-DECLARE
-  obs d_observation_id;
-BEGIN
-  FOR obs IN SELECT c_observation_id FROM t_archive_duplication LOOP
-    CALL invalidate_obscalc(obs);
-  END LOOP;
-END;
-$$;

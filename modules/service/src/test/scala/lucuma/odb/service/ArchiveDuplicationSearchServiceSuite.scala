@@ -305,29 +305,8 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   // --- staleness ---
 
-  /**
-   * Configuration needs reference coordinates, which are resolved at the CfP
-   * reference time, so these observations live in a program with a proposal.
-   */
-  private def configuredObservation: IO[Observation.Id] =
-    for
-      pid <- proposedProgram
-      tid <- createTargetAs(pi, pid)
-      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
-    yield oid
-
-  /**
-   * Refresh with a mapping-backed Services, as the mutation has in production:
-   * assembling the searched configuration runs an internal GraphQL query, and
-   * without a mapping the refresh stores a snapshot with no provenance.
-   */
-  private def refreshStoringProvenance(client: GoaClient[IO])(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
-    withServicesForObscalc(serviceUser): services =>
-      given Services[IO] = services
-      ArchiveDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get)
-
   private def staleness(oid: Observation.Id): IO[Boolean] =
-    withServicesForObscalc(serviceUser): services =>
+    withServices(pi): services =>
       services.transactionally(services.archiveDuplicationService.isStale(oid))
 
   private def setLongSlitMode(oid: Observation.Id): IO[Unit] =
@@ -337,6 +316,14 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
         mutation {
           updateObservations(input: {
             SET: {
+              scienceRequirements: {
+                exposureTimeMode: {
+                  signalToNoise: {
+                    value: 75
+                    at: { nanometers: 500 }
+                  }
+                }
+              }
               observingMode: {
                 gmosNorthLongSlit: {
                   grating: B1200_G5301
@@ -384,54 +371,86 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       """
     ).void
 
+  private def renameTarget(tid: lucuma.core.model.Target.Id): IO[Unit] =
+    query(
+      user = pi,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: { name: "Encke" }
+            WHERE: { id: { EQ: "$tid" } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
+
   test("an observation that has never been searched is not stale"):
     for
-      oid <- configuredObservation
+      oid <- gmosObservation
       s   <- staleness(oid)
     yield assert(!s)
 
   test("a fresh search is not stale"):
     for
-      oid <- configuredObservation
-      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
       s   <- staleness(oid)
     yield assert(!s)
 
   test("replacing the observing mode after a search is stale"):
     for
-      oid <- configuredObservation
-      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
       _   <- setLongSlitMode(oid)
       s   <- staleness(oid)
     yield assert(s)
 
   test("unsetting the observing mode after a search is not stale: nothing can be searched"):
     for
-      oid <- configuredObservation
-      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
       _   <- unsetMode(oid)
       s   <- staleness(oid)
     yield assert(!s)
 
   test("a conditions change does not stale a search: the GOA query never uses them"):
     for
-      oid <- configuredObservation
-      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
       _   <- worsenCloudExtinction(oid)
       s   <- staleness(oid)
     yield assert(!s)
 
-  test("a snapshot stored without provenance is stale once something can be searched"):
+  test("renaming a non-sidereal target after a search is stale: its query searches by name"):
     for
-      oid <- configuredObservation
-      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
-      // Simulate a row from before c_searched_configuration existed.
-      _   <- withFreshSession: s =>
-               s.execute(
-                 sql"update t_archive_duplication set c_searched_configuration = null where c_observation_id = $observation_id".command
-               )(oid).void
+      pid <- createProgramAs(pi)
+      tid <- createNonsiderealTargetAs(pi, pid, name = "Halley")
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- renameTarget(tid)
       s   <- staleness(oid)
     yield assert(s)
+
+  test("a not-applicable snapshot goes stale once something can be searched"):
+    for
+      oid <- visitorObservation
+      _   <- refresh(mockOf())(oid)
+      _   <- setLongSlitMode(oid)
+      s   <- staleness(oid)
+    yield assert(s)
+
+  test("a frozen snapshot is never stale: its refresh is rejected, so the flag could prompt nothing"):
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- refresh(mockOf("a.fits"))(oid)
+      _   <- setLongSlitMode(oid)
+      _   <- markSubmitted(pid)
+      s   <- staleness(oid)
+    yield assert(!s)
 
   private def storedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
     withFreshSession: s =>
@@ -446,14 +465,14 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   test("the obscalc worker materializes staleness, and a refresh resets it"):
     for
-      oid <- configuredObservation
-      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      oid <- gmosObservation
+      _   <- refresh(mockOf("a.fits"))(oid)
       _   <- setLongSlitMode(oid)
       _   <- runObscalc(oid)
       s1  <- storedStaleFlag(oid)
       // The refresh searched the new mode, so its snapshot reads not-stale at
       // once rather than waiting for the recalculation it scheduled.
-      _   <- refreshStoringProvenance(mockOf("a.fits"))(oid)
+      _   <- refresh(mockOf("a.fits"))(oid)
       s2  <- storedStaleFlag(oid)
     yield
       assertEquals(s1, true.some)

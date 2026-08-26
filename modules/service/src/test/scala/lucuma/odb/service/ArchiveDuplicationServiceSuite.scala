@@ -133,7 +133,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     val ms = List(fullRecord, sparseRecord)
     for
       oid <- newObservation
-      _   <- run(_.store(oid, h, ms, none))
+      _   <- run(_.store(oid, h, ms))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary, h)
@@ -144,15 +144,15 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     val h    = summary(0, ArchiveSearchPointing.NonSidereal(name).some)
     for
       oid <- newObservation
-      _   <- run(_.store(oid, h, Nil, none))
+      _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
     yield assertEquals(s.summary.searchArea.center, ArchiveSearchPointing.NonSidereal(name).some)
 
   test("storing replaces the previous snapshot rather than appending to it"):
     for
       oid <- newObservation
-      _   <- run(_.store(oid, sidereal(2), List(fullRecord, sparseRecord), none))
-      _   <- run(_.store(oid, sidereal(1), List(sparseRecord), none))
+      _   <- run(_.store(oid, sidereal(2), List(fullRecord, sparseRecord)))
+      _   <- run(_.store(oid, sidereal(1), List(sparseRecord)))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.matchCount.value, 1)
@@ -161,7 +161,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
   test("an error leaves the previous matches and last checked time intact"):
     for
       oid <- newObservation
-      _   <- run(_.store(oid, sidereal(1), List(fullRecord), none))
+      _   <- run(_.store(oid, sidereal(1), List(fullRecord)))
       _   <- run(_.storeError(oid, "GOA is down".refined, checkedAt))
       s   <- run(_.select(oid))
     yield
@@ -186,7 +186,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
     val h = ArchiveDuplication.Summary.notApplicable(checkedAt, ArchiveDuplication.SearchArea.Empty)
     for
       oid <- newObservation
-      _   <- run(_.store(oid, h, Nil, none))
+      _   <- run(_.store(oid, h, Nil))
       s   <- run(_.select(oid))
     yield
       assertEquals(s.summary.state, ArchiveDuplication.State.NotApplicable)
@@ -202,7 +202,7 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
   test("an observation with no observing mode reads as not applicable whatever is stored"):
     for
       oid <- modelessObservation
-      _   <- run(_.store(oid, sidereal(1), List(fullRecord), none))
+      _   <- run(_.store(oid, sidereal(1), List(fullRecord)))
       s   <- run(_.select(oid))
     yield
       // The stored evidence is untouched; only its interpretation is derived.

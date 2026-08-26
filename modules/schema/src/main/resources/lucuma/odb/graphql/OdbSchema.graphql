@@ -16065,13 +16065,12 @@ type ArchiveDuplication {
 
   """
   Whether the snapshot no longer describes the observation as it now stands:
-  something could be searched today, and it is not what was searched.  Judged
-  by the same limits a configuration request grants without re-approval —
-  pointing within the mode's field of view, identity-defining mode options
-  unchanged — with observing conditions excluded, since the archive query never
-  uses them.  Never true when nothing was searched or nothing can be searched.
-  Computed in the background, so it can briefly lag an edit; a successful
-  refresh clears it immediately.
+  the archive queries the search would run today differ from the ones the
+  snapshot was gathered from (`queryUrls`).
+  Any query-affecting change counts — mode, pointing, or the searched target
+  name.
+  Never true when nothing was searched, when nothing can be searched now, or
+  after submission, whose frozen snapshot cannot be re-checked.
   """
   stale: Boolean!
 

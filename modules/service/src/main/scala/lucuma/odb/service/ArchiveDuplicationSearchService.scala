@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import cats.Applicative
 import cats.Parallel
 import cats.data.NonEmptyChain
 import cats.effect.Clock
@@ -21,7 +22,6 @@ import lucuma.core.enums.ProposalStatus
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
 import lucuma.core.math.RightAscension
-import lucuma.core.model.Configuration
 import lucuma.core.model.Observation
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
@@ -63,13 +63,76 @@ trait ArchiveDuplicationSearchService[F[_]]:
 
 object ArchiveDuplicationSearchService:
 
+  import Services.Syntax.*
+
   /**
    * Submission freezes the snapshot, so that the count the TAC and the proposal
    * PDF see is the one the PI last saw.
    */
   extension (ps: ProposalStatus)
-    private def isFrozen: Boolean =
+    private[service] def isFrozen: Boolean =
       ps >= ProposalStatus.Submitted
+
+  /**
+   * Everything the query policy needs, as loaded from the database.  Shared
+   * with `ArchiveDuplicationService.isStale`, which regenerates the queries
+   * from these same inputs to compare against the stored ones: an input read
+   * by the search but not here would leave a kind of change staleness cannot
+   * see.
+   */
+  private[service] final case class QueryContext(
+    mode:           Option[ObservingMode],
+    explicitBase:   Option[Coordinates],
+    referenceTime:  Option[Timestamp],
+    asterism:       List[Target],
+    proposalStatus: ProposalStatus
+  ):
+    lazy val pointings: List[GoaQueryPolicy.TargetPointing] =
+      asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
+
+  private[service] object QueryContext:
+
+    /** None when the observation does not exist. */
+    def load[F[_]: Concurrent](
+      observationId: Observation.Id
+    )(using Services[F], Transaction[F]): F[Option[QueryContext]] =
+      session.option(Statements.SelectObservation)(observationId).flatMap:
+        case None                              => none.pure
+        case Some((omt, ra, dec, refTime, ps)) =>
+          val explicitBase = (ra, dec).mapN(Coordinates.apply)
+          for
+            mode     <- Services.asSuperUser(omt.traverse: t =>
+                          observingModeServices.selectObservingMode(List((observationId, t)))
+                        ).map(_.flatMap(_.get(observationId)))
+            asterism <- Services.asSuperUser(asterismService.getAsterism(observationId))
+          yield QueryContext(mode, explicitBase, refTime, asterism.map(_._2), ps).some
+
+  /**
+   * The asterism center, resolved only when the search actually depends on
+   * it.  An explicit base or a wholly non-sidereal asterism answers the
+   * question on its own, and resolving anyway would mean an ephemeris
+   * lookup we do not need.
+   */
+  private[service] def resolveCenter[F[_]: {Concurrent, Clock}](
+    observationId: Observation.Id,
+    ctx:           QueryContext
+  )(using Services[F]): F[Option[Coordinates]] =
+    if GoaQueryPolicy.searchPointing(ctx.explicitBase, none, ctx.pointings).isDefined then none.pure
+    else
+      ctx.referenceTime.fold(nowTimestamp)(_.pure[F]).flatMap: t =>
+        trackingService
+          .getCoordinatesSnapshot(observationId, t, false)
+          .map(_.toOption.map(_.base))
+
+  private[service] def queriesFor(ctx: QueryContext, center: Option[Coordinates]): List[GoaParams] =
+    ctx.mode.toList.flatMap(GoaQueryPolicy.queries(_, ctx.explicitBase, center, ctx.pointings))
+
+  /** The GOA query URLs for these params, in order. */
+  private[service] def queryUrlsOf(params: List[GoaParams]): List[String] =
+    params.mapFilter(p => GoaParams.toUri(p).map(_.renderString))
+
+  private def nowTimestamp[F[_]: {Applicative, Clock}]: F[Timestamp] =
+    Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
 
   def instantiate[F[_]: {Concurrent, Parallel, Clock, Tracer as T, LoggerFactory as LF}](
     goaClient: GoaClient[F]
@@ -80,17 +143,6 @@ object ArchiveDuplicationSearchService:
       given Logger[F] = LF.getLoggerFromName("archive-duplication-search")
 
       import Services.Syntax.*
-
-      /** Everything the query policy needs, as loaded from the database. */
-      private case class Context(
-        mode:          Option[ObservingMode],
-        explicitBase:  Option[Coordinates],
-        referenceTime: Option[Timestamp],
-        asterism:      List[Target],
-        configuration: Option[Configuration]
-      ):
-        lazy val pointings: List[GoaQueryPolicy.TargetPointing] =
-          asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
 
       override def refresh(observationId: Observation.Id)(using NoTransaction[F]): F[Result[ArchiveDuplication.Snapshot]] =
         T.span("archiveDuplicationSearch.refresh", Attribute.from(ObservationIdKey, observationId)).use: span =>
@@ -114,42 +166,19 @@ object ArchiveDuplicationSearchService:
             Attribute("archiveDuplication.saturated", snap.summary.saturated)
           )
 
-      private def loadContext(observationId: Observation.Id)(using NoTransaction[F]): F[Result[Context]] =
+      private def loadContext(observationId: Observation.Id)(using NoTransaction[F]): F[Result[QueryContext]] =
         services.transactionally:
-          session.option(Statements.SelectObservation)(observationId).flatMap:
-            case None                                   =>
-              OdbError.InvalidObservation(observationId).asFailureF[F, Context]
-            case Some((_, _, _, _, ps)) if ps.isFrozen  =>
-              OdbError.InvalidObservation(observationId, frozen).asFailureF[F, Context]
-            case Some((omt, ra, dec, refTime, _))       =>
-              val explicitBase = (ra, dec).mapN(Coordinates.apply)
-              for
-                mode     <- Services.asSuperUser(omt.traverse: t =>
-                              observingModeServices.selectObservingMode(List((observationId, t)))
-                            ).map(_.flatMap(_.get(observationId)))
-                asterism <- Services.asSuperUser(asterismService.getAsterism(observationId))
-                // Configuration needs a mode, so don't bother asking without one.
-                cfg      <- omt.fold(none[Configuration].pure[F]): _ =>
-                              Services.asSuperUser(configurationService.selectConfiguration(observationId)).map(_.toOption)
-              yield Result(Context(mode, explicitBase, refTime, asterism.map(_._2), cfg))
-
-      /**
-       * The asterism center, resolved only when the search actually depends on
-       * it.  An explicit base or a wholly non-sidereal asterism answers the
-       * question on its own, and resolving anyway would mean an ephemeris
-       * lookup we do not need.
-       */
-      private def resolveCenter(observationId: Observation.Id, ctx: Context): F[Option[Coordinates]] =
-        if GoaQueryPolicy.searchPointing(ctx.explicitBase, none, ctx.pointings).isDefined then none.pure
-        else
-          ctx.referenceTime.fold(now)(_.pure[F]).flatMap: t =>
-            trackingService
-              .getCoordinatesSnapshot(observationId, t, false)
-              .map(_.toOption.map(_.base))
+          QueryContext.load(observationId).map:
+            case None                                     =>
+              OdbError.InvalidObservation(observationId).asFailure
+            case Some(ctx) if ctx.proposalStatus.isFrozen =>
+              OdbError.InvalidObservation(observationId, frozen).asFailure
+            case Some(ctx)                                =>
+              Result(ctx)
 
       private def search(
         observationId: Observation.Id,
-        ctx:           Context,
+        ctx:           QueryContext,
         center:        Option[Coordinates]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         val searchArea =
@@ -158,12 +187,9 @@ object ArchiveDuplicationSearchService:
             ctx.mode.flatMap(GoaQueryPolicy.searchRadius)
           )
 
-        val params =
-          ctx.mode.toList.flatMap(GoaQueryPolicy.queries(_, ctx.explicitBase, center, ctx.pointings))
-
-        params match
-          case Nil => storeNotApplicable(observationId, searchArea, ctx.configuration)
-          case ps  => runQueries(observationId, searchArea, ps, ctx.configuration)
+        queriesFor(ctx, center) match
+          case Nil => storeNotApplicable(observationId, searchArea)
+          case ps  => runQueries(observationId, searchArea, ps)
 
       /**
        * Records that the search ran and found nothing to ask GOA, which is a
@@ -171,20 +197,18 @@ object ArchiveDuplicationSearchService:
        */
       private def storeNotApplicable(
         observationId: Observation.Id,
-        searchArea:    ArchiveDuplication.SearchArea,
-        searched:      Option[Configuration]
+        searchArea:    ArchiveDuplication.SearchArea
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         now.flatMap: t =>
           val summary = ArchiveDuplication.Summary.notApplicable(t, searchArea)
           storeUnlessFrozen(observationId):
-            archiveDuplicationService.store(observationId, summary, Nil, searched)
+            archiveDuplicationService.store(observationId, summary, Nil)
               .as(ArchiveDuplication.Snapshot(summary, Nil))
 
       private def runQueries(
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea,
-        params:        List[GoaParams],
-        searched:      Option[Configuration]
+        params:        List[GoaParams]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         info"$observationId: Archive Duplication Search querying GOA: ${params.mkString(" | ")}" *>
           runner.run(params).flatMap:
@@ -193,13 +217,7 @@ object ArchiveDuplicationSearchService:
                 storeError(observationId, errors)
             case Right(byQuery) =>
               info"$observationId: Archive Duplication Search returned ${byQuery.map(_.size).mkString(" + ")} record(s)" *>
-                storeMatches(observationId, searchArea, byQuery, queryUrlsOf(params), searched)
-
-      /**
-       * The GOA query URLs for these params, in order.
-       */
-      private def queryUrlsOf(params: List[GoaParams]): List[String] =
-        params.mapFilter(p => GoaParams.toUri(p).map(_.renderString))
+                storeMatches(observationId, searchArea, byQuery, queryUrlsOf(params))
 
       /**
        * Records the failure without disturbing the stored matches, so a GOA
@@ -222,8 +240,7 @@ object ArchiveDuplicationSearchService:
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea,
         byQuery:       List[List[GoaSummaryRecord]],
-        queryUrls:     List[String],
-        searched:      Option[Configuration]
+        queryUrls:     List[String]
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         // A file returned by more than one query in the group is one duplicate,
         // not several, so the count is of distinct files.
@@ -241,7 +258,7 @@ object ArchiveDuplicationSearchService:
               queryUrls     = queryUrls
             )
           storeUnlessFrozen(observationId):
-            archiveDuplicationService.store(observationId, summary, matches, searched)
+            archiveDuplicationService.store(observationId, summary, matches)
               .as(ArchiveDuplication.Snapshot(summary, matches))
 
       /**
@@ -267,7 +284,7 @@ object ArchiveDuplicationSearchService:
             case _                        => archiveDuplicationService.select(observationId)
 
       private val now: F[Timestamp] =
-        Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
+        nowTimestamp
 
       private val frozen: Option[String] =
         "The Archive Duplication Search cannot be re-run because the proposal has been submitted.".some

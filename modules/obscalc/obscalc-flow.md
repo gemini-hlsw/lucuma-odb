@@ -53,7 +53,7 @@ Composite primary key `(c_program_id, c_observation_id)`; cascades from `t_obser
 - Digests: `c_acq_*`, `c_sci_*` (obs class, charged/non-charged time, offsets, atom count, execution state).
 - Workflow: `c_workflow_state`, `c_workflow_transitions`, `c_workflow_validations`.
 - J2000 base position: `c_j2000_base_ra`, `c_j2000_base_dec` — indexed, backing the `targetCoordinates` cone WHERE filter. The explicit base if set, otherwise the asterism composite PM-corrected to J2000; null when the asterism has a non-sidereal or opportunity target (and no explicit base) or the entry has not been computed yet.
-- Archive Duplication staleness: `c_archive_stale` — whether the observation's stored archive-search snapshot no longer subsumes its current configuration (`ArchiveDuplicationService.isStale`, conditions excluded). Read through `v_archive_duplication`; a successful `refreshArchiveDuplication` resets it to false directly, without waiting for the recalculation its write schedules.
+- Archive Duplication staleness: `c_archive_stale` — whether the GOA queries the search policy would run today differ from the snapshot's stored `c_query_urls` (`ArchiveDuplicationService.isStale`); false when nothing was searched, nothing is searchable now, or the proposal is frozen. Read through `v_archive_duplication`; a successful `refreshArchiveDuplication` resets it to false directly, without waiting for the recalculation its write schedules.
 
 ## Invalidation
 
@@ -156,7 +156,7 @@ flowchart TD
 | `Generator.obscalc` (`Generator.scala:299`) | `ExecutionDigest` (acq + sci) and per-atom `AtomDigest` stream |
 | `ObservationWorkflowService.getCalculatedWorkflow` (`ObservationWorkflowService.scala:87`) | Workflow state, allowed transitions, validation errors |
 | `ObscalcService.computeBasePosition` | Stored J2000 base position: explicit base, else the all-sidereal asterism composite PM-corrected to J2000; `None` when undefined. Computed independently of ITC success so a misconfigured observation still gets a position |
-| `ArchiveDuplicationService.isStale` | Whether the stored archive-search snapshot's configuration still subsumes the current one (`Configuration.subsumes`, conditions excluded). False when nothing was searched or nothing can be searched now; true for a snapshot without readable provenance, so legacy rows self-heal |
+| `ArchiveDuplicationService.isStale` | Whether the GOA queries the search policy would generate today (same `QueryContext` inputs as the search itself) still equal the snapshot's stored query URLs. False when nothing was searched, nothing is searchable now, or the proposal is frozen — a frozen snapshot cannot be re-checked, so flagging it could prompt nothing |
 
 ### Result Storage Guard
 

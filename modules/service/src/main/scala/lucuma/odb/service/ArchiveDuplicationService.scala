@@ -4,24 +4,25 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
+import cats.effect.Clock
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
-import io.circe.Json
-import io.circe.syntax.*
 import lucuma.catalog.goa.GoaObservationClass
 import lucuma.catalog.goa.GoaObservationType
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.math.Coordinates
-import lucuma.core.model.Configuration
 import lucuma.core.model.Observation
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.ArchiveSearchPointing
-import lucuma.odb.json.configurationrequest.query.given
+import lucuma.odb.service.ArchiveDuplicationSearchService.QueryContext
+import lucuma.odb.service.ArchiveDuplicationSearchService.isFrozen
+import lucuma.odb.service.ArchiveDuplicationSearchService.queriesFor
+import lucuma.odb.service.ArchiveDuplicationSearchService.queryUrlsOf
+import lucuma.odb.service.ArchiveDuplicationSearchService.resolveCenter
 import lucuma.odb.util.Codecs.*
 import skunk.*
-import skunk.circe.codec.json.jsonb
 import skunk.codec.boolean.bool
 import skunk.codec.numeric.float8
 import skunk.codec.temporal.date
@@ -47,14 +48,12 @@ trait ArchiveDuplicationService[F[_]]:
 
   /**
    * Replaces any existing snapshot with this one.  There is no history: the
-   * previous matches are discarded.  The configuration the search ran against
-   * is stored with it.
+   * previous matches are discarded.
    */
   def store(
     observationId: Observation.Id,
     summary:       ArchiveDuplication.Summary,
-    matches:       List[GoaSummaryRecord],
-    searched:      Option[Configuration]
+    matches:       List[GoaSummaryRecord]
   )(using Transaction[F]): F[Unit]
 
   /**
@@ -66,17 +65,19 @@ trait ArchiveDuplicationService[F[_]]:
 
   /**
    * Whether the stored snapshot no longer describes the observation as it now
-   * stands: something could be searched today, and it is not what was searched
-   * (per `Configuration.subsumes`, conditions excluded because the GOA query
-   * never uses them).  False when nothing was ever searched or nothing can be
-   * searched now; true for a snapshot whose searched configuration is missing
-   * or unreadable, so pre-provenance rows self-heal on their first re-check.
+   * stands: the GOA queries the search policy would run today differ from the
+   * ones the snapshot was gathered from.  Any change is a change — there is no
+   * within-limits tolerance — but conditions never participate, because the
+   * query does not use them.  False when nothing was ever searched, when
+   * nothing can be searched now (the derived state says NOT_APPLICABLE and a
+   * re-check would only destroy the stored evidence), and for a frozen
+   * proposal, whose refresh is rejected, so flagging it could prompt nothing.
    */
   def isStale(observationId: Observation.Id)(using Transaction[F]): F[Boolean]
 
 object ArchiveDuplicationService:
 
-  def instantiate[F[_]: Concurrent](using Services[F]): ArchiveDuplicationService[F] =
+  def instantiate[F[_]: {Concurrent, Clock}](using Services[F]): ArchiveDuplicationService[F] =
     new ArchiveDuplicationService[F]:
 
       import Services.Syntax.*
@@ -93,11 +94,10 @@ object ArchiveDuplicationService:
       override def store(
         observationId: Observation.Id,
         summary:       ArchiveDuplication.Summary,
-        matches:       List[GoaSummaryRecord],
-        searched:      Option[Configuration]
+        matches:       List[GoaSummaryRecord]
       )(using Transaction[F]): F[Unit] =
         for
-          _ <- session.execute(Statements.UpsertSummary)(observationId, summary, searched)
+          _ <- session.execute(Statements.UpsertSummary)(observationId, summary)
           _ <- session.execute(Statements.DeleteMatches)(observationId)
           _ <- NonEmptyList.fromList(matches).traverse_ : nel =>
                  session.execute(Statements.insertMatches(nel))(observationId, nel)
@@ -109,16 +109,16 @@ object ArchiveDuplicationService:
         session.execute(Statements.UpsertError)(observationId, message, erroredAt).void
 
       override def isStale(observationId: Observation.Id)(using Transaction[F]): F[Boolean] =
-        session.option(Statements.SelectSearchedConfiguration)(observationId).flatMap:
-          case None           => false.pure[F]  // never searched, so nothing to go stale
-          case Some(searched) =>
-            Services.asSuperUser(configurationService.selectConfiguration(observationId)).map: current =>
-              current.toOption match
-                case None      => false  // nothing can be searched now; the derived state says so
-                case Some(cur) =>
-                  searched.flatMap(_.as[Configuration].toOption) match
-                    case None      => true  // searched, but against what is unknown
-                    case Some(old) => !old.copy(conditions = cur.conditions).subsumes(cur)
+        session.option(Statements.SelectStoredQueryUrls)(observationId).flatMap:
+          case None             => false.pure[F]  // never searched, so nothing to go stale
+          case Some(storedUrls) =>
+            QueryContext.load(observationId).flatMap:
+              case None                                     => false.pure[F]  // observation gone
+              case Some(ctx) if ctx.proposalStatus.isFrozen => false.pure[F]
+              case Some(ctx)                                =>
+                resolveCenter(observationId, ctx).map: center =>
+                  val urls = queryUrlsOf(queriesFor(ctx, center))
+                  urls.nonEmpty && urls =!= storedUrls
 
   object Statements:
 
@@ -248,16 +248,13 @@ object ArchiveDuplicationService:
         WHERE c_observation_id = $observation_id
       """.query(archive_duplication_summary)
 
-    /**
-     * Raw JSON rather than the decoded Configuration, so an unreadable stored
-     * value reads as stale instead of failing the whole calculation.
-     */
-    val SelectSearchedConfiguration: Query[Observation.Id, Option[Json]] =
+    /** The provenance staleness compares against: what was actually asked. */
+    val SelectStoredQueryUrls: Query[Observation.Id, List[String]] =
       sql"""
-        SELECT c_searched_configuration
+        SELECT c_query_urls
         FROM t_archive_duplication
         WHERE c_observation_id = $observation_id
-      """.query(jsonb.opt)
+      """.query(text_list)
 
     val SelectMatches: Query[Observation.Id, GoaSummaryRecord] =
       sql"""
@@ -287,15 +284,11 @@ object ArchiveDuplicationService:
         ORDER BY c_file_name
       """.query(goa_match)
 
-    /** The Configuration a search ran against, as configuration-request JSON. */
-    private val configuration: Codec[Configuration] =
-      jsonb.eimap(_.as[Configuration].leftMap(f => s"Could not decode Configuration: ${f.message}"))(_.asJson)
-
     /**
      * A successful store clears the error timestamp along with the message, so
      * the derived attempt time falls back to the checked time it just set.
      */
-    val UpsertSummary: Command[(Observation.Id, ArchiveDuplication.Summary, Option[Configuration])] =
+    val UpsertSummary: Command[(Observation.Id, ArchiveDuplication.Summary)] =
       sql"""
         INSERT INTO t_archive_duplication (
           c_observation_id,
@@ -307,21 +300,19 @@ object ArchiveDuplicationService:
           c_search_dec,
           c_search_target,
           c_search_radius,
-          c_query_urls,
-          c_searched_configuration
-        ) VALUES ($observation_id, $archive_duplication_summary_write, ${configuration.opt})
+          c_query_urls
+        ) VALUES ($observation_id, $archive_duplication_summary_write)
         ON CONFLICT (c_observation_id) DO UPDATE SET
-          c_state                  = EXCLUDED.c_state,
-          c_saturated              = EXCLUDED.c_saturated,
-          c_last_checked_at        = EXCLUDED.c_last_checked_at,
-          c_error                  = EXCLUDED.c_error,
-          c_error_at               = NULL,
-          c_search_ra              = EXCLUDED.c_search_ra,
-          c_search_dec             = EXCLUDED.c_search_dec,
-          c_search_target          = EXCLUDED.c_search_target,
-          c_search_radius          = EXCLUDED.c_search_radius,
-          c_query_urls             = EXCLUDED.c_query_urls,
-          c_searched_configuration = EXCLUDED.c_searched_configuration
+          c_state           = EXCLUDED.c_state,
+          c_saturated       = EXCLUDED.c_saturated,
+          c_last_checked_at = EXCLUDED.c_last_checked_at,
+          c_error           = EXCLUDED.c_error,
+          c_error_at        = NULL,
+          c_search_ra       = EXCLUDED.c_search_ra,
+          c_search_dec      = EXCLUDED.c_search_dec,
+          c_search_target   = EXCLUDED.c_search_target,
+          c_search_radius   = EXCLUDED.c_search_radius,
+          c_query_urls      = EXCLUDED.c_query_urls
       """.command
 
     /**
