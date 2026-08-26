@@ -4,9 +4,11 @@
 package lucuma.odb.service
 
 import cats.syntax.all.*
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.CalculationState
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.TestUsers
@@ -159,5 +161,51 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
       assertEquals(loaded.length, 1)
       assertEquals(after, CalculationState.Calculating)
     }
+
+  // cascade_telluric_invalidation() (V1072, repaired in V1289) decides whether an
+  // obscalc write re-requests the science observation's telluric target.  The
+  // predicate is written in plpgsql as a list of state names with nothing
+  // checking it against the Scala enum, which is how 'for_review' came to be
+  // omitted when it was added -- so pin the whole table rather than one state.
+  //
+  // Driving this from Enumerated.all means a state added to core later lands in
+  // the non-cascading bucket and fails here.  In production the predicate is a
+  // complement and will cascade for that state, which is the safe default; this
+  // failure is the prompt to record the decision, not a bug report.
+  val CascadingStates: Set[ObservationWorkflowState] =
+    Set(
+      ObservationWorkflowState.Defined,
+      ObservationWorkflowState.ForReview,
+      ObservationWorkflowState.Ready
+    )
+
+  Enumerated[ObservationWorkflowState].all.foreach: ws =>
+    val cascades = CascadingStates.contains(ws)
+    val verb     = if cascades then "invalidates" else "leaves"
+    test(s"cascade_telluric_invalidation - an obscalc write in '${ws.tag}' $verb the telluric resolution"):
+      for {
+        _     <- cleanup
+        pid   <- createProgramAs(pi, "Telluric Test Program")
+        sid   <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+        oid   <- createTelluricCalibrationObservation(pi, pid)
+        _     <- insertMeta(createMetaEntry(pid, oid, sid, CalculationState.Ready, testDuration))
+        _     <- touchObscalc(sid, ws)
+        after <- calculationState(oid)
+      } yield
+        assertEquals(after, if cascades then CalculationState.Pending else CalculationState.Ready)
+
+  // The cascade skips calibration observations, so an obscalc write for the
+  // telluric itself must not invalidate its own resolution even in a state that
+  // otherwise cascades.
+  test("cascade_telluric_invalidation - an obscalc write for a calibration observation does not cascade"):
+    for {
+      _     <- cleanup
+      pid   <- createProgramAs(pi, "Telluric Test Program")
+      sid   <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+      oid   <- createTelluricCalibrationObservation(pi, pid)
+      _     <- insertMeta(createMetaEntry(pid, oid, sid, CalculationState.Ready, testDuration))
+      _     <- touchObscalc(oid, ObservationWorkflowState.Ready)
+      after <- calculationState(oid)
+    } yield assertEquals(after, CalculationState.Ready)
 
 }

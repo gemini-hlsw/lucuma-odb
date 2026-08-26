@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.IO
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -20,6 +21,7 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.all.*
+import skunk.data.Completion
 import skunk.implicits.*
 
 trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingos2:
@@ -125,6 +127,25 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
         meta.errorMessage,
         meta.scienceDuration
       ).void
+
+  // Simulates an obscalc worker writing a result for `oid`: sets the workflow
+  // state and bumps c_last_update, which is what fires
+  // cascade_telluric_invalidation_trigger.  The interval keeps the new
+  // timestamp distinct from the old one, since the trigger function ignores an
+  // update that leaves c_last_update unchanged.
+  def touchObscalc(oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
+    withSession: session =>
+      val update: Command[(ObservationWorkflowState, Observation.Id)] =
+        sql"""
+          UPDATE t_obscalc
+             SET c_workflow_state = $observation_workflow_state,
+                 c_last_update    = c_last_update + INTERVAL '1 second'
+           WHERE c_observation_id = $observation_id
+        """.command
+
+      session.execute(update)(state, oid).flatMap:
+        case Completion.Update(1) => IO.unit
+        case other                => IO.raiseError(new RuntimeException(s"expected exactly one t_obscalc row for $oid, got $other"))
 
   val cleanup: IO[Unit] =
     withSession: session =>
