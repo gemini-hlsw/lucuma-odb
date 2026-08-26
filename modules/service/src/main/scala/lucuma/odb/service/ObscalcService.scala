@@ -6,6 +6,7 @@ package lucuma.odb.service
 import cats.data.EitherT
 import cats.data.Nested
 import cats.data.NonEmptyList
+import cats.effect.Clock
 import cats.effect.Concurrent
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
@@ -152,7 +153,7 @@ object ObscalcService:
     Nil
   )
 
-  def instantiate[F[_]: Concurrent: Logger: Services]: ObscalcService[F] =
+  def instantiate[F[_]: Concurrent: Clock: Logger: Services]: ObscalcService[F] =
 
     new ObscalcService[F]:
       override def selectOne(
@@ -346,15 +347,14 @@ object ObscalcService:
               .flatMap: (result, atomDigests) =>
                 services.transactionally:
                   sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
-                  archiveDuplicationService.isStale(pending.observationId).flatMap: stale =>
+                  ArchiveDuplicationSearchService.isStale(pending.observationId).flatMap: stale =>
                     (result.odbError match
                       case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, basePosition, stale.some, CalculationState.Retry)
                       case _                                        => storeResult(pending, result, basePosition, stale.some, CalculationState.Ready))
               .handleErrorWith: e =>
                 val result = Obscalc.Result.Error(OdbError.UpdateFailed(Option(e.getMessage)), UndefinedWorkflow)
                 services.transactionally:
-                  // The staleness flag is left as it was: this path cannot tell
-                  // whether the failure would have changed it.
+                  // Staleness is left as it was: this path cannot evaluate it.
                   storeResult(pending, result, basePosition, none, CalculationState.Retry)
 
   object Statements:

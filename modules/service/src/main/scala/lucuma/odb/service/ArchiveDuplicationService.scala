@@ -4,7 +4,6 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
-import cats.effect.Clock
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -16,11 +15,6 @@ import lucuma.core.model.Observation
 import lucuma.core.util.Timestamp
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.ArchiveSearchPointing
-import lucuma.odb.service.ArchiveDuplicationSearchService.QueryContext
-import lucuma.odb.service.ArchiveDuplicationSearchService.isFrozen
-import lucuma.odb.service.ArchiveDuplicationSearchService.queriesFor
-import lucuma.odb.service.ArchiveDuplicationSearchService.queryUrlsOf
-import lucuma.odb.service.ArchiveDuplicationSearchService.resolveCenter
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.bool
@@ -59,25 +53,13 @@ trait ArchiveDuplicationService[F[_]]:
   /**
    * Records that the most recent attempt failed, leaving any previously stored
    * matches and headline values in place so a GOA outage cannot destroy a good
-   * snapshot.  The error time is stored beside the message.
+   * snapshot.
    */
   def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit]
 
-  /**
-   * Whether the stored snapshot no longer describes the observation as it now
-   * stands: the GOA queries the search policy would run today differ from the
-   * ones the snapshot was gathered from.  Any change is a change — there is no
-   * within-limits tolerance — but conditions never participate, because the
-   * query does not use them.  False when nothing was ever searched, when
-   * nothing can be searched now (the derived state says NOT_APPLICABLE and a
-   * re-check would only destroy the stored evidence), and for a frozen
-   * proposal, whose refresh is rejected, so flagging it could prompt nothing.
-   */
-  def isStale(observationId: Observation.Id)(using Transaction[F]): F[Boolean]
-
 object ArchiveDuplicationService:
 
-  def instantiate[F[_]: {Concurrent, Clock}](using Services[F]): ArchiveDuplicationService[F] =
+  def instantiate[F[_]: Concurrent](using Services[F]): ArchiveDuplicationService[F] =
     new ArchiveDuplicationService[F]:
 
       import Services.Syntax.*
@@ -101,24 +83,11 @@ object ArchiveDuplicationService:
           _ <- session.execute(Statements.DeleteMatches)(observationId)
           _ <- NonEmptyList.fromList(matches).traverse_ : nel =>
                  session.execute(Statements.insertMatches(nel))(observationId, nel)
-          // A snapshot stored just now describes the observation as it stands,
           _ <- session.execute(Statements.ResetStale)(observationId)
         yield ()
 
       override def storeError(observationId: Observation.Id, message: NonEmptyString, erroredAt: Timestamp)(using Transaction[F]): F[Unit] =
         session.execute(Statements.UpsertError)(observationId, message, erroredAt).void
-
-      override def isStale(observationId: Observation.Id)(using Transaction[F]): F[Boolean] =
-        session.option(Statements.SelectStoredQueryUrls)(observationId).flatMap:
-          case None             => false.pure[F]  // never searched, so nothing to go stale
-          case Some(storedUrls) =>
-            QueryContext.load(observationId).flatMap:
-              case None                                     => false.pure[F]  // observation gone
-              case Some(ctx) if ctx.proposalStatus.isFrozen => false.pure[F]
-              case Some(ctx)                                =>
-                resolveCenter(observationId, ctx).map: center =>
-                  val urls = queryUrlsOf(queriesFor(ctx, center))
-                  urls.nonEmpty && urls =!= storedUrls
 
   object Statements:
 
@@ -248,14 +217,6 @@ object ArchiveDuplicationService:
         WHERE c_observation_id = $observation_id
       """.query(archive_duplication_summary)
 
-    /** The provenance staleness compares against: what was actually asked. */
-    val SelectStoredQueryUrls: Query[Observation.Id, List[String]] =
-      sql"""
-        SELECT c_query_urls
-        FROM t_archive_duplication
-        WHERE c_observation_id = $observation_id
-      """.query(text_list)
-
     val SelectMatches: Query[Observation.Id, GoaSummaryRecord] =
       sql"""
         SELECT
@@ -284,10 +245,7 @@ object ArchiveDuplicationService:
         ORDER BY c_file_name
       """.query(goa_match)
 
-    /**
-     * A successful store clears the error timestamp along with the message, so
-     * the derived attempt time falls back to the checked time it just set.
-     */
+    /** Clears the error timestamp too, so the attempt time falls back to the checked time. */
     val UpsertSummary: Command[(Observation.Id, ArchiveDuplication.Summary)] =
       sql"""
         INSERT INTO t_archive_duplication (
@@ -316,10 +274,8 @@ object ArchiveDuplicationService:
       """.command
 
     /**
-     * A fresh snapshot trivially describes the observation it was just taken
-     * from, so the materialized flag resets here rather than waiting out the
-     * recalculation the upsert trigger scheduled.  No row is fine: obscalc
-     * creates one with the same default when it first hears of the observation.
+     * A fresh snapshot is trivially not stale, so reset now rather than wait
+     * for the recalculation the trigger scheduled.  A missing row is fine.
      */
     val ResetStale: Command[Observation.Id] =
       sql"""
@@ -328,10 +284,7 @@ object ArchiveDuplicationService:
         WHERE c_observation_id = $observation_id
       """.command
 
-    /**
-     * Flags a failed attempt.  Only the state, message and error time are
-     * touched, so a previously good snapshot survives a GOA outage intact.
-     */
+    /** Flags a failed attempt, leaving the previously stored matches intact. */
     val UpsertError: Command[(Observation.Id, NonEmptyString, Timestamp)] =
       sql"""
         INSERT INTO t_archive_duplication (

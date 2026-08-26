@@ -93,10 +93,9 @@ object GoaQueryPolicy:
   /**
    * Where to search.  An explicit base wins; otherwise a wholly non-sidereal
    * asterism is searched by target name and a wholly sidereal one by the
-   * asterism center evaluated at the observation's reference time.  A mixed
-   * asterism has no single pointing that represents it — a cone around the
-   * composite center would miss the moving member's archive history and read
-   * back as a false all-clear — so it is not searched at all.
+   * asterism center at the reference time.  A mixed asterism is not searched:
+   * a cone around the composite center would miss the moving member and read
+   * back as a false all-clear.
    *
    * `None` means the observation has no resolvable pointing and no usable name.
    */
@@ -118,8 +117,7 @@ object GoaQueryPolicy:
 
   /**
    * Whether resolving the asterism center could change `searchPointing`'s
-   * answer, so callers can skip the tracking (and possibly ephemeris) lookup
-   * when it could not be used anyway.
+   * answer, letting callers skip the tracking lookup otherwise.
    */
   def centerRequired(
     explicitBase: Option[Coordinates],

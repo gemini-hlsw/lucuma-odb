@@ -307,7 +307,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   private def staleness(oid: Observation.Id): IO[Boolean] =
     withServices(pi): services =>
-      services.transactionally(services.archiveDuplicationService.isStale(oid))
+      services.transactionally(ArchiveDuplicationSearchService.isStale(oid))
 
   private def setLongSlitMode(oid: Observation.Id): IO[Unit] =
     query(
@@ -470,8 +470,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       _   <- setLongSlitMode(oid)
       _   <- runObscalc(oid)
       s1  <- storedStaleFlag(oid)
-      // The refresh searched the new mode, so its snapshot reads not-stale at
-      // once rather than waiting for the recalculation it scheduled.
+      // A refresh resets the flag at once, without waiting for obscalc.
       _   <- refresh(mockOf("a.fits"))(oid)
       s2  <- storedStaleFlag(oid)
     yield
@@ -479,8 +478,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       assertEquals(s2, false.some)
 
   test("a mixed sidereal and non-sidereal asterism is reported as not applicable"):
-    // A cone around the composite center would miss the moving member's
-    // archive history, so the search declines rather than report a false zero.
+    // Declines rather than report a false zero.
     for
       pid <- createProgramAs(pi)
       t1  <- createTargetAs(pi, pid)

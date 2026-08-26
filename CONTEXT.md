@@ -34,7 +34,7 @@ The coarse imaging-vs-spectroscopy classification of an observing mode, where sp
 _Avoid_: observing mode (the ODB's full mode is finer), instrument mode.
 
 **Search Center**:
-The single sky position an Archive Duplication Search is run around: the observation's resolved base position (explicit base if set, otherwise the asterism center at the reference time). Non-sidereal targets are searched by target name instead, via `GoaParams.NonSidereal`.
+The single sky position an Archive Duplication Search is run around: the observation's explicit base if set, otherwise the asterism center at the reference time. A wholly non-sidereal asterism is searched by target name instead, via `GoaParams.NonSidereal`. An asterism mixing sidereal and non-sidereal targets has no usable Search Center — a cone around the composite center would miss the moving member's archive history — so without an explicit base the search declines and reports Not Applicable rather than a false all-clear.
 
 **Search Radius**:
 Half the observation's field of view, derived per observing mode from lucuma-core's science-area geometry.
@@ -49,6 +49,10 @@ _Avoid_: parsing, normalization, conversion (all imply the projection is total).
 
 **Submission Freeze**:
 The rule that an observation's Archive Duplication Search snapshot becomes read-only once its proposal is submitted, so the Match Count seen by the TAC and the PDF is exactly what the PI last saw. Before submission every refresh overwrites the snapshot; after submission refresh is rejected.
+
+**Stale Snapshot**:
+A stored Archive Duplication Search snapshot whose provenance no longer matches the observation: the GOA query URLs the search policy would build today differ from the ones recorded with the snapshot. Materialized as `t_obscalc.c_archive_stale` by the background obscalc calculation and exposed as `stale` in GraphQL. Never true for an observation that was never searched, that has nothing searchable now, or whose proposal is under the Submission Freeze. Staleness looks only at the observation side; GOA gaining new files does not stale a snapshot.
+_Avoid_: outdated, dirty, invalid (the snapshot remains valid evidence of what was asked).
 
 ### Focal Plane Units
 

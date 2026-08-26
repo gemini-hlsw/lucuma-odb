@@ -235,8 +235,6 @@ class GoaQueryPolicySuite extends FunSuite:
     )
 
   test("a mixed asterism has no search pointing, even with a resolved center"):
-    // A cone around the composite center would miss the moving member's
-    // archive history and read back as a false all-clear.
     assertEquals(
       GoaQueryPolicy.searchPointing(
         none,
@@ -277,7 +275,7 @@ class GoaQueryPolicySuite extends FunSuite:
     // Already answered without a center.
     assert(!GoaQueryPolicy.centerRequired(base.some, List(TargetPointing.Sidereal)))
     assert(!GoaQueryPolicy.centerRequired(none, List(moving)))
-    // A center could never be used, so resolving one would be wasted work.
+    // A center could never be used.
     assert(!GoaQueryPolicy.centerRequired(none, List(moving, TargetPointing.Sidereal)))
 
   test("targets are classified by how they can be pointed at"):

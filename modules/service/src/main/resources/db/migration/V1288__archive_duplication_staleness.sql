@@ -1,32 +1,26 @@
 -- Archive Duplication Search staleness.
 --
--- The stored snapshot is frozen evidence of a search that ran and no changes
--- are taken into account.
---
--- We can drop the current set of results, this feature is not yet in active use,
--- and we can simplify the migration this way.
+-- Existing snapshots are dropped rather than migrated: the feature is not yet
+-- in active use.
 DELETE FROM t_archive_duplication;
 
 ALTER TABLE t_archive_duplication
   ADD COLUMN c_error_at timestamp NULL,
-  -- A failed attempt sets both the message and the time; a successful store
-  -- clears both together.
+  -- A failed attempt sets both; a successful store clears both.
   ADD CONSTRAINT archive_duplication_error_at CHECK ((c_error_at IS NULL) = (c_error IS NULL));
 
 COMMENT ON COLUMN t_archive_duplication.c_error_at IS
   'When the most recent failed search ran; cleared by a successful one, whose time is c_last_checked_at.';
 
--- Materialized by the obscalc worker alongside the workflow: true when the
--- stored snapshot no longer applies to the observation as it now stands.
+-- Materialized by the obscalc worker.
 ALTER TABLE t_obscalc
   ADD COLUMN c_archive_stale boolean NOT NULL DEFAULT false;
 
 COMMENT ON COLUMN t_obscalc.c_archive_stale IS
   'Whether the Archive Duplication snapshot''s stored GOA queries differ from the ones the search policy would run today.';
 
--- Every snapshot write schedules a staleness recalculation.  The other obscalc
--- triggers only see observation edits, so nothing else would evaluate a new
--- snapshot.
+-- Snapshot writes schedule a staleness recalculation; the other obscalc
+-- triggers only see observation edits.
 CREATE OR REPLACE FUNCTION archive_duplication_obscalc_invalidate()
 RETURNS trigger AS $$
 BEGIN

@@ -73,9 +73,7 @@ object ArchiveDuplicationSearchService:
     private[service] def isFrozen: Boolean =
       ps >= ProposalStatus.Submitted
 
-  /**
-   * Everything the query policy needs to make a query, as loaded from the database.
-   */
+  /** What the query policy needs, as loaded from the database. */
   final case class QueryContext(
     mode:           Option[ObservingMode],
     explicitBase:   Option[Coordinates],
@@ -103,11 +101,7 @@ object ArchiveDuplicationSearchService:
             asterism <- Services.asSuperUser(asterismService.getAsterism(observationId))
           yield QueryContext(mode, explicitBase, refTime, asterism.map(_._2), ps).some
 
-  /**
-   * The asterism center, resolved only when the search actually depends on
-   * it.  An explicit base or a non-sidereal asterism answers the question on
-   * its own, and a mixed asterism cannot use a center at all.
-   */
+  /** The asterism center, resolved only when the search actually uses it. */
   private[service] def resolveCenter[F[_]: {Concurrent, Clock}](
     observationId: Observation.Id,
     ctx:           QueryContext
@@ -125,6 +119,26 @@ object ArchiveDuplicationSearchService:
   /** The GOA query URLs for these params, in order. */
   private[service] def queryUrlsOf(params: List[GoaParams]): List[String] =
     params.mapFilter(p => GoaParams.toUri(p).map(_.renderString))
+
+  /**
+   * Whether the stored snapshot is out of date: the GOA queries the policy
+   * would run today differ from the stored `queryUrls`.  False when nothing
+   * was ever searched, nothing can be searched now, or the proposal is
+   * frozen, since a refresh would be rejected anyway.
+   */
+  private[service] def isStale[F[_]: {Concurrent, Clock}](
+    observationId: Observation.Id
+  )(using Services[F], Transaction[F]): F[Boolean] =
+    session.option(Statements.SelectStoredQueryUrls)(observationId).flatMap:
+      case None             => false.pure[F]  // never searched
+      case Some(storedUrls) =>
+        QueryContext.load(observationId).flatMap:
+          case None                                     => false.pure[F]  // observation gone
+          case Some(ctx) if ctx.proposalStatus.isFrozen => false.pure[F]
+          case Some(ctx)                                =>
+            resolveCenter(observationId, ctx).map: center =>
+              val urls = queryUrlsOf(queriesFor(ctx, center))
+              urls.nonEmpty && urls =!= storedUrls
 
   private def nowTimestamp[F[_]: {Applicative, Clock}]: F[Timestamp] =
     Clock[F].realTimeInstant.map(Timestamp.fromInstantTruncatedAndBounded)
@@ -194,7 +208,7 @@ object ArchiveDuplicationSearchService:
         observationId: Observation.Id,
         searchArea:    ArchiveDuplication.SearchArea
       )(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
-        now.flatMap: t =>
+        nowTimestamp.flatMap: t =>
           val summary = ArchiveDuplication.Summary.notApplicable(t, searchArea)
           storeUnlessFrozen(observationId):
             archiveDuplicationService.store(observationId, summary, Nil)
@@ -226,7 +240,7 @@ object ArchiveDuplicationSearchService:
           NonEmptyString
             .from(errors.toList.map(_.message).mkString("; "))
             .getOrElse("The Archive Duplication Search failed for an unreported reason.".refined)
-        now.flatMap: t =>
+        nowTimestamp.flatMap: t =>
           storeUnlessFrozen(observationId):
             archiveDuplicationService.storeError(observationId, message, t) >>
             archiveDuplicationService.select(observationId)
@@ -240,7 +254,7 @@ object ArchiveDuplicationSearchService:
         // A file returned by more than one query in the group is one duplicate,
         // not several, so the count is of distinct files.
         val matches = byQuery.flatten.distinctBy(_.name)
-        now.flatMap: t =>
+        nowTimestamp.flatMap: t =>
           val summary =
             ArchiveDuplication.Summary(
               ArchiveDuplication.State.Checked,
@@ -278,9 +292,6 @@ object ArchiveDuplicationSearchService:
             case Some(ps) if !ps.isFrozen => write
             case _                        => archiveDuplicationService.select(observationId)
 
-      private val now: F[Timestamp] =
-        nowTimestamp
-
       private val frozen: Option[String] =
         "The Archive Duplication Search cannot be re-run because the proposal has been submitted.".some
 
@@ -306,6 +317,14 @@ object ArchiveDuplicationSearchService:
         JOIN t_program p ON p.c_program_id = o.c_program_id
         WHERE o.c_observation_id = $observation_id
       """.query(observing_mode_type.opt *: right_ascension.opt *: declination.opt *: core_timestamp.opt *: proposal_status)
+
+    /** What the stored search actually asked. */
+    val SelectStoredQueryUrls: Query[Observation.Id, List[String]] =
+      sql"""
+        SELECT c_query_urls
+        FROM t_archive_duplication
+        WHERE c_observation_id = $observation_id
+      """.query(text_list)
 
     /**
      * The observation's proposal status, taking a row lock on the program so a

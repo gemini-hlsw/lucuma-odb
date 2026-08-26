@@ -16057,20 +16057,16 @@ describe the last search that succeeded, and `lastCheckedAt` says when that was.
 type ArchiveDuplication {
 
   """
-  State of the stored snapshot, in part derived from the present: an
-  observation that currently has no observing mode reads NOT_APPLICABLE
-  whatever was stored, because the search cannot be asked for it today.
+  State of the stored snapshot.  Partly derived: an observation with no
+  observing mode reads NOT_APPLICABLE whatever was stored.
   """
   state: ArchiveDuplicationState!
 
   """
   Whether the snapshot no longer describes the observation as it now stands:
-  the archive queries the search would run today differ from the ones the
-  snapshot was gathered from (`queryUrls`).
-  Any query-affecting change counts — mode, pointing, or the searched target
-  name.
+  the archive queries the search would run today differ from `queryUrls`.
   Never true when nothing was searched, when nothing can be searched now, or
-  after submission, whose frozen snapshot cannot be re-checked.
+  after submission.
   """
   stale: Boolean!
 
@@ -16095,10 +16091,8 @@ type ArchiveDuplication {
   lastCheckedAt: Timestamp
 
   """
-  When a search last ran, successfully or not.  Equal to `lastCheckedAt` after
-  a success and later than it when the most recent attempt failed, so a client
-  can tell a fresh failure from one it has already reacted to.  Null when the
-  search never ran.
+  When a search last ran, successfully or not.  Later than `lastCheckedAt`
+  exactly when the most recent attempt failed.  Null when the search never ran.
   """
   attemptedAt: Timestamp
 
