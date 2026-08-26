@@ -196,6 +196,8 @@ Each domain type gets its own file (e.g., `offset.scala`, `wavelength.scala`) wi
 - `query` — GraphQL API responses (users can request any unit).
 - `transport` — DB JSON blobs, inter-service payloads (compact, lossless integer µas).
 
+**`configurationrequest.query`'s `Configuration` codec is also a storage format**: it encodes `t_archive_duplication.c_searched_configuration`, which archive-duplication staleness compares against the current configuration. An undecodable blob deliberately reads as stale and self-heals on the next refresh — but a *breaking* change to this codec must ship with a migration for that column: rewrite the blobs (at minimum for observations in submitted proposals, whose refresh is rejected and can never self-heal), or knowingly null them to force re-checks. A shape-compatible *semantic* change (same field, new meaning/units) is worse — old blobs still decode and staleness silently compares the wrong thing — so it always needs the rewrite.
+
 **Existing codecs and their locations:**
 
 | Type | File | Notes |

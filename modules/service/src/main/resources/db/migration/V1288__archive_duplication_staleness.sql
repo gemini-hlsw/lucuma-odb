@@ -4,9 +4,7 @@
 -- are taken into account.
 --
 -- The Configuration the search actually ran against, so staleness compares the
--- present against what was asked, not against a reconstruction.  NULL for rows
--- stored before this migration (and after a failed first attempt); the obscalc
--- worker treats a checked row without one as stale, so legacy rows self-heal.
+-- present against what was asked, not against a reconstruction.
 --
 -- No stored attempt time: a successful attempt's time is c_last_checked_at and
 -- a failed one's is c_error_at, so the view derives it as the coalesce of the
