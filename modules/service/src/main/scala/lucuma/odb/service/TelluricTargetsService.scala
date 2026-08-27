@@ -33,6 +33,7 @@ import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
+import lucuma.odb.sequence.flamingos2.mos.Config as F2MosConfig
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.Services.ServiceAccess
@@ -111,11 +112,23 @@ object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDec
       case TelluricType.A0V       => hminHot
       case _: TelluricType.Manual => hminHot
 
+  private def lookupF2Key(
+    m:            HminBrightnessCache,
+    disperser:    Flamingos2Disperser,
+    filter:       Flamingos2Filter,
+    fpu:          Flamingos2Fpu,
+    telluricType: TelluricType
+  ): BigDecimal =
+    m.value.get(HminBrightnessKey.F2(disperser, filter, fpu)).flatMap(entry(_, telluricType))
+      .getOrElse(HminBrightnessCache.DefaultHmin)
+
   extension(m: HminBrightnessCache)
     def lookupF2(config: F2Config): BigDecimal =
-      val key = HminBrightnessKey.F2(config.disperser, config.filter, config.fpu)
-      m.value.get(key).flatMap(entry(_, config.telluricType))
-        .getOrElse(HminBrightnessCache.DefaultHmin)
+      lookupF2Key(m, config.disperser, config.filter, config.fpu, config.telluricType)
+
+    /** MOS shares the long slit brightness table, keyed on its equivalent FPU. */
+    def lookupF2Mos(config: F2MosConfig): BigDecimal =
+      lookupF2Key(m, config.disperser, config.filter, config.equivalentFpu, config.telluricType)
 
     def lookupIgrins2(telluricType: TelluricType): BigDecimal =
       m.value.get(HminBrightnessKey.Igrins2).flatMap(entry(_, telluricType))
@@ -183,6 +196,8 @@ object TelluricTargetsService:
                                 session.prepareR(Statements.SelectTargetCoordinates).use(_.option(scienceObsId))
               f2Config   <- flamingos2LongSlitService.select(List(scienceObsId))
                               .map(_.get(scienceObsId))
+              f2MosConfig <- flamingos2MosService.select(List(scienceObsId))
+                              .map(_.get(scienceObsId))
               ig2Config  <- igrins2LongSlitService.select(List(scienceObsId))
                               .map(_.get(scienceObsId))
               gnirsConfig <- gnirsSpectroscopyService.select(List(scienceObsId))
@@ -190,6 +205,9 @@ object TelluricTargetsService:
             yield coordsOpt.flatMap: coords =>
               f2Config.map: f2 =>
                 TelluricSearchParams(coords, f2.telluricType, hminCache.lookupF2(f2))
+              .orElse:
+                f2MosConfig.map: f2m =>
+                  TelluricSearchParams(coords, f2m.telluricType, hminCache.lookupF2Mos(f2m))
               .orElse:
                 ig2Config.map: ig2 =>
                   TelluricSearchParams(coords, ig2.telluricType, hminCache.lookupIgrins2(ig2.telluricType))

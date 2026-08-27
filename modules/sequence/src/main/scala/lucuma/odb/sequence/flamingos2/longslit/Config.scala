@@ -14,6 +14,7 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
@@ -31,11 +32,12 @@ import java.io.DataOutputStream
  * F2 long slit sequence may be generated.
  */
 case class Config(
-  disperser:   Flamingos2Disperser,
-  filter:      Flamingos2Filter,
-  fpu:         Flamingos2Fpu,
-  acquisition: AcquisitionConfig,
-  common:      Common
+  disperser:           Flamingos2Disperser,
+  filter:              Flamingos2Filter,
+  fpu:                 Flamingos2Fpu,
+  acquisition:         AcquisitionConfig,
+  common:              Common,
+  telluricScienceMode: Option[ObservingModeType]
 ) extends spectroscopy.Config derives Eq:
 
   override def fpuMask: Flamingos2FpuMask =
@@ -57,6 +59,7 @@ case class Config(
     out.writeChars(explicitReads.foldMap(_.tag))
     out.writeChars(decker.tag)
     out.writeChars(readoutMode.tag)
+    out.writeChars(telluricScienceMode.foldMap(_.tag))
 
     telescopeConfigs.toList.foreach: tc =>
       out.write(tc.hashBytes)
@@ -80,7 +83,8 @@ object Config:
     explicitReads: Option[Flamingos2Reads] = None,
     explicitDecker: Option[Flamingos2Decker] = None,
     explicitReadoutMode: Option[Flamingos2ReadoutMode] = None,
-    telluricType: TelluricType = TelluricType.Hot
+    telluricType: TelluricType = TelluricType.Hot,
+    telluricScienceMode: Option[ObservingModeType] = None
   ): Config =
     new Config(
       disperser,
@@ -96,5 +100,6 @@ object Config:
         explicitReadoutMode,
         telescopeConfigs,
         telluricType
-      )
+      ),
+      telluricScienceMode
     )

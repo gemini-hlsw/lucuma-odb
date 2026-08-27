@@ -2515,3 +2515,68 @@ class perScienceObservationCalibrations
       result <- attemptSetObservationWorkflowState(pi, pinOid, ObservationWorkflowState.Inactive)
     yield
       assert(result.isLeft, "a daytime pinhole must not be declinable")
+
+  private def longSlitTelluric(oid: Observation.Id): IO[(String, Flamingos2Fpu, List[Long])] =
+    query(
+      user = pi,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            observingMode {
+              mode
+              flamingos2LongSlit {
+                fpu
+                telescopeConfigs {
+                  alongSlit { q { microarcseconds } }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map: json =>
+      val mode = json.hcursor.downFields("observation", "observingMode").downField("mode").as[String].toOption.get
+      val ls   = json.hcursor.downFields("observation", "observingMode", "flamingos2LongSlit")
+      val fpu  = ls.downField("fpu").as[Flamingos2Fpu].toOption.get
+      val qs   = ls.downFields("telescopeConfigs", "alongSlit").as[List[Json]].toOption.orEmpty
+                   .flatMap(_.hcursor.downFields("q", "microarcseconds").as[Long].toOption)
+      (mode, fpu, qs)
+
+  test("F2 MOS observation gets a telluric calibration observation"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2MosObservationAs(pi, pid, List(tid))
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      telluric <- selectTelluricObservationFor(oid)
+    yield assert(telluric.isDefined, "expected a telluric for the F2 MOS observation")
+
+  test("the F2 MOS telluric is a long slit observation on the equivalent FPU"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2MosObservationAs(pi, pid, List(tid))
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      telluric <- selectTelluricObservationFor(oid).map(_.get)
+      result   <- longSlitTelluric(telluric)
+    yield
+      val (mode, fpu, qs) = result
+      // CUSTOM_WIDTH_2_PIX maps 1:1 onto LONG_SLIT_2.
+      assertEquals(mode, "FLAMINGOS_2_LONG_SLIT")
+      assertEquals(fpu, Flamingos2Fpu.LongSlit2)
+      assertEquals(qs, List(60L, 40L, 20L, -20L, 40L, 60L).map(_ * 1_000_000L))
+
+  test("a long slit telluric keeps its own nod pattern, not the MOS one"):
+    for
+      pid      <- createProgramAs(pi)
+      tid      <- createTargetWithProfileAs(pi, pid)
+      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _        <- runObscalcUpdate(pid, oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      telluric <- selectTelluricObservationFor(oid).map(_.get)
+      result   <- longSlitTelluric(telluric)
+    yield
+      val (_, _, qs) = result
+      assertEquals(qs, List(15L, -15L, -15L, 15L).map(_ * 1_000_000L))

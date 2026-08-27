@@ -14,6 +14,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.Angle
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
@@ -36,6 +37,7 @@ import lucuma.odb.otel.given
 import lucuma.odb.sequence.gnirs as gnirs
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
+import lucuma.odb.syntax.exposureTimeMode.*
 import lucuma.odb.syntax.observingModeType.*
 import lucuma.odb.util.Codecs.*
 import org.typelevel.log4cats.Logger
@@ -351,9 +353,27 @@ object PerScienceObservationCalibrationsService:
 
       private val MaxTelluricSN = SignalToNoise.fromInt(100).get
 
+      /**
+       * The telluric's acquisition is reset rather than copied: the standard is
+       * a different (much brighter) star, so the science target's acquisition
+       * S/N means nothing for it.  Each mode resets to its own default, which for
+       * GNIRS is a derived signal-to-noise its ITC brightness classification later
+       * rewrites.  The mode here is the telluric's, not its science observation's.
+       */
+      private def telluricAcquisitionEtm(
+        mode: Option[ObservingModeType],
+        at:   Wavelength
+      ): ExposureTimeMode =
+        mode match
+          case Some(ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu) =>
+            gnirs.derivedAcquisitionExposureTimeMode(none, at)
+          case _                                                                  =>
+            ExposureTimeMode.forAcquisition(at)
+
       // After cloning we have the same etm as science, but we need a different one for tellurics
       // https://app.shortcut.com/lucuma/story/6968/generate-telluric-standard-sequence
       private def createTelluricExposureTimeMode(
+        mode:        Option[ObservingModeType],
         scienceOid:  Observation.Id,
         telluricOid: Observation.Id
       )(using Transaction[F]): F[Unit] =
@@ -396,14 +416,9 @@ object PerScienceObservationCalibrationsService:
           scienceEtm  = allSciEtm.get(scienceOid)
           _          <- scienceEtm.traverse_ : etm =>
                           // Normally there is a single acq etm but is safe to go over all of them.
-                          //
-                          // The telluric's acquisition is *reset*, not copied: the standard is a
-                          // different (much brighter) star, so the science target's acquisition
-                          // S/N means nothing for it.  Writing it as derived lets the telluric's
-                          // own ITC brightness classification set the S/N, which is the whole
-                          // point of the derivation.  Tellurics only exist for cross-dispersed
-                          // GNIRS, so this is always a GNIRS acquisition.
-                          val acqEtm = allAcqEtm.get(scienceOid).map(a => gnirs.derivedAcquisitionExposureTimeMode(none, a.at))
+                          // It is written as derived, not explicit: it is the mode's default,
+                          // not a user choice.
+                          val acqEtm = allAcqEtm.get(scienceOid).map(a => telluricAcquisitionEtm(mode, a.at))
 
                           replaceEtm(ExposureTimeModeRole.Science, telluricEtm(etm), allSciEtm.get(telluricOid)) *>
                             acqEtm.traverse_(replaceEtm(ExposureTimeModeRole.Acquisition, _, allAcqEtm.get(telluricOid), isExplicit = false))
@@ -434,6 +449,14 @@ object PerScienceObservationCalibrationsService:
         def syncObservationProperties: F[Unit] =
           S.session.executeCommand(Statements.syncObservationConfiguration(sourceOid, targetOid)).void
 
+        // A Flamingos 2 MOS telluric is observed through the builtin long slit that
+        // matches the mask's slitlets, never through the mask, so its calibration
+        // observation is a long slit one.  Every other mode calibrates as itself.
+        def telluricModeFor(sm: Option[ObservingModeType]): Option[ObservingModeType] =
+          sm.map:
+            case ObservingModeType.Flamingos2Mos => ObservingModeType.Flamingos2LongSlit
+            case other                           => other
+
         def deleteOldTargetMode(tm: Option[ObservingModeType]): F[Unit] =
           tm.traverse(mode => observingModeServices.delete(mode, List(targetOid))).void
 
@@ -446,12 +469,25 @@ object PerScienceObservationCalibrationsService:
           )).void
 
         def updateTargetModeType(sm: Option[ObservingModeType]): F[Unit] =
-          sm.traverse(mode =>
+          telluricModeFor(sm).traverse(mode =>
             S.session.execute(Statements.updateObservingModeType)(mode.some, mode.instrumentOption, targetOid)
           ).void
 
+        // MOS has no same-mode clone to make: the long slit row is derived from it,
+        // carrying the equivalent builtin FPU.  Its exposure time modes still come
+        // across, as they would from any other mode.
+        def deriveMosTelluricMode: F[Unit] =
+          for
+            cfg <- flamingos2MosService.select(List(sourceOid)).map(_.get(sourceOid))
+            _   <- S.exposureTimeModeService.clone(sourceOid, targetOid).void
+            _   <- cfg.traverse_(c => flamingos2LongSlitService.insertMosTelluric(sourceOid, targetOid, c.equivalentFpu))
+          yield ()
+
         def cloneSourceMode(sm: Option[ObservingModeType]): F[Unit] =
-          sm.traverse(mode => observingModeServices.clone(mode, sourceOid, targetOid)).void
+          sm.traverse_ : mode =>
+            mode match
+              case ObservingModeType.Flamingos2Mos => deriveMosTelluricMode
+              case _                               => observingModeServices.clone(mode, sourceOid, targetOid)
 
         // Reset any mode-specific telluric overrides on the cloned obs.
         // At the moment only offsets but eventually other properties may need a reset,
@@ -461,6 +497,8 @@ object PerScienceObservationCalibrationsService:
               igrins2LongSlitService.resetTelluricConfig(targetOid)
             case Some(ObservingModeType.Flamingos2LongSlit) =>
               flamingos2LongSlitService.resetTelluricConfig(targetOid)
+            case Some(ObservingModeType.Flamingos2Mos) =>
+              flamingos2LongSlitService.resetMosTelluricConfig(targetOid)
             case Some(ObservingModeType.GnirsLongSlit) =>
               gnirsSpectroscopyService.resetTelluricConfig(targetOid)
             case _ =>
@@ -475,7 +513,7 @@ object PerScienceObservationCalibrationsService:
           _        <- updateTargetModeType(sm)
           _        <- cloneSourceMode(sm)
           _        <- resetTelluricConfig(sm)
-          _        <- createTelluricExposureTimeMode(sourceOid, targetOid)
+          _        <- createTelluricExposureTimeMode(telluricModeFor(sm), sourceOid, targetOid)
         } yield ()
 
       private def findObsCalibrationGroupForObservation(

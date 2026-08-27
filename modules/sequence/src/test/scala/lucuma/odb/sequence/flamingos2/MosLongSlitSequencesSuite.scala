@@ -104,7 +104,8 @@ class MosLongSlitSequencesSuite extends FunSuite:
       Filter,
       Fpu,
       acquisition,
-      common
+      common,
+      none
     )
 
   private val mosConfig: mos.Config =
