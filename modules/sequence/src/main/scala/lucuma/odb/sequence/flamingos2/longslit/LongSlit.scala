@@ -9,6 +9,7 @@ import cats.Monad
 import cats.data.EitherT
 import fs2.Pure
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as F2Static
@@ -36,7 +37,18 @@ object LongSlit:
     scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
+    // A telluric derived from a MOS observation is a long slit observation.
+    val isMosTelluric: Boolean =
+      calRole.contains(CalibrationRole.Telluric) &&
+        config.telluricScienceMode.contains(ObservingModeType.Flamingos2Mos)
+
+    val science: F[Either[OdbError, SequenceGenerator[F2Dynamic]]] =
+      if isMosTelluric then
+        spectroscopy.MosTelluric.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
+      else
+        spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, MaxSciencePeriod, config, scienceItc, calRole)
+
     (for
        a <- EitherT.fromEither(Acquisition.instantiate(observationId, estimator, Static, namespace, config, acquisitionItc))
-       s <- EitherT(spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, MaxSciencePeriod, config, scienceItc, calRole))
+       s <- EitherT(science)
     yield StreamingExecutionConfig(Static, a.generate, s.generate)).value

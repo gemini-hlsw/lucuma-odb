@@ -14,10 +14,12 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.format.StoredSlitTelescopeConfigs
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
+import lucuma.odb.sequence.flamingos2.spectroscopy.MosTelluricTelescopeConfigs
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
@@ -50,6 +52,10 @@ trait Flamingos2LongSlitService[F[_]]:
     */
   def resetTelluricConfig(oid: Observation.Id): F[Unit]
 
+  def insertMosTelluric(mosOid: Observation.Id, telluricOid: Observation.Id, fpu: Flamingos2Fpu): F[Unit]
+
+  def resetMosTelluricConfig(oid: Observation.Id): F[Unit]
+
 object Flamingos2LongSlitService:
 
   def instantiate[F[_]: {Concurrent as F, Services}]: Flamingos2LongSlitService[F] =
@@ -74,13 +80,14 @@ object Flamingos2LongSlitService:
          flamingos_2_readout_mode.opt *:
          slit_offset_mode             *: // c_slit_offset_mode_effective
          text                         *: // c_telescope_configs_effective
-         telluric_type
-        ).emap { case (disperser, filter, fpu, sci, acq, readMode, reads, decker, readoutMode, offsetMode, tcJson, telluricType) =>
+         telluric_type                *:
+         observing_mode_type.opt
+        ).emap { case (disperser, filter, fpu, sci, acq, readMode, reads, decker, readoutMode, offsetMode, tcJson, telluricType, telluricScienceMode) =>
           SlitTelescopeConfigsFormat.getOption((offsetMode, tcJson))
             .map(_.telescopeConfigs)
             .toRight(s"Could not parse '$tcJson' as telescope configs.")
             .map { telescopeConfigs =>
-              Config(disperser, filter, fpu, sci, acq, telescopeConfigs, readMode, reads, decker, readoutMode, telluricType)
+              Config(disperser, filter, fpu, sci, acq, telescopeConfigs, readMode, reads, decker, readoutMode, telluricType, telluricScienceMode)
             }
         }
 
@@ -150,6 +157,12 @@ object Flamingos2LongSlitService:
 
       override def resetTelluricConfig(oid: Observation.Id): F[Unit] =
         session.exec(Statements.applyF2TelluricDefaults(oid))
+
+      override def insertMosTelluric(mosOid: Observation.Id, telluricOid: Observation.Id, fpu: Flamingos2Fpu): F[Unit] =
+        session.exec(Statements.insertMosTelluric(mosOid, telluricOid, fpu))
+
+      override def resetMosTelluricConfig(oid: Observation.Id): F[Unit] =
+        session.exec(Statements.applyF2MosTelluricDefaults(oid))
     }
 
   object Statements {
@@ -179,7 +192,8 @@ object Flamingos2LongSlitService:
           ls.c_readout_mode,
           ls.c_slit_offset_mode_effective,
           ls.c_telescope_configs_effective,
-          ls.c_telluric_type
+          ls.c_telluric_type,
+          ls.c_telluric_science_mode
         FROM
           v_flamingos_2_long_slit ls
         LEFT JOIN t_exposure_time_mode acq
@@ -352,6 +366,63 @@ object Flamingos2LongSlitService:
       """.apply(newId, newId, originalId)
 
     // Tellurics use the default telescope configs
+    /**
+     * Builds the telluric's long slit row from its MOS science observation: the
+     * same configuration seen through the builtin slit matching the mask's
+     * slitlets.  The decker is left unset so the long slit default applies
+     * rather than the MOS one, and the offsets follow from
+     * `applyF2MosTelluricDefaults`.
+     */
+    def insertMosTelluric(mosOid: Observation.Id, telluricOid: Observation.Id, fpu: Flamingos2Fpu): AppliedFragment =
+      sql"""
+        INSERT INTO t_flamingos_2_long_slit (
+          c_observation_id,
+          c_program_id,
+          c_disperser,
+          c_filter,
+          c_fpu,
+          c_acquisition_filter,
+          c_read_mode,
+          c_reads,
+          c_readout_mode,
+          c_telluric_type,
+          c_telluric_science_mode,
+          c_initial_disperser,
+          c_initial_filter,
+          c_initial_fpu
+        )
+        SELECT
+          $observation_id,
+          m.c_program_id,
+          m.c_disperser,
+          m.c_filter,
+          $flamingos_2_fpu,
+          m.c_acquisition_filter,
+          m.c_read_mode,
+          m.c_reads,
+          m.c_readout_mode,
+          m.c_telluric_type,
+          'flamingos_2_mos',
+          m.c_disperser,
+          m.c_filter,
+          $flamingos_2_fpu
+        FROM t_flamingos_2_mos m
+        WHERE m.c_observation_id = $observation_id
+      """.apply(telluricOid, fpu, fpu, mosOid)
+
+    /**
+     * A MOS-derived telluric steps the standard down the slit instead of taking
+     * the long slit nod pattern.
+     */
+    def applyF2MosTelluricDefaults(oid: Observation.Id): AppliedFragment =
+      val StoredSlitTelescopeConfigs(mode, configs) = storedSlitTelescopeConfigs(MosTelluricTelescopeConfigs)
+      sql"""
+        UPDATE t_flamingos_2_long_slit
+        SET c_slit_offset_mode  = $slit_offset_mode,
+            c_telescope_configs = $text
+        WHERE c_observation_id = $observation_id
+      """.apply(mode, configs, oid)
+
     def applyF2TelluricDefaults(oid: Observation.Id): AppliedFragment =
       sql"""
         UPDATE t_flamingos_2_long_slit
