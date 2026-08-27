@@ -56,7 +56,7 @@ class groupIndices extends OdbSuite {
         )((index, oid)) >>
         s.execute(sql"call group_compact($program_id, null)".command)(pid).void.whenA(repair)
 
-  private def indicesAtTopLevel(pid: Program.Id): IO[List[Short]] =
+  private def indicesAtTopLevel(pid: Program.Id): IO[List[Int]] =
     withSession: s =>
       s.execute(
         sql"""
@@ -64,7 +64,7 @@ class groupIndices extends OdbSuite {
           where c_program_id = $program_id and c_group_id is null
           order by c_index
         """.query(int2)
-      )(pid)
+      )(pid).map(_.map(_.toInt))
 
   // This is the case that went undetected in production. Collapsing the duplicate leaves
   // {0, 1}, which starts at zero and is consecutive, so the pre-V1294 check passed it. Putting
@@ -104,7 +104,7 @@ class groupIndices extends OdbSuite {
       ix          <- indicesAtTopLevel(pid)
     yield
       assert(e.message.startsWith("Duplicate index detected"), s"unexpected error: ${e.message}")
-      assertEquals(ix, List[Short](0, 1, 2))  // rolled back
+      assertEquals(ix, List(0, 1, 2))  // rolled back
 
   // group_open_hole reads max(c_index) + 1 and hands it back for the caller to insert at, so
   // without serialization two concurrent creates in one program are handed the same slot. This
@@ -116,7 +116,52 @@ class groupIndices extends OdbSuite {
       pid  <- createProgramAs(pi)
       _    <- List.fill(N)(()).parTraverse(_ => createObservationInGroupAs(pi, pid, none))
       ix   <- indicesAtTopLevel(pid)
-    yield assertEquals(ix, List.range(0, N).map(_.toShort))
+    yield assertEquals(ix, List.range(0, N))
+
+  /** Corrupt with constraints deferred, then compact before commit. */
+  private def corruptThenCompact(pid: Program.Id)(corrupt: skunk.Session[IO] => IO[Unit]): IO[Unit] =
+    withFreshSession: s =>
+      s.transaction.use: _ =>
+        s.execute(sql"set constraints all deferred".command) >>
+        corrupt(s) >>
+        s.execute(sql"call group_compact($program_id, null)".command)(pid).void
+
+  // Compaction renumbers child groups through a data-modifying CTE whose output the enclosing
+  // statement never reads. Postgres runs such a CTE to completion regardless of that, and this
+  // is the test that holds it down: were the group update skipped, the two groups would still
+  // share index 0 and the deferred check would reject the commit.
+  test("child groups sharing an index are renumbered too"):
+    for
+      pid <- createProgramAs(pi)
+      g0  <- createGroupAs(pi, pid)
+      g1  <- createGroupAs(pi, pid)
+      _   <- corruptThenCompact(pid): s =>
+               s.execute(
+                 sql"update t_group set c_parent_index = 0 where c_group_id = $group_id".command
+               )(g1).void
+      ix  <- indicesAtTopLevel(pid)
+      els <- groupElementsAs(pi, pid, none)
+    yield
+      assertEquals(ix, List(0, 1))
+      assertEquals(els.toSet, Set(g0.asLeft[Observation.Id], g1.asLeft[Observation.Id]))
+
+  // The production shape in p-10d0: a user group and a system group sharing a slot. Both
+  // tables are renumbered from one snapshot in a single statement, so neither update can see
+  // the other's writes and perturb the numbering.
+  test("a group and an observation sharing an index are renumbered together"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      oid <- createObservationInGroupAs(pi, pid, none)
+      _   <- corruptThenCompact(pid): s =>
+               s.execute(
+                 sql"update t_observation set c_group_index = 0 where c_observation_id = $observation_id".command
+               )(oid).void
+      ix  <- indicesAtTopLevel(pid)
+      els <- groupElementsAs(pi, pid, none)
+    yield
+      assertEquals(ix, List(0, 1))
+      assertEquals(els.toSet, Set(gid.asLeft[Observation.Id], oid.asRight[Group.Id]))
 
   test("group_compact renumbers a duplicated group so the commit succeeds"):
     for
@@ -125,7 +170,7 @@ class groupIndices extends OdbSuite {
       ix          <- indicesAtTopLevel(pid)
       elems       <- groupElementsAs(pi, pid, none)
     yield
-      assertEquals(ix, List[Short](0, 1, 2))
+      assertEquals(ix, List(0, 1, 2))
       // All three elements are still addressable: a duplicated index makes two elements share
       // the GroupElement key (program:parent:index) and one of them disappears from the API.
       assertEquals(elems.size, 3)

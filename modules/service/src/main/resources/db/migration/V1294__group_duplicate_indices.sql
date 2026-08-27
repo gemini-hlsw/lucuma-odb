@@ -40,7 +40,8 @@
 --      caller then inserts at that index, so concurrent creates in one program could both be
 --      handed the same slot -- which is how the duplicates in production arose, from separate
 --      calibration recalculation transactions each numbering from its own snapshot. Follows the
---      pg_advisory_xact_lock precedent in VisitService. Every caller derives pid from the
+--      pg_advisory_xact_lock precedent in VisitService, in the two-argument form so the hashed
+--      program id cannot collide with that fixed lock id. Every caller derives pid from the
 --      element it is placing and so takes at most one of these locks per transaction; that is
 --      what keeps a lock-ordering deadlock out of reach, so a future caller that places
 --      elements in two programs at once would need to acquire them in a defined order.
@@ -161,6 +162,12 @@ BEGIN
   -- Both updates read `ordered`, which is computed from the statement's snapshot, so the
   -- renumbering of groups below cannot perturb the numbering computed for observations. The
   -- inequality guards keep untouched rows from firing their triggers.
+  --
+  -- The `g` CTE's output is intentionally unused, and that does NOT make it dead code: a
+  -- data-modifying CTE is not conditional on being referenced. Postgres executes each one
+  -- exactly once and always to completion, whether or not the primary query reads any of its
+  -- output. Child groups are therefore renumbered even though nothing selects from `g` -- the
+  -- "child groups sharing an index" test exists to hold that guarantee down.
   WITH ordered AS (
     SELECT
       c_child_group_id,
@@ -239,7 +246,14 @@ BEGIN
   -- The next free slot is read and then handed back to the caller, which inserts at it, so
   -- concurrent creates in one program have to be serialized or they are handed the same slot.
   -- The lock is per program and released at commit.
-  PERFORM pg_advisory_xact_lock(hashtext(pid::text)::bigint);
+  --
+  -- The two-argument form is deliberate. Its key space is disjoint from the single-bigint space
+  -- (per the Postgres docs), so a hashed program id here can never collide with a fixed lock id
+  -- taken elsewhere -- VisitService holds pg_advisory_xact_lock(100) while creating a visit.
+  -- Key 1 namespaces this to group element numbering; give any future caller its own key 1.
+  -- hashtext can of course map two programs to the same key 2, which costs those two an
+  -- occasional needless wait but is never incorrect.
+  PERFORM pg_advisory_xact_lock(1, hashtext(pid::text));
 
   -- The next free slot at the end of the group. Elements parked at a negative index by
   -- group_move_group/group_move_observation are excluded; they are on their way elsewhere and
