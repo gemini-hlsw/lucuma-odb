@@ -43,7 +43,6 @@ import lucuma.odb.sequence.StepTimeEstimateCalculator
 import lucuma.odb.sequence.data.ProtoStep
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.flamingos2.longslit
-import lucuma.odb.sequence.flamingos2.mos
 import munit.FunSuite
 
 import java.util.UUID
@@ -75,7 +74,7 @@ class TelluricSuite extends FunSuite:
       .map(q => TelescopeConfig(lucuma.core.math.Offset(lucuma.core.math.Offset.P.Zero, lucuma.core.math.Offset.Q(Angle.fromDoubleArcseconds(q.toDouble))), StepGuideState.Enabled))
 
   private def config(
-    telescopeConfigs:    NonEmptyList[TelescopeConfig] = mos.Config.TelluricTelescopeConfigs.telescopeConfigs,
+    telescopeConfigs:    NonEmptyList[TelescopeConfig] = longslit.Config.MosTelluricTelescopeConfigs.telescopeConfigs,
     telluricScienceMode: Option[ObservingModeType]     = ObservingModeType.Flamingos2Mos.some
   ): longslit.Config =
     longslit.Config(

@@ -4,20 +4,14 @@
 package lucuma.odb.sequence.flamingos2.mos
 
 import cats.Eq
-import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.foldable.*
 import lucuma.core.enums.Flamingos2CustomSlitWidth
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
-import lucuma.core.enums.StepGuideState
-import lucuma.core.math.Offset
-import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Defined
-import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.ToBeDefined
-import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.sequence.flamingos2.spectroscopy
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
@@ -78,18 +72,6 @@ case class Config private (
     bao.toByteArray
 
 object Config:
-
-  /**
-   * Nod pattern for the MOS telluric standard.  The standard is a single star
-   * observed through the equivalent long slit, so it steps down the slit and
-   * back rather than nodding between mask slitlets; p is zero throughout.
-   */
-  val TelluricTelescopeConfigs: SlitTelescopeConfigs =
-    SlitTelescopeConfigs.AlongSlit(
-      NonEmptyList
-        .of(60, 40, 20, -20, 40, 60)
-        .map(q => TelescopeConfigAlongSlit(Offset.Q(q.arcsec), StepGuideState.Enabled))
-    )
 
   /**
    * `Flamingos2CustomSlitWidth.Other` carries no width at all, so neither the

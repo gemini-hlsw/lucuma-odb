@@ -15,9 +15,14 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.Flamingos2ReadoutMode
 import lucuma.core.enums.Flamingos2Reads
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
+import lucuma.core.math.syntax.int.*
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
+import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.odb.sequence.flamingos2.spectroscopy
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
@@ -71,6 +76,17 @@ case class Config(
 
 
 object Config:
+
+  /**
+   * Nod pattern for the telluric standard of a MOS observation.
+   * Move to lucuma-core
+   */
+  val MosTelluricTelescopeConfigs: SlitTelescopeConfigs =
+    SlitTelescopeConfigs.AlongSlit(
+      NonEmptyList
+        .of(60, 40, 20, -20, 40, 60)
+        .map(q => TelescopeConfigAlongSlit(Offset.Q(q.arcsec), StepGuideState.Enabled))
+    )
 
   def apply(
     disperser: Flamingos2Disperser,
