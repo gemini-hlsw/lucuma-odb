@@ -9,6 +9,7 @@ import lucuma.core.enums.*
 import lucuma.core.enums.GmosRoi
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.arb.ArbEnumerated.given
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
@@ -41,9 +42,9 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
         explicitAmpReadMode = None,
         explicitAmpGain = None,
         explicitRoi = roi.some,
-        explicitWavelengthDithers = None,
-        explicitSpatialOffsets = None
+        explicitWavelengthDithers = None
       ),
+      telescopeConfigs = DefaultSlitTelescopeConfigs.telescopeConfigs,
       acquisition = AcquisitionConfig.GmosNorth(
         exposureTimeMode = e,
         defaultFilter  = GmosNorthFilter.GPrime,

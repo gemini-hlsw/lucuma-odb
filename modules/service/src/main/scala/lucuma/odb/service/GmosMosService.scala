@@ -30,9 +30,11 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.MaskDefinition
 import lucuma.core.model.Observation
 import lucuma.core.model.ToBeDefined
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.graphql.input.GmosMosInput
 import lucuma.odb.sequence.gmos.mos.AcquisitionConfig
@@ -142,12 +144,10 @@ object GmosMosService {
          gmos_amp_read_mode.opt *:   // explicitAmpReadMode
          gmos_amp_gain.opt      *:   // explicitAmpGain
          gmos_roi.opt           *:   // explicitRoi
-         text.opt               *:   // explicitWavelengthDithers
-         text.opt                    // explicitOffsets
-        ).emap: (w, exp, defaultX, x, defaultY, y, arm, ag, roi, owd, oso) =>
+         text.opt                    // explicitWavelengthDithers
+        ).emap: (w, exp, defaultX, x, defaultY, y, arm, ag, roi, owd) =>
           for
             wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
-            offsets           <- oso.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as as offsets list."))
           yield Common(
             w,
             exp,
@@ -158,9 +158,13 @@ object GmosMosService {
             arm,
             ag,
             roi,
-            wavelengthDithers,
-            offsets
+            wavelengthDithers
           )
+
+      /** The effective positions, explicit or default, as the view resolves them. */
+      val telescope_configs: Decoder[NonEmptyList[TelescopeConfig]] =
+        text.emap: json =>
+          ToSkyFormat.getOption(json).toRight(s"Could not parse '$json' as telescope configs.")
 
       val north: Decoder[GmosNorth] =
         (gmos_north_grating       *:
@@ -168,7 +172,8 @@ object GmosMosService {
          custom_mask              *:
          gmos_mos_acquisition_type *:
          north_acquisition        *:
-         common
+         common                    *:
+         telescope_configs
         ).to[GmosNorth]
 
       val south: Decoder[GmosSouth] =
@@ -177,7 +182,8 @@ object GmosMosService {
          custom_mask              *:
          gmos_mos_acquisition_type *:
          south_acquisition        *:
-         common
+         common                    *:
+         telescope_configs
         ).to[GmosSouth]
 
       private def select[A](
@@ -379,7 +385,7 @@ object GmosMosService {
           m.c_amp_gain,
           m.c_roi,
           m.c_wavelength_dithers,
-          m.c_offsets
+          m.c_telescope_configs_effective
         FROM
           #$table m
         LEFT JOIN t_exposure_time_mode acq
@@ -445,7 +451,7 @@ object GmosMosService {
           c_amp_gain,
           c_roi,
           c_wavelength_dithers,
-          c_offsets,
+          c_telescope_configs,
           c_initial_grating,
           c_initial_filter,
           c_initial_slit_width,
@@ -498,7 +504,7 @@ object GmosMosService {
         input.common.explicitAmpGain,
         input.common.explicitRoi,
         input.common.formattedλDithers,
-        input.common.formattedOffsets,
+        input.common.formattedTelescopeConfigs,
         input.grating,
         input.filter,
         input.customMask.slitWidth,
@@ -544,7 +550,7 @@ object GmosMosService {
           c_amp_gain,
           c_roi,
           c_wavelength_dithers,
-          c_offsets,
+          c_telescope_configs,
           c_initial_grating,
           c_initial_filter,
           c_initial_slit_width,
@@ -597,7 +603,7 @@ object GmosMosService {
         input.common.explicitAmpGain,
         input.common.explicitRoi,
         input.common.formattedλDithers,
-        input.common.formattedOffsets,
+        input.common.formattedTelescopeConfigs,
         input.grating,
         input.filter,
         input.customMask.slitWidth,
@@ -633,7 +639,7 @@ object GmosMosService {
       val upAmpGain     = sql"c_amp_gain           = ${gmos_amp_gain.opt}"
       val upRoi         = sql"c_roi                = ${gmos_roi.opt}"
       val upλDithers    = sql"c_wavelength_dithers = ${text.opt}"
-      val upOffsets     = sql"c_offsets            = ${text.opt}"
+      val upTelescopeCfg = sql"c_telescope_configs  = ${text.opt}"
 
       List(
         input.centralWavelength.map(upCentralλ),
@@ -643,7 +649,7 @@ object GmosMosService {
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
         input.explicitRoi.toOptionOption.map(upRoi),
         input.formattedλDithers.toOptionOption.map(upλDithers),
-        input.formattedOffsets.toOptionOption.map(upOffsets)
+        input.formattedTelescopeConfigs.toOptionOption.map(upTelescopeCfg)
       ).flatten
     }
 
@@ -751,7 +757,7 @@ object GmosMosService {
         c_amp_gain,
         c_roi,
         c_wavelength_dithers,
-        c_offsets,
+        c_telescope_configs,
         c_initial_grating,
         c_initial_filter,
         c_initial_slit_width,
@@ -775,7 +781,7 @@ object GmosMosService {
         c_amp_gain,
         c_roi,
         c_wavelength_dithers,
-        c_offsets,
+        c_telescope_configs,
         c_initial_grating,
         c_initial_filter,
         c_initial_slit_width,

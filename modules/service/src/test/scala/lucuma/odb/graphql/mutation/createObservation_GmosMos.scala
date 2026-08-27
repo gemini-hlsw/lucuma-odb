@@ -238,9 +238,9 @@ class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
                    { nanometers: 0 },
                    { nanometers: 5 }
                  ]
-                 explicitOffsets: [
-                   { arcseconds: 0 },
-                   { arcseconds: 10 }
+                 explicitTelescopeConfigs: [
+                   { offset: { p: { arcseconds: 0 }, q: { arcseconds:  0 } }, guiding: ENABLED },
+                   { offset: { p: { arcseconds: 1 }, q: { arcseconds: 10 } }, guiding: DISABLED }
                  ]
                }
              """)
@@ -261,8 +261,8 @@ class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
                        explicitRoi
                        wavelengthDithers { nanometers }
                        explicitWavelengthDithers { nanometers }
-                       offsets { arcseconds }
-                       explicitOffsets { arcseconds }
+                       telescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+                       explicitTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
                      }
                    }
                  }
@@ -290,13 +290,13 @@ class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
                          { "nanometers": 0.000 },
                          { "nanometers": 5.000 }
                        ],
-                       "offsets": [
-                         { "arcseconds": 0.000000 },
-                         { "arcseconds": 10.000000 }
+                       "telescopeConfigs": [
+                         { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED"  },
+                         { "offset": { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": 10.000000 } }, "guiding": "DISABLED" }
                        ],
-                       "explicitOffsets": [
-                         { "arcseconds": 0.000000 },
-                         { "arcseconds": 10.000000 }
+                       "explicitTelescopeConfigs": [
+                         { "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds":  0.000000 } }, "guiding": "ENABLED"  },
+                         { "offset": { "p": { "arcseconds": 1.000000 }, "q": { "arcseconds": 10.000000 } }, "guiding": "DISABLED" }
                        ]
                      }
                    }
@@ -424,11 +424,11 @@ class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
             observingMode {
               gmosNorthMos {
                 defaultWavelengthDithers { nanometers }
-                defaultOffsets { arcseconds }
+                defaultTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
                 wavelengthDithers { nanometers }
-                offsets { arcseconds }
+                telescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
                 explicitWavelengthDithers { nanometers }
-                explicitOffsets { arcseconds }
+                explicitTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
               }
             }
           }
@@ -443,15 +443,15 @@ class createObservation_GmosMos extends OdbSuite with MosMaskSupport:
                   { "nanometers": 5.000 },
                   { "nanometers": -5.000 }
                 ],
-                "defaultOffsets": [],
+                "defaultTelescopeConfigs": [{ "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }],
                 "wavelengthDithers": [
                   { "nanometers": 0.000 },
                   { "nanometers": 5.000 },
                   { "nanometers": -5.000 }
                 ],
-                "offsets": [],
+                "telescopeConfigs": [{ "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }],
                 "explicitWavelengthDithers": null,
-                "explicitOffsets": null
+                "explicitTelescopeConfigs": null
               }
             }
           }

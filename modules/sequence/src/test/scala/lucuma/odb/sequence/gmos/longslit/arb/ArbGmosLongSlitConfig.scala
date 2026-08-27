@@ -25,7 +25,9 @@ import lucuma.core.math.arb.ArbOffset
 import lucuma.core.math.arb.ArbWavelength
 import lucuma.core.math.arb.ArbWavelengthDither
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.arb.ArbExposureTimeMode
+import lucuma.core.model.sequence.arb.ArbSlitTelescopeConfigs.given
 import lucuma.core.util.arb.ArbEnumerated
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
@@ -82,8 +84,7 @@ object ArbGmosLongSlitConfig:
         m,
         n,
         r,
-        d,
-        s
+        d
       )
 
   given Arbitrary[Config.GmosNorth] =
@@ -94,7 +95,8 @@ object ArbGmosLongSlitConfig:
         u <- arbitrary[GmosNorthFpu]
         c <- arbitrary[spectroscopy.Config.Common]
         a <- arbitrary[AcquisitionConfig.GmosNorth]
-      yield Config.GmosNorth(g, f, u, c, a)
+        t <- arbitrary[SlitTelescopeConfigs].map(_.telescopeConfigs)
+      yield Config.GmosNorth(g, f, u, c, t, a)
 
   given Arbitrary[Config.GmosSouth] =
     Arbitrary:
@@ -104,4 +106,5 @@ object ArbGmosLongSlitConfig:
         u <- arbitrary[GmosSouthFpu]
         c <- arbitrary[spectroscopy.Config.Common]
         a <- arbitrary[AcquisitionConfig.GmosSouth]
-      yield Config.GmosSouth(g, f, u, c, a)
+        t <- arbitrary[SlitTelescopeConfigs].map(_.telescopeConfigs)
+      yield Config.GmosSouth(g, f, u, c, t, a)

@@ -58,14 +58,16 @@ class programPlannedTime extends ExecutionTestSupportForGmos:
           centralWavelength: {
             nanometers: 500
           }
-          explicitSpatialOffsets: [
-            { arcseconds: -10.0 },
-            { arcseconds:  -5.0 },
-            { arcseconds:   0.0 },
-            { arcseconds:   5.0 },
-            { arcseconds:  10.0 },
-            { arcseconds:  15.0 }
-          ]
+          explicitTelescopeConfigs: {
+            alongSlit: [
+              { q: { arcseconds: -10.0 }, guiding: ENABLED },
+              { q: { arcseconds: -5.0 }, guiding: ENABLED },
+              { q: { arcseconds: 0.0 }, guiding: ENABLED },
+              { q: { arcseconds: 5.0 }, guiding: ENABLED },
+              { q: { arcseconds: 10.0 }, guiding: ENABLED },
+              { q: { arcseconds: 15.0 }, guiding: ENABLED }
+            ]
+          }
         }
       """
     )

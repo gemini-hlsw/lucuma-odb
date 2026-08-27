@@ -33,6 +33,8 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
+import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.SmartGcalExpander
@@ -67,8 +69,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
       explicitAmpReadMode       = none,
       explicitAmpGain           = none,
       explicitRoi               = none,
-      explicitWavelengthDithers = none,
-      explicitSpatialOffsets    = none
+      explicitWavelengthDithers = none
     )
 
   private val longSlit: longslit.Config.GmosNorth =
@@ -77,6 +78,7 @@ class MosLongSlitSequencesSuite extends FunSuite:
       Filter,
       Fpu,
       common,
+      DefaultSlitTelescopeConfigs.telescopeConfigs,
       longslit.AcquisitionConfig.GmosNorth(
         common.exposureTimeMode,
         GmosNorthFilter.GPrime,
@@ -97,11 +99,12 @@ class MosLongSlitSequencesSuite extends FunSuite:
         GmosNorthFilter.GPrime,
         none
       ),
-      common
+      common,
+      DefaultTelescopeConfigs
     )
 
   private val mosConfigAtLongSlitOffsets: mos.Config.GmosNorth =
-    mosConfig.withSpatialOffsets(longSlit.spatialOffsets.some)
+    mosConfig.withTelescopeConfigs(longSlit.telescopeConfigs)
 
   private val expander: SmartGcalExpander[Eval, StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =
     SmartGcalExpander.pure[Eval, StaticConfig.GmosNorth, DynamicConfig.GmosNorth]: (_, _, d) =>
@@ -149,8 +152,8 @@ class MosLongSlitSequencesSuite extends FunSuite:
     assert(ls.nonEmpty, "expected a non-empty long slit sequence")
     assertEquals(ms.map(withoutFpu), ls.map(withoutFpu))
 
-  test("MOS has no default offsets"):
-    assertEquals(mosConfig.spatialOffsets, List.empty)
+  test("MOS does not nod by default"):
+    assertEquals(mosConfig.telescopeConfigs, DefaultTelescopeConfigs)
 
     val qs = generate(mosConfig).flatMap(_.steps.toList).map(_.telescopeConfig.offset.q)
     assert(qs.nonEmpty)

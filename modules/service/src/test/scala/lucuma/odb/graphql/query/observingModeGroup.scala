@@ -40,6 +40,7 @@ class observingModeGroup extends OdbSuite:
     fpu:      String = "LONG_SLIT_0_25",
     xbin:     Option[GmosXBinning] = None,
     ybin:     Option[GmosYBinning] = None,
+    qs:       Option[List[Int]]    = None,
     iq:       ImageQuality.Preset,
     asterism: List[Target.Id]
   ): IO[Observation.Id] =
@@ -71,6 +72,10 @@ class observingModeGroup extends OdbSuite:
                   }
                   explicitXBin: ${xbin.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
                   explicitYBin: ${ybin.map(_.tag.toScreamingSnakeCase).getOrElse("null")}
+                  ${qs.foldMap: as =>
+                      as.map(a => s"{ q: { arcseconds: $a }, guiding: ENABLED }")
+                        .mkString("explicitTelescopeConfigs: { alongSlit: [", ", ", "] }")
+                   }
                 }
               }
               targetEnvironment: {
@@ -252,6 +257,56 @@ class observingModeGroup extends OdbSuite:
                             "xBin": "TWO"
                           }
                         },
+                        "observations" : {
+                          "matches" : ${g.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                        }
+                      }
+                    ]
+                  }
+                }
+              """.asRight
+            )
+
+  // Guards the default telescope configs duplicated into the c_mode_key
+  // expression against lucuma-core's DefaultSlitTelescopeConfigs.
+  test("default telescope configs match explicit telescope configs"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid, "Biff").flatMap: tid =>
+
+        def createObs(qs: Option[List[Int]]): IO[Observation.Id] =
+          createObservation(
+            pi,
+            pid,
+            Site.GN,
+            grating  = GmosNorthGrating.B1200_G5301.tag.toScreamingSnakeCase,
+            qs       = qs,
+            iq       = ImageQuality.Preset.PointOne,
+            asterism = List(tid)
+          )
+
+        // Default configs in the first obs, the same values spelled out in the second.
+        List(createObs(none), createObs(List(0, 15, -15).some)).sequence.flatMap: g =>
+          expect(
+            user = pi,
+            query = s"""
+              query {
+                observingModeGroup(programId: ${pid.asJson}) {
+                  matches {
+                    observations {
+                      matches {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            """,
+            expected =
+              json"""
+                {
+                  "observingModeGroup" : {
+                    "matches" : [
+                      {
                         "observations" : {
                           "matches" : ${g.map { id => Json.obj("id" -> id.asJson) }.asJson }
                         }

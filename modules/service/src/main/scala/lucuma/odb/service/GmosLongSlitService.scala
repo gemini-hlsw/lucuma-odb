@@ -21,10 +21,13 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
+import lucuma.core.enums.SlitOffsetMode
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.odb.data.ExposureTimeModeRole
+import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GmosLongSlitInput
 import lucuma.odb.sequence.gmos.longslit.AcquisitionConfig
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth
@@ -102,12 +105,10 @@ object GmosLongSlitService {
          gmos_amp_read_mode.opt *:   // explicitAmpReadMode
          gmos_amp_gain.opt      *:   // explicitAmpGain
          gmos_roi.opt           *:   // explicitRoi
-         text.opt               *:   // explicitWavelengthDithers
-         text.opt                    // explicitOffsets
-        ).emap: (w, exp, defaultX, x, defaultY, y, arm, ag, roi, owd, oso) =>
+         text.opt                    // explicitWavelengthDithers
+        ).emap: (w, exp, defaultX, x, defaultY, y, arm, ag, roi, owd) =>
           for
             wavelengthDithers <- owd.traverse(wd => GmosLongSlitInput.WavelengthDithersFormat.getOption(wd).toRight(s"Could not parse '$wd' as a wavelength dithers list."))
-            offsets           <- oso.traverse(sd => GmosLongSlitInput.SpatialOffsetsFormat.getOption(sd).toRight(s"Could not parse '$sd' as as offsets list."))
           yield Common(
             w,
             exp,
@@ -118,9 +119,16 @@ object GmosLongSlitService {
             arm,
             ag,
             roi,
-            wavelengthDithers,
-            offsets
+            wavelengthDithers
           )
+
+      /** The effective telescope configurations, explicit or default, as the view resolves them. */
+      val telescope_configs: Decoder[NonEmptyList[TelescopeConfig]] =
+        (slit_offset_mode *: text).emap: (mode, json) =>
+          SlitTelescopeConfigsFormat
+            .getOption((mode, json))
+            .map(_.telescopeConfigs)
+            .toRight(s"Could not parse '$json' as telescope configs (mode ${mode.tag}).")
 
       val north_acquisition: Decoder[AcquisitionConfig.GmosNorth] =
         (exposure_time_mode     *: // acquisition exposure time mode
@@ -143,6 +151,7 @@ object GmosLongSlitService {
          gmos_north_filter.opt  *: // science filter (if any)
          gmos_north_fpu         *:
          common                 *:
+         telescope_configs      *:
          north_acquisition
         ).to[GmosNorth]
 
@@ -151,6 +160,7 @@ object GmosLongSlitService {
          gmos_south_filter.opt  *: // science filter (if any)
          gmos_south_fpu         *:
          common                 *:
+         telescope_configs      *:
          south_acquisition
         ).to[GmosSouth]
 
@@ -286,7 +296,8 @@ object GmosLongSlitService {
           ls.c_amp_gain,
           ls.c_roi,
           ls.c_wavelength_dithers,
-          ls.c_offsets,
+          ls.c_slit_offset_mode_effective,
+          ls.c_telescope_configs_effective,
           acq.c_exposure_time_mode,
           acq.c_signal_to_noise_at,
           acq.c_signal_to_noise,
@@ -335,6 +346,7 @@ object GmosLongSlitService {
       Option[GmosRoi],
       Option[GmosLongSlitAcquisitionRoi],
       Option[String],
+      Option[SlitOffsetMode],
       Option[String],
       GmosNorthGrating,
       Option[GmosNorthFilter],
@@ -357,7 +369,8 @@ object GmosLongSlitService {
           c_roi,
           c_acquisition_roi,
           c_wavelength_dithers,
-          c_offsets,
+          c_slit_offset_mode,
+          c_telescope_configs,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -378,6 +391,7 @@ object GmosLongSlitService {
           ${gmos_roi.opt},
           ${gmos_long_slit_acquisition_roi.opt},
           ${text.opt},
+          ${slit_offset_mode.opt},
           ${text.opt},
           $gmos_north_grating,
           ${gmos_north_filter.opt},
@@ -385,8 +399,8 @@ object GmosLongSlitService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, af, u, w, x, y, r, n, i, aroi, wd, so, ig, il, iu, iw) => (
-         o, g, l, af, u, w, x.map(_.value), y.map(_.value), r, n, i, aroi, wd, so, ig, il, iu, iw, o
+       """.contramap { (o, g, l, af, u, w, x, y, r, n, i, aroi, wd, som, tc, ig, il, iu, iw) => (
+         o, g, l, af, u, w, x.map(_.value), y.map(_.value), r, n, i, aroi, wd, som, tc, ig, il, iu, iw, o
        )}
 
     def insertGmosNorthLongSlit(
@@ -407,7 +421,8 @@ object GmosLongSlitService {
         input.common.explicitRoi,
         input.acquisition.flatMap(_.roi.toOption),
         input.common.formattedλDithers,
-        input.common.formattedOffsets,
+        input.common.explicitSlitOffsetMode,
+        input.common.formattedTelescopeConfigs,
         input.grating,
         input.filter,
         input.fpu,
@@ -428,6 +443,7 @@ object GmosLongSlitService {
       Option[GmosRoi],
       Option[GmosLongSlitAcquisitionRoi],
       Option[String],
+      Option[SlitOffsetMode],
       Option[String],
       GmosSouthGrating,
       Option[GmosSouthFilter],
@@ -450,7 +466,8 @@ object GmosLongSlitService {
           c_roi,
           c_acquisition_roi,
           c_wavelength_dithers,
-          c_offsets,
+          c_slit_offset_mode,
+          c_telescope_configs,
           c_initial_grating,
           c_initial_filter,
           c_initial_fpu,
@@ -471,6 +488,7 @@ object GmosLongSlitService {
           ${gmos_roi.opt},
           ${gmos_long_slit_acquisition_roi.opt},
           ${text.opt},
+          ${slit_offset_mode.opt},
           ${text.opt},
           $gmos_south_grating,
           ${gmos_south_filter.opt},
@@ -478,8 +496,8 @@ object GmosLongSlitService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, af, u, w, x, y, r, n, i, aroi, wd, so, ig, il, iu, iw) => (
-         o, g, l, af, u, w, x.map(_.value), y.map(_.value), r, n, i, aroi, wd, so, ig, il, iu, iw, o
+       """.contramap { (o, g, l, af, u, w, x, y, r, n, i, aroi, wd, som, tc, ig, il, iu, iw) => (
+         o, g, l, af, u, w, x.map(_.value), y.map(_.value), r, n, i, aroi, wd, som, tc, ig, il, iu, iw, o
        )}
 
     def insertGmosSouthLongSlit(
@@ -500,7 +518,8 @@ object GmosLongSlitService {
         input.common.explicitRoi,
         input.acquisition.flatMap(_.roi.toOption),
         input.common.formattedλDithers,
-        input.common.formattedOffsets,
+        input.common.explicitSlitOffsetMode,
+        input.common.formattedTelescopeConfigs,
         input.grating,
         input.filter,
         input.fpu,
@@ -533,7 +552,8 @@ object GmosLongSlitService {
       val upAmpGain     = sql"c_amp_gain           = ${gmos_amp_gain.opt}"
       val upRoi         = sql"c_roi                = ${gmos_roi.opt}"
       val upλDithers    = sql"c_wavelength_dithers = ${text.opt}"
-      val upOffsets     = sql"c_offsets            = ${text.opt}"
+      val upSlitMode    = sql"c_slit_offset_mode   = ${slit_offset_mode.opt}"
+      val upTelescopeCfg = sql"c_telescope_configs  = ${text.opt}"
 
       List(
         input.centralWavelength.map(upCentralλ),
@@ -543,7 +563,8 @@ object GmosLongSlitService {
         input.explicitAmpGain.toOptionOption.map(upAmpGain),
         input.explicitRoi.toOptionOption.map(upRoi),
         input.formattedλDithers.toOptionOption.map(upλDithers),
-        input.formattedOffsets.toOptionOption.map(upOffsets)
+        input.explicitSlitOffsetMode.toOptionOption.map(upSlitMode),
+        input.formattedTelescopeConfigs.toOptionOption.map(upTelescopeCfg)
       ).flatten
     }
 
@@ -639,7 +660,8 @@ object GmosLongSlitService {
         c_roi,
         c_acquisition_roi,
         c_wavelength_dithers,
-        c_offsets,
+        c_slit_offset_mode,
+        c_telescope_configs,
         c_initial_grating,
         c_initial_filter,
         c_initial_fpu,
@@ -661,7 +683,8 @@ object GmosLongSlitService {
         c_roi,
         c_acquisition_roi,
         c_wavelength_dithers,
-        c_offsets,
+        c_slit_offset_mode,
+        c_telescope_configs,
         c_initial_grating,
         c_initial_filter,
         c_initial_fpu,

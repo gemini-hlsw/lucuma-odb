@@ -144,11 +144,13 @@ class ShortCut_7591 extends ExecutionTestSupportForGmos:
                    centralWavelength: {
                      nanometers: 540
                    }
-                   explicitSpatialOffsets: [
-                     { arcseconds: 1.0 },
-                     { arcseconds: 2.0 },
-                     { arcseconds: 3.0 }
-                   ]
+                   explicitTelescopeConfigs: {
+                     alongSlit: [
+                       { q: { arcseconds: 1.0 }, guiding: ENABLED },
+                       { q: { arcseconds: 2.0 }, guiding: ENABLED },
+                       { q: { arcseconds: 3.0 }, guiding: ENABLED }
+                     ]
+                   }
                    explicitWavelengthDithers: [
                      { nanometers:  1.0 },
                      { nanometers:  2.0 }

@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 package gmos.mos
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosMosAcquisitionType
@@ -14,11 +15,11 @@ import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
-import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.Defined
 import lucuma.core.model.ToBeDefined
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
 import lucuma.odb.sequence.gmos.longslit.Config as LongSlitConfig
@@ -64,12 +65,6 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
   override def gcalFpu: U =
     equivalentFpu
 
-  /**
-   * MOS does not nod along the slit by default.
-   */
-  override def defaultSpatialOffsets: List[Q] =
-    Config.DefaultSpatialOffsets
-
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
@@ -90,8 +85,10 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
     out.writeChars(roi.tag)
     wavelengthDithers.foreach: d =>
       out.writeInt(d.toPicometers.value)
-    spatialOffsets.foreach: o =>
-      out.writeLong(o.toAngle.toMicroarcseconds)
+    telescopeConfigs.toList.foreach: tc =>
+      out.writeLong(tc.offset.p.toAngle.toMicroarcseconds)
+      out.writeLong(tc.offset.q.toAngle.toMicroarcseconds)
+      out.writeChars(tc.guiding.tag)
     out.write(acquisition.hashBytes)
 
     out.close()
@@ -100,12 +97,13 @@ sealed trait Config[G: Enumerated, L: Enumerated, U] extends spectroscopy.Config
 object Config:
 
   final case class GmosNorth(
-    grating:         GmosNorthGrating,
-    filter:          Option[GmosNorthFilter],
-    customMask:      GmosFpuMask.Custom,
-    acquisitionType: GmosMosAcquisitionType,
-    acquisition:     AcquisitionConfig.GmosNorth,
-    common:          Common
+    grating:          GmosNorthGrating,
+    filter:           Option[GmosNorthFilter],
+    customMask:       GmosFpuMask.Custom,
+    acquisitionType:  GmosMosAcquisitionType,
+    acquisition:      AcquisitionConfig.GmosNorth,
+    common:           Common,
+    telescopeConfigs: NonEmptyList[TelescopeConfig]
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =
@@ -120,16 +118,17 @@ object Config:
     override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosNorth =
       copy(common = common.copy(explicitWavelengthDithers = dithers))
 
-    override def withSpatialOffsets(offsets: Option[List[Q]]): GmosNorth =
-      copy(common = common.copy(explicitSpatialOffsets = offsets))
+    override def withTelescopeConfigs(tcs: NonEmptyList[TelescopeConfig]): GmosNorth =
+      copy(telescopeConfigs = tcs)
 
   final case class GmosSouth(
-    grating:         GmosSouthGrating,
-    filter:          Option[GmosSouthFilter],
-    customMask:      GmosFpuMask.Custom,
-    acquisitionType: GmosMosAcquisitionType,
-    acquisition:     AcquisitionConfig.GmosSouth,
-    common:          Common
+    grating:          GmosSouthGrating,
+    filter:           Option[GmosSouthFilter],
+    customMask:       GmosFpuMask.Custom,
+    acquisitionType:  GmosMosAcquisitionType,
+    acquisition:      AcquisitionConfig.GmosSouth,
+    common:           Common,
+    telescopeConfigs: NonEmptyList[TelescopeConfig]
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
 
     override def coverage: WavelengthDelta =
@@ -144,11 +143,8 @@ object Config:
     override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosSouth =
       copy(common = common.copy(explicitWavelengthDithers = dithers))
 
-    override def withSpatialOffsets(offsets: Option[List[Q]]): GmosSouth =
-      copy(common = common.copy(explicitSpatialOffsets = offsets))
-
-  val DefaultSpatialOffsets: List[Q] =
-    List.empty
+    override def withTelescopeConfigs(tcs: NonEmptyList[TelescopeConfig]): GmosSouth =
+      copy(telescopeConfigs = tcs)
 
   def northFpu(slitWidth: GmosCustomSlitWidth): GmosNorthFpu =
     slitWidth match

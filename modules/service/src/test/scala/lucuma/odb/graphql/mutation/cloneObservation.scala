@@ -98,12 +98,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
               at { nanometers }
             }
           }
-          offsets { arcseconds }
-          explicitOffsets { arcseconds }
-          defaultOffsets { arcseconds }
-          spatialOffsets { arcseconds }
-          explicitSpatialOffsets { arcseconds }
-          defaultSpatialOffsets { arcseconds }
+          telescopeConfigs { offsetMode alongSlit { q { arcseconds } guiding } toSky { offset { p { arcseconds } q { arcseconds } } guiding } }
+          explicitTelescopeConfigs { offsetMode alongSlit { q { arcseconds } guiding } toSky { offset { p { arcseconds } q { arcseconds } } guiding } }
+          defaultTelescopeConfigs { offsetMode alongSlit { q { arcseconds } guiding } toSky { offset { p { arcseconds } q { arcseconds } } guiding } }
           acquisition {
             filter
             defaultFilter
@@ -144,9 +141,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
               at { nanometers }
             }
           }
-          offsets { arcseconds }
-          explicitOffsets { arcseconds }
-          defaultOffsets { arcseconds }
+          telescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+          explicitTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+          defaultTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
         }
         gmosSouthLongSlit {
           grating
@@ -164,12 +161,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
               at { nanometers }
             }
           }
-          offsets { arcseconds }
-          explicitOffsets { arcseconds }
-          defaultOffsets { arcseconds }
-          spatialOffsets { arcseconds }
-          explicitSpatialOffsets { arcseconds }
-          defaultSpatialOffsets { arcseconds }
+          telescopeConfigs { offsetMode alongSlit { q { arcseconds } guiding } toSky { offset { p { arcseconds } q { arcseconds } } guiding } }
+          explicitTelescopeConfigs { offsetMode alongSlit { q { arcseconds } guiding } toSky { offset { p { arcseconds } q { arcseconds } } guiding } }
+          defaultTelescopeConfigs { offsetMode alongSlit { q { arcseconds } guiding } toSky { offset { p { arcseconds } q { arcseconds } } guiding } }
           acquisition {
             filter
             defaultFilter
@@ -210,9 +204,9 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
               at { nanometers }
             }
           }
-          offsets { arcseconds }
-          explicitOffsets { arcseconds }
-          defaultOffsets { arcseconds }
+          telescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+          explicitTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
+          defaultTelescopeConfigs { offset { p { arcseconds } q { arcseconds } } guiding }
         }
         gmosNorthImaging {
           filters { filter }

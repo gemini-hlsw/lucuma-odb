@@ -5,6 +5,7 @@ package lucuma.odb.sequence
 package gmos.longslit
 
 import cats.Eq
+import cats.data.NonEmptyList
 import coulomb.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GmosNorthDetector
@@ -17,10 +18,10 @@ import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.Site
 import lucuma.core.math.Angle
-import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDelta
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Pixels
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.util.Enumerated
 import lucuma.odb.sequence.gmos.spectroscopy
@@ -65,8 +66,10 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectro
     out.writeChars(roi.tag)
     wavelengthDithers.foreach: d =>
       out.writeInt(d.toPicometers.value)
-    spatialOffsets.foreach: o =>
-      out.writeLong(o.toAngle.toMicroarcseconds)
+    telescopeConfigs.toList.foreach: tc =>
+      out.writeLong(tc.offset.p.toAngle.toMicroarcseconds)
+      out.writeLong(tc.offset.q.toAngle.toMicroarcseconds)
+      out.writeChars(tc.guiding.tag)
     out.write(acquisition.hashBytes)
 
     out.close()
@@ -75,11 +78,12 @@ sealed trait Config[G: Enumerated, L: Enumerated, U: Enumerated] extends spectro
 object Config:
 
   final case class GmosNorth(
-    grating:     GmosNorthGrating,
-    filter:      Option[GmosNorthFilter],
-    fpu:         GmosNorthFpu,
-    common:      Common,
-    acquisition: AcquisitionConfig.GmosNorth
+    grating:          GmosNorthGrating,
+    filter:           Option[GmosNorthFilter],
+    fpu:              GmosNorthFpu,
+    common:           Common,
+    telescopeConfigs: NonEmptyList[TelescopeConfig],
+    acquisition:      AcquisitionConfig.GmosNorth
   ) extends Config[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
 
     override def coverage: WavelengthDelta =
@@ -91,8 +95,8 @@ object Config:
     override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosNorth =
       copy(common = common.copy(explicitWavelengthDithers = dithers))
 
-    override def withSpatialOffsets(offsets: Option[List[Q]]): GmosNorth =
-      copy(common = common.copy(explicitSpatialOffsets = offsets))
+    override def withTelescopeConfigs(tcs: NonEmptyList[TelescopeConfig]): GmosNorth =
+      copy(telescopeConfigs = tcs)
 
   object GmosNorth:
 
@@ -103,15 +107,17 @@ object Config:
           a.filter,
           a.fpu,
           a.common,
+          a.telescopeConfigs,
           a.acquisition
         )
 
   final case class GmosSouth(
-    grating:     GmosSouthGrating,
-    filter:      Option[GmosSouthFilter],
-    fpu:         GmosSouthFpu,
-    common:      Common,
-    acquisition: AcquisitionConfig.GmosSouth
+    grating:          GmosSouthGrating,
+    filter:           Option[GmosSouthFilter],
+    fpu:              GmosSouthFpu,
+    common:           Common,
+    telescopeConfigs: NonEmptyList[TelescopeConfig],
+    acquisition:      AcquisitionConfig.GmosSouth
   ) extends Config[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
 
     override def coverage: WavelengthDelta =
@@ -123,8 +129,8 @@ object Config:
     override def withWavelengthDithers(dithers: Option[List[WavelengthDither]]): GmosSouth =
       copy(common = common.copy(explicitWavelengthDithers = dithers))
 
-    override def withSpatialOffsets(offsets: Option[List[Q]]): GmosSouth =
-      copy(common = common.copy(explicitSpatialOffsets = offsets))
+    override def withTelescopeConfigs(tcs: NonEmptyList[TelescopeConfig]): GmosSouth =
+      copy(telescopeConfigs = tcs)
 
   object GmosSouth:
 
@@ -135,13 +141,12 @@ object Config:
           a.filter,
           a.fpu,
           a.common,
+          a.telescopeConfigs,
           a.acquisition
         )
 
   val IfuSlitWidth: Angle =
     Angle.fromMicroarcseconds(310_000L)
-
-  export spectroscopy.Config.DefaultSpatialOffsets
 
   def gapSize(site: Site): Quantity[PosInt, Pixels] =
     site match {

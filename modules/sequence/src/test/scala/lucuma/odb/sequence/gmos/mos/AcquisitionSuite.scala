@@ -29,6 +29,7 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.gmos.DynamicConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.model.sequence.gmos.StaticConfig
+import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.sequence.StepTimeEstimateCalculator
@@ -67,8 +68,7 @@ class AcquisitionSuite extends FunSuite:
       explicitAmpReadMode       = none,
       explicitAmpGain           = none,
       explicitRoi               = none,
-      explicitWavelengthDithers = none,
-      explicitSpatialOffsets    = none
+      explicitWavelengthDithers = none
     )
 
   private def config(
@@ -81,7 +81,8 @@ class AcquisitionSuite extends FunSuite:
       GmosFpuMask.Custom(ToBeDefined, SlitWidth),
       acquisitionType,
       acq,
-      common
+      common,
+      DefaultTelescopeConfigs
     )
 
   private val estimator: StepTimeEstimateCalculator[StaticConfig.GmosNorth, DynamicConfig.GmosNorth] =

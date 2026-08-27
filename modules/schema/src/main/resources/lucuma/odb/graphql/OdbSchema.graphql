@@ -2539,20 +2539,14 @@ input GmosNorthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
-  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitOffsets: [OffsetComponentInput!]
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetComponentInput!] @deprecated(reason: "Use 'explicitOffsets' instead.")
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   """
   Parameters that override acquisition defaults.
   """
   acquisition: GmosNorthLongSlitAcquisitionInput
-
 }
 
 """
@@ -3015,20 +3009,14 @@ input GmosSouthLongSlitInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
-  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitOffsets: [OffsetComponentInput!]
-
-  """
-  The explicitSpatialOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
-  """
-  explicitSpatialOffsets: [OffsetComponentInput!] @deprecated(reason: "Use 'explicitOffsets' instead.")
+  explicitTelescopeConfigs: SlitTelescopeConfigsInput
 
   """
   Parameters that override acquisition defaults.
   """
   acquisition: GmosSouthLongSlitAcquisitionInput
-
 }
 
 """
@@ -3099,15 +3087,14 @@ input GmosNorthMosInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
-  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitOffsets: [OffsetComponentInput!]
+  explicitTelescopeConfigs: [TelescopeConfigInput!]
 
   """
   Parameters that override acquisition defaults.
   """
   acquisition: GmosNorthMosAcquisitionInput
-
 }
 
 """
@@ -3200,15 +3187,14 @@ input GmosSouthMosInput {
   explicitWavelengthDithers: [WavelengthDitherInput!]
 
   """
-  The explicitOffsets field may be unset by assigning a null value, or ignored by skipping it altogether
+  The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
   """
-  explicitOffsets: [OffsetComponentInput!]
+  explicitTelescopeConfigs: [TelescopeConfigInput!]
 
   """
   Parameters that override acquisition defaults.
   """
   acquisition: GmosSouthMosAcquisitionInput
-
 }
 
 """
@@ -13006,38 +12992,22 @@ type GmosNorthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
-  Q offsets, either explicitly specified in explicitOffsets
-  or else taken from defaultOffsets
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.
   """
-  offsets: [OffsetQ!]!
+  telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default offsets.
+  Default telescope configurations: three guided positions along the slit.
   """
-  defaultOffsets: [OffsetQ!]!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Optional explicitly specified q offsets. If set it overrides the
+  Optional explicitly specified telescope configurations. If set it overrides
   the default.
   """
-  explicitOffsets: [OffsetQ!]
-
-  """
-  Spacial q offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
-
-  """
-  Optional explicitly specified spatial q offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Settings that apply to the acquisition sequence.
@@ -13865,38 +13835,22 @@ type GmosSouthLongSlit {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
-  Q offsets, either explicitly specified in explicitOffsets
-  or else taken from defaultOffsets
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.
   """
-  offsets: [OffsetQ!]!
+  telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default offsets.
+  Default telescope configurations: three guided positions along the slit.
   """
-  defaultOffsets: [OffsetQ!]!
+  defaultTelescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Optional explicitly specified q offsets. If set it overrides the
+  Optional explicitly specified telescope configurations. If set it overrides
   the default.
   """
-  explicitOffsets: [OffsetQ!]
-
-  """
-  Spacial q offsets, either explicitly specified in explicitSpatialOffsets
-  or else taken from defaultSpatialOffsets
-  """
-  spatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'offsets', 'defaultOffsets', and 'explicitOffsets' instead.")
-
-  """
-  Default spatial offsets.
-  """
-  defaultSpatialOffsets: [OffsetQ!]! @deprecated(reason: "Use 'defaultOffsets' instead.")
-
-  """
-  Optional explicitly specified spatial q offsets. If set it overrides the
-  the default.
-  """
-  explicitSpatialOffsets: [OffsetQ!] @deprecated(reason: "Use 'explicitOffsets' instead.")
+  explicitTelescopeConfigs: SlitTelescopeConfigs
 
   """
   Settings that apply to the acquisition sequence.
@@ -14099,20 +14053,23 @@ type GmosNorthMos {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
-  Q offsets, either explicitly specified in explicitOffsets or else taken from
-  defaultOffsets.
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
+  along, so these are plain offsets rather than slit telescope configurations.
   """
-  offsets: [OffsetQ!]!
+  telescopeConfigs: [TelescopeConfig!]!
 
   """
-  Default offsets.
+  Default telescope configurations: a single guided position on target.
   """
-  defaultOffsets: [OffsetQ!]!
+  defaultTelescopeConfigs: [TelescopeConfig!]!
 
   """
-  Optional explicitly specified q offsets. If set it overrides the default.
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
   """
-  explicitOffsets: [OffsetQ!]
+  explicitTelescopeConfigs: [TelescopeConfig!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the
@@ -14318,20 +14275,23 @@ type GmosSouthMos {
   explicitWavelengthDithers: [WavelengthDither!]
 
   """
-  Q offsets, either explicitly specified in explicitOffsets or else taken from
-  defaultOffsets.
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.  A MOS mask has no single slit to nod
+  along, so these are plain offsets rather than slit telescope configurations.
   """
-  offsets: [OffsetQ!]!
+  telescopeConfigs: [TelescopeConfig!]!
 
   """
-  Default offsets.
+  Default telescope configurations: a single guided position on target.
   """
-  defaultOffsets: [OffsetQ!]!
+  defaultTelescopeConfigs: [TelescopeConfig!]!
 
   """
-  Optional explicitly specified q offsets. If set it overrides the default.
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
   """
-  explicitOffsets: [OffsetQ!]
+  explicitTelescopeConfigs: [TelescopeConfig!]
 
   """
   The grating as it was initially selected.  See the `grating` field for the

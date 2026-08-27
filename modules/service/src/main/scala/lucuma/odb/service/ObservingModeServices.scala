@@ -73,6 +73,12 @@ object ObservingModeServices:
   def instantiate[F[_]: {MonadCancelThrow, Services}]: ObservingModeServices[F] =
     new ObservingModeServices[F]:
 
+      // GMOS IFU has an ObservingModeType but no table, input or service yet, so these
+      // branches exist for exhaustivity alone.  Raising in F rather than throwing keeps
+      // the failure inside the effect even where the match is evaluated eagerly.
+      private def gmosIfuNotImplemented[A]: F[A] =
+        MonadCancelThrow[F].raiseError(new RuntimeException("GMOS IFU observing mode is not yet supported"))
+
       override def selectObservingMode(
         which: List[(Observation.Id, ObservingModeType)]
       )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservingMode]] =
@@ -130,9 +136,8 @@ object ObservingModeServices:
               .selectSouth(oids)
               .map(_.widen[ObservingMode])
 
-          // GMOS IFU support will be implemented in a future PR.
           case (GmosNorthIfu | GmosSouthIfu, _) =>
-            throw new NotImplementedError("GMOS IFU observing mode")
+            gmosIfuNotImplemented
 
           case (GnirsImaging, oids) =>
             gnirsImagingService
@@ -224,8 +229,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.GmosSouthMos       => gmosMosService.deleteSouth(which)
-            // GMOS IFU support will be implemented in a future PR.
-            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => throw new NotImplementedError("GMOS IFU observing mode")
+            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => gmosIfuNotImplemented
             case ObservingModeType.GnirsImaging       => gnirsImagingService.delete(which)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
@@ -284,8 +288,7 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthMos       => gmosMosService.cloneSouth(origOid, newOid)
-            // GMOS IFU support will be implemented in a future PR.
-            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => throw new NotImplementedError("GMOS IFU observing mode")
+            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => gmosIfuNotImplemented
             case ObservingModeType.GnirsImaging       => gnirsImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)

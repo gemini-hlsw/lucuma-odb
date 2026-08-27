@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package input
 
 import cats.Eq
+import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
@@ -22,14 +23,15 @@ import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Site
-import lucuma.core.math.Offset.Q
 import lucuma.core.math.Wavelength
 import lucuma.core.math.WavelengthDither
 import lucuma.core.model.ExposureTimeMode
+import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.binding.*
 
 /**
@@ -106,16 +108,16 @@ object GmosMosInput extends AcquisitionFilterCheck:
       explicitAmpReadMode: Option[GmosAmpReadMode],
       explicitAmpGain:     Option[GmosAmpGain],
       explicitRoi:         Option[GmosRoi],
-      explicitλDithers:    Option[List[WavelengthDither]],
-      explicitOffsets:     Option[List[Q]]
+      explicitλDithers:         Option[List[WavelengthDither]],
+      explicitTelescopeConfigs: Option[NonEmptyList[TelescopeConfig]]
     ):
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Option[String] =
         explicitλDithers.map(GmosLongSlitInput.WavelengthDithersFormat.reverseGet)
 
-      val formattedOffsets: Option[String] =
-        explicitOffsets.map(GmosLongSlitInput.SpatialOffsetsFormat.reverseGet)
+      val formattedTelescopeConfigs: Option[String] =
+        explicitTelescopeConfigs.map(ToSkyFormat.reverseGet)
 
     final case class North(
       grating:         GmosNorthGrating,
@@ -163,8 +165,8 @@ object GmosMosInput extends AcquisitionFilterCheck:
       explicitAmpReadMode: Nullable[GmosAmpReadMode],
       explicitAmpGain:     Nullable[GmosAmpGain],
       explicitRoi:         Nullable[GmosRoi],
-      explicitλDithers:    Nullable[List[WavelengthDither]],
-      explicitOffsets:     Nullable[List[Q]]
+      explicitλDithers:         Nullable[List[WavelengthDither]],
+      explicitTelescopeConfigs: Nullable[NonEmptyList[TelescopeConfig]]
     ) derives Eq:
 
       def toCreate(site: Site): Result[Create.Common] =
@@ -178,15 +180,15 @@ object GmosMosInput extends AcquisitionFilterCheck:
             explicitAmpGain.toOption,
             explicitRoi.toOption,
             explicitλDithers.toOption,
-            explicitOffsets.toOption
+            explicitTelescopeConfigs.toOption
           )
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Nullable[String] =
         explicitλDithers.map(GmosLongSlitInput.WavelengthDithersFormat.reverseGet)
 
-      val formattedOffsets: Nullable[String] =
-        explicitOffsets.map(GmosLongSlitInput.SpatialOffsetsFormat.reverseGet)
+      val formattedTelescopeConfigs: Nullable[String] =
+        explicitTelescopeConfigs.map(ToSkyFormat.reverseGet)
 
     object Common:
       val AllUndefined: Common =
@@ -273,7 +275,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
+        TelescopeConfigInput.Binding.List.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
         NorthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
@@ -290,7 +292,11 @@ object GmosMosInput extends AcquisitionFilterCheck:
           rExplicitAmpGain,
           rExplicitRoi,
           rWavelengthDithers,
-          rOffsets
+          rTelescopeConfigs.flatMap(_.traverse: cs =>
+            NonEmptyList.fromList(cs).fold(
+              Matcher.validationFailure("'explicitTelescopeConfigs' must not be empty")
+            )(Result(_))
+          )
         ).parMapN(Edit.Common.apply)
       ).parTupled
 
@@ -316,7 +322,7 @@ object GmosMosInput extends AcquisitionFilterCheck:
         GmosAmpGainBinding.Nullable("explicitAmpGain", rExplicitAmpGain),
         GmosRoiBinding.Nullable("explicitRoi", rExplicitRoi),
         WavelengthDitherInput.Binding.List.Nullable("explicitWavelengthDithers", rWavelengthDithers),
-        OffsetComponentInput.BindingQ.List.Nullable("explicitOffsets", rOffsets),
+        TelescopeConfigInput.Binding.List.Nullable("explicitTelescopeConfigs", rTelescopeConfigs),
         SouthAcquisition.Binding.Option("acquisition", rAcquisition)
       ) => (
         rGrating,
@@ -333,6 +339,10 @@ object GmosMosInput extends AcquisitionFilterCheck:
           rExplicitAmpGain,
           rExplicitRoi,
           rWavelengthDithers,
-          rOffsets
+          rTelescopeConfigs.flatMap(_.traverse: cs =>
+            NonEmptyList.fromList(cs).fold(
+              Matcher.validationFailure("'explicitTelescopeConfigs' must not be empty")
+            )(Result(_))
+          )
         ).parMapN(Edit.Common.apply)
       ).parTupled

@@ -44,6 +44,7 @@ import lucuma.core.model.TelluricType
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
+import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Enumerated
 import lucuma.odb.TestCoordinates.coords
@@ -101,9 +102,9 @@ class GoaQueryPolicySuite extends FunSuite:
         explicitAmpReadMode       = none[GmosAmpReadMode],
         explicitAmpGain           = none[GmosAmpGain],
         explicitRoi               = GmosRoi.CentralSpectrum.some,
-        explicitWavelengthDithers = none,
-        explicitSpatialOffsets    = none
+        explicitWavelengthDithers = none
       ),
+      telescopeConfigs = DefaultSlitTelescopeConfigs.telescopeConfigs,
       acquisition = AcquisitionConfig.GmosNorth(
         exposureTimeMode = exposureTimeMode,
         defaultFilter    = GmosNorthFilter.GPrime,

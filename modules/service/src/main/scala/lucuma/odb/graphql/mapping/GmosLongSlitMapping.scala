@@ -25,14 +25,12 @@ import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthGrating
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
-import lucuma.core.math.Offset.Q
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.sequence.gmos.longslit.*
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
-import lucuma.odb.json.offset.query.given
 import lucuma.odb.json.wavelength.query.given
 import lucuma.odb.sequence.gmos.longslit.Config
 
@@ -41,6 +39,7 @@ import scala.reflect.ClassTag
 trait GmosLongSlitMapping[F[_]]
   extends GmosLongSlitView[F]
      with ExposureTimeModeMapping[F]
+     with SlitTelescopeConfigsMapping[F]
      with OptionalFieldMapping[F]
      with Predicates[F] { this: SkunkMapping[F] =>
 
@@ -81,58 +80,32 @@ trait GmosLongSlitMapping[F[_]]
         List("wavelengthDithersString")
       )
 
-    val offsetsString: FieldMapping =
-      SqlField("offsetsString", cc.Offsets, hidden = true)
+    val slitOffsetModeExpRaw: FieldMapping =
+      SqlField("slitOffsetModeExpRaw", cc.SlitOffsetMode, hidden = true)
 
-    val offsets: FieldMapping =
-      CursorFieldJson("offsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.getOrElse(defaultSpatialOffsetsJson)),
-        List("explicitOffsets", "defaultOffsets")
-      )
+    val telescopeConfigsExpRaw: FieldMapping =
+      SqlField("telescopeConfigsExpRaw", cc.TelescopeConfigs, hidden = true)
 
-    val explicitOffsets: FieldMapping =
-      CursorFieldJson("explicitOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.asJson),
-        List("offsetsString")
-      )
+    val slitOffsetModeDefRaw: FieldMapping =
+      SqlField("slitOffsetModeDefRaw", cc.SlitOffsetModeDefault, hidden = true)
 
-    val defaultOffsets: FieldMapping =
-      CursorFieldJson("defaultOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
+    val telescopeConfigsDefRaw: FieldMapping =
+      SqlField("telescopeConfigsDefRaw", cc.TelescopeConfigsDefault, hidden = true)
 
-    // Deprecated spatial offsets fields - these map to the same data as the new offsets fields
-    val spatialOffsetsString: FieldMapping =
-      SqlField("spatialOffsetsString", cc.Offsets, hidden = true)
+    val slitOffsetModeEffRaw: FieldMapping =
+      SqlField("slitOffsetModeEffRaw", cc.SlitOffsetModeEffective, hidden = true)
 
-    val spatialOffsets: FieldMapping =
-      CursorFieldJson("spatialOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.getOrElse(defaultSpatialOffsetsJson)),
-        List("explicitSpatialOffsets", "defaultSpatialOffsets")
-      )
+    val telescopeConfigsEffRaw: FieldMapping =
+      SqlField("telescopeConfigsEffRaw", cc.TelescopeConfigsEffective, hidden = true)
 
-    val explicitSpatialOffsets: FieldMapping =
-      CursorFieldJson("explicitSpatialOffsets",
-        cursor =>
-          cursor
-            .field("offsetsString", None)
-            .flatMap(_.as[Option[String]].map(_.map(decodeSpatialOffsets)))
-            .map(_.asJson),
-        List("offsetsString")
-      )
+    val telescopeConfigs: FieldMapping =
+      slitTelescopeConfigsField("telescopeConfigs", "slitOffsetModeEffRaw", "telescopeConfigsEffRaw")
 
-    val defaultSpatialOffsets: FieldMapping =
-      CursorFieldJson("defaultSpatialOffsets", _ => Result(defaultSpatialOffsetsJson), Nil)
+    val defaultTelescopeConfigs: FieldMapping =
+      slitTelescopeConfigsField("defaultTelescopeConfigs", "slitOffsetModeDefRaw", "telescopeConfigsDefRaw")
+
+    val explicitTelescopeConfigs: FieldMapping =
+      explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "telescopeConfigsExpRaw")
 
     val imageQuality: FieldMapping =
       SqlField("imageQuality", cc.ImageQuality, hidden = true)
@@ -226,20 +199,17 @@ trait GmosLongSlitMapping[F[_]]
       ),
 
       // ---------------------
-      // offsets
+      // telescope configs
       // ---------------------
-      common.offsetsString,
-      common.offsets,
-      common.explicitOffsets,
-      common.defaultOffsets,
-
-      // ---------------------
-      // spatialOffsets (deprecated)
-      // ---------------------
-      common.spatialOffsetsString,
-      common.spatialOffsets,
-      common.explicitSpatialOffsets,
-      common.defaultSpatialOffsets,
+      common.slitOffsetModeExpRaw,
+      common.telescopeConfigsExpRaw,
+      common.slitOffsetModeDefRaw,
+      common.telescopeConfigsDefRaw,
+      common.slitOffsetModeEffRaw,
+      common.telescopeConfigsEffRaw,
+      common.telescopeConfigs,
+      common.explicitTelescopeConfigs,
+      common.defaultTelescopeConfigs,
 
       // ---------------------
       // hidden view fields
@@ -366,20 +336,17 @@ trait GmosLongSlitMapping[F[_]]
       ),
 
       // ---------------------
-      // offsets
+      // telescope configs
       // ---------------------
-      common.offsetsString,
-      common.offsets,
-      common.explicitOffsets,
-      common.defaultOffsets,
-
-      // ---------------------
-      // spatialOffsets (deprecated)
-      // ---------------------
-      common.spatialOffsetsString,
-      common.spatialOffsets,
-      common.explicitSpatialOffsets,
-      common.defaultSpatialOffsets,
+      common.slitOffsetModeExpRaw,
+      common.telescopeConfigsExpRaw,
+      common.slitOffsetModeDefRaw,
+      common.telescopeConfigsDefRaw,
+      common.slitOffsetModeEffRaw,
+      common.telescopeConfigsEffRaw,
+      common.telescopeConfigs,
+      common.explicitTelescopeConfigs,
+      common.defaultTelescopeConfigs,
 
       // ---------------------
       // hidden view fields
@@ -435,8 +402,3 @@ object GmosLongSlitMapping:
   private def defaultWavelengthDithersSouthJson(g: GmosSouthGrating): Json =
     Config.defaultWavelengthDithersSouth(g).map(_.asJson).asJson
 
-  private def decodeSpatialOffsets(s: String): Json =
-    parseCsvBigDecimals(s).map(arcsec => Q.signedDecimalArcseconds.reverseGet(arcsec).asJson).asJson
-
-  private val defaultSpatialOffsetsJson: Json =
-    Config.DefaultSpatialOffsets.map(_.asJson).asJson

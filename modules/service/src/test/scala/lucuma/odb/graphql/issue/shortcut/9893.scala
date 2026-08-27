@@ -137,9 +137,9 @@ class ShortCut_9893 extends OdbSuite {
     wavelengthDithers { picometers }
     defaultWavelengthDithers { picometers }
     explicitWavelengthDithers { picometers }
-    offsets { microarcseconds }
-    defaultOffsets { microarcseconds }
-    explicitOffsets { microarcseconds }
+    telescopeConfigs { offsetMode alongSlit { q { microarcseconds } guiding } }
+    defaultTelescopeConfigs { offsetMode alongSlit { q { microarcseconds } guiding } }
+    explicitTelescopeConfigs { offsetMode alongSlit { q { microarcseconds } guiding } }
     acquisition {
       filter
       defaultFilter
@@ -183,9 +183,9 @@ class ShortCut_9893 extends OdbSuite {
     wavelengthDithers { picometers }
     defaultWavelengthDithers { picometers }
     explicitWavelengthDithers { picometers }
-    offsets { microarcseconds }
-    defaultOffsets { microarcseconds }
-    explicitOffsets { microarcseconds }
+    telescopeConfigs { offset { p { microarcseconds } q { microarcseconds } } guiding }
+    defaultTelescopeConfigs { offset { p { microarcseconds } q { microarcseconds } } guiding }
+    explicitTelescopeConfigs { offset { p { microarcseconds } q { microarcseconds } } guiding }
     initialGrating
     initialFilter
     initialSlitWidth
