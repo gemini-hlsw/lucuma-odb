@@ -32,7 +32,6 @@ import lucuma.core.model.Observation
 import lucuma.core.model.ToBeDefined
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.gmos.GmosFpuMask
-import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
@@ -162,15 +161,10 @@ object GmosMosService {
             wavelengthDithers
           )
 
-      /**
-       * The explicit positions, or the constant default when there are none.  MOS
-       * positions are a plain list of full offsets rather than slit configs, so
-       * there is no offset mode to pair with them.
-       */
+      /** The effective positions, explicit or default, as the view resolves them. */
       val telescope_configs: Decoder[NonEmptyList[TelescopeConfig]] =
-        text.opt.emap: json =>
-          json.fold(DefaultTelescopeConfigs.asRight[String]): j =>
-            ToSkyFormat.getOption(j).toRight(s"Could not parse '$j' as telescope configs.")
+        text.emap: json =>
+          ToSkyFormat.getOption(json).toRight(s"Could not parse '$json' as telescope configs.")
 
       val north: Decoder[GmosNorth] =
         (gmos_north_grating       *:
@@ -391,7 +385,7 @@ object GmosMosService {
           m.c_amp_gain,
           m.c_roi,
           m.c_wavelength_dithers,
-          m.c_telescope_configs
+          m.c_telescope_configs_effective
         FROM
           #$table m
         LEFT JOIN t_exposure_time_mode acq

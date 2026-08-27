@@ -90,31 +90,6 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
       List(modeCol, tcCol)
     )
 
-  /**
-   * Cursor field for an effective `SlitTelescopeConfigs!` resolved against a constant default.
-   * GMOS keeps its defaults in Scala rather than computing them in the view, so unlike the other
-   * instruments there is no `_effective` column to read: the explicit columns are used when set,
-   * and the default otherwise.
-   */
-  protected def effectiveSlitTelescopeConfigsField(
-    name:    String,
-    modeCol: String,
-    tcCol:   String,
-    default: => SlitTelescopeConfigs
-  ): CursorFieldJson =
-    CursorFieldJson(
-      name,
-      cursor =>
-        for
-          modeOpt <- cursor.field(modeCol, None).flatMap(_.as[Option[SlitOffsetMode]])
-          jsonOpt <- cursor.field(tcCol, None).flatMap(_.as[Option[String]])
-          json    <- (modeOpt, jsonOpt)
-                       .mapN(slitTelescopeConfigsJson)
-                       .getOrElse(Result(slitTelescopeConfigsJsonOf(default)))
-        yield json,
-      List(modeCol, tcCol)
-    )
-
   /** The same encoding as [[slitTelescopeConfigsJson]], for a value already in hand. */
   protected def slitTelescopeConfigsJsonOf(stc: SlitTelescopeConfigs): Json =
     stc match
@@ -132,19 +107,13 @@ trait SlitTelescopeConfigsMapping[F[_]] extends BaseMapping[F]:
         )
 
   /**
-   * Cursor field for a plain `[TelescopeConfig!]!` resolved against a constant default, for the
-   * modes with no slit to nod along (GMOS MOS).
+   * Cursor field for a non-null plain `[TelescopeConfig!]!` column, for the modes with no slit to
+   * nod along (GMOS MOS). Used for the view's `_default` and `_effective` columns.
    */
-  protected def effectiveTelescopeConfigsField(
-    name:    String,
-    tcCol:   String,
-    default: => NonEmptyList[TelescopeConfig]
-  ): CursorFieldJson =
+  protected def plainTelescopeConfigsField(name: String, tcCol: String): CursorFieldJson =
     CursorFieldJson(
       name,
-      cursor =>
-        cursor.field(tcCol, None).flatMap(_.as[Option[String]]).flatMap:
-          _.fold(Result(telescopeConfigsJson(default)))(ifuTelescopeConfigsJson),
+      cursor => cursor.field(tcCol, None).flatMap(_.as[String]).flatMap(ifuTelescopeConfigsJson),
       List(tcCol)
     )
 

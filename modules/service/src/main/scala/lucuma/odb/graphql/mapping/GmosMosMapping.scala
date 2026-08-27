@@ -26,7 +26,6 @@ import lucuma.core.enums.GmosYBinning
 import lucuma.core.math.WavelengthDither
 import lucuma.core.math.units.Nanometer
 import lucuma.core.model.sequence.gmos.longslit.*
-import lucuma.core.model.sequence.gmos.mos.DefaultTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.graphql.table.*
@@ -77,17 +76,23 @@ trait GmosMosMapping[F[_]]
         List("wavelengthDithersString")
       )
 
-    val telescopeConfigsRaw: FieldMapping =
-      SqlField("telescopeConfigsRaw", cc.TelescopeConfigs, hidden = true)
+    val telescopeConfigsExpRaw: FieldMapping =
+      SqlField("telescopeConfigsExpRaw", cc.TelescopeConfigs, hidden = true)
+
+    val telescopeConfigsDefRaw: FieldMapping =
+      SqlField("telescopeConfigsDefRaw", cc.TelescopeConfigsDefault, hidden = true)
+
+    val telescopeConfigsEffRaw: FieldMapping =
+      SqlField("telescopeConfigsEffRaw", cc.TelescopeConfigsEffective, hidden = true)
 
     val telescopeConfigs: FieldMapping =
-      effectiveTelescopeConfigsField("telescopeConfigs", "telescopeConfigsRaw", DefaultTelescopeConfigs)
+      plainTelescopeConfigsField("telescopeConfigs", "telescopeConfigsEffRaw")
 
     val defaultTelescopeConfigs: FieldMapping =
-      CursorFieldJson("defaultTelescopeConfigs", _ => Result(telescopeConfigsJson(DefaultTelescopeConfigs)), Nil)
+      plainTelescopeConfigsField("defaultTelescopeConfigs", "telescopeConfigsDefRaw")
 
     val explicitTelescopeConfigs: FieldMapping =
-      explicitTelescopeConfigsField("explicitTelescopeConfigs", "telescopeConfigsRaw")
+      explicitTelescopeConfigsField("explicitTelescopeConfigs", "telescopeConfigsExpRaw")
 
   lazy val GmosNorthMosCustomMaskMapping: ObjectMapping =
     ObjectMapping(GmosNorthMosType / "customMask")(
@@ -178,7 +183,9 @@ trait GmosMosMapping[F[_]]
         List("grating")
       ),
 
-      common.telescopeConfigsRaw,
+      common.telescopeConfigsExpRaw,
+      common.telescopeConfigsDefRaw,
+      common.telescopeConfigsEffRaw,
       common.telescopeConfigs,
       common.explicitTelescopeConfigs,
       common.defaultTelescopeConfigs,
@@ -266,7 +273,9 @@ trait GmosMosMapping[F[_]]
         List("grating")
       ),
 
-      common.telescopeConfigsRaw,
+      common.telescopeConfigsExpRaw,
+      common.telescopeConfigsDefRaw,
+      common.telescopeConfigsEffRaw,
       common.telescopeConfigs,
       common.explicitTelescopeConfigs,
       common.defaultTelescopeConfigs,

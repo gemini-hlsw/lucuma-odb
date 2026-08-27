@@ -26,7 +26,6 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.TelescopeConfig
-import lucuma.core.model.sequence.gmos.longslit.DefaultSlitTelescopeConfigs
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.GmosLongSlitInput
@@ -123,21 +122,13 @@ object GmosLongSlitService {
             wavelengthDithers
           )
 
-      /**
-       * The explicit telescope configurations, or the constant default when there
-       * are none.  GMOS resolves this in Scala rather than in the view, which is
-       * why there is no `_effective` column to read: unlike Flamingos2 and GNIRS,
-       * the GMOS default does not depend on any other column.
-       */
+      /** The effective telescope configurations, explicit or default, as the view resolves them. */
       val telescope_configs: Decoder[NonEmptyList[TelescopeConfig]] =
-        (slit_offset_mode.opt *: text.opt).emap: (mode, json) =>
-          (mode, json)
-            .tupled
-            .fold(DefaultSlitTelescopeConfigs.telescopeConfigs.asRight[String]): (m, j) =>
-              SlitTelescopeConfigsFormat
-                .getOption((m, j))
-                .map(_.telescopeConfigs)
-                .toRight(s"Could not parse '$j' as telescope configs.")
+        (slit_offset_mode *: text).emap: (mode, json) =>
+          SlitTelescopeConfigsFormat
+            .getOption((mode, json))
+            .map(_.telescopeConfigs)
+            .toRight(s"Could not parse '$json' as telescope configs (mode ${mode.tag}).")
 
       val north_acquisition: Decoder[AcquisitionConfig.GmosNorth] =
         (exposure_time_mode     *: // acquisition exposure time mode
@@ -305,8 +296,8 @@ object GmosLongSlitService {
           ls.c_amp_gain,
           ls.c_roi,
           ls.c_wavelength_dithers,
-          ls.c_slit_offset_mode,
-          ls.c_telescope_configs,
+          ls.c_slit_offset_mode_effective,
+          ls.c_telescope_configs_effective,
           acq.c_exposure_time_mode,
           acq.c_signal_to_noise_at,
           acq.c_signal_to_noise,

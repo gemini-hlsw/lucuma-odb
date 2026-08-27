@@ -80,24 +80,32 @@ trait GmosLongSlitMapping[F[_]]
         List("wavelengthDithersString")
       )
 
-    val slitOffsetModeRaw: FieldMapping =
-      SqlField("slitOffsetModeRaw", cc.SlitOffsetMode, hidden = true)
+    val slitOffsetModeExpRaw: FieldMapping =
+      SqlField("slitOffsetModeExpRaw", cc.SlitOffsetMode, hidden = true)
 
-    val telescopeConfigsRaw: FieldMapping =
-      SqlField("telescopeConfigsRaw", cc.TelescopeConfigs, hidden = true)
+    val telescopeConfigsExpRaw: FieldMapping =
+      SqlField("telescopeConfigsExpRaw", cc.TelescopeConfigs, hidden = true)
+
+    val slitOffsetModeDefRaw: FieldMapping =
+      SqlField("slitOffsetModeDefRaw", cc.SlitOffsetModeDefault, hidden = true)
+
+    val telescopeConfigsDefRaw: FieldMapping =
+      SqlField("telescopeConfigsDefRaw", cc.TelescopeConfigsDefault, hidden = true)
+
+    val slitOffsetModeEffRaw: FieldMapping =
+      SqlField("slitOffsetModeEffRaw", cc.SlitOffsetModeEffective, hidden = true)
+
+    val telescopeConfigsEffRaw: FieldMapping =
+      SqlField("telescopeConfigsEffRaw", cc.TelescopeConfigsEffective, hidden = true)
 
     val telescopeConfigs: FieldMapping =
-      effectiveSlitTelescopeConfigsField(
-        "telescopeConfigs", "slitOffsetModeRaw", "telescopeConfigsRaw", DefaultSlitTelescopeConfigs
-      )
+      slitTelescopeConfigsField("telescopeConfigs", "slitOffsetModeEffRaw", "telescopeConfigsEffRaw")
 
     val defaultTelescopeConfigs: FieldMapping =
-      CursorFieldJson("defaultTelescopeConfigs", _ => Result(slitTelescopeConfigsJsonOf(DefaultSlitTelescopeConfigs)), Nil)
+      slitTelescopeConfigsField("defaultTelescopeConfigs", "slitOffsetModeDefRaw", "telescopeConfigsDefRaw")
 
     val explicitTelescopeConfigs: FieldMapping =
-      explicitSlitTelescopeConfigsField(
-        "explicitTelescopeConfigs", "slitOffsetModeRaw", "telescopeConfigsRaw"
-      )
+      explicitSlitTelescopeConfigsField("explicitTelescopeConfigs", "slitOffsetModeExpRaw", "telescopeConfigsExpRaw")
 
     val imageQuality: FieldMapping =
       SqlField("imageQuality", cc.ImageQuality, hidden = true)
@@ -193,8 +201,12 @@ trait GmosLongSlitMapping[F[_]]
       // ---------------------
       // telescope configs
       // ---------------------
-      common.slitOffsetModeRaw,
-      common.telescopeConfigsRaw,
+      common.slitOffsetModeExpRaw,
+      common.telescopeConfigsExpRaw,
+      common.slitOffsetModeDefRaw,
+      common.telescopeConfigsDefRaw,
+      common.slitOffsetModeEffRaw,
+      common.telescopeConfigsEffRaw,
       common.telescopeConfigs,
       common.explicitTelescopeConfigs,
       common.defaultTelescopeConfigs,
@@ -326,8 +338,12 @@ trait GmosLongSlitMapping[F[_]]
       // ---------------------
       // telescope configs
       // ---------------------
-      common.slitOffsetModeRaw,
-      common.telescopeConfigsRaw,
+      common.slitOffsetModeExpRaw,
+      common.telescopeConfigsExpRaw,
+      common.slitOffsetModeDefRaw,
+      common.telescopeConfigsDefRaw,
+      common.slitOffsetModeEffRaw,
+      common.telescopeConfigsEffRaw,
       common.telescopeConfigs,
       common.explicitTelescopeConfigs,
       common.defaultTelescopeConfigs,

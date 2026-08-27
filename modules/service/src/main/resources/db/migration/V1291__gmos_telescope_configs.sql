@@ -5,10 +5,10 @@
 --   long slit -> SlitTelescopeConfigs, stored as (c_slit_offset_mode, JSON)
 --   MOS       -> a plain [TelescopeConfig] list, stored as JSON alone
 --
--- Unlike Flamingos2 and GNIRS there are no `_default` / `_effective` columns: the
--- GMOS defaults are constants rather than functions of other columns, and the
--- mappings already serve them from Scala.  The tables hold only the explicit
--- value and Scala resolves `explicit.getOrElse(default)`.
+-- The tables hold only the explicit override; the views add `_default` and
+-- `_effective` columns as Flamingos2, GNIRS and IGRINS-2 do.  GMOS's defaults are
+-- constants rather than functions of other columns, so the JSON is a literal here
+-- rather than a CASE over the row.
 
 ALTER TABLE t_gmos_north_long_slit
   ADD COLUMN c_slit_offset_mode  d_tag NULL REFERENCES t_slit_offset_mode(c_tag),
@@ -249,7 +249,8 @@ AFTER INSERT OR DELETE OR UPDATE OF c_mode_key ON t_gmos_south_mos
 FOR EACH ROW
 EXECUTE FUNCTION trigger_set_observation_mode_key();
 
--- Rebuild the mode views unchanged apart from the dropped column.
+-- Rebuild the mode views, adding the `_default` / `_effective` columns the other modes
+-- already expose, so a NULL override resolves to the default in SQL rather than in Scala.
 CREATE VIEW v_gmos_north_long_slit AS
 SELECT
   m.*,
@@ -265,10 +266,23 @@ SELECT
     WHEN o.c_calibration_role = 'spectrophotometric'::e_calibration_role THEN 'Stamp'::e_gmos_long_slit_acquisition_roi
     WHEN m.c_roi              = 'CentralSpectrum'                        THEN 'Ccd2Stamp'::e_gmos_long_slit_acquisition_roi
     ELSE 'Ccd2'::e_gmos_long_slit_acquisition_roi
-  END AS c_acquisition_roi_default
+  END AS c_acquisition_roi_default,
+
+  d.c_slit_offset_mode_default,
+  d.c_telescope_configs_default,
+  COALESCE(m.c_slit_offset_mode,  d.c_slit_offset_mode_default)  AS c_slit_offset_mode_effective,
+  COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
 
 FROM t_gmos_north_long_slit m
-INNER JOIN t_observation o ON o.c_observation_id = m.c_observation_id;
+INNER JOIN t_observation o ON o.c_observation_id = m.c_observation_id
+CROSS JOIN LATERAL (
+  SELECT
+    -- Default slit offset mode (shape): nod along slit.
+    'nod_along_slit'::varchar AS c_slit_offset_mode_default,
+    -- ATTENTION: duplicated from lucuma-core gmos.longslit.DefaultSlitTelescopeConfigs
+    -- (the nod-along-slit preset: q = 0, +15, -15 arcsec, all guided).  Keep in sync.
+    '[{"q":{"microarcseconds":0},"guiding":"ENABLED"},{"q":{"microarcseconds":15000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-15000000},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
+) d;
 
 CREATE VIEW v_gmos_south_long_slit AS
 SELECT
@@ -285,10 +299,23 @@ SELECT
     WHEN o.c_calibration_role = 'spectrophotometric'::e_calibration_role THEN 'Stamp'::e_gmos_long_slit_acquisition_roi
     WHEN m.c_roi              = 'CentralSpectrum'                        THEN 'Ccd2Stamp'::e_gmos_long_slit_acquisition_roi
     ELSE 'Ccd2'::e_gmos_long_slit_acquisition_roi
-  END AS c_acquisition_roi_default
+  END AS c_acquisition_roi_default,
+
+  d.c_slit_offset_mode_default,
+  d.c_telescope_configs_default,
+  COALESCE(m.c_slit_offset_mode,  d.c_slit_offset_mode_default)  AS c_slit_offset_mode_effective,
+  COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
 
 FROM t_gmos_south_long_slit m
-INNER JOIN t_observation o ON o.c_observation_id = m.c_observation_id;
+INNER JOIN t_observation o ON o.c_observation_id = m.c_observation_id
+CROSS JOIN LATERAL (
+  SELECT
+    -- Default slit offset mode (shape): nod along slit.
+    'nod_along_slit'::varchar AS c_slit_offset_mode_default,
+    -- ATTENTION: duplicated from lucuma-core gmos.longslit.DefaultSlitTelescopeConfigs
+    -- (the nod-along-slit preset: q = 0, +15, -15 arcsec, all guided).  Keep in sync.
+    '[{"q":{"microarcseconds":0},"guiding":"ENABLED"},{"q":{"microarcseconds":15000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-15000000},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
+) d;
 
 CREATE VIEW v_gmos_north_mos AS
 SELECT
@@ -299,8 +326,18 @@ SELECT
       WHERE f.c_is_acquisition_filter
       ORDER BY abs(f.c_wavelength - m.c_central_wavelength)
       LIMIT 1
-  ) AS c_acquisition_filter_default
-FROM t_gmos_north_mos m;
+  ) AS c_acquisition_filter_default,
+
+  d.c_telescope_configs_default,
+  COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
+
+FROM t_gmos_north_mos m
+CROSS JOIN LATERAL (
+  SELECT
+    -- ATTENTION: duplicated from lucuma-core gmos.mos.DefaultTelescopeConfigs
+    -- (a single guided position on target).  Keep in sync.
+    '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
+) d;
 
 CREATE VIEW v_gmos_south_mos AS
 SELECT
@@ -311,8 +348,18 @@ SELECT
       WHERE f.c_is_acquisition_filter
       ORDER BY abs(f.c_wavelength - m.c_central_wavelength)
       LIMIT 1
-  ) AS c_acquisition_filter_default
-FROM t_gmos_south_mos m;
+  ) AS c_acquisition_filter_default,
+
+  d.c_telescope_configs_default,
+  COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
+
+FROM t_gmos_south_mos m
+CROSS JOIN LATERAL (
+  SELECT
+    -- ATTENTION: duplicated from lucuma-core gmos.mos.DefaultTelescopeConfigs
+    -- (a single guided position on target).  Keep in sync.
+    '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
+) d;
 
 CREATE VIEW v_all_modes AS
   SELECT c_mode_key, c_observation_id FROM t_flamingos_2_long_slit

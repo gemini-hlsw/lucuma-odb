@@ -28,8 +28,12 @@ trait GmosLongSlitView[F[_]] extends BaseMapping[F]:
     val AcquisitionRoiDefault: ColumnRef    = col("c_acquisition_roi_default", gmos_long_slit_acquisition_roi)
 
     val WavelengthDithers: ColumnRef        = col("c_wavelength_dithers", text.opt)
-    val SlitOffsetMode: ColumnRef           = col("c_slit_offset_mode", slit_offset_mode.opt)
-    val TelescopeConfigs: ColumnRef         = col("c_telescope_configs", text.opt)
+    val SlitOffsetMode: ColumnRef            = col("c_slit_offset_mode", slit_offset_mode.opt)
+    val TelescopeConfigs: ColumnRef          = col("c_telescope_configs", text.opt)
+    val SlitOffsetModeDefault: ColumnRef     = col("c_slit_offset_mode_default", slit_offset_mode.opt)
+    val TelescopeConfigsDefault: ColumnRef   = col("c_telescope_configs_default", text)
+    val SlitOffsetModeEffective: ColumnRef   = col("c_slit_offset_mode_effective", slit_offset_mode.opt)
+    val TelescopeConfigsEffective: ColumnRef = col("c_telescope_configs_effective", text)
 
     val InitialCentralWavelength: ColumnRef = col("c_initial_central_wavelength", wavelength_pm)
 
