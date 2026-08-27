@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "c443957cb23664d7195b9884a186c0e3b5825960",
+  "ocs_git_hash": "a1419758255ac3a6d38b9133b60baf45cdf87595",
   "ocs_git_branch": "main",
-  "ocs_git_describe": "2026B.1.1.1-28-gc443957cb",
+  "ocs_git_describe": "vpit-v2027A.1.1.1-2-ga14197582",
   "local": false,
-  "build_timestamp": "2026-08-24T21:17:48Z"
+  "build_timestamp": "2026-08-27T18:26:11Z"
 }
