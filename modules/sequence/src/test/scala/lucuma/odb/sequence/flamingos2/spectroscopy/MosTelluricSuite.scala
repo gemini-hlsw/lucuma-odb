@@ -69,7 +69,7 @@ class MosTelluricSuite extends FunSuite:
     ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(100)), At)
 
   private def config(
-    telescopeConfigs:    NonEmptyList[TelescopeConfig] = longslit.Config.MosTelluricTelescopeConfigs.telescopeConfigs,
+    telescopeConfigs:    NonEmptyList[TelescopeConfig] = MosTelluricTelescopeConfigs.telescopeConfigs,
     telluricScienceMode: Option[ObservingModeType]     = ObservingModeType.Flamingos2Mos.some
   ): longslit.Config =
     longslit.Config(

@@ -3,9 +3,15 @@
 
 package lucuma.odb.sequence.flamingos2.spectroscopy
 
+import cats.data.NonEmptyList
 import cats.syntax.option.*
 import lucuma.core.enums.Flamingos2ReadMode
+import lucuma.core.enums.StepGuideState
+import lucuma.core.math.Offset
+import lucuma.core.math.syntax.int.*
 import lucuma.core.model.Observation
+import lucuma.core.model.SlitTelescopeConfigs
+import lucuma.core.model.sequence.TelescopeConfigAlongSlit
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
@@ -25,3 +31,14 @@ def definitionError(oid: Observation.Id, msg: String): OdbError =
 
 def zeroExposureTime(oid: Observation.Id, modeName: String): OdbError =
   definitionError(oid, s"$modeName requires a positive exposure time.")
+
+/**
+ * Nod pattern for the telluric standard of a MOS observation.
+ * Move to lucuma-core
+ */
+val MosTelluricTelescopeConfigs: SlitTelescopeConfigs =
+  SlitTelescopeConfigs.AlongSlit(
+    NonEmptyList
+      .of(60, 40, 20, -20, 40, 60)
+      .map(q => TelescopeConfigAlongSlit(Offset.Q(q.arcsec), StepGuideState.Enabled))
+  )

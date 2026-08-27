@@ -19,6 +19,7 @@ import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
+import lucuma.odb.sequence.flamingos2.spectroscopy.MosTelluricTelescopeConfigs
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
@@ -414,7 +415,7 @@ object Flamingos2LongSlitService:
      * the long slit nod pattern.
      */
     def applyF2MosTelluricDefaults(oid: Observation.Id): AppliedFragment =
-      val StoredSlitTelescopeConfigs(mode, configs) = storedSlitTelescopeConfigs(Config.MosTelluricTelescopeConfigs)
+      val StoredSlitTelescopeConfigs(mode, configs) = storedSlitTelescopeConfigs(MosTelluricTelescopeConfigs)
       sql"""
         UPDATE t_flamingos_2_long_slit
         SET c_slit_offset_mode  = $slit_offset_mode,
