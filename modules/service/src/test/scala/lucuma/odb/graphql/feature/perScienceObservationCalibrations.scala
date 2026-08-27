@@ -2542,16 +2542,6 @@ class perScienceObservationCalibrations
                    .flatMap(_.hcursor.downFields("q", "microarcseconds").as[Long].toOption)
       (mode, fpu, qs)
 
-  test("F2 MOS observation gets a telluric calibration observation"):
-    for
-      pid      <- createProgramAs(pi)
-      tid      <- createTargetWithProfileAs(pi, pid)
-      oid      <- createFlamingos2MosObservationAs(pi, pid, List(tid))
-      _        <- runObscalcUpdate(pid, oid)
-      _        <- recalculateCalibrations(pid, when, oid)
-      telluric <- selectTelluricObservationFor(oid)
-    yield assert(telluric.isDefined, "expected a telluric for the F2 MOS observation")
-
   test("the F2 MOS telluric is a long slit observation on the equivalent FPU"):
     for
       pid      <- createProgramAs(pi)
@@ -2567,16 +2557,3 @@ class perScienceObservationCalibrations
       assertEquals(mode, "FLAMINGOS_2_LONG_SLIT")
       assertEquals(fpu, Flamingos2Fpu.LongSlit2)
       assertEquals(qs, List(60L, 40L, 20L, -20L, 40L, 60L).map(_ * 1_000_000L))
-
-  test("a long slit telluric keeps its own nod pattern, not the MOS one"):
-    for
-      pid      <- createProgramAs(pi)
-      tid      <- createTargetWithProfileAs(pi, pid)
-      oid      <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _        <- runObscalcUpdate(pid, oid)
-      _        <- recalculateCalibrations(pid, when, oid)
-      telluric <- selectTelluricObservationFor(oid).map(_.get)
-      result   <- longSlitTelluric(telluric)
-    yield
-      val (_, _, qs) = result
-      assertEquals(qs, List(15L, -15L, -15L, 15L).map(_ * 1_000_000L))

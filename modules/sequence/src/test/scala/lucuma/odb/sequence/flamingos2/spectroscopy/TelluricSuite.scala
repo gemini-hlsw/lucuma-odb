@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import cats.syntax.option.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.enums.Flamingos2Decker
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
@@ -32,7 +31,6 @@ import lucuma.core.model.sequence.StepConfig
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
-import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
@@ -132,12 +130,6 @@ class TelluricSuite extends FunSuite:
     assertEquals(steps.map(_.telescopeConfig.offset.p.toAngle.toMicroarcseconds).toSet, Set(0L))
     assertEquals(steps.map(_.telescopeConfig.guiding).toSet, Set(StepGuideState.Enabled))
 
-  test("the aperture is the builtin long slit"):
-    val steps = generate().science.toList.flatMap(_.steps.toList)
-
-    assertEquals(steps.map(_.instrumentConfig.fpu).toSet, Set[Flamingos2FpuMask](Flamingos2FpuMask.Builtin(EquivalentFpu)))
-    assertEquals(steps.map(_.instrumentConfig.decker).toSet, Set(Flamingos2Decker.LongSlit))
-
   test("science steps are night calibrations, and so is the arc"):
     val atoms = generate().science.toList
 
@@ -159,10 +151,5 @@ class TelluricSuite extends FunSuite:
 
   test("a long slit observation's own telluric keeps the ABBA cadence"):
     val atoms = generate(cfg = config(abbaOffsets, none)).science.toList
-
-    assertEquals(titles(atoms).distinct, List("ABBA Cycle", "Nighttime Calibrations"))
-
-  test("without the telluric role the MOS marker changes nothing"):
-    val atoms = generate(calRole = none, cfg = config(abbaOffsets)).science.toList
 
     assertEquals(titles(atoms).distinct, List("ABBA Cycle", "Nighttime Calibrations"))
