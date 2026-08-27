@@ -153,6 +153,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
       LeafMapping[ImagingVariantType](ImagingVariantTypeType),
       LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
+      LeafMapping[GmosNorthIfuFpu](GmosNorthIfuFpuType),
+      LeafMapping[GmosSouthIfuFpu](GmosSouthIfuFpuType),
       LeafMapping[GmosMosAcquisitionType](GmosMosAcquisitionTypeType),
       LeafMapping[GmosNorthFpu](GmosNorthBuiltinFpuType),
       LeafMapping[GmosNorthDetector](GmosNorthDetectorType),

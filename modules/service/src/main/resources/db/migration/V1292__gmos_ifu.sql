@@ -46,7 +46,11 @@ CREATE TABLE t_gmos_north_ifu (
   c_roi                        d_tag                 NULL DEFAULT NULL REFERENCES t_gmos_roi(c_tag),
 
   c_wavelength_dithers         text                  NULL DEFAULT NULL,
-  c_offsets                    text                  NULL DEFAULT NULL,
+
+  -- The IFU dithers within its field rather than nodding along a slit, so it
+  -- stores a plain list of telescope configurations, as MOS does, with no slit
+  -- offset mode to pair with it.
+  c_telescope_configs          text                  NULL DEFAULT NULL,
 
   -- How the ITC samples the field: sum every element within a radius of the
   -- centre, or measure the single element at an offset.  At most one is set;
@@ -62,7 +66,6 @@ CREATE TABLE t_gmos_north_ifu (
   c_initial_central_wavelength d_wavelength_pm       NOT NULL,
 
   CONSTRAINT gmos_north_ifu_wavelength_dither_format CHECK (c_wavelength_dithers ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$'),
-  CONSTRAINT gmos_north_ifu_offset_format            CHECK (c_offsets ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$'),
 
   CONSTRAINT gmos_north_ifu_analysis_check
     CHECK (num_nonnulls(c_ifu_analysis_sum_radius, c_ifu_analysis_single_offset) <= 1),
@@ -102,7 +105,11 @@ CREATE TABLE t_gmos_south_ifu (
   c_roi                        d_tag                 NULL DEFAULT NULL REFERENCES t_gmos_roi(c_tag),
 
   c_wavelength_dithers         text                  NULL DEFAULT NULL,
-  c_offsets                    text                  NULL DEFAULT NULL,
+
+  -- The IFU dithers within its field rather than nodding along a slit, so it
+  -- stores a plain list of telescope configurations, as MOS does, with no slit
+  -- offset mode to pair with it.
+  c_telescope_configs          text                  NULL DEFAULT NULL,
 
   c_ifu_analysis_sum_radius    d_angle_µas           NULL DEFAULT NULL,
   c_ifu_analysis_single_offset d_angle_µas           NULL DEFAULT NULL,
@@ -115,7 +122,6 @@ CREATE TABLE t_gmos_south_ifu (
   c_initial_central_wavelength d_wavelength_pm       NOT NULL,
 
   CONSTRAINT gmos_south_ifu_wavelength_dither_format CHECK (c_wavelength_dithers ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$'),
-  CONSTRAINT gmos_south_ifu_offset_format            CHECK (c_offsets ~ '^-?\d+(\.\d+)?(,-?\d+(\.\d+)?)*$'),
 
   CONSTRAINT gmos_south_ifu_analysis_check
     CHECK (num_nonnulls(c_ifu_analysis_sum_radius, c_ifu_analysis_single_offset) <= 1),
@@ -159,7 +165,11 @@ ALTER TABLE t_gmos_north_ifu
       c_amp_gain,
       c_roi,
       c_wavelength_dithers,
-      c_offsets
+      -- The effective value is keyed, so spelling out the default groups with
+      -- falling through to it.
+      -- ATTENTION: duplicated from gmos.ifu.Config.DefaultTelescopeConfigs
+      -- (transport codec).  Keep in sync.
+      COALESCE(c_telescope_configs, '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]')
     )
   ) STORED;
 
@@ -181,7 +191,11 @@ ALTER TABLE t_gmos_south_ifu
       c_amp_gain,
       c_roi,
       c_wavelength_dithers,
-      c_offsets
+      -- The effective value is keyed, so spelling out the default groups with
+      -- falling through to it.
+      -- ATTENTION: duplicated from gmos.ifu.Config.DefaultTelescopeConfigs
+      -- (transport codec).  Keep in sync.
+      COALESCE(c_telescope_configs, '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]')
     )
   ) STORED;
 
@@ -200,6 +214,8 @@ DROP VIEW v_all_modes;
 
 CREATE VIEW v_all_modes AS
   SELECT c_mode_key, c_observation_id FROM t_flamingos_2_long_slit
+  UNION ALL
+  SELECT c_mode_key, c_observation_id FROM t_flamingos_2_mos
   UNION ALL
   SELECT c_mode_key, c_observation_id FROM t_ghost_ifu
   UNION ALL
@@ -242,8 +258,19 @@ SELECT
       WHERE f.c_is_acquisition_filter
       ORDER BY abs(f.c_wavelength - m.c_central_wavelength)
       LIMIT 1
-  ) AS c_acquisition_filter_default
-FROM t_gmos_north_ifu m;
+  ) AS c_acquisition_filter_default,
+
+  d.c_telescope_configs_default,
+  COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
+
+FROM t_gmos_north_ifu m
+CROSS JOIN LATERAL (
+  SELECT
+    -- ATTENTION: duplicated from gmos.ifu.Config.DefaultTelescopeConfigs (a single
+    -- guided position on target; the IFU has a dedicated sky field so it does not
+    -- nod).  Keep in sync.
+    '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
+) d;
 
 CREATE VIEW v_gmos_south_ifu AS
 SELECT
@@ -254,8 +281,19 @@ SELECT
       WHERE f.c_is_acquisition_filter
       ORDER BY abs(f.c_wavelength - m.c_central_wavelength)
       LIMIT 1
-  ) AS c_acquisition_filter_default
-FROM t_gmos_south_ifu m;
+  ) AS c_acquisition_filter_default,
+
+  d.c_telescope_configs_default,
+  COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
+
+FROM t_gmos_south_ifu m
+CROSS JOIN LATERAL (
+  SELECT
+    -- ATTENTION: duplicated from gmos.ifu.Config.DefaultTelescopeConfigs (a single
+    -- guided position on target; the IFU has a dedicated sky field so it does not
+    -- nod).  Keep in sync.
+    '[{"offset":{"p":{"microarcseconds":0},"q":{"microarcseconds":0}},"guiding":"ENABLED"}]'::text AS c_telescope_configs_default
+) d;
 
 -- An explicit acquisition filter must be one of the acquisition filters.
 CREATE TRIGGER check_gmos_north_ifu_acquisition_filter_is_valid_trigger

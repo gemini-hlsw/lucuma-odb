@@ -124,7 +124,9 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosLongSlitInput.Create.North(grating, filter, fpu, longSlitCommonInput, none).some,
+        none,
         none,
         none,
         none,
@@ -151,6 +153,8 @@ object CalibrationConfigSubset:
 
     def toLongSlitInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
+        none,
+        none,
         none,
         none,
         none,
@@ -194,6 +198,7 @@ object CalibrationConfigSubset:
         none,
         none,
         none,
+        none,
         GmosImagingInput.Create(
           ImagingVariantInput.Default,
           filters.map(f => GmosImagingFilterInput(f, none)),
@@ -204,6 +209,7 @@ object CalibrationConfigSubset:
             roi.some
           )
         ).some,
+        none,
         none,
         none,
         none,
@@ -227,6 +233,8 @@ object CalibrationConfigSubset:
 
     def toImagingInput: ObservingModeInput.Create =
       ObservingModeInput.Create(
+        none,
+        none,
         none,
         none,
         none,
@@ -266,6 +274,8 @@ object CalibrationConfigSubset:
         none,
         none,
         Flamingos2LongSlitInput.Create(disperser, filter, fpu, none, none, none, none, none, none).some,
+        none,
+        none,
         none,
         none,
         none,

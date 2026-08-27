@@ -1639,11 +1639,6 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
 
-      // No GMOS IFU input type yet; the mode-iterating harnesses skip it via
-      // `UnImplementedModes`, so this is never reached.
-      case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu =>
-        ???
-
       case v: VisitorObservingModeType =>
         val extras = v match
           case VisitorObservingModeType.VisitorNorth | VisitorObservingModeType.VisitorSouth =>

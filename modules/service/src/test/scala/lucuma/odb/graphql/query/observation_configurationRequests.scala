@@ -141,7 +141,6 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => IO.unit
       case ObservingModeType.GnirsImaging       => IO.unit
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.unit // TODO implement Gnirs
-      case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => IO.unit // TODO implement GMOS IFU
       case ObservingModeType.Igrins2LongSlit    => Mutation.forIgrins2LongSlit(user, oid, SlitOffsetMode.NodAlongSlit)
       case _: VisitorObservingModeType          => IO.unit
 
@@ -162,7 +161,6 @@ class observation_configurationRequests
       case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => throw new NotImplementedError("GMOS IFU observing mode")
       case ObservingModeType.GnirsImaging       => IO.unit
       case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => IO.unit // TODO implement Gnirs
-      case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => IO.unit // TODO implement GMOS IFU
       case ObservingModeType.Igrins2LongSlit    => IO.unit // no changes are compatible
       case _: VisitorObservingModeType          => IO.unit
 
