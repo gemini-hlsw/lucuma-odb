@@ -75,7 +75,7 @@ object ObservationValidator:
 
     val scienceValidator2: ObservationValidator =
       ItcValidator(itcFor)                |+| 
-      AcquisitionValidator(itcFor)        //|+| 
+      AcquisitionValidator(itcFor)        |+| 
       TotalSignalToNoiseValidator(itcFor)
 
     // And our validation results
