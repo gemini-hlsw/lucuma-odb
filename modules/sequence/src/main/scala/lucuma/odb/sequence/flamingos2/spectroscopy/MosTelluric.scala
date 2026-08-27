@@ -38,15 +38,16 @@ import java.util.UUID
  * Telluric standard sequence for a Flamingos 2 MOS observation.
  *
  * The standard is a single star, so it is observed through the builtin long slit
- * whose aperture matches the mask's slitlets rather than through the mask; its
- * calibration observation is a long slit one.  The star is stepped along that
- * slit following the mode's telescope configs, and an arc taken at the last
- * position closes the sequence.
+ * whose aperture matches the mask's rather than through the mask itself.
+ * Thus the calibration observation is essentially a long slit one.
  *
- * This is not how a long slit observation's own telluric is generated: that one
- * keeps the ABBA cadence and its interleaved calibrations.
+ * The star is stepped along that slit following the mode's telescope configs, and
+ * an arc taken at the last position closes the sequence.
+ *
+ * This is not exactly how a long slit observation's own telluric is generated. That
+ * one keeps the ABBA cadence and its interleaved calibrations.
  */
-object Telluric:
+object MosTelluric:
 
   val ScienceAtomTitle: NonEmptyString =
     NonEmptyString.unsafeFrom("Telluric")
@@ -102,13 +103,6 @@ object Telluric:
     science:  NonEmptyList[ProtoStep[F2]],
     arc:      ProtoStep[F2]
   ): EitherT[F, String, StepDefinition] =
-
-    // The arc's exposure time comes from the SmartGcal lookup, so its read mode
-    // has to be recomputed rather than inherited from the science steps.
-    def adjustReadMode(s: ProtoStep[F2]): ProtoStep[F2] =
-      val mode = Flamingos2ReadMode.forExposureTime(s.value.exposure)
-      s.copy(value = s.value.copy(readMode = mode, reads = mode.readCount))
-
     EitherT(expander.expandStep(static, arc))
       .map(as => StepDefinition(science, as.map(adjustReadMode)))
 
@@ -119,17 +113,10 @@ object Telluric:
   ) extends SequenceGenerator[F2]:
 
     override def generate: Stream[Pure, Atom[F2]] =
-      val protos =
-        List.fill(1 max goalCycles.value)(ProtoAtom(ScienceAtomTitle.some, steps.science)) :+
-          ProtoAtom(ArcAtomTitle.some, steps.arc)
-
-      Stream
-        .emits(protos)
-        .mapAccumulate((0, StepTimeEstimateCalculator.Last.empty[F2])): (state, protoAtom) =>
-          val (a, calcState) = state
-          val (csʹ, atom)    = builder.build(protoAtom.description, a, 0, protoAtom.steps).run(calcState).value
-          ((a + 1, csʹ), atom)
-        .map(_._2)
+      builder.buildStream:
+        Stream.emits:
+          List.fill(1.max(goalCycles.value))(ProtoAtom(ScienceAtomTitle.some, steps.science)) :+
+            ProtoAtom(ArcAtomTitle.some, steps.arc)
 
   def instantiate[F[_]: Monad](
     observationId: Observation.Id,
@@ -142,17 +129,13 @@ object Telluric:
     time:          Either[OdbError, IntegrationTime],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[F2]]] =
-
-    def definitionError(msg: String): OdbError =
-      OdbError.SequenceUnavailable(observationId, s"Could not generate a sequence for $observationId: $msg".some)
-
     (for
        t         <- EitherT.fromEither[F]:
                       time.filterOrElse(
                         _.exposureTime.toNonNegMicroseconds.value > 0,
-                        definitionError(s"$modeName requires a positive exposure time.")
+                        zeroExposureTime(observationId, modeName)
                       )
        (ss, arc)  = StepComputer.compute(config, t, calRole)
-       d         <- expand(static, expander, ss, arc).leftMap(definitionError)
-       c         <- EitherT.fromEither[F](d.cycleCount(t).leftMap(definitionError))
+       d         <- expand(static, expander, ss, arc).leftMap(definitionError(observationId, _))
+       c         <- EitherT.fromEither[F](d.cycleCount(t).leftMap(definitionError(observationId, _)))
      yield Generator(d, AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science), c): SequenceGenerator[F2]).value

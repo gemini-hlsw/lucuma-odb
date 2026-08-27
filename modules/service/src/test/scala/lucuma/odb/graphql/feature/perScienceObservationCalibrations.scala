@@ -2557,3 +2557,72 @@ class perScienceObservationCalibrations
       assertEquals(mode, "FLAMINGOS_2_LONG_SLIT")
       assertEquals(fpu, Flamingos2Fpu.LongSlit2)
       assertEquals(qs, List(60L, 40L, 20L, -20L, 40L, 60L).map(_ * 1_000_000L))
+
+  private def updateFlamingos2MosSlitWidth(oid: Observation.Id, slitWidth: String): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: { observingMode: { flamingos2Mos: { customMask: { slitWidth: $slitWidth } } } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  private def switchToFlamingos2LongSlit(oid: Observation.Id): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: {
+            observingMode: {
+              flamingos2LongSlit: { disperser: R1200_JH, filter: JH, fpu: LONG_SLIT_1 }
+            }
+          }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  test("changing the MOS slit width syncs the telluric's equivalent FPU"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2MosObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when, oid)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      fpu1 <- queryObservationFpu(toid)
+      // 1 pix, not 4: the suite only seeds smart gcal for LongSlit1 and LongSlit2,
+      // and without a mapping the science sequence -- and so the telluric -- is gone.
+      _    <- updateFlamingos2MosSlitWidth(oid, "CUSTOM_WIDTH_1_PIX")
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- sleep >> recalculateCalibrations(pid, when, oid)
+      toid2 <- selectTelluricObservationFor(oid).map(_.get)
+      fpu2 <- queryObservationFpu(toid2)
+    yield
+      assertEquals(fpu1, Flamingos2Fpu.LongSlit2.some)
+      assertEquals(fpu2, Flamingos2Fpu.LongSlit1.some)
+
+  test("switching the science off MOS drops the MOS telluric nod pattern"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2MosObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when, oid)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      mos  <- longSlitTelluric(toid)
+      _    <- switchToFlamingos2LongSlit(oid)
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- sleep >> recalculateCalibrations(pid, when, oid)
+      toid2 <- selectTelluricObservationFor(oid).map(_.get)
+      ls   <- longSlitTelluric(toid2)
+    yield
+      assertEquals(mos._3, List(60L, 40L, 20L, -20L, 40L, 60L).map(_ * 1_000_000L))
+      // No stale MOS marker: the telluric falls back to the long slit nod pattern.
+      assertEquals(ls._3, List(15L, -15L, -15L, 15L).map(_ * 1_000_000L))

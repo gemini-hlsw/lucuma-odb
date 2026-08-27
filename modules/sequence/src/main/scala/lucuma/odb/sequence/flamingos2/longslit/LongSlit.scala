@@ -37,16 +37,14 @@ object LongSlit:
     scienceItc:     Either[OdbError, IntegrationTime],
     calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, F2Static, F2Dynamic]]] =
-    // A telluric derived from a MOS observation is a long slit observation, but
-    // its sequence steps the standard down the slit and closes with an arc.  A
-    // long slit observation's own telluric keeps the ABBA cadence below.
+    // A telluric derived from a MOS observation is a long slit observation.
     val isMosTelluric: Boolean =
       calRole.contains(CalibrationRole.Telluric) &&
         config.telluricScienceMode.contains(ObservingModeType.Flamingos2Mos)
 
     val science: F[Either[OdbError, SequenceGenerator[F2Dynamic]]] =
       if isMosTelluric then
-        spectroscopy.Telluric.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
+        spectroscopy.MosTelluric.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, config, scienceItc, calRole)
       else
         spectroscopy.Science.instantiate(observationId, estimator, Static, namespace, expander, ObservingMode.Flamingos2LongSlitName, MaxSciencePeriod, config, scienceItc, calRole)
 

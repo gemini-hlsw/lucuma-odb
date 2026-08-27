@@ -126,11 +126,6 @@ object Science:
         mask:     Flamingos2FpuMask
       ): EitherT[F, String, StepDefinition] =
 
-        // Flamingos2 needs read mode and reads to be consistent with exposure time
-        def adjustReadMode(f2: ProtoStep[F2]): ProtoStep[F2] =
-          val mode = Flamingos2ReadMode.forExposureTime(f2.value.exposure)
-          f2.copy(value = f2.value.copy(readMode = mode, reads = mode.readCount))
-
         val fpu = applyFpuMask(mask)
 
         EitherT(expander.expandFlatAndOrArc(static, flat, arc))
@@ -276,12 +271,6 @@ object Science:
         .map(_._2)
 
   end Generator
-
-  private def definitionError(oid: Observation.Id, msg: String): OdbError =
-     OdbError.SequenceUnavailable(oid, s"Could not generate a sequence for $oid: $msg".some)
-
-  private def zeroExposureTime(oid: Observation.Id, modeName: String): OdbError =
-    definitionError(oid, s"$modeName requires a positive exposure time.")
 
   private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan, maxSciencePeriod: TimeSpan): OdbError =
     definitionError(oid, s"Estimated ABBA cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${maxSciencePeriod.toMinutes} minutes.")

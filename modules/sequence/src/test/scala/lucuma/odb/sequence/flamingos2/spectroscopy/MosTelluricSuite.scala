@@ -12,6 +12,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Flamingos2SlitOffsetPreset
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
@@ -32,6 +33,7 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.core.model.sequence.flamingos2.defaultSlitTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
@@ -49,7 +51,7 @@ import java.util.UUID
  * The telluric standard of a Flamingos 2 MOS observation, which is a long slit
  * observation stepping the star down the slit rather than nodding ABBA.
  */
-class TelluricSuite extends FunSuite:
+class MosTelluricSuite extends FunSuite:
 
   private val EquivalentFpu: Flamingos2Fpu       = Flamingos2Fpu.LongSlit2
   private val Disperser:     Flamingos2Disperser = Flamingos2Disperser.R1200HK
@@ -65,11 +67,6 @@ class TelluricSuite extends FunSuite:
 
   private val ScienceEtm: ExposureTimeMode =
     ExposureTimeMode.SignalToNoiseMode(SignalToNoise.unsafeFromBigDecimalExact(BigDecimal(100)), At)
-
-  private val abbaOffsets: NonEmptyList[TelescopeConfig] =
-    NonEmptyList
-      .of(15, -15, -15, 15)
-      .map(q => TelescopeConfig(lucuma.core.math.Offset(lucuma.core.math.Offset.P.Zero, lucuma.core.math.Offset.Q(Angle.fromDoubleArcseconds(q.toDouble))), StepGuideState.Enabled))
 
   private def config(
     telescopeConfigs:    NonEmptyList[TelescopeConfig] = longslit.Config.MosTelluricTelescopeConfigs.telescopeConfigs,
@@ -150,6 +147,7 @@ class TelluricSuite extends FunSuite:
     assertEquals(titles(atoms), List("Telluric", "Telluric", "Telluric", "Nighttime Calibrations"))
 
   test("a long slit observation's own telluric keeps the ABBA cadence"):
-    val atoms = generate(cfg = config(abbaOffsets, none)).science.toList
+    val atoms = generate(cfg = config(defaultSlitTelescopeConfigs(Flamingos2SlitOffsetPreset.Telluric).telescopeConfigs
+, none)).science.toList
 
     assertEquals(titles(atoms).distinct, List("ABBA Cycle", "Nighttime Calibrations"))
