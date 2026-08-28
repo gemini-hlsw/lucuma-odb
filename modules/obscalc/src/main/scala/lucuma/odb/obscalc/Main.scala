@@ -96,6 +96,7 @@ object CalcMain extends MainParams:
             |
             |CommitHash.....: ${config.commitHash.format}
             |Max Connections: ${config.database.maxObscalcConnections}
+            |Workers........: ${config.database.obscalcWorkers}
             |Poll Period....: ${config.obscalcPoll}
             |PID............: ${ProcessHandle.current.pid}
             |Tracing........: ${OdbTelemetry.tracingBackend(config)}
@@ -290,12 +291,8 @@ object CalcMain extends MainParams:
                         c.email,
                         schema
                       )
-      // Passing the full pool size, rather than subtracting the session pinned
-      // by `topic`, oversubscribes the pool by exactly one.  That is deliberate:
-      // the pool hands out sessions FIFO, so the extra worker costs nothing and
-      // is ready to start the moment a session is returned.
       o          <- runObscalcDaemon(
-                      c.database.maxObscalcConnections,
+                      c.database.obscalcWorkers,
                       c.obscalcPoll,
                       t,
                       pool.evalMap(

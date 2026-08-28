@@ -185,18 +185,25 @@ object Config:
     def jdbcUrl: String = s"jdbc:postgresql://${host}:${port}/${database}?sslmode=require"
 
     /**
-     * Connections available to daemon workers in the calibration service.
+     * Connections available to daemon workers, given a pool of `maxConnections`.
      *
      * The `*_MAX_CONNECTIONS` settings size the Skunk pool, which is the number
      * budgeted against the database's overall connection limit. That is not the
-     * same as the number a daemon can put to work: `CMain.topics` checks out one
+     * same as the number a daemon can put to work: each service checks out one
      * pooled session and holds it for the life of the process to serve
-     * LISTEN/NOTIFY, so worker parallelism must stay below the pool size or the
-     * surplus workers merely queue on the pool -- having already claimed rows
-     * that then sit in 'calculating' while they wait.
+     * LISTEN/NOTIFY (`CalcMain.topic`, `CMain.topics`), so worker parallelism
+     * must stay below the pool size or the surplus workers merely queue on the
+     * pool -- having already claimed rows that then sit in 'calculating' while
+     * they wait.
      */
-    def calibrationWorkers: Int =
-      (maxCalibrationConnections - Database.ReservedSessions).max(1)
+    private def workers(maxConnections: Int): Int =
+      (maxConnections - Database.ReservedSessions).max(1)
+
+    /** Connections available to obscalc daemon workers. */
+    def obscalcWorkers: Int = workers(maxObscalcConnections)
+
+    /** Connections available to calibration daemon workers. */
+    def calibrationWorkers: Int = workers(maxCalibrationConnections)
 
   object Database:
 
