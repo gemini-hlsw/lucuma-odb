@@ -179,9 +179,5 @@ object Config:
           a.telescopeConfigs
         )
 
-  /**
-   * The IFU samples a field and has a dedicated sky field 60" away, so it neither nods for
-   * background nor dithers by default: one guided position on the target.
-   */
   val DefaultTelescopeConfigs: NonEmptyList[TelescopeConfig] =
     NonEmptyList.one(TelescopeConfig(Offset.Zero, StepGuideState.Enabled))
