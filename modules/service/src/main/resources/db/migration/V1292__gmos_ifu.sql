@@ -458,6 +458,31 @@ ALTER TABLE t_configuration_request
   ADD CONSTRAINT t_configuration_request_c_gmos_south_ifu_check
     CHECK ((c_gmos_south_ifu_grating IS NULL) = (c_gmos_south_ifu_fpu IS NULL));
 
+-- The uniqueness key has to carry every column that discriminates one request
+-- from another, or two IFU requests differing only in grating or aperture
+-- collide and `ON CONFLICT DO NOTHING` silently returns no row for the second.
+ALTER TABLE t_configuration_request
+  DROP CONSTRAINT t_configuration_request_unique;
+
+ALTER TABLE t_configuration_request
+  ADD CONSTRAINT t_configuration_request_unique UNIQUE NULLS NOT DISTINCT (
+    c_program_id,
+    c_cloud_extinction,
+    c_image_quality,
+    c_sky_background,
+    c_water_vapor,
+    c_reference_ra,
+    c_reference_dec,
+    c_observing_mode_type,
+    c_gmos_north_longslit_grating,
+    c_gmos_south_longslit_grating,
+    c_flamingos_2_longslit_disperser,
+    c_gmos_north_ifu_grating,
+    c_gmos_north_ifu_fpu,
+    c_gmos_south_ifu_grating,
+    c_gmos_south_ifu_fpu
+  );
+
 DROP VIEW v_configuration_request;
 
 CREATE VIEW v_configuration_request AS
