@@ -21,7 +21,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.Step
 import lucuma.core.util.IdempotencyKey
 
-class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
+class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos with query.ObservingModeSetupOperations {
 
   private def setup(
     mode: ObservingModeType,
@@ -341,10 +341,12 @@ class recordDataset extends OdbSuite with query.ExecutionTestSupportForGmos {
         _   <- addProposal(pi, pid, cfp.some, None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
-
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        _   <- computeItcResultAs(pi, oid)
+        // The proposal needs its science before it can be accepted.
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
+
         vid <- recordVisitAs(serviceUser, oid)
 
         acq <- firstAcquisitionAtomStepIds(serviceUser, oid)

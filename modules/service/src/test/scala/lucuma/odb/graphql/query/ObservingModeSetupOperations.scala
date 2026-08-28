@@ -17,6 +17,26 @@ import ObservingModeSetupOperations.*
 
 trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =>
 
+  /**
+   * Everything submission requires of the program around the proposal: a title
+   * and abstract, the science and team attachments, and one defined
+   * observation.  Tests that exercise a particular rule start from here and
+   * take away the piece they are about.
+   */
+  def addSubmissionPrerequisitesAs(user: User, pid: Program.Id): IO[Unit] =
+    addProposalPrerequisitesAs(user, pid) *> addDefinedObservationAs(user, pid).void
+
+  /**
+   * A single science observation in the `Defined` workflow state, with the target
+   * it observes.  Returns both, for tests that have to account for them.
+   */
+  def addDefinedObservationAs(user: User, pid: Program.Id): IO[(Target.Id, Observation.Id)] =
+    for
+      tid <- createTargetWithProfileAs(user, pid)
+      oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      _   <- computeItcResultAs(user, oid)
+    yield (tid, oid)
+
   private def formatExplicitTelescopeConfigsInput(arcsecs: List[Int]): String =
     arcsecs
       .map(a => s"{ q: { arcseconds: $a }, guiding: ENABLED }")

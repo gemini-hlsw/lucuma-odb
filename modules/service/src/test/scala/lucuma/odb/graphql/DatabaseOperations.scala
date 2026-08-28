@@ -16,6 +16,7 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.PerSite
+import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.DatasetQaState
@@ -97,6 +98,7 @@ import org.typelevel.otel4s.metrics.Meter.Implicits.noop
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.*
 import skunk.codec.boolean.*
+import skunk.codec.text.text
 import skunk.syntax.all.*
 
 import java.time.Instant
@@ -814,6 +816,85 @@ trait DatabaseOperations { this: OdbSuite =>
         e <- interval.downField("end").as[LocalDate]
       yield DateInterval.between(s, e)).leftMap(f => new RuntimeException(f.message)).liftTo[IO]
 
+  /**
+   * Gives the program the title and abstract that proposal submission requires.
+   */
+  def setProgramTitleAndAbstractAs(
+    user:     User,
+    pid:      Program.Id,
+    title:    Option[String] = "Test Proposal Title".some,
+    abstrakt: Option[String] = "Test proposal abstract.".some
+  ): IO[Unit] =
+    val fields = List(
+      title.map(t => s"""name: "$t""""),
+      abstrakt.map(a => s"""description: "$a"""")
+    ).flattenOption.mkString("\n                ")
+    query(
+      user,
+      s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: {
+                $fields
+              }
+              WHERE: { id: { EQ: ${pid.asJson} } }
+            }
+          ) {
+            programs { id }
+          }
+        }
+      """
+    ).void
+
+  /**
+   * Inserts a proposal attachment row directly.  The upload route is an HTTP
+   * endpoint backed by S3, which these tests do not stand up; submission only
+   * cares that a row of the type exists.
+   */
+  def addProposalAttachmentAs(pid: Program.Id, attachmentType: AttachmentType): IO[Unit] =
+    val fileName = s"${attachmentType.tag}.pdf"
+    withSession: s =>
+      s.execute(
+        sql"""
+          INSERT INTO t_attachment (c_program_id, c_attachment_type, c_file_name, c_file_size, c_remote_path)
+          SELECT $program_id, $attachment_type, $text, 0, $text
+          WHERE NOT EXISTS (
+            SELECT 1 FROM t_attachment
+            WHERE c_program_id = $program_id AND c_attachment_type = $attachment_type
+          )
+        """.command
+      )((pid, attachmentType, fileName, s"remote/$fileName", pid, attachmentType)).void
+
+  /**
+   * The program-level prerequisites for submission: title, abstract, and the
+   * science and team attachments.
+   */
+  def addProposalPrerequisitesAs(
+    user:                  User,
+    pid:                   Program.Id,
+    includeTitle:          Boolean = true,
+    includeAbstract:       Boolean = true,
+    includeScienceAttachment: Boolean = true,
+    includeTeamAttachment:    Boolean = true
+  ): IO[Unit] =
+    for
+      js       <- query(user, s"""query { program(programId: "$pid") { name description } }""")
+      cursor    = js.hcursor.downField("program")
+      // Fill in only what is missing: a test that set its own title or abstract
+      // is usually saying something about them.
+      needTitle = includeTitle && cursor.downField("name").as[Option[String]].toOption.flatten.isEmpty
+      needAbs   = includeAbstract && cursor.downField("description").as[Option[String]].toOption.flatten.isEmpty
+      _        <- setProgramTitleAndAbstractAs(
+                    user,
+                    pid,
+                    title    = Option.when(needTitle)("Test Proposal Title"),
+                    abstrakt = Option.when(needAbs)("Test proposal abstract.")
+                  ).whenA(needTitle || needAbs)
+      _        <- addProposalAttachmentAs(pid, AttachmentType.Science).whenA(includeScienceAttachment)
+      _        <- addProposalAttachmentAs(pid, AttachmentType.Team).whenA(includeTeamAttachment)
+    yield ()
+
   def addPartnerSplits(
     user: User,
     pid: Program.Id,
@@ -847,7 +928,15 @@ trait DatabaseOperations { this: OdbSuite =>
       }
     """).void
 
+  /**
+   * Moves the proposal to `status`, first supplying the program-level pieces
+   * submission requires -- a title, an abstract and the proposal attachments --
+   * so that suites concerned with something else need not set them up.
+   * Observations and investigators are left to the caller, since those are
+   * usually what such suites are arranging themselves.
+   */
   def setProposalStatus(user: User, pid: Program.Id, status: String): IO[(Option[ProgramReference], Option[ProposalReference])] =
+    addProposalPrerequisitesAs(user, pid) *>
     queryIor(user,  s"""
         mutation {
           setProposalStatus(
@@ -3080,9 +3169,51 @@ trait DatabaseOperations { this: OdbSuite =>
       """
     ).void
 
+  /**
+   * Records a pending invitation for a program user without going through the
+   * mutation, and so without sending any email.  Submission requires every
+   * investigator to have been invited; a pending invitation whose email has not
+   * been posted yet is in flight, which is what that rule asks for.
+   */
+  def inviteProgramUserDirectly(u: User, pid: Program.Id, puid: ProgramUser.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"""
+          SELECT insert_invitation($program_user_id, $user_id, $program_id, $email_address, NULL)
+        """.query(text)
+      )((puid, u.id, pid, EmailAddress.unsafeFrom("coi@dobbs.com"))).void
+
+  /** Adds co-investigators and invites each one, as submission requires. */
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
     ps.traverse_ : p =>
       addProgramUserAs(u, pid, partnerLink = PartnerLink.HasGeminiPartner(p))
+        .flatMap(inviteProgramUserDirectly(u, pid, _))
+
+  /**
+   * Records the PI's educational status, which decides whether a Fast Turnaround
+   * proposal needs a mentor.
+   */
+  def setPiEducationalStatusAs(
+    user:      User,
+    pid:       Program.Id,
+    education: EducationalStatus
+  ): IO[Unit] =
+    piProgramUserIdAs(user, pid).flatMap: puid =>
+      query(
+        user,
+        s"""
+          mutation {
+            updateProgramUsers(
+              input: {
+                SET: { educationalStatus: ${education.tag.toScreamingSnakeCase} }
+                WHERE: { id: { EQ: "$puid" } }
+              }
+            ) {
+              programUsers { id }
+            }
+          }
+        """
+      ).void
 
   def deleteProgramUserAs(
     user: User,

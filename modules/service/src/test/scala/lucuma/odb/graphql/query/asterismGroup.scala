@@ -15,7 +15,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 
-class asterismGroup extends OdbSuite {
+class asterismGroup extends OdbSuite with query.ObservingModeSetupOperations {
 
   val pi         = TestUsers.Standard.pi(nextId, nextId)
   val staff      = TestUsers.Standard.staff(nextId, nextId)
@@ -194,6 +194,9 @@ class asterismGroup extends OdbSuite {
         cid  <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
         pid  <- createProgramWithUsPi(user)
         _    <- addDemoScienceProposal(user, pid, cid)
+        // The proposal needs its own science before it can be submitted.  The
+        // query below filters to one observation, so it does not show up.
+        _    <- addDefinedObservationAs(user, pid)
         _    <- submitProposal(user, pid)
         tids <- createTargetAs(user, pid).replicateA(5)
         oid0 <- createObservationAs(user, pid, tids(3))

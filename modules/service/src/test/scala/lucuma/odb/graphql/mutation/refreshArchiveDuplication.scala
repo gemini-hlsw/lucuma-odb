@@ -26,7 +26,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.util.Codecs.program_id
 import skunk.syntax.all.*
 
-class refreshArchiveDuplication extends OdbSuite:
+class refreshArchiveDuplication extends OdbSuite with query.ObservingModeSetupOperations:
 
   val pi: User    = TestUsers.Standard.pi(nextId, nextId)
   val pi2: User   = TestUsers.Standard.pi(nextId, nextId)
@@ -80,6 +80,7 @@ class refreshArchiveDuplication extends OdbSuite:
   private def observationUnderSubmittedProposal: IO[Observation.Id] =
     for
       pid <- proposedProgram
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       tid <- createTargetAs(pi, pid)
       oid <- createGmosNorthImagingObservationAs(pi, pid, tid)

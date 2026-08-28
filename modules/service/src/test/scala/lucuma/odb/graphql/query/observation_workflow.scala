@@ -681,10 +681,10 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- computeItcResultAs(pi, oid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
@@ -712,11 +712,11 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid)
         _   <- computeItcResultAs(pi, oid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
@@ -744,11 +744,11 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Denied))
         _   <- computeItcResultAs(pi, oid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
@@ -776,10 +776,14 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createObservationAs(pi, pid, tid)
         _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
+        // The calibration is what this test queries, but a proposal cannot be
+        // submitted on one alone, so give the program some science too.
+        sci <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResultAs(pi, sci)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
@@ -833,11 +837,11 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
@@ -896,11 +900,11 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- mkTarget(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield oid
 
@@ -934,12 +938,12 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _   <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield (pid, oid)
 
@@ -985,12 +989,12 @@ class observation_workflow
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
         _    <- updateCloudExtinctionAs(pi, oid, CloudExtinction.Preset.OnePointZero)  // ask for poor conditions
         _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Ready)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield (pid, oid)

@@ -24,11 +24,15 @@ import lucuma.core.model.Program
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.DateInterval
 import lucuma.odb.data.OdbError
+import lucuma.odb.graphql.query.ObservingModeSetupOperations
 
 import java.time.LocalDate
 import java.time.Month
 
-class updateProposal extends OdbSuite with DatabaseOperations {
+class updateProposal extends OdbSuite with ObservingModeSetupOperations {
+
+  // Submittable proposals invite their co-investigators, which sends email.
+  override val httpRequestHandler = invitationEmailRequestHandler
 
   val pi    = TestUsers.Standard.pi(nextId, nextId)
   val pi2   = TestUsers.Standard.pi(nextId, nextId)
@@ -1697,6 +1701,7 @@ class updateProposal extends OdbSuite with DatabaseOperations {
     createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
       createProgramWithNonPartnerPi(pi).flatTap { pid =>
         addProposal(pi, pid, cid.some) *>
+        addSubmissionPrerequisitesAs(pi, pid) *>
         addPartnerSplits(pi, pid) *>
         addCoisAs(pi, pid)
       }

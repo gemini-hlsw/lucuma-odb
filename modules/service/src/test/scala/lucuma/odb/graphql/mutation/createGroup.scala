@@ -14,7 +14,7 @@ import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.model.Semester
 import lucuma.odb.data.OdbError
 
-class createGroup extends OdbSuite {
+class createGroup extends OdbSuite with query.ObservingModeSetupOperations {
 
   val pi = TestUsers.Standard.pi(nextId, nextId)
   val staff = TestUsers.Standard.staff(nextId, nextId)
@@ -340,6 +340,7 @@ class createGroup extends OdbSuite {
       cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- createWithReference
     } yield ()
