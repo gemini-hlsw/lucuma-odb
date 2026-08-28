@@ -13,15 +13,20 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
+import lucuma.core.enums.Site
 import lucuma.core.enums.StellarLibrarySpectrum
 import lucuma.core.enums.TargetDisposition
 import lucuma.core.enums.TelluricCalibrationOrder
+import lucuma.core.enums.TwilightType
 import lucuma.core.math.Coordinates
+import lucuma.core.math.skycalc.ImprovedSkyCalc
 import lucuma.core.model.Observation
+import lucuma.core.model.ObservingNight
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.model.UnnormalizedSED
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.NewType
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -49,6 +54,7 @@ import skunk.SqlState
 import skunk.codec.all.*
 import skunk.implicits.*
 
+import java.time.Instant
 import scala.concurrent.duration.*
 
 trait TelluricTargetsService[F[_]]:
@@ -144,10 +150,18 @@ type HminBrightnessCache = HminBrightnessCache.Type
 case class TelluricSearchParams(
   coords:       Coordinates,
   telluricType: TelluricType,
-  hmin:         BigDecimal
+  hmin:         BigDecimal,
+  site:         Site,
+  obsTime:      Option[Timestamp]
 )
 
 object TelluricTargetsService:
+
+  /** Science durations above this threshold request two tellurics (Before + After). */
+  val MultiTelluricThreshold: TimeSpan = 90.minTimeSpan
+
+  /** Buffer from twilight LST used by the single-telluric RA/LST selection rule. */
+  private val TwilightBufferHours: Double = 0.75
 
   given HashBytes[TelluricSearchInput] with
     def hashBytes(input: TelluricSearchInput): Array[Byte] =
@@ -157,6 +171,61 @@ object TelluricTargetsService:
         input.brightest.hashBytes,
         input.spType.hashBytes
       )
+
+  /**
+   * Signed hour delta matching the spec:
+   *   delta = (t1 - t2) mod 24
+   *   if delta >= 12 then delta -= 24
+   * Returns a value in [-12, 12).
+   */
+  private def hourDelta(t1: Double, t2: Double): Double =
+    val m = ((t1 - t2) % 24 + 24) % 24
+    if m >= 12 then m - 24 else m
+
+  private[service] def lstHoursAt(site: Site, instant: Instant): Double =
+    ImprovedSkyCalc(site.place).getSiderealTime(instant)
+
+  /**
+   * Selects a single telluric candidate for science durations below
+   * `MultiTelluricThreshold`, applying the RA vs. twilight LST rule.
+   *
+   * Returns `None` if the rule cannot be applied.
+   */
+  def selectSingleByLstRule[A](
+    results: List[(TelluricStar, A)],
+    coords:  Coordinates,
+    site:    Site,
+    obsTime: Option[Timestamp]
+  ): Option[(TelluricStar, A)] =
+    val before = results.find(_._1.order == TelluricCalibrationOrder.Before)
+    val after  = results.find(_._1.order == TelluricCalibrationOrder.After)
+    (before, after, obsTime) match
+      case (None, None, _)              => none
+      case (None, Some(a), _)           => a.some
+      case (Some(b), None, _)           => b.some
+      case (Some(_), Some(_), None)     => none
+      case (Some(b), Some(a), Some(ot)) =>
+        val instant    = ot.toInstant
+        val night      = ObservingNight.fromSiteAndInstant(site, instant)
+        val tbn        = night.twilightBoundedUnsafe(TwilightType.Nautical)
+        val lstEvening = lstHoursAt(site, tbn.start)
+        val lstMorning = lstHoursAt(site, tbn.end)
+        val raHours    = coords.ra.toHourAngle.toDoubleHours
+        val dtEvening  = hourDelta(raHours, lstEvening)
+        val dtMorning  = hourDelta(lstMorning, raHours)
+
+        // Logic taken directly from the spec
+        val selected =
+          if dtEvening > TwilightBufferHours && dtMorning > TwilightBufferHours then
+            // Not close to twilight: pick lowest score
+            if b._1.score <= a._1.score then b else a
+          else if math.abs(dtEvening) < math.abs(dtMorning) then
+            // Closer to evening twilight -> After candidate
+            a
+          else
+            // Closer to morning twilight -> Before candidate
+            b
+        selected.some
 
   def loadBrightnessCache[F[_]: Monad](session: Session[F]): F[HminBrightnessCache] =
     for
@@ -204,16 +273,16 @@ object TelluricTargetsService:
                               .map(_.get(scienceObsId))
             yield coordsOpt.flatMap: coords =>
               f2Config.map: f2 =>
-                TelluricSearchParams(coords, f2.telluricType, hminCache.lookupF2(f2))
+                TelluricSearchParams(coords, f2.telluricType, hminCache.lookupF2(f2), Site.GS, obsTimeOpt)
               .orElse:
                 f2MosConfig.map: f2m =>
-                  TelluricSearchParams(coords, f2m.telluricType, hminCache.lookupF2Mos(f2m))
+                  TelluricSearchParams(coords, f2m.telluricType, hminCache.lookupF2Mos(f2m), Site.GS, obsTimeOpt)
               .orElse:
                 ig2Config.map: ig2 =>
-                  TelluricSearchParams(coords, ig2.telluricType, hminCache.lookupIgrins2(ig2.telluricType))
+                  TelluricSearchParams(coords, ig2.telluricType, hminCache.lookupIgrins2(ig2.telluricType), Site.GN, obsTimeOpt)
               .orElse:
                 gnirsConfig.map: gnirs =>
-                  TelluricSearchParams(coords, gnirs.telluricType, hminCache.lookupGnirs(gnirs.telluricType))
+                  TelluricSearchParams(coords, gnirs.telluricType, hminCache.lookupGnirs(gnirs.telluricType), Site.GN, obsTimeOpt)
 
       // Exponential backoff calculation
       // Should this be configurable?
@@ -360,9 +429,17 @@ object TelluricTargetsService:
           def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
             observationExists.ifM(
               telluricClient.searchTarget(searchInput).flatMap { results =>
-                // Find star matching the calibration order
-                val matchingStar = results.find(_._1.order == pending.calibrationOrder)
-                  .orElse(results.headOption)
+                // For multi-telluric (duration > 1.5h) match the requested order.
+                // For single-telluric (duration <= 1.5h) apply the RA vs. twilight LST rule.
+                val matchingStar =
+                  if pending.scienceDuration > MultiTelluricThreshold then
+                    results.find(_._1.order == pending.calibrationOrder)
+                      .orElse(results.headOption)
+                  else
+                    TelluricTargetsService
+                      .selectSingleByLstRule(results, params.coords, params.site, params.obsTime)
+                      .orElse(results.find(_._1.order == pending.calibrationOrder))
+                      .orElse(results.headOption)
 
                 matchingStar match
                   case Some((star, catalogResult)) =>

@@ -62,7 +62,7 @@ object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
 
-      private val MultiTelluricThreshold: TimeSpan = TimeSpan.fromHours(1.5).get
+      private val MultiTelluricThreshold: TimeSpan = TelluricTargetsService.MultiTelluricThreshold
 
       private def groupNameForObservation(
         config: CalibrationConfigSubset,
