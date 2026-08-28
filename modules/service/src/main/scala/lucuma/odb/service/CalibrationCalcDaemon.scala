@@ -109,7 +109,6 @@ object CalibrationCalcDaemon:
 
   /** Runs the startup reconciliation, then the event/poll streams in the background. */
   def run[F[_]: {Async, LoggerFactory as LF, Tracer as T}](
-    connectionsLimit: Int,
     pollPeriod:       FiniteDuration,
     batchSize:        Int,
     topic:            Topic[F, CalibrationCalcTopic.Element],
@@ -141,7 +140,7 @@ object CalibrationCalcDaemon:
           T.noopScope:
             services.useTransactionally:
               Services.asSuperUser:
-                calibrationCalcService.load(connectionsLimit)
+                calibrationCalcService.load(batchSize)
         .map(groupByProgram)
         .flatMap(Stream.emits)
 

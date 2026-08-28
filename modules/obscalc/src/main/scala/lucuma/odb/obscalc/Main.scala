@@ -173,8 +173,9 @@ object CalcMain extends MainParams:
                   obscalcService.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
-    // up to connectionsLimit entries including those that are in a 'Retry'
-    // state.
+    // up to 1024 entries including those that are in a 'Retry' state.  How many
+    // are claimed per poll is deliberately independent of how many can be worked
+    // at once (connectionsLimit, below); the surplus simply waits its turn.
     val pollStream: Stream[F, Obscalc.PendingCalc] =
       Stream
         .awakeEvery(pollPeriod)
@@ -289,6 +290,10 @@ object CalcMain extends MainParams:
                         c.email,
                         schema
                       )
+      // Passing the full pool size, rather than subtracting the session pinned
+      // by `topic`, oversubscribes the pool by exactly one.  That is deliberate:
+      // the pool hands out sessions FIFO, so the extra worker costs nothing and
+      // is ready to start the moment a session is returned.
       o          <- runObscalcDaemon(
                       c.database.maxObscalcConnections,
                       c.obscalcPoll,

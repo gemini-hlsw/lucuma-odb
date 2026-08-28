@@ -143,12 +143,14 @@ object CMain extends MainParams {
   // Drains the durable `t_calibration_calc` queue
   def runCalibrationCalcDaemon[F[_]: {Async, LoggerFactory as LF, Tracer as T}](
     calcTopic:        Topic[F, CalibrationCalcTopic.Element],
-    connectionsLimit: Int,
     pollPeriod:       FiniteDuration,
     services:         Resource[F, Services[F]]
   ): Resource[F, Unit] =
+    // No connection limit to pass: `connectionsLimit` was only ever this
+    // daemon's poll batch size, never a bound on any fan-out -- it recalculates
+    // one program at a time to avoid same-program races.  `batchSize` says that
+    // plainly.
     CalibrationCalcDaemon.run(
-      connectionsLimit = connectionsLimit,
       pollPeriod       = pollPeriod,
       batchSize        = 10,
       topic            = calcTopic,
@@ -254,9 +256,9 @@ object CMain extends MainParams {
       hminCache          <- Resource.eval(pool.use(TelluricTargetsService.loadBrightnessCache))
       _                  <- Resource.eval(info"Loading ${hminCache.value.size} configurations for telluric brightness")
       servicesResource   = pool.evalMap(services(user, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient, hminCache))
-      _                  <- runCalibrationCalcDaemon(ccT, c.database.maxObscalcConnections, c.obscalcPoll, servicesResource)
+      _                  <- runCalibrationCalcDaemon(ccT, c.obscalcPoll, servicesResource)
       _                  <- runCalibTimeDaemon(ctT, servicesResource)
-      _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, servicesResource)
+      _                  <- runTelluricTargetsDaemon(c.database.calibrationWorkers, c.obscalcPoll, trT, servicesResource)
     } yield ExitCode.Success
 
   /** Our logical entry point. */

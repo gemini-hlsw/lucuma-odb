@@ -25,6 +25,13 @@ object TelluricTargetsDaemon:
 
   /**
    * Run the telluric resolution daemon.
+   *
+   * @param connectionsLimit how many resolutions may be in flight at once. Each
+   *   holds a pooled session for its duration -- including the remote call to
+   *   the telluric service -- so this must not exceed the sessions the pool can
+   *   actually hand out (see `Config.Database.calibrationWorkers`).
+   * @param batchSize how many entries a single poll claims. Claimed entries move
+   *   to 'calculating', so this is a queue-drain rate, not a concurrency bound.
    */
   def run[F[_]: {Async, Parallel, LoggerFactory as LF, Tracer as T}](
     connectionsLimit: Int,
@@ -62,7 +69,7 @@ object TelluricTargetsDaemon:
           T.noopScope:
             services.useTransactionally:
               Services.asSuperUser:
-                telluricTargetsService.load(connectionsLimit)
+                telluricTargetsService.load(batchSize)
         .flatMap(Stream.emits)
 
     val mainStream: Stream[F, Unit] =
