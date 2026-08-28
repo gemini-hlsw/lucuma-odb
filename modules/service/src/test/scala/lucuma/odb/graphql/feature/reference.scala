@@ -128,12 +128,14 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _    <- addQueueProposal(pi, pid0, cid0)
       _    <- addPartnerSplits(pi, pid0)
       _    <- addCoisAs(pi, pid0)
+      _    <- addDefinedObservationAs(pi, pid0)
       ref0 <- submitProposal(pi, pid0)
 
       pid1 <- createProgramWithUsPi(pi)
       _    <- addQueueProposal(pi, pid1, cid0)
       _    <- addPartnerSplits(pi, pid1)
       _    <- addCoisAs(pi, pid1)
+      _    <- addDefinedObservationAs(pi, pid1)
       ref1 <- submitProposal(pi, pid1)
 
       cid1 <- createGeminiCallForProposalsAs(staff, semester = sem2025A)
@@ -141,6 +143,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _    <- addQueueProposal(pi, pid2, cid1)
       _    <- addPartnerSplits(pi, pid2)
       _    <- addCoisAs(pi, pid2)
+      _    <- addDefinedObservationAs(pi, pid2)
       ref2 <- submitProposal(pi, pid2)
     } yield {
       assertEquals(ref0, ref2024B1)
@@ -260,6 +263,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _    <- addQueueProposal(pi, pid, cid)
       _    <- addPartnerSplits(pi, pid)
       _    <- addCoisAs(pi, pid)
+      _    <- addDefinedObservationAs(pi, pid)
       ref0 <- submitProposal(pi, pid)
       _    <- unsubmitProposal(pi, pid)
       ref1 <- submitProposal(pi, pid)
@@ -276,6 +280,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _    <- addQueueProposal(pi, pid, cid)
       _    <- addPartnerSplits(pi, pid)
       _    <- addCoisAs(pi, pid)
+      _    <- addDefinedObservationAs(pi, pid)
       _    <- submitProposal(pi, pid)
       ref0 <- fetchProgramReference(pi, pid)
        _   <- acceptProposal(staff, pid)
@@ -293,6 +298,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- acceptProposal(staff, pid)
       _   <- expect(pi, s"""
@@ -364,6 +370,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid  <- createProgramWithUsPi(pi)
       _    <- addExchangeProposal(pid, cid, s"keck: { $exchangeSplits }")
       _    <- addCoisAs(pi, pid)
+      _    <- addDefinedObservationAs(pi, pid)
       refP <- submitProposal(pi, pid)
       refG <- acceptProposal(staff, pid)
       _    <- expect(pi, s"""
@@ -401,6 +408,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid  <- createProgramWithUsPi(pi)
       _    <- addExchangeProposal(pid, cid, s"subaru: { $exchangeSplits }")
       _    <- addCoisAs(pi, pid)
+      _    <- addDefinedObservationAs(pi, pid)
       refP <- submitProposal(pi, pid)
       refG <- acceptProposal(staff, pid)
       _    <- expect(pi, s"""
@@ -437,6 +445,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       pid  <- createProgramWithUsPi(pi)
       _    <- addExchangeProposal(pid, cid, s"subaru: { $exchangeSplits }")
       _    <- addCoisAs(pi, pid)
+      _    <- addDefinedObservationAs(pi, pid)
       refP <- submitProposal(pi, pid)
       refG <- acceptProposal(staff, pid)
     } yield assertEquals(refG.map(_.label), s"${refP.label}-U".some)
@@ -852,6 +861,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- acceptProposal(staff, pid)
       ref <- fetchProgramReference(pi, pid)
     } yield assertEquals(ref, "G-2025B-0001-Q".programReference.some)
@@ -891,6 +901,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
       _   <- setProgramReference(staff, pid, """calibration: { semester: "2025B", instrument: GMOS_SOUTH }""")
       _   <- setProgramReference(staff, pid, """science: { semester: "2025B", scienceSubtype: QUEUE }""")
       _   <- addProposal(pi, pid, cid.some, "queue: { considerForBand3: DO_NOT_CONSIDER }".some)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- acceptProposal(staff, pid)
       ref <- fetchProgramReference(pi, pid)
     } yield assertEquals(ref, "G-2025B-0002-Q".programReference.some)
@@ -1046,8 +1057,8 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
     for {
       pid <- fetchPid(pi, pRef)
       o   <- createObservationAs(pi, pid)
-      _   <- expectObservationReference(o, s"${pRef.label}-0001".observationReference)
-      _   <- expectObservationIndex(o, 1)
+      _   <- expectObservationReference(o, s"${pRef.label}-0003".observationReference)
+      _   <- expectObservationIndex(o, 3)
     } yield ()
   }
 
@@ -1071,7 +1082,10 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
     assertIO(
       observationRefsWhere( s"""{ reference: { label: { LIKE: "%-Q-%" } } }"""),
       List(
-        "G-2025B-0002-Q-0001".observationReference
+        "G-2024A-0002-Q-0001".observationReference,
+        "G-2025B-0002-Q-0001".observationReference,
+        "G-2025B-0002-Q-0002".observationReference,
+        "G-2025B-0002-Q-0003".observationReference
       )
     )
   }
@@ -1079,7 +1093,10 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
   test("select via WHERE observation reference index") {
     assertIO(
       observationRefsWhere( s"""{ reference: { index: { EQ: 2 } } }"""),
-      List("G-2025B-ENG-GMOSS-02-0002".observationReference)
+      List(
+        "G-2025B-0002-Q-0002".observationReference,
+        "G-2025B-ENG-GMOSS-02-0002".observationReference
+      )
     )
   }
 
@@ -1097,7 +1114,14 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
     assertIO(
       observationRefsWhere( s"""{ reference: { IS_NULL: false } }"""),
       List(
+        "G-2024A-0001-C-0001".observationReference,
+        "G-2024A-0002-Q-0001".observationReference,
+        "G-2026A-0001-K-0001".observationReference,
+        "G-2026B-0001-I-0001".observationReference,
+        "G-2027A-0001-U-0001".observationReference,
         "G-2025B-0002-Q-0001".observationReference,
+        "G-2025B-0002-Q-0002".observationReference,
+        "G-2025B-0002-Q-0003".observationReference,
         "G-2025B-ENG-GMOSS-02-0001".observationReference,
         "G-2025B-ENG-GMOSS-02-0002".observationReference
       )
@@ -1105,8 +1129,10 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
   }
 
   test("select via WHERE observation reference is null") {
-    // We created a single observation in a program without a program reference
-    // above in test 'no observation reference'.
+    // The one from 'no observation reference', plus the science observations the
+    // submitted-but-unaccepted proposals above required: those programs have a
+    // proposal reference but no program reference, so their observations have none
+    // either.
     assertIO(
       query(pi, s"""query { observations(WHERE: { reference: { IS_NULL: true } }) { matches { id } } }""")
         .map {
@@ -1117,7 +1143,7 @@ class reference extends OdbSuite with query.ExecutionTestSupportForGmos {
            .flatMap(_.toList)
            .size
         },
-      1
+      5
     )
   }
 

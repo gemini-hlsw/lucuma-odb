@@ -179,13 +179,13 @@ class observation_workflow_warnings
       _   <- addProposal(pi, pid, Some(cfp), None)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
-      _   <- setProposalStatus(staff, pid, "ACCEPTED")
       tid <- createTargetAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
       _   <- createConfigurationRequestAs(pi, oid).flatMap(approveConfigurationRequestHack)
       _   <- IO { HACK_ITC = true }
       _   <- computeItcResultAs(pi, oid)
       _   <- IO { HACK_ITC = false }
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
     yield oid
 

@@ -15,7 +15,7 @@ import lucuma.core.model.ProgramReference
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 
-class createTarget extends OdbSuite {
+class createTarget extends OdbSuite with query.ObservingModeSetupOperations {
   import createTarget.FullTargetGraph
 
   val pi       = TestUsers.Standard.pi(nextId, nextId)
@@ -571,6 +571,7 @@ class createTarget extends OdbSuite {
       createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
+      addDefinedObservationAs(pi, pid) *>
       submitProposal(pi, pid) *>
       query(pi,
         s"""

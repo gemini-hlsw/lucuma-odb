@@ -23,11 +23,14 @@ import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
 import lucuma.core.enums.ProposalStatus
+import lucuma.core.enums.ProposalSubmissionError
+import lucuma.core.enums.ProposalSubmissionError.*
 import lucuma.core.enums.ScienceSubtype
 import lucuma.core.enums.SubaruCallForProposalsType
 import lucuma.core.model.Access
 import lucuma.core.model.CallForProposals
 import lucuma.core.model.IntPercent
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Semester
@@ -136,42 +139,14 @@ object ProposalService {
     def invalidProposalStatus(ps: Tag): OdbError =
       s"Invalid proposal status: ${ps.value}".invalidArg
 
-    def missingCfP(pid: Program.Id): OdbError =
-      s"A Call for Proposals must be selected for $pid before submitting a proposal.".invalidArg
-
-    def missingSemester(pid: Program.Id): OdbError =
-      s"Submitted proposal $pid must be associated with a semester.".invalidArg
-
-    def missingScienceSubtype(pid: Program.Id): OdbError =
-      s"Submitted proposal $pid must have a science subtype.".invalidArg
-
-    def missingOrInvalidSplits(pid: Program.Id, subtype: ScienceSubtype): OdbError =
-      s"Submitted proposal $pid of type ${subtype.title} must specify partner time percentages which sum to 100%.".invalidArg
-
-    def missingOrInvalidSplitsExternal(pid: Program.Id): OdbError =
-      s"Submitted external proposal $pid must specify partner time percentages which sum to 100%.".invalidArg
-
-    def bothTimeRequests(pid: Program.Id): OdbError =
-      s"Proposal $pid may not have both an exchange partner and partner splits.".invalidArg
-
-    def unofferedExchangePartner(pid: Program.Id, xp: ExchangePartner): OdbError =
-      s"Program $pid requests time on behalf of ${xp.tag.toUpperCase}, but the Call for Proposals does not offer that exchange partner.".invalidArg
-
-    def missingPartners(pid: Program.Id, partners: Set[Partner] = Set.empty): OdbError =
-      partners.toList.map(_.abbreviation).sorted match
-        case Nil     =>
-          s"Program $pid requests time from partners not represented by any investigator.".invalidArg
-        case List(p) =>
-          s"Program $pid requests time from $p, but there is no matching investigator with this partner.".invalidArg
-        case ps      =>
-          s"Program $pid requests time from ${ps.init.mkString(", ")} and ${ps.last}, but there are no matching investigators with these partners.".invalidArg
-
-    // If all the other validations pass, I don't think we should get this...
-    def missingDeadline(pid: Program.Id): OdbError =
-      s"Could not determine the deadline for the call for proposals for program $pid.".invalidArg
-
-    def pastDeadline(pid: Program.Id): OdbError =
-      s"Call for proposals for program $pid has passed its deadline.".invalidArg
+    /**
+     * Renders one of the shared proposal submission rules.  The rule text is
+     * defined once in lucuma-core so that the ODB and Explore describe the same
+     * thing; the program id is appended here because a server-side error is read
+     * out of a log, away from the program that produced it.
+     */
+    def submissionError(e: ProposalSubmissionError, pid: Program.Id): OdbError =
+      s"${e.message} (program $pid)".invalidArg
 
     def invalidProgramType(pid: Program.Id, progType: ProgramType): OdbError =
       s"Program $pid is of type $progType. Only Science programs can have proposals.".invalidArg
@@ -187,18 +162,6 @@ object ProposalService {
 
     def notAuthorizedOld(pid: Program.Id, user: User, ps: ProposalStatus): OdbError =
       s"User ${user.id} not authorized to change proposal status from ${ps.tag.toUpperCase} in program $pid.".noAuth(user.id)
-
-    def undefinedObservations(pid: Program.Id): OdbError =
-      s"Submitted proposal $pid contains undefined observations.".invalidArg
-
-    def missingPiEmailAddress(pid: Program.Id): OdbError =
-      s"Missing email address for PI in program $pid".invalidArg
-
-    def invalidPiEmailAddress(email: String, pid: Program.Id): OdbError =
-      s"Invalid email address \"$email\" for PI in program $pid".invalidArg
-
-    def missingConsiderForBand3(pid: Program.Id): OdbError =
-      s"Proposal $pid must specify whether it should be considered for Band 3 before it can be submitted.".invalidArg
 
   }
 
@@ -259,13 +222,26 @@ object ProposalService {
           .selectProperties(cid)
           .map(o => Result.fromOption(o, cfpNotFound(cid).asProblem))
 
+      /**
+       * Everything the proposal validations need, read in one query.
+       *
+       * `piPartnerLink` is the PI's affiliation, from which both their Gemini
+       * partner and their exchange community are read; it is empty only if the
+       * program has no PI.  `piPartnerOffered` says whether the call offers that
+       * Gemini partner, and is false when the PI has no Gemini partner to begin
+       * with.  `hasUnaffiliatedInvestigator` flags an investigator whose
+       * affiliation is still unspecified, and `hasUninvitedInvestigator` one who
+       * has neither redeemed an invitation nor has one still in flight.
+       * `reviewerHasPhd` describes the Fast Turnaround reviewer -- the named one,
+       * or the PI when none is named.
+       */
       case class ProposalContext(
         status:            ProposalStatus,
         hasProposal:       Boolean,
         piEmailStr:        Option[NonEmptyString],
         piName:            Option[String],
         title:             Option[NonEmptyString],
-        description:       Option[String],
+        description:       Option[NonEmptyString],
         reference:         Option[ProposalReference],
         semester:          Option[Semester],
         scienceSubtype:    Option[ScienceSubtype],
@@ -284,7 +260,17 @@ object ProposalService {
         // Whether the call offers the exchange partner named above.  False when
         // there is no exchange partner to begin with.
         exchangeOffered:   Boolean,
-        observatory:       Option[Observatory]
+        observatory:       Option[Observatory],
+        hasCategory:       Boolean,
+        piPartnerLink:     Option[PartnerLink],
+        piPartnerOffered:  Boolean,
+        allowsNonPartnerPi: Option[Boolean],
+        hasScienceAttachment: Boolean,
+        hasTeamAttachment:    Boolean,
+        hasUnaffiliatedInvestigator: Boolean,
+        hasUninvitedInvestigator:    Boolean,
+        reviewerHasPhd:    Boolean,
+        hasMentor:         Boolean
       ) {
         // Every stored proposal has an observatory; default to Gemini defensively.
         val obs: Observatory = observatory.getOrElse(Observatory.Gemini)
@@ -318,7 +304,7 @@ object ProposalService {
           orMissing(piName)
 
         val abstractText: String =
-          orMissing(description)
+          orMissing(description.map(_.value))
 
         // The observatory the PI is associated with, which is Gemini unless the time
         // request is on behalf of an exchange partner community.
@@ -339,47 +325,151 @@ object ProposalService {
           )
 
         def validatePiEmailAddress(pid: Program.Id): Result[Unit] =
-          piEmailStr.fold(missingPiEmailAddress(pid).asFailure)(emailStr =>
-            piEmailAddress.fold(invalidPiEmailAddress(emailStr.value, pid).asFailure)(_ => Result.unit)
+          piEmailStr.fold(submissionError(MissingPiEmail, pid).asFailure)(_ =>
+            piEmailAddress.fold(submissionError(InvalidPiEmail, pid).asFailure)(_ => Result.unit)
           )
 
+        // The PI's Gemini partner, if they have one.  A non-partner PI is counted
+        // as US wherever a Gemini partner is called for, matching how the
+        // available-partner set is built.
+        private val piGeminiPartner: Option[Partner] =
+          piPartnerLink.flatMap:
+            case PartnerLink.HasGeminiPartner(p) => p.some
+            case PartnerLink.HasNonPartner       => Partner.US.some
+            case _                               => none
+
+        private val piExchangePartner: Option[ExchangePartner] =
+          piPartnerLink.flatMap(_.exchangePartnerOption)
+
+        /**
+         * Checks the PI's affiliation against the call.  Mirrors the front end,
+         * which rejects the same three cases and, like this, says nothing about a
+         * PI whose affiliation is simply unset -- that is reported once, for every
+         * investigator, by `validateSubmitOnly`.
+         */
+        private def validatePiAffiliation(pid: Program.Id): Result[Unit] =
+          piPartnerLink.fold(Result.unit):
+            case PartnerLink.HasGeminiPartner(_)   =>
+              submissionError(PiPartnerNotInCall, pid).asFailure.unlessA(piPartnerOffered)
+            case PartnerLink.HasNonPartner         =>
+              submissionError(NonPartnerPiNotAllowed, pid).asFailure
+                .whenA(allowsNonPartnerPi.contains(false))
+            case PartnerLink.HasExchangePartner(_) =>
+              // `exchangeOffered` describes the community the proposal names, so
+              // it says nothing useful when that is not the PI's own; the
+              // mismatch rule reports that case on its own.
+              submissionError(ExchangePartnerNotInCall, pid).asFailure
+                .unlessA(exchangeOffered || exchangePartner =!= piExchangePartner)
+            case PartnerLink.HasUnspecifiedPartner =>
+              Result.unit
+
+        /**
+         * Checks that the time requested from each partner is backed by someone on
+         * the team.  US is exempt: it is the default home for a proposal with no
+         * other affiliation, so a US share needs no matching investigator.  UH is
+         * stricter than the rest -- a UH share requires the PI themselves, not just
+         * any UH collaborator.
+         */
+        private def validateRequestedPartners(pid: Program.Id): Result[Unit] =
+          val needsUhPi    = requestedPartners.contains(Partner.UH) && !piGeminiPartner.contains(Partner.UH)
+          val unrepresented = requestedPartners - Partner.US -- availablePartners
+          (
+            submissionError(UhTimeWithoutUhPi, pid).asFailure.whenA(needsUhPi),
+            submissionError(UnmatchedPartnerTime, pid).asFailure.unlessA(unrepresented.isEmpty)
+          ).parTupled.void
+
+        /**
+         * The partner splits, and the rules that only make sense once the splits
+         * are sound.  An exchange-partner request carries no Gemini splits, so the
+         * sum-to-100 rule does not apply to it; an external (Keck or Subaru)
+         * proposal apportions its time across Gemini partners and does.
+         */
+        private def validateSplits(pid: Program.Id): Result[Unit] =
+          val splitsApply =
+            exchangePartner.isEmpty && (
+              isExternal ||
+              scienceSubtype.exists(s => s === ScienceSubtype.Classical || s === ScienceSubtype.Queue)
+            )
+          val splitsValid = !splitsApply || splitsSum === 100
+          (
+            submissionError(InvalidPartnerSplits, pid).asFailure.unlessA(splitsValid),
+            // Matching investigators against the splits is only meaningful once
+            // every investigator is affiliated and the splits themselves add up.
+            validateRequestedPartners(pid).whenA(splitsValid && !hasUnaffiliatedInvestigator)
+          ).parTupled.void
+
+        private def validateFastTurnaround(pid: Program.Id): Result[Unit] =
+          submissionError(MissingFtMentor, pid).asFailure.whenA(
+            scienceSubtype.contains(ScienceSubtype.FastTurnaround) && !reviewerHasPhd && !hasMentor
+          )
+
+        /**
+         * The proposal's own consistency, checked both on submission and whenever a
+         * submitted proposal is edited, so that it cannot be edited back out of a
+         * submittable state.
+         */
         def validateSubmission(
           pid: Program.Id,
           newStatus: ProposalStatus
         ): Result[Unit] =
-          val unmatchedPartners = requestedPartners -- availablePartners
           (
             missingProposal(pid).asFailure.unlessA(hasProposal),
-            missingCfP(pid).asFailure.unlessA(cfp.isDefined),
-            missingSemester(pid).asFailure.unlessA(semester.isDefined),
+            submissionError(MissingCfp, pid).asFailure.unlessA(cfp.isDefined),
+            submissionError(MissingSemester, pid).asFailure.unlessA(semester.isDefined),
             // A Gemini proposal must have a science subtype; an external proposal
             // has none.
-            missingScienceSubtype(pid).asFailure.unlessA(isExternal || scienceSubtype.isDefined),
+            submissionError(MissingProposalType, pid).asFailure.unlessA(isExternal || scienceSubtype.isDefined),
+            submissionError(MissingCategory, pid).asFailure.unlessA(hasCategory),
             // Defense in depth: the DB trigger also forbids this, but reject a
             // both-set time request here with a clear message rather than
             // silently treating it as an exchange request below.
-            bothTimeRequests(pid).asFailure.whenA(exchangePartner.isDefined && splitsSum =!= 0),
-            // Time may only be requested on behalf of a community the call invites.
-            exchangePartner.filterNot(_ => exchangeOffered).fold(Result.unit): xp =>
-              unofferedExchangePartner(pid, xp).asFailure,
-            scienceSubtype.fold(().success) { s =>
-              // An exchange-partner time request carries no Gemini partner
-              // splits, so the sum-to-100 rule does not apply to it.
-              missingOrInvalidSplits(pid, s).asFailure.whenA(
-                exchangePartner.isEmpty &&
-                splitsSum =!= 100 &&
-                ((s === ScienceSubtype.Classical) ||
-                 (s === ScienceSubtype.Queue))
-              )
-            },
-            // An external (exchange) proposal apportions its time across Gemini
-            // partners, which must sum to 100% at submission.
-            missingOrInvalidSplitsExternal(pid).asFailure.whenA(isExternal && splitsSum =!= 100),
-            missingConsiderForBand3(pid).asFailure
+            submissionError(BothTimeRequests, pid).asFailure.whenA(exchangePartner.isDefined && splitsSum =!= 0),
+            // The front end derives the proposal's exchange partner from the PI's
+            // affiliation, so the two can only disagree by way of the API.  Reject
+            // that here: left alone it would silently waive the splits rule below.
+            submissionError(ExchangePartnerPiMismatch, pid).asFailure
+              .whenA(exchangePartner =!= piExchangePartner),
+            // Gemini partners, non-partner PIs and exchange communities are all
+            // properties of a Gemini call; an external proposal's PI is checked
+            // only against the exchange invariant above.
+            validatePiAffiliation(pid).whenA(geminiCallType.isDefined),
+            validateSplits(pid),
+            submissionError(MissingBand3Consideration, pid).asFailure
               .whenA(scienceSubtype.contains(ScienceSubtype.Queue) && considerForBand3.contains(ConsiderForBand3.Unset)),
-            missingPartners(pid, unmatchedPartners).asFailure.unlessA(unmatchedPartners.isEmpty),
+            validateFastTurnaround(pid),
             validatePiEmailAddress(pid)
-          ).tupled.unlessA(newStatus === ProposalStatus.NotSubmitted)
+          ).parTupled.unlessA(newStatus === ProposalStatus.NotSubmitted)
+
+        /**
+         * The rules that describe the surrounding program rather than the proposal:
+         * its title and abstract, its attachments, its team and its observations.
+         * These gate submission only.  A submitted proposal that predates one of
+         * them stays editable, which it would not if these were folded into
+         * `validateSubmission` -- that runs on every edit too.
+         */
+        def validateSubmitOnly(
+          pid: Program.Id,
+          hasDefinedObservations: Boolean,
+          hasUndefinedObservations: Boolean,
+          newStatus: ProposalStatus
+        ): Result[Unit] =
+          (
+            submissionError(MissingTitle, pid).asFailure.unlessA(title.isDefined),
+            submissionError(MissingAbstract, pid).asFailure.unlessA(description.isDefined),
+            // Attachments are only called for once there is a call to submit to.
+            // Fast Turnaround proposals are reviewed without a team attachment.
+            submissionError(MissingScienceAttachment, pid).asFailure
+              .whenA(cfp.isDefined && !hasScienceAttachment),
+            submissionError(MissingTeamAttachment, pid).asFailure.whenA(
+              cfp.isDefined && !hasTeamAttachment &&
+                !scienceSubtype.contains(ScienceSubtype.FastTurnaround)
+            ),
+            submissionError(UnspecifiedInvestigatorPartner, pid).asFailure
+              .whenA(hasUnaffiliatedInvestigator),
+            submissionError(UninvitedInvestigator, pid).asFailure.whenA(hasUninvitedInvestigator),
+            submissionError(NoDefinedObservations, pid).asFailure.unlessA(hasDefinedObservations),
+            submissionError(UndefinedObservations, pid).asFailure.whenA(hasUndefinedObservations)
+          ).parTupled.unlessA(newStatus === ProposalStatus.NotSubmitted)
 
         def validateDeadline(
           pid: Program.Id,
@@ -387,8 +477,8 @@ object ProposalService {
         ): Result[Unit] =
           (
             for
-              _ <- missingDeadline(pid).asFailure.unlessA(deadline.isDefined)
-              _ <- pastDeadline(pid).asFailure.whenA(isPastDeadline.exists(identity))
+              _ <- submissionError(MissingDeadline, pid).asFailure.unlessA(deadline.isDefined)
+              _ <- submissionError(PastDeadline, pid).asFailure.whenA(isPastDeadline.exists(identity))
             yield ()
           ).whenA(newStatus === ProposalStatus.Submitted)
 
@@ -603,7 +693,7 @@ object ProposalService {
           _instrument.map(_.toList)
 
         val codec: Decoder[ProposalContext] =
-          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: bool *: observatory.opt).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: bool *: observatory.opt *: bool *: partner_link.opt *: bool *: bool.opt *: bool *: bool *: bool *: bool *: bool *: bool).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -808,6 +898,9 @@ object ProposalService {
         ptc: TimeEstimateCalculatorImplementation.ForInstrumentMode
       )(using NoTransaction[F], Services.PiAccess): F[Result[Program.Id]] = {
 
+        // Authorization gates everything else, so it short-circuits; the rules
+        // themselves accumulate, so that a PI is told everything that is wrong
+        // with the proposal at once rather than one item per attempt.
         def validate(
           pid: Program.Id,
           ctx: ProposalContext,
@@ -816,11 +909,18 @@ object ProposalService {
           newStatus: ProposalStatus
         ): Result[Unit] =
           for {
-            _ <- undefinedObservations(pid).asFailure.whenA(states.contains(ObservationWorkflowState.Undefined))
             _ <- notAuthorizedNew(pid, user, newStatus).asFailure.unlessA(newStatus.userCanChangeStatus)
             _ <- notAuthorizedOld(pid, user, ctx.status).asFailure.unlessA(oldStatus.userCanChangeStatus)
-            _ <- ctx.validateSubmission(pid, newStatus)
-            _ <- ctx.validateDeadline(pid, newStatus)
+            _ <- (
+                   ctx.validateSubmission(pid, newStatus),
+                   ctx.validateSubmitOnly(
+                     pid,
+                     states.contains(ObservationWorkflowState.Defined),
+                     states.contains(ObservationWorkflowState.Undefined),
+                     newStatus
+                   ),
+                   ctx.validateDeadline(pid, newStatus)
+                 ).parTupled.void
           } yield ()
 
         def update(pid: Program.Id, ps: ProposalStatus): F[Unit] =
@@ -840,8 +940,8 @@ object ProposalService {
 
         ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           .flatMap: pid =>
-            ResultT(Services.asSuperUser(observationWorkflowService.getWorkflows(pid))).flatMap: wfs =>
-              val states = wfs.values.map(_.state).toSet
+            ResultT(Services.asSuperUser(observationWorkflowService.getWorkflowsModesAndRoles(pid))).flatMap: wfs =>
+              val states = wfs.values.collect { case (wf, _, None) => wf.state }.toSet
               ResultT:
                 services.transactionally:
                   val go2 =
@@ -1188,7 +1288,57 @@ object ProposalService {
           prop.c_consider_for_band_3,
           prop.c_exchange_partner,
           cfp_ep.c_cfp_id IS NOT NULL AS c_exchange_offered,
-          prop.c_observatory
+          prop.c_observatory,
+          prop.c_category IS NOT NULL AS c_has_category,
+          pi.c_partner_link,
+          pi.c_gemini_partner,
+          pi.c_exchange_partner,
+          cfp_pi.c_cfp_id IS NOT NULL AS c_pi_partner_offered,
+          cfp.c_gemini_allows_non_partner,
+          EXISTS (
+            SELECT 1 FROM t_attachment att
+            WHERE att.c_program_id = prog.c_program_id
+              AND att.c_attachment_type = 'science'
+          ) AS c_has_science_attachment,
+          EXISTS (
+            SELECT 1 FROM t_attachment att
+            WHERE att.c_program_id = prog.c_program_id
+              AND att.c_attachment_type = 'team'
+          ) AS c_has_team_attachment,
+          EXISTS (
+            SELECT 1 FROM t_program_user pu
+            WHERE pu.c_program_id = prog.c_program_id
+              AND pu.c_role IN ('pi', 'coi', 'coi_ro')
+              AND pu.c_partner_link = 'has_unspecified_partner'
+          ) AS c_has_unaffiliated_investigator,
+          -- An investigator who has not redeemed an invitation and has none in
+          -- flight: either none was ever sent, they declined it, or the mail to
+          -- them failed.  A pending invitation whose email has not been posted
+          -- yet has no t_email row and is still in flight.
+          EXISTS (
+            SELECT 1 FROM t_program_user pu
+            LEFT JOIN t_invitation inv
+              ON inv.c_program_user_id = pu.c_program_user_id
+              AND inv.c_status <> 'revoked'
+            LEFT JOIN t_email eml
+              ON eml.c_email_id = inv.c_email_id
+            WHERE pu.c_program_id = prog.c_program_id
+              AND pu.c_role IN ('pi', 'coi', 'coi_ro')
+              AND pu.c_user_id IS NULL
+              AND (
+                inv.c_invitation_id IS NULL
+                OR inv.c_status = 'declined'
+                OR eml.c_status IN ('rejected', 'permanent_failure', 'temporary_failure')
+              )
+          ) AS c_has_uninvited_investigator,
+          -- The Fast Turnaround reviewer defaults to the PI when none is named.
+          COALESCE(
+            (SELECT rev.c_educational_status
+               FROM t_program_user rev
+              WHERE rev.c_program_user_id = prop.c_reviewer_id),
+            pi.c_educational_status
+          ) IS NOT DISTINCT FROM 'phd' AS c_reviewer_has_phd,
+          prop.c_mentor_id IS NOT NULL AS c_has_mentor
         FROM t_program prog
         LEFT JOIN t_proposal prop
           ON prog.c_program_id = prop.c_program_id

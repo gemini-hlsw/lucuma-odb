@@ -21,7 +21,7 @@ import lucuma.odb.service.Services
 
 import scala.concurrent.duration.*
 
-class obscalcUpdate extends ObscalcServiceSuiteSupport:
+class obscalcUpdate extends ObscalcServiceSuiteSupport with query.ObservingModeSetupOperations:
   protected val sleep: IO[Unit] =
     IO.sleep(5000.millis)
 
@@ -508,11 +508,12 @@ class obscalcUpdate extends ObscalcServiceSuiteSupport:
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
         _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
         _   <- computeItcResultAs(pi, oid)
+        // The proposal needs its science before it can be accepted.
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- setObservationWorkflowState(serviceUser, oid, ObservationWorkflowState.Ready)
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield (pid, oid)

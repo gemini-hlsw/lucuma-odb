@@ -19,7 +19,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 
-class constraintSetGroup extends OdbSuite {
+class constraintSetGroup extends OdbSuite with query.ObservingModeSetupOperations {
 
   val pi         = TestUsers.Standard.pi(nextId, nextId)
   val staff      = TestUsers.Standard.staff(nextId, nextId)
@@ -138,66 +138,79 @@ class constraintSetGroup extends OdbSuite {
           createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
            addDemoScienceProposal(user, pid, cid)
           } *>
-          submitProposal(user, pid) *>
-          expectIor(
-            user = user,
-            query =
-              s"""
-              query {
-                constraintSetGroup(proposalReference: "G-2025A-0001") {
-                  matches {
-                    constraintSet {
-                      imageQuality
-                      skyBackground
-                    }
-                    observations {
-                      matches {
-                        id
+          // The proposal needs its own science before it can be submitted; that
+          // observation forms a constraint-set group of its own below.
+          addDefinedObservationAs(user, pid).flatMap { (_, poid) =>
+            submitProposal(user, pid) *>
+            expectIor(
+              user = user,
+              query =
+                s"""
+                query {
+                  constraintSetGroup(proposalReference: "G-2025A-0001") {
+                    matches {
+                      constraintSet {
+                        imageQuality
+                        skyBackground
+                      }
+                      observations {
+                        matches {
+                          id
+                        }
                       }
                     }
                   }
                 }
-              }
-              """,
-            expected = Ior.right(
-              // N.B. the ordering of groups is based on the concatenation of all the components so it's deterministic
-              json"""
-                {
-                  "constraintSetGroup" : {
-                    "matches" : [
-                      {
-                        "constraintSet" : {
-                          "imageQuality" : "ONE_POINT_FIVE",
-                          "skyBackground" : "BRIGHT"
+                """,
+              expected = Ior.right(
+                // N.B. the ordering of groups is based on the concatenation of all the components so it's deterministic
+                json"""
+                  {
+                    "constraintSetGroup" : {
+                      "matches" : [
+                        {
+                          "constraintSet" : {
+                            "imageQuality" : "ONE_POINT_ZERO",
+                            "skyBackground" : "DARK"
+                          },
+                          "observations" : {
+                            "matches" : [ { "id" : $poid } ]
+                          }
                         },
-                        "observations" : {
-                          "matches" : ${g1.map { id => Json.obj("id" -> id.asJson) }.asJson }
-                        }
-                      },
-                      {
-                        "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
-                          "skyBackground" : "BRIGHT"
+                        {
+                          "constraintSet" : {
+                            "imageQuality" : "ONE_POINT_FIVE",
+                            "skyBackground" : "BRIGHT"
+                          },
+                          "observations" : {
+                            "matches" : ${g1.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                          }
                         },
-                        "observations" : {
-                          "matches" : ${g2.map { id => Json.obj("id" -> id.asJson) }.asJson }
-                        }
-                      },
-                      {
-                        "constraintSet" : {
-                          "imageQuality" : "POINT_ONE",
-                          "skyBackground" : "DARK"
+                        {
+                          "constraintSet" : {
+                            "imageQuality" : "POINT_ONE",
+                            "skyBackground" : "BRIGHT"
+                          },
+                          "observations" : {
+                            "matches" : ${g2.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                          }
                         },
-                        "observations" : {
-                          "matches" : ${g3.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                        {
+                          "constraintSet" : {
+                            "imageQuality" : "POINT_ONE",
+                            "skyBackground" : "DARK"
+                          },
+                          "observations" : {
+                            "matches" : ${g3.map { id => Json.obj("id" -> id.asJson) }.asJson }
+                          }
                         }
-                      }
-                    ]
+                      ]
+                    }
                   }
-                }
-              """
+                """
+              )
             )
-          )
+          }
         }
       }
     }

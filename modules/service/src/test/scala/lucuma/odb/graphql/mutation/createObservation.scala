@@ -32,7 +32,7 @@ import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.json.tellurictype.query.given
 
-class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
+class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with query.ObservingModeSetupOperations {
 
   extension (ac: ACursor)
     def downPath(p: String*): ACursor =
@@ -142,6 +142,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
+      addDefinedObservationAs(pi, pid) *>
       submitProposal(pi, pid) *>
       query(pi,
         s"""
@@ -175,6 +176,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
+      addDefinedObservationAs(pi, pid) *>
       submitProposal(pi, pid) *>
       query(pi,
         s"""
@@ -209,6 +211,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
+      addDefinedObservationAs(pi, pid) *>
       submitProposal(pi, pid) *>
       expect(
         pi,
@@ -239,6 +242,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat {
       createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A")).flatMap { cid =>
         addDemoScienceProposal(pi, pid, cid)
       } *>
+      addDefinedObservationAs(pi, pid) *>
       submitProposal(pi, pid) *>
       expect(
         pi,

@@ -101,9 +101,9 @@ class observation_workflow_visitors extends OdbSuite with ObservingModeSetupOper
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
         oid <- createObservationWithModeAs(pi, pid, List(tid), mode)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       yield (pid, oid)
 

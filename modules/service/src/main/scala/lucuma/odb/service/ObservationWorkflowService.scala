@@ -52,6 +52,10 @@ sealed trait ObservationWorkflowService[F[_]] {
     pid: Program.Id
   )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, ObservationWorkflow]]]
 
+  def getWorkflowsModesAndRoles(
+    pid: Program.Id
+  )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]]
+
   /**
    * Computes the workflow for the observation using the current results of a
    * background calculation instead of pausing to unfold the execution sequence.
@@ -325,6 +329,15 @@ object ObservationWorkflowService {
             session.prepareR(Statements.selectObservationIds).use: pq =>
               pq.stream(pid, 1024).compile.toList
           .flatMap(getWorkflows)
+
+      override def getWorkflowsModesAndRoles(
+        pid: Program.Id
+      )(using NoTransaction[F], SuperUserAccess): F[Result[Map[Observation.Id, (ObservationWorkflow, Option[ObservingModeType], Option[CalibrationRole])]]] =
+        services
+          .transactionally:
+            session.prepareR(Statements.selectObservationIds).use: pq =>
+              pq.stream(pid, 1024).compile.toList
+          .flatMap(getWorkflowsModesAndRoles)
 
       extension (self: ObservingModeType) def isVisitorMode: Boolean =
         self match

@@ -117,7 +117,6 @@ class observation_workflow_tellurics
         _   <- addProposal(pi, pid, Some(cfp), None)
         _   <- addPartnerSplits(pi, pid)
         _   <- addCoisAs(pi, pid)
-        _   <- setProposalStatus(staff, pid, "ACCEPTED")
         tid <- createTargetWithProfileAs(pi, pid)
 
         // science
@@ -134,6 +133,7 @@ class observation_workflow_tellurics
         _   <- moveObservationAs(pi, sci, Some(gid))
         _   <- moveObservationAs(pi, cal, Some(gid))
         _   <- setObservationCalibrationRole(List(cal), role)
+        _   <- setProposalStatus(staff, pid, "ACCEPTED")
 
       yield (pid, sci, cal)
 

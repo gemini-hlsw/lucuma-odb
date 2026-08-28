@@ -8,10 +8,13 @@ package mutation
 import cats.effect.IO
 import cats.syntax.option.*
 import lucuma.core.data.EmailAddress
+import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.CallForProposals
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.ProgramUser
 import lucuma.core.model.ProposalReference
@@ -22,7 +25,7 @@ import org.http4s.implicits.*
 
 // Tests the notification emails that are sent, in addition to the PI confirmation
 // email, when a proposal is submitted.
-class setProposalStatusEmails extends OdbSuite {
+class setProposalStatusEmails extends OdbSuite with query.ObservingModeSetupOperations {
 
   val pi    = TestUsers.Standard.pi(1, 101)
   val staff = TestUsers.Standard.staff(4, 104)
@@ -76,8 +79,10 @@ class setProposalStatusEmails extends OdbSuite {
     for {
       cid <- geminiCall(GeminiCallForProposalsType.FastTurnaround)
       pid <- createProgramWithUsPi(pi)
+      _   <- setPiEducationalStatusAs(pi, pid, EducationalStatus.PhD)
       _   <- addProposal(pi, pid, cid.some, "fastTurnaround: {}".some)
       _   <- addCoisAs(pi, pid, List(Partner.US))
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress, address("fast-turnaround")))
     } yield ()
@@ -89,6 +94,7 @@ class setProposalStatusEmails extends OdbSuite {
       pid <- createProgramWithUsPi(pi)
       _   <- addProposal(pi, pid, cid.some, "directorsTime: {}".some)
       _   <- addCoisAs(pi, pid, List(Partner.US))
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress, address("directors-time")))
     } yield ()
@@ -101,6 +107,7 @@ class setProposalStatusEmails extends OdbSuite {
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 70), (Partner.CA, 30)))
       _   <- addCoisAs(pi, pid, List(Partner.US, Partner.CA))
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress, address("us"), address("ca")))
     } yield ()
@@ -113,6 +120,7 @@ class setProposalStatusEmails extends OdbSuite {
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100), (Partner.CA, 0)))
       _   <- addCoisAs(pi, pid, List(Partner.US, Partner.CA))
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress, address("us")))
     } yield ()
@@ -125,6 +133,7 @@ class setProposalStatusEmails extends OdbSuite {
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.AR, 50), (Partner.BR, 50)))
       _   <- addCoisAs(pi, pid, List(Partner.AR, Partner.BR))
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress, ngoShared))
     } yield ()
@@ -139,9 +148,10 @@ class setProposalStatusEmails extends OdbSuite {
                GeminiCallForProposalsType.RegularSemester,
                otherGemini = "exchangePartners: [{ exchangePartner: KECK }]".some
              )
-      pid <- createProgramWithNonPartnerPi(pi)
+      pid <- createProgramWithPiAffiliation(pi, PartnerLink.HasExchangePartner(ExchangePartner.Keck))
       _   <- addProposal(pi, pid, cid.some, "classical: { exchangePartner: KECK }".some)
       _   <- addCoisAs(pi, pid)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress, address("keck")))
     } yield ()
@@ -153,6 +163,7 @@ class setProposalStatusEmails extends OdbSuite {
       // A US PI, since a Subaru call has no deadline for a non-partner.
       pid <- createProgramWithUsPi(pi)
       _   <- createSubaruProposal(pid, cid)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress))
     } yield ()
@@ -166,6 +177,7 @@ class setProposalStatusEmails extends OdbSuite {
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
       _   <- addCoisAs(pi, pid, List(Partner.US))
       _   <- assertRecipients(pid, Nil)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- unsubmitProposal(pi, pid)
       _   <- assertRecipients(pid, List(piAddress, address("us")))
@@ -181,7 +193,7 @@ class setProposalStatusEmails extends OdbSuite {
           |PI: Petra Ito (Gemini Observatory)
           |CoIs: Ann Coi, Zoe CoiRO
           |Request: Not available
-          |Instruments: None
+          |Instruments: GMOS North
           |Abstract: A study of <interesting> things.""".stripMargin
 
     val expectedHtml = (ref: ProposalReference) =>
@@ -192,7 +204,7 @@ class setProposalStatusEmails extends OdbSuite {
           |PI: Petra Ito (Gemini Observatory)<br/>
           |CoIs: Ann Coi, Zoe CoiRO<br/>
           |Request: Not available<br/>
-          |Instruments: None<br/>
+          |Instruments: GMOS North<br/>
           |Abstract: A study of &lt;interesting&gt; things.""".stripMargin
 
     for {
@@ -202,9 +214,12 @@ class setProposalStatusEmails extends OdbSuite {
       pu  <- piProgramUserIdAs(pi, pid)
       _   <- setCreditName(pu, "Petra Ito")
       _   <- addProgramUserAs(pi, pid, ProgramUserRole.Coi, preferred = creditName("Ann Coi"))
+               .flatMap(inviteProgramUserDirectly(pi, pid, _))
       _   <- addProgramUserAs(pi, pid, ProgramUserRole.CoiRO, preferred = creditName("Zoe CoiRO"))
+               .flatMap(inviteProgramUserDirectly(pi, pid, _))
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
+      _   <- addDefinedObservationAs(pi, pid)
       ref <- submitProposal(pi, pid)
       ms  <- getEmailMessages(pid, address("us"))
     } yield assertEquals(

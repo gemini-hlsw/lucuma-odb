@@ -15,7 +15,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.Target
 
-class targetGroup extends OdbSuite {
+class targetGroup extends OdbSuite with query.ObservingModeSetupOperations {
 
   val pi         = TestUsers.Standard.pi(nextId, nextId)
   val staff      = TestUsers.Standard.staff(nextId, nextId)
@@ -188,6 +188,10 @@ class targetGroup extends OdbSuite {
         cid  <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
         pid  <- createProgramWithUsPi(user)
         _    <- addDemoScienceProposal(user, pid, cid)
+        // The proposal needs its own science before it can be submitted; that
+        // observation and target show up in the groups below.
+        po   <- addDefinedObservationAs(user, pid)
+        (ptid, poid) = po
         _    <- submitProposal(user, pid)
         tids <- createTargetAs(user, pid).replicateA(3)
         oid1 <- createObservationAs(user, pid, tids(0), tids(1))
@@ -216,6 +220,18 @@ class targetGroup extends OdbSuite {
               {
                 "targetGroup" : {
                   "matches" : [
+                    {
+                      "observations" : {
+                        "matches" : [
+                          {
+                            "id" : $poid
+                          }
+                        ]
+                      },
+                      "target" : {
+                        "id" : $ptid
+                      }
+                    },
                     {
                       "observations" : {
                         "matches" : [

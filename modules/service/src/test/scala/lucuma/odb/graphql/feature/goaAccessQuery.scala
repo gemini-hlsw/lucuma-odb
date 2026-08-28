@@ -17,7 +17,7 @@ import lucuma.core.model.StandardRole
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 
-class goaAccessQuery extends OdbSuite:
+class goaAccessQuery extends OdbSuite with query.ObservingModeSetupOperations:
 
   val pi    = TestUsers.Standard.pi(1, 30)
   val pi2   = TestUsers.Standard.pi(2, 32)
@@ -65,6 +65,7 @@ class goaAccessQuery extends OdbSuite:
       _   <- addQueueProposal(pi, pid, cid)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       _   <- link.fold(IO.unit)((u, r) => addUser(pid, u, r))
       _   <- submitProposal(pi, pid)

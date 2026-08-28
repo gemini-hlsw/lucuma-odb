@@ -21,7 +21,7 @@ import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.input.AllocationInput
 
-class setAllocations extends OdbSuite {
+class setAllocations extends OdbSuite with query.ObservingModeSetupOperations {
 
   val guest    = TestUsers.guest(nextId)
   val pi       = TestUsers.Standard.pi(nextId, nextId)
@@ -247,6 +247,7 @@ class setAllocations extends OdbSuite {
       cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
+      _   <- addDefinedObservationAs(pi, pid)
       ref <- submitProposal(pi, pid)
     yield ref
 
@@ -298,6 +299,7 @@ class setAllocations extends OdbSuite {
       cid <- createGeminiCallForProposalsAs(staff, DemoScience, Semester.unsafeFromString("2025A"))
       pid <- createProgramWithUsPi(pi)
       _   <- addDemoScienceProposal(pi, pid, cid)
+      _   <- addDefinedObservationAs(pi, pid)
       _   <- submitProposal(pi, pid)
       ref <- acceptProposal(staff, pid)
     yield ref
