@@ -119,6 +119,11 @@ object CMain extends MainParams {
       .withSSL(SSL.Trusted.withFallback(true))
       .withTypingStrategy(TypingStrategy.SearchPath)
       // .withDebug(true)
+      // Tag connections so they can be attributed per service in
+      // pg_stat_activity; see also the pool sizes in Config.Database.
+      .withConnectionParameters(
+        Session.DefaultConnectionParameters + ("application_name" -> "odb-calibration")
+      )
       .pooled(max = config.maxCalibrationConnections)
 
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[Option[User]] =
