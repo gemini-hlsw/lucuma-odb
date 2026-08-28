@@ -54,6 +54,8 @@ import skunk.SqlState
 import skunk.codec.all.*
 import skunk.implicits.*
 
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Instant
 import scala.concurrent.duration.*
 
@@ -171,6 +173,28 @@ object TelluricTargetsService:
         input.brightest.hashBytes,
         input.spType.hashBytes
       )
+
+  /**
+   * Hash of the inputs that determine the selected telluric star.
+   */
+  private[service] def searchParamsHash(
+    input:    TelluricSearchInput,
+    duration: TimeSpan,
+    site:     Site,
+    obsTime:  Option[Timestamp]
+  ): Md5Hash =
+    val nightBytes =
+      if duration > MultiTelluricThreshold then Array.emptyByteArray
+      else
+        obsTime.fold(Array.emptyByteArray): ot =>
+          ObservingNight
+            .fromSiteAndInstant(site, ot.toInstant)
+            .toLocalDate
+            .toString
+            .getBytes(StandardCharsets.UTF_8)
+    Md5Hash.unsafeFromByteArray(
+      MessageDigest.getInstance("MD5").digest(Array.concat(input.hashBytes, nightBytes))
+    )
 
   /**
    * Signed hour delta matching the spec:
@@ -419,7 +443,8 @@ object TelluricTargetsService:
 
         def searchAndResolve(params: TelluricSearchParams): F[Option[(Either[String, Target.Id], Md5Hash)]] =
           val searchInput = mkSearchInput(params, pending.scienceDuration.min(MaxTelluricDuration))
-          val paramsHash = Md5Hash.unsafeFromByteArray(searchInput.md5)
+          val paramsHash =
+            TelluricTargetsService.searchParamsHash(searchInput, pending.scienceDuration, params.site, params.obsTime)
 
           def observationExists: F[Boolean] =
             session.prepareR(Statements.ObservationExists)
