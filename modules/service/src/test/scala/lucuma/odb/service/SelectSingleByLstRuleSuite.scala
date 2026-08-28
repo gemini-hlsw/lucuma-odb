@@ -3,6 +3,7 @@
 
 package lucuma.odb.service
 
+import lucuma.catalog.telluric.TelluricSearchInput
 import lucuma.catalog.telluric.TelluricStar
 import lucuma.core.enums.Site
 import lucuma.core.enums.TelluricCalibrationOrder
@@ -13,6 +14,7 @@ import lucuma.core.math.HourAngle
 import lucuma.core.math.RightAscension
 import lucuma.core.model.ObservingNight
 import lucuma.core.model.TelluricType
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import munit.FunSuite
 
@@ -111,3 +113,27 @@ class SelectSingleByLstRuleSuite extends FunSuite:
       pair2, coordsAtRa(midRa), site, Some(obsTime)
     )
     assertEquals(r.map(_._1.id), Some(betterAfter.id))
+
+  private val searchInput =
+    TelluricSearchInput(coordsAtRa(10.0), 1.hourTimeSpan, BigDecimal(8), TelluricType.Hot)
+
+  private def timestampAt(instant: Instant): Timestamp =
+    Timestamp.unsafeFromInstantTruncated(instant)
+
+  test("params hash changes when the observing night changes for single-telluric"):
+    val nextNight = timestampAt(obsInstant.plusSeconds(24 * 3600))
+    val h1 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(obsTime))
+    val h2 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(nextNight))
+    assertNotEquals(h1, h2)
+
+  test("params hash is stable within the same observing night"):
+    val laterSameNight = timestampAt(obsInstant.plusSeconds(3 * 3600))
+    val h1 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(obsTime))
+    val h2 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(laterSameNight))
+    assertEquals(h1, h2)
+
+  test("params hash ignores the date for multi-telluric durations"):
+    val nextNight = timestampAt(obsInstant.plusSeconds(24 * 3600))
+    val h1 = TelluricTargetsService.searchParamsHash(searchInput, 2.hourTimeSpan, site, Some(obsTime))
+    val h2 = TelluricTargetsService.searchParamsHash(searchInput, 2.hourTimeSpan, site, Some(nextNight))
+    assertEquals(h1, h2)
