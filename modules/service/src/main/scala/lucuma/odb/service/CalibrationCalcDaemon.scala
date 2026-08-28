@@ -32,7 +32,7 @@ import scala.concurrent.duration.*
  * drain (the reconciliation of rows enqueued while the daemon was down), a
  * NOTIFY event stream, and a periodic poll.
  *
- * Batch paths group claimed rows by program so the per-program GMOS strategy 
+ * Batch paths group claimed rows by program so the per-program GMOS strategy
  * runs once per program.
  */
 object CalibrationCalcDaemon:
@@ -145,13 +145,23 @@ object CalibrationCalcDaemon:
         .map(groupByProgram)
         .flatMap(Stream.emits)
 
+    // A failure that escapes `process` (e.g. markRetry losing its connection)
+    // can strand claimed rows in `calculating`, which `load` excludes. Re-pend
+    // them on every (re)start of the stream, not just at daemon startup.
+    val resetStranded: F[Unit] =
+      T.rootSpan("calibration-calc.reset").surround:
+        services.useTransactionally:
+          Services.asSuperUser:
+            calibrationCalcService.reset
+
     // Sequential on purpose: parallel workers could recalculate the same
     // program concurrently and race on its shared calibration set. Recalc is
     // infrequent, so there is no throughput to protect.
     val mainStream: Stream[F, Unit] =
-      eventStream
-        .merge(pollStream)
-        .evalMap(process(services))
+      (Stream.exec(resetStranded) ++
+        eventStream
+          .merge(pollStream)
+          .evalMap(process(services)))
         .attempts(Stream.constant(WaitToRestart))
         .evalTap:
           case Left(e)  => error"Calibration calc daemon error: ${e.getMessage}, restarting in $WaitToRestart..."
