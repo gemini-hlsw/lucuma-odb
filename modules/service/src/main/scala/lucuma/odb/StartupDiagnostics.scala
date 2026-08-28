@@ -177,6 +177,7 @@ object StartupDiagnostics:
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),
           checkPostgresLookupTable(imaging_capability, "t_imaging_capability"),
           checkPostgresLookupTable(instrument, "t_instrument"),
+          checkPostgresLookupTable(program_status, "t_program_status"),
           checkPostgresLookupTable(proposal_status, "t_proposal_status"),
           checkPostgresLookupTable(seeing_trend, "t_seeing_trend"),
           checkPostgresLookupTable(spectroscopy_capability, "t_spectroscopy_capability"),

@@ -562,6 +562,9 @@ trait Codecs {
       ProposalReference.fromString.reverseGet
     )
 
+  val program_status: Codec[ProgramStatus] =
+    enumerated(Type.varchar)
+
   val proposal_status: Codec[ProposalStatus] =
     enumerated(Type.varchar)
 

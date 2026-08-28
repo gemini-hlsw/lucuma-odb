@@ -4747,6 +4747,13 @@ input ProgramPropertiesInput {
   existence: Existence
 
   """
+  Program status (defaults to ACTIVE for new programs).  Readable by anyone
+  with access to the program, but may be set only by those with staff access
+  or better.  Not nullable.
+  """
+  status: ProgramStatus
+
+  """
   Active period start date (inclusive) for this program.  The date is considered
   to be the local date at each observation site.  Observations may begin the
   evening of the indicated date at the site of the observation.
@@ -16926,6 +16933,12 @@ type Program {
   isActive: Boolean!
 
   """
+  Program status: whether the program is active for scheduling purposes and
+  whether it is considered complete.
+  """
+  status: ProgramStatus!
+
+  """
   Proposal status of the program
   """
   proposalStatus: ProposalStatus!
@@ -17183,6 +17196,32 @@ type ProgramSelectResult {
   `true` when there were additional matches that were not returned.
   """
   hasMore: Boolean!
+}
+
+"""
+Program status.
+"""
+enum ProgramStatus {
+  """
+  The program is active and may be scheduled.
+  """
+  ACTIVE
+
+  """
+  The program is inactive and should not be scheduled.
+  """
+  INACTIVE
+
+  """
+  The program is considered complete, even if it has not used all of its
+  allocated time.
+  """
+  COMPLETE
+
+  """
+  The program is considered incomplete.
+  """
+  INCOMPLETE
 }
 
 enum ProgramType {

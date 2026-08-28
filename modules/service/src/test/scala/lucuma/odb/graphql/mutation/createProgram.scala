@@ -163,6 +163,87 @@ class createProgram extends OdbSuite {
     )
   }
 
+  test("program status defaults to ACTIVE") {
+    expect(
+      user = pi,
+      query =
+        """
+          mutation {
+            createProgram(
+              input: {
+                SET: {
+                  name: "Foo"
+                }
+              }
+            ) {
+              program {
+                name
+                status
+              }
+            }
+          }
+        """,
+      expected =
+        json"""
+          {
+            "createProgram" : {
+              "program": {
+                "name" : "Foo",
+                "status": "ACTIVE"
+              }
+            }
+          }
+        """.asRight
+    )
+  }
+
+  val CreateWithStatus =
+    """
+      mutation {
+        createProgram(
+          input: {
+            SET: {
+              name: "Foo",
+              status: INACTIVE
+            }
+          }
+        ) {
+          program {
+            name
+            status
+          }
+        }
+      }
+    """
+
+  test("status may be specified as staff") {
+    expect(
+      user     = staff,
+      query    = CreateWithStatus,
+      expected =
+        json"""
+          {
+            "createProgram" : {
+              "program": {
+                "name" : "Foo",
+                "status": "INACTIVE"
+              }
+            }
+          }
+        """.asRight
+    )
+  }
+
+  test("status may not be specified as pi") {
+    expect(
+      user     = pi,
+      query    = CreateWithStatus,
+      expected = List(
+        "Only staff may set the program status."
+      ).asLeft
+    )
+  }
+
   val CreateWithProprietaryMonths =
     """
       mutation {
