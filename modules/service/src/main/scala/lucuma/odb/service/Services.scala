@@ -110,6 +110,9 @@ trait Services[F[_]]:
   /** The `CalibrationsService`. */
   def calibrationsService: CalibrationsService[F]
 
+  /** The `CalibrationCalcService`. */
+  def calibrationCalcService: CalibrationCalcService[F]
+
   /** The `CallForProposalsService`. */
   def callForProposalsService: CallForProposalsService[F]
 
@@ -403,6 +406,7 @@ object Services:
       lazy val obscalcService = ObscalcService.instantiate
       lazy val timeEstimateService = TimeEstimateService.instantiate
       lazy val calibrationsService = CalibrationsService.instantiate
+      lazy val calibrationCalcService = CalibrationCalcService.instantiate
       lazy val groupService = GroupService.instantiate
       lazy val programService = ProgramService.instantiate
       lazy val observationWorkflowService = ObservationWorkflowService.instantiate
@@ -438,6 +442,7 @@ object Services:
     def attachmentMetadataService[F[_]](using Services[F]): AttachmentMetadataService[F] = summon[Services[F]].attachmentMetadataService
     def blindOffsetsService[F[_]](using Services[F]): BlindOffsetsService[F] = summon[Services[F]].blindOffsetsService
     def calibrationsService[F[_]](using Services[F]): CalibrationsService[F] = summon[Services[F]].calibrationsService
+    def calibrationCalcService[F[_]](using Services[F]): CalibrationCalcService[F] = summon[Services[F]].calibrationCalcService
     def callForProposalsService[F[_]](using Services[F]): CallForProposalsService[F] = summon[Services[F]].callForProposalsService
     def chronicleService[F[_]](using Services[F]): ChronicleService[F] = summon[Services[F]].chronicleService
     def configurationService[F[_]](using Services[F]): ConfigurationService[F] = summon[Services[F]].configurationService

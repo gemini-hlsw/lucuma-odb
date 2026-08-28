@@ -49,18 +49,26 @@ import java.time.Instant
 trait CalibrationsService[F[_]] {
 
   /**
-    * Recalculates the calibrations for a program
+    * Recalculates the calibrations for a program, given the set of science
+    * observations that changed.
     *
     * @param pid Program.Id
     * @param referenceInstant time used to calculate targets
-    * @param oid obsid that triggered the recalculation
+    * @param changedOids the science observations that triggered the recalculation
     * @return list of added and removed calibration observations
     */
   def recalculateCalibrations(
     pid:              Program.Id,
     referenceInstant: Instant,
-    oid:              Observation.Id
+    changedOids:      NonEmptyList[Observation.Id]
   )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])]
+
+  def recalculateCalibrations(
+    pid:              Program.Id,
+    referenceInstant: Instant,
+    oid:              Observation.Id
+  )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
+    recalculateCalibrations(pid, referenceInstant, NonEmptyList.one(oid))
 
   /**
     * Returns the calibration targets for a given role adjusted to a reference instant
@@ -136,11 +144,11 @@ object CalibrationsService extends CalibrationObservations {
       def recalculateCalibrations(
         pid:              Program.Id,
         referenceInstant: Instant,
-        oid:              Observation.Id
+        changedOids:      NonEmptyList[Observation.Id]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         T.span("recalculate-calibrations").surround:
           for {
-            _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant, oid: $oid ==="
+            _                <- info"=== Recalculating calibrations for program ID: $pid, reference instant $referenceInstant, changed oids: ${changedOids.toList} ==="
             // Read calibration targets (shared resource)
             calibTargets     <- calibrationTargets(PerProgramPerConfigCalibrationTypes, referenceInstant)
             // Get all science and calibration observations (regardless of workflow state)
@@ -154,8 +162,12 @@ object CalibrationsService extends CalibrationObservations {
             perObs           = allSci.collect(ObsExtract.perObsFilter).map(_.map(_.toConfigSubset))
             perProgram       = allSci.collect(ObsExtract.perProgramFilter)
             _                <- (info"Program $pid has ${perObs.length} science observations with per obs calibrations: ${perObs.map(_.id)}").whenA(perObs.nonEmpty)
-            // Handle per-science-observation calibs
-            (f2Added, f2Removed)     <- perObsService.generateCalibrations(pid, perObs, oid)
+            // Handle per-science-observation calibs: run the per-obs strategy once
+            // per changed observation, concatenating the results.
+            perObsResults    <- changedOids.traverse(perObsService.generateCalibrations(pid, perObs, _))
+            (f2Added, f2Removed)   = perObsResults.foldLeft((List.empty[Observation.Id], List.empty[Observation.Id])) {
+                                       case ((a, r), (na, nr)) => (a ++ na, r ++ nr)
+                                     }
             _                <- (info"Program ID: $pid has ${perProgram.length} science observations for per program calibrations: ${perProgram.map(_.id)}").whenA(perProgram.nonEmpty)
             // Handle per--config calib
             (gmosAdded, gmosRemoved) <- sharedService.generateCalibrations(pid, perProgram, allCalibs, calibTargets, referenceInstant)

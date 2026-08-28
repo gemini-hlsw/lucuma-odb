@@ -251,6 +251,7 @@ object PerScienceObservationCalibrationsService:
             existing           <- findAllTelluricObservations(gid)
             deletable          <- excludeObsCalibrationsFromDeletion(existing, identity)
             duration           <- obsDuration(obs.id)
+            _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(duration.isEmpty)
             requiredCount      = duration match
                                   case Some(d) if d > MultiTelluricThreshold => 2
                                   case Some(_)                               => 1

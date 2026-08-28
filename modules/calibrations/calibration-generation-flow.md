@@ -2,37 +2,120 @@
 
 ## Overview
 
-The ODB automatically generates calibration observations for science programs. When a science observation's configuration changes, a background daemon detects the change and triggers calibration recalculation. There are two distinct strategies depending on the instrument and calibration type.
+The ODB automatically generates calibration observations for science programs. When a science observation's configuration changes and its obscalc settles to `Ready`, a background daemon recalculates the program's calibrations.
+
+Recalculation is now driven by a **durable, database-backed work queue**
+(`t_calibration_calc`) rather than a direct `ch_obscalc_update` subscription. A DB
+trigger enqueues work when a non-calibration observation's obscalc settles; the
+daemon drains the queue on startup, on NOTIFY, and on a periodic poll. This means
+**no work is lost if the daemon is down** — rows left `pending` are replayed on
+restart (startup reconciliation). There are two distinct calibration strategies
+depending on the instrument and calibration type.
 
 ## Trigger Chain
 
-All calibration generation begins with a database change detected via PostgreSQL NOTIFY/LISTEN channels.
+Calibration generation begins when obscalc settles a non-calibration observation
+to `Ready`. The durable queue (`t_calibration_calc`) sits between obscalc and
+the daemon, exactly like `t_obscalc` and `t_telluric_resolution`.
 
 ```mermaid
 sequenceDiagram
     participant User
     participant GraphQL as GraphQL Mutation
     participant DB as PostgreSQL
-    participant Trigger as DB Trigger
+    participant Obscalc as Obscalc Daemon
+    participant Trig as cascade_calibration_invalidation
+    participant Queue as t_calibration_calc
+    participant Notify as ch_calibration_calc
     participant Daemon as Calibrations Daemon
     participant Service as CalibrationsService
 
     User->>GraphQL: updateObservations / updateAsterisms / updateTargets
     GraphQL->>DB: UPDATE t_observation / t_asterism_target / t_target
-    DB->>Trigger: invalidate_obscalc()
-    Trigger->>DB: UPDATE t_obscalc SET state = 'pending'
-    Note over DB: obscalc recalculates asynchronously
-    DB->>Trigger: ch_obscalc_update_trigger
-    Trigger-->>Daemon: NOTIFY ch_obscalc_update (oid, pid, old_obscalc_state, new_obscalc_state, old_workflow_state, new_workflow_state, TG_OP)
-    Daemon->>Daemon: Filter: obscalc state transitioned to Ready (oldState != newState), not a calibration
-    Daemon->>Service: recalculateCalibrations(pid, referenceInstant, oid)
+    DB->>DB: invalidate_obscalc() → t_obscalc state = 'pending'
+    Obscalc->>DB: storeResult → t_obscalc.c_last_update, state = 'ready'
+    DB->>Trig: AFTER UPDATE OF c_last_update ON t_obscalc
+    Trig->>Trig: non-calibration obs? obscalc ready? c_last_update changed?
+    Trig->>Queue: CALL invalidate_calibration_calc(oid, pid) → 'pending'
+    Queue->>Notify: NOTIFY (oid, pid, old_state, new_state=pending)
+    Note over Daemon: If down, row stays pending — replayed on startup drain
+    Notify-->>Daemon: event → loadObs → 'calculating'
+    Daemon->>Daemon: group batch by program; GMOS once + tellurics per obs
+    Daemon->>Service: recalculateCalibrations(pid, referenceInstant, changedOids)
+    Daemon->>Queue: markReady (guard c_last_invalidation) / markRetry on error
 ```
+
+The daemon (`CalibrationCalcDaemon`) runs three things:
+  - a **startup reset** (`calculating` → `pending`/`retry`) followed by a
+    **startup drain** that loads batches until empty — this is the
+    reconciliation that replays missed events;
+  - an **event stream** on `ch_calibration_calc` (transitions to `pending`);
+  - a **poll stream** that periodically claims a batch.
+
+The `isCalibration(oid)` filter the daemon used to apply is now enforced by the
+DB trigger (`c_calibration_role IS NOT NULL`), so calibration observations never
+enter the queue and the daemon cannot recurse on its own output.
+
+## Durable Queue: `t_calibration_calc`
+
+Created by `V1294__calibration_calc.sql`; state machine in
+`CalibrationCalcService.scala`. One row per science observation, keyed
+`c_observation_id`, mirroring `t_obscalc` / `t_telluric_resolution`.
+
+```mermaid
+flowchart TD
+    NEW([new row]) -->|invalidate_calibration_calc| PENDING[pending]
+    PENDING -->|load / loadObs| CALCULATING[calculating]
+    RETRY[retry] -->|load when now >= c_retry_at| CALCULATING
+    CALCULATING -->|recalc ok, invalidation unchanged| READY[ready]
+    CALCULATING -->|recalc ok, invalidation changed mid-flight| PENDING
+    CALCULATING -->|recalc error| RETRY
+    CALCULATING -->|startup reset, no c_retry_at| PENDING
+    CALCULATING -->|startup reset, with c_retry_at| RETRY
+    READY -->|invalidate_calibration_calc| PENDING
+    RETRY -->|invalidate_calibration_calc| PENDING
+```
+
+Key behaviors:
+
+- **Mid-flight guard.** `markReady` only sets `ready` if `c_last_invalidation`
+  is unchanged from the claimed value; if the row was re-invalidated during
+  recalculation it goes back to `pending` so the next pickup re-runs against the
+  newer inputs.
+- **Retry policy.** Every recalculation error is retryable: `markRetry` stores
+  `c_error_message`, increments `c_failure_count`, and sets
+  `c_retry_at = now() + 1 min * 2^min(failures, 5)` (capped ~32 min), matching
+  obscalc's retry-indefinitely behavior. There is no terminal error state
+  because `recalculateCalibrations` raises rather than returning an error value.
+- **Granularity.** The queue is keyed per science observation (what the obscalc
+  trigger naturally produces), but batch drains group claimed rows by
+  `c_program_id`: the per-program GMOS diff runs once per program while the
+  per-observation telluric sync runs per changed observation. The live event
+  path processes one observation at a time, matching the previous behavior.
+- **Concurrency.** `load` uses `FOR UPDATE SKIP LOCKED`, so parallel workers are
+  safe. Two workers claiming observations of the same program across batches can
+  both run the GMOS diff — harmless, since the diff is idempotent
+  (needed-vs-existing).
+- **No backfill.** The trigger covers obscalc updates from deploy forward;
+  pre-existing drift is corrected on each program's next natural edit.
+
+Known edge: a science observation **deleted** while the daemon is down cascades
+its queue row away without enqueueing anything, so an orphaned calibration
+survives until something else in the program triggers a recalc — same as the
+previous live behavior, which also keyed on `Ready` transitions, not deletions.
+The calibration-time retarget path (below) remains best-effort NOTIFY-only.
 
 ## Entry Point: `recalculateCalibrations`
 
-`CalibrationsService.scala:136`
+`CalibrationsService.scala`
 
-This method orchestrates both calibration strategies. It loads all observations for the program, splits them by instrument type, and delegates to the appropriate service.
+This method orchestrates both calibration strategies. It accepts a
+`NonEmptyList[Observation.Id]` of changed science observations: the per-program
+(GMOS) strategy runs **once** for the program, while the per-observation
+(telluric) strategy runs **once per changed observation**. A single-oid overload
+is retained for callers that only have one oid. It loads all observations for
+the program, splits them by instrument type, and delegates to the appropriate
+service.
 
 ```mermaid
 flowchart TD

@@ -951,4 +951,36 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
           f(services).map(Result.success)
         .flatMap(_.get)
 
+  // Like `withServicesForObscalc`, but hands the caller a Resource that builds a
+  // Services on a fresh pooled session per use.
+  def withServicesResourceForObscalc[A](u: ServiceUser)(f: Resource[IO, Services[IO]] => IO[A]): IO[A] =
+    import Tracer.Implicits.noop
+    import Meter.Implicits.noop
+
+    val res =
+      for
+        db     <- FMain.databasePoolResource[IO](databaseConfig)
+        enm    <- db.evalMap(Enums.load)
+        ptc    <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
+        schema <- Resource.eval(OdbMapping.loadSchema[IO])
+      yield (db, ptc, schema)
+
+    res.use: (db, ptc, schema) =>
+      val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
+        Resource.pure(s),
+        SkunkMonitor.noopMonitor[IO],
+        u,
+        goaUsers,
+        gaiaClient,
+        itcClient,
+        CommitHash.Zero,
+        ptc,
+        httpClient,
+        horizonsClient,
+        GoaClient.noop[IO],
+        emailConfig,
+        schema
+      )
+      f(db.map(s => Services.forUser(u, mapping.some, emailConfig, CommitHash.Zero, ptc, httpClient, itcClient, gaiaClient, S3FileService.noop[IO], horizonsClient, TelluricTargetsClient.noop[IO], GoaClient.noop[IO])(s)))
+
 }

@@ -22,19 +22,16 @@ import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.core.model.Access
 import lucuma.core.model.User
-import lucuma.core.util.CalculationState
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
-import lucuma.odb.data.EditType
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibTimeTopic
-import lucuma.odb.graphql.topic.ObscalcTopic
+import lucuma.odb.graphql.topic.CalibrationCalcTopic
 import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.otel.*
-import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
+import lucuma.odb.service.CalibrationCalcDaemon
 import lucuma.odb.service.HminBrightnessCache
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
@@ -52,16 +49,11 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
-import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
 
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.ZoneOffset
 import scala.concurrent.duration.*
 
 sealed trait MainParams {
@@ -134,64 +126,50 @@ object CMain extends MainParams {
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
   def topics[F[_]: Concurrent: Logger: Tracer](pool: Resource[F, Session[F]]):
-   Resource[F, (Topic[F, ObscalcTopic.Element], Topic[F, CalibTimeTopic.Element], Topic[F, TelluricTargetTopic.Element])] =
+   Resource[F, (Topic[F, CalibrationCalcTopic.Element], Topic[F, CalibTimeTopic.Element], Topic[F, TelluricTargetTopic.Element])] =
     for {
       sup <- Supervisor[F]
       ses <- pool
       ctt <- Resource.eval(CalibTimeTopic(ses, 1024, sup))
-      top <- Resource.eval(ObscalcTopic(ses, 1024, sup))
+      cct <- Resource.eval(CalibrationCalcTopic(ses, 1024, sup))
       trt <- Resource.eval(TelluricTargetTopic(ses, 1024, sup))
-    } yield (top, ctt, trt)
+    } yield (cct, ctt, trt)
 
-  def runCalibrationsDaemon[F[_]: {Async, Tracer as T, Logger as L, Clock as C}](
-    obscalcTopic: Topic[F, ObscalcTopic.Element],
+  // Drains the durable `t_calibration_calc` queue
+  def runCalibrationCalcDaemon[F[_]: {Async, LoggerFactory as LF, Tracer as T}](
+    calcTopic:        Topic[F, CalibrationCalcTopic.Element],
+    connectionsLimit: Int,
+    pollPeriod:       FiniteDuration,
+    services:         Resource[F, Services[F]]
+  ): Resource[F, Unit] =
+    CalibrationCalcDaemon.run(
+      connectionsLimit = connectionsLimit,
+      pollPeriod       = pollPeriod,
+      batchSize        = 10,
+      topic            = calcTopic,
+      services         = services
+    )
+
+  // Calibration-time still uses NOTIFY-only.
+  // TODO:. We should consider moving it to a durable queue as well
+  def runCalibTimeDaemon[F[_]: {Async, Tracer as T, Logger as L}](
     calibTopic: Topic[F, CalibTimeTopic.Element],
-    services: Resource[F, Services[F]]
+    services:   Resource[F, Services[F]]
   ): Resource[F, Unit] =
     for {
-      _  <- Resource.eval(info"Calibrations Service starting")
-      _  <- Resource.eval(info"Start listening for obscalc changes")
-      _  <- Resource.eval(obscalcTopic.subscribe(100).evalMap { elem =>
-              services.useTransactionally:
-                Services.asSuperUser:
-                  T.rootSpan("calibration-calculation").use: span =>
-                    for {
-                      cal <- calibrationsService.isCalibration(elem.observationId)
-                      run = (!cal &&
-                             elem.newState.exists(_ === CalculationState.Ready) &&
-                             elem.oldState =!= elem.newState &&
-                             (elem.editType === EditType.Created || elem.editType === EditType.Updated))
-                      _ <- (info"Calibrations Service Obscalc channel: Element(${elem.observationId},${elem.programId},${elem.editType},oldState=${elem.oldState},newState=${elem.newState},${elem.users}), is calibration: $cal").whenA(run)
-                      _ <- span.addAttributes(
-                             Attribute.from(ProgramIdKey, elem.programId),
-                             Attribute.from(ObservationIdKey, elem.observationId),
-                             Attribute.from(IsCalibrationKey, cal),
-                             Attribute.from(CalibrationRunKey, run)).whenA(run)
-                      t <- C.realTimeInstant.map(LocalDate.ofInstant(_, ZoneOffset.UTC))
-                      _ <- calibrationsService
-                            .recalculateCalibrations(
-                              elem.programId,
-                              LocalDateTime.of(t, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC),
-                              elem.observationId
-                            ).whenA(run)
-                    } yield Result.unit
-              .handleErrorWith: e =>
-                L.error(e)(
-                  s"Error precessing obscalc event for ${elem.programId}/${elem.observationId}"
-                ).as(Result.unit)
-            }.compile.drain.start.void)
-      _  <- Resource.eval(info"Start listening for calibration time changes")
-      _  <- Resource.eval(calibTopic.subscribe(100).evalMap: elem =>
-              T.rootSpan("calibration-time-event").surround:
-                services.useTransactionally:
-                  Services.asSuperUser:
-                    calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
-                      .map(Result.success)
-              .handleErrorWith: e =>
-                L.error(e)(
-                  s"Error processing calib time event for ${elem.programId}/${elem.observationId}"
-                ).as(Result.unit)
-            .compile.drain.start.void)
+      _ <- Resource.eval(info"Calibrations Service starting")
+      _ <- Resource.eval(info"Start listening for calibration time changes")
+      _ <- Resource.eval(calibTopic.subscribe(100).evalMap: elem =>
+             T.rootSpan("calibration-time-event").surround:
+               services.useTransactionally:
+                 Services.asSuperUser:
+                   calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
+                     .map(Result.success)
+             .handleErrorWith: e =>
+               L.error(e)(
+                 s"Error processing calib time event for ${elem.programId}/${elem.observationId}"
+               ).as(Result.unit)
+           .compile.drain.start.void)
     } yield ()
 
   def runTelluricTargetsDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory, Tracer}](
@@ -257,7 +235,7 @@ object CMain extends MainParams {
       _                  <- Resource.eval(banner[F](c))
       pool               <- databasePoolResource[F](c.database)
       enums              <- Resource.eval(pool.use(Enums.load))
-      (obsT, ctT, trT)   <- topics(pool)
+      (ccT, ctT, trT)    <- topics(pool)
       user               <- Resource.eval(serviceUser[F](c))
       _                  <- Resource.eval(user.traverse_ : u =>
                               pool.use(s => Services.asSuperUser(UserService.fromSession(s).canonicalizeUser(u)))
@@ -271,7 +249,8 @@ object CMain extends MainParams {
       hminCache          <- Resource.eval(pool.use(TelluricTargetsService.loadBrightnessCache))
       _                  <- Resource.eval(info"Loading ${hminCache.value.size} configurations for telluric brightness")
       servicesResource   = pool.evalMap(services(user, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient, hminCache))
-      _                  <- runCalibrationsDaemon(obsT, ctT, servicesResource)
+      _                  <- runCalibrationCalcDaemon(ccT, c.database.maxObscalcConnections, c.obscalcPoll, servicesResource)
+      _                  <- runCalibTimeDaemon(ctT, servicesResource)
       _                  <- runTelluricTargetsDaemon(c.database.maxObscalcConnections, c.obscalcPoll, trT, servicesResource)
     } yield ExitCode.Success
 
