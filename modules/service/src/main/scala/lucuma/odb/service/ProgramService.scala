@@ -14,6 +14,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ProgramStatus
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Access
 import lucuma.core.model.Program
@@ -219,6 +220,16 @@ object ProgramService {
               case _                                            => active.isEmpty
           )
 
+      def validateProgramStatus(status: Option[ProgramStatus]): Result[Unit] =
+        OdbError
+          .NotAuthorized(user.id, "Only staff may set the program status.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => status.isEmpty
+          )
+
       def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
         OdbError
           .NotAuthorized(user.id, "Only staff may set the proprietary months.".some)
@@ -264,6 +275,7 @@ object ProgramService {
 
             (for {
               _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
+              _ <- ResultT.fromResult(validateProgramStatus(SETʹ.status))
               _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
               p <- ResultT(create)
               _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
@@ -304,6 +316,7 @@ object ProgramService {
             _   <- ResultT.liftF(setup)
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
+            _   <- ResultT.fromResult(validateProgramStatus(SET.status))
             ids <- ResultT(updatePrograms)
           yield ids).value
 
@@ -383,6 +396,7 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
+          SET.status.map(sql"c_program_status = $program_status"),
           SET.name.foldPresent(sql"c_name = ${text_nonempty.opt}"),
           SET.description.foldPresent(sql"c_description = ${text_nonempty.opt}"),
           SET.goa.flatMap(_.proprietaryMonths).map(sql"c_goa_proprietary = $int4_nonneg"),
@@ -413,7 +427,8 @@ object ProgramService {
           c_goa_proprietary,
           c_goa_should_notify,
           c_goa_private_header,
-          c_existence
+          c_existence,
+          c_program_status
         )
         VALUES (
           ${text_nonempty.opt},
@@ -421,7 +436,8 @@ object ProgramService {
           $int4_nonneg,
           $bool,
           $bool,
-          $existence
+          $existence,
+          $program_status
         )
         RETURNING c_program_id
       """.query(program_id).contramap { c => (
@@ -430,7 +446,8 @@ object ProgramService {
         c.goa.proprietaryMonths,
         c.goa.shouldNotify,
         c.goa.privateHeader,
-        c.existence
+        c.existence,
+        c.status.getOrElse(ProgramStatus.Default)
       )}
 
     /** Insert a calibration program, without a user for a staff program */

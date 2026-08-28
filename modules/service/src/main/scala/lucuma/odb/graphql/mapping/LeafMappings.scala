@@ -213,6 +213,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[PosInt](PosIntType),
       LeafMapping[Program.Id](ProgramIdType),
       LeafMapping[ProgramNote.Id](ProgramNoteIdType),
+      LeafMapping[ProgramStatus](ProgramStatusType),
       LeafMapping[ProgramType](ProgramTypeType),
       LeafMapping[ProgramUser.Id](ProgramUserIdType),
       LeafMapping[ProgramUserRole](ProgramUserRoleType),

@@ -396,6 +396,61 @@ class updatePrograms extends OdbSuite {
       )
   }
 
+  def editStatusQuery(pid: Program.Id): String =
+    s"""
+      mutation {
+        updatePrograms(
+          input: {
+            SET: {
+              status: COMPLETE
+            }
+            WHERE: {
+              id: {
+                EQ: "$pid"
+              }
+            }
+          }
+        ) {
+          programs {
+            id
+            status
+          }
+        }
+      }
+    """
+
+  test("can edit status as staff") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = staff,
+        query = editStatusQuery(pid),
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "status": "COMPLETE"
+                }
+              ]
+            }
+          }
+          """.asRight
+      )
+  }
+
+  test("cannot edit status as pi") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = pi,
+        query = editStatusQuery(pid),
+        expected = List(
+          "Only staff may set the program status."
+        ).asLeft
+      )
+  }
+
   def editActivePeriodQuery(pid: Program.Id): String =
     s"""
       mutation {

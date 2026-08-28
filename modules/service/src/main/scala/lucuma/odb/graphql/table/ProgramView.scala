@@ -19,6 +19,7 @@ trait ProgramView[F[_]] extends BaseMapping[F]:
     val Existence       = col("c_existence", existence)
     val Name            = col("c_name", text_nonempty.opt)
     val Description     = col("c_description", text_nonempty.opt)
+    val ProgramStatus   = col("c_program_status", program_status)
     val ProposalStatus  = col("c_proposal_status", proposal_status)
     val CalibrationRole = col("c_calibration_role", calibration_role.opt)
     val ActiveStart     = col("c_active_start", date)
