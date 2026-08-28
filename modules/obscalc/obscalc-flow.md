@@ -136,7 +136,7 @@ flowchart TD
 ```
 
 - Pickup uses `SELECT ... FOR UPDATE SKIP LOCKED` (`ObscalcService.scala:524`, `:542`) so multiple daemon instances / workers don't contend.
-- Parallelism is bounded by `maxObscalcConnections`; each worker holds one DB connection during its calculation.
+- Parallelism is bounded by `Config.Database.obscalcWorkers` (`OBSCALC_MAX_CONNECTIONS` less the session `topic` pins for LISTEN/NOTIFY); each worker holds one DB connection during its calculation.
 
 ## `ObscalcService.calculateAndUpdate`
 
@@ -221,6 +221,6 @@ Note: `v_generator_params.c_execution_state` (consumed by calibration deletion g
 ## Concurrency
 
 - Pickup: `FOR UPDATE SKIP LOCKED` makes the queue safe for parallel workers and survives multiple daemon processes.
-- Worker fan-out: `parEvalMapUnordered(connectionsLimit)` bounds parallelism to the connection pool size.
+- Worker fan-out: `parEvalMapUnordered(connectionsLimit)` bounds parallelism to the sessions the pool can actually hand out. How many entries a poll claims (`load(1024)`) is deliberately independent of this.
 - Mid-flight invalidation: detected by comparing `c_last_invalidation` snapshots; loses no edits.
 - Crash recovery: `reset()` on startup re-queues any row stuck in `calculating`.

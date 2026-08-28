@@ -297,6 +297,11 @@ object FMain extends MainParams {
       .withSSL(SSL.Trusted.withFallback(true))
       .withTypingStrategy(TypingStrategy.SearchPath)
       // .withDebug(true)
+      // Tag connections so they can be attributed per service in
+      // pg_stat_activity; see also the pool sizes in Config.Database.
+      .withConnectionParameters(
+        Session.DefaultConnectionParameters + ("application_name" -> "odb-web")
+      )
 
   def singleSession[F[_]: Temporal: Console: Network](
     config:   Config.Database,

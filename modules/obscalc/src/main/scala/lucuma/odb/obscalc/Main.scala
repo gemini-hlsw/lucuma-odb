@@ -96,6 +96,7 @@ object CalcMain extends MainParams:
             |
             |CommitHash.....: ${config.commitHash.format}
             |Max Connections: ${config.database.maxObscalcConnections}
+            |Workers........: ${config.database.obscalcWorkers}
             |Poll Period....: ${config.obscalcPoll}
             |PID............: ${ProcessHandle.current.pid}
             |Tracing........: ${OdbTelemetry.tracingBackend(config)}
@@ -115,6 +116,11 @@ object CalcMain extends MainParams:
       .withSSL(SSL.Trusted.withFallback(true))
       .withTypingStrategy(TypingStrategy.SearchPath)
       // .withDebug(true)
+      // Tag connections so they can be attributed per service in
+      // pg_stat_activity; see also the pool sizes in Config.Database.
+      .withConnectionParameters(
+        Session.DefaultConnectionParameters + ("application_name" -> "odb-obscalc")
+      )
       .pooled(config.maxObscalcConnections)
 
   def serviceUser[F[_]: Async: Trace: Network: Logger](c: Config): F[User] =
@@ -168,8 +174,9 @@ object CalcMain extends MainParams:
                   obscalcService.loadObs(oid)
 
     // Stream of pending calc produced by periodic polling.  This will pick up
-    // up to connectionsLimit entries including those that are in a 'Retry'
-    // state.
+    // up to 1024 entries including those that are in a 'Retry' state.  How many
+    // are claimed per poll is deliberately independent of how many can be worked
+    // at once (connectionsLimit, below); the surplus simply waits its turn.
     val pollStream: Stream[F, Obscalc.PendingCalc] =
       Stream
         .awakeEvery(pollPeriod)
@@ -285,7 +292,7 @@ object CalcMain extends MainParams:
                         schema
                       )
       o          <- runObscalcDaemon(
-                      c.database.maxObscalcConnections,
+                      c.database.obscalcWorkers,
                       c.obscalcPoll,
                       t,
                       pool.evalMap(

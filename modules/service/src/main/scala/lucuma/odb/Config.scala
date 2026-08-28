@@ -184,7 +184,31 @@ object Config:
     // We use Flyway (which uses JDBC) to perform schema migrations. Savor the irony.
     def jdbcUrl: String = s"jdbc:postgresql://${host}:${port}/${database}?sslmode=require"
 
+    /**
+     * Connections available to daemon workers, given a pool of `maxConnections`.
+     *
+     * The `*_MAX_CONNECTIONS` settings size the Skunk pool, which is the number
+     * budgeted against the database's overall connection limit. That is not the
+     * same as the number a daemon can put to work: each service checks out one
+     * pooled session and holds it for the life of the process to serve
+     * LISTEN/NOTIFY (`CalcMain.topic`, `CMain.topics`), so worker parallelism
+     * must stay below the pool size or the surplus workers merely queue on the
+     * pool -- having already claimed rows that then sit in 'calculating' while
+     * they wait.
+     */
+    private def workers(maxConnections: Int): Int =
+      (maxConnections - Database.ReservedSessions).max(1)
+
+    /** Connections available to obscalc daemon workers. */
+    def obscalcWorkers: Int = workers(maxObscalcConnections)
+
+    /** Connections available to calibration daemon workers. */
+    def calibrationWorkers: Int = workers(maxCalibrationConnections)
+
   object Database:
+
+    /** Pooled sessions each service pins for the life of the process (LISTEN/NOTIFY). */
+    val ReservedSessions = 1
 
     object Default:
       val MaxConnections = Runtime.getRuntime.availableProcessors * 2 + 1
