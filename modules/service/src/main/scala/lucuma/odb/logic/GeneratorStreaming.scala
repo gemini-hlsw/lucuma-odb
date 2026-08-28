@@ -97,6 +97,15 @@ sealed trait GeneratorStreaming[F[_]]:
   ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
 
 
+  def selectOrGenerateGmosNorthIfu(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
+
+  def generateGmosNorthIfu(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
+
+
   def selectOrGenerateGmosNorthLongSlit(
     context: GeneratorContext
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]]
@@ -120,6 +129,15 @@ sealed trait GeneratorStreaming[F[_]]:
   )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
 
   def generateGmosSouthImaging(
+    context: GeneratorContext
+  ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
+
+
+  def selectOrGenerateGmosSouthIfu(
+    context: GeneratorContext
+  )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
+
+  def generateGmosSouthIfu(
     context: GeneratorContext
   ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]]
 
@@ -473,6 +491,29 @@ object GeneratorStreaming:
           res <- collapseIfNecessary(context, gen)
         yield res).value
 
+      override def selectOrGenerateGmosNorthIfu(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+        selectOrGenerate(
+          lucuma.odb.sequence.gmos.InitialConfigs.GmosNorthStatic,
+          sequenceService.selectGmosNorthSequence(context.oid, _, _),
+          generateGmosNorthIfu(context)
+        )
+
+      override def generateGmosNorthIfu(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
+        import lucuma.odb.sequence.gmos.ifu.Ifu
+        (for
+          cfg <- extractMode(ObservingMode.GmosNorthIfuName, context)(_.asGmosNorthIfu)
+          acq  = acquisitionTime(context.oid, context.itcRes)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
+          rol  = context.params.calibrationRole
+          gen <- EitherT(Ifu.gmosNorth(context.oid, calculator.gmosNorthStep, context.namespace, exp.gmosNorth, cfg, acq, sci, rol))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+
       override def selectOrGenerateGmosNorthLongSlit(
         context: GeneratorContext
       )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosNorthStatic, GmosNorthDynamic]]] =
@@ -538,6 +579,29 @@ object GeneratorStreaming:
           cfg <- extractMode(ObservingMode.GmosSouthImagingName, context)(_.asGmosSouthImaging)
           itc  = requireImagingItc(ObservingMode.GmosSouthImagingName, context.oid, context.itcRes, ItcScience.gmosSouthImaging.getOption)
           gen <- EitherT(Imaging.gmosSouth(calculator.gmosSouthStep, context.namespace, cfg, itc))
+          res <- collapseIfNecessary(context, gen)
+        yield res).value
+
+
+      override def selectOrGenerateGmosSouthIfu(
+        context: GeneratorContext
+      )(using Transaction[F]): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
+        selectOrGenerate(
+          lucuma.odb.sequence.gmos.InitialConfigs.GmosSouthStatic,
+          sequenceService.selectGmosSouthSequence(context.oid, _, _),
+          generateGmosSouthIfu(context)
+        )
+
+      override def generateGmosSouthIfu(
+        context: GeneratorContext
+      ): F[Either[OdbError, StreamingExecutionConfig[F, GmosSouthStatic, GmosSouthDynamic]]] =
+        import lucuma.odb.sequence.gmos.ifu.Ifu
+        (for
+          cfg <- extractMode(ObservingMode.GmosSouthIfuName, context)(_.asGmosSouthIfu)
+          acq  = acquisitionTime(context.oid, context.itcRes)
+          sci  = spectroscopyScienceTime(context.oid, context.itcRes)
+          rol  = context.params.calibrationRole
+          gen <- EitherT(Ifu.gmosSouth(context.oid, calculator.gmosSouthStep, context.namespace, exp.gmosSouth, cfg, acq, sci, rol))
           res <- collapseIfNecessary(context, gen)
         yield res).value
 

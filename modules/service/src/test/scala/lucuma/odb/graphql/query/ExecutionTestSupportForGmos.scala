@@ -154,6 +154,35 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
       GmosAmpGain.Low
     )
 
+  // The IFU is read out unbinned and takes the aperture itself as its focal plane unit.
+  val gn_key_ifu: Gmos.TableKey[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosNorthGrating.R831_G5302,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosNorthFilter.RPrime.some,
+      GmosNorthFpu.Ifu2Slits.some,
+      GmosXBinning.One,
+      GmosYBinning.One,
+      GmosAmpGain.Low
+    )
+
+  val gs_key_ifu: Gmos.TableKey[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] =
+    Gmos.TableKey(
+      Gmos.GratingConfigKey(
+        GmosSouthGrating.R600_G5324,
+        GmosGratingOrder.One,
+        BoundedInterval.unsafeOpenUpper(Wavelength.Min, Wavelength.Max)
+      ).some,
+      GmosSouthFilter.RPrime.some,
+      GmosSouthFpu.Ifu2Slits.some,
+      GmosXBinning.One,
+      GmosYBinning.One,
+      GmosAmpGain.Low
+    )
+
   val gmos_flat =
     SmartGcalValue(
       Gcal(
@@ -194,7 +223,9 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gmos_flat),
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_1_00, gmos_arc),
         Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gmos_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gmos_arc)
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_5_00, gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_ifu,  gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gn_key_ifu,  gmos_arc)
       )
 
     val rowsSouth: List[Gmos.TableRow.South] =
@@ -202,7 +233,9 @@ trait ExecutionTestSupportForGmos extends ExecutionTestSupport:
         Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_flat),
         Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50,      gmos_arc),
         Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_flat),
-        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_arc)
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_0_50_R600, gmos_arc),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_ifu,       gmos_flat),
+        Gmos.TableRow(PosLong.unsafeFrom(1), gs_key_ifu,       gmos_arc)
       )
 
     val north = servicesFor(pi /* doesn't matter*/).map(_(s)).use: services =>

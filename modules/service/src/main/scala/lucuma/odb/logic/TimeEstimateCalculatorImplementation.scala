@@ -96,6 +96,10 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.GhostIfuMaxVisit.time
       )
 
+    // OCS charges the IFU the same setup as MOS (`SETUP_TIME_IFU_MOS`, 18 minutes).
+    lazy val gmosNorthIfuSetup: SetupTimeEstimateCalculator =
+      gmosNorthMosSetup
+
     lazy val gmosNorthImagingSetup: SetupTimeEstimateCalculator =
       setupCalculatorfromEstimation(
         SetupTime(
@@ -122,6 +126,9 @@ object TimeEstimateCalculatorImplementation:
         ),
         ctx.enums.TimeEstimate.GmosNorthMosMaxVisit.time
       )
+
+    lazy val gmosSouthIfuSetup: SetupTimeEstimateCalculator =
+      gmosSouthMosSetup
 
     lazy val gmosSouthImagingSetup: SetupTimeEstimateCalculator =
       setupCalculatorfromEstimation(
