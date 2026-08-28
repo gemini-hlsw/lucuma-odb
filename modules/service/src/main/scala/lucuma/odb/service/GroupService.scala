@@ -477,10 +477,10 @@ object GroupService {
         FROM (
           SELECT null c_group_id, c_observation_id, c_group_index
           FROM t_observation WHERE c_group_id = $group_id
-          UNION
+          UNION ALL
           SELECT c_group_id, null, c_parent_index
           FROM t_group WHERE c_parent_id = $group_id
-        ) sub ORDER BY c_group_index
+        ) sub ORDER BY c_group_index, c_group_id, c_observation_id
       """
         .contramap[Group.Id](a => (a, a))
         .query(
