@@ -7,10 +7,10 @@ package query
 import cats.effect.IO
 import io.circe.syntax.*
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
-import lucuma.core.model.Observation
 import lucuma.odb.graphql.query.ObservingModeSetupOperations.ConstraintSet
 
 /**
