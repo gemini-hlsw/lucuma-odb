@@ -8699,6 +8699,11 @@ enum ObservingModeType {
   GHOST_IFU
 
   """
+  ObservingModeType GmosNorthIfu
+  """
+  GMOS_NORTH_IFU
+
+  """
   ObservingModeType GmosNorthImaging
   """
   GMOS_NORTH_IMAGING
@@ -8712,6 +8717,11 @@ enum ObservingModeType {
   ObservingModeType GmosNorthMos
   """
   GMOS_NORTH_MOS
+
+  """
+  ObservingModeType GmosSouthIfu
+  """
+  GMOS_SOUTH_IFU
 
   """
   ObservingModeType GmosSouthImaging
