@@ -92,6 +92,16 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val Prism   = col("c_gnirs_longslit_prism", gnirs_prism.embedded)
 
     // GNIRS IFU is keyed by (grating, ifu); no camera/prism in the configuration.
+    object GmosNorthIfu:
+      val Id      = col("c_gmos_north_ifu_id", configuration_request_id.embedded)
+      val Grating = col("c_gmos_north_ifu_grating", gmos_north_grating.embedded)
+      val Fpu     = col("c_gmos_north_ifu_fpu", gmos_north_ifu_fpu.embedded)
+
+    object GmosSouthIfu:
+      val Id      = col("c_gmos_south_ifu_id", configuration_request_id.embedded)
+      val Grating = col("c_gmos_south_ifu_grating", gmos_south_grating.embedded)
+      val Fpu     = col("c_gmos_south_ifu_fpu", gmos_south_ifu_fpu.embedded)
+
     object GnirsIfu:
       val Id      = col("c_gnirs_ifu_id", configuration_request_id.embedded)
       val Grating = col("c_gnirs_ifu_grating", gnirs_grating.embedded)

@@ -71,6 +71,8 @@ trait BaseMapping[F[_]]
   lazy val ConditionsIntuitionType                 = schema.ref("ConditionsIntuition")
   lazy val ConditionsExpectationType               = schema.ref("ConditionsExpectation")
   lazy val ConditionsExpectationTypeType           = schema.ref("ConditionsExpectationType")
+  lazy val ConfigurationGmosNorthIfuType           = schema.ref("ConfigurationGmosNorthIfu")
+  lazy val ConfigurationGmosSouthIfuType           = schema.ref("ConfigurationGmosSouthIfu")
   lazy val ConfigurationConditionsType             = schema.ref("ConfigurationConditions")
   lazy val ConfigurationFlamingos2LongSlitType     = schema.ref("ConfigurationFlamingos2LongSlit")
   lazy val ConfigurationFlamingos2MosType          = schema.ref("ConfigurationFlamingos2Mos")
