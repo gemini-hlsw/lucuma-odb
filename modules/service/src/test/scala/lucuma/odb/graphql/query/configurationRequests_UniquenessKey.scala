@@ -214,6 +214,69 @@ class configurationRequests_UniquenessKey
   test("GMOS IFU - differing only in aperture"):
     assertDistinct(gmosNorthIfu("R831_G5302", "TWO_SLITS"), gmosNorthIfu("R831_G5302", "ONE_SLIT_RED"))
 
+  private val imagingRequirements: String =
+    """
+      exposureTimeMode: {
+        signalToNoise: { value: 100.0, at: { nanometers: 1210 } }
+      }
+      imaging: {
+        minimumFov: { arcseconds: 100 }
+        narrowFilters: false
+        broadFilters: false
+        combinedFilters: true
+      }
+    """
+
+  private def imaging(filters: String*): String =
+    s"""
+      gmosNorthImaging: {
+        variant: { interleaved: {} }
+        filters: ${filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")}
+      }
+    """
+
+  private def createImagingObservation(pid: Program.Id, tid: Target.Id, mode: String): IO[Observation.Id] =
+    query(
+      pi,
+      s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson}
+            SET: {
+              $ConstraintSet,
+              targetEnvironment: { asterism: ${List(tid).asJson} }
+              scienceRequirements: { $imagingRequirements }
+              observingMode: { $mode }
+            }
+          }) {
+            observation { id }
+          }
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  // sc-8036 removed the filters from the approval check, so they no longer identify a request and
+  // both orders must canonicalize onto the same one.  Widening used to fail: the insert collided on
+  // the key, and the old containment lookup then asked {r} @> {r,g} and found nothing.
+  private def assertImagingCollapses(first: String, second: String): IO[Unit] =
+    setup.flatMap: (pid, tid) =>
+      for
+        o1 <- createImagingObservation(pid, tid, first)
+        o2 <- createImagingObservation(pid, tid, second)
+        r1 <- createConfigurationRequestAs(pi, o1)
+        r2 <- createConfigurationRequestAs(pi, o2)
+        _  <- IO(assertEquals(r1, r2))
+      yield ()
+
+  test("GMOS imaging - adding a filter reuses the request"):
+    assertImagingCollapses(imaging("R_PRIME"), imaging("R_PRIME", "G_PRIME"))
+
+  test("GMOS imaging - removing a filter reuses the request"):
+    assertImagingCollapses(imaging("R_PRIME", "G_PRIME"), imaging("R_PRIME"))
+
+  test("GMOS imaging - a disjoint filter set reuses the request"):
+    assertImagingCollapses(imaging("R_PRIME"), imaging("G_PRIME"))
+
   // Widening the key must not stop genuinely identical requests collapsing onto one.
   test("identical requests still collapse onto one"):
     setup.flatMap: (pid, tid) =>

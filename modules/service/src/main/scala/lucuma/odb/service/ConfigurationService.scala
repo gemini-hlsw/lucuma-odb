@@ -1086,7 +1086,9 @@ object ConfigurationService {
 
   private object Statements {
 
-    // select matching row, if any
+    // Select the row a conflicting insert collided with. The matched columns are exactly the
+    // columns of t_configuration_request_unique -- a discriminant belongs in both or in neither,
+    // otherwise a genuinely distinct request collides and then fails to find its own row.
     val SelectRequest: Query[(Observation.Id, Configuration), ConfigurationRequest] =
       sql"""
         SELECT
@@ -1138,8 +1140,6 @@ object ConfigurationService {
           c_region_dec_arc_end is not distinct from ${declination.opt} AND
           c_observing_mode_type = $observing_mode_type AND
           c_flamingos_2_longslit_disperser IS NOT DISTINCT FROM ${flamingos_2_disperser.opt} AND
-          COALESCE(c_gmos_north_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_north_filter.opt}, '{}'::_d_tag) AND
-          COALESCE(c_gmos_south_imaging_filters, '{}'::_d_tag) @> COALESCE(${_gmos_south_filter.opt}, '{}'::_d_tag) AND
           c_gmos_north_longslit_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_south_longslit_grating is not distinct from ${gmos_south_grating.opt} AND
           c_gnirs_longslit_grating is not distinct from ${gnirs_grating.opt} AND
@@ -1339,8 +1339,6 @@ object ConfigurationService {
         cfg.observingMode.tpe                                                   *:
         cfg.observingMode.flamingos2LongSlit.map(_.disperser)
           .orElse(cfg.observingMode.flamingos2Mos.map(_.disperser))             *:
-        cfg.observingMode.gmosNorthImaging.map(_.filters).map(Arr.fromFoldable) *:
-        cfg.observingMode.gmosSouthImaging.map(_.filters).map(Arr.fromFoldable) *:
         cfg.observingMode.gmosNorthLongSlit.map(_.grating)
           .orElse(cfg.observingMode.gmosNorthMos.map(_.grating))                *:
         cfg.observingMode.gmosSouthLongSlit.map(_.grating)
