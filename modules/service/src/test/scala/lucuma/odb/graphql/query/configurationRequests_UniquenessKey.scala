@@ -12,6 +12,9 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.graphql.query.ObservingModeSetupOperations.ConstraintSet
+import skunk.codec.all.*
+import skunk.implicits.*
+import skunk.data.Arr
 
 /**
  * The configuration request uniqueness key must carry exactly the columns that `SelectRequest`
@@ -195,6 +198,24 @@ class configurationRequests_UniquenessKey
       r2  <- requestFor(pid, t2, gnirsLongSlit("D111", "SHORT_BLUE"))
       _   <- IO(assertNotEquals(r1, r2, s"Expected distinct configuration requests, got $r1 twice."))
     yield ()
+
+  // The GMOS IFU columns are in the key but not yet matched by `SelectRequest`, so two IFU
+  // requests currently canonicalize onto one.  This pins that the key still *carries* them: were
+  // they dropped, adding the service-side matching later would silently reintroduce a collision.
+  test("GMOS IFU columns are part of the uniqueness key"):
+    val cols = List(
+      "c_gmos_north_ifu_grating",
+      "c_gmos_north_ifu_fpu",
+      "c_gmos_south_ifu_grating",
+      "c_gmos_south_ifu_fpu"
+    )
+    withSession: s =>
+      s.unique(sql"""
+        SELECT count(*)::int
+          FROM information_schema.constraint_column_usage
+         WHERE constraint_name = 't_configuration_request_unique'
+           AND column_name = ANY($_varchar)
+      """.query(int4)).apply(Arr(cols*)).map(assertEquals(_, cols.length))
 
   // Widening the key must not stop genuinely identical requests collapsing onto one.
   test("identical requests still collapse onto one"):

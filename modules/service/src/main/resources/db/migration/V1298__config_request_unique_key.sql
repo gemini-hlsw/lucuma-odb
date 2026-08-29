@@ -9,6 +9,11 @@
 -- opportunity targets, where the reference coordinates are null), the visitor
 -- radius, and every GNIRS column.
 --
+-- The GMOS IFU columns are carried over from V1297.  `SelectRequest` does not match them yet --
+-- ConfigurationService has no GMOS IFU handling on main -- so they are always null today and the
+-- key is unaffected.  They stay because they are the mode's real discriminants: dropping them
+-- would reintroduce the collision the moment that service work lands.
+--
 -- The GMOS imaging filter arrays are deliberately excluded: `SelectRequest`
 -- matches them by containment (@>), not equality, so imaging canonicalizes onto
 -- a superset row on purpose.
