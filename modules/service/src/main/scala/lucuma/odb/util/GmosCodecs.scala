@@ -12,6 +12,7 @@ import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosIfuAcquisitionRoi
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthDetector
@@ -67,6 +68,9 @@ trait GmosCodecs {
 
   val gmos_grating_order: Codec[GmosGratingOrder] =
     enumerated(Type.varchar)
+
+  val gmos_ifu_acquisition_roi: Codec[GmosIfuAcquisitionRoi] =
+    enumerated(Type("e_gmos_ifu_acquisition_roi"))
 
   val gmos_long_slit_acquisition_roi: Codec[GmosLongSlitAcquisitionRoi] =
     enumerated(Type("e_gmos_long_slit_acquisition_roi"))

@@ -17,6 +17,7 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosIfuAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosRoi
@@ -112,6 +113,10 @@ trait GmosIfuMapping[F[_]]
       explicitOrElseDefault[GmosNorthFilter]("filter", "explicitFilter", "defaultFilter"),
       SqlField("defaultFilter",  GmosNorthIfuView.AcquisitionFilterDefault),
       SqlField("explicitFilter", GmosNorthIfuView.AcquisitionFilter),
+
+      explicitOrElseDefault[GmosIfuAcquisitionRoi]("roi", "explicitRoi", "defaultRoi"),
+      SqlField("defaultRoi",  GmosNorthIfuView.AcquisitionRoiDefault),
+      SqlField("explicitRoi", GmosNorthIfuView.AcquisitionRoi),
 
       SqlObject("exposureTimeMode", Join(GmosNorthIfuView.Common.ObservationId, ExposureTimeModeView.ObservationId))
     )
@@ -224,6 +229,10 @@ trait GmosIfuMapping[F[_]]
       explicitOrElseDefault[GmosSouthFilter]("filter", "explicitFilter", "defaultFilter"),
       SqlField("defaultFilter",  GmosSouthIfuView.AcquisitionFilterDefault),
       SqlField("explicitFilter", GmosSouthIfuView.AcquisitionFilter),
+
+      explicitOrElseDefault[GmosIfuAcquisitionRoi]("roi", "explicitRoi", "defaultRoi"),
+      SqlField("defaultRoi",  GmosSouthIfuView.AcquisitionRoiDefault),
+      SqlField("explicitRoi", GmosSouthIfuView.AcquisitionRoi),
 
       SqlObject("exposureTimeMode", Join(GmosSouthIfuView.Common.ObservationId, ExposureTimeModeView.ObservationId))
     )

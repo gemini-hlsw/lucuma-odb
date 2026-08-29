@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosIfuAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosNorthIfuFpu
@@ -102,15 +103,19 @@ object GmosIfuService {
     new GmosIfuService[F] {
 
       val north_acquisition: Decoder[AcquisitionConfig.GmosNorth] =
-        (exposure_time_mode     *:
-         gmos_north_filter      *:
-         gmos_north_filter.opt
+        (exposure_time_mode          *:
+         gmos_north_filter          *:
+         gmos_north_filter.opt      *:
+         gmos_ifu_acquisition_roi     *:
+         gmos_ifu_acquisition_roi.opt
         ).to[AcquisitionConfig.GmosNorth]
 
       val south_acquisition: Decoder[AcquisitionConfig.GmosSouth] =
-        (exposure_time_mode     *:
-         gmos_south_filter      *:
-         gmos_south_filter.opt
+        (exposure_time_mode          *:
+         gmos_south_filter          *:
+         gmos_south_filter.opt      *:
+         gmos_ifu_acquisition_roi     *:
+         gmos_ifu_acquisition_roi.opt
         ).to[AcquisitionConfig.GmosSouth]
 
       val common: Decoder[Common] =
@@ -321,6 +326,8 @@ object GmosIfuService {
           acq.c_exposure_count,
           m.c_acquisition_filter_default,
           m.c_acquisition_filter,
+          m.c_acquisition_roi_default,
+          m.c_acquisition_roi,
           m.c_central_wavelength,
           sci.c_exposure_time_mode,
           sci.c_signal_to_noise_at,
@@ -365,6 +372,7 @@ object GmosIfuService {
       Option[Angle],
       Option[Angle],
       Option[GmosNorthFilter],
+      Option[GmosIfuAcquisitionRoi],
       Wavelength,
       Option[GmosXBinning],
       Option[GmosYBinning],
@@ -388,6 +396,7 @@ object GmosIfuService {
           c_ifu_analysis_sum_radius,
           c_ifu_analysis_single_offset,
           c_acquisition_filter,
+          c_acquisition_roi,
           c_central_wavelength,
           c_xbin,
           c_ybin,
@@ -410,6 +419,7 @@ object GmosIfuService {
           ${angle_µas.opt},
           ${angle_µas.opt},
           ${gmos_north_filter.opt},
+          ${gmos_ifu_acquisition_roi.opt},
           $wavelength_pm,
           ${gmos_binning.opt},
           ${gmos_binning.opt},
@@ -424,8 +434,8 @@ object GmosIfuService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, u, sr, so, af, w, x, y, r, n, i, wd, tc, ig, il, iu, iw) => (
-         o, g, l, u, sr, so, af, w, x.map(_.value), y.map(_.value), r, n, i, wd, tc, ig, il, iu, iw, o
+       """.contramap { (o, g, l, u, sr, so, af, ar, w, x, y, r, n, i, wd, tc, ig, il, iu, iw) => (
+         o, g, l, u, sr, so, af, ar, w, x.map(_.value), y.map(_.value), r, n, i, wd, tc, ig, il, iu, iw, o
        )}
 
     def insertGmosNorthIfu(
@@ -441,6 +451,7 @@ object GmosIfuService {
         sumRadius,
         singleOffset,
         input.acquisition.flatMap(_.filter.toOption),
+        input.acquisition.flatMap(_.roi.toOption),
         input.common.centralWavelength,
         input.common.explicitXBin,
         input.common.explicitYBin,
@@ -468,13 +479,15 @@ object GmosIfuService {
       val upFilter    = sql"c_filter             = ${gmos_north_filter.opt}"
       val upFpu       = sql"c_fpu                = $gmos_north_ifu_fpu"
       val upAcqFilter = sql"c_acquisition_filter = ${gmos_north_filter.opt}"
+      val upAcqRoi    = sql"c_acquisition_roi    = ${gmos_ifu_acquisition_roi.opt}"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
           input.fpu.map(upFpu),
-          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter)
+          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter),
+          input.acquisition.flatMap(_.roi.toOptionOption).map(upAcqRoi)
         ).flatten ++ commonUpdates(input.common)
 
       NonEmptyList.fromList(ups)
@@ -500,6 +513,7 @@ object GmosIfuService {
       Option[Angle],
       Option[Angle],
       Option[GmosSouthFilter],
+      Option[GmosIfuAcquisitionRoi],
       Wavelength,
       Option[GmosXBinning],
       Option[GmosYBinning],
@@ -523,6 +537,7 @@ object GmosIfuService {
           c_ifu_analysis_sum_radius,
           c_ifu_analysis_single_offset,
           c_acquisition_filter,
+          c_acquisition_roi,
           c_central_wavelength,
           c_xbin,
           c_ybin,
@@ -545,6 +560,7 @@ object GmosIfuService {
           ${angle_µas.opt},
           ${angle_µas.opt},
           ${gmos_south_filter.opt},
+          ${gmos_ifu_acquisition_roi.opt},
           $wavelength_pm,
           ${gmos_binning.opt},
           ${gmos_binning.opt},
@@ -559,8 +575,8 @@ object GmosIfuService {
           $wavelength_pm
         FROM t_observation
         WHERE c_observation_id = $observation_id
-       """.contramap { (o, g, l, u, sr, so, af, w, x, y, r, n, i, wd, tc, ig, il, iu, iw) => (
-         o, g, l, u, sr, so, af, w, x.map(_.value), y.map(_.value), r, n, i, wd, tc, ig, il, iu, iw, o
+       """.contramap { (o, g, l, u, sr, so, af, ar, w, x, y, r, n, i, wd, tc, ig, il, iu, iw) => (
+         o, g, l, u, sr, so, af, ar, w, x.map(_.value), y.map(_.value), r, n, i, wd, tc, ig, il, iu, iw, o
        )}
 
     def insertGmosSouthIfu(
@@ -576,6 +592,7 @@ object GmosIfuService {
         sumRadius,
         singleOffset,
         input.acquisition.flatMap(_.filter.toOption),
+        input.acquisition.flatMap(_.roi.toOption),
         input.common.centralWavelength,
         input.common.explicitXBin,
         input.common.explicitYBin,
@@ -603,13 +620,15 @@ object GmosIfuService {
       val upFilter    = sql"c_filter             = ${gmos_south_filter.opt}"
       val upFpu       = sql"c_fpu                = $gmos_south_ifu_fpu"
       val upAcqFilter = sql"c_acquisition_filter = ${gmos_south_filter.opt}"
+      val upAcqRoi    = sql"c_acquisition_roi    = ${gmos_ifu_acquisition_roi.opt}"
 
       val ups: List[AppliedFragment] =
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
           input.fpu.map(upFpu),
-          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter)
+          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter),
+          input.acquisition.flatMap(_.roi.toOptionOption).map(upAcqRoi)
         ).flatten ++ commonUpdates(input.common)
 
       NonEmptyList.fromList(ups)
@@ -678,6 +697,7 @@ object GmosIfuService {
         c_ifu_analysis_sum_radius,
         c_ifu_analysis_single_offset,
         c_acquisition_filter,
+        c_acquisition_roi,
         c_central_wavelength,
         c_xbin,
         c_ybin,
@@ -701,6 +721,7 @@ object GmosIfuService {
         c_ifu_analysis_sum_radius,
         c_ifu_analysis_single_offset,
         c_acquisition_filter,
+        c_acquisition_roi,
         c_central_wavelength,
         c_xbin,
         c_ybin,

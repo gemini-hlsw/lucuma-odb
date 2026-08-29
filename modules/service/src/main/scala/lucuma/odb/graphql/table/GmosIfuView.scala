@@ -42,6 +42,8 @@ trait GmosIfuView[F[_]] extends BaseMapping[F]:
     val Fpu: ColumnRef            = col("c_fpu", gmos_north_ifu_fpu)
     val AcquisitionFilter         = col("c_acquisition_filter", gmos_north_filter.opt)
     val AcquisitionFilterDefault  = col("c_acquisition_filter_default", gmos_north_filter)
+    val AcquisitionRoi            = col("c_acquisition_roi", gmos_ifu_acquisition_roi.opt)
+    val AcquisitionRoiDefault     = col("c_acquisition_roi_default", gmos_ifu_acquisition_roi)
 
     val InitialGrating: ColumnRef = col("c_initial_grating", gmos_north_grating)
     val InitialFilter: ColumnRef  = col("c_initial_filter", gmos_north_filter.opt)
@@ -56,6 +58,8 @@ trait GmosIfuView[F[_]] extends BaseMapping[F]:
     val Fpu: ColumnRef            = col("c_fpu", gmos_south_ifu_fpu)
     val AcquisitionFilter         = col("c_acquisition_filter", gmos_south_filter.opt)
     val AcquisitionFilterDefault  = col("c_acquisition_filter_default", gmos_south_filter)
+    val AcquisitionRoi            = col("c_acquisition_roi", gmos_ifu_acquisition_roi.opt)
+    val AcquisitionRoiDefault     = col("c_acquisition_roi_default", gmos_ifu_acquisition_roi)
 
     val InitialGrating: ColumnRef = col("c_initial_grating", gmos_south_grating)
     val InitialFilter: ColumnRef  = col("c_initial_filter", gmos_south_filter.opt)

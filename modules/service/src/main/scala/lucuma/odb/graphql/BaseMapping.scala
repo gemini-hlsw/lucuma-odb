@@ -197,6 +197,7 @@ trait BaseMapping[F[_]]
   lazy val GmosCustomSlitWidthType                 = schema.ref("GmosCustomSlitWidth")
   lazy val GmosDtaxType                            = schema.ref("GmosDtax")
   lazy val GmosGratingOrderType                    = schema.ref("GmosGratingOrder")
+  lazy val GmosIfuAcquisitionRoiType               = schema.ref("GmosIfuAcquisitionRoi")
   lazy val GmosLongSlitAcquisitionRoiType          = schema.ref("GmosLongSlitAcquisitionRoi")
   lazy val GmosMosAcquisitionTypeType              = schema.ref("GmosMosAcquisitionType")
   lazy val GmosMosPreImagingVariantType            = schema.ref("GmosMosPreImagingVariant")

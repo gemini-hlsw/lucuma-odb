@@ -12,6 +12,7 @@ import cats.syntax.traverse.*
 import grackle.Result
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
+import lucuma.core.enums.GmosIfuAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
 import lucuma.core.enums.GmosNorthIfuFpu
@@ -43,37 +44,43 @@ object GmosIfuInput extends AcquisitionFilterCheck:
 
   final case class NorthAcquisition(
     filter:           Nullable[GmosNorthFilter],
+    roi:              Nullable[GmosIfuAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
   ):
     def updatesAcquisition: Boolean =
-      filter.isDefined || exposureTimeMode.isDefined
+      filter.isDefined || roi.isDefined || exposureTimeMode.isDefined
 
   object NorthAcquisition:
     val Binding: Matcher[NorthAcquisition] =
       ObjectFieldsBinding.rmap:
         case List(
           GmosNorthFilterBinding.Nullable("explicitFilter", rFilter),
+          GmosIfuAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
           acquisitionFilter(GmosNorthFilter.acquisition, rFilter),
+          rRoi,
           rExposureTimeMode
         ).parMapN(apply)
 
   final case class SouthAcquisition(
     filter:           Nullable[GmosSouthFilter],
+    roi:              Nullable[GmosIfuAcquisitionRoi],
     exposureTimeMode: Option[ExposureTimeMode]
   ):
     def updatesAcquisition: Boolean =
-      filter.isDefined || exposureTimeMode.isDefined
+      filter.isDefined || roi.isDefined || exposureTimeMode.isDefined
 
   object SouthAcquisition:
     val Binding: Matcher[SouthAcquisition] =
       ObjectFieldsBinding.rmap:
         case List(
           GmosSouthFilterBinding.Nullable("explicitFilter", rFilter),
+          GmosIfuAcquisitionRoiBinding.Nullable("explicitRoi", rRoi),
           ExposureTimeModeInput.Binding.Option("exposureTimeMode", rExposureTimeMode)
         ) => (
           acquisitionFilter(GmosSouthFilter.acquisition, rFilter),
+          rRoi,
           rExposureTimeMode
         ).parMapN(apply)
 

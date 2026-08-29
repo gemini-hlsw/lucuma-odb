@@ -3113,6 +3113,13 @@ input GmosNorthIfuAcquisitionInput {
   explicitFilter: GmosNorthFilter
 
   """
+  An explicit acquisition ROI to use instead of the default.  The `explicitRoi` may be unset by
+  assigning a null value, or ignored by skipping it altogether.  If not provided, the ROIs used
+  depend on the observation's calibration role.
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
+
+  """
   Exposure time mode for the acquisition sequence.
   """
   exposureTimeMode: ExposureTimeModeInput
@@ -3211,6 +3218,13 @@ input GmosSouthIfuAcquisitionInput {
   the central wavelength.
   """
   explicitFilter: GmosSouthFilter
+
+  """
+  An explicit acquisition ROI to use instead of the default.  The `explicitRoi` may be unset by
+  assigning a null value, or ignored by skipping it altogether.  If not provided, the ROIs used
+  depend on the observation's calibration role.
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
 
   """
   Exposure time mode for the acquisition sequence.
@@ -12738,6 +12752,26 @@ enum GmosAmpReadMode {
 """
 GMOS Long Slit Acquisition ROI options.
 """
+enum GmosIfuAcquisitionRoi {
+
+  """
+  Imaging step uses CCD2, steps through the IFU use Full Frame.  The default for science.
+  """
+  CCD2_FULL_FRAME
+
+  """
+  Imaging step uses Central Stamp, steps through the IFU use Full Frame.  The default for
+  spectrophotometric standards.
+  """
+  STAMP_FULL_FRAME
+
+  """
+  Both the imaging step and the steps through the IFU use Full Frame.
+  """
+  FULL_FRAME
+
+}
+
 enum GmosLongSlitAcquisitionRoi {
 
   """
@@ -14203,6 +14237,23 @@ type GmosNorthIfuAcquisition {
   explicitFilter: GmosNorthFilter
 
   """
+  The ROIs that will be used for the acquisition sequence.  The first is used for the imaging
+  step and the second for the steps taken through the IFU.  This will be the `explicitRoi` if
+  specified, but otherwise the `defaultRoi`.
+  """
+  roi: GmosIfuAcquisitionRoi!
+
+  """
+  The acquisition ROIs that will be used by default, if an explicit ROI was not specified.
+  """
+  defaultRoi: GmosIfuAcquisitionRoi!
+
+  """
+  An explicitly specified acquisition ROI (if any).
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
+
+  """
   The exposure time mode for the acquisition sequence.
   """
   exposureTimeMode: ExposureTimeMode!
@@ -14435,6 +14486,23 @@ type GmosSouthIfuAcquisition {
   An explicitly specified GMOS South filter to use in acquisition (if any).
   """
   explicitFilter: GmosSouthFilter
+
+  """
+  The ROIs that will be used for the acquisition sequence.  The first is used for the imaging
+  step and the second for the steps taken through the IFU.  This will be the `explicitRoi` if
+  specified, but otherwise the `defaultRoi`.
+  """
+  roi: GmosIfuAcquisitionRoi!
+
+  """
+  The acquisition ROIs that will be used by default, if an explicit ROI was not specified.
+  """
+  defaultRoi: GmosIfuAcquisitionRoi!
+
+  """
+  An explicitly specified acquisition ROI (if any).
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
 
   """
   The exposure time mode for the acquisition sequence.

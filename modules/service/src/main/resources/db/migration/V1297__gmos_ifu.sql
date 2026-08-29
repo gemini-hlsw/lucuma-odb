@@ -24,6 +24,15 @@ INSERT INTO t_gmos_ifu_fpu VALUES ('TwoSlits',    'IFU-2', 'IFU 2 Slits',       
 INSERT INTO t_gmos_ifu_fpu VALUES ('OneSlitRed',  'IFU-R', 'IFU Right Slit (red)',  3500000);
 INSERT INTO t_gmos_ifu_fpu VALUES ('OneSlitBlue', 'IFU-B', 'IFU Left Slit (blue)',  3500000);
 
+-- Acquisition ROI pairs, per sc-10044.  Unlike the long slit these widen rather than narrow: the
+-- image through the IFU is always Full Frame, because both bundles must be visible and the sky
+-- bundle sits 60" from the target.
+CREATE TYPE e_gmos_ifu_acquisition_roi AS enum(
+  'Ccd2FullFrame',
+  'StampFullFrame',
+  'FullFrame'
+);
+
 CREATE TABLE t_gmos_north_ifu (
 
   c_observation_id             d_observation_id      NOT NULL,
@@ -59,6 +68,7 @@ CREATE TABLE t_gmos_north_ifu (
   c_ifu_analysis_single_offset d_angle_µas           NULL DEFAULT NULL,
 
   c_acquisition_filter         d_tag                 NULL DEFAULT NULL REFERENCES t_gmos_north_filter(c_tag),
+  c_acquisition_roi            e_gmos_ifu_acquisition_roi NULL DEFAULT NULL,
 
   c_initial_grating            d_tag                 NOT NULL          REFERENCES t_gmos_north_disperser(c_tag),
   c_initial_filter             d_tag                 NULL DEFAULT NULL REFERENCES t_gmos_north_filter(c_tag),
@@ -115,6 +125,7 @@ CREATE TABLE t_gmos_south_ifu (
   c_ifu_analysis_single_offset d_angle_µas           NULL DEFAULT NULL,
 
   c_acquisition_filter         d_tag                 NULL DEFAULT NULL REFERENCES t_gmos_south_filter(c_tag),
+  c_acquisition_roi            e_gmos_ifu_acquisition_roi NULL DEFAULT NULL,
 
   c_initial_grating            d_tag                 NOT NULL          REFERENCES t_gmos_south_disperser(c_tag),
   c_initial_filter             d_tag                 NULL DEFAULT NULL REFERENCES t_gmos_south_filter(c_tag),
@@ -260,10 +271,18 @@ SELECT
       LIMIT 1
   ) AS c_acquisition_filter_default,
 
+  -- ATTENTION: duplicated from GmosIfuAcquisitionRoi.defaultForScienceOrCalibration.
+  -- Keep in sync.
+  CASE
+    WHEN o.c_calibration_role = 'spectrophotometric'::e_calibration_role THEN 'StampFullFrame'::e_gmos_ifu_acquisition_roi
+    ELSE 'Ccd2FullFrame'::e_gmos_ifu_acquisition_roi
+  END AS c_acquisition_roi_default,
+
   d.c_telescope_configs_default,
   COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
 
 FROM t_gmos_north_ifu m
+INNER JOIN t_observation o ON o.c_observation_id = m.c_observation_id
 CROSS JOIN LATERAL (
   SELECT
     -- ATTENTION: duplicated from gmos.ifu.Config.DefaultTelescopeConfigs (a single
@@ -283,10 +302,18 @@ SELECT
       LIMIT 1
   ) AS c_acquisition_filter_default,
 
+  -- ATTENTION: duplicated from GmosIfuAcquisitionRoi.defaultForScienceOrCalibration.
+  -- Keep in sync.
+  CASE
+    WHEN o.c_calibration_role = 'spectrophotometric'::e_calibration_role THEN 'StampFullFrame'::e_gmos_ifu_acquisition_roi
+    ELSE 'Ccd2FullFrame'::e_gmos_ifu_acquisition_roi
+  END AS c_acquisition_roi_default,
+
   d.c_telescope_configs_default,
   COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
 
 FROM t_gmos_south_ifu m
+INNER JOIN t_observation o ON o.c_observation_id = m.c_observation_id
 CROSS JOIN LATERAL (
   SELECT
     -- ATTENTION: duplicated from gmos.ifu.Config.DefaultTelescopeConfigs (a single

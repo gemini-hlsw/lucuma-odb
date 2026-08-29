@@ -152,6 +152,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[GmosDtax](GmosDtaxType),
       LeafMapping[GmosGratingOrder](GmosGratingOrderType),
       LeafMapping[ImagingVariantType](ImagingVariantTypeType),
+      LeafMapping[GmosIfuAcquisitionRoi](GmosIfuAcquisitionRoiType),
       LeafMapping[GmosLongSlitAcquisitionRoi](GmosLongSlitAcquisitionRoiType),
       LeafMapping[GmosNorthIfuFpu](GmosNorthIfuFpuType),
       LeafMapping[GmosSouthIfuFpu](GmosSouthIfuFpuType),

@@ -84,6 +84,7 @@ object StartupDiagnostics:
               ds.updated(Type("e_ghost_fiber_agitator"))
           },
           checkPostgresEnum(imaging_variant),
+          checkPostgresEnum(gmos_ifu_acquisition_roi),
           checkPostgresEnum(gmos_long_slit_acquisition_roi),
           checkPostgresEnum(gmos_mos_acquisition_type),
           checkPostgresEnum(gender),

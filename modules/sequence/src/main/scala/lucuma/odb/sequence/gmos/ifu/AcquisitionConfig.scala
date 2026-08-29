@@ -5,6 +5,7 @@ package lucuma.odb.sequence.gmos.ifu
 
 import cats.Eq
 import cats.derived.*
+import lucuma.core.enums.GmosIfuAcquisitionRoi
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.model.ExposureTimeMode
@@ -18,9 +19,8 @@ import java.io.DataOutputStream
  * Configuration for the GMOS IFU acquisition.
  *
  * As for MOS, the default filter is the acquisition filter nearest the central
- * wavelength; it is computed in the database view and passed in here.  The two
- * steps the acquisition takes always use the same filter and exposure time, so
- * there is nothing else to choose.
+ * wavelength; it is computed in the database view and passed in here, as is the
+ * default ROI, which depends on the observation's calibration role.
  *
  * @tparam L filter type
  */
@@ -35,11 +35,19 @@ sealed trait AcquisitionConfig[L: Enumerated] extends Product with Serializable:
 
   def explicitFilter: Option[L]
 
+  def roi: GmosIfuAcquisitionRoi =
+    explicitRoi.getOrElse(defaultRoi)
+
+  def defaultRoi: GmosIfuAcquisitionRoi
+
+  def explicitRoi: Option[GmosIfuAcquisitionRoi]
+
   def hashBytes: Array[Byte] =
     val bao: ByteArrayOutputStream = new ByteArrayOutputStream(256)
     val out: DataOutputStream      = new DataOutputStream(bao)
 
     out.writeChars(Enumerated[L].tag(filter))
+    out.writeChars(roi.tag)
     out.write(exposureTimeMode.hashBytes)
 
     out.close()
@@ -47,14 +55,19 @@ sealed trait AcquisitionConfig[L: Enumerated] extends Product with Serializable:
 
 object AcquisitionConfig:
 
+
   final case class GmosNorth(
     exposureTimeMode: ExposureTimeMode,
     defaultFilter:    GmosNorthFilter,
-    explicitFilter:   Option[GmosNorthFilter]
+    explicitFilter:   Option[GmosNorthFilter],
+    defaultRoi:       GmosIfuAcquisitionRoi,
+    explicitRoi:      Option[GmosIfuAcquisitionRoi]
   ) extends AcquisitionConfig[GmosNorthFilter] derives Eq
 
   final case class GmosSouth(
     exposureTimeMode: ExposureTimeMode,
     defaultFilter:    GmosSouthFilter,
-    explicitFilter:   Option[GmosSouthFilter]
+    explicitFilter:   Option[GmosSouthFilter],
+    defaultRoi:       GmosIfuAcquisitionRoi,
+    explicitRoi:      Option[GmosIfuAcquisitionRoi]
   ) extends AcquisitionConfig[GmosSouthFilter] derives Eq

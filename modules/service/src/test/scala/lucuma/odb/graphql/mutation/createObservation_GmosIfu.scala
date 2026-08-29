@@ -93,6 +93,7 @@ class createObservation_GmosIfu extends OdbSuite:
               filter
               fpu
               centralWavelength { nanometers }
+              acquisition { filter defaultFilter explicitFilter roi defaultRoi explicitRoi }
               ifuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
               defaultIfuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
               explicitIfuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
@@ -137,6 +138,14 @@ class createObservation_GmosIfu extends OdbSuite:
                 "filter": "R_PRIME",
                 "fpu": "TWO_SLITS",
                 "centralWavelength": { "nanometers": 500.000 },
+                "acquisition": {
+                  "filter": "G_PRIME",
+                  "defaultFilter": "G_PRIME",
+                  "explicitFilter": null,
+                  "roi": "CCD2_FULL_FRAME",
+                  "defaultRoi": "CCD2_FULL_FRAME",
+                  "explicitRoi": null
+                },
                 "ifuAnalysis": $defaultAnalysis,
                 "defaultIfuAnalysis": $defaultAnalysis,
                 "explicitIfuAnalysis": null,
@@ -172,6 +181,14 @@ class createObservation_GmosIfu extends OdbSuite:
                 "filter": null,
                 "fpu": "ONE_SLIT_BLUE",
                 "centralWavelength": { "nanometers": 500.000 },
+                "acquisition": {
+                  "filter": "G_PRIME",
+                  "defaultFilter": "G_PRIME",
+                  "explicitFilter": null,
+                  "roi": "CCD2_FULL_FRAME",
+                  "defaultRoi": "CCD2_FULL_FRAME",
+                  "explicitRoi": null
+                },
                 "ifuAnalysis": $defaultAnalysis,
                 "defaultIfuAnalysis": $defaultAnalysis,
                 "explicitIfuAnalysis": null,
@@ -210,7 +227,7 @@ class createObservation_GmosIfu extends OdbSuite:
           observation(observationId: "$oid") {
             observingMode {
               gmosNorthIfu {
-                ifuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
+              ifuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
                 explicitIfuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
               }
             }
@@ -243,7 +260,7 @@ class createObservation_GmosIfu extends OdbSuite:
           observation(observationId: "$oid") {
             observingMode {
               gmosNorthIfu {
-                ifuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
+              ifuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
                 explicitIfuAnalysis { sumRadius { arcseconds } singleOffset { arcseconds } }
               }
             }
