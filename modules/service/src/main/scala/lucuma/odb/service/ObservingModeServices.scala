@@ -73,12 +73,6 @@ object ObservingModeServices:
   def instantiate[F[_]: {MonadCancelThrow, Services}]: ObservingModeServices[F] =
     new ObservingModeServices[F]:
 
-      // GMOS IFU has an ObservingModeType but no table, input or service yet, so these
-      // branches exist for exhaustivity alone.  Raising in F rather than throwing keeps
-      // the failure inside the effect even where the match is evaluated eagerly.
-      private def gmosIfuNotImplemented[A]: F[A] =
-        MonadCancelThrow[F].raiseError(new RuntimeException("GMOS IFU observing mode is not yet supported"))
-
       override def selectObservingMode(
         which: List[(Observation.Id, ObservingModeType)]
       )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, ObservingMode]] =
@@ -136,8 +130,15 @@ object ObservingModeServices:
               .selectSouth(oids)
               .map(_.widen[ObservingMode])
 
-          case (GmosNorthIfu | GmosSouthIfu, _) =>
-            gmosIfuNotImplemented
+          case (GmosNorthIfu, oids) =>
+            gmosIfuService
+              .selectNorth(oids)
+              .map(_.widen[ObservingMode])
+
+          case (GmosSouthIfu, oids) =>
+            gmosIfuService
+              .selectSouth(oids)
+              .map(_.widen[ObservingMode])
 
           case (GnirsImaging, oids) =>
             gnirsImagingService
@@ -193,9 +194,11 @@ object ObservingModeServices:
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.insert(m, etm, which)),
           input.flamingos2Mos.map(m =>      flamingos2MosService.insert(m, etm, which)),
           input.ghostIfu.map(m =>           ghostIfuService.insert(m, etm, which)),
+          input.gmosNorthIfu.map(m =>       gmosIfuService.insertNorth(m, etm, which)),
           input.gmosNorthImaging.map(m =>   gmosImagingService.insertNorth(m, etm, which)),
           input.gmosNorthLongSlit.map(m =>  gmosLongSlitService.insertNorth(m, etm, which)),
           input.gmosNorthMos.map(m =>       gmosMosService.insertNorth(m, etm, which)),
+          input.gmosSouthIfu.map(m =>       gmosIfuService.insertSouth(m, etm, which)),
           input.gmosSouthImaging.map(m =>   gmosImagingService.insertSouth(m, etm, which)),
           input.gmosSouthLongSlit.map(m =>  gmosLongSlitService.insertSouth(m, etm, which)),
           input.gmosSouthMos.map(m =>       gmosMosService.insertSouth(m, etm, which)),
@@ -229,7 +232,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.deleteSouth(which)
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.deleteSouth(which)
             case ObservingModeType.GmosSouthMos       => gmosMosService.deleteSouth(which)
-            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => gmosIfuNotImplemented
+            case ObservingModeType.GmosNorthIfu       => gmosIfuService.deleteNorth(which)
+            case ObservingModeType.GmosSouthIfu       => gmosIfuService.deleteSouth(which)
             case ObservingModeType.GnirsImaging       => gnirsImagingService.delete(which)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.delete(which)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.delete(which)
@@ -247,9 +251,11 @@ object ObservingModeServices:
           input.flamingos2LongSlit.map(m => flamingos2LongSlitService.update(m, which).map(_.success)),
           input.flamingos2Mos.map(m => flamingos2MosService.update(m, which)),
           input.ghostIfu.map(m => ghostIfuService.update(m, which)),
+          input.gmosNorthIfu.map(m => gmosIfuService.updateNorth(m, which)),
           input.gmosNorthImaging.map(m => gmosImagingService.updateNorth(m, which)),
           input.gmosNorthLongSlit.map(m => gmosLongSlitService.updateNorth(m, which).map(_.success)),
           input.gmosNorthMos.map(m => gmosMosService.updateNorth(m, which)),
+          input.gmosSouthIfu.map(m => gmosIfuService.updateSouth(m, which)),
           input.gmosSouthImaging.map(m => gmosImagingService.updateSouth(m, which)),
           input.gmosSouthLongSlit.map(m => gmosLongSlitService.updateSouth(m, which).map(_.success)),
           input.gmosSouthMos.map(m => gmosMosService.updateSouth(m, which)),
@@ -288,7 +294,8 @@ object ObservingModeServices:
             case ObservingModeType.GmosSouthLongSlit  => gmosLongSlitService.cloneSouth(origOid, newOid)
             case ObservingModeType.GmosSouthImaging   => gmosImagingService.cloneSouth(origOid, newOid, etms)
             case ObservingModeType.GmosSouthMos       => gmosMosService.cloneSouth(origOid, newOid)
-            case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu => gmosIfuNotImplemented
+            case ObservingModeType.GmosNorthIfu       => gmosIfuService.cloneNorth(origOid, newOid)
+            case ObservingModeType.GmosSouthIfu       => gmosIfuService.cloneSouth(origOid, newOid)
             case ObservingModeType.GnirsImaging       => gnirsImagingService.clone(origOid, newOid, etms)
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => gnirsSpectroscopyService.clone(origOid, newOid, etms)
             case ObservingModeType.Igrins2LongSlit    => igrins2LongSlitService.clone(origOid, newOid)

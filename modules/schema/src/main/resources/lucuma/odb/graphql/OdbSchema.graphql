@@ -3020,6 +3020,220 @@ input GmosSouthLongSlitInput {
 }
 
 """
+Edit or create GMOS North IFU advanced configuration
+"""
+input GmosNorthIfuInput {
+  """
+  The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  grating: GmosNorthGrating
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: GmosNorthFilter
+
+  """
+  The IFU aperture.  It must be either specified or skipped altogether; it cannot
+  be unset with a null value.
+  """
+  fpu: GmosNorthIfuFpu
+
+  """
+  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  centralWavelength: WavelengthInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  How the ITC samples the IFU field.  The explicitIfuAnalysis field may be unset by
+  assigning a null value, or ignored by skipping it altogether.  When unset the
+  default sampling applies.
+  """
+  explicitIfuAnalysis: GmosIfuAnalysisInput
+
+  """
+  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitXBin: GmosBinning
+
+  """
+  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitYBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+
+  """
+  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWavelengthDithers: [WavelengthDitherInput!]
+
+  """
+  The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitTelescopeConfigs: [TelescopeConfigInput!]
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosNorthIfuAcquisitionInput
+}
+
+"""
+Parameters that override IFU acquisition defaults.  IFU acquisition images the
+field full frame, so (unlike long slit) there is no ROI to configure.
+"""
+input GmosNorthIfuAcquisitionInput {
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitFilter: GmosNorthFilter
+
+  """
+  An explicit acquisition ROI to use instead of the default.  The `explicitRoi` may be unset by
+  assigning a null value, or ignored by skipping it altogether.  If not provided, the ROIs used
+  depend on the observation's calibration role.
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
+
+  """
+  Exposure time mode for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
+Edit or create GMOS South IFU advanced configuration
+"""
+input GmosSouthIfuInput {
+  """
+  The grating field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  grating: GmosSouthGrating
+
+  """
+  The filter field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  filter: GmosSouthFilter
+
+  """
+  The IFU aperture.  It must be either specified or skipped altogether; it cannot
+  be unset with a null value.
+  """
+  fpu: GmosSouthIfuFpu
+
+  """
+  The centralWavelength field must be either specified or skipped altogether.  It cannot be unset with a null value.
+  """
+  centralWavelength: WavelengthInput
+
+  """
+  Exposure time mode for the science sequence.  If not specified, the exposure
+  time mode of the observation's science requirements are used.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+  """
+  How the ITC samples the IFU field.  The explicitIfuAnalysis field may be unset by
+  assigning a null value, or ignored by skipping it altogether.  When unset the
+  default sampling applies.
+  """
+  explicitIfuAnalysis: GmosIfuAnalysisInput
+
+  """
+  The explicitXBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitXBin: GmosBinning
+
+  """
+  The explicitYBin field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitYBin: GmosBinning
+
+  """
+  The explicitAmpReadMode field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  The explicitAmpGain field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  The explicitRoi field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitRoi: GmosRoi
+
+  """
+  The explicitWavelengthDithers field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitWavelengthDithers: [WavelengthDitherInput!]
+
+  """
+  The explicitTelescopeConfigs field may be unset by assigning a null value, or ignored by skipping it altogether
+  """
+  explicitTelescopeConfigs: [TelescopeConfigInput!]
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosSouthIfuAcquisitionInput
+}
+
+"""
+Parameters that override IFU acquisition defaults.  IFU acquisition images the
+field full frame, so (unlike long slit) there is no ROI to configure.
+"""
+input GmosSouthIfuAcquisitionInput {
+
+  """
+  An explicit acquisition filter to use instead of the default.  The `explicitFilter`
+  may be unset by assigning a null value, or ignored by skipping it altogether.  If not provided,
+  the filter that will be used for the acquisition sequence is the broadband filter closest to
+  the central wavelength.
+  """
+  explicitFilter: GmosSouthFilter
+
+  """
+  An explicit acquisition ROI to use instead of the default.  The `explicitRoi` may be unset by
+  assigning a null value, or ignored by skipping it altogether.  If not provided, the ROIs used
+  depend on the observation's calibration role.
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
+
+  """
+  Exposure time mode for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeModeInput
+
+}
+
+"""
 Edit or create GMOS North MOS advanced configuration
 """
 input GmosNorthMosInput {
@@ -5973,6 +6187,11 @@ input ObservingModeInput @oneOf {
   ghostIfu: GhostIfuInput
 
   """
+  GMOS North IFU
+  """
+  gmosNorthIfu: GmosNorthIfuInput
+
+  """
   The gmosNorthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosNorthImaging: GmosNorthImagingInput
@@ -5986,6 +6205,11 @@ input ObservingModeInput @oneOf {
   The gmosNorthMos field must be either specified or skipped altogether.  It cannot be unset with a null value.
   """
   gmosNorthMos: GmosNorthMosInput
+
+  """
+  GMOS South IFU
+  """
+  gmosSouthIfu: GmosSouthIfuInput
 
   """
   The gmosSouthImaging field must be either specified or skipped altogether.  It cannot be unset with a null value.
@@ -12528,6 +12752,26 @@ enum GmosAmpReadMode {
 """
 GMOS Long Slit Acquisition ROI options.
 """
+enum GmosIfuAcquisitionRoi {
+
+  """
+  Imaging step uses CCD2, steps through the IFU use Full Frame.  The default for science.
+  """
+  CCD2_FULL_FRAME
+
+  """
+  Imaging step uses Central Stamp, steps through the IFU use Full Frame.  The default for
+  spectrophotometric standards.
+  """
+  STAMP_FULL_FRAME
+
+  """
+  Both the imaging step and the steps through the IFU use Full Frame.
+  """
+  FULL_FRAME
+
+}
+
 enum GmosLongSlitAcquisitionRoi {
 
   """
@@ -12550,6 +12794,85 @@ enum GmosLongSlitAcquisitionRoi {
   """
   FULL_CCD2
 
+}
+
+"""
+The GMOS IFU apertures the IFU observing mode offers: both pseudo-slits, or
+either one alone.  The nod & shuffle units the South also carries are not
+offered, because nothing generates a nod & shuffle sequence yet.
+"""
+enum GmosNorthIfuFpu {
+  """
+  Both pseudo-slits, covering the full 7" x 5" target field.
+  """
+  TWO_SLITS
+
+  """
+  The left pseudo-slit alone, covering half the field.
+  """
+  ONE_SLIT_BLUE
+
+  """
+  The right pseudo-slit alone, covering half the field.
+  """
+  ONE_SLIT_RED
+}
+
+"""
+See `GmosNorthIfuFpu`.  The apertures are the same at both sites.
+"""
+enum GmosSouthIfuFpu {
+  """
+  Both pseudo-slits, covering the full 7" x 5" target field.
+  """
+  TWO_SLITS
+
+  """
+  The left pseudo-slit alone, covering half the field.
+  """
+  ONE_SLIT_BLUE
+
+  """
+  The right pseudo-slit alone, covering half the field.
+  """
+  ONE_SLIT_RED
+}
+
+"""
+How the ITC samples the IFU field.  Exactly one of the two is set.
+"""
+type GmosIfuAnalysis {
+  """
+  Sum every IFU element whose centre falls within this radius of the field
+  centre.  Null when a single element is measured instead.
+  """
+  sumRadius: Angle
+
+  """
+  Measure the single IFU element sitting this far from the field centre.  Null when
+  elements are summed instead.
+  """
+  singleOffset: Angle
+}
+
+"""
+How the ITC samples the IFU field: exactly one of a summation radius or a
+single element offset.  The number of fibres on sky is not settable; it follows
+from the focal plane unit.
+"""
+input GmosIfuAnalysisInput @oneOf {
+  """
+  Sum every IFU element whose centre falls within this radius of the field
+  centre.  Must be greater than zero.
+  """
+  sumRadius: AngleInput
+
+  """
+  Measure the single IFU element sitting this far from the field centre.  A distance:
+  the ITC places the element on one axis and integrates a centred source, so the two
+  directions along it give the same answer.
+  """
+  singleOffset: AngleInput
 }
 
 """
@@ -13887,6 +14210,508 @@ type GmosSouthLongSlit {
   field for the wavelength that will be used in the observation.
   """
   initialCentralWavelength: Wavelength!
+}
+
+"""
+GMOS North IFU acquisition parameters.  The IFU acquires through the mirror with
+the field imaged full frame, so there is no ROI to configure.
+"""
+type GmosNorthIfuAcquisition {
+
+  """
+  The GMOS North filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosNorthFilter!
+
+  """
+  The GMOS North filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosNorthFilter!
+
+  """
+  An explicitly specified GMOS North filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosNorthFilter
+
+  """
+  The ROIs that will be used for the acquisition sequence.  The first is used for the imaging
+  step and the second for the steps taken through the IFU.  This will be the `explicitRoi` if
+  specified, but otherwise the `defaultRoi`.
+  """
+  roi: GmosIfuAcquisitionRoi!
+
+  """
+  The acquisition ROIs that will be used by default, if an explicit ROI was not specified.
+  """
+  defaultRoi: GmosIfuAcquisitionRoi!
+
+  """
+  An explicitly specified acquisition ROI (if any).
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
+
+  """
+  The exposure time mode for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+GMOS North IFU mode.  This is GMOS long slit with the slit replaced by one of the
+IFU apertures, so the science sequence is generated the same way.  What differs
+is that the IFU samples a field rather than a slit: it reads out unbinned, it
+dithers within its field instead of nodding along a slit, and it carries the
+sampling geometry the ITC integrates over.
+"""
+type GmosNorthIfu {
+
+  """
+  GMOS North Grating
+  """
+  grating: GmosNorthGrating!
+
+  """
+  GMOS North Filter
+  """
+  filter: GmosNorthFilter
+
+  """
+  The IFU aperture through which the observation is taken.
+  """
+  fpu: GmosNorthIfuFpu!
+
+  """
+  The central wavelength.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  How the ITC samples the IFU field, either explicitly specified in
+  explicitIfuAnalysis or else taken from defaultIfuAnalysis.
+  """
+  ifuAnalysis: GmosIfuAnalysis!
+
+  """
+  Default IFU sampling: sum within one lenslet pitch (0.2 arcsec) of the field
+  centre, which encloses only the element on the target.
+  """
+  defaultIfuAnalysis: GmosIfuAnalysis!
+
+  """
+  Optional explicitly specified IFU sampling.  If set it overrides the default.
+  """
+  explicitIfuAnalysis: GmosIfuAnalysis
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning (ONE).  The IFU fibre traces blend together on the
+  detector if it is binned, so the default is unbinned.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """
+  Default GMOS Y-Binning (ONE).  See `defaultXBin`.
+  """
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it overrides the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.  The IFU has no slit to nod along, so
+  these are plain offsets rather than slit telescope configurations.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
+
+  """
+  Default telescope configurations: a single guided position on target.  The
+  IFU has a dedicated sky field, so it does not nod for background.
+  """
+  defaultTelescopeConfigs: [TelescopeConfig!]!
+
+  """
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
+  """
+  explicitTelescopeConfigs: [TelescopeConfig!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosNorthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosNorthFilter
+
+  """
+  The IFU aperture as it was initially selected.  See the `fpu` field for the
+  aperture that will be used in the observation.
+  """
+  initialFpu: GmosNorthIfuFpu!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosNorthIfuAcquisition!
+}
+
+"""
+GMOS South IFU acquisition parameters.  The IFU acquires through the mirror with
+the field imaged full frame, so there is no ROI to configure.
+"""
+type GmosSouthIfuAcquisition {
+
+  """
+  The GMOS South filter that will be used in the acquisition sequence.  This will
+  be the `explicitFilter` if specified, but otherwise the `defaultFilter`.
+  """
+  filter: GmosSouthFilter!
+
+  """
+  The GMOS South filter that will be used by default, if an explicit acquisition
+  filter was not specified.  The default is calculated as the broadband filter
+  closest in wavelength to the observation's `centralWavelength`.
+  """
+  defaultFilter: GmosSouthFilter!
+
+  """
+  An explicitly specified GMOS South filter to use in acquisition (if any).
+  """
+  explicitFilter: GmosSouthFilter
+
+  """
+  The ROIs that will be used for the acquisition sequence.  The first is used for the imaging
+  step and the second for the steps taken through the IFU.  This will be the `explicitRoi` if
+  specified, but otherwise the `defaultRoi`.
+  """
+  roi: GmosIfuAcquisitionRoi!
+
+  """
+  The acquisition ROIs that will be used by default, if an explicit ROI was not specified.
+  """
+  defaultRoi: GmosIfuAcquisitionRoi!
+
+  """
+  An explicitly specified acquisition ROI (if any).
+  """
+  explicitRoi: GmosIfuAcquisitionRoi
+
+  """
+  The exposure time mode for the acquisition sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+}
+
+"""
+GMOS South IFU mode.  This is GMOS long slit with the slit replaced by one of the
+IFU apertures, so the science sequence is generated the same way.  What differs
+is that the IFU samples a field rather than a slit: it reads out unbinned, it
+dithers within its field instead of nodding along a slit, and it carries the
+sampling geometry the ITC integrates over.
+"""
+type GmosSouthIfu {
+
+  """
+  GMOS South Grating
+  """
+  grating: GmosSouthGrating!
+
+  """
+  GMOS South Filter
+  """
+  filter: GmosSouthFilter
+
+  """
+  The IFU aperture through which the observation is taken.
+  """
+  fpu: GmosSouthIfuFpu!
+
+  """
+  The central wavelength.
+  """
+  centralWavelength: Wavelength!
+
+  """
+  The exposure time mode used for ITC lookup for the science sequence.
+  """
+  exposureTimeMode: ExposureTimeMode!
+
+  """
+  How the ITC samples the IFU field, either explicitly specified in
+  explicitIfuAnalysis or else taken from defaultIfuAnalysis.
+  """
+  ifuAnalysis: GmosIfuAnalysis!
+
+  """
+  Default IFU sampling: sum within one lenslet pitch (0.2 arcsec) of the field
+  centre, which encloses only the element on the target.
+  """
+  defaultIfuAnalysis: GmosIfuAnalysis!
+
+  """
+  Optional explicitly specified IFU sampling.  If set it overrides the default.
+  """
+  explicitIfuAnalysis: GmosIfuAnalysis
+
+  """
+  GMOS X-Binning, either explicitly specified in explicitXBin or else taken
+  from the defaultXBin.
+  """
+  xBin: GmosBinning!
+
+  """
+  Default GMOS X-Binning (ONE).  The IFU fibre traces blend together on the
+  detector if it is binned, so the default is unbinned.
+  """
+  defaultXBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS X-Binning. If set it overrides the
+  default.
+  """
+  explicitXBin: GmosBinning
+
+  """
+  GMOS Y-Binning, either explicitly specified in explicitYBin or else taken
+  from the defaultYBin.
+  """
+  yBin: GmosBinning!
+
+  """
+  Default GMOS Y-Binning (ONE).  See `defaultXBin`.
+  """
+  defaultYBin: GmosBinning!
+
+  """
+  Optional explicitly specified GMOS Y-Binning. If set it overrides the
+  default.
+  """
+  explicitYBin: GmosBinning
+
+  """
+  GMOS amp read mode, either explicitly specified in explicitAmpReadMode or
+  else taken from the defaultAmpReadMode.
+  """
+  ampReadMode: GmosAmpReadMode!
+
+  """
+  Default GmosAmpReadMode (SLOW).
+  """
+  defaultAmpReadMode: GmosAmpReadMode!
+
+  """
+  Optional explicitly specified GMOS amp read mode. If set it overrides the
+  default.
+  """
+  explicitAmpReadMode: GmosAmpReadMode
+
+  """
+  GMOS amp read gain, either explicitly specified in explicitAmpGain or else
+  taken from the defaultAmpGain.
+  """
+  ampGain: GmosAmpGain!
+
+  """
+  Default GMOS amp gain (LOW).
+  """
+  defaultAmpGain: GmosAmpGain!
+
+  """
+  Optional explicitly specified GMOS amp gain.  If set it overrides the default.
+  """
+  explicitAmpGain: GmosAmpGain
+
+  """
+  GMOS ROI, either explicitly specified in explicitRoi or else taken from the
+  defaultRoi.
+  """
+  roi: GmosRoi!
+
+  """
+  Default GMOS ROI (FULL_FRAME).
+  """
+  defaultRoi: GmosRoi!
+
+  """
+  Optional explicitly specified GMOS ROI. If set it overrides the default.
+  """
+  explicitRoi: GmosRoi
+
+  """
+  Wavelength dithers required to fill in the chip gaps. This value is either
+  explicitly specified in explicitWavelengthDithers or else taken from
+  defaultWavelengthDithers
+  """
+  wavelengthDithers: [WavelengthDither!]!
+
+  """
+  Default wavelength dithers, calculated based on the grating dispersion.
+  """
+  defaultWavelengthDithers: [WavelengthDither!]!
+
+  """
+  Optional explicitly specified wavelength dithers.  If set it overrides the
+  default.
+  """
+  explicitWavelengthDithers: [WavelengthDither!]
+
+  """
+  The telescope configuration at each spatial position the science steps cycle
+  through, either explicitly specified in explicitTelescopeConfigs or else
+  taken from defaultTelescopeConfigs.  The IFU has no slit to nod along, so
+  these are plain offsets rather than slit telescope configurations.
+  """
+  telescopeConfigs: [TelescopeConfig!]!
+
+  """
+  Default telescope configurations: a single guided position on target.  The
+  IFU has a dedicated sky field, so it does not nod for background.
+  """
+  defaultTelescopeConfigs: [TelescopeConfig!]!
+
+  """
+  Optional explicitly specified telescope configurations. If set it overrides
+  the default.
+  """
+  explicitTelescopeConfigs: [TelescopeConfig!]
+
+  """
+  The grating as it was initially selected.  See the `grating` field for the
+  grating that will be used in the observation.
+  """
+  initialGrating: GmosSouthGrating!
+
+  """
+  The filter as it was initially selected (if any).  See the `filter` field
+  for the filter that will be used in the observation.
+  """
+  initialFilter: GmosSouthFilter
+
+  """
+  The IFU aperture as it was initially selected.  See the `fpu` field for the
+  aperture that will be used in the observation.
+  """
+  initialFpu: GmosSouthIfuFpu!
+
+  """
+  The central wavelength as initially selected.  See the `centralWavelength`
+  field for the wavelength that will be used in the observation.
+  """
+  initialCentralWavelength: Wavelength!
+
+  """
+  Parameters that override acquisition defaults.
+  """
+  acquisition: GmosSouthIfuAcquisition!
 }
 
 """
@@ -17970,6 +18795,11 @@ type ObservingMode {
   ghostIfu: GhostIfu
 
   """
+  GMOS North IFU mode
+  """
+  gmosNorthIfu: GmosNorthIfu
+
+  """
   GMOS North Imaging mode
   """
   gmosNorthImaging: GmosNorthImaging
@@ -17983,6 +18813,11 @@ type ObservingMode {
   GMOS North MOS mode
   """
   gmosNorthMos: GmosNorthMos
+
+  """
+  GMOS South IFU mode
+  """
+  gmosSouthIfu: GmosSouthIfu
 
   """
   GMOS South Imaging mode

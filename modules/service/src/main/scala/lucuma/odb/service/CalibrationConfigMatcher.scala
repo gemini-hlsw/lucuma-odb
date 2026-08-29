@@ -64,6 +64,8 @@ object CalibrationConfigMatcher:
       case GhostConfigs                => GhostIfu
       case _: GmosNConfigs             => GmosNorthLongSlit
       case _: GmosSConfigs             => GmosSouthLongSlit
+      case _: GmosNIfuConfigs          => GmosNorthIfu
+      case _: GmosSIfuConfigs          => GmosSouthIfu
       case _: GmosNImagingConfigs      => GmosNorthImaging
       case _: GmosSImagingConfigs      => GmosSouthImaging
       case g: GnirsSpectroscopyConfigs => g.modeType

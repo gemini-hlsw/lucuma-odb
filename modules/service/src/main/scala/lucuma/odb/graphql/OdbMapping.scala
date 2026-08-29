@@ -224,6 +224,7 @@ object OdbMapping {
           with GmosImagingFilterMapping[F]
           with GmosImagingMapping[F]
           with GmosLongSlitMapping[F]
+          with GmosIfuMapping[F]
           with GmosMosMapping[F]
           with GmosNorthStaticMapping[F]
           with GmosSouthStaticMapping[F]
@@ -633,6 +634,7 @@ object OdbMapping {
                 ConfigurationGmosSouthLongSlitMappings,
                 ConfigurationGmosNorthMosMappings,
                 ConfigurationGmosSouthMosMappings,
+                GmosIfuMappings,
                 GmosMosMappings,
                 Flamingos2MosMappings,
                 ConfigurationObservingModeMappings,
@@ -700,6 +702,7 @@ object OdbMapping {
                 GmosNorthLongSlitElaborator,
                 GmosSouthImagingElaborator,
                 GmosSouthLongSlitElaborator,
+                GmosIfuElaborator,
                 GmosMosElaborator,
                 ArchiveDuplicationElaborator,
                 GroupElaborator,

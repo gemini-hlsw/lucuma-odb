@@ -84,6 +84,7 @@ object StartupDiagnostics:
               ds.updated(Type("e_ghost_fiber_agitator"))
           },
           checkPostgresEnum(imaging_variant),
+          checkPostgresEnum(gmos_ifu_acquisition_roi),
           checkPostgresEnum(gmos_long_slit_acquisition_roi),
           checkPostgresEnum(gmos_mos_acquisition_type),
           checkPostgresEnum(gender),
@@ -161,6 +162,10 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gmos_north_filter, "t_gmos_north_filter"),
           checkPostgresLookupTable(gmos_north_fpu, "t_gmos_north_fpu"),
           checkPostgresLookupTable(gmos_north_grating, "t_gmos_north_disperser"),
+          // Both IFU FPU enums are backed by the one shared table, so checking
+          // each also catches the two drifting apart.
+          checkPostgresLookupTable(gmos_north_ifu_fpu, "t_gmos_ifu_fpu"),
+          checkPostgresLookupTable(gmos_south_ifu_fpu, "t_gmos_ifu_fpu"),
           checkPostgresLookupTable(gmos_north_stage_mode, "t_gmos_north_stage_mode"),
           checkPostgresLookupTable(gmos_roi, "t_gmos_roi"),
           checkPostgresLookupTable(gmos_south_detector, "t_gmos_south_detector"),

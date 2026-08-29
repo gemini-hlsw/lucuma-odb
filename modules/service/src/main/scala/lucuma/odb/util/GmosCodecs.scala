@@ -12,18 +12,21 @@ import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosCustomSlitWidth
 import lucuma.core.enums.GmosDtax
 import lucuma.core.enums.GmosGratingOrder
+import lucuma.core.enums.GmosIfuAcquisitionRoi
 import lucuma.core.enums.GmosLongSlitAcquisitionRoi
 import lucuma.core.enums.GmosMosAcquisitionType
 import lucuma.core.enums.GmosNorthDetector
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosNorthIfuFpu
 import lucuma.core.enums.GmosNorthStageMode
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthDetector
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosSouthIfuFpu
 import lucuma.core.enums.GmosSouthStageMode
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
@@ -66,6 +69,9 @@ trait GmosCodecs {
   val gmos_grating_order: Codec[GmosGratingOrder] =
     enumerated(Type.varchar)
 
+  val gmos_ifu_acquisition_roi: Codec[GmosIfuAcquisitionRoi] =
+    enumerated(Type("e_gmos_ifu_acquisition_roi"))
+
   val gmos_long_slit_acquisition_roi: Codec[GmosLongSlitAcquisitionRoi] =
     enumerated(Type("e_gmos_long_slit_acquisition_roi"))
 
@@ -85,6 +91,14 @@ trait GmosCodecs {
     enumerated(Type.varchar)
 
   val gmos_north_grating: Codec[GmosNorthGrating] =
+    enumerated(Type.varchar)
+
+  // Both sites offer the same two IFU apertures, so one lookup table backs both
+  // codecs; the Scala types stay per-site like every other GMOS enum.
+  val gmos_north_ifu_fpu: Codec[GmosNorthIfuFpu] =
+    enumerated(Type.varchar)
+
+  val gmos_south_ifu_fpu: Codec[GmosSouthIfuFpu] =
     enumerated(Type.varchar)
 
   val gmos_north_stage_mode: Codec[GmosNorthStageMode] =

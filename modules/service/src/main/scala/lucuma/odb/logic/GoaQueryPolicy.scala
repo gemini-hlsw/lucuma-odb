@@ -33,6 +33,8 @@ import lucuma.odb.sequence.flamingos2.imaging.Config as Flamingos2Imaging
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2LongSlit
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2Mos
 import lucuma.odb.sequence.ghost.ifu.Config as GhostIfu
+import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth as GmosNorthIfu
+import lucuma.odb.sequence.gmos.ifu.Config.GmosSouth as GmosSouthIfu
 import lucuma.odb.sequence.gmos.imaging.Config.GmosNorth as GmosNorthImaging
 import lucuma.odb.sequence.gmos.imaging.Config.GmosSouth as GmosSouthImaging
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
@@ -148,6 +150,10 @@ object GoaQueryPolicy:
         List(gmosScienceArea.imaging)
       case _: GmosSouthImaging   =>
         List(gmosScienceArea.imaging)
+      case c: GmosNorthIfu       =>
+        List(gmosScienceArea.ifuMode.shapeAt(pa, off, c.fpu.fieldWidth))
+      case c: GmosSouthIfu       =>
+        List(gmosScienceArea.ifuMode.shapeAt(pa, off, c.fpu.fieldWidth))
       case c: GmosNorthLongSlit  =>
         List(gmosScienceArea.longSlitMode.shapeAt(pa, off, c.fpu.asLeft))
       case c: GmosSouthLongSlit  =>
@@ -187,6 +193,8 @@ object GoaQueryPolicy:
       case _: GmosSouthLongSlit  => ScienceMode.Spectroscopy.some
       case _: GmosNorthMos       => ScienceMode.Spectroscopy.some
       case _: GmosSouthMos       => ScienceMode.Spectroscopy.some
+      case _: GmosNorthIfu       => ScienceMode.Spectroscopy.some
+      case _: GmosSouthIfu       => ScienceMode.Spectroscopy.some
       case _: GnirsImaging       => ScienceMode.Imaging.some
       case _: GnirsSpectroscopy  => ScienceMode.Spectroscopy.some
       case _: Igrins2LongSlit    => ScienceMode.Spectroscopy.some
