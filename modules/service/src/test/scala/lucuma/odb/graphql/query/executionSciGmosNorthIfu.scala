@@ -26,6 +26,7 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 
 /**
@@ -78,18 +79,27 @@ class executionSciGmosNorthIfu extends ExecutionTestSupportForGmos:
           ).asRight
       )
 
-  private def acqStep(fpu: Option[GmosFpuMask[GmosNorthFpu]], xBin: GmosXBinning, yBin: GmosYBinning, roi: GmosRoi): GmosNorth =
+  // The field image takes the ITC acquisition time; the step through the IFU takes four times
+  // that, capped at 180s. Each reads out at the mode its own exposure calls for.
+  private def fieldStep(roi: GmosRoi): GmosNorth =
     gmosNorthScience(0).copy(
       exposure      = fakeItcImagingResult.exposureTime,
-      readout       = GmosCcdMode(xBin, yBin, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
+      readout       = GmosCcdMode(GmosXBinning.Two, GmosYBinning.Two, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
       roi           = roi,
       gratingConfig = none,
       filter        = GmosNorthFilter.GPrime.some,
-      fpu           = fpu
+      fpu           = none
     )
 
-  // The last step of the initial atom carries the breakpoint, placed by `AcquisitionAtoms`.
-  private def expectedAcqStep(d: GmosNorth, breakpoint: Breakpoint): Json =
+  private def ifuStep(roi: GmosRoi, exposure: TimeSpan, readMode: GmosAmpReadMode): GmosNorth =
+    fieldStep(roi).copy(
+      exposure = exposure,
+      readout  = GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, readMode),
+      fpu      = GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits).some
+    )
+
+  // sc-10044 specifies a breakpoint after every step, not only the last of the initial atom.
+  private def expectedAcqStep(d: GmosNorth, breakpoint: Breakpoint = Breakpoint.Enabled): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(d)},
@@ -100,7 +110,7 @@ class executionSciGmosNorthIfu extends ExecutionTestSupportForGmos:
       }
     """
 
-  test("acquisition - CCD2 field image then a Full Frame image through the IFU"):
+  test("acquisition - CCD2 field image, then 4x exposure through the IFU on Full Frame"):
     setup.flatMap: oid =>
       expect(
         user     = pi,
@@ -114,8 +124,8 @@ class executionSciGmosNorthIfu extends ExecutionTestSupportForGmos:
                     "description"  -> "Initial Acquisition".asJson,
                     "observeClass" -> "ACQUISITION".asJson,
                     "steps"        -> List(
-                      expectedAcqStep(acqStep(none, GmosXBinning.Two, GmosYBinning.Two, GmosRoi.Ccd2), Breakpoint.Disabled),
-                      expectedAcqStep(acqStep(GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits).some, GmosXBinning.One, GmosYBinning.One, GmosRoi.FullFrame), Breakpoint.Enabled)
+                      expectedAcqStep(fieldStep(GmosRoi.Ccd2)),
+                      expectedAcqStep(ifuStep(GmosRoi.FullFrame, 40.secTimeSpan, GmosAmpReadMode.Fast))
                     ).asJson
                   ),
                   "possibleFuture" -> Json.arr(),
