@@ -280,7 +280,7 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
           updateObservations(input: {
             SET: {
               schedulingConstraints: {
-                isSplittable: false
+                schedulingMode: NO_SPLITTING
               }
             }
             WHERE: {

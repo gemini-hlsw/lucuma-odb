@@ -3059,54 +3059,66 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
           expected = { case OdbError.InvalidArgument(Some(msg)) if msg.contains("requires both `name` and `totalRequestTime`") => () }
         )
 
-  test("[general] created observation should have specified splittable property"):
-    assertIOBoolean:
-      createProgramAs(pi).flatMap: pid =>
-        query(pi,
-          s"""
-            mutation {
-              createObservation(input: {
-                programId: ${pid.asJson}
-                SET: {
-                  schedulingConstraints: {
-                    isSplittable: false
-                  }
-                }
-              }) {
-                observation {
-                  schedulingConstraints {
-                    isSplittable
-                  }
+  // Checked in Scala at creation rather than in SQL, because both values are known
+  // here.  An omitted activation is defaulted to NONE, compatible with every mode,
+  // and an omitted mode follows a ToO activation, so only an explicit mode
+  // contradicting an explicit ToO activation can be wrong.
+  test("[general] created observation cannot pair INTERRUPTING with UNCONSTRAINED"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                schedulingConstraints: {
+                  tooActivation: INTERRUPTING
+                  schedulingMode: UNCONSTRAINED
                 }
               }
-            }
-          """
-        ).map: js =>
-          !js.hcursor
-             .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
-             .require[Boolean]
+            }) { observation { id } }
+          }
+        """,
+        expected = List("Target of Opportunity activation INTERRUPTING fixes the scheduling mode at UNINTERRUPTIBLE; it cannot be UNCONSTRAINED.").asLeft
+      )
 
-  test("[general] created observation should have default splittable property"):
-    assertIOBoolean:
-      createProgramAs(pi).flatMap: pid =>
-        query(pi,
-          s"""
-            mutation {
-              createObservation(input: {
-                programId: ${pid.asJson}
-              }) {
-                observation {
-                  schedulingConstraints {
-                    isSplittable
-                  }
+  test("[general] created ToO observation takes UNINTERRUPTIBLE when no mode is given"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                schedulingConstraints: {
+                  tooActivation: RAPID
+                }
+              }
+            }) {
+              observation {
+                schedulingConstraints {
+                  tooActivation
+                  schedulingMode
                 }
               }
             }
-          """
-        ).map: js =>
-          js.hcursor
-            .downFields("createObservation", "observation", "schedulingConstraints", "isSplittable")
-            .require[Boolean]
+          }
+        """,
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "schedulingConstraints": {
+                  "tooActivation": "RAPID",
+                  "schedulingMode": "UNINTERRUPTIBLE"
+                }
+              }
+            }
+          }
+        """.asRight
+      )
 
   test("[general] created observation should have specified schedulingMode"):
     createProgramAs(pi).flatMap: pid =>
@@ -3125,7 +3137,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
               observation {
                 schedulingConstraints {
                   schedulingMode
-                  isSplittable
                 }
               }
             }
@@ -3136,8 +3147,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             "createObservation": {
               "observation": {
                 "schedulingConstraints": {
-                  "schedulingMode": "UNINTERRUPTIBLE",
-                  "isSplittable": false
+                  "schedulingMode": "UNINTERRUPTIBLE"
                 }
               }
             }
@@ -3157,7 +3167,6 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
               observation {
                 schedulingConstraints {
                   schedulingMode
-                  isSplittable
                 }
               }
             }
@@ -3168,14 +3177,50 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
             "createObservation": {
               "observation": {
                 "schedulingConstraints": {
-                  "schedulingMode": "UNCONSTRAINED",
-                  "isSplittable": true
+                  "schedulingMode": "UNCONSTRAINED"
                 }
               }
             }
           }
         """.asRight
       )
+
+  // A new observation is born at the lowest level of each axis; anything higher
+  // is a deliberate choice.
+  test("[general] created observation should default to UNCONSTRAINED and NONE"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- addProposal(pi, pid, callProps = "queue: { considerForBand3: DO_NOT_CONSIDER }".some)
+      _   <- expect(
+               user  = pi,
+               query = s"""
+                 mutation {
+                   createObservation(input: {
+                     programId: ${pid.asJson}
+                   }) {
+                     observation {
+                       schedulingConstraints {
+                         schedulingMode
+                         tooActivation
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = json"""
+                 {
+                   "createObservation": {
+                     "observation": {
+                       "schedulingConstraints": {
+                         "schedulingMode": "UNCONSTRAINED",
+                         "tooActivation": "NONE"
+                       }
+                     }
+                   }
+                 }
+               """.asRight
+             )
+    yield ()
 
   test("[general] created observation should default to MEDIUM priority"):
     createProgramAs(pi).flatMap: pid =>

@@ -51,6 +51,7 @@ import lucuma.odb.util.Codecs.*
 import skunk.Encoder
 import skunk.Query
 import skunk.Transaction
+import skunk.codec.boolean.bool
 import skunk.syntax.all.*
 
 import java.time.Instant
@@ -71,9 +72,10 @@ case class ObservationValidationInfo(
   userState:              Option[ObservationWorkflowService.UserState],
   declaredExecutionState: Option[DeclaredExecutionState],
   proposalStatus:         ProposalStatus,
-  tooActivation:          TooActivation,      // derived from the asterism and the scheduling mode; not declared
+  tooActivation:          TooActivation,      // declared on the observation
   schedulingMode:         SchedulingMode,
-  tooCeiling:             Option[TooActivation], // effective proposal ceiling; None when there is none to enforce
+  tooCeiling:             Option[TooActivation], // the program's ceiling; none for no restriction
+  tooPermitted:           Boolean,            // whether the proposal type ordinarily has ToOs; true with no proposal
   cfpid:                  Option[CallForProposals.Id],
   scienceBand:            Option[ScienceBand],
   asterism:               List[Target],
@@ -109,44 +111,38 @@ case class ObservationValidationInfo(
     proposalStatus === ProposalStatus.Accepted
 
   /**
-   * Does this observation demand more Target-of-Opportunity disruption than the
-   * program's proposal allows?  Before acceptance the ceiling is derived as the
-   * maximum over the program's own observations, so this can only be true then
-   * if the PI explicitly chose a ceiling below one of their observations -- also
-   * worth surfacing.  A program with no proposal has no ceiling to enforce.
+   * Does this observation declare a Target of Opportunity activation above its
+   * program's ceiling?  A program with no ceiling has no restriction.
    */
   def exceedsTooCeiling: Boolean =
     tooCeiling.exists(tooActivation > _)
+
+  /**
+   * Does this observation declare a ToO in a proposal type that ordinarily has
+   * none, while no ceiling has been set?  Acceptance will then set the ceiling
+   * to `None`.  Once a ceiling exists it speaks for itself.
+   */
+  def tooUnexpected: Boolean =
+    !tooPermitted && tooActivation.isToo && tooCeiling.isEmpty
 
   def site: Option[Site] =
     instrument.map(_.site)
 
   /**
-   * Is this a Target-of-Opportunity observation -- one that waits for an alert
-   * rather than for the queue?  Setting such an observation `Ready` is what
-   * requests its trigger.
+   * Does the asterism still hold an opportunity target -- a placeholder carrying a
+   * region and no coordinates?
    *
-   * This is exactly [[hasTooTarget]]: an observation is a ToO precisely when its
-   * asterism holds an opportunity target, and its activation is derived from
-   * that plus the scheduling mode rather than declared.  The two used to be
-   * independent, which is what made a declared-but-targetless ToO expressible.
-   *
-   * True for the observation's whole life, resolved or not -- an opportunity
-   * target does not stop being one when the alert arrives.  Use
-   * [[hasUnresolvedTooTarget]] for the "still waiting" question.
+   * This says nothing about whether the observation is a Target of Opportunity.
+   * That is declared, and answered by [[tooActivation]] being above `None`; the
+   * asterism has no say in it either way.  What this answers is narrower and is
+   * the reason it exists: the observation has nowhere to point, so it must not be
+   * offered `Ready` and must not put a request in front of an observer.  When the
+   * alert arrives a real target takes the placeholder's place and this goes false.
    */
   def hasTooTarget: Boolean =
     asterism.exists:
       case _: Target.Opportunity => true
       case _ => false
-
-  /**
-   * Is the asterism still waiting on an alert?  An unresolved Target of
-   * Opportunity has no coordinates at all, so nothing downstream can point at
-   * it, which is why this blocks Ready.
-   */
-  def hasUnresolvedTooTarget: Boolean =
-    asterism.exists(_.resolution.isEmpty)
 
   def isVisitor: Boolean =
     observingMode.exists:
@@ -348,7 +344,8 @@ object ObservationValidationInfo {
           p.c_proposal_status,
           o.c_too_activation,
           o.c_scheduling_mode,
-          x.c_too_activation_effective,
+          p.c_too_activation_ceiling,
+          x.c_program_id IS NULL OR too_activation_permitted(x.c_observatory, x.c_science_subtype),
           x.c_cfp_id,
           o.c_science_band,
           s.c_workflow_user_state,
@@ -377,9 +374,7 @@ object ObservationValidationInfo {
           o.c_altair_nd_filter
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
-        -- v_proposal rather than t_proposal: it adds the effective ToO ceiling
-        -- (explicit, else derived from the program's observations).
-        LEFT JOIN v_proposal x
+        LEFT JOIN t_proposal x
           ON o.c_program_id = x.c_program_id
         LEFT JOIN t_observation s
           ON  o.c_calibration_role = ANY(ARRAY['telluric','daytime_pinhole']::e_calibration_role[])
@@ -401,6 +396,7 @@ object ObservationValidationInfo {
         too_activation                  *:
         scheduling_mode                 *:
         too_activation.opt              *:
+        bool                            *:
         cfp_id.opt                      *:
         science_band.opt                *:
         user_state.opt                  *:
@@ -418,13 +414,13 @@ object ObservationValidationInfo {
         altair_nd_filter.opt
       )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, permitted, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
           // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here
           // are unreachable in practice, not a second source of truth for them.
           val altair = altairMode.map: m =>
             AltairConfiguration(m, fieldLens, cassRotator.getOrElse(CassRotator.Following), ndFilter.getOrElse(AltairNdFilter.Out))
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, permitted, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

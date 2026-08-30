@@ -51,7 +51,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
       schedulingConstraints {
         tooActivation
         schedulingMode
-        isSplittable
         $TimingWindowsGraph
       }
       scienceRequirements {
@@ -437,7 +436,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
       schedulingConstraints {
         tooActivation
         schedulingMode
-        isSplittable
       }
     }
   """
@@ -486,8 +484,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
           json"""
             {
               "tooActivation": "NONE",
-              "schedulingMode": "UNINTERRUPTIBLE",
-              "isSplittable": false
+              "schedulingMode": "UNINTERRUPTIBLE"
             }
           """
         )
@@ -506,8 +503,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
           json"""
             {
               "tooActivation": "NONE",
-              "schedulingMode": "UNCONSTRAINED",
-              "isSplittable": true
+              "schedulingMode": "UNCONSTRAINED"
             }
           """
         )
@@ -519,15 +515,14 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          _ <- setScheduling(oid, "schedulingMode: INTERRUPTING")
+          _ <- setScheduling(oid, "schedulingMode: UNINTERRUPTIBLE")
           c <- cloneWith(oid, "schedulingMode: NO_SPLITTING".some)
         yield assertEquals(
           c,
           json"""
             {
               "tooActivation": "NONE",
-              "schedulingMode": "NO_SPLITTING",
-              "isSplittable": false
+              "schedulingMode": "NO_SPLITTING"
             }
           """
         )

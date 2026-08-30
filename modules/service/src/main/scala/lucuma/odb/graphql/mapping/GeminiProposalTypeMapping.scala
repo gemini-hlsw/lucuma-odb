@@ -87,27 +87,18 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val DemoScienceMapping: ObjectMapping =
     ObjectMapping(DemoScienceType)(
       SqlField("id", ProposalView.DemoScience.Id, key = true, hidden = true),
-      SqlField("tooActivationCeiling", ProposalView.TooActivationCeilingEffective),
-      SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
-      SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
 
   lazy val DirectorsTimeMapping: ObjectMapping =
     ObjectMapping(DirectorsTimeType)(
       SqlField("id", ProposalView.DirectorsTime.Id, key = true, hidden = true),
-      SqlField("tooActivationCeiling", ProposalView.TooActivationCeilingEffective),
-      SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
-      SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
 
   lazy val FastTurnaroundMapping: ObjectMapping =
     ObjectMapping(FastTurnaroundType)(
       SqlField("id", ProposalView.FastTurnaround.Id, key = true, hidden = true),
-      SqlField("tooActivationCeiling", ProposalView.TooActivationCeilingEffective),
-      SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
-      SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",  ProposalView.MinPercent),
       SqlObject("reviewer",       Join(ProposalView.FastTurnaround.ReviewerId, ProgramUserView.ProgramUserId)),
       SqlObject("mentor",         Join(ProposalView.FastTurnaround.MentorId, ProgramUserView.ProgramUserId))
@@ -116,9 +107,6 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val LargeProgramMapping: ObjectMapping =
     ObjectMapping(LargeProgramType)(
       SqlField("id", ProposalView.LargeProgram.Id, key = true, hidden = true),
-      SqlField("tooActivationCeiling", ProposalView.TooActivationCeilingEffective),
-      SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
-      SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",      ProposalView.MinPercent),
       SqlField("minPercentTotalTime", ProposalView.LargeProgram.MinPercentTotal),
       SqlObject("aeonMultiFacility"),
@@ -134,9 +122,6 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val QueueMapping: ObjectMapping =
     ObjectMapping(QueueType)(
       SqlField("id", ProposalView.Queue.Id, key = true, hidden = true),
-      SqlField("tooActivationCeiling", ProposalView.TooActivationCeilingEffective),
-      SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
-      SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",    ProposalView.MinPercent),
       SqlObject("aeonMultiFacility"),
       SqlField("jwstSynergy",       ProposalView.Queue.JwstSynergy),
@@ -149,9 +134,6 @@ trait GeminiProposalTypeMapping[F[_]] extends BaseMapping[F]
   lazy val SystemVerificationMapping: ObjectMapping =
     ObjectMapping(SystemVerificationType)(
       SqlField("id", ProposalView.SystemVerification.Id, key = true, hidden = true),
-      SqlField("tooActivationCeiling", ProposalView.TooActivationCeilingEffective),
-      SqlField("defaultTooActivationCeiling", ProposalView.TooActivationCeilingDefault),
-      SqlField("explicitTooActivationCeiling", ProposalView.TooActivationCeilingExplicit),
       SqlField("minPercentTime",  ProposalView.MinPercent)
     )
 

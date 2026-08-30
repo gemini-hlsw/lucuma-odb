@@ -119,7 +119,6 @@ object StartupDiagnostics:
           checkPostgresEnum(summary_generation_state),
           checkPostgresEnum(summary_style),
           checkPostgresEnum(target_disposition),
-          checkPostgresEnum(target_tracking_type),
           checkPostgresEnum(telluric_calibration_order),
           checkPostgresEnum(tg_op),
           checkPostgresEnum(time_charge_correction_op),

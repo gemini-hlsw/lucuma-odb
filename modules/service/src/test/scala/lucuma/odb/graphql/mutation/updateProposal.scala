@@ -400,7 +400,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                   category: SMALL_BODIES
                   gemini: {
                     demoScience: {
-                      explicitTooActivationCeiling: STANDARD
                       minPercentTime: 50
                     }
                   }
@@ -412,7 +411,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                 gemini {
                   scienceSubtype
                   ... on DemoScience {
-                    tooActivationCeiling
                     minPercentTime
                   }
                 }
@@ -427,7 +425,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                 "category": "SMALL_BODIES",
                 "gemini": {
                   "scienceSubtype": "DEMO_SCIENCE",
-                  "tooActivationCeiling": "STANDARD",
                   "minPercentTime": 50
                 }
               }
@@ -549,7 +546,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
         s"""
           largeProgram: {
              minPercentTime: 50
-             explicitTooActivationCeiling: STANDARD
              minPercentTotalTime: 25
              totalTime: { hours: 10.0 }
           }
@@ -599,7 +595,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
         s"""
           largeProgram: {
              minPercentTime: 50
-             explicitTooActivationCeiling: STANDARD
              minPercentTotalTime: 25
              totalTime: { hours: 10.0 }
           }
@@ -850,7 +845,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                   SET: {
                     gemini: {
                       demoScience: {
-                        explicitTooActivationCeiling: STANDARD
                         minPercentTime: 50
                       }
                     }
@@ -900,7 +894,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                       callId: "$cid2"
                       gemini: {
                         demoScience: {
-                          explicitTooActivationCeiling: STANDARD
                           minPercentTime: 50
                         }
                       }
@@ -958,7 +951,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                     callId: null
                     gemini: {
                       demoScience: {
-                        explicitTooActivationCeiling: STANDARD
                         minPercentTime: 50
                       }
                     }
@@ -1104,7 +1096,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      explicitTooActivationCeiling: NONE
                       minPercentTime: 50
                       partnerSplits: [
                         {
@@ -1379,7 +1370,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                 SET: {
                   gemini: {
                     largeProgram: {
-                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       minPercentTotalTime: 90
                       totalTime: { hours: 120.0 }
@@ -1393,7 +1383,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
               proposal {
                 gemini {
                   ... on LargeProgram {
-                    tooActivationCeiling
                     minPercentTime
                     minPercentTotalTime
                     totalTime { hours }
@@ -1410,7 +1399,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
                   "minPercentTotalTime": 90,
                   "totalTime": { "hours": 120.000000 },
@@ -1436,7 +1424,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
                       aeonMultiFacility: {}
@@ -1451,7 +1438,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
               proposal {
                 gemini {
                   ... on Queue {
-                    tooActivationCeiling
                     minPercentTime
                     aeonMultiFacility { requiredInstruments }
                     jwstSynergy
@@ -1468,7 +1454,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "tooActivationCeiling": "NONE",
                   "minPercentTime": 80,
                   "aeonMultiFacility": { "requiredInstruments": [] },
                   "jwstSynergy": true,
@@ -1494,7 +1479,6 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
                 SET: {
                   gemini: {
                     queue: {
-                      explicitTooActivationCeiling: NONE
                       minPercentTime: 80
                       partnerSplits: [{ partner: US, percent: 100 }]
                       aeonMultiFacility: {}
@@ -1690,11 +1674,11 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
       )
 
 
-  // The freeze-at-acceptance design leans on the PI being locked out of the
-  // proposal once it is submitted: the accepted tooActivationCeiling is supposed
-  // to be what the TAC awarded, not something the PI can revise afterwards.
-  // ProposalService gates this on `userCanEditProposal`, which permits the edit
-  // when the proposal is not yet submitted, or when the user is NGO or better.
+  // What the TAC reviews is meant to be what it accepts, so the PI is locked out
+  // of the proposal once it is submitted.  ProposalService gates this on
+  // `userCanEditProposal`, which permits the edit when the proposal is not yet
+  // submitted, or when the user is NGO or better.  The field edited below is
+  // incidental; any proposal property is gated the same way.
 
   /** A proposal that satisfies the submission requirements. */
   private def submittableProposal: IO[Program.Id] =
@@ -1707,51 +1691,51 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
       }
     }
 
-  private def setCeiling(pid: Program.Id, ceiling: String) = s"""
+  private def setMinPercent(pid: Program.Id, percent: Int) = s"""
     mutation {
       updateProposal(
         input: {
           programId: "$pid"
-          SET: { gemini: { queue: { explicitTooActivationCeiling: $ceiling } } }
+          SET: { gemini: { queue: { minPercentTime: $percent } } }
         }
       ) {
-        proposal { gemini { ... on Queue { explicitTooActivationCeiling } } }
+        proposal { gemini { ... on Queue { minPercentTime } } }
       }
     }
   """
 
-  private def ceilingSet(v: String) =
-    json"""{ "updateProposal": { "proposal": { "gemini": { "explicitTooActivationCeiling": $v } } } }"""
+  private def minPercentSet(percent: Int) =
+    json"""{ "updateProposal": { "proposal": { "gemini": { "minPercentTime": $percent } } } }"""
 
 
-  test("✓ the PI may set the ToO ceiling before submission") {
+  test("✓ the PI may edit the proposal before submission") {
     submittableProposal.flatMap { pid =>
       expect(
         user     = pi,
-        query    = setCeiling(pid, "RAPID"),
-        expected = ceilingSet("RAPID").asRight
+        query    = setMinPercent(pid, 50),
+        expected = minPercentSet(50).asRight
       )
     }
   }
 
-  test("⨯ the PI may not change the ToO ceiling once the proposal is accepted") {
+  test("⨯ the PI may not edit the proposal once it is accepted") {
     submittableProposal.flatMap { pid =>
       submitProposal(pi, pid) *>
       acceptProposal(staff, pid) *>
       expect(
         user     = pi,
-        query    = setCeiling(pid, "INTERRUPTING"),
+        query    = setMinPercent(pid, 60),
         expected = List(s"User ${pi.id} cannot edit this proposal $pid because it has been submitted.").asLeft
       )
     }
   }
 
-  test("⨯ the PI may not change the ToO ceiling once the proposal is submitted") {
+  test("⨯ the PI may not edit the proposal once it is submitted") {
     submittableProposal.flatMap { pid =>
       submitProposal(pi, pid) *>
       expect(
         user     = pi,
-        query    = setCeiling(pid, "INTERRUPTING"),
+        query    = setMinPercent(pid, 60),
         expected = List(s"User ${pi.id} cannot edit this proposal $pid because it has been submitted.").asLeft
       )
     }
@@ -1760,15 +1744,15 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
   // An NGO user only reaches a program at all when their own partner holds a
   // time allocation for it (existsAllocationForPartner), so the allocation is
   // part of the setup rather than incidental to it.
-  test("✓ an NGO user whose partner holds an allocation may change the ToO ceiling once accepted") {
+  test("✓ an NGO user whose partner holds an allocation may edit the proposal once it is accepted") {
     submittableProposal.flatMap { pid =>
       submitProposal(pi, pid) *>
       acceptProposal(staff, pid) *>
       setOneAllocationAs(staff, pid, Partner.CA.timeAccountingCategory, ScienceBand.Band1, 42.hourTimeSpan) *>
       expect(
         user     = ngo,
-        query    = setCeiling(pid, "STANDARD"),
-        expected = ceilingSet("STANDARD").asRight
+        query    = setMinPercent(pid, 50),
+        expected = minPercentSet(50).asRight
       )
     }
   }
@@ -1779,20 +1763,20 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
       acceptProposal(staff, pid) *>
       expect(
         user     = ngo,
-        query    = setCeiling(pid, "STANDARD"),
+        query    = setMinPercent(pid, 50),
         expected = List(s"Program $pid does not exist, is not visible, or is ineligible for the requested operation.").asLeft
       )
     }
   }
 
-  test("✓ staff may change the ToO ceiling once the proposal is accepted") {
+  test("✓ staff may edit the proposal once it is accepted") {
     submittableProposal.flatMap { pid =>
       submitProposal(pi, pid) *>
       acceptProposal(staff, pid) *>
       expect(
         user     = staff,
-        query    = setCeiling(pid, "INTERRUPTING"),
-        expected = ceilingSet("INTERRUPTING").asRight
+        query    = setMinPercent(pid, 60),
+        expected = minPercentSet(60).asRight
       )
     }
   }
