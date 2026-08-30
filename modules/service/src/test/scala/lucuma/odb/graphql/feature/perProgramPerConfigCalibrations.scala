@@ -328,6 +328,53 @@ class perProgramPerConfigCalibrations
     }
   }
 
+  // sc-10046 / sc-10047: the IFU needs a twilight and a spectrophotometric standard, taken through
+  // the IFU rather than an equivalent slit, so each science mode yields two calibrations.
+  test("add calibrations for each IFU mode") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthIfu.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthIfu.some, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
+      gr1  <- groupElementsAs(pi, pid, None)
+      ob   <- queryObservations(pid)
+    } yield {
+      val cgid = gr1.calibrationGroupId
+      assert(ob.groupIds.forall(g => cgid.exists(_ == g)))
+      // One specphot and one twilight per science mode.
+      assertEquals(ob.countCalibrations, 4)
+      assertEquals(gr1.observationIds.size, 2)
+    }
+  }
+
+  // The calibration must repeat the science aperture; were it dropped, the two IFU observations
+  // would share one calibration set.
+  test("IFU calibrations distinguish the aperture") {
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthIfu.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthIfu.some, tid2)
+      _    <- query(pi, s"""
+                mutation {
+                  updateObservations(input: {
+                    WHERE: { id: { EQ: "$oid2" } }
+                    SET: { observingMode: { gmosNorthIfu: { fpu: ONE_SLIT_RED } } }
+                  }) { observations { id } }
+                }
+              """)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
+      ob   <- queryObservations(pid)
+    } yield assertEquals(ob.countCalibrations, 4)
+  }
+
   test("calibrations take the highest priority band of the science observations") {
     // With a single allocated band, setAllocations back-fills it onto every
     // observation with no band, which would hide the case under test. More

@@ -176,6 +176,14 @@ object PerProgramPerConfigCalibrationsService:
             gmosLongSlitTwilightObs(pid, gid, tid, props, c).some
           case (Site.GS, CalibrationRole.Twilight, c: GmosSConfigs)           =>
             gmosLongSlitTwilightObs(pid, gid, tid, props, c).some
+          case (Site.GN, CalibrationRole.SpectroPhotometric, c: GmosNIfuConfigs) =>
+            gmosIfuSpecPhotObs(pid, gid, tid, props, c, c.toIfuInput).some
+          case (Site.GS, CalibrationRole.SpectroPhotometric, c: GmosSIfuConfigs) =>
+            gmosIfuSpecPhotObs(pid, gid, tid, props, c, c.toIfuInput).some
+          case (Site.GN, CalibrationRole.Twilight, c: GmosNIfuConfigs)        =>
+            gmosIfuTwilightObs(pid, gid, tid, props, c, c.centralWavelength, c.toIfuInput).some
+          case (Site.GS, CalibrationRole.Twilight, c: GmosSIfuConfigs)        =>
+            gmosIfuTwilightObs(pid, gid, tid, props, c, c.centralWavelength, c.toIfuInput).some
           case _                                                              =>
             none
 
@@ -213,8 +221,8 @@ object PerProgramPerConfigCalibrationsService:
                 oid      <- calibObservation(calibType, site, pid, gid, props, config, tid).sequence
               } yield oid.toList
 
-        val gnoCalibs = newCalibs(Site.GN, gnTgt, configs.collect { case g: GmosNConfigs => g })
-        val gsoCalibs = newCalibs(Site.GS, gsTgt, configs.collect { case g: GmosSConfigs => g })
+        val gnoCalibs = newCalibs(Site.GN, gnTgt, configs.collect { case g: (GmosNConfigs | GmosNIfuConfigs) => g })
+        val gsoCalibs = newCalibs(Site.GS, gsTgt, configs.collect { case g: (GmosSConfigs | GmosSIfuConfigs) => g })
 
         (gnoCalibs, gsoCalibs).mapN((_, _).mapN(_ ::: _)).getOrElse(List.empty.pure[F]).flatTap { oids =>
           setCalibRoleAndGroup(oids, calibType).whenA(oids.nonEmpty)
