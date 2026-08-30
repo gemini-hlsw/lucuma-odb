@@ -2092,10 +2092,47 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  /**
+   * The region `createOpportunityTargetAs` draws: the whole of right ascension,
+   * declination from 10 to 70 degrees.  Tests that resolve or swap in a real
+   * target have to land inside it, or the approval stops covering the
+   * observation.  This is the body of a `region: { ... }` input.
+   */
+  val DefaultOpportunityRegion: String =
+    """
+      rightAscensionArc: { type: FULL }
+      declinationArc: {
+        type: PARTIAL
+        start: { degrees: 10 }
+        end: { degrees: 70 }
+      }
+    """
+
+  /** A declination-bounded region over the whole of right ascension, as GraphQL input. */
+  def decRegion(startDegrees: Int, endDegrees: Int): String =
+    s"""
+      rightAscensionArc: { type: FULL }
+      declinationArc: {
+        type: PARTIAL
+        start: { degrees: $startDegrees }
+        end: { degrees: $endDegrees }
+      }
+    """
+
   def createOpportunityTargetAs(
     user: User,
     pid:  Program.Id,
     name: String = "No Name",
+    sourceProfile: String = DefaultSourceProfile
+  ): IO[Target.Id] =
+    createOpportunityTargetWithRegionAs(user, pid, DefaultOpportunityRegion, name, sourceProfile)
+
+  /** As `createOpportunityTargetAs`, but with an explicit region (the body of `region: { ... }`). */
+  def createOpportunityTargetWithRegionAs(
+    user:   User,
+    pid:    Program.Id,
+    region: String,
+    name:   String = "No Name",
     sourceProfile: String = DefaultSourceProfile
   ): IO[Target.Id] =
     query(
@@ -2109,12 +2146,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 name: "$name"
                 opportunity: {
                   region: {
-                    rightAscensionArc: { type: FULL }
-                    declinationArc: {
-                      type: PARTIAL
-                      start: { degrees: 10 }
-                      end: { degrees: 70 }
-                    }
+                    $region
                   }
                 }
                 $sourceProfile
