@@ -7,12 +7,7 @@
 --
 -- Missing until now: the region columns (which carry the whole discriminant for
 -- opportunity targets, where the reference coordinates are null), the visitor
--- radius, and every GNIRS column.
---
--- The GMOS IFU columns are carried over from V1297.  `SelectRequest` does not match them yet --
--- ConfigurationService has no GMOS IFU handling on main -- so they are always null today and the
--- key is unaffected.  They stay because they are the mode's real discriminants: dropping them
--- would reintroduce the collision the moment that service work lands.
+-- radius, and every GNIRS column.  The GMOS IFU columns come from V1297 and are kept.
 --
 -- The GMOS imaging filter arrays are deliberately excluded: `SelectRequest`
 -- matches them by containment (@>), not equality, so imaging canonicalizes onto
@@ -48,5 +43,9 @@ ALTER TABLE t_configuration_request
     c_gnirs_longslit_prism,
     c_gnirs_ifu_grating,
     c_gnirs_ifu_fpu,
-    c_visitor_radius
+    c_visitor_radius,
+    c_gmos_north_ifu_grating,
+    c_gmos_north_ifu_fpu,
+    c_gmos_south_ifu_grating,
+    c_gmos_south_ifu_fpu
   );
