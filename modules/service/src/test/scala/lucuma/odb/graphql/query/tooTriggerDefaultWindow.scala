@@ -7,7 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.option.*
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.SchedulingMode
+import lucuma.core.enums.TooActivation
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TimingWindowInclusion.Include
 import lucuma.core.model.Observation
@@ -69,7 +69,7 @@ class tooTriggerDefaultWindow extends ExecutionTestSupportForGmos with TooTrigge
 
   test("a rapid trigger with no timing windows opens a 24 hour window"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       before      <- windows(oid)
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       at          <- requestedAt(oid)
@@ -82,20 +82,11 @@ class tooTriggerDefaultWindow extends ExecutionTestSupportForGmos with TooTrigge
 
   test("an interrupting trigger opens a 24 hour window"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Interrupting)
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Interrupting)
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       at          <- requestedAt(oid)
       after       <- windows(oid)
     yield assertEquals(after, List(defaultWindow(at)))
-
-  // A standard ToO waits its turn in the queue like anything else, so a 24 hour
-  // deadline describes nothing about it.
-  test("a standard trigger opens no window"):
-    for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Unconstrained)
-      _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
-      after       <- windows(oid)
-    yield assertEquals(after, Nil)
 
   test("a non-ToO observation set Ready gets no window"):
     for
@@ -204,10 +195,14 @@ class tooTriggerDefaultWindow extends ExecutionTestSupportForGmos with TooTrigge
   // hours run from its own.
   test("superseding a request replaces the window"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Interrupting)
+      // Proposed at INTERRUPTING so the ceiling it freezes is evidenced by an
+      // observation, then lowered -- which is always allowed.  The test escalates
+      // back up from here.
+      _           <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       before      <- windows(oid)
-      _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Interrupting)
+      _           <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
       at          <- requestedAt(oid)
       after       <- windows(oid)
     yield
@@ -215,33 +210,33 @@ class tooTriggerDefaultWindow extends ExecutionTestSupportForGmos with TooTrigge
       assertEquals(after, List(defaultWindow(at)))
       assertNotEquals(after, before)
 
-  // Superseded downwards, though, the successor is standard and wants no window
-  // at all -- so the close-out takes the rapid request's window and nothing
-  // replaces it.
-  test("superseding down off the ladder removes the window")  :
+  // Lowered to None, though, the observation is no longer a ToO at all: the
+  // request is withdrawn rather than superseded, the close-out takes its window,
+  // and nothing replaces it.
+  test("lowering a triggered ToO to None removes the window"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       before      <- windows(oid)
-      _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Unconstrained)
+      _           <- setTooActivationAs(pi, oid, TooActivation.None)
       after       <- windows(oid)
     yield
       assertEquals(before.length, 1)
       assertEquals(after, Nil)
 
-  // ... and the reverse: a standard request escalated onto the ladder reaches
-  // the rule for the first time.
-  test("escalating a standard request onto the ladder opens a window"):
+  // ... and the reverse: a Ready observation raised to a ToO is requested for the
+  // first time, and its request opens the window.
+  test("raising a Ready observation to a ToO opens a window"):
     for
-      // Created uninterruptible so the frozen ceiling admits the escalation,
-      // then lowered before the request is made.
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
-      _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Unconstrained)
+      // Created at RAPID so the frozen ceiling admits the raise, then lowered to
+      // None before it is set Ready.
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
+      _           <- setTooActivationAs(pi, oid, TooActivation.None)
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
-      standard    <- windows(oid)
-      _           <- setSchedulingModeAs(pi, oid, SchedulingMode.Uninterruptible)
+      none        <- windows(oid)
+      _           <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       at          <- requestedAt(oid)
       after       <- windows(oid)
     yield
-      assertEquals(standard, Nil)
+      assertEquals(none, Nil)
       assertEquals(after, List(defaultWindow(at)))

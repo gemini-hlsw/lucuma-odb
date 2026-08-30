@@ -11,6 +11,7 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SchedulingMode
+import lucuma.core.enums.TooActivation
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -94,26 +95,33 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       assertEquals(ts, Nil)
       assertEquals(s, ObservationWorkflowState.Ready)
 
-  // The activation is derived from the asterism now, so what used to be
-  // "lower the activation" is "remove the opportunity target" -- the
-  // observation stops being a ToO and its request goes with it.
-  test("removing the opportunity target while Ready withdraws the trigger"):
+  // A trigger is a prompt, not a promise that the observation can run right now.
+  // Emptying the asterism breaks the observation, but the activation is declared
+  // and did not move, so the PI has not taken their request back -- and the
+  // request records when *they* asked, which is the number that matters when the
+  // point is promptness.
+  test("emptying the asterism leaves the request outstanding"):
     for
       (_, oid, tid) <- createTooObservationAs(pi, staff)
       _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       _             <- editAsterismAs(pi, oid, add = Nil, del = List(tid))
       ts            <- triggers(oid)
-    yield assertEquals(ts, List((Withdrawn, None)))
+    yield assertEquals(ts, List((Requested, None)))
 
-  test("adding a resolved opportunity target while Ready requests a trigger"):
+  // The reverse of the test above.  Ready is a pre-execution state, so a placeholder
+  // can still be put back into a triggered observation -- and doing so is a deliberate
+  // return to waiting, which must not leave a live request in front of an observer.
+  test("adding an opportunity target while Ready withdraws the trigger"):
     for
-      (pid, oid) <- createTriggerableObservationAs(pi, staff)
-      tid        <- createOpportunityTargetAs(pi, pid)
-      _          <- resolveOpportunityTargetAs(pi, tid)
+      (pid, oid, _) <- createTooObservationAs(pi, staff)
       _          <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      requested  <- triggers(oid)
+      tid        <- createOpportunityTargetAs(pi, pid)
       _          <- editAsterismAs(pi, oid, add = List(tid), del = Nil)
       ts         <- triggers(oid)
-    yield assertEquals(ts, List((Requested, None)))
+    yield
+      assertEquals(requested, List((Requested, None)))
+      assertEquals(ts, List((Withdrawn, None)))
 
   test("declining records the reason and returns the observation to Defined"):
     for
@@ -176,34 +184,96 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
                   )
     yield ()
 
-  // The old incoherence -- an opportunity target with NONE activation -- is now
-  // unrepresentable, since the activation is derived from the target.  What is
-  // still possible is its converse: INTERRUPTING is the one mode reserved to
-  // Targets of Opportunity, so carrying it without one is rejected.
-  test("an interrupting observation with no opportunity target is Undefined"):
+  private def modeOf(oid: Observation.Id): IO[SchedulingMode] =
+    query(
+      pi,
+      s"""query { observation(observationId: ${oid.asJson}) { schedulingConstraints { schedulingMode } } }"""
+    ).map(_.hcursor.downFields("observation", "schedulingConstraints", "schedulingMode").require[SchedulingMode])
+
+  private def lockRefusal(oid: Observation.Id, activation: String, mode: String) =
+    List(
+      s"Cannot set the scheduling constraints for observation $oid: Target of Opportunity activation $activation fixes the scheduling mode at UNINTERRUPTIBLE; it cannot be $mode."
+    ).asLeft
+
+  private def plainObservation: IO[Observation.Id] =
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramAs(pi, "ToO")
       _   <- addProposal(pi, pid, cfp.some, None)
       tid <- createTargetWithProfileAs(pi, pid)
       oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- setSchedulingModeAs(pi, oid, SchedulingMode.Interrupting)
-      s   <- getWorkflowState(pid, oid)
-      ms  <- query(
-               pi,
-               s"""
-                 query {
-                   observation(observationId: ${oid.asJson}) {
-                     workflow { value { validationErrors { messages } } }
-                   }
-                 }
-               """
-             ).map(_.hcursor.downFields("observation", "workflow", "value", "validationErrors")
-                     .require[List[io.circe.Json]]
-                     .flatMap(_.hcursor.downField("messages").require[List[String]]))
+    yield oid
+
+  // The asterism has nothing to say about either axis now.  What relates them is
+  // the one rule that every Target of Opportunity is Uninterruptible: an
+  // observation that displaces other science must not itself be displaceable, and
+  // one promised as soon as possible should not be broken up once it starts.  So
+  // the mode comes with the activation rather than being a separate choice.
+  test("raising the activation to a ToO brings Uninterruptible with it"):
+    for
+      oid    <- plainObservation
+      before <- modeOf(oid)
+      _      <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
+      after  <- modeOf(oid)
     yield
-      assertEquals(s, ObservationWorkflowState.Undefined)
-      assert(ms.exists(_.contains("may only interrupt executing science")), s"expected the interrupting message, got $ms")
+      assertEquals(before, SchedulingMode.Unconstrained)
+      assertEquals(after,  SchedulingMode.Uninterruptible)
+
+  // What is checked is the pair the row would end up with, so naming a
+  // contradictory mode in the same edit is refused rather than overridden.
+  test("an explicit mode contradicting a ToO activation in the same edit is refused"):
+    for
+      oid  <- plainObservation
+      _    <- expect(
+                pi,
+                s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: { schedulingConstraints: { tooActivation: INTERRUPTING, schedulingMode: UNCONSTRAINED } }
+                      WHERE: { id: { EQ: ${oid.asJson} } }
+                    }) { observations { id } }
+                  }
+                """,
+                lockRefusal(oid, "INTERRUPTING", "UNCONSTRAINED")
+              )
+      mode <- modeOf(oid)
+    yield assertEquals(mode, SchedulingMode.Unconstrained)
+
+  test("a ToO's mode cannot be changed while the activation stands"):
+    for
+      oid  <- plainObservation
+      _    <- setTooActivationAs(pi, oid, TooActivation.Rapid)
+      _    <- expect(
+                pi,
+                s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: { schedulingConstraints: { schedulingMode: NO_SPLITTING } }
+                      WHERE: { id: { EQ: ${oid.asJson} } }
+                    }) { observations { id } }
+                  }
+                """,
+                lockRefusal(oid, "RAPID", "NO_SPLITTING")
+              )
+      // Restating the mode it already has is not a change, and is accepted.
+      _    <- setSchedulingModeAs(pi, oid, SchedulingMode.Uninterruptible)
+      mode <- modeOf(oid)
+    yield assertEquals(mode, SchedulingMode.Uninterruptible)
+
+  // No automatic downgrade: lowering the activation leaves the mode where it
+  // was, since quietly changing what an observation is scheduled under is always
+  // a surprise.  The PI may then relax it themselves.
+  test("lowering the activation leaves the mode for the PI to relax"):
+    for
+      oid     <- plainObservation
+      _       <- setTooActivationAs(pi, oid, TooActivation.Rapid)
+      _       <- setTooActivationAs(pi, oid, TooActivation.None)
+      kept    <- modeOf(oid)
+      _       <- setSchedulingModeAs(pi, oid, SchedulingMode.Unconstrained)
+      relaxed <- modeOf(oid)
+    yield
+      assertEquals(kept,    SchedulingMode.Uninterruptible)
+      assertEquals(relaxed, SchedulingMode.Unconstrained)
 
   test("an observation still holding an unresolved opportunity target cannot be triggered"):
     for
@@ -229,7 +299,7 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
   // this path.
   test("a resolved opportunity target is offered Ready"):
     for
-      (pid, oid, _) <- createTooObservationAs(pi, staff, resolved = true)
+      (pid, oid, _) <- createTooObservationAs(pi, staff, swapped = true)
       (s, ts)       <- tooWorkflowStateAndTransitions(pid, oid, pi)
     yield
       assertEquals(s, ObservationWorkflowState.Defined)
@@ -237,13 +307,13 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
 
   test("an unresolved opportunity target is not offered Ready"):
     for
-      (pid, oid, _) <- createTooObservationAs(pi, staff, resolved = false)
+      (pid, oid, _) <- createTooObservationAs(pi, staff, swapped = false)
       (_, ts)       <- tooWorkflowStateAndTransitions(pid, oid, pi)
     yield assert(!ts.contains(ObservationWorkflowState.Ready), s"expected READY to be withheld, got $ts")
 
   test("setting a resolved opportunity ToO Ready requests a trigger"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, resolved = true)
+      (_, oid, _) <- createTooObservationAs(pi, staff, swapped = true)
       before      <- triggers(oid)
       _           <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       after       <- triggers(oid)
@@ -251,36 +321,36 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       assertEquals(before, Nil)
       assertEquals(after, List((Requested, None)))
 
-  test("resolving an opportunity target unblocks triggering"):
+  test("swapping in a real target unblocks triggering"):
     for
-      (pid, oid, tid) <- createTooObservationAs(pi, staff, resolved = false)
+      (pid, oid, tid) <- createTooObservationAs(pi, staff, swapped = false)
       (_, before)     <- tooWorkflowStateAndTransitions(pid, oid, pi)
-      // No re-approval: the request was approved against the target's region, and
-      // resolving inside that region leaves the approval covering it.
-      _               <- resolveOpportunityTargetAs(pi, tid)
+      // No re-approval: the request was approved against the placeholder's region,
+      // and a target inside that region is still covered by it.
+      _               <- swapInRealTargetAs(pi, pid, oid, tid)
       (_, after)      <- tooWorkflowStateAndTransitions(pid, oid, pi)
       _               <- setWorkflowState(oid, ObservationWorkflowState.Ready)
       ts              <- triggers(oid)
     yield
       assert(!before.contains(ObservationWorkflowState.Ready), s"expected READY to be withheld, got $before")
-      assert(after.contains(ObservationWorkflowState.Ready), s"expected READY once resolved, got $after")
+      assert(after.contains(ObservationWorkflowState.Ready), s"expected READY once swapped, got $after")
       assertEquals(ts, List((Requested, None)))
 
   // The approval is against the region, so the resolution has to land inside it.  This is the
   // one place a ToO's region is enforced today, and it enforces it through the approval rather
   // than through a validator of its own: `Configuration.subsumes` asks `region.contains(coords)`.
-  test("resolving inside the approved region keeps the approval"):
+  test("swapping in a target inside the approved region keeps the approval"):
     for
-      (pid, oid, tid) <- createTooObservationAs(pi, staff, resolved = false)
-      _               <- resolveOpportunityTargetAs(pi, tid, "30:00:00.00")
+      (pid, oid, tid) <- createTooObservationAs(pi, staff, swapped = false)
+      _               <- swapInRealTargetAs(pi, pid, oid, tid, "30:00:00.00")
       state           <- tooWorkflowState(pid, oid, pi)
     yield assertEquals(state, ObservationWorkflowState.Defined)
 
-  test("resolving outside the approved region unapproves the observation"):
+  test("swapping in a target outside the approved region unapproves the observation"):
     for
-      (pid, oid, tid) <- createTooObservationAs(pi, staff, resolved = false)
+      (pid, oid, tid) <- createTooObservationAs(pi, staff, swapped = false)
       // The region runs from 10 to 70 degrees of declination; this is below it.
-      _               <- resolveOpportunityTargetAs(pi, tid, "-00:06:04.89")
+      _               <- swapInRealTargetAs(pi, pid, oid, tid, "-00:06:04.89")
       (state, trans)  <- tooWorkflowStateAndTransitions(pid, oid, pi)
     yield
       assertEquals(state, ObservationWorkflowState.Unapproved)
@@ -288,31 +358,20 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
 
   // The region outlives resolution, so the approval keeps being checked against it: moving a
   // resolved target out of its region later is caught exactly as resolving outside it would be.
-  test("moving a resolved target outside the region unapproves it afterwards"):
+  test("swapping to a target outside the region unapproves it afterwards"):
     for
-      (pid, oid, tid) <- createTooObservationAs(pi, staff, resolved = false)
-      _               <- resolveOpportunityTargetAs(pi, tid, "30:00:00.00")
+      (pid, oid, tid) <- createTooObservationAs(pi, staff, swapped = false)
+      a               <- swapInRealTargetAs(pi, pid, oid, tid, "30:00:00.00")
       inside          <- tooWorkflowState(pid, oid, pi)
-      _               <- resolveOpportunityTargetAs(pi, tid, "-00:06:04.89")
+      b               <- swapInRealTargetAs(pi, pid, oid, a, "-00:06:04.89")
       outside         <- tooWorkflowState(pid, oid, pi)
-      _               <- resolveOpportunityTargetAs(pi, tid, "45:00:00.00")
+      _               <- swapInRealTargetAs(pi, pid, oid, b, "45:00:00.00")
       back            <- tooWorkflowState(pid, oid, pi)
     yield
       assertEquals(inside,  ObservationWorkflowState.Defined)
       assertEquals(outside, ObservationWorkflowState.Unapproved)
       assertEquals(back,    ObservationWorkflowState.Defined)
 
-  private def unresolveTargetAs(tid: lucuma.core.model.Target.Id): IO[Unit] =
-    query(pi,
-      s"""
-        mutation {
-          updateTargets(input: {
-            SET: { opportunity: { resolution: null } }
-            WHERE: { id: { EQ: ${tid.asJson} } }
-          }) { targets { id } }
-        }
-      """
-    ).void
 
   // An unresolved ToO has nowhere to point, so it must not put a request in front of an observer.
   // The workflow validator calls such an observation Undefined, but that is a computed opinion --
@@ -327,25 +386,27 @@ class tooTriggerWorkflow extends ExecutionTestSupportForGmos with TooTriggerSetu
       ts         <- triggers(oid)
     yield assertEquals(ts, Nil)
 
-  test("clearing the resolution of a triggered ToO withdraws the trigger"):
+  test("putting a placeholder back into a triggered ToO withdraws the trigger"):
     for
-      (_, oid, tid) <- createTooObservationAs(pi, staff, resolved = true)
-      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
-      before        <- triggers(oid)
-      _             <- unresolveTargetAs(tid)
-      after         <- triggers(oid)
+      (pid, oid, tid) <- createTooObservationAs(pi, staff, swapped = true)
+      _               <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      before          <- triggers(oid)
+      opp             <- createOpportunityTargetAs(pi, pid)
+      _               <- editAsterismAs(pi, oid, add = List(opp), del = List(tid))
+      after           <- triggers(oid)
     yield
       assertEquals(before, List((Requested, None)))
       assertEquals(after,  List((Withdrawn, None)))
 
-  // ... and resolving it again asks afresh, so the round trip is not one-way.
-  test("re-resolving a withdrawn trigger requests it again"):
+  // ... and swapping a real target back in asks afresh, so the round trip is not one-way.
+  test("swapping a real target back in requests the trigger again"):
     for
-      (_, oid, tid) <- createTooObservationAs(pi, staff, resolved = true)
-      _             <- setWorkflowState(oid, ObservationWorkflowState.Ready)
-      _             <- unresolveTargetAs(tid)
-      _             <- resolveOpportunityTargetAs(pi, tid)
-      ts            <- triggers(oid)
+      (pid, oid, tid) <- createTooObservationAs(pi, staff, swapped = true)
+      _               <- setWorkflowState(oid, ObservationWorkflowState.Ready)
+      opp             <- createOpportunityTargetAs(pi, pid)
+      _               <- editAsterismAs(pi, oid, add = List(opp), del = List(tid))
+      _               <- swapInRealTargetAs(pi, pid, oid, opp)
+      ts              <- triggers(oid)
     yield assertEquals(ts.map(_._1), List(Withdrawn, Requested))
 
   // ACCEPTANCE (V1274/V1275).  A request ends in a "yes" when the observatory acts

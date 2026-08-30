@@ -370,6 +370,52 @@ class configurationRequests_UniquenessKey
   test("Altair - differing only in whether Altair is used at all"):
     assertDistinctAltair("NGS".some, none)
 
+  private def setSchedulingAs(oid: Observation.Id, constraints: String): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: { schedulingConstraints: { $constraints } }
+            WHERE: { id: { EQ: "$oid" } }
+          }) { observations { id } }
+        }
+      """
+    ).void
+
+  // Same observing mode throughout: only the scheduling constraints differ.
+  private def assertDistinctScheduling(a: String, b: String): IO[Unit] =
+    setup.flatMap: (pid, tid) =>
+      val mode = gnirsLongSlit("D111", "SHORT_BLUE")
+      for
+        o1 <- createObservationWithModeAs(pi, pid, List(tid), mode)
+        o2 <- createObservationWithModeAs(pi, pid, List(tid), mode)
+        _  <- setSchedulingAs(o1, a)
+        _  <- setSchedulingAs(o2, b)
+        r1 <- createConfigurationRequestAs(pi, o1)
+        r2 <- createConfigurationRequestAs(pi, o2)
+        _  <- IO(assertNotEquals(r1, r2, s"Expected distinct configuration requests, got $r1 twice."))
+      yield ()
+
+  test("differing only in scheduling mode"):
+    assertDistinctScheduling("schedulingMode: UNCONSTRAINED", "schedulingMode: NO_SPLITTING")
+
+  // RAPID brings UNINTERRUPTIBLE with it, so the other side names that mode
+  // explicitly: the activation is then the only difference, and it is no part of
+  // a request.
+  test("differing only in ToO activation reuses the request"):
+    setup.flatMap: (pid, tid) =>
+      val mode = gnirsLongSlit("D111", "SHORT_BLUE")
+      for
+        o1 <- createObservationWithModeAs(pi, pid, List(tid), mode)
+        o2 <- createObservationWithModeAs(pi, pid, List(tid), mode)
+        _  <- setSchedulingAs(o1, "schedulingMode: UNINTERRUPTIBLE")
+        _  <- setSchedulingAs(o2, "tooActivation: RAPID")
+        r1 <- createConfigurationRequestAs(pi, o1)
+        r2 <- createConfigurationRequestAs(pi, o2)
+        _  <- IO(assertEquals(r1, r2))
+      yield ()
+
   // Widening the key must not stop genuinely identical requests collapsing onto one.
   test("identical requests still collapse onto one"):
     setup.flatMap: (pid, tid) =>

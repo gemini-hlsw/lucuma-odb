@@ -170,43 +170,32 @@ class observations_targetCoordinates extends OdbSuite with ObservingModeSetupOpe
       got  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, $NearCone""")
     yield assertEquals(got, Nil)
 
-  // Resolving is what gives a Target of Opportunity a position, and it keeps its
-  // opportunity identity when it does -- so the subtype no longer answers whether a
-  // position exists, and a resolved ToO has to be findable at the coordinates the
-  // alert supplied.
-  test("resolved opportunity target is visible to the cone"):
+  // A placeholder never acquires a position; the alert brings a real target that takes
+  // its place in the asterism.  So the observation becomes findable by the swap, and
+  // it is findable at the swapped-in target's coordinates like any other observation.
+  test("swapping a real target in makes the observation visible to the cone"):
     for
       (pid, near, _) <- coneSetup
       tid  <- createOpportunityTargetAs(pi, pid)
       opp  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _    <- resolveOpportunityTargetAtAs(pi, tid, Resolved)
+      real <- createSiderealTargetAtAs(pi, pid, Resolved)
+      _    <- editAsterismAs(pi, opp, add = List(real), del = List(tid))
       _    <- runObscalcUpdateAs(service, pid, opp)
       got  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, $NearCone""")
     yield assertEquals(got.toSet, Set(near, opp))
 
-  // The counterpart to the unresolved mixed asterism above: once every member tracks
-  // siderally the composite is well defined, whichever subtype each member is.
-  test("a resolved opportunity target contributes to a mixed asterism"):
-    for
-      pid  <- createProgramAs(pi)
-      sid  <- createSiderealTargetAtAs(pi, pid, Resolved)
-      opp  <- createOpportunityTargetAs(pi, pid)
-      _    <- resolveOpportunityTargetAtAs(pi, opp, Resolved)
-      oid  <- createGmosNorthLongSlitObservationAs(pi, pid, List(sid, opp))
-      _    <- runObscalcUpdateAs(service, pid, oid)
-      got  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Resolved, 5.degrees)}""")
-    yield assertEquals(got, List(oid))
-
-  // Clearing the resolution takes the position away again.
-  test("un-resolving an opportunity target removes its position"):
+  // ... and swapping one back in takes the position away again, which is what makes
+  // returning an observation to the waiting state a real operation rather than a
+  // one-way door.
+  test("swapping a placeholder back in removes the position"):
     for
       pid  <- createProgramAs(pi)
       tid  <- createOpportunityTargetAs(pi, pid)
-      oid  <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _    <- resolveOpportunityTargetAtAs(pi, tid, Resolved)
+      real <- createSiderealTargetAtAs(pi, pid, Resolved)
+      oid  <- createGmosNorthLongSlitObservationAs(pi, pid, List(real))
       _    <- runObscalcUpdateAs(service, pid, oid)
       pos  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Resolved, 5.degrees)}""")
-      _    <- unresolveOpportunityTargetAs(pi, tid)
+      _    <- editAsterismAs(pi, oid, add = List(tid), del = List(real))
       _    <- runObscalcUpdateAs(service, pid, oid)
       gone <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, ${coneText(Resolved, 5.degrees)}""")
     yield

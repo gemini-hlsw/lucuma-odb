@@ -10,6 +10,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ProgramStatus
+import lucuma.core.enums.TooActivation
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.Existence
 import lucuma.odb.data.Nullable
@@ -33,11 +34,12 @@ object ProgramPropertiesInput:
     explicitStatus: Nullable[ProgramStatus],
     active:      Option[Ior[LocalDate, LocalDate]],
     dismissedWarnings: Option[List[ObservationValidationCode.Warning]],
+    tooActivationCeiling: Option[TooActivation],
   )
 
   object Create:
     val Default: Create =
-      Create(None, None, GoaPropertiesInput.Create.Default, Existence.Present, Nullable.Absent, None, None)
+      Create(None, None, GoaPropertiesInput.Create.Default, Existence.Present, Nullable.Absent, None, None, None)
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
@@ -50,9 +52,10 @@ object ProgramPropertiesInput:
           DateBinding.Option("activeStart", rActiveStart),
           DateBinding.Option("activeEnd",   rActiveEnd),
           ObservationValidationWarningBinding.List.NonNullable("dismissedWarnings", rdismissedWarnings),
+          TooActivationBinding.Option("tooActivationCeiling", rTooActivationCeiling),
         ) =>
           val rActive = date.validateOptionalInputInterval("activeStart", "activeEnd", rActiveStart, rActiveEnd)
-          (rName, rDescription, rGoa, rExistence, rExplicitStatus, rActive, rdismissedWarnings).parMapN: (name, description, goa, existence, explicitStatus, active, dismissedWarnings) =>
+          (rName, rDescription, rGoa, rExistence, rExplicitStatus, rActive, rdismissedWarnings, rTooActivationCeiling).parMapN: (name, description, goa, existence, explicitStatus, active, dismissedWarnings, tooActivationCeiling) =>
             Create(
               name,
               description,
@@ -61,6 +64,7 @@ object ProgramPropertiesInput:
               explicitStatus,
               active,
               dismissedWarnings,
+              tooActivationCeiling,
             )
 
   case class Edit(
@@ -71,11 +75,12 @@ object ProgramPropertiesInput:
     explicitStatus: Nullable[ProgramStatus],
     active:         Option[Ior[LocalDate, LocalDate]],
     dismissedWarnings: Option[List[ObservationValidationCode.Warning]],
+    tooActivationCeiling: Nullable[TooActivation],
   )
 
   object Edit:
     val Default: Edit =
-      Edit(Nullable.Absent, Nullable.Absent, None, None, Nullable.Absent, None, None)
+      Edit(Nullable.Absent, Nullable.Absent, None, None, Nullable.Absent, None, None, Nullable.Absent)
 
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
@@ -87,7 +92,8 @@ object ProgramPropertiesInput:
           ProgramStatusBinding.Nullable("explicitStatus", rExplicitStatus),
           DateBinding.Option("activeStart", rActiveStart),
           DateBinding.Option("activeEnd",   rActiveEnd),
-          ObservationValidationWarningBinding.List.NonNullable("dismissedWarnings", rdismissedWarnings)
+          ObservationValidationWarningBinding.List.NonNullable("dismissedWarnings", rdismissedWarnings),
+          TooActivationBinding.Nullable("tooActivationCeiling", rTooActivationCeiling)
         ) =>
           val rActive = date.validateOptionalInputInterval("activeStart", "activeEnd", rActiveStart, rActiveEnd)
-          (rName, rDescription, rGoa, rExistence, rExplicitStatus, rActive, rdismissedWarnings).parMapN(Edit.apply)
+          (rName, rDescription, rGoa, rExistence, rExplicitStatus, rActive, rdismissedWarnings, rTooActivationCeiling).parMapN(Edit.apply)

@@ -106,6 +106,9 @@ trait ProgramMapping[F[_]]
       SqlField("resourceLimit", ProgramView.ResourceLimit),
       SqlField("resourceCount", ProgramView.ResourceCount),
       SqlField("dismissedWarnings", ProgramView.dismissedWarnings),
+      SqlField("tooActivationCeiling", ProgramView.TooActivationCeiling),
+      SqlField("maxTooActivation", ProgramView.MaxTooActivation),
+      SqlField("maxSchedulingMode", ProgramView.MaxSchedulingMode),
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
