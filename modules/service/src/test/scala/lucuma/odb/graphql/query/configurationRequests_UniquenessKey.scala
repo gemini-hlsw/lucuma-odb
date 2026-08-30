@@ -227,13 +227,16 @@ class configurationRequests_UniquenessKey
       }
     """
 
-  private def imaging(filters: String*): String =
+  private def imagingAt(site: String, filters: Seq[String]): String =
     s"""
-      gmosNorthImaging: {
+      gmos${site}Imaging: {
         variant: { interleaved: {} }
         filters: ${filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")}
       }
     """
+
+  private def imaging(filters: String*): String      = imagingAt("North", filters)
+  private def southImaging(filters: String*): String = imagingAt("South", filters)
 
   private def createImagingObservation(pid: Program.Id, tid: Target.Id, mode: String): IO[Observation.Id] =
     query(
@@ -276,6 +279,17 @@ class configurationRequests_UniquenessKey
 
   test("GMOS imaging - a disjoint filter set reuses the request"):
     assertImagingCollapses(imaging("R_PRIME"), imaging("G_PRIME"))
+
+  // The same three, for the south: `SelectRequest` dropped the containment clause for both sites,
+  // so a south-only regression would otherwise go unnoticed.
+  test("GMOS South imaging - adding a filter reuses the request"):
+    assertImagingCollapses(southImaging("R_PRIME"), southImaging("R_PRIME", "G_PRIME"))
+
+  test("GMOS South imaging - removing a filter reuses the request"):
+    assertImagingCollapses(southImaging("R_PRIME", "G_PRIME"), southImaging("R_PRIME"))
+
+  test("GMOS South imaging - a disjoint filter set reuses the request"):
+    assertImagingCollapses(southImaging("R_PRIME"), southImaging("G_PRIME"))
 
   // Widening the key must not stop genuinely identical requests collapsing onto one.
   test("identical requests still collapse onto one"):
