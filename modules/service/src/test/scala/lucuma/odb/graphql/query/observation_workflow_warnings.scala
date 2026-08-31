@@ -189,7 +189,7 @@ class observation_workflow_warnings
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
     yield oid
 
-  test("Phase 2 warning should switch READY transition to FOR_REVIEW") {
+  test("Phase 2 warning should disallow READY transition") {
     createPhaseTwoObservationWithWarnings.flatMap: oid =>
       expect(
         pi,
@@ -201,7 +201,6 @@ class observation_workflow_warnings
               ObservationWorkflowState.Defined,
               List(
                 ObservationWorkflowState.Inactive, 
-                ObservationWorkflowState.ForReview,
               ),
               List(ObservationValidation.genericWarning("Total S/N  is 2.000 (min. 3.000 recommended)"))
             )

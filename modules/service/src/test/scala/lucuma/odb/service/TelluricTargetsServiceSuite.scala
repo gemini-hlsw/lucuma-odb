@@ -175,7 +175,6 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
   val CascadingStates: Set[ObservationWorkflowState] =
     Set(
       ObservationWorkflowState.Defined,
-      ObservationWorkflowState.ForReview,
       ObservationWorkflowState.Ready
     )
 
