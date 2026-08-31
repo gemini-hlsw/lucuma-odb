@@ -30,6 +30,7 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
+import lucuma.odb.graphql.input.GmosIfuInput
 import lucuma.odb.graphql.input.GmosImagingFilterInput
 import lucuma.odb.graphql.input.GmosImagingInput
 import lucuma.odb.graphql.input.GmosLongSlitInput
@@ -101,6 +102,20 @@ object CalibrationConfigSubset:
       )
 
     def toLongSlitInput: ObservingModeInput.Create
+
+  private def ifuCommonInput[G, L, U](config: IfuConfig[G, L, U]): GmosIfuInput.Create.Common =
+    GmosIfuInput.Create.Common(
+      centralWavelength        = config.centralWavelength,
+      exposureTimeMode         = none,
+      explicitIfuAnalysis      = none,
+      explicitXBin             = config.xBin.some,
+      explicitYBin             = config.yBin.some,
+      explicitAmpReadMode      = config.ampReadMode.some,
+      explicitAmpGain          = config.ampGain.some,
+      explicitRoi              = config.roi.some,
+      explicitLambdaDithers    = none,
+      explicitTelescopeConfigs = none
+    )
 
   case class GmosNConfigs(
     grating:           GmosNorthGrating,
@@ -302,14 +317,41 @@ object CalibrationConfigSubset:
     def modeType: ObservingModeType = ObservingModeType.GnirsImaging
 
   /**
-   * The IFU is calibrated through the IFU, not through the equivalent long slit,
-   * so unlike MOS it does not reuse [[GmosNConfigs]] / [[GmosSConfigs]].
+   * These modes are calibrated through the IFU, so the calibration repeats the science aperture
+   * rather than falling back to an equivalent slit. Everything the ITC and the sequence need is
+   * pinned explicitly, as for the long slit.
    */
   case class GmosNIfuConfigs(config: IfuConfig.GmosNorth) extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GmosNorthIfu
 
+    def centralWavelength: Wavelength = config.centralWavelength
+
+    def toIfuInput: ObservingModeInput.Create =
+      ObservingModeInput.Create.Empty.copy(
+        gmosNorthIfu = GmosIfuInput.Create.North(
+          grating     = config.grating,
+          filter      = config.filter,
+          fpu         = config.fpu,
+          acquisition = none,
+          common      = ifuCommonInput(config)
+        ).some
+      )
+
   case class GmosSIfuConfigs(config: IfuConfig.GmosSouth) extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.GmosSouthIfu
+
+    def centralWavelength: Wavelength = config.centralWavelength
+
+    def toIfuInput: ObservingModeInput.Create =
+      ObservingModeInput.Create.Empty.copy(
+        gmosSouthIfu = GmosIfuInput.Create.South(
+          grating     = config.grating,
+          filter      = config.filter,
+          fpu         = config.fpu,
+          acquisition = none,
+          common      = ifuCommonInput(config)
+        ).some
+      )
 
   case object Igrins2Configs extends CalibrationConfigSubset derives Eq:
     def modeType: ObservingModeType = ObservingModeType.Igrins2LongSlit

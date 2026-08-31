@@ -62,6 +62,31 @@ object ObservingModeInput:
 
   object Create:
 
+    /**
+     * No mode selected.  Callers `copy` the one field they mean, which is safer than seventeen
+     * positional `none`s where a misplaced `Some` typechecks.
+     */
+    val Empty: Create =
+      Create(
+        exchange           = None,
+        flamingos2Imaging  = None,
+        flamingos2LongSlit = None,
+        flamingos2Mos      = None,
+        ghostIfu           = None,
+        gmosNorthIfu       = None,
+        gmosNorthImaging   = None,
+        gmosNorthLongSlit  = None,
+        gmosNorthMos       = None,
+        gmosSouthIfu       = None,
+        gmosSouthImaging   = None,
+        gmosSouthLongSlit  = None,
+        gmosSouthMos       = None,
+        gnirsImaging       = None,
+        gnirsSpectroscopy  = None,
+        igrins2LongSlit    = None,
+        visitor            = None
+      )
+
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
         case List(

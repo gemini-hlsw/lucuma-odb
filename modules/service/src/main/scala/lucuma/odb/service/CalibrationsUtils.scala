@@ -40,6 +40,8 @@ import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
+import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth as GmosNorthIfu
+import lucuma.odb.sequence.gmos.ifu.Config.GmosSouth as GmosSouthIfu
 import lucuma.odb.sequence.gmos.longslit.Config.GmosNorth as GmosNorthLongSlit
 import lucuma.odb.sequence.gmos.longslit.Config.GmosSouth as GmosSouthLongSlit
 import lucuma.odb.sequence.gnirs.spectroscopy.Config as GnirsSpectroscopyConfig
@@ -83,9 +85,12 @@ object ObsExtract:
     case d @ ObsExtract(data = _: Igrins2Config)       => d
     case d @ ObsExtract(data = _: GnirsSpectroscopyConfig) => d
 
+  /** The modes that take per-program, per-configuration calibrations: a twilight and a specphot. */
   def perProgramFilter: PartialFunction[ObsExtract[ObservingMode], ObsExtract[ObservingMode]] =
     case d @ ObsExtract(data = _: GmosNorthLongSlit) => d
     case d @ ObsExtract(data = _: GmosSouthLongSlit) => d
+    case d @ ObsExtract(data = _: GmosNorthIfu)      => d
+    case d @ ObsExtract(data = _: GmosSouthIfu)      => d
 
   def perProgramCalibrationFilter: PartialFunction[ObsExtract[CalibrationConfigSubset], ObsExtract[CalibrationConfigSubset]] =
     case d @ ObsExtract(role = Some(r)) if PerProgramPerConfigCalibrationTypes.exists(_ === r) => d
@@ -335,6 +340,33 @@ trait CalibrationObservations {
     val wavelengthAt: Option[Wavelength]   = matchingProps.flatMap(_.wavelengthAt)
     val band: Option[ScienceBand]          = matchingProps.flatMap(_.band)
     specPhotoObservation(pid, gid, tid, wavelengthAt, band, config.toLongSlitInput)
+
+  /**
+   * The IFU calibrations mirror the long slit ones, but the observing mode input comes from the
+   * IFU config subset: the calibration is taken through the same aperture as the science.
+   */
+  def gmosIfuSpecPhotObs[F[_]: MonadThrow: Services: Transaction](
+    pid:    Program.Id,
+    gid:    Group.Id,
+    tid:    Target.Id,
+    props:  Map[CalibrationConfigSubset, CalObsProps],
+    config: CalibrationConfigSubset,
+    input:  ObservingModeInput.Create
+  ): F[Observation.Id] =
+    val matchingProps: Option[CalObsProps] = propsForConfig(props, CalibrationRole.SpectroPhotometric, config)
+    specPhotoObservation(pid, gid, tid, matchingProps.flatMap(_.wavelengthAt), matchingProps.flatMap(_.band), input)
+
+  def gmosIfuTwilightObs[F[_]: MonadThrow: Services: Transaction](
+    pid:    Program.Id,
+    gid:    Group.Id,
+    tid:    Target.Id,
+    props:  Map[CalibrationConfigSubset, CalObsProps],
+    config: CalibrationConfigSubset,
+    cw:     Wavelength,
+    input:  ObservingModeInput.Create
+  ): F[Observation.Id] =
+    val band: Option[ScienceBand] = propsForConfig(props, CalibrationRole.Twilight, config).flatMap(_.band)
+    twilightObservation(pid, gid, tid, band, cw, input)
 
   def roleConstraints(role: CalibrationRole) =
     role match

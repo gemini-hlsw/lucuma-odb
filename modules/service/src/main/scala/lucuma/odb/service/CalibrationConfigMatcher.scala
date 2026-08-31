@@ -49,6 +49,10 @@ object CalibrationConfigMatcher:
         SpecphotoGmosLS
       case (GmosNorthLongSlit | GmosSouthLongSlit, CalibrationRole.Twilight)           =>
         TwilightGmosLS
+      case (GmosNorthIfu | GmosSouthIfu, CalibrationRole.SpectroPhotometric)          =>
+        SpecphotoGmosIfu
+      case (GmosNorthIfu | GmosSouthIfu, CalibrationRole.Twilight)                    =>
+        TwilightGmosIfu
       case (Flamingos2LongSlit, CalibrationRole.Telluric)                              =>
         Flamingos2LS
       case (Igrins2LongSlit, CalibrationRole.Telluric)                                =>
@@ -88,6 +92,30 @@ object SpecphotoGmosLS extends CalibrationConfigMatcher:
       case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
       case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
       case other => other
+
+/**
+ * The IFU is calibrated through the IFU itself, and unlike the long slit there is no ROI to relax:
+ * the mode reads out Full Frame already, so the configuration is compared as-is.
+ */
+object SpecphotoGmosIfu extends CalibrationConfigMatcher:
+  def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
+    mode.toConfigSubset
+
+  def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
+    c1 === c2
+
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
+    config
+
+object TwilightGmosIfu extends CalibrationConfigMatcher:
+  def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
+    mode.toConfigSubset
+
+  def configsMatch(c1: CalibrationConfigSubset, c2: CalibrationConfigSubset): Boolean =
+    c1 === c2
+
+  def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
+    config
 
 object TwilightGmosLS extends CalibrationConfigMatcher:
   def extractConfig(mode: ObservingMode): CalibrationConfigSubset =
