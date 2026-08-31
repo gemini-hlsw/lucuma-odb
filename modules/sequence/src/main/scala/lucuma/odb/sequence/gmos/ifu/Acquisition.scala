@@ -47,8 +47,10 @@ import java.util.UUID
  * filter, with no grating and no offset; only the through-IFU step is repeated.
  * The two ROIs come from the observation's acquisition ROI setting.
  *
- * Unlike the long slit there is no centering step: the IFU field is 7"x5"
- * rather than a slit width, so there is nothing to walk the target into.
+ * The long slit's middle step exists to walk the target sideways into a slit
+ * that may be under an arcsecond wide: 20s at a 10" offset in p.  The IFU
+ * aperture is 7"x5", so a target anywhere in it is already acquired and that
+ * step is dropped.
  */
 object Acquisition:
 
@@ -94,8 +96,9 @@ object Acquisition:
       val fieldExposureTime: TimeSpan =
         Acquisition.MaxExpTimeFirstStep min exposureTime
 
-      // Four times the field image: enough signal through the IFU to see where the target
-      // landed.  The cap on the field image is what bounds it.
+      // Four times the field image, for enough signal to see where the target landed. This step
+      // has no cap of its own: but the field image (1st step) is capped at 180s so this one is
+      // capped at 720s.
       val ifuExposureTime: TimeSpan =
         TimeSpan.unsafeFromMicroseconds(fieldExposureTime.toMicroseconds * 4)
 
