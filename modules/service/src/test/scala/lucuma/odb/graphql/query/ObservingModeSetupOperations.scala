@@ -164,6 +164,50 @@ trait ObservingModeSetupOperations extends DatabaseOperations { this: OdbSuite =
       """
     )
 
+  def createGmosNorthIfuObservationAs(
+    user:         User,
+    pid:          Program.Id,
+    tids:         List[Target.Id],
+    offsetArcsec: Option[List[Int]] = None
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids,
+      s"""
+        gmosNorthIfu: {
+          grating: R831_G5302
+          filter: R_PRIME
+          fpu: TWO_SLITS
+          centralWavelength: {
+            nanometers: 500
+          }
+          ${offsetArcsec.fold("")(formatExplicitTelescopeConfigsInput)}
+        }
+      """
+    )
+
+  def createGmosSouthIfuObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tids: List[Target.Id]
+  ): IO[Observation.Id] =
+    createObservationWithModeAs(
+      user,
+      pid,
+      tids,
+      """
+        gmosSouthIfu: {
+          grating: R600_G5324
+          filter: R_PRIME
+          fpu: TWO_SLITS
+          centralWavelength: {
+            nanometers: 500
+          }
+        }
+      """
+    )
+
   def createGmosNorthMosObservationAs(
     user:         User,
     pid:          Program.Id,

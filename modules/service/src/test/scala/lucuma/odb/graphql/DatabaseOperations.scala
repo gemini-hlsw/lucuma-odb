@@ -1305,7 +1305,9 @@ trait DatabaseOperations { this: OdbSuite =>
       case ObservingModeType.GmosNorthLongSlit |
            ObservingModeType.GmosSouthLongSlit |
            ObservingModeType.GmosNorthMos      |
-           ObservingModeType.GmosSouthMos      =>
+           ObservingModeType.GmosSouthMos      |
+           ObservingModeType.GmosNorthIfu      |
+           ObservingModeType.GmosSouthIfu      =>
         val focalPlane = observingMode match
           case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos => "MULTIPLE_SLIT"
           case _                                                              => "SINGLE_SLIT"
@@ -1546,8 +1548,24 @@ trait DatabaseOperations { this: OdbSuite =>
           }
         }"""
       // GMOS IFU support will be implemented in a future PR.
-      case ObservingModeType.GmosNorthIfu | ObservingModeType.GmosSouthIfu =>
-        throw new NotImplementedError("GMOS IFU observing mode")
+      case ObservingModeType.GmosNorthIfu =>
+        """{
+          gmosNorthIfu: {
+            grating: R831_G5302
+            filter: R_PRIME
+            fpu: TWO_SLITS
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
+      case ObservingModeType.GmosSouthIfu =>
+        """{
+          gmosSouthIfu: {
+            grating: R600_G5324
+            filter: R_PRIME
+            fpu: TWO_SLITS
+            centralWavelength: { nanometers: 500 }
+          }
+        }"""
       case ObservingModeType.GnirsImaging =>
         s"""{
           gnirsImaging: {

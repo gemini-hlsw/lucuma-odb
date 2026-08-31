@@ -8699,6 +8699,11 @@ enum ObservingModeType {
   GHOST_IFU
 
   """
+  ObservingModeType GmosNorthIfu
+  """
+  GMOS_NORTH_IFU
+
+  """
   ObservingModeType GmosNorthImaging
   """
   GMOS_NORTH_IMAGING
@@ -8712,6 +8717,11 @@ enum ObservingModeType {
   ObservingModeType GmosNorthMos
   """
   GMOS_NORTH_MOS
+
+  """
+  ObservingModeType GmosSouthIfu
+  """
+  GMOS_SOUTH_IFU
 
   """
   ObservingModeType GmosSouthImaging
@@ -16964,6 +16974,8 @@ type ConfigurationObservingMode {
   gmosSouthLongSlit: ConfigurationGmosSouthLongSlit
   gmosNorthMos: ConfigurationGmosNorthMos
   gmosSouthMos: ConfigurationGmosSouthMos
+  gmosNorthIfu: ConfigurationGmosNorthIfu
+  gmosSouthIfu: ConfigurationGmosSouthIfu
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
@@ -17015,6 +17027,16 @@ type ConfigurationGnirsLongSlit {
   grating: GnirsGrating!
   camera: GnirsCamera!
   prism: GnirsPrism!
+}
+
+type ConfigurationGmosNorthIfu {
+  grating: GmosNorthGrating!
+  fpu: GmosNorthIfuFpu!
+}
+
+type ConfigurationGmosSouthIfu {
+  grating: GmosSouthGrating!
+  fpu: GmosSouthIfuFpu!
 }
 
 type ConfigurationGnirsIfu {

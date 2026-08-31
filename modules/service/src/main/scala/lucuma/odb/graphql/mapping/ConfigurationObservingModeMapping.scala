@@ -13,6 +13,7 @@ import table.*
 
 trait ConfigurationObservingModeMappings[F[_]]
   extends ObservationView[F]
+     with GmosIfuView[F]
      with ConfigurationRequestView[F]
      with Flamingos2LongSlitView[F]
      with GmosImagingView[F]
@@ -39,6 +40,8 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosSouthLongSlit", Join(ObservationView.Id, GmosSouthLongSlitView.Common.ObservationId)),
       SqlObject("gmosNorthMos", Join(ObservationView.Id, GmosNorthMosView.Common.ObservationId)),
       SqlObject("gmosSouthMos", Join(ObservationView.Id, GmosSouthMosView.Common.ObservationId)),
+      SqlObject("gmosNorthIfu", Join(ObservationView.Id, GmosNorthIfuView.Common.ObservationId)),
+      SqlObject("gmosSouthIfu", Join(ObservationView.Id, GmosSouthIfuView.Common.ObservationId)),
       SqlObject("gmosNorthImaging", Join(ObservationView.Id, GmosNorthImagingView.Common.ObservationId)),
       SqlObject("gmosSouthImaging", Join(ObservationView.Id, GmosSouthImagingView.Common.ObservationId)),
       SqlObject("igrins2LongSlit", Join(ObservationView.Id, Igrins2LongSlitView.ObservationId)),
@@ -58,6 +61,8 @@ trait ConfigurationObservingModeMappings[F[_]]
       SqlObject("gmosSouthLongSlit"),
       SqlObject("gmosNorthMos"),
       SqlObject("gmosSouthMos"),
+      SqlObject("gmosNorthIfu"),
+      SqlObject("gmosSouthIfu"),
       SqlObject("gmosNorthImaging"),
       SqlObject("gmosSouthImaging"),
       SqlObject("gnirsLongSlit"),

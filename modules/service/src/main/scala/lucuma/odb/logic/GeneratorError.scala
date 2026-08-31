@@ -4,7 +4,6 @@
 package lucuma.odb.logic
 
 import cats.syntax.option.*
-import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode
@@ -19,13 +18,6 @@ object GeneratorError:
 
   def programNotFound(oid: Observation.Id): OdbError =
     OdbError.InvalidObservation(oid, s"Program for observation $oid not found.".some)
-
-  /**
-   * A facility mode that has a model but no sequence generator yet.  Nothing can
-   * create such an observation, so this is unreachable until the generator lands.
-   */
-  def modeNotImplemented(oid: Observation.Id, mode: ObservingModeType): OdbError =
-    sequenceUnavailable(oid, s"Sequence generation for ${mode.tag} is not implemented yet.")
 
   def unexpectedMode(oid: Observation.Id, expected: String, actual: ObservingMode): OdbError =
     OdbError.InvalidObservation(oid, s"Expected observation $oid as $expected, but was ${actual.name}".some)
