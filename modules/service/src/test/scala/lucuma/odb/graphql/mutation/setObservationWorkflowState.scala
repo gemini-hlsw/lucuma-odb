@@ -451,7 +451,7 @@ class setObservationWorkflowState
       assertIO(queryObservationWorkflowState(oid), Defined) >>
       testTransitionsAs(pi, pid, oid, Defined, Inactive)
 
-  // sc-10025-1 staff can't do this anymore
+  // sc-10025 staff can't do this anymore
   test("[Warnings]    Defined   <-> Inactive (staff)"):
     createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
       assertIO(queryObservationWorkflowState(oid), Defined) >>
