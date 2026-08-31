@@ -8,9 +8,10 @@ import lucuma.core.model.TelluricType
 
 trait TelluricTypeGraphQLFormat:
   def telluricTypeToGraphQL(tt: TelluricType): String = tt match
-    case TelluricType.Hot   => "{ tag: HOT }"
-    case TelluricType.A0V   => "{ tag: A0V }"
-    case TelluricType.Solar => "{ tag: SOLAR }"
+    case TelluricType.Hot        => "{ tag: HOT }"
+    case TelluricType.A0V        => "{ tag: A0V }"
+    case TelluricType.Solar      => "{ tag: SOLAR }"
+    case TelluricType.NoTelluric => "{ tag: NO_TELLURIC }"
     case TelluricType.Manual(starTypes) =>
       val types = starTypes.toList.map(s => s""""$s"""").mkString("[", ", ", "]")
       s"{ tag: MANUAL, starTypes: $types }"

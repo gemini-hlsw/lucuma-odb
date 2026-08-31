@@ -18,10 +18,11 @@ object tellurictype:
     given Decoder[TelluricType] = Decoder.instance: cursor =>
       cursor.downField("tag").as[String].flatMap: tag =>
         tag.toUpperCase match
-          case "HOT"    => TelluricType.Hot.asRight
-          case "A0V"    => TelluricType.A0V.asRight
-          case "SOLAR"  => TelluricType.Solar.asRight
-          case "MANUAL" =>
+          case "HOT"         => TelluricType.Hot.asRight
+          case "A0V"         => TelluricType.A0V.asRight
+          case "SOLAR"       => TelluricType.Solar.asRight
+          case "NO_TELLURIC" => TelluricType.NoTelluric.asRight
+          case "MANUAL"      =>
             cursor.downField("starTypes").as[Option[List[String]]].flatMap:
               case Some(types) =>
                 NonEmptyList.fromList(types) match {
@@ -43,6 +44,8 @@ object tellurictype:
           Json.obj("tag" -> Json.fromString("A0V"), "starTypes" -> Json.Null)
         case TelluricType.Solar             =>
           Json.obj("tag" -> Json.fromString("SOLAR"), "starTypes" -> Json.Null)
+        case TelluricType.NoTelluric        =>
+          Json.obj("tag" -> Json.fromString("NO_TELLURIC"), "starTypes" -> Json.Null)
         case TelluricType.Manual(starTypes) =>
           Json.obj("tag" -> Json.fromString("MANUAL"), "starTypes" -> starTypes.asJson)
 
@@ -51,12 +54,14 @@ object tellurictype:
   trait TransportCodec extends DecoderTelluricType:
     given Encoder_TelluricType: Encoder[TelluricType] =
       Encoder.instance:
-        case TelluricType.Hot   =>
+        case TelluricType.Hot        =>
           Json.obj("tag" -> Json.fromString("HOT"))
-        case TelluricType.A0V   =>
+        case TelluricType.A0V        =>
           Json.obj("tag" -> Json.fromString("A0V"))
-        case TelluricType.Solar =>
+        case TelluricType.Solar      =>
           Json.obj("tag" -> Json.fromString("SOLAR"))
+        case TelluricType.NoTelluric =>
+          Json.obj("tag" -> Json.fromString("NO_TELLURIC"))
         case TelluricType.Manual(starTypes) =>
           Json.obj("tag" -> Json.fromString("MANUAL"), "starTypes" -> starTypes.asJson)
 

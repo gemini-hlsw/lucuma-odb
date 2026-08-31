@@ -188,40 +188,32 @@ object PerScienceObservationCalibrationsService:
         } yield telluricId
 
       private def createTelluricCalibrations(
-        pid:             Program.Id,
-        scienceOid:      Observation.Id,
-        groupId: Group.Id
+        pid:        Program.Id,
+        scienceOid: Observation.Id,
+        groupId:    Group.Id,
+        duration:   TimeSpan
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        for
-          duration <- obsDuration(scienceOid)
-          created  <- duration match
-            case Some(d) if d > MultiTelluricThreshold =>
-              // Over 1.5h: 1 telluric before and 1 after
-              for {
-                sciIdx <- obsGroupIndex(scienceOid)
-                bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
-                c1     <- createTelluricObs(pid, scienceOid, groupId, bIdx, d, TelluricCalibrationOrder.Before)
-                aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 2).toShort)
-                c2     <- createTelluricObs(pid, scienceOid, groupId, aftIdx, d, TelluricCalibrationOrder.After)
-              } yield List(c1, c2)
-
-            case Some(d) =>
-              // Less than 1.5h: one telluric after science
-              for {
-                sciIdx <- obsGroupIndex(scienceOid)
-                aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
-                cal    <- createTelluricObs(pid, scienceOid, groupId, aftIdx, d, TelluricCalibrationOrder.After)
-              } yield List(cal)
-
-            case None =>
-              // No duration available, skip
-              List.empty[Observation.Id].pure[F]
-        yield created
+        if (duration > MultiTelluricThreshold)
+          // Over 1.5h: 1 telluric before and 1 after
+          for {
+            sciIdx <- obsGroupIndex(scienceOid)
+            bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
+            c1     <- createTelluricObs(pid, scienceOid, groupId, bIdx, duration, TelluricCalibrationOrder.Before)
+            aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 2).toShort)
+            c2     <- createTelluricObs(pid, scienceOid, groupId, aftIdx, duration, TelluricCalibrationOrder.After)
+          } yield List(c1, c2)
+        else
+          // Less than 1.5h: one telluric after science
+          for {
+            sciIdx <- obsGroupIndex(scienceOid)
+            aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
+            cal    <- createTelluricObs(pid, scienceOid, groupId, aftIdx, duration, TelluricCalibrationOrder.After)
+          } yield List(cal)
 
       private def readObsCalibrationGroup(
         pid:  Program.Id,
@@ -242,16 +234,19 @@ object PerScienceObservationCalibrationsService:
             )(gid => gid.pure[F])
 
       private def syncTelluricObservation(
-        pid: Program.Id,
-        obs: ObsExtract[CalibrationConfigSubset],
-        gid: Group.Id
+        pid:              Program.Id,
+        obs:              ObsExtract[CalibrationConfigSubset],
+        gid:              Group.Id,
+        requiresTelluric: Boolean
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         T.span("sync-telluric", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
           for {
             existing           <- findAllTelluricObservations(gid)
             deletable          <- excludeObsCalibrationsFromDeletion(existing, identity)
-            duration           <- obsDuration(obs.id)
-            _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(duration.isEmpty)
+            duration           <- if (requiresTelluric) obsDuration(obs.id)
+                                  else Option.empty[TimeSpan].pure[F]
+            _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
+            _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
             requiredCount      = duration match
                                   case Some(d) if d > MultiTelluricThreshold => 2
                                   case Some(_)                               => 1
@@ -261,7 +256,8 @@ object PerScienceObservationCalibrationsService:
                                     for
                                       _ <- NonEmptyList.fromList(deletable)
                                             .traverse_(observationService.deleteCalibrationObservations)
-                                      c <- createTelluricCalibrations(pid, obs.id, gid)
+                                      c <- duration.fold(List.empty[Observation.Id].pure):
+                                             createTelluricCalibrations(pid, obs.id, gid, _)
                                     yield (c, deletable)
                                   else
                                     (List.empty, List.empty).pure[F]
@@ -346,11 +342,20 @@ object PerScienceObservationCalibrationsService:
         obs:  ObsExtract[CalibrationConfigSubset]
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         T.span("generate-obs-calibrations-for-science", Attribute.from(ProgramIdKey, pid)).surround:
-          for
-            gid     <- readObsCalibrationGroup(pid, tree, obs)
-            tResult <- syncTelluricObservation(pid, obs, gid)
-            pResult <- syncDaytimePinhole(pid, obs, gid)
-          yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
+          val requiresTelluric = obs.requiresTelluric
+          if !requiresTelluric && !isCrossDispersedGnirs(obs.data) then
+            findObsCalibrationGroupForObservation(obs.id).flatMap:
+              case Some(gid) =>
+                info"Observation ${obs.id} does not require tellurics, cleaning up obs calibration group $gid" *>
+                  cleanupOrphanedObsCalibrationGroup(pid, gid, obs.id)
+              case None      =>
+                (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+          else
+            for
+              gid     <- readObsCalibrationGroup(pid, tree, obs)
+              tResult <- syncTelluricObservation(pid, obs, gid, requiresTelluric)
+              pResult <- syncDaytimePinhole(pid, obs, gid)
+            yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
 
       private val MaxTelluricSN = SignalToNoise.fromInt(100).get
 

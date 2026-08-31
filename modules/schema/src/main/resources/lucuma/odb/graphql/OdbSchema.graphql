@@ -10725,13 +10725,15 @@ enum Flamingos2Reads {
 }
 
 """
-Telluric calibration type
+Telluric calibration type.  NO_TELLURIC means no telluric calibration is
+wanted: none are generated and existing ones without visits are removed.
 """
 enum TelluricTag {
   HOT
   A0V
   SOLAR
   MANUAL
+  NO_TELLURIC
 }
 
 """

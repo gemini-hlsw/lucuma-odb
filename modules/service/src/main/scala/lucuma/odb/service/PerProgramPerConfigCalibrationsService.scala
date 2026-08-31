@@ -234,7 +234,7 @@ object PerProgramPerConfigCalibrationsService:
         calibrations:   List[ObsExtract[CalibrationConfigSubset]]
       )(using Transaction[F], ServiceAccess): F[List[Observation.Id]] = {
         val candidates = calibrations.collect {
-          case ObsExtract(oid, _, _, Some(role), config)
+          case ObsExtract(id = oid, role = Some(role), data = config)
             if !isCalibrationNeeded(scienceConfigs, config, role) => oid
         }
 
