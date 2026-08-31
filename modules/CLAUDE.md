@@ -81,7 +81,7 @@ When adding a new observing mode, the migration must:
 4. Update `v_observing_mode_group` (a `UNION ALL` view) to include the new mode.
 5. Call `SELECT register_observing_mode('{mode_tag}', 't_{mode}');`.
 6. Update the `check_etm_consistent` PL/pgSQL function to handle the new mode tag.
-7. If the new mode needs a `c_configuration_request` column (for configuration grouping), `ALTER TABLE t_configuration_request ADD COLUMN ...`, then `DROP VIEW v_configuration_request` and recreate it adding a new `CASE WHEN` column for the mode.
+7. If the new mode needs a `c_configuration_request` column (for configuration grouping), `ALTER TABLE t_configuration_request ADD COLUMN ...`, then `DROP VIEW v_configuration_request` and recreate it adding a new `CASE WHEN` column for the mode. **Then rebuild `t_configuration_request_unique` to include the new columns** — see the invariant below; forgetting this makes every request for the new mode fail with a 500.
 
 **PostgreSQL domain types to use for offsets:** `d_angle_µas` (not `d_offset_component`, which doesn't exist).
 
@@ -277,6 +277,23 @@ When writing a `Fragment` / `encoder` for an INSERT that maps to a table with `c
 
 - Add the match case in both occurrences of `selectMany` (there are two — one for a single obs, one for multiple).
 - The JSON codec in `configurationrequest.scala` must encode and decode the new variant; the discriminant field is the mode-specific key (e.g., `"gnirsLongSlit"`).
+- Add the new discriminant columns to `SelectRequest`'s `WHERE`, to its `contramap`, and to `InsertRequest`.
+- **Rebuild the `t_configuration_request_unique` constraint to include them** (see below).
+
+### The uniqueness invariant — easy to miss, fails loudly
+
+**`SelectRequest`'s matched columns must be exactly the columns of `t_configuration_request_unique`.** A discriminant belongs in both or in neither.
+
+`canonicalizeRequest` inserts with `ON CONFLICT DO NOTHING` and, when that yields no row, falls back to `SelectRequest` to find the row it collided with. So:
+
+- **Matched but not in the key** → two genuinely distinct requests collide on the narrower key, the fallback then looks for a row with the *new* configuration and finds the *old* one, and the caller gets `Result.internalError`: *"Failed to insert a configuration request … likely due to an incorrect unique index."* That message is a deliberate assertion; if you see it, the key is missing a column.
+- **In the key but not matched** → the insert never conflicts where it should, so identical requests stop collapsing onto one row.
+
+This was broken for every mode added after V1086 (GNIRS, the region columns, the visitor radius) and fixed in `V1297__config_request_unique_key.sql`. `configurationRequests_UniquenessKey` covers it; **add a case there for each new mode** — two requests differing only in the new discriminant must get distinct ids.
+
+**The one deliberate exception is the GMOS imaging filter arrays.** They are stored but are *not* part of a request's identity: [sc-8036](https://app.shortcut.com/lucuma/story/8036/) made `Configuration.subsumes` return `true` for any two imaging configs, so filters may change without approval. They are therefore in neither the key nor `SelectRequest`. If a future mode has a parameter that should not require re-approval, follow that pattern — keep it out of both, never out of just one.
+
+Modes whose parameters are already covered by another column need nothing: `Flamingos2Mos` reuses `c_flamingos_2_longslit_disperser` and `Gmos{North,South}Mos` reuse the long slit grating columns, which is safe only because `c_observing_mode_type` is itself in the key. Parameterless variants (`GhostIfu`, `Igrins2LongSlit`) are discriminated by the mode type alone.
 
 ## ETM (ExposureTimeMode) Convention
 
