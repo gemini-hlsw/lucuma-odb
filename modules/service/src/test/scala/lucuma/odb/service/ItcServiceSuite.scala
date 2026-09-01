@@ -8,8 +8,10 @@ import cats.effect.IO
 import cats.effect.Ref
 import clue.ResponseException
 import clue.model.GraphQLError
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.util.CalculationState
 import lucuma.itc.ItcVersions
 import lucuma.itc.client.ClientCalculationResult
 import lucuma.itc.client.ImagingInput
@@ -107,6 +109,15 @@ trait ItcServiceSuiteSupport extends ExecutionTestSupportForGmos:
                  c_observation_id = $observation_id
         """.command
       )(Md5Hash.unsafeFromByteArray(Array.fill[Byte](16)(0)), pid, oid).void
+
+  def obscalcWorkflowState(oid: Observation.Id): IO[Option[ObservationWorkflowState]] =
+    withSession: s =>
+      s.option(
+        sql"""
+          SELECT c_workflow_state FROM t_obscalc
+          WHERE c_observation_id = $observation_id
+        """.query(observation_workflow_state)
+      )(oid)
 
   // Simulates an ITC version bump, which fires the itc_version_update trigger.
   def bumpItcVersion(version: String): IO[Unit] =
@@ -215,3 +226,28 @@ class ItcServiceFreezeSuite extends ItcServiceSuiteSupport:
     yield
       assertEquals(before, false) // not frozen before execution begins
       assert(after, "the observe visit should freeze the ITC result")
+
+// The itc_version_update trigger discards every non-frozen cached result.  Any
+// observation that loses one must be requeued, or a later live workflow
+// computation reads the absent result as an ITC failure while obscalc keeps
+// reporting the stale state.
+class ItcServiceVersionBumpSuite extends ItcServiceSuiteSupport:
+
+  test("a version bump requeues a 'defined' observation whose cached result it discards"):
+    for
+      pid   <- createProgramAs(pi)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _     <- withItcService(itcClient)(_.lookup(pid, oid).void)
+      _     <- runObscalcUpdateAs(serviceUser, pid, oid)
+      wf    <- obscalcWorkflowState(oid)
+      calc0 <- selectCalculationStates.map(_.get(oid))
+      _     <- bumpItcVersion("itc-version-bump-test")
+      row   <- itcRowExists(pid, oid)
+      calc1 <- selectCalculationStates.map(_.get(oid))
+    yield
+      // Not 'ready': that is the only state the trigger used to requeue.
+      assertEquals(wf, Some(ObservationWorkflowState.Defined))
+      assertEquals(calc0, Some(CalculationState.Ready))
+      assert(!row, "the unfrozen cache row should be wiped by the version bump")
+      assertEquals(calc1, Some(CalculationState.Pending))
