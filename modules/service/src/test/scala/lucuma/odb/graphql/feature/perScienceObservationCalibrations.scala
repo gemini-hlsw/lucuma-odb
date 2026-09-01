@@ -2748,3 +2748,24 @@ class perScienceObservationCalibrations
       assertEquals(state, CalculationState.Pending)
       assertEquals(meta.map(_.state), Some(CalculationState.Ready))
       assert(meta.flatMap(_.resolvedTargetId).isDefined, "the rerun must record the resolved target")
+
+  test("a preserved telluric under NO_TELLURIC resolves without calling the backend"):
+    for
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      toid   <- selectTelluricObservationFor(oid).map(_.get)
+      _      <- sleep >> resolveTelluricTargets
+      before <- selectMeta(toid).map(_.get)
+      _      <- recordVisitAs(serviceUser, toid)
+      _      <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
+      _      <- recalculateCalibrations(pid, when, oid)
+      _      <- touchObscalc(oid, ObservationWorkflowState.Ready)
+      _      <- resolveTelluricTargets
+      after  <- selectMeta(toid).map(_.get)
+    yield
+      assert(before.resolvedTargetId.isDefined, "the initial resolution must find a target")
+      assertEquals(after.state, CalculationState.Ready)
+      assertEquals(after.resolvedTargetId, before.resolvedTargetId)

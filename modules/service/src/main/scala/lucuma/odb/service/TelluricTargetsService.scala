@@ -510,15 +510,21 @@ object TelluricTargetsService:
               warn"Observation ${pending.observationId} deleted, skip resolution".as(none)
             )
 
-          pending.paramsHash match
-            case Some(storedHash) if storedHash === paramsHash =>
-              debug"Params hash unchanged for ${pending.observationId}, skipping" *>
-                resetToReady.as(none) // mark it as ready
-            case Some(_) =>
-              debug"Params hash changed for ${pending.observationId}, searching for new target" *>
-                doSearch
-            case None =>
-              doSearch
+          params.telluricType match
+            // Don't try to call the backend for no-tellurics
+            case TelluricType.NoTelluric =>
+              info"Science observation ${pending.scienceObservationId} requests no telluric standard, skipping search for ${pending.observationId}" *>
+                resetToReady.as(none)
+            case _ =>
+              pending.paramsHash match
+                case Some(storedHash) if storedHash === paramsHash =>
+                  debug"Params hash unchanged for ${pending.observationId}, skipping" *>
+                    resetToReady.as(none) // mark it as ready
+                case Some(_) =>
+                  debug"Params hash changed for ${pending.observationId}, searching for new target" *>
+                    doSearch
+                case None =>
+                  doSearch
 
         def handleResult(result: Either[String, Target.Id], paramsHash: Md5Hash): F[Option[TelluricTargets.Meta]] =
           result match
