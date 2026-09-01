@@ -2626,3 +2626,94 @@ class perScienceObservationCalibrations
       assertEquals(mos._3, List(60L, 40L, 20L, -20L, 40L, 60L).map(_ * 1_000_000L))
       // No stale MOS marker: the telluric falls back to the long slit nod pattern.
       assertEquals(ls._3, List(15L, -15L, -15L, 15L).map(_ * 1_000_000L))
+
+  private def setTelluricType(oid: Observation.Id, modeField: String, tag: String): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: { observingMode: { $modeField: { telluricType: { tag: $tag } } } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
+
+  test("telluricType NO_TELLURIC prevents telluric generation"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _   <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
+      _   <- runObscalcUpdate(pid, oid)
+      _   <- recalculateCalibrations(pid, when, oid)
+      obs <- queryObservation(oid)
+    yield assertEquals(obs.groupId, None)
+
+  test("setting telluricType NO_TELLURIC removes the telluric obs and group"):
+    for
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when, oid)
+      groupId      <- queryObservation(oid).map(_.groupId.get)
+      telluricOid  <- selectTelluricObservationFor(oid).map(_.get)
+      _            <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
+      _            <- recalculateCalibrations(pid, when, oid)
+      groupExists  <- queryGroupExists(groupId)
+      telExists    <- queryObservationExists(telluricOid)
+      obsOff       <- queryObservation(oid)
+      _            <- setTelluricType(oid, "flamingos2LongSlit", "HOT")
+      _            <- recalculateCalibrations(pid, when, oid)
+      obsOn        <- queryObservation(oid)
+      telluricOid2 <- selectTelluricObservationFor(oid)
+    yield
+      assert(!groupExists, "obs calibration group should be deleted")
+      assert(!telExists,   "telluric should be deleted")
+      assertEquals(obsOff.groupId, None)
+      assert(obsOn.groupId.isDefined, "obs calibration group should be recreated")
+      assert(telluricOid2.isDefined,  "telluric should be recreated")
+
+  test("telluric with a visit is preserved when telluricType becomes NO_TELLURIC"):
+    for
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      oid         <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      _           <- sleep >> resolveTelluricTargets
+      groupId     <- queryObservation(oid).map(_.groupId.get)
+      telluricOid <- selectTelluricObservationFor(oid).map(_.get)
+      _           <- recordVisitAs(serviceUser, telluricOid)
+      _           <- setTelluricType(oid, "flamingos2LongSlit", "NO_TELLURIC")
+      _           <- recalculateCalibrations(pid, when, oid)
+      groupExists <- queryGroupExists(groupId)
+      telExists   <- queryObservationExists(telluricOid)
+    yield
+      assert(telExists,   "an executing telluric must survive telluricType NO_TELLURIC")
+      assert(groupExists, "a group holding a preserved telluric must survive")
+
+  test("gnirs cross-dispersed with telluricType NO_TELLURIC keeps the daytime pinhole"):
+    for
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
+      _           <- seedGnirsXdSmartGcal
+      oid         <- createGnirsXdObservationAs(pi, pid, tid)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      groupId     <- queryObservation(oid).map(_.groupId.get)
+      telluricOid <- selectTelluricObservationFor(oid).map(_.get)
+      pinholeOid  <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      _           <- setTelluricType(oid, "gnirsSpectroscopy", "NO_TELLURIC")
+      _           <- recalculateCalibrations(pid, when, oid)
+      groupExists <- queryGroupExists(groupId)
+      telExists   <- queryObservationExists(telluricOid)
+      telAfter    <- selectTelluricObservationFor(oid)
+      pinExists   <- queryObservationExists(pinholeOid)
+    yield
+      assert(!telExists,  "telluric should be deleted")
+      assert(telAfter.isEmpty, "no telluric may be recreated while telluricType is NO_TELLURIC")
+      assert(pinExists,   "daytime pinhole must survive telluricType NO_TELLURIC")
+      assert(groupExists, "the group still holds the daytime pinhole")

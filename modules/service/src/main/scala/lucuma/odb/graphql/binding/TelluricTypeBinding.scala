@@ -18,10 +18,11 @@ object TelluricTypeBinding extends Matcher[TelluricType]:
         fieldMap.get("tag") match {
           case Some(Value.EnumValue(tag)) =>
             tag.toUpperCase match {
-              case "HOT"    => Right(TelluricType.Hot)
-              case "A0V"    => Right(TelluricType.A0V)
-              case "SOLAR"  => Right(TelluricType.Solar)
-              case "MANUAL" =>
+              case "HOT"         => Right(TelluricType.Hot)
+              case "A0V"         => Right(TelluricType.A0V)
+              case "SOLAR"       => Right(TelluricType.Solar)
+              case "NO_TELLURIC" => Right(TelluricType.NoTelluric)
+              case "MANUAL"      =>
                 fieldMap.get("starTypes") match {
                   case Some(Value.ListValue(starTypes)) =>
                     starTypes.traverse {
