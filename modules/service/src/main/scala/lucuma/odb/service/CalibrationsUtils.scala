@@ -180,6 +180,16 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
   def onlyDefinedAndReady[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
     filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready), true)
 
+  /**
+   * Defined and Ready ones once obscalc has settled, plus
+   * Ongoing and Completed ones regardless of obscalc state.
+   */
+  def onlyCalibrationRelevant[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
+    for
+      defined  <- filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Defined, ObservationWorkflowState.Ready), true)
+      executed <- filterWorkflowStateIn(obs, oid, List(ObservationWorkflowState.Ongoing, ObservationWorkflowState.Completed), false)
+    yield defined ++ executed
+
   private def workflowStates(
     oids:      List[Observation.Id],
     onlyReady: Boolean

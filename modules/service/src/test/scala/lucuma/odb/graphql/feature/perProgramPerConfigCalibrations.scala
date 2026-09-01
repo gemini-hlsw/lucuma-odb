@@ -1193,6 +1193,29 @@ class perProgramPerConfigCalibrations
       assertEquals(oids.size, 1)
     }
 
+  test("calibrations are kept when the science observation is Ongoing or Completed"):
+    for {
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid, "One")
+      oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+      _   <- prepareObservation(pi, pid, oid, tid)
+      // should produce 2 calibrations
+      _   <- recalculateCalibrations(pid, when, oid)
+      ob1 <- queryObservations(pid)
+      // Science observation starts executing
+      _   <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Ongoing)
+      _   <- recalculateCalibrations(pid, when, oid)
+      ob2 <- queryObservations(pid)
+      // Science observation finishes executing
+      _   <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Completed)
+      _   <- recalculateCalibrations(pid, when, oid)
+      ob3 <- queryObservations(pid)
+    } yield {
+      assertEquals(ob1.countCalibrations, 2)
+      assertEquals(ob2.callibrationIds.toSet, ob1.callibrationIds.toSet)
+      assertEquals(ob3.callibrationIds.toSet, ob1.callibrationIds.toSet)
+    }
+
   test("SpectroPhotometric calibrations ignore ROI differences from science observations") {
     for {
       pid  <- createProgramAs(pi)
