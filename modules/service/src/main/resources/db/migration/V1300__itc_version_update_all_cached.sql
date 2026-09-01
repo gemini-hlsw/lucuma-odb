@@ -48,6 +48,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- V1299 dropped and recreated e_workflow_state, giving it a new OID.  When
+-- Flyway applies V1299 and this migration in the same session as an earlier
+-- migration that already wrote to t_obscalc (V1273 among others), plpgsql is
+-- still holding a compiled ch_obscalc_update() whose plan casts
+-- c_workflow_state using the dropped type, and the UPDATE below dies with
+-- "cache lookup failed for type <oid>".  Touching the pg_proc row forces a
+-- recompile.  Harmless when the plan was never cached.
+ALTER FUNCTION ch_obscalc_update() RESET ALL;
+
 -- Repair the rows already stranded by the previous version of the trigger:
 -- obscalc says the calculation had an ITC result, but no such result remains.
 UPDATE t_obscalc o SET
