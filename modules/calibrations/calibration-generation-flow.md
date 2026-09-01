@@ -239,7 +239,7 @@ For GMOS North and South Long-Slit, the system creates **one calibration observa
 ```mermaid
 flowchart TD
     A["generateCalibrations(pid, allSci, allCalibs, calibTargets, when)"] --> B[Filter existing calibrations to SpectroPhoto/Twilight roles]
-    A --> C[Filter science obs to Defined/Ready only]
+    A --> C["Keep science obs Defined/Ready (obscalc settled) plus Ongoing/Completed"]
 
     C --> D[Extract unique GMOS configurations from science obs]
     D --> E[Prepare ideal targets for GN and GS sites]
@@ -368,7 +368,8 @@ sequenceDiagram
 
 | Operation | Allowed States | Blocked States |
 |-----------|---------------|----------------|
-| Process science observation | Defined, Ready | All others |
+| Count science obs toward GMOS calibrations | Defined, Ready (obscalc settled), Ongoing, Completed | All others |
+| Process science observation (telluric path) | Defined, Ready | All others |
 | Modify calibration observation | execution state NotStarted/NotDefined | Ongoing, Completed, DeclaredComplete |
 | Delete calibration observation | execution state NotStarted/NotDefined (no visits) | Ongoing, Completed, DeclaredComplete, or has visits |
 | Delete telluric calibration | Above, **and** parent science obs execution state NotStarted/NotDefined | Same as above, plus parent science Ongoing/Completed/DeclaredComplete |
