@@ -187,28 +187,20 @@ class tooRegionApproval extends ExecutionTestSupportForGmos with TooTriggerSetup
       _    <- setProposalStatus(staff, pid, "ACCEPTED")
     yield (pid, oidA, tidA, rA, rB)
 
-  // BOTH TESTS BELOW ARE IGNORED pending
-  // https://github.com/gemini-hlsw/lucuma-odb/pull/2929, which rebuilds
-  // `t_configuration_request_unique` to carry every column `SelectRequest` matches
-  // exactly -- including the six `c_region_*` columns that V1030 added after the
-  // constraint was last written.
-  //
-  // Without that, two region-bearing requests in one program agreeing on conditions and
-  // observing mode collide on the unique key: the second `INSERT ... ON CONFLICT DO
-  // NOTHING` returns no row, the follow-up `SELECT` (which does match on the region
-  // columns) finds nothing, and `canonicalizeRequest` raises "Failed to insert a
-  // configuration request ... likely due to an incorrect unique index."  A program can
-  // therefore hold at most one ToO region per (conditions, observing mode), so the
-  // setup these tests need cannot be built.
-  //
-  // Un-ignore them once that PR merges; nothing else here should need to change.
+  // These pin the program-wide half of approval: a configuration request records no
+  // observation, so `selectRequests` asks every request in the program whether it
+  // subsumes the observation's current configuration. Two region-bearing requests in one
+  // program agreeing on conditions and observing mode only became possible once
+  // V1298__config_request_unique_key.sql rebuilt `t_configuration_request_unique` to
+  // carry the six `c_region_*` columns; before that the second insert collided and
+  // `canonicalizeRequest` raised "likely due to an incorrect unique index".
 
   // Approval is program-scoped.  A configuration request records no observation, and
   // `selectRequests` asks every request in the program whether it subsumes the
   // observation's current configuration -- so for observations alike in conditions and
   // observing mode, the approved regions effectively union.  Observation A may be
   // pointed anywhere B was approved for.
-  test("a swapped target inside *another* observation's approved region is still approved".ignore):
+  test("a swapped target inside *another* observation's approved region is still approved"):
     for
       (pid, oidA, tidA, rA, rB) <- twoApprovedRegions
       before                    <- requestsFor(oidA)
@@ -223,7 +215,7 @@ class tooRegionApproval extends ExecutionTestSupportForGmos with TooTriggerSetup
       assert(trans.contains(ObservationWorkflowState.Ready), s"expected READY to be offered, got $trans")
 
   // The corollary: land outside *both* regions and nothing covers it.
-  test("a swapped target outside every approved region is Unapproved".ignore):
+  test("a swapped target outside every approved region is Unapproved"):
     for
       (pid, oidA, tidA, _, _) <- twoApprovedRegions
       _                       <- swapInSiderealAt(pid, oidA, tidA, coords("05:46:13.137 +80:00:00.00"))
