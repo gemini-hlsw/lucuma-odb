@@ -49,6 +49,7 @@ import lucuma.core.model.TelluricType
 import lucuma.core.model.User
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.timespan.*
+import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
@@ -69,6 +70,7 @@ import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.user_state
 import lucuma.refined.*
+import org.typelevel.otel4s.trace.Tracer
 import skunk.syntax.all.*
 
 import java.time.LocalDateTime
@@ -2717,3 +2719,32 @@ class perScienceObservationCalibrations
       assert(telAfter.isEmpty, "no telluric may be recreated while telluricType is NO_TELLURIC")
       assert(pinExists,   "daytime pinhole must survive telluricType NO_TELLURIC")
       assert(groupExists, "the group still holds the daytime pinhole")
+
+  // An invalidation that lands while a worker is resolving bumps
+  // c_last_invalidation but leaves the row 'calculating' (V1072), The row must go
+  // back to 'pending'
+  test("a resolution invalidated while calculating is requeued instead of left stuck"):
+    for
+      pid     <- createProgramAs(pi)
+      tid     <- createTargetWithProfileAs(pi, pid)
+      oid     <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _       <- runObscalcUpdate(pid, oid)
+      _       <- recalculateCalibrations(pid, when, oid)
+      toid    <- selectTelluricObservationFor(oid).map(_.get)
+      // Claim the row the way a daemon worker does (pending -> calculating)
+      pending <- sleep >> loadObs(toid).map(_.get)
+      // A concurrent obscalc write for the science observation re-invalidates
+      // the claimed row
+      _       <- touchObscalc(oid, ObservationWorkflowState.Ready)
+      // The worker completes against the now-stale invalidation
+      _       <- withServices(serviceUser): services =>
+                   import Tracer.Implicits.noop
+                   Services.asSuperUser(services.telluricTargetsService.resolveTargets(pending))
+      state   <- calculationState(toid)
+      // The requeued row resolves normally on the next pass
+      _       <- resolveTelluricTargets
+      meta    <- selectMeta(toid)
+    yield
+      assertEquals(state, CalculationState.Pending)
+      assertEquals(meta.map(_.state), Some(CalculationState.Ready))
+      assert(meta.flatMap(_.resolvedTargetId).isDefined, "the rerun must record the resolved target")

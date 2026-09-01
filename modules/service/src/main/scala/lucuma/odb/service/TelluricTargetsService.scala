@@ -52,6 +52,7 @@ import org.typelevel.log4cats.syntax.*
 import skunk.*
 import skunk.SqlState
 import skunk.codec.all.*
+import skunk.data.Completion
 import skunk.implicits.*
 
 import java.nio.charset.StandardCharsets
@@ -356,6 +357,23 @@ object TelluricTargetsService:
         pending: TelluricTargets.Pending
       )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] = {
 
+        // The completion updates guard on c_last_invalidation, so a miss means a
+        // newer invalidation arrived mid-resolution and the row is still
+        // 'calculating', a state neither the poll nor the event stream picks up.
+        // Requeue it so the daemon reprocesses it with the newer invalidation.
+        def requeueIfSuperseded(meta: Option[TelluricTargets.Meta]): F[Option[TelluricTargets.Meta]] =
+          meta match
+            case Some(_) => meta.pure[F]
+            case None    =>
+              S.transactionally:
+                session.execute(Statements.RequeueSuperseded)(pending.observationId)
+              .flatTap:
+                case Completion.Update(n) if n > 0 =>
+                  info"Telluric resolution for ${pending.observationId} was invalidated while calculating, requeueing"
+                case _                             =>
+                  ().pure[F]
+              .as(none)
+
         def requestReady(
           targetId:   Option[Target.Id],
           errorMsg:   Option[String],
@@ -365,12 +383,14 @@ object TelluricTargetsService:
             session
               .prepareR(Statements.RequestReady)
               .use(_.option((targetId, errorMsg, paramsHash, pending.observationId, pending.lastInvalidation)))
+          .flatMap(requeueIfSuperseded)
 
         def resetToReady: F[Option[TelluricTargets.Meta]] =
           S.transactionally:
             session
               .prepareR(Statements.ResetToReady)
               .use(_.option((pending.observationId, pending.lastInvalidation)))
+          .flatMap(requeueIfSuperseded)
 
         def retryRequest(
           failureCount: Int,
@@ -478,7 +498,7 @@ object TelluricTargetsService:
                       val sidereal =
                         catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(star, params.telluricType)
 
-                      info"Found telluric star ID ${star.id} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
+                      info"Found telluric star ID ${star.id} with type `${params.telluricType}` and order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
                         createAndLinkTarget(sidereal).map:
                           case Some(tid) => (tid.asRight[String], paramsHash).some
                           case _         => none
@@ -602,6 +622,16 @@ object TelluricTargetsService:
               AND  c_last_invalidation = $core_timestamp
             RETURNING #$metaColumns
           """.query(meta)
+
+        val RequeueSuperseded: Command[Observation.Id] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_state = 'pending',
+                   c_retry_at = NULL,
+                   c_failure_count = 0
+            WHERE  c_observation_id = $observation_id
+              AND  c_state = 'calculating'
+          """.command
 
         val ResetToReady: Query[(Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
