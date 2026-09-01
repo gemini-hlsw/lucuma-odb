@@ -27,10 +27,13 @@ END;
 $$;
 
 -- Install the invalidation trigger as part of mode registration, the way the
--- consistency trigger already is, so a future mode cannot be registered
--- without it. The duplicate-trigger catches cover tables registered more than
--- once (t_visitor, t_gnirs_spectroscopy) and tables whose triggers predate
--- this function.
+-- consistency trigger already is
+--
+-- With this change we'll avoid forgetting to add the invalidation trigger
+-- Called for eaxmple as
+-- Register mode for observing mode consistency trigger
+-- SELECT register_observing_mode('gnirs_long_slit', 't_gnirs_long_slit');
+--
 CREATE OR REPLACE FUNCTION register_observing_mode(
   observing_mode_type e_observing_mode_type,
   mode_table_name     text
