@@ -746,6 +746,8 @@ Graph data types
 enum ItcGraphType {
   SIGNAL_GRAPH
 
+  SIGNAL_PIXEL_GRAPH
+
   S2N_GRAPH
 }
 
