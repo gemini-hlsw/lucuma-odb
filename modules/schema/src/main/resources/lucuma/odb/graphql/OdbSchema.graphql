@@ -16442,11 +16442,6 @@ enum ObsStatus {
   APPROVED
 
   """
-  ObsStatus ForReview
-  """
-  FOR_REVIEW
-
-  """
   ObsStatus Ready
   """
   READY
@@ -25025,7 +25020,6 @@ enum ObservationWorkflowState {
   UNDEFINED
   UNAPPROVED
   DEFINED
-  FOR_REVIEW
   READY
   ONGOING
   COMPLETED
