@@ -1,11 +1,12 @@
--- A soft-deleted system group is invisible to every lookup (they all filter on
--- c_existence = 'present') but still owned its name under
+-- A soft-deleted system group is invisible but still has a name under
 -- unique_system_group_name, so regenerating a per-observation calibration
 -- group for the same science observation failed with a unique violation.
 --
 -- Two-part fix: enforce name uniqueness only among present system groups, and
 -- forbid soft-deleting system groups going forward -- the service manages
--- their lifecycle and always hard-deletes them. Existing soft-deleted rows
+-- their lifecycle and always hard-deletes them. 
+-- 
+-- Existing soft-deleted rows
 -- are left in place (their deleted observations still reference them); the
 -- narrowed index makes them harmless.
 

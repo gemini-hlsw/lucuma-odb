@@ -357,10 +357,9 @@ object TelluricTargetsService:
         pending: TelluricTargets.Pending
       )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] = {
 
-        // The completion updates guard on c_last_invalidation, so a miss means a
-        // newer invalidation arrived mid-resolution and the row is still
-        // 'calculating', a state neither the poll nor the event stream picks up.
-        // Requeue it so the daemon reprocesses it with the newer invalidation.
+        // It is possible to get multiple obs update for the same telluric observation and will
+        // invalide the row while still calculation and the update would be lost.
+        // Instead we requeue it so the daemon reprocesses it with the newer invalidation.
         def requeueIfSuperseded(meta: Option[TelluricTargets.Meta]): F[Option[TelluricTargets.Meta]] =
           meta match
             case Some(_) => meta.pure[F]
