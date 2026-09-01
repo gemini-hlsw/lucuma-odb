@@ -75,7 +75,7 @@ ALTER TABLE t_observation
       ELSE c_workflow_user_state::text::e_workflow_user_state
     END;
 
--- Body copied verbatim from V1261; all we're doing is re-creating to change tye type of c_workflow_user_state
+-- Body copied verbatim from V1261; all we're doing is re-creating to change the type of c_workflow_user_state
 CREATE VIEW v_observation AS
   SELECT o.*,
   (o.c_scheduling_mode = 'unconstrained'::e_scheduling_mode) AS c_is_splittable,
