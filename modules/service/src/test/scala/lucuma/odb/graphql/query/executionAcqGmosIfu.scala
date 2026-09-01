@@ -30,13 +30,14 @@ import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 
 /**
- * The two GMOS IFU acquisition parameters that the main suite cannot reach: the 180s cap on the
+ * The two GMOS IFU acquisition parameters that the main suite cannot reach: the cap on the
  * through-IFU exposure, which needs a long ITC acquisition time, and the acquisition ROI, which
  * pairs the field image's ROI with the one used through the IFU.
  */
 class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
 
-  // Over the 180s cap on the field image, so the cap bites and the IFU step is 4 x 180s.
+  // Above the GMOS-wide 180s acquisition clamp, so the field image comes back at 180s; 4 x 180s
+  // then exceeds the through-IFU step's four minute cap.
   override def fakeItcImagingResult: IntegrationTime =
     IntegrationTime(300.secTimeSpan, PosInt.unsafeFrom(1))
 
@@ -114,25 +115,25 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
       o <- createObservationWithModeAs(pi, p, List(t), mode(acquisition))
     yield o
 
-  test("the field image is capped at 180s and the IFU step is 4x that"):
+  test("the field image takes the GMOS acquisition clamp and the IFU step its own four minute cap"):
     setup("").flatMap: oid =>
       expectInitialAtom(oid, List(
         expectedStep(fieldStep(GmosRoi.Ccd2)),
-        expectedStep(ifuStep(GmosRoi.FullFrame, 720.secTimeSpan, GmosAmpReadMode.Slow))
+        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
       ))
 
   test("an explicit acquisition ROI drives both steps"):
     setup("acquisition: { explicitRoi: STAMP_FULL_FRAME }").flatMap: oid =>
       expectInitialAtom(oid, List(
         expectedStep(fieldStep(GmosRoi.CentralStamp)),
-        expectedStep(ifuStep(GmosRoi.FullFrame, 720.secTimeSpan, GmosAmpReadMode.Slow))
+        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
       ))
 
   test("a Full Frame acquisition ROI uses it for the field image too"):
     setup("acquisition: { explicitRoi: FULL_FRAME }").flatMap: oid =>
       expectInitialAtom(oid, List(
         expectedStep(fieldStep(GmosRoi.FullFrame)),
-        expectedStep(ifuStep(GmosRoi.FullFrame, 720.secTimeSpan, GmosAmpReadMode.Slow))
+        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
       ))
 
   // `AcquisitionAtoms` only breaks after the initial atom's last step, so the repeating atom's
@@ -152,7 +153,7 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
                     "observeClass" -> "ACQUISITION".asJson,
                     "steps"        -> List(
                       expectedStep(fieldStep(GmosRoi.Ccd2)),
-                      expectedStep(ifuStep(GmosRoi.FullFrame, 720.secTimeSpan, GmosAmpReadMode.Slow))
+                      expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
                     ).asJson
                   ),
                   "possibleFuture" -> List(
@@ -160,7 +161,7 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
                       "description"  -> "Fine Adjustments".asJson,
                       "observeClass" -> "ACQUISITION".asJson,
                       "steps"        -> List(
-                        expectedStep(ifuStep(GmosRoi.FullFrame, 720.secTimeSpan, GmosAmpReadMode.Slow))
+                        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
                       ).asJson
                     )
                   ).asJson,

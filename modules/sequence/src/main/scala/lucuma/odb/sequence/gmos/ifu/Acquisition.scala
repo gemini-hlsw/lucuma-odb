@@ -58,10 +58,11 @@ object Acquisition:
     "GMOS IFU"
 
   /**
-   * Cap on the field image exposure time.  The step through the IFU is four
-   * times whatever the field image ends up being, so it is bounded at 720s.
+   * Cap on the through-IFU image exposure time (sc-10044).  As for the long slit, this mode caps
+   * only the multiplied step; the field image is already bounded by the GMOS-wide
+   * [[lucuma.odb.sequence.gmos.MaxAcquisitionExposureTime]] the ITC clamps to.
    */
-  val MaxExpTimeFirstStep: TimeSpan = 180.secondTimeSpan
+  val MaxExpTimeIfuStep: TimeSpan = 240.secondTimeSpan
 
   val RepeatingAtomCount: Int = 10
 
@@ -93,28 +94,23 @@ object Acquisition:
       fpu:          U,
       exposureTime: TimeSpan
     ): Acquisition.Steps[D] =
-      val fieldExposureTime: TimeSpan =
-        Acquisition.MaxExpTimeFirstStep min exposureTime
-
-      // Four times the field image, for enough signal to see where the target landed. This step
-      // has no cap of its own: but the field image (1st step) is capped at 180s so this one is
-      // capped at 720s.
+      // Four times the field image, for enough signal to see where the target landed, capped.
       val ifuExposureTime: TimeSpan =
-        TimeSpan.unsafeFromMicroseconds(fieldExposureTime.toMicroseconds * 4)
+        Acquisition.MaxExpTimeIfuStep min
+          TimeSpan.unsafeFromMicroseconds(exposureTime.toMicroseconds * 4)
 
-      // As for the long slit, the acquisition reads out at one mode throughout, taken from the
-      // exposure the ITC solved for rather than from each step.
-      val readMode = AcquisitionAtoms.readMode(fieldExposureTime)
+      // sc-10044: each step reads out according to its own exposure time, so the through-IFU image
+      // can land on Slow while the shorter field image stays Fast.
 
       eval:
         for
-          _  <- optics.exposure    := fieldExposureTime
+          _  <- optics.exposure    := exposureTime
           _  <- optics.filter      := acqConfig.filter.some
           _  <- optics.fpu         := none[GmosFpuMask[U]]
           _  <- optics.grating     := none[(G, GmosGratingOrder, Wavelength)]
           _  <- optics.xBin        := GmosXBinning.Two
           _  <- optics.yBin        := GmosYBinning.Two
-          _  <- optics.ampReadMode := readMode
+          _  <- optics.ampReadMode := AcquisitionAtoms.readMode(exposureTime)
           _  <- optics.roi         := acqConfig.roi.imagingRoi
           s0 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
 
@@ -122,6 +118,7 @@ object Acquisition:
           _  <- optics.fpu         := GmosFpuMask.Builtin(fpu).some
           _  <- optics.xBin        := GmosXBinning.One
           _  <- optics.yBin        := GmosYBinning.One
+          _  <- optics.ampReadMode := AcquisitionAtoms.readMode(ifuExposureTime)
           _  <- optics.roi         := acqConfig.roi.ifuRoi
           s1 <- scienceStep(0.arcsec, 0.arcsec, ObserveClass.Acquisition)
         yield Acquisition.Steps(s0, s1)
