@@ -24,6 +24,9 @@ import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
+import lucuma.odb.service.workflow.validator.ConditionsProbabilityValidator
+import lucuma.core.model.IntCentiPercent
+import lucuma.odb.service.workflow.validator.TotalSignalToNoiseValidator
 
 class observation_workflow_warnings
   extends ExecutionTestSupportForGmos
@@ -120,7 +123,7 @@ class observation_workflow_warnings
             ObservationWorkflow(
               ObservationWorkflowState.Defined,
               List(ObservationWorkflowState.Inactive),
-              List(ObservationValidation.genericWarning("Conditions likelihood is 9%."))
+              List(ConditionsProbabilityValidator.warning(IntCentiPercent.unsafeFromPercent(9)))
             )
           )
         ).asRight
@@ -164,7 +167,7 @@ class observation_workflow_warnings
             ObservationWorkflow(
               ObservationWorkflowState.Defined,
               List(ObservationWorkflowState.Inactive),
-              List(ObservationValidation.genericWarning("Total S/N  is 2.000 (min. 3.000 recommended)"))
+              List(TotalSignalToNoiseValidator.warning(None, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2))))
             )
           )
         ).asRight
@@ -202,7 +205,7 @@ class observation_workflow_warnings
               List(
                 ObservationWorkflowState.Inactive, 
               ),
-              List(ObservationValidation.genericWarning("Total S/N  is 2.000 (min. 3.000 recommended)"))
+              List(TotalSignalToNoiseValidator.warning(None, TotalSN(SignalToNoise.unsafeFromBigDecimalExact(2))))
             )
           )
         ).asRight

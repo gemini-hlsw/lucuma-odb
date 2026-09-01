@@ -170,7 +170,7 @@ object ObservationWorkflowService {
             case ObservationValidationCode.ConfigurationRequestDenied => 6
             case ObservationValidationCode.ConfigurationRequestPending => 7
             case ObservationValidationCode.TooActivationUnapproved => 8
-            case ObservationValidationCode.GenericWarning => 9 // warnings sort after the errors
+            case _: ObservationValidationCode.Nonfatal => 9 // warnings sort after the errors
 
         val validationStatus: ValidationState =
           if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined
@@ -183,7 +183,7 @@ object ObservationWorkflowService {
                   ObservationValidationCode.ConfigurationRequestDenied       |
                   ObservationValidationCode.ConfigurationRequestPending      |
                   ObservationValidationCode.TooActivationUnapproved          => Unapproved
-            case ObservationValidationCode.GenericWarning                    => Defined // with warnings
+            case _: ObservationValidationCode.Nonfatal                       => Defined // with warnings
 
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:

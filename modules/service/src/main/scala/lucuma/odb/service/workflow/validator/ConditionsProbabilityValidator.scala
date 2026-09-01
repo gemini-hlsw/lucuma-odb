@@ -14,15 +14,17 @@ import lucuma.odb.data.ObservationValidationMap
 
 object ConditionsProbabilityValidator extends ObservationValidator:
 
-  val limit = IntCentiPercent.unsafeFromPercent(10)
+  val Recommended = IntCentiPercent.unsafeFromPercent(10)
+
+  def warning(actual: IntCentiPercent): ObservationValidation =
+    ObservationValidation.Warning.conditionsUnlikely(Recommended, actual)
 
   def apply(info: ObservationValidationInfo): ObservationValidationMap = 
     // TODO: what do we do for imaging?
     (info.spectroscopyWavelength, info.coordinates.map(_.dec), info.site)
       .tupled
       .map(info.constraintSet.likelihood)
-      .filter(p => p.value.value < limit.value.value)
-      .foldMap: percent =>
-        val w = ObservationValidation.genericWarning(s"Conditions likelihood is ${percent.toPercent.toInt}%.")
-        ObservationValidationMap.singleton(w)
+      .filter(p => p.value.value < Recommended.value.value)
+      .map(warning)
+      .foldMap(ObservationValidationMap.singleton)
 

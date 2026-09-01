@@ -17584,6 +17584,13 @@ enum ObservationValidationCode {
   the observation from being executed.
   """
   GENERIC_WARNING
+
+  "Total signal to noise is below recommended threshold."
+  LOW_TOTAL_SIGNAL_TO_NOISE
+
+  "Likelihood of observing conditions is below recommended percentage."
+  CONDITIONS_UNLIKELY
+
 }
 
 """
