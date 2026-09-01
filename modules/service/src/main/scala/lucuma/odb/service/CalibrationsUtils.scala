@@ -25,6 +25,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.TelluricType
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
@@ -60,16 +61,25 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 case class ObsExtract[A](
-  id:   Observation.Id,
-  itc:  Option[ItcInput],
-  band: Option[ScienceBand],
-  role: Option[CalibrationRole],
-  data: A
+  id:               Observation.Id,
+  itc:              Option[ItcInput],
+  band:             Option[ScienceBand],
+  role:             Option[CalibrationRole],
+  data:             A,
+  requiresTelluric: Boolean = true
 ):
   def map[B](f: A => B): ObsExtract[B] =
     copy(data = f(data))
 
 object ObsExtract:
+  def modeRequiresTelluric(mode: ObservingMode): Boolean =
+    mode match
+      case c: Flamingos2Config        => c.telluricType =!= TelluricType.NoTelluric
+      case c: Flamingos2MosConfig     => c.telluricType =!= TelluricType.NoTelluric
+      case c: Igrins2Config           => c.telluricType =!= TelluricType.NoTelluric
+      case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
+      case _                          => true
+
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 
   // Calibration roles whose observations live in a per-observation calibration
@@ -159,7 +169,8 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
   // group (tellurics and daytime pinhole flats): if the science obs has started
   // or finished executing, its calibrations are kept.
   def excludeObsCalibrationsFromDeletion[A](obs: List[A], oid: A => Observation.Id): F[List[A]] =
-    T.span("exclude-obs-calibrations-from-deletion").surround:
+    if obs.isEmpty then List.empty[A].pure
+    else T.span("exclude-obs-calibrations-from-deletion").surround:
       excludeFromDeletion(obs, oid).flatMap: base =>
         executionStates(base.map(oid), Statements.selectObsCalibrationScienceExecutionStates).map: parents =>
           base.filterNot: a =>

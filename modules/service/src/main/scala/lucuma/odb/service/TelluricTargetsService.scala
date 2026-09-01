@@ -115,10 +115,11 @@ object HminBrightnessCache extends NewType[Map[HminBrightnessKey, (Option[BigDec
   ): Option[BigDecimal] =
     val (hminHot, hminSolar) = entry
     telluricType match
-      case TelluricType.Solar     => hminSolar
-      case TelluricType.Hot       => hminHot
-      case TelluricType.A0V       => hminHot
-      case _: TelluricType.Manual => hminHot
+      case TelluricType.Solar      => hminSolar
+      case TelluricType.Hot        => hminHot
+      case TelluricType.A0V        => hminHot
+      case _: TelluricType.Manual  => hminHot
+      case TelluricType.NoTelluric => hminHot // Not in use
 
   private def lookupF2Key(
     m:            HminBrightnessCache,

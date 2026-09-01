@@ -3987,6 +3987,55 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     }
                   }
                 """.asRight)
+      _   <- expect(
+                user = pi,
+                query =s"""
+                  mutation {
+                    updateObservations(input: {
+                      SET: {
+                        observingMode: {
+                          flamingos2LongSlit: {
+                            telluricType: {
+                              tag: NO_TELLURIC
+                            }
+                          }
+                        }
+                      }
+                      WHERE: {
+                        id: { EQ: ${oid.asJson} }
+                      }
+                    }) {
+                      observations {
+                        observingMode {
+                          flamingos2LongSlit {
+                            telluricType {
+                              tag
+                              starTypes
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                """,
+                expected = json"""
+                  {
+                    "updateObservations": {
+                      "observations": [
+                        {
+                          "observingMode": {
+                            "flamingos2LongSlit": {
+                              "telluricType": {
+                                "tag": "NO_TELLURIC",
+                                "starTypes": null
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                """.asRight)
     } yield ()
 
   test("[igrins2] updateObservations with telluricType"):
@@ -5275,4 +5324,3 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """,
       expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `schedulingMode` and the deprecated `isSplittable` may be specified.".asLeft
     )
-
