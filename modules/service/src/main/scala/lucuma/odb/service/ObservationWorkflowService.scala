@@ -190,6 +190,7 @@ object ObservationWorkflowService {
             case Inactive => Some(Inactive)       // Inactive overrides validation errors
             case Ready   =>
               validationStatus match              // Validation errors override Ready
+                case Undefined  => None
                 case Unapproved => None
                 case Defined    => Some(Ready)
 
