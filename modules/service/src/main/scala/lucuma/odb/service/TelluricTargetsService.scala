@@ -454,31 +454,37 @@ object TelluricTargetsService:
 
           def doSearch: F[Option[(Either[String, Target.Id], Md5Hash)]] =
             observationExists.ifM(
-              telluricClient.searchTarget(searchInput).flatMap { results =>
-                // For multi-telluric (duration > 1.5h) match the requested order.
-                // For single-telluric (duration <= 1.5h) apply the RA vs. twilight LST rule.
-                val matchingStar =
-                  if pending.scienceDuration > MultiTelluricThreshold then
-                    results.find(_._1.order == pending.calibrationOrder)
-                      .orElse(results.headOption)
-                  else
-                    TelluricTargetsService
-                      .selectSingleByLstRule(results, params.coords, params.site, params.obsTime)
-                      .orElse(results.find(_._1.order == pending.calibrationOrder))
-                      .orElse(results.headOption)
+              telluricClient.searchTarget(searchInput).attempt.flatMap {
+                // We need to capture search failures or the daemon will stop.
+                case Left(e)        =>
+                  val msg = s"Telluric search failed: ${e.getMessage}"
+                  Logger[F].error(e)(s"Telluric search failed for ${pending.observationId}")
+                    .as((msg.asLeft[Target.Id], paramsHash).some)
+                case Right(results) =>
+                  // For multi-telluric (duration > 1.5h) match the requested order.
+                  // For single-telluric (duration <= 1.5h) apply the RA vs. twilight LST rule.
+                  val matchingStar =
+                    if pending.scienceDuration > MultiTelluricThreshold then
+                      results.find(_._1.order == pending.calibrationOrder)
+                        .orElse(results.headOption)
+                    else
+                      TelluricTargetsService
+                        .selectSingleByLstRule(results, params.coords, params.site, params.obsTime)
+                        .orElse(results.find(_._1.order == pending.calibrationOrder))
+                        .orElse(results.headOption)
 
-                matchingStar match
-                  case Some((star, catalogResult)) =>
-                    val sidereal =
-                      catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(star, params.telluricType)
+                  matchingStar match
+                    case Some((star, catalogResult)) =>
+                      val sidereal =
+                        catalogResult.map(_.target).getOrElse(star.asSiderealTarget).sedFromTelluricType(star, params.telluricType)
 
-                    info"Found telluric star ID ${star.id} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
-                      createAndLinkTarget(sidereal).map:
-                        case Some(tid) => (tid.asRight[String], paramsHash).some
-                        case _         => none
-                  case None =>
-                    val msg = s"No telluric stars found for observation ${pending.observationId}"
-                    Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some)
+                      info"Found telluric star ID ${star.id} with order: ${star.order} for ${pending.calibrationOrder} observation ${pending.observationId}" *>
+                        createAndLinkTarget(sidereal).map:
+                          case Some(tid) => (tid.asRight[String], paramsHash).some
+                          case _         => none
+                    case None =>
+                      val msg = s"No telluric stars found for observation ${pending.observationId}"
+                      Logger[F].warn(msg).as((msg.asLeft[Target.Id], paramsHash).some)
               },
               // Observation was deleted before resolving the target
               warn"Observation ${pending.observationId} deleted, skip resolution".as(none)
