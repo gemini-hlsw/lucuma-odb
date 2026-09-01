@@ -70,7 +70,6 @@ import lucuma.odb.smartgcal.data.Gnirs
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.user_state
 import lucuma.refined.*
-import org.typelevel.otel4s.trace.Tracer
 import skunk.syntax.all.*
 
 import java.time.LocalDateTime
@@ -2738,7 +2737,6 @@ class perScienceObservationCalibrations
       _       <- touchObscalc(oid, ObservationWorkflowState.Ready)
       // The worker completes against the now-stale invalidation
       _       <- withServices(serviceUser): services =>
-                   import Tracer.Implicits.noop
                    Services.asSuperUser(services.telluricTargetsService.resolveTargets(pending))
       state   <- calculationState(toid)
       // The requeued row resolves normally on the next pass
