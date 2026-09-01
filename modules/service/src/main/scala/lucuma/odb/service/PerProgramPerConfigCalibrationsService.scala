@@ -375,8 +375,9 @@ object PerProgramPerConfigCalibrationsService:
         val gmosCalibs = toConfigForCalibration(allCalibs).collect(ObsExtract.perProgramCalibrationFilter)
 
         for {
-          // Filter for only 'defined' or 'ready' observations where obscalc has been calculated
-          activeGmosSci   <- onlyDefinedAndReady(allSci, _.id)
+          // Keep 'defined' or 'ready' observations where obscalc has been calculated,
+          // plus 'ongoing' and 'completed' ones so their calibrations aren't dropped
+          activeGmosSci   <- onlyCalibrationRelevant(allSci, _.id)
           // unique GMOS configurations
           uniqueSci       = uniqueConfiguration(activeGmosSci)
           // Extract props from all science observations, normalized per calibration type.
