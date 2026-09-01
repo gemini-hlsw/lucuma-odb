@@ -391,6 +391,18 @@ object GuideService {
             AgsParams.GmosMos(Site.GS, PortDisposition.Side).withPWFS1.some
           case (_: gmos.mos.Config.GmosSouth, GuideProbe.PWFS2)                                             =>
             AgsParams.GmosMos(Site.GS, PortDisposition.Side).withPWFS2.some
+          case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                                 =>
+            AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).some
+          case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1)                                     =>
+            AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).withPWFS1.some
+          case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2)                                     =>
+            AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).withPWFS2.some
+          case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS)                                 =>
+            AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).some
+          case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1)                                     =>
+            AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).withPWFS1.some
+          case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2)                                     =>
+            AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS2)                                               =>
             AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
           case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
