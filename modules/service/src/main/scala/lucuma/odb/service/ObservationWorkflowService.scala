@@ -189,8 +189,7 @@ object ObservationWorkflowService {
           info.effectiveUserState.flatMap:
             case Inactive => Some(Inactive)       // Inactive overrides validation errors
             case Ready   =>
-              validationStatus match              // Validation errors override Ready and ForReview
-                case Undefined  => None
+              validationStatus match              // Validation errors override Ready
                 case Unapproved => None
                 case Defined    => Some(Ready)
 
