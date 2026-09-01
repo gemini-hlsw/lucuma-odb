@@ -12,6 +12,7 @@ import cats.data.NonEmptyMap
 import cats.effect.Async
 import cats.effect.Concurrent
 import cats.effect.Resource
+import cats.effect.syntax.concurrent.*
 import cats.effect.syntax.spawn.*
 import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
@@ -133,6 +134,20 @@ sealed trait ItcService[F[_]] {
   )(using Transaction[F], SuperUserAccess): F[Map[Observation.Id, Itc]]
 
   /**
+   * Ensures that every science observation in the program that could have an
+   * ITC result actually has one stored, calling the remote service only for
+   * those with no stored result or failure at all.  A live workflow
+   * computation consults the cache alone, so without this a wholesale cache
+   * purge (see the `itc_version_update` trigger, which discards every
+   * non-frozen result when the ITC version changes) reads as an ITC failure on
+   * every observation in the program.  Calibrations are skipped; they are not
+   * validated against the ITC.
+   */
+  def warmAll(
+    programId: Program.Id
+  )(using NoTransaction[F], SuperUserAccess): F[Unit]
+
+  /**
    * Freezes the ITC result for an observation, making it durable and
    * authoritative.  A frozen result is exempt from the wholesale wipe on an ITC
    * version bump and is returned by all lookups regardless of the current input
@@ -249,6 +264,10 @@ object ItcService {
       case ItcAcquisition.NotApplicable       => (none, none)
       case ItcAcquisition.Failed(msg)         => (none, msg.some)
       case a @ ItcAcquisition.Available(_, _) => (a.some, none)
+
+  // Bound on the number of simultaneous remote ITC calls made while warming a
+  // program's cache, so that a wholly cold program cannot fan out unbounded.
+  private val WarmConcurrency: Int = 4
 
   def pollVersionsForever[F[_]: Async: Logger](
     client:     Resource[F, ItcClient[F]],
@@ -400,6 +419,13 @@ object ItcService {
                     yield pair
                 .toMap
 
+      override def warmAll(
+        programId: Program.Id
+      )(using NoTransaction[F], SuperUserAccess): F[Unit] =
+        services
+          .transactionally(session.execute(Statements.SelectUncachedObservations)(programId))
+          .flatMap(_.parTraverseN(WarmConcurrency)(lookup(programId, _)))
+          .void
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images
@@ -986,6 +1012,24 @@ object ItcService {
               c_is_frozen                         AND
               c_science_results IS NOT NULL
       """.query(science *: acquisition.opt *: text.opt)
+
+    // Science observations in the program with no stored ITC result at all --
+    // neither a success nor a cached failure.  A stale hash is not interesting
+    // here: `lookup` re-derives such a result on demand anyway.
+    val SelectUncachedObservations: Query[Program.Id, Observation.Id] =
+      sql"""
+        SELECT o.c_observation_id
+        FROM t_observation o
+        WHERE o.c_program_id       = $program_id AND
+              o.c_existence        = 'present'   AND
+              o.c_calibration_role IS NULL       AND
+              NOT EXISTS (
+                SELECT 1
+                FROM t_itc_result r
+                WHERE r.c_program_id     = o.c_program_id AND
+                      r.c_observation_id = o.c_observation_id
+              )
+      """.query(observation_id)
 
     val SelectAllItcResults: Query[Program.Id, (Observation.Id, Md5Hash, ItcScience, Option[ItcAcquisition.Available], Option[String], Boolean)] =
       sql"""
