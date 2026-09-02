@@ -47,6 +47,18 @@
             nodejs.package = pkgs.nodejs_22;
             jdk.package = pkgs.jdk25;
           };
+          commands = [
+            {
+              name = "odb-psql";
+              help = "open psql on the local dev database";
+              command = ''PGPASSWORD=banana psql -h localhost -p 5432 -U jimmy -d lucuma-odb "$@"'';
+            }
+            {
+              name = "odb-pgcli";
+              help = "open pgcli on the local dev database";
+              command = ''PGPASSWORD=banana ${pkgs.pgcli}/bin/pgcli -h localhost -p 5432 -U jimmy -d lucuma-odb "$@"'';
+            }
+          ];
           env = [
             {
               name = "ODB_ITC_ROOT";

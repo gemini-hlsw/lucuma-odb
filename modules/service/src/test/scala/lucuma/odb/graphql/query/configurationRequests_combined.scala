@@ -41,7 +41,7 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
 
   // Approved, active program, GMOS-N long slit, within 5° (18000") of (0h, +10°).
   private val Where =
-    """status: { EQ: APPROVED }, program: { isActive: true }, observingModeType: { IN: [ GMOS_NORTH_LONG_SLIT ] }, targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { arcseconds: 18000 } }"""
+    """status: { EQ: APPROVED }, program: { status: { EQ: ACTIVE } }, observingModeType: { IN: [ GMOS_NORTH_LONG_SLIT ] }, targetCoordinates: { center: { ra: { hours: "0.0" }, dec: { degrees: "10.0" } }, distance: { arcseconds: 18000 } }"""
 
   private def destinationQuery(args: String): String =
     s"""
@@ -67,7 +67,7 @@ class configurationRequests_combined extends OdbSuite with ObservingModeSetupOpe
   private def page(args: String): IO[(List[ConfigurationRequest.Id], Boolean)] =
     query(pi, destinationQuery(args)).flatMap(idsAndHasMore)
 
-  test("destination query: status + isActive + observingModeType + cone compose"):
+  test("destination query: status + program status + observingModeType + cone compose"):
     val today = LocalDate.now()
     for
       cfpid <- createGeminiCallForProposalsAs(admin)

@@ -93,7 +93,8 @@ object ItcSeries:
     ItcSeries(title, seriesType, dataY, xAxis, ItcYAxis.fromData(dataY))
 
   /**
-   * Build a series out of legacy data, dropping the samples at or below 0 nm.
+   * Build a series out of legacy data, dropping the samples at or below 0 nm and trimming the
+   * title.
    *
    * Low dispersion gratings at blue central wavelengths (e.g. GMOS R150 below ~608 nm) report an
    * x-axis that extends past 0 nm.
@@ -101,6 +102,10 @@ object ItcSeries:
    * Those samples are zero padding but have no valid Wavelength, so they are dropped together with
    * their y-values to keep the index to wavelength mapping intact. Returns None if no sample is
    * above 0 nm.
+   *
+   * Legacy titles append the CCD name to the series name, and that name is empty for the first CCD,
+   * so those arrive padded ("Blue Slit Signal "). Multi-CCD GMOS graphs are only comparable across
+   * graph types if the same series is named identically in each, hence the trim.
    */
   def fromLegacy(
     title:      String,
@@ -108,12 +113,13 @@ object ItcSeries:
     dataY:      NonEmptyList[Double],
     xAxis:      ItcXAxis
   ): Option[ItcSeries] =
+    val trimmedTitle = title.trim
     xAxis.nonPositiveCount match
-      case 0 => ItcSeries(title, seriesType, dataY, xAxis).some
+      case 0 => ItcSeries(trimmedTitle, seriesType, dataY, xAxis).some
       case n =>
         NonEmptyList
           .fromList(dataY.toList.drop(n))
-          .map(ItcSeries(title, seriesType, _, xAxis.drop(n)))
+          .map(ItcSeries(trimmedTitle, seriesType, _, xAxis.drop(n)))
 
 case class ItcGraph(graphType: GraphType, series: List[ItcSeries]) derives Eq, Encoder.AsObject
 
