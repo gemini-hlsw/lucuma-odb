@@ -147,3 +147,21 @@ _Avoid_: required configuration ("configuration" means something else in the ODB
 
 **Backing Observation**:
 An observation that makes an instrument eligible to be an AEON Required Instrument: it is present (not deleted), active (not user-deactivated), and its observing mode maps to that instrument. An instrument may only be marked required while it has a Backing Observation, and the mark is removed the moment its last Backing Observation goes away — by deletion, deactivation, or a mode change. Taking the proposal out of the program (nulling `aeonMultiFacility`, or switching proposal type) likewise clears the whole set.
+
+### Program Status
+
+**Program Status**:
+The effective status of a program: the Explicit Status when one is declared, otherwise the Default Status. One of Active, Inactive, Complete, Incomplete. Advisory — the ODB reports it (and the scheduler filters on it) but does not gate observation workflow with it.
+_Avoid_: program state, activation.
+
+**Default Status**:
+The derived layer of Program Status: Active when the current UTC date falls within the Active Period (inclusive of both bounds), Inactive otherwise. Time-varying; never Complete or Incomplete.
+_Avoid_: computed status, isActive (removed from the API; query the effective status instead).
+
+**Explicit Status**:
+A staff-declared status that masks the Default Status; any status may be declared, including Active (forcing a program active outside its Active Period). Clearing it returns the program to its derived status. Setting and clearing are both staff-only; reading is not.
+_Avoid_: status override, manual status.
+
+**Active Period**:
+The `[activeStart, activeEnd]` date interval during which a program's observations may be scheduled, defaulted from the Call for Proposals when there is one. Staff-editable. The source of the Default Status.
+_Avoid_: observing window (that is an observation-level concept), semester dates.

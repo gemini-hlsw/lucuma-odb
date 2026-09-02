@@ -163,7 +163,7 @@ class createProgram extends OdbSuite {
     )
   }
 
-  test("program status defaults to ACTIVE") {
+  test("program status derives from the default active period") {
     expect(
       user = pi,
       query =
@@ -179,6 +179,8 @@ class createProgram extends OdbSuite {
               program {
                 name
                 status
+                explicitStatus
+                defaultStatus
               }
             }
           }
@@ -189,7 +191,9 @@ class createProgram extends OdbSuite {
             "createProgram" : {
               "program": {
                 "name" : "Foo",
-                "status": "ACTIVE"
+                "status": "ACTIVE",
+                "explicitStatus": null,
+                "defaultStatus": "ACTIVE"
               }
             }
           }
@@ -197,36 +201,40 @@ class createProgram extends OdbSuite {
     )
   }
 
-  val CreateWithStatus =
+  val CreateWithExplicitStatus =
     """
       mutation {
         createProgram(
           input: {
             SET: {
               name: "Foo",
-              status: INACTIVE
+              explicitStatus: INACTIVE
             }
           }
         ) {
           program {
             name
             status
+            explicitStatus
+            defaultStatus
           }
         }
       }
     """
 
-  test("status may be specified as staff") {
+  test("explicitStatus may be specified as staff") {
     expect(
       user     = staff,
-      query    = CreateWithStatus,
+      query    = CreateWithExplicitStatus,
       expected =
         json"""
           {
             "createProgram" : {
               "program": {
                 "name" : "Foo",
-                "status": "INACTIVE"
+                "status": "INACTIVE",
+                "explicitStatus": "INACTIVE",
+                "defaultStatus": "ACTIVE"
               }
             }
           }
@@ -234,13 +242,74 @@ class createProgram extends OdbSuite {
     )
   }
 
-  test("status may not be specified as pi") {
+  test("explicitStatus may not be specified as pi") {
     expect(
       user     = pi,
-      query    = CreateWithStatus,
+      query    = CreateWithExplicitStatus,
       expected = List(
-        "Only staff may set the program status."
+        "Only staff may set the explicit program status."
       ).asLeft
+    )
+  }
+
+  test("explicitStatus may not be cleared by a pi, even on create") {
+    expect(
+      user     = pi,
+      query    =
+        """
+          mutation {
+            createProgram(
+              input: {
+                SET: {
+                  name: "Foo",
+                  explicitStatus: null
+                }
+              }
+            ) {
+              program {
+                status
+              }
+            }
+          }
+        """,
+      expected = List(
+        "Only staff may set the explicit program status."
+      ).asLeft
+    )
+  }
+
+  test("explicitStatus may be ACTIVE") {
+    expect(
+      user     = staff,
+      query    =
+        """
+          mutation {
+            createProgram(
+              input: {
+                SET: {
+                  name: "Foo",
+                  explicitStatus: ACTIVE
+                }
+              }
+            ) {
+              program {
+                status
+                explicitStatus
+              }
+            }
+          }
+        """,
+      expected =
+        json"""
+          {
+            "createProgram": {
+              "program": {
+                "status": "ACTIVE",
+                "explicitStatus": "ACTIVE"
+              }
+            }
+          }
+        """.asRight
     )
   }
 

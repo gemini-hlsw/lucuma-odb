@@ -220,14 +220,14 @@ object ProgramService {
               case _                                            => active.isEmpty
           )
 
-      def validateProgramStatus(status: Option[ProgramStatus]): Result[Unit] =
+      def validateExplicitStatus(explicitStatus: Nullable[ProgramStatus]): Result[Unit] =
         OdbError
-          .NotAuthorized(user.id, "Only staff may set the program status.".some)
+          .NotAuthorized(user.id, "Only staff may set the explicit program status.".some)
           .asFailure
           .unlessA(
             user.role.access match
               case Access.Admin | Access.Service | Access.Staff => true
-              case _                                            => status.isEmpty
+              case _                                            => explicitStatus.isAbsent
           )
 
       def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
@@ -275,7 +275,7 @@ object ProgramService {
 
             (for {
               _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
-              _ <- ResultT.fromResult(validateProgramStatus(SETʹ.status))
+              _ <- ResultT.fromResult(validateExplicitStatus(SETʹ.explicitStatus))
               _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
               p <- ResultT(create)
               _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
@@ -315,8 +315,7 @@ object ProgramService {
           (for
             _   <- ResultT.liftF(setup)
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-            _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-            _   <- ResultT.fromResult(validateProgramStatus(SET.status))
+            _   <- ResultT.fromResult(validateExplicitStatus(SET.explicitStatus))
             ids <- ResultT(updatePrograms)
           yield ids).value
 
@@ -396,7 +395,7 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.status.map(sql"c_program_status = $program_status"),
+          SET.explicitStatus.foldPresent(sql"c_explicit_status = ${program_status.opt}"),
           SET.name.foldPresent(sql"c_name = ${text_nonempty.opt}"),
           SET.description.foldPresent(sql"c_description = ${text_nonempty.opt}"),
           SET.goa.flatMap(_.proprietaryMonths).map(sql"c_goa_proprietary = $int4_nonneg"),
@@ -428,7 +427,7 @@ object ProgramService {
           c_goa_should_notify,
           c_goa_private_header,
           c_existence,
-          c_program_status
+          c_explicit_status
         )
         VALUES (
           ${text_nonempty.opt},
@@ -437,7 +436,7 @@ object ProgramService {
           $bool,
           $bool,
           $existence,
-          $program_status
+          ${program_status.opt}
         )
         RETURNING c_program_id
       """.query(program_id).contramap { c => (
@@ -447,7 +446,7 @@ object ProgramService {
         c.goa.shouldNotify,
         c.goa.privateHeader,
         c.existence,
-        c.status.getOrElse(ProgramStatus.Default)
+        c.explicitStatus.toOption
       )}
 
     /** Insert a calibration program, without a user for a staff program */
