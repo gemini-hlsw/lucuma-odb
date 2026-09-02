@@ -53,3 +53,14 @@ class ItcSeriesSuite extends FunSuite:
 
   test("ItcSeries.fromLegacy is empty when no sample is above 0 nm"):
     assertEquals(series(ItcXAxis(-5.0, -1.0, 5), NonEmptyList.of(1.0, 2.0, 3.0, 4.0, 5.0)), none)
+
+  test("ItcSeries.fromLegacy trims the title"):
+    // The first CCD of a multi-CCD GMOS graph has an empty CCD name appended
+    val x = ItcXAxis(1.0, 5.0, 5)
+    val y = NonEmptyList.of(1.0, 2.0, 3.0, 4.0, 5.0)
+    val s = ItcSeries.fromLegacy("Blue Slit Signal ", SeriesDataType.SignalData, y, x)
+    assertEquals(s.map(_.title), "Blue Slit Signal".some)
+
+  test("ItcSeries.fromLegacy trims the title of a truncated series too"):
+    val s = ItcSeries.fromLegacy("Blue Slit Signal ", SeriesDataType.SignalData, dataY, axis)
+    assertEquals(s.map(_.title), "Blue Slit Signal".some)
