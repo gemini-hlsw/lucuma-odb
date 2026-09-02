@@ -26,17 +26,15 @@ import lucuma.odb.data.ObservationValidationMap
 
 // warn if < 3
 case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) extends ObservationValidator:
+  import TotalSignalToNoiseValidator.*
   
-  val MinRecommended = TotalSN(SignalToNoise.unsafeFromBigDecimalExact(3))
-
   def warningsForZipper(zr: Zipper[ItcResult], extra: Option[String] = None): ObservationValidationMap =
     zr.focus
       .signalToNoise
       .map(_.total)
       .filter(_ < MinRecommended)
-      .foldMap: sn =>
-        val msg = f"Total S/N ${extra.foldMap(s => s"($s) ")} is ${sn.value.toBigDecimal}%4.3f (min. ${MinRecommended.value.toBigDecimal}%4.3f recommended)"
-        ObservationValidationMap.singleton(ObservationValidation.genericWarning(msg))
+      .map(warning(extra, _))
+      .foldMap(ObservationValidationMap.singleton)
 
   def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(f: A => Option[String]): ObservationValidationMap =
     map.toNel.foldMap: (a, z) =>
@@ -56,3 +54,10 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
         case Spectroscopy(science)      => warningsForZipper(science)
         case GnirsSpectroscopy(science) => warningsForMap(science) { w => f"${Wavelength.decimalNanometers.reverseGet(w)}%4.3f nm".some }
  
+object TotalSignalToNoiseValidator:
+
+  val MinRecommended = TotalSN(SignalToNoise.unsafeFromBigDecimalExact(3))
+
+  def warning(extra: Option[String], actual: TotalSN): ObservationValidation =
+    ObservationValidation.Warning.lowTotalSignalToNoise(extra, MinRecommended, actual)
+
