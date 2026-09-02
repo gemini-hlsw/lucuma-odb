@@ -5497,7 +5497,7 @@ type Queue implements GeminiProposalType {
   exchangePartner: ExchangePartner
 
   """
-  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  Whether this proposal should be considered for Band 3. Defaults to CONSIDER
   on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
   be submitted.
   """
@@ -5852,7 +5852,7 @@ input QueueInput {
   exchangePartner: ExchangePartner
 
   """
-  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  Whether this proposal should be considered for Band 3. Defaults to CONSIDER
   on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
   be submitted.
   """
