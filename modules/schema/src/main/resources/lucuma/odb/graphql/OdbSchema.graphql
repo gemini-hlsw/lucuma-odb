@@ -4986,6 +4986,13 @@ input ProgramPropertiesInput {
   nullable.  Limited to dates between 1900 and 2100 (exclusive).
   """
   activeEnd: Date
+
+  """
+  Set of validation codes to treat as 'dismissed' by the workflow computation. This
+  field can only be set by staff users. 
+  """
+  dismissedWarnings: [ObservationValidationCode!]
+
 }
 
 """
@@ -17900,6 +17907,12 @@ type Program {
   against `resourceLimit`.
   """
   resourceCount: NonNegInt!
+
+  """
+  List of validation codes that have been dismissed for this program.
+  """
+  dismissedWarnings: [ObservationValidationCode!]!
+
 }
 
 """

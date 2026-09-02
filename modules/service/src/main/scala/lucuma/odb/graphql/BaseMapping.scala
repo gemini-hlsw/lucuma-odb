@@ -333,6 +333,7 @@ trait BaseMapping[F[_]]
   lazy val ObservationReferenceLabelType           = schema.ref("ObservationReferenceLabel")
   lazy val ObservationSelectResultType             = schema.ref("ObservationSelectResult")
   lazy val ObservationWorkflowStateType            = schema.ref("ObservationWorkflowState")
+  lazy val ObservationValidationCodeType           = schema.ref("ObservationValidationCode")
   lazy val ObservatoryType                         = schema.ref("Observatory")
   lazy val ObserveClassType                        = schema.ref("ObserveClass")
   lazy val ObservingModeGroupType                  = schema.ref("ObservingModeGroup")

@@ -14,6 +14,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ProgramStatus
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Access
@@ -230,6 +231,16 @@ object ProgramService {
               case _                                            => status.isEmpty
           )
 
+      def validatedismissedWarnings(status: Option[List[ObservationValidationCode]]): Result[Unit] =
+        OdbError
+          .NotAuthorized(user.id, "Only staff may set the dismissed validations.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => status.isEmpty
+          )
+
       def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
         OdbError
           .NotAuthorized(user.id, "Only staff may set the proprietary months.".some)
@@ -277,6 +288,7 @@ object ProgramService {
               _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
               _ <- ResultT.fromResult(validateProgramStatus(SETʹ.status))
               _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
+              _ <- ResultT.fromResult(validatedismissedWarnings(SETʹ.dismissedWarnings))
               p <- ResultT(create)
               _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
             } yield p).value
@@ -317,6 +329,7 @@ object ProgramService {
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
             _   <- ResultT.fromResult(validateProgramStatus(SET.status))
+              _ <- ResultT.fromResult(validatedismissedWarnings(SET.dismissedWarnings))
             ids <- ResultT(updatePrograms)
           yield ids).value
 
@@ -403,7 +416,8 @@ object ProgramService {
           SET.goa.flatMap(_.shouldNotify).map(sql"c_goa_should_notify = $bool"),
           SET.goa.flatMap(_.privateHeader).map(sql"c_goa_private_header = $bool"),
           SET.active.flatMap(_.left).map(sql"c_active_start = $date"),
-          SET.active.flatMap(_.right).map(sql"c_active_end = $date")
+          SET.active.flatMap(_.right).map(sql"c_active_end = $date"),
+          SET.dismissedWarnings.map(sql"c_dismissed_warnings = $_observation_validation_warning"),
         ).flatten
       )
 
@@ -428,7 +442,8 @@ object ProgramService {
           c_goa_should_notify,
           c_goa_private_header,
           c_existence,
-          c_program_status
+          c_program_status,
+          c_dismissed_warnings
         )
         VALUES (
           ${text_nonempty.opt},
@@ -437,7 +452,8 @@ object ProgramService {
           $bool,
           $bool,
           $existence,
-          $program_status
+          $program_status,
+          $_observation_validation_warning
         )
         RETURNING c_program_id
       """.query(program_id).contramap { c => (
@@ -447,7 +463,8 @@ object ProgramService {
         c.goa.shouldNotify,
         c.goa.privateHeader,
         c.existence,
-        c.status.getOrElse(ProgramStatus.Default)
+        c.status.getOrElse(ProgramStatus.Default),
+        c.dismissedWarnings.orEmpty
       )}
 
     /** Insert a calibration program, without a user for a staff program */

@@ -748,6 +748,22 @@ trait Codecs {
       Type("_d_tag", List(Type("d_tag")))
     )
 
+  // RCN: the set of codes here is likely to change a lot, so I'm storing them as 
+  // raw `tag` values to avoid having to maintain a enum in the database (it is very
+  // inconvenient to remove elements from an enum). Any invalid elements are
+  // filtered out.
+  val _observation_validation_warning: Codec[List[ObservationValidationCode.Warning]] =
+    _tag.imap[List[ObservationValidationCode.Warning]](
+      arr => 
+        arr.toList.flatMap: tag =>
+          Enumerated[ObservationValidationCode.Warning].fromTag(tag.value)
+    )(
+      vcs => 
+        Arr.fromFoldable:
+          vcs.map: vc =>
+            Tag(vc.tag)
+    )
+
   val target_id: Codec[Target.Id] =
     gid[Target.Id]
 

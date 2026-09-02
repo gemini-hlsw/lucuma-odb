@@ -102,7 +102,8 @@ trait ProgramMapping[F[_]]
       SqlField("calibrationRole", ProgramView.CalibrationRole),
       SqlObject("goa"),
       SqlField("resourceLimit", ProgramView.ResourceLimit),
-      SqlField("resourceCount", ProgramView.ResourceCount)
+      SqlField("resourceCount", ProgramView.ResourceCount),
+      SqlField("dismissedWarnings", ProgramView.dismissedWarnings),
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
