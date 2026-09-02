@@ -504,14 +504,27 @@ class updatePrograms extends OdbSuite {
       )
   }
 
-  test("cannot set explicitStatus to ACTIVE") {
+  test("explicitStatus ACTIVE masks a derived INACTIVE") {
+    val today = LocalDate.now()
     createProgramAs(pi).flatMap: pid =>
+      setProgramActiveAs(staff, pid, today.plusDays(100), today.plusDays(200)) >>
       expect(
         user = staff,
         query = editExplicitStatusQuery(pid, "ACTIVE"),
-        expected = List(
-          "ACTIVE cannot be set explicitly; clear explicitStatus or adjust the active period instead."
-        ).asLeft
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "status": "ACTIVE",
+                  "explicitStatus": "ACTIVE"
+                }
+              ]
+            }
+          }
+          """.asRight
       )
   }
 

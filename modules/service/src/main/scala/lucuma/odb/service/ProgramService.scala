@@ -221,21 +221,14 @@ object ProgramService {
           )
 
       def validateExplicitStatus(explicitStatus: Nullable[ProgramStatus]): Result[Unit] =
-        val staffOnly =
-          OdbError
-            .NotAuthorized(user.id, "Only staff may set the explicit program status.".some)
-            .asFailure
-            .unlessA(
-              user.role.access match
-                case Access.Admin | Access.Service | Access.Staff => true
-                case _                                            => explicitStatus.isAbsent
-            )
-        val notActive =
-          OdbError
-            .InvalidArgument("ACTIVE cannot be set explicitly; clear explicitStatus or adjust the active period instead.".some)
-            .asFailure
-            .whenA(explicitStatus.toOption.contains(ProgramStatus.Active))
-        (staffOnly, notActive).tupled.void
+        OdbError
+          .NotAuthorized(user.id, "Only staff may set the explicit program status.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => explicitStatus.isAbsent
+          )
 
       def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
         OdbError

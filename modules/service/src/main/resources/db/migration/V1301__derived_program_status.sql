@@ -1,7 +1,6 @@
 -- Program status becomes a derived value: ACTIVE/INACTIVE computed from the
--- active period, with an optional explicit staff override (INACTIVE, COMPLETE
--- or INCOMPLETE).  The stored column holds only the override; the effective
--- status lives on v_program.
+-- active period, with an optional explicit staff override.  The stored column
+-- holds only the override; the effective status lives on v_program.
 
 alter table t_program
 rename column c_program_status to c_explicit_status;
@@ -15,11 +14,6 @@ alter column c_explicit_status drop not null;
 update t_program
 set c_explicit_status = null
 where c_explicit_status = 'active';
-
--- ACTIVE may not be declared explicitly; it only arises from the active period.
-alter table t_program
-add constraint t_program_explicit_status_check
-check (c_explicit_status is distinct from 'active');
 
 -- The view gains computed status columns and drops c_is_active (V1250), which
 -- c_status = 'active' supersedes, so it must be dropped and recreated.

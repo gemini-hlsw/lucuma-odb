@@ -4962,9 +4962,8 @@ input ProgramPropertiesInput {
 
   """
   Explicit program status, masking the status derived from the active period.
-  INACTIVE, COMPLETE and INCOMPLETE are accepted, ACTIVE is not.  Set to null
-  to return to the derived status.  May be set or cleared only by those with
-  staff access or better.
+  Set to null to return to the derived status.  May be set or cleared only by
+  those with staff access or better.
   """
   explicitStatus: ProgramStatus
 
@@ -17780,7 +17779,7 @@ type Program {
   """
   Explicitly declared program status, if any, masking the derived
   `defaultStatus`.  May be set (and cleared) only by those with staff access
-  or better, and never takes the value ACTIVE.
+  or better.
   """
   explicitStatus: ProgramStatus
 

@@ -278,7 +278,7 @@ class createProgram extends OdbSuite {
     )
   }
 
-  test("explicitStatus may not be ACTIVE") {
+  test("explicitStatus may be ACTIVE") {
     expect(
       user     = staff,
       query    =
@@ -294,13 +294,22 @@ class createProgram extends OdbSuite {
             ) {
               program {
                 status
+                explicitStatus
               }
             }
           }
         """,
-      expected = List(
-        "ACTIVE cannot be set explicitly; clear explicitStatus or adjust the active period instead."
-      ).asLeft
+      expected =
+        json"""
+          {
+            "createProgram": {
+              "program": {
+                "status": "ACTIVE",
+                "explicitStatus": "ACTIVE"
+              }
+            }
+          }
+        """.asRight
     )
   }
 
