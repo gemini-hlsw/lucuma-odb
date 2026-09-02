@@ -33,6 +33,7 @@ object WhereProgram {
     val WhereCalibrationRoleBinding  = WhereOptionEq.binding[CalibrationRole](path / "calibrationRole", enumeratedBinding[CalibrationRole])
     val WhereStartBinding            = WhereOrder.binding(path / "active" / "start", DateBinding)
     val WhereEndBinding              = WhereOrder.binding(path / "active" / "end",   DateBinding)
+    val WhereEqStatus                = WhereEq.binding(path / "status", ProgramStatusBinding)
 
     lazy val WhereProgramBinding = binding(path)
 
@@ -51,10 +52,11 @@ object WhereProgram {
         WhereCalibrationRoleBinding.Option("calibrationRole", rCalibRole),
         WhereStartBinding.Option("activeStart", rStart),
         WhereEndBinding.Option("activeEnd", rEnd),
-        BooleanBinding.Option("isActive", rIsActive)
+        BooleanBinding.Option("isActive", rIsActive),
+        WhereEqStatus.Option("status", rStatus)
       ) =>
-          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole, rStart, rEnd, rIsActive).parMapN {
-            (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib, start, end, isActive) =>
+          (rAND, rOR, rNOT, rId, rName, rType, rRef, rPi, rPs, rPro, rCalibRole, rStart, rEnd, rIsActive, rStatus).parMapN {
+            (AND, OR, NOT, id, name, ptype, ref, pi, ps, pro, calib, start, end, isActive, status) =>
               and(List(
                 AND.map(and),
                 OR.map(or),
@@ -69,7 +71,8 @@ object WhereProgram {
                 calib,
                 start,
                 end,
-                isActive.map(b => Eql(path / "isActive", Const(b)))
+                isActive.map(b => Eql(path / "isActive", Const(b))),
+                status
               ).flatten)
         }
     }

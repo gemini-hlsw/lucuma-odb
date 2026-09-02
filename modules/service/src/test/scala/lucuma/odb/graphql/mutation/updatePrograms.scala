@@ -396,13 +396,13 @@ class updatePrograms extends OdbSuite {
       )
   }
 
-  def editStatusQuery(pid: Program.Id): String =
+  def editExplicitStatusQuery(pid: Program.Id, value: String): String =
     s"""
       mutation {
         updatePrograms(
           input: {
             SET: {
-              status: COMPLETE
+              explicitStatus: $value
             }
             WHERE: {
               id: {
@@ -414,16 +414,18 @@ class updatePrograms extends OdbSuite {
           programs {
             id
             status
+            explicitStatus
+            isActive
           }
         }
       }
     """
 
-  test("can edit status as staff") {
+  test("can set explicitStatus as staff, masking the derived status") {
     createProgramAs(pi).flatMap: pid =>
       expect(
         user = staff,
-        query = editStatusQuery(pid),
+        query = editExplicitStatusQuery(pid, "COMPLETE"),
         expected =
           json"""
           {
@@ -431,7 +433,9 @@ class updatePrograms extends OdbSuite {
               "programs": [
                 {
                   "id": $pid,
-                  "status": "COMPLETE"
+                  "status": "COMPLETE",
+                  "explicitStatus": "COMPLETE",
+                  "isActive": false
                 }
               ]
             }
@@ -440,14 +444,108 @@ class updatePrograms extends OdbSuite {
       )
   }
 
-  test("cannot edit status as pi") {
+  test("clearing explicitStatus returns to the derived status") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = staff,
+        query = editExplicitStatusQuery(pid, "INCOMPLETE"),
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "status": "INCOMPLETE",
+                  "explicitStatus": "INCOMPLETE",
+                  "isActive": false
+                }
+              ]
+            }
+          }
+          """.asRight
+      ) >>
+      expect(
+        user = staff,
+        query = editExplicitStatusQuery(pid, "null"),
+        expected =
+          json"""
+          {
+            "updatePrograms": {
+              "programs": [
+                {
+                  "id": $pid,
+                  "status": "ACTIVE",
+                  "explicitStatus": null,
+                  "isActive": true
+                }
+              ]
+            }
+          }
+          """.asRight
+      )
+  }
+
+  test("cannot set explicitStatus as pi") {
     createProgramAs(pi).flatMap: pid =>
       expect(
         user = pi,
-        query = editStatusQuery(pid),
+        query = editExplicitStatusQuery(pid, "COMPLETE"),
         expected = List(
-          "Only staff may set the program status."
+          "Only staff may set the explicit program status."
         ).asLeft
+      )
+  }
+
+  test("cannot clear explicitStatus as pi") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = pi,
+        query = editExplicitStatusQuery(pid, "null"),
+        expected = List(
+          "Only staff may set the explicit program status."
+        ).asLeft
+      )
+  }
+
+  test("cannot set explicitStatus to ACTIVE") {
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = staff,
+        query = editExplicitStatusQuery(pid, "ACTIVE"),
+        expected = List(
+          "ACTIVE cannot be set explicitly; clear explicitStatus or adjust the active period instead."
+        ).asLeft
+      )
+  }
+
+  test("status derives INACTIVE outside the active period") {
+    val today = LocalDate.now()
+    createProgramAs(pi).flatMap: pid =>
+      setProgramActiveAs(staff, pid, today.plusDays(100), today.plusDays(200)) >>
+      expect(
+        user = pi,
+        query = s"""
+          query {
+            program(programId: "$pid") {
+              status
+              explicitStatus
+              defaultStatus
+              isActive
+            }
+          }
+        """,
+        expected =
+          json"""
+          {
+            "program": {
+              "status": "INACTIVE",
+              "explicitStatus": null,
+              "defaultStatus": "INACTIVE",
+              "isActive": false
+            }
+          }
+          """.asRight
       )
   }
 

@@ -391,4 +391,57 @@ class programs extends OdbSuite {
     }
   }
 
+  def setExplicitStatusAs(pid: Program.Id, value: String) =
+    query(
+      staff,
+      s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: { explicitStatus: $value }
+              WHERE: { id: { EQ: ${pid.asJson} } }
+            }
+          ) {
+            programs { id }
+          }
+        }
+      """
+    ).void
+
+  test("program selection via isActive"):
+    val today = LocalDate.now()
+    for
+      pidActive   <- createProgramAs(pi)
+      _           <- setProgramActiveAs(staff, pidActive, today.minusDays(30), today.plusDays(30))
+      pidInactive <- createProgramAs(pi)
+      _           <- setProgramActiveAs(staff, pidInactive, today.plusDays(100), today.plusDays(200))
+      idFilter     = s"id: { IN: [${pidActive.asJson}, ${pidInactive.asJson}] }"
+      active      <- programsWhere(pi, s"$idFilter, isActive: true")
+      inactive    <- programsWhere(pi, s"$idFilter, isActive: false")
+      omit        <- programsWhere(pi, s"$idFilter") // no isActive filter: both match
+    yield
+      assertEquals(active, List(pidActive))
+      assertEquals(inactive, List(pidInactive))
+      assertEquals(omit.toSet, Set(pidActive, pidInactive))
+
+  // `status` filters on the effective status: the explicit override when set,
+  // otherwise the value derived from the active period.
+  test("program selection via status"):
+    for
+      pidActive   <- createProgramAs(pi)
+      pidComplete <- createProgramAs(pi)
+      _           <- setExplicitStatusAs(pidComplete, "COMPLETE")
+      pidInactive <- createProgramAs(pi)
+      _           <- setExplicitStatusAs(pidInactive, "INACTIVE")
+      idFilter     = s"id: { IN: [${pidActive.asJson}, ${pidComplete.asJson}, ${pidInactive.asJson}] }"
+      active      <- programsWhere(pi, s"$idFilter, status: { EQ: ACTIVE }")
+      complete    <- programsWhere(pi, s"$idFilter, status: { EQ: COMPLETE }")
+      notActive   <- programsWhere(pi, s"$idFilter, status: { NEQ: ACTIVE }")
+      inOrOut     <- programsWhere(pi, s"$idFilter, status: { IN: [COMPLETE, INACTIVE] }")
+    yield
+      assertEquals(active, List(pidActive))
+      assertEquals(complete, List(pidComplete))
+      assertEquals(notActive.toSet, Set(pidComplete, pidInactive))
+      assertEquals(inOrOut.toSet, Set(pidComplete, pidInactive))
+
 }
