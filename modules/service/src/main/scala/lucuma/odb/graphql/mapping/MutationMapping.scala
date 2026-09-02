@@ -107,6 +107,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       RecordVisit,
       RedeemUserInvitation,
       RefreshArchiveDuplication,
+      RegenerateProposalSummaries,
       ReplaceFlamingos2Sequence,
       ReplaceGmosNorthSequence,
       ReplaceGmosSouthSequence,
@@ -805,6 +806,13 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         requireStaffAccess:
           programService.setResourceLimit(input.programId, input.limit).nestMap: pid =>
             Unique(Filter(Predicates.program.id.eql(pid), child))
+
+  private lazy val RegenerateProposalSummaries =
+    MutationField("regenerateProposalSummaries", RegenerateProposalSummariesInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        requirePiAccess:
+          pdfSummaryJobService.regenerate(input.programId).nestMap: _ =>
+            Unique(Filter(Predicates.program.id.eql(input.programId), child))
 
   private lazy val SetProposalStatus =
     MutationField("setProposalStatus", SetProposalStatusInput.Binding): (input, child) =>
