@@ -30,7 +30,7 @@ $$;
 -- consistency trigger already is
 --
 -- With this change we'll avoid forgetting to add the invalidation trigger
--- Called for eaxmple as
+-- Called for example as
 -- Register mode for observing mode consistency trigger
 -- SELECT register_observing_mode('gnirs_long_slit', 't_gnirs_long_slit');
 --

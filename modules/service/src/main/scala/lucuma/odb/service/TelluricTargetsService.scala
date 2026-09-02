@@ -357,8 +357,8 @@ object TelluricTargetsService:
         pending: TelluricTargets.Pending
       )(using ServiceAccess, NoTransaction[F]): F[Option[TelluricTargets.Meta]] = {
 
-        // It is possible to get multiple obs update for the same telluric observation and will
-        // invalide the row while still calculation and the update would be lost.
+        // A second observation update can invalidate the row while it is still calculating,
+        // so the finishing update matches nothing and would be lost.
         // Instead we requeue it so the daemon reprocesses it with the newer invalidation.
         def requeueIfSuperseded(meta: Option[TelluricTargets.Meta]): F[Option[TelluricTargets.Meta]] =
           meta match
