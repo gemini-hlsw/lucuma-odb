@@ -71,6 +71,7 @@ import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
+import lucuma.odb.data.SummaryStyle
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -465,6 +466,9 @@ trait Codecs {
 
   val calibration_work_type: Codec[CalibrationWorkType] =
     enumerated(Type("e_calibration_work_type"))
+
+  val summary_style: Codec[SummaryStyle] =
+    enumerated(Type("e_summary_style"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]

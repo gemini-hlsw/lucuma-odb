@@ -411,6 +411,7 @@ object OdbMapping {
                 AtomEventMapping,
                 AtomRecordMapping,
                 AttachmentMapping,
+                ProposalSummaryPropertiesMapping,
                 CalibrationProgramReferenceMapping,
                 CallsForProposalsSelectResultMapping,
                 CatalogInfoMapping,

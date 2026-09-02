@@ -57,6 +57,7 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
+import lucuma.odb.data.SummaryStyle
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
@@ -253,6 +254,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[TooActivation](TooActivationType),
       LeafMapping[TooTrigger.Id](TooTriggerIdType),
+      LeafMapping[SummaryStyle](ProposalSummaryStyleType),
       LeafMapping[TooTriggerStatus](TooTriggerStatusType),
       LeafMapping[Long](TransactionIdType),
       LeafMapping[User.Id](UserIdType),
