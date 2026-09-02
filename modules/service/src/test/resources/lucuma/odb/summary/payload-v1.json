@@ -1,0 +1,361 @@
+{
+  "schemaVersion": "1.0.0",
+
+  "program": {
+    "data": {
+      "program": {
+        "id": "p-123",
+        "name": "Kinematics of the Fixture Field Dwarf Galaxies",
+        "description": "Synthetic but contract-complete proposal used as the shared payload fixture between the ODB and pyexplore. Every block mirrors the shape the `query program` GraphQL response has in production.",
+        "active": {"start": "2026-08-01", "end": "2027-01-31"},
+        "timeEstimateRange": {
+          "value": {
+            "minimum": {"total": {"hours": 4.5}},
+            "maximum": {"total": {"hours": 6.0}}
+          }
+        },
+        "pi": {
+          "thesis": false,
+          "displayName": "Jane Fixture",
+          "affiliation": "Gemini Observatory",
+          "email": "jane.fixture@example.edu",
+          "educationalStatus": null
+        },
+        "users": [
+          {
+            "thesis": true,
+            "displayName": "Sam Student",
+            "affiliation": "Fixture University",
+            "email": "sam.student@example.edu",
+            "educationalStatus": "PHD"
+          }
+        ],
+        "attachments": [
+          {"id": "a-101", "fileName": "science.pdf", "attachmentType": "SCIENCE"},
+          {"id": "a-102", "fileName": "team.pdf", "attachmentType": "TEAM"}
+        ],
+        "proposal": {
+          "reference": {"label": "G-2026B-9999"},
+          "category": "GALACTIC_OTHER",
+          "call": {"semester": "2026B"},
+          "gemini": {
+            "scienceSubtype": "QUEUE",
+            "tooActivationCeiling": null,
+            "usLongTerm": false,
+            "jwstSynergy": false,
+            "considerForBand3": false,
+            "minPercentTime": 100,
+            "partnerSplits": [
+              {"partner": "US", "percent": 60},
+              {"partner": "CL", "percent": 40}
+            ],
+            "exchangePartner": null
+          },
+          "keck": null,
+          "subaru": null
+        },
+        "groupElements": [],
+        "observations": {
+          "matches": [
+            {
+              "id": "o-1001",
+              "title": "Fixture Dwarf A",
+              "groupId": null,
+              "calibrationRole": null,
+              "workflow": {"value": {"state": "DEFINED"}},
+              "targetEnvironment": {
+                "firstScienceTarget": {
+                  "sidereal": {"ra": {"degrees": 152.5}, "dec": {"degrees": -28.4}},
+                  "sourceProfile": {"point": {"bandNormalized": {}}}
+                }
+              },
+              "observingMode": {
+                "instrument": "GMOS_NORTH",
+                "mode": "GMOS_NORTH_LONG_SLIT"
+              },
+              "constraintSet": {
+                "imageQuality": "POINT_EIGHT",
+                "cloudExtinction": "POINT_THREE",
+                "skyBackground": "GRAY",
+                "waterVapor": "WET",
+                "elevationRange": {"airMass": {"min": 1.0, "max": 2.0}}
+              },
+              "schedulingConstraints": {"timingWindows": []},
+              "execution": {
+                "digest": {
+                  "calculationState": "READY",
+                  "value": {
+                    "estimate": {"total": {"total": {"hours": 1.5}}},
+                    "science": {"observeClass": "SCIENCE"}
+                  }
+                }
+              },
+              "archiveDuplication": {"state": "CHECKED", "matchCount": 0, "lastCheckedAt": "2026-08-20T00:00:00Z"}
+            },
+            {
+              "id": "o-1002",
+              "title": "Fixture Dwarf B",
+              "groupId": null,
+              "calibrationRole": null,
+              "workflow": {"value": {"state": "DEFINED"}},
+              "targetEnvironment": {
+                "firstScienceTarget": {
+                  "sidereal": {"ra": {"degrees": 153.1}, "dec": {"degrees": -27.9}},
+                  "sourceProfile": {"point": {"bandNormalized": {}}}
+                }
+              },
+              "observingMode": {
+                "instrument": "GMOS_NORTH",
+                "mode": "GMOS_NORTH_LONG_SLIT"
+              },
+              "constraintSet": {
+                "imageQuality": "POINT_EIGHT",
+                "cloudExtinction": "POINT_THREE",
+                "skyBackground": "GRAY",
+                "waterVapor": "WET",
+                "elevationRange": {"airMass": {"min": 1.0, "max": 2.0}}
+              },
+              "schedulingConstraints": {"timingWindows": []},
+              "execution": {
+                "digest": {
+                  "calculationState": "READY",
+                  "value": {
+                    "estimate": {"total": {"total": {"hours": 3.0}}},
+                    "science": {"observeClass": "SCIENCE"}
+                  }
+                }
+              },
+              "archiveDuplication": {"state": "NOT_CHECKED", "matchCount": null, "lastCheckedAt": null}
+            }
+          ]
+        }
+      }
+    }
+  },
+
+  "attachments": [
+    {"fileName": "science.pdf", "url": "https://presigned.example.invalid/science.pdf"},
+    {"fileName": "team.pdf", "url": "https://presigned.example.invalid/team.pdf"}
+  ],
+
+  "observations": [
+    {
+      "id": "o-1001",
+      "reference": {"label": "G-2026B-9999-Q-0001"},
+      "instrument": "GMOS_NORTH",
+      "calibrationRole": null,
+      "workflow": {"value": {"state": "DEFINED"}},
+      "targetEnvironment": {
+        "firstScienceTarget": {
+          "name": "Fixture Dwarf A",
+          "sourceProfile": {
+            "point": {
+              "bandNormalized": {
+                "sed": {
+                  "stellarLibrary": "K0_III",
+                  "coolStar": null, "galaxy": null, "planet": null, "quasar": null,
+                  "hiiRegion": null, "planetaryNebula": null, "powerLaw": null,
+                  "blackBodyTempK": null, "fluxDensitiesAttachment": null,
+                  "fluxDensities": null
+                },
+                "brightnesses": [
+                  {"band": "R", "value": 17.2, "units": "VEGA_MAGNITUDE", "error": 0.1}
+                ]
+              },
+              "emissionLines": null
+            },
+            "uniform": null,
+            "gaussian": null
+          },
+          "sidereal": {
+            "ra": {"hms": "10:10:00.000"},
+            "dec": {"dms": "-28:24:00.00"},
+            "radialVelocity": {"kilometersPerSecond": 120.0}
+          }
+        }
+      },
+      "constraintSet": {
+        "imageQuality": "POINT_EIGHT",
+        "cloudExtinction": "POINT_THREE",
+        "skyBackground": "GRAY",
+        "waterVapor": "WET",
+        "elevationRange": {
+          "airMass": {"min": 1.0, "max": 2.0},
+          "hourAngle": null
+        }
+      },
+      "observingMode": {
+        "instrument": "GMOS_NORTH",
+        "mode": "GMOS_NORTH_LONG_SLIT",
+        "gmosNorthLongSlit": {
+          "grating": "B480_G5309",
+          "filter": null,
+          "fpu": "LONG_SLIT_1_00",
+          "roi": "FULL_FRAME",
+          "xBin": "TWO",
+          "yBin": "TWO",
+          "ampGain": "LOW",
+          "ampReadMode": "SLOW",
+          "centralWavelength": {"nanometers": 550.0},
+          "exposureTimeMode": {
+            "signalToNoise": {"value": 30.0, "at": {"nanometers": 550.0}},
+            "timeAndCount": null
+          }
+        }
+      },
+      "execution": {
+        "digest": {"value": {"estimate": {"total": {"total": {"minutes": 90.0}}}}}
+      }
+    },
+    {
+      "id": "o-1002",
+      "reference": {"label": "G-2026B-9999-Q-0002"},
+      "instrument": "GMOS_NORTH",
+      "calibrationRole": null,
+      "workflow": {"value": {"state": "DEFINED"}},
+      "targetEnvironment": {
+        "firstScienceTarget": {
+          "name": "Fixture Dwarf B",
+          "sourceProfile": {
+            "point": {
+              "bandNormalized": {
+                "sed": {
+                  "stellarLibrary": "K0_III",
+                  "coolStar": null, "galaxy": null, "planet": null, "quasar": null,
+                  "hiiRegion": null, "planetaryNebula": null, "powerLaw": null,
+                  "blackBodyTempK": null, "fluxDensitiesAttachment": null,
+                  "fluxDensities": null
+                },
+                "brightnesses": [
+                  {"band": "R", "value": 18.4, "units": "VEGA_MAGNITUDE", "error": 0.15}
+                ]
+              },
+              "emissionLines": null
+            },
+            "uniform": null,
+            "gaussian": null
+          },
+          "sidereal": {
+            "ra": {"hms": "10:12:24.000"},
+            "dec": {"dms": "-27:54:00.00"},
+            "radialVelocity": {"kilometersPerSecond": 95.0}
+          }
+        }
+      },
+      "constraintSet": {
+        "imageQuality": "POINT_EIGHT",
+        "cloudExtinction": "POINT_THREE",
+        "skyBackground": "GRAY",
+        "waterVapor": "WET",
+        "elevationRange": {
+          "airMass": {"min": 1.0, "max": 2.0},
+          "hourAngle": null
+        }
+      },
+      "observingMode": {
+        "instrument": "GMOS_NORTH",
+        "mode": "GMOS_NORTH_LONG_SLIT",
+        "gmosNorthLongSlit": {
+          "grating": "B480_G5309",
+          "filter": null,
+          "fpu": "LONG_SLIT_1_00",
+          "roi": "FULL_FRAME",
+          "xBin": "TWO",
+          "yBin": "TWO",
+          "ampGain": "LOW",
+          "ampReadMode": "SLOW",
+          "centralWavelength": {"nanometers": 550.0},
+          "exposureTimeMode": {
+            "signalToNoise": {"value": 30.0, "at": {"nanometers": 550.0}},
+            "timeAndCount": null
+          }
+        }
+      },
+      "execution": {
+        "digest": {"value": {"estimate": {"total": {"total": {"minutes": 180.0}}}}}
+      }
+    },
+    {
+      "id": "o-1003",
+      "reference": {"label": "G-2026B-9999-Q-0003"},
+      "instrument": "GMOS_NORTH",
+      "calibrationRole": null,
+      "workflow": {"value": {"state": "INACTIVE"}},
+      "targetEnvironment": {
+        "firstScienceTarget": {
+          "name": "Fixture Dwarf C (inactive)",
+          "sourceProfile": {"point": {"bandNormalized": {"sed": null, "brightnesses": []}, "emissionLines": null}, "uniform": null, "gaussian": null},
+          "sidereal": {
+            "ra": {"hms": "10:14:00.000"},
+            "dec": {"dms": "-28:00:00.00"},
+            "radialVelocity": {"kilometersPerSecond": 0.0}
+          }
+        }
+      },
+      "constraintSet": {
+        "imageQuality": "POINT_EIGHT",
+        "cloudExtinction": "POINT_THREE",
+        "skyBackground": "GRAY",
+        "waterVapor": "WET",
+        "elevationRange": {"airMass": {"min": 1.0, "max": 2.0}, "hourAngle": null}
+      },
+      "observingMode": {
+        "instrument": "GMOS_NORTH",
+        "mode": "GMOS_NORTH_LONG_SLIT",
+        "gmosNorthLongSlit": {
+          "grating": "B480_G5309",
+          "filter": null,
+          "fpu": "LONG_SLIT_1_00",
+          "roi": "FULL_FRAME",
+          "xBin": "TWO", "yBin": "TWO", "ampGain": "LOW", "ampReadMode": "SLOW",
+          "centralWavelength": {"nanometers": 550.0},
+          "exposureTimeMode": {"signalToNoise": {"value": 30.0, "at": {"nanometers": 550.0}}, "timeAndCount": null}
+        }
+      },
+      "execution": {
+        "digest": {"value": {"estimate": {"total": {"total": {"minutes": 60.0}}}}}
+      }
+    },
+    {
+      "id": "o-1004",
+      "reference": {"label": "G-2026B-9999-Q-0004"},
+      "instrument": "GMOS_NORTH",
+      "calibrationRole": "SPECTROPHOTOMETRIC",
+      "workflow": {"value": {"state": "DEFINED"}},
+      "targetEnvironment": {
+        "firstScienceTarget": {
+          "name": "Fixture Standard (calibration)",
+          "sourceProfile": {"point": {"bandNormalized": {"sed": null, "brightnesses": []}, "emissionLines": null}, "uniform": null, "gaussian": null},
+          "sidereal": {
+            "ra": {"hms": "10:20:00.000"},
+            "dec": {"dms": "-28:30:00.00"},
+            "radialVelocity": {"kilometersPerSecond": 0.0}
+          }
+        }
+      },
+      "constraintSet": {
+        "imageQuality": "POINT_EIGHT",
+        "cloudExtinction": "POINT_THREE",
+        "skyBackground": "GRAY",
+        "waterVapor": "WET",
+        "elevationRange": {"airMass": {"min": 1.0, "max": 2.0}, "hourAngle": null}
+      },
+      "observingMode": {
+        "instrument": "GMOS_NORTH",
+        "mode": "GMOS_NORTH_LONG_SLIT",
+        "gmosNorthLongSlit": {
+          "grating": "B480_G5309",
+          "filter": null,
+          "fpu": "LONG_SLIT_1_00",
+          "roi": "FULL_FRAME",
+          "xBin": "TWO", "yBin": "TWO", "ampGain": "LOW", "ampReadMode": "SLOW",
+          "centralWavelength": {"nanometers": 550.0},
+          "exposureTimeMode": {"signalToNoise": {"value": 30.0, "at": {"nanometers": 550.0}}, "timeAndCount": null}
+        }
+      },
+      "execution": {
+        "digest": {"value": {"estimate": {"total": {"total": {"minutes": 20.0}}}}}
+      }
+    }
+  ]
+}

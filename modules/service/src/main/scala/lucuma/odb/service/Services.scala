@@ -233,6 +233,9 @@ trait Services[F[_]]:
   /** The `SmartGcalService`. */
   def smartGcalService: SmartGcalService[F]
 
+  /** The `PdfSummaryJobService`. */
+  def pdfSummaryJobService: PdfSummaryJobService[F]
+
   /** The `Sequence`. */
   def sequenceService: SequenceService[F]
 
@@ -426,6 +429,7 @@ object Services:
       lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val sequenceService = SequenceService.instantiate(tc)
+      lazy val pdfSummaryJobService = PdfSummaryJobService.instantiate(s3FileService)
       lazy val trackingService = TrackingService.instantiate(horizonsClient)
       lazy val telluricTargetsService: TelluricTargetsService[F] = TelluricTargetsService.instantiate(telluricClient0, hminCache0)
       lazy val userInvitationService = UserInvitationService.instantiate(emailConfig)
@@ -485,6 +489,7 @@ object Services:
     def programService[F[_]](using Services[F]): ProgramService[F] = summon[Services[F]].programService
     def programUserService[F[_]](using Services[F]): ProgramUserService[F] = summon[Services[F]].programUserService
     def proposalService[F[_]](using Services[F]): ProposalService[F] = summon[Services[F]].proposalService
+    def pdfSummaryJobService[F[_]](using Services[F]): PdfSummaryJobService[F] = summon[Services[F]].pdfSummaryJobService
     def smartGcalService[F[_]](using Services[F]): SmartGcalService[F] = summon[Services[F]].smartGcalService
     def sequenceService[F[_]](using Services[F]): SequenceService[F] = summon[Services[F]].sequenceService
     def targetService[F[_]](using Services[F]): TargetService[F] = summon[Services[F]].targetService

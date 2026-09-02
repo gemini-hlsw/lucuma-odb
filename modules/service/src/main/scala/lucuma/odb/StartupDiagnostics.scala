@@ -194,6 +194,7 @@ object StartupDiagnostics:
           // Enumerated types that are used in the database schema but don't exist in the model
           assertUnusedPostgresEnum(Type("e_target_type")),
           assertUnusedPostgresEnum(Type("e_source_profile_type")),
+          assertUnusedPostgresEnum(Type("e_summary_job_state")),
 
           // This should come last
           checkEnumCoverage,

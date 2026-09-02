@@ -958,6 +958,7 @@ object ProposalService {
                       _         <- ResultT.fromResult(validate(pid, info, states, oldStatus, newStatus))
                       _         <- ResultT.liftF(update(pid, input.status))
                       _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
+                      _         <- ResultT.liftF(Services.asSuperUser(pdfSummaryJobService.enqueue(pid)).void).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
                       _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === ProposalStatus.Submitted && newStatus === ProposalStatus.NotSubmitted)
                       _         <- ResultT.liftF(freezeTooActivation(pid)).whenA(newStatus === ProposalStatus.Accepted)
                       _         <- ResultT(info.sendEmail(pid, newStatus))
