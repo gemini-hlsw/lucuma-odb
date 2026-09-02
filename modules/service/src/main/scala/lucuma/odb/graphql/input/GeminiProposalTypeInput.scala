@@ -104,6 +104,8 @@ object GeminiProposalTypeInput:
         Create(ScienceSubtype.LargeProgram, minPercentTotal = HundredPercent.some, totalTime = TimeSpan.Zero.some)
       case ScienceSubtype.PoorWeather =>
         Create(ScienceSubtype.PoorWeather, minPercentTime = ZeroPercent)
+      case ScienceSubtype.Queue        =>
+        Create(ScienceSubtype.Queue, considerForBand3 = ConsiderForBand3.Consider)
       case s                           =>
         Create(s)
     }
@@ -226,7 +228,7 @@ object GeminiProposalTypeInput:
         ) => (rToo, rMin, rSplits, rExchange, rBand3, rAeon, rJwst, rUsLong).parTupled.flatMap:
           case (too, min, splits, exchange, band3, aeon, jwst, usLong) =>
             exchangeXorSplits(exchange, splits).as(
-              Create(ScienceSubtype.Queue).update(
+              DefaultFor(ScienceSubtype.Queue).update(
                 for
                   _ <- tooActivationCeiling    := too
                   _ <- minPercentTime          := min

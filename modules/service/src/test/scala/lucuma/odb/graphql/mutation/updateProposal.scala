@@ -1637,7 +1637,7 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
 
   test("✓ converting queue to classical resets considerForBand3"):
     createProgramAs(pi).flatMap: pid =>
-      addProposal(pi, pid, callProps = "queue: { considerForBand3: CONSIDER }".some) *>
+      addProposal(pi, pid, callProps = "queue: { considerForBand3: DO_NOT_CONSIDER }".some) *>
       // Convert it to classical
       query(pi, s"""
         mutation {
@@ -1675,13 +1675,13 @@ class updateProposal extends OdbSuite with ObservingModeSetupOperations {
             }
           }
         """,
-        // considerForBand3 gets reset on conversion to classical
+        // considerForBand3 gets reset on conversion to classical.
         expected = json"""
           {
             "updateProposal": {
               "proposal": {
                 "gemini": {
-                  "considerForBand3": "UNSET"
+                  "considerForBand3": "CONSIDER"
                 }
               }
             }
