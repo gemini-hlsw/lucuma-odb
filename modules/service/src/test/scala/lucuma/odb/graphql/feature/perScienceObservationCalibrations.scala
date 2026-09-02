@@ -63,6 +63,7 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
+import lucuma.odb.logic.Generator
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
@@ -1488,6 +1489,25 @@ class perScienceObservationCalibrations
       assert(obs.targetName.isDefined)
       assertEquals(storedDur, obscalcDur)
     }
+
+  test("a telluric for an unresolved ToO is charged a fixed placeholder time"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createOpportunityTargetAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when, oid)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- sleep >> resolveTelluricTargets
+      meta <- selectMeta(toid)
+      _    <- runObscalcUpdate(pid, toid)
+      dig  <- withServicesForObscalc(serviceUser): services =>
+                services.transactionally:
+                  services.obscalcService.selectOne(toid).map:
+                    _.flatMap(_.result).flatMap(_.digest)
+    yield
+      assertEquals(meta.flatMap(_.resolvedTargetId), None)
+      assertEquals(dig.map(_.fullTimeEstimate.sum), Generator.UnresolvedTelluricTime.some)
 
   test("coordinate change triggers re-resolution with new hash"):
     val obsTime = Timestamp.fromInstantTruncated(when).get

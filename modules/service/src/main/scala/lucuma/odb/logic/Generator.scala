@@ -17,19 +17,25 @@ import eu.timepit.refined.api.RefinedTypeOps
 import eu.timepit.refined.numeric.Interval
 import eu.timepit.refined.types.numeric.NonNegInt
 import fs2.Stream
+import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.AtomDigest
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.Md5Hash
@@ -38,6 +44,7 @@ import lucuma.odb.sequence.ObservingMode.Syntax.*
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
 import lucuma.odb.sequence.util.CommitHash
@@ -131,6 +138,9 @@ object Generator:
   // a reasonable upper limit on the number of atoms in a sequence.
   val SequenceAtomLimit = 1000
 
+  // Placeholder charge for a telluric whose target is not yet resolved.
+  val UnresolvedTelluricTime: TimeSpan = 15.minTimeSpan
+
   // This is a user-specifiable limit on how many `possibleFuture` steps should
   // be returned by the sequence generation.  It doesn't limit the overall
   // length of the sequence the way that the SequenceAtomLimit above does.
@@ -201,6 +211,25 @@ object Generator:
           _ <- ExecutionDigestCache.store(ctx, d)
         yield d
 
+      // No target means no sequence, so charge a fixed time instead.
+      private def isUnresolvedTelluric(ctx: GeneratorContext): Boolean =
+        ctx.params.calibrationRole.contains(CalibrationRole.Telluric) &&
+          (ctx.params.itcInput match
+            case ItcInputDerivation.Incomplete(_) => true
+            case _                                => false)
+
+      private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
+        ExecutionDigest(
+          SetupTime.Zero,
+          NonNegInt.MinValue,
+          SequenceDigest.Zero,
+          SequenceDigest.Zero.copy(
+            observeClass   = ObserveClass.Science,
+            timeEstimate   = CategorizedTime.Zero.sumCharge(ChargeClass.Program, UnresolvedTelluricTime),
+            executionState = ctx.params.executionState
+          )
+        )
+
       private def calcDigestFromContext(
         ctx: GeneratorContext
       )(using Transaction[F]): EitherT[F, OdbError, ExecutionDigest] =
@@ -238,6 +267,7 @@ object Generator:
             )
 
         if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then done
+        else if isUnresolvedTelluric(ctx) then EitherT.pure(unresolvedTelluricDigest(ctx))
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2Imaging  =>
@@ -313,11 +343,15 @@ object Generator:
               GeneratorError.sequenceTooLong(ctx.oid)
             )
 
+        val noSequence =
+          EitherT.rightT[F, OdbError]:
+            StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
+
         // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
-        val stream = ctx.params.observingMode.modeType match
-          case _: ExchangeObservingModeType         =>
-            EitherT.rightT[F, OdbError]:
-              StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
+        val stream =
+          if isUnresolvedTelluric(ctx) then noSequence
+          else ctx.params.observingMode.modeType match
+          case _: ExchangeObservingModeType         => noSequence
           case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
           case ObservingModeType.Flamingos2LongSlit => EitherT(streaming.selectOrGenerateFlamingos2LongSlit(ctx))
           case ObservingModeType.Flamingos2Mos      => EitherT(streaming.selectOrGenerateFlamingos2Mos(ctx))
@@ -333,9 +367,7 @@ object Generator:
           case ObservingModeType.GnirsImaging       => EitherT(streaming.selectOrGenerateGnirsImaging(ctx))
           case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu => EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx))
           case ObservingModeType.Igrins2LongSlit    => EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx))
-          case _: VisitorObservingModeType          =>
-            EitherT.rightT[F, OdbError]:
-              StreamingExecutionConfig[F, Unit, Nothing]((), Stream.empty, Stream.empty)
+          case _: VisitorObservingModeType          => noSequence
 
         (checkSequence *> stepCount).flatMap: sc =>
           val base = sc.value
