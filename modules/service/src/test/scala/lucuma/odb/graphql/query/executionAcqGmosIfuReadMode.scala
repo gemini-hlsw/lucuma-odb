@@ -27,10 +27,9 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 
 /**
- * The acquisition reads out at one mode throughout, taken from the field image's exposure, as the
- * long slit does.  30s is the case that tells the two candidate behaviours apart: the field image
- * is under the 60s Fast limit but the step through the IFU, at 4x, is over it.  Deriving the mode
- * per step would make that second step Slow.
+ * Each acquisition step reads out according to its own exposure time (sc-10044).  30s is the case
+ * that shows it: the field image is under the 60s Fast limit but the step through the IFU, at 4x,
+ * is over it, so the two steps disagree.
  */
 class executionAcqGmosIfuReadMode extends ExecutionTestSupportForGmos:
 
@@ -56,7 +55,7 @@ class executionAcqGmosIfuReadMode extends ExecutionTestSupportForGmos:
   private val ifuStep: GmosNorth =
     fieldStep.copy(
       exposure = 120.secTimeSpan,
-      readout  = GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Fast),
+      readout  = GmosCcdMode(GmosXBinning.One, GmosYBinning.One, GmosAmpCount.Twelve, GmosAmpGain.Low, GmosAmpReadMode.Slow),
       roi      = GmosRoi.FullFrame,
       fpu      = GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits).some
     )
@@ -72,7 +71,7 @@ class executionAcqGmosIfuReadMode extends ExecutionTestSupportForGmos:
       }
     """
 
-  test("both steps read out Fast, even though the IFU step is over the 60s limit"):
+  test("the field image reads out Fast and the longer IFU step Slow"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
