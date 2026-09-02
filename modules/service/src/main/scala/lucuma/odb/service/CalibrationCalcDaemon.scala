@@ -11,6 +11,7 @@ import cats.syntax.all.*
 import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.util.CalculationState
+import lucuma.odb.data.CalibrationWorkType
 import lucuma.odb.data.PendingRecalc
 import lucuma.odb.graphql.topic.CalibrationCalcTopic
 import lucuma.odb.service.Services.Syntax.*
@@ -32,8 +33,8 @@ import scala.concurrent.duration.*
  * drain (the reconciliation of rows enqueued while the daemon was down), a
  * NOTIFY event stream, and a periodic poll.
  *
- * Batch paths group claimed rows by program so the per-program GMOS strategy
- * runs once per program.
+ * Batch paths group claimed rows by program and work type so the per-program
+ * GMOS strategy runs once per program, while retargets run per observation.
  */
 object CalibrationCalcDaemon:
 
@@ -43,14 +44,21 @@ object CalibrationCalcDaemon:
       val d = LocalDate.ofInstant(now, ZoneOffset.UTC)
       LocalDateTime.of(d, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC)
 
-  private def groupByProgram(
+  private def groupByProgramAndWorkType(
     pendings: List[PendingRecalc]
   ): List[NonEmptyList[PendingRecalc]] =
-    pendings.groupBy(_.programId).values.toList.flatMap(NonEmptyList.fromList)
+    pendings.groupBy(p => (p.programId, p.workType)).values.toList.flatMap(NonEmptyList.fromList)
+
+  private def process[F[_]: {Async, Logger, Tracer}](
+    services: Resource[F, Services[F]]
+  )(pendings: NonEmptyList[PendingRecalc]): F[Unit] =
+    pendings.head.workType match
+      case CalibrationWorkType.Recalc   => processRecalc(services)(pendings)
+      case CalibrationWorkType.Retarget => pendings.traverse_(processRetarget(services))
 
   // Recalculate one program's worth of claimed rows, then mark each row
   // ready, or retry on failure.
-  private def process[F[_]: {Async, Logger, Tracer as T}](
+  private def processRecalc[F[_]: {Async, Logger, Tracer as T}](
     services: Resource[F, Services[F]]
   )(pendings: NonEmptyList[PendingRecalc]): F[Unit] =
     val pid  = pendings.head.programId
@@ -70,6 +78,25 @@ object CalibrationCalcDaemon:
                 calibrationCalcService.markRetry(p.observationId, msg)
           }
 
+  // Re-pick one calibration observation's target for its new observation
+  // time. Per observation on purpose: one bad row must not retry the rest.
+  private def processRetarget[F[_]: {Async, Logger, Tracer as T}](
+    services: Resource[F, Services[F]]
+  )(pending: PendingRecalc): F[Unit] =
+    val pid = pending.programId
+    val oid = pending.observationId
+    T.span("calibration-calc.retarget").surround:
+      services.useTransactionally:
+        Services.asSuperUser:
+          calibrationsService.recalculateCalibrationTarget(pid, oid) *>
+            calibrationCalcService.markReady(pending)
+    .handleErrorWith: e =>
+      val msg = Option(e.getMessage).getOrElse(e.toString)
+      error"Calibration retarget failed for program $pid, observation $oid: $msg" *>
+        services.useTransactionally:
+          Services.asSuperUser:
+            calibrationCalcService.markRetry(oid, msg)
+
   /**
    * Startup reconciliation: reset `calculating` leftovers, then drain the
    * queue in batches until empty. Processing is sequential to avoid
@@ -87,7 +114,7 @@ object CalibrationCalcDaemon:
           Services.asSuperUser:
             calibrationCalcService.load(batchSize)
         .flatMap: batch =>
-          groupByProgram(batch).traverse_(process(services)).as(batch.length)
+          groupByProgramAndWorkType(batch).traverse_(process(services)).as(batch.length)
 
     def drain(processed: Int): F[Unit] =
       processBatch.flatMap: count =>
@@ -141,7 +168,7 @@ object CalibrationCalcDaemon:
             services.useTransactionally:
               Services.asSuperUser:
                 calibrationCalcService.load(batchSize)
-        .map(groupByProgram)
+        .map(groupByProgramAndWorkType)
         .flatMap(Stream.emits)
 
     // A failure that escapes `process` (e.g. markRetry losing its connection)

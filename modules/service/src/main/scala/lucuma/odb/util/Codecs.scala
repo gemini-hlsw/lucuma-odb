@@ -57,6 +57,7 @@ import lucuma.core.util.Uid
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.CalibrationWorkType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -461,6 +462,9 @@ trait Codecs {
 
   val calculation_state: Codec[CalculationState] =
     enumerated(Type("e_calculation_state"))
+
+  val calibration_work_type: Codec[CalibrationWorkType] =
+    enumerated(Type("e_calibration_work_type"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
