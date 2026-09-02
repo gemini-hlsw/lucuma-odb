@@ -31,6 +31,8 @@ import lucuma.core.util.Timestamp
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.ProposalService.error
+import lucuma.odb.util.Codecs.program_id
+import skunk.implicits.*
 
 import java.time.Instant
 import java.time.LocalDate
@@ -1462,6 +1464,53 @@ class setProposalStatus extends OdbSuite
       )
 
     IO(assertEquals(Enumerated[ProposalSubmissionError].all.toSet -- exercised -- elsewhere, Set.empty))
+  }
+
+  // Discards the program's cached ITC results, as an ITC version bump does for
+  // every non-frozen result.
+  private def purgeItcResults(pid: Program.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"DELETE FROM t_itc_result WHERE c_program_id = $program_id".command
+      )(pid).void
+
+  // The workflow computation behind proposal submission reads cached ITC
+  // results and never calls the ITC, so an absent result is indistinguishable
+  // from a failed one.  A purged cache must not make every observation look
+  // undefined.
+  test("✓ valid submission with a purged ITC cache") {
+    createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester).flatMap { cid =>
+      createProgramWithNonPartnerPi(pi).flatMap { pid =>
+        addProposal(pi, pid, cid.some) *>
+        addSubmissionPrerequisites(pid) *>
+        addPartnerSplits(pi, pid) *>
+        addCoisAs(pi, pid) *>
+        purgeItcResults(pid) *>
+        expect(
+          user = pi,
+          query = s"""
+            mutation {
+              setProposalStatus(
+                input: {
+                  programId: "$pid"
+                  status: SUBMITTED
+                }
+              ) {
+                program { proposalStatus }
+              }
+            }
+          """,
+          expected =
+            json"""
+              {
+                "setProposalStatus": {
+                  "program": { "proposalStatus": "SUBMITTED" }
+                }
+              }
+            """.asRight
+        )
+      }
+    }
   }
 
 }

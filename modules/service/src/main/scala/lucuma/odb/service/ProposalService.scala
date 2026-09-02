@@ -940,6 +940,12 @@ object ProposalService {
 
         ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           .flatMap: pid =>
+            // The workflow computation below reads cached ITC results and never
+            // calls the ITC, so a missing result is indistinguishable from a
+            // failed one and every observation would look undefined.  Refill
+            // whatever the cache is missing first; normally there is nothing to
+            // do and this costs one query.
+            ResultT.liftF(Services.asSuperUser(itcService.warmAll(pid))) *>
             ResultT(Services.asSuperUser(observationWorkflowService.getWorkflowsModesAndRoles(pid))).flatMap: wfs =>
               val states = wfs.values.collect { case (wf, _, None) => wf.state }.toSet
               ResultT:
