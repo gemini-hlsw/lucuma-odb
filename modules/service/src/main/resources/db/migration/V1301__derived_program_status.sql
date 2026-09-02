@@ -21,27 +21,22 @@ alter table t_program
 add constraint t_program_explicit_status_check
 check (c_explicit_status is distinct from 'active');
 
--- The view gains computed status columns and c_is_active changes meaning, so
--- it must be dropped and recreated.
+-- The view gains computed status columns and drops c_is_active (V1250), which
+-- c_status = 'active' supersedes, so it must be dropped and recreated.
 drop view v_program;
 
 create view v_program as
   select
-    s.*,
-    (s.c_status = 'active') as c_is_active
+    q.*,
+    coalesce(q.c_explicit_status, q.c_default_status) as c_status
   from (
     select
-      q.*,
-      coalesce(q.c_explicit_status, q.c_default_status) as c_status
-    from (
-      select
-        p.*,
-        coalesce(rc.c_resource_count, 0) as c_resource_count,
-        (case
-           when (now() at time zone 'UTC')::date between p.c_active_start and p.c_active_end then 'active'
-           else 'inactive'
-         end)::d_tag as c_default_status
-      from t_program p
-      left join t_program_resource_count rc on rc.c_program_id = p.c_program_id
-    ) q
-  ) s;
+      p.*,
+      coalesce(rc.c_resource_count, 0) as c_resource_count,
+      (case
+         when (now() at time zone 'UTC')::date between p.c_active_start and p.c_active_end then 'active'
+         else 'inactive'
+       end)::d_tag as c_default_status
+    from t_program p
+    left join t_program_resource_count rc on rc.c_program_id = p.c_program_id
+  ) q;

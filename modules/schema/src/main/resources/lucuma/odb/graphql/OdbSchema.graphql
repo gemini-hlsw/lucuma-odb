@@ -17772,12 +17772,6 @@ type Program {
   active: DateInterval!
 
   """
-  Whether the program is currently active: `true` exactly when `status` is
-  ACTIVE.
-  """
-  isActive: Boolean!
-
-  """
   Effective program status: `explicitStatus` when set, otherwise
   `defaultStatus`.
   """
@@ -24509,14 +24503,8 @@ input WhereProgram {
   activeEnd: WhereOrderDate
 
   """
-  When true, matches programs whose effective `status` is ACTIVE; when false,
-  matches the complement. Evaluated in the database, so the date is taken at
-  transaction start.
-  """
-  isActive: Boolean
-
-  """
-  Matches the effective program status.
+  Matches the effective program status. Evaluated in the database, so the
+  derived component is taken at transaction start.
   """
   status: WhereEqProgramStatus
 }

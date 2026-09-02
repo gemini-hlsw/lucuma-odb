@@ -156,7 +156,7 @@ _Avoid_: program state, activation.
 
 **Default Status**:
 The derived layer of Program Status: Active when the current UTC date falls within the Active Period (inclusive of both bounds), Inactive otherwise. Time-varying; never Complete or Incomplete.
-_Avoid_: computed status, isActive (that is the boolean shorthand).
+_Avoid_: computed status, isActive (removed from the API; query the effective status instead).
 
 **Explicit Status**:
 A staff-declared status that masks the Default Status: Inactive, Complete, or Incomplete — never Active, which only arises from the Active Period. Clearing it returns the program to its derived status. Setting and clearing are both staff-only; reading is not.

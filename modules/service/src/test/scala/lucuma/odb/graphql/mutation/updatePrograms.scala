@@ -415,7 +415,6 @@ class updatePrograms extends OdbSuite {
             id
             status
             explicitStatus
-            isActive
           }
         }
       }
@@ -434,8 +433,7 @@ class updatePrograms extends OdbSuite {
                 {
                   "id": $pid,
                   "status": "COMPLETE",
-                  "explicitStatus": "COMPLETE",
-                  "isActive": false
+                  "explicitStatus": "COMPLETE"
                 }
               ]
             }
@@ -457,8 +455,7 @@ class updatePrograms extends OdbSuite {
                 {
                   "id": $pid,
                   "status": "INCOMPLETE",
-                  "explicitStatus": "INCOMPLETE",
-                  "isActive": false
+                  "explicitStatus": "INCOMPLETE"
                 }
               ]
             }
@@ -476,8 +473,7 @@ class updatePrograms extends OdbSuite {
                 {
                   "id": $pid,
                   "status": "ACTIVE",
-                  "explicitStatus": null,
-                  "isActive": true
+                  "explicitStatus": null
                 }
               ]
             }
@@ -531,7 +527,6 @@ class updatePrograms extends OdbSuite {
               status
               explicitStatus
               defaultStatus
-              isActive
             }
           }
         """,
@@ -541,8 +536,7 @@ class updatePrograms extends OdbSuite {
             "program": {
               "status": "INACTIVE",
               "explicitStatus": null,
-              "defaultStatus": "INACTIVE",
-              "isActive": false
+              "defaultStatus": "INACTIVE"
             }
           }
           """.asRight
