@@ -242,8 +242,10 @@ object GeneratorParamsService {
         // A daytime pinhole flat is an internal GCAL calibration with no target.
         // It needs no asterism (and no ITC), so skip the target requirement; its
         // sequence is a single smart day flat that ignores target information.
+        // A telluric has no target until resolved (never, for an unresolved ToO);
+        // let it through so the generator can charge a placeholder time.
         val targetCheck =
-          if calibrationRole.contains(CalibrationRole.DaytimePinhole) then
+          if calibrationRole.exists(r => r === CalibrationRole.DaytimePinhole || r === CalibrationRole.Telluric) then
             ().asRight[NonEmptyList[MissingParam]]
           else
             params
