@@ -3106,7 +3106,8 @@ trait DatabaseOperations { this: OdbSuite =>
     preferred:   UserProfile       = UserProfile.Empty,
     education:   EducationalStatus = EducationalStatus.PhD,
     thesis:      Boolean           = false,
-    gender:      Gender            = Gender.NotSpecified
+    gender:      Gender            = Gender.NotSpecified,
+    affiliation: Option[String]    = none
   ): IO[ProgramUser.Id] =
     extension (o: Option[String]) def strOrNull: String = o.fold("null")(s => s""""$s"""")
 
@@ -3136,6 +3137,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 educationalStatus: ${education.tag.toScreamingSnakeCase}
                 thesis: $thesis
                 gender: ${gender.tag.toScreamingSnakeCase}
+                ${affiliation.foldMap(a => s"""affiliation: "$a"""")}
               }
             }
           ) { programUser { id } }
@@ -3146,19 +3148,59 @@ trait DatabaseOperations { this: OdbSuite =>
 
   val defaultPiEmail: NonEmptyString = "pi@someprestigiousplace.com".refined
 
+  /**
+   * What every investigator must have before a proposal may be submitted: a
+   * name, an email address, an educational status and an affiliation.  The
+   * helpers below fill these in by default so that a test which submits says
+   * nothing about them, and a test about one of the rules can take the one
+   * field away.
+   */
+  val defaultInvestigatorProfile: UserProfile =
+    UserProfile("Test".some, "Investigator".some, none, "investigator@someprestigiousplace.com".some)
+
+  val defaultAffiliation: String = "Test University"
+
+  /**
+   * Adds a fully specified investigator and, unless told otherwise, invites
+   * them -- which submission also requires.
+   */
+  def addInvestigatorAs(
+    user:        User,
+    pid:         Program.Id,
+    role:        ProgramUserRole = ProgramUserRole.Coi,
+    partnerLink: PartnerLink     = PartnerLink.HasGeminiPartner(Partner.US),
+    invite:      Boolean         = true
+  ): IO[ProgramUser.Id] =
+    addProgramUserAs(
+      user,
+      pid,
+      role,
+      partnerLink,
+      preferred   = defaultInvestigatorProfile,
+      affiliation = defaultAffiliation.some
+    ).flatTap(puid => inviteProgramUserDirectly(user, pid, puid).whenA(invite))
+
   def updateProgramUserAs(
-    user:       User,
-    puid:       ProgramUser.Id,
+    user:        User,
+    puid:        ProgramUser.Id,
     partnerLink: PartnerLink,
-    email: Option[NonEmptyString] = defaultPiEmail.some
+    email:       Option[NonEmptyString]    = defaultPiEmail.some,
+    creditName:  Option[String]            = "Test Investigator".some,
+    education:   Option[EducationalStatus] = EducationalStatus.PhD.some,
+    affiliation: Option[String]            = defaultAffiliation.some
   ): IO[Unit] =
-    val preferred = email.foldMap(e =>
-      s"""
-        preferredProfile: {
-          email: "$e"
-        }
-      """
-    )
+    def field(name: String, value: String): String = s"$name: \"$value\""
+    val profileFields = List(
+      email.map(e => field("email", e.value)),
+      creditName.map(n => field("creditName", n))
+    ).flattenOption
+    val preferred =
+      if profileFields.isEmpty then ""
+      else s"preferredProfile: { ${profileFields.mkString(", ")} }"
+    val extras = List(
+      education.map(e => s"educationalStatus: ${e.tag.toScreamingSnakeCase}"),
+      affiliation.map(a => field("affiliation", a))
+    ).flattenOption.mkString("\n              ")
     query(
       user = user,
       query = s"""
@@ -3179,6 +3221,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 }
               }
               $preferred
+              $extras
             }
           }) {
             programUsers { id }
@@ -3204,8 +3247,7 @@ trait DatabaseOperations { this: OdbSuite =>
   /** Adds co-investigators and invites each one, as submission requires. */
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =
     ps.traverse_ : p =>
-      addProgramUserAs(u, pid, partnerLink = PartnerLink.HasGeminiPartner(p))
-        .flatMap(inviteProgramUserDirectly(u, pid, _))
+      addInvestigatorAs(u, pid, partnerLink = PartnerLink.HasGeminiPartner(p)).void
 
   /**
    * Records the PI's educational status, which decides whether a Fast Turnaround

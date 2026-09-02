@@ -54,7 +54,9 @@ class goaAccessQuery extends OdbSuite with query.ObservingModeSetupOperations:
   def addUser(pid: Program.Id, user: User, role: ProgramUserRole): IO[Unit] =
     for
       _ <- createUsers(user)
-      m <- addProgramUserAs(pi, pid, role)
+      // Linking a real user satisfies the invitation rule on its own, but the
+      // rest of the profile still has to be there for the re-submission below.
+      m <- addInvestigatorAs(pi, pid, role, invite = false)
       _ <- linkUserAs(pi, m, user.id)
     yield ()
 

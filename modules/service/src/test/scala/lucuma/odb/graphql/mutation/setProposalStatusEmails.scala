@@ -213,9 +213,11 @@ class setProposalStatusEmails extends OdbSuite with query.ObservingModeSetupOper
       _   <- setProgramDescription(pid, "A study of <interesting> things.")
       pu  <- piProgramUserIdAs(pi, pid)
       _   <- setCreditName(pu, "Petra Ito")
-      _   <- addProgramUserAs(pi, pid, ProgramUserRole.Coi, preferred = creditName("Ann Coi"))
+      _   <- addProgramUserAs(pi, pid, ProgramUserRole.Coi, preferred = creditName("Ann Coi"),
+                              affiliation = defaultAffiliation.some)
                .flatMap(inviteProgramUserDirectly(pi, pid, _))
-      _   <- addProgramUserAs(pi, pid, ProgramUserRole.CoiRO, preferred = creditName("Zoe CoiRO"))
+      _   <- addProgramUserAs(pi, pid, ProgramUserRole.CoiRO, preferred = creditName("Zoe CoiRO"),
+                              affiliation = defaultAffiliation.some)
                .flatMap(inviteProgramUserDirectly(pi, pid, _))
       _   <- addProposal(pi, pid, cid.some)
       _   <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.US, 100)))
@@ -228,8 +230,18 @@ class setProposalStatusEmails extends OdbSuite with query.ObservingModeSetupOper
     )
   }
 
+  /**
+   * A co-investigator known by their credit name alone -- which is what the
+   * notification body below names them by.  The email is there because
+   * submission requires one of every investigator, not because it is read here.
+   */
   private def creditName(name: String): UserProfile =
-    UserProfile(givenName = none, familyName = none, creditName = name.some, email = none)
+    UserProfile(
+      givenName  = none,
+      familyName = none,
+      creditName = name.some,
+      email      = defaultInvestigatorProfile.email
+    )
 
   private def setCreditName(puid: ProgramUser.Id, name: String): IO[Unit] =
     query(

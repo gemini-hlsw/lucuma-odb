@@ -25,6 +25,7 @@ import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
+import lucuma.core.model.UserProfile
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -428,10 +429,13 @@ class setProposalStatus extends OdbSuite
             error.submissionError(ProposalSubmissionError.MissingSemester, pid).message,
             error.submissionError(ProposalSubmissionError.MissingProposalType, pid).message,
             error.submissionError(ProposalSubmissionError.MissingCategory, pid).message,
-            error.submissionError(ProposalSubmissionError.MissingPiEmail, pid).message,
             error.submissionError(ProposalSubmissionError.MissingTitle, pid).message,
             error.submissionError(ProposalSubmissionError.MissingAbstract, pid).message,
             error.submissionError(ProposalSubmissionError.UnspecifiedInvestigatorPartner, pid).message,
+            error.submissionError(ProposalSubmissionError.MissingInvestigatorName, pid).message,
+            error.submissionError(ProposalSubmissionError.MissingInvestigatorEmail, pid).message,
+            error.submissionError(ProposalSubmissionError.MissingInvestigatorEducationalStatus, pid).message,
+            error.submissionError(ProposalSubmissionError.MissingInvestigatorAffiliation, pid).message,
             error.submissionError(ProposalSubmissionError.NoDefinedObservations, pid).message,
             error.submissionError(ProposalSubmissionError.MissingDeadline, pid).message
           ))
@@ -917,10 +921,8 @@ class setProposalStatus extends OdbSuite
         addProposal(pi, pid, cid.some) *>
         addSubmissionPrerequisites(pid) *>
         addPartnerSplits(pi, pid) *>
-        addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.CA))
-          .flatMap(inviteProgramUserDirectly(pi, pid, _)) *>
-        addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasNonPartner)
-          .flatMap(inviteProgramUserDirectly(pi, pid, _)) *>
+        addInvestigatorAs(pi, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.CA)) *>
+        addInvestigatorAs(pi, pid, partnerLink = PartnerLink.HasNonPartner) *>
         expect(
           user = pi,
           query = s"""
@@ -1076,7 +1078,7 @@ class setProposalStatus extends OdbSuite
             List(error.submissionError(ProposalSubmissionError.PastDeadline, pid).message).asLeft
         )
 
-  test("Cannot submit without a PI email address"):
+  test("Cannot submit without an investigator email address"):
     for
       cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester)
       pid <- createProgramAs(pi)
@@ -1103,11 +1105,11 @@ class setProposalStatus extends OdbSuite
             }
           """,
           expected =
-            List(error.submissionError(ProposalSubmissionError.MissingPiEmail, pid).message).asLeft
+            List(error.submissionError(ProposalSubmissionError.MissingInvestigatorEmail, pid).message).asLeft
         )
     yield ()
 
-  test("Cannot submit with an invalid PI email address"):
+  test("Cannot submit with an invalid investigator email address"):
     for
       cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester)
       pid <- createProgramAs(pi)
@@ -1135,7 +1137,7 @@ class setProposalStatus extends OdbSuite
             }
           """,
           expected =
-            List(error.submissionError(ProposalSubmissionError.InvalidPiEmail, pid).message).asLeft
+            List(error.submissionError(ProposalSubmissionError.InvalidInvestigatorEmail, pid).message).asLeft
         )
     yield ()
 
@@ -1312,13 +1314,80 @@ class setProposalStatus extends OdbSuite
     yield ()
   }
 
+  test("⨯ an investigator with an unspecified partner") {
+    for
+      cid <- createGeminiCallForProposalsAs(staff)
+      pid <- proposalMissing(cid)
+      _   <- addInvestigatorAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner)
+      _   <- submitExpecting(pid, UnspecifiedInvestigatorPartner)
+    yield ()
+  }
+
+  /**
+   * Clears one part of the PI's profile on an otherwise submittable proposal,
+   * which is how each investigator rule is exercised: every investigator the
+   * test helpers create is complete, so the rule has to be provoked.
+   */
+  private def clearPiFields(pid: Program.Id, set: String): IO[Unit] =
+    piProgramUserIdAs(pi, pid).flatMap: puid =>
+      query(
+        pi,
+        s"""
+          mutation {
+            updateProgramUsers(
+              input: {
+                SET: { $set }
+                WHERE: { id: { EQ: "$puid" } }
+              }
+            ) { programUsers { id } }
+          }
+        """
+      ).void
+
+  test("⨯ an investigator with no name") {
+    for
+      cid <- createGeminiCallForProposalsAs(staff)
+      pid <- proposalMissing(cid)
+      // The test PI has no ORCID name either, so the display name goes null.
+      // Only one error is expected because updateProgramUsers applies each part
+      // of preferredProfile on its own, leaving the email alone.
+      _   <- clearPiFields(pid, "preferredProfile: { creditName: null, givenName: null, familyName: null }")
+      _   <- submitExpecting(pid, MissingInvestigatorName)
+    yield ()
+  }
+
+  // The two email rules accumulate independently, so a team with one of each
+  // problem reports both.  Explore pins this too; the two must not drift.
+  test("⨯ one investigator with no email and another with a bad one") {
+    for
+      cid <- createGeminiCallForProposalsAs(staff)
+      pid <- proposalMissing(cid)
+      _   <- clearPiFields(pid, "preferredProfile: { email: null }")
+      _   <- addProgramUserAs(
+               pi,
+               pid,
+               preferred   = UserProfile("Bad".some, "Email".some, none, "not an email".some),
+               affiliation = defaultAffiliation.some
+             ).flatMap(inviteProgramUserDirectly(pi, pid, _))
+      _   <- submitExpecting(pid, MissingInvestigatorEmail, InvalidInvestigatorEmail)
+    yield ()
+  }
+
+  test("⨯ an investigator with no educational status") {
+    for
+      cid <- createGeminiCallForProposalsAs(staff)
+      pid <- proposalMissing(cid)
+      _   <- clearPiFields(pid, "educationalStatus: null")
+      _   <- submitExpecting(pid, MissingInvestigatorEducationalStatus)
+    yield ()
+  }
+
   test("⨯ an investigator with no affiliation") {
     for
       cid <- createGeminiCallForProposalsAs(staff)
       pid <- proposalMissing(cid)
-      _   <- addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasUnspecifiedPartner)
-               .flatMap(inviteProgramUserDirectly(pi, pid, _))
-      _   <- submitExpecting(pid, UnspecifiedInvestigatorPartner)
+      _   <- clearPiFields(pid, "affiliation: null")
+      _   <- submitExpecting(pid, MissingInvestigatorAffiliation)
     yield ()
   }
 
@@ -1326,7 +1395,7 @@ class setProposalStatus extends OdbSuite
     for
       cid <- createGeminiCallForProposalsAs(staff)
       pid <- proposalMissing(cid)
-      _   <- addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.US))
+      _   <- addInvestigatorAs(pi, pid, partnerLink = PartnerLink.HasGeminiPartner(Partner.US), invite = false)
       _   <- submitExpecting(pid, UninvitedInvestigator)
     yield ()
   }
@@ -1436,8 +1505,7 @@ class setProposalStatus extends OdbSuite
       pid <- createProgramWithNonPartnerPi(pi)
       _   <- addProposal(pi, pid, cid.some)
       _   <- addSubmissionPrerequisites(pid)
-      _   <- addProgramUserAs(pi, pid, partnerLink = PartnerLink.HasExchangePartner(ExchangePartner.Keck))
-               .flatMap(inviteProgramUserDirectly(pi, pid, _))
+      _   <- addInvestigatorAs(pi, pid, partnerLink = PartnerLink.HasExchangePartner(ExchangePartner.Keck))
       _   <- submitExpecting(pid, InvalidPartnerSplits)
     yield ()
   }
@@ -1457,7 +1525,9 @@ class setProposalStatus extends OdbSuite
         MissingTitle, MissingAbstract, MissingCategory, MissingCfp, MissingProposalType,
         MissingSemester, PiPartnerNotInCall, NonPartnerPiNotAllowed, ExchangePartnerNotInCall,
         ExchangePartnerPiMismatch, MissingBand3Consideration, UnspecifiedInvestigatorPartner,
-        InvalidPartnerSplits, MissingPiEmail, InvalidPiEmail, UninvitedInvestigator,
+        InvalidPartnerSplits, MissingInvestigatorName, MissingInvestigatorEmail,
+        InvalidInvestigatorEmail, MissingInvestigatorEducationalStatus,
+        MissingInvestigatorAffiliation, UninvitedInvestigator,
         UhTimeWithoutUhPi, UnmatchedPartnerTime, MissingFtMentor, MissingScienceAttachment,
         MissingTeamAttachment, NoDefinedObservations, UndefinedObservations,
         MissingDeadline, PastDeadline
