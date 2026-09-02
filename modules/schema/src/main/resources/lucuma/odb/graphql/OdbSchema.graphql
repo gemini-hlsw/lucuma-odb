@@ -4988,7 +4988,7 @@ input ProgramPropertiesInput {
   activeEnd: Date
 
   """
-  Set of validation codes to treat as 'dismissed' by the workflow computation. This
+  List of validation codes to treat as 'dismissed' by the workflow computation. This
   field can only be set by staff users. 
   """
   dismissedWarnings: [ObservationValidationCode!]
