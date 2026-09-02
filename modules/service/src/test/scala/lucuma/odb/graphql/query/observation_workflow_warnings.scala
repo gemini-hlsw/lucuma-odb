@@ -17,6 +17,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
+import lucuma.core.model.IntCentiPercent
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.ObservationWorkflow
@@ -25,7 +26,6 @@ import lucuma.core.util.CalculationState
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.workflow.validator.ConditionsProbabilityValidator
-import lucuma.core.model.IntCentiPercent
 import lucuma.odb.service.workflow.validator.TotalSignalToNoiseValidator
 
 class observation_workflow_warnings
