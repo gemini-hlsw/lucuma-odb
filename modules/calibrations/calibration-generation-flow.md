@@ -36,7 +36,7 @@ sequenceDiagram
     Obscalc->>DB: storeResult → t_obscalc.c_last_update, state = 'ready'
     DB->>Trig: AFTER UPDATE OF c_last_update ON t_obscalc
     Trig->>Trig: non-calibration obs? obscalc ready? c_last_update changed?
-    Trig->>Queue: CALL invalidate_calibration_calc(oid, pid) → 'pending'
+    Trig->>Queue: CALL invalidate_calibration_calc(oid, pid, 'recalc') → 'pending'
     Queue->>Notify: NOTIFY (oid, pid, old_state, new_state=pending)
     Note over Daemon: If down, row stays pending — replayed on startup drain
     Notify-->>Daemon: event → loadObs → 'calculating'
@@ -58,9 +58,15 @@ enter the queue and the daemon cannot recurse on its own output.
 
 ## Durable Queue: `t_calibration_calc`
 
-Created by `V1294__calibration_calc.sql`; state machine in
-`CalibrationCalcService.scala`. One row per science observation, keyed
+Created by `V1295__calibration_calc.sql`; state machine in
+`CalibrationCalcService.scala`. One row per observation, keyed
 `c_observation_id`, mirroring `t_obscalc` / `t_telluric_resolution`.
+
+`V1304__calibration_retarget.sql` adds `c_work_type` (`recalc` | `retarget`):
+science observations enqueue `recalc` work when their obscalc settles, and
+calibration observations enqueue `retarget` work when their observation time
+changes. Science and calibration observation ids are disjoint, so one row per
+id still holds and a row's work type never changes.
 
 ```mermaid
 flowchart TD
@@ -87,11 +93,11 @@ Key behaviors:
   `c_retry_at = now() + 1 min * 2^min(failures, 5)` (capped ~32 min), matching
   obscalc's retry-indefinitely behavior. There is no terminal error state
   because `recalculateCalibrations` raises rather than returning an error value.
-- **Granularity.** The queue is keyed per science observation (what the obscalc
-  trigger naturally produces), but batch drains group claimed rows by
-  `c_program_id`: the per-program GMOS diff runs once per program while the
-  per-observation telluric sync runs per changed observation. The live event
-  path processes one observation at a time, matching the previous behavior.
+- **Granularity.** The queue is keyed per observation, but batch drains group
+  claimed rows by `(c_program_id, c_work_type)`: the per-program GMOS diff runs
+  once per program while the per-observation telluric sync and target retargets
+  run per changed observation. The live event path processes one observation at
+  a time, matching the previous behavior.
 - **Concurrency.** `load` uses `FOR UPDATE SKIP LOCKED`, so parallel workers are
   safe. Two workers claiming observations of the same program across batches can
   both run the GMOS diff — harmless, since the diff is idempotent
@@ -103,7 +109,6 @@ Known edge: a science observation **deleted** while the daemon is down cascades
 its queue row away without enqueueing anything, so an orphaned calibration
 survives until something else in the program triggers a recalc — same as the
 previous live behavior, which also keyed on `Ready` transitions, not deletions.
-The calibration-time retarget path (below) remains best-effort NOTIFY-only.
 
 ## Entry Point: `recalculateCalibrations`
 
@@ -336,18 +341,27 @@ flowchart TD
 
 ## Calibration Target Recalculation
 
-A separate flow handles updating a calibration's target when its observation time changes.
+A separate flow handles updating a calibration's target when its observation
+time changes. It rides the same durable queue as recalculation: a trigger on
+`t_observation.c_observation_time` (rows with a calibration role, comparing
+with `IS DISTINCT FROM` so first-time sets fire too) enqueues a `retarget` row,
+and the daemon's startup drain, event stream, poll, retry backoff, and
+mid-flight guard all apply. The former NOTIFY-only `ch_calib_obs_time` channel
+and its daemon are gone (V1304).
 
 ```mermaid
 sequenceDiagram
     participant DB as PostgreSQL
+    participant Queue as t_calibration_calc
     participant Daemon as Calibrations Daemon
     participant Service as CalibrationsService
     participant Target as TargetService
     participant Asterism as AsterismService
 
     Note over DB: UPDATE t_observation SET c_observation_time (on a calibration)
-    DB-->>Daemon: NOTIFY ch_calib_obs_time (pid, oid, 'UPDATE')
+    DB->>Queue: CALL invalidate_calibration_calc(oid, pid, 'retarget') → 'pending'
+    Queue-->>Daemon: NOTIFY ch_calibration_calc (or startup drain / poll)
+    Daemon->>Queue: loadObs → 'calculating'
     Daemon->>Service: recalculateCalibrationTarget(pid, oid)
 
     Service->>DB: Query calibration time, role, and observing mode type

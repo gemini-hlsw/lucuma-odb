@@ -8,11 +8,14 @@ import lucuma.core.model.Program
 import lucuma.core.util.Timestamp
 
 /**
- * A claimed row of the calibration-recalculation queue (`t_calibration_calc`):
- * a science observation whose program's calibrations may need recalculation.
+ * A claimed row of the calibration work queue (`t_calibration_calc`): a
+ * science observation whose program's calibrations may need recalculation, or
+ * a calibration observation whose target may need re-picking for a new
+ * observation time.
  */
 final case class PendingRecalc(
   programId:        Program.Id,
   observationId:    Observation.Id,
-  lastInvalidation: Timestamp
+  lastInvalidation: Timestamp,
+  workType:         CalibrationWorkType
 )
