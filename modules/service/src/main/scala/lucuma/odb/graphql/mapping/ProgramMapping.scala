@@ -80,7 +80,9 @@ trait ProgramMapping[F[_]]
       SqlField("type", ProgramView.ProgramType),
       SqlObject("reference",  Join(ProgramView.Id, ProgramReferenceView.Id)),
 
-      SqlField("status", ProgramView.ProgramStatus),
+      SqlField("status", ProgramView.Status),
+      SqlField("explicitStatus", ProgramView.ExplicitStatus),
+      SqlField("defaultStatus", ProgramView.DefaultStatus),
       SqlField("proposalStatus", ProgramView.ProposalStatus),
       SqlObject("pi", Join(ProgramView.Id, ProgramUserView.ProgramId)),
       SqlObject("users", Join(ProgramView.Id, ProgramUserView.ProgramId)),
@@ -88,7 +90,6 @@ trait ProgramMapping[F[_]]
       SqlObject("configurationRequests"),
       SqlObject("proposal", Join(ProgramView.Id, ProposalView.ProgramId)),
       SqlObject("active"),
-      SqlField("isActive", ProgramView.IsActive),
       SqlObject("groupElements", Join(ProgramView.Id, GroupElementView.ProgramId)),
       SqlObject("allGroupElements", Join(ProgramView.Id, GroupElementView.ProgramId)),
       SqlObject("attachments", Join(ProgramView.Id, AttachmentTable.ProgramId)),

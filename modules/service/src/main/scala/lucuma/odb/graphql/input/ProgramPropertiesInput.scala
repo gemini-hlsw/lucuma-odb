@@ -18,17 +18,17 @@ import java.time.LocalDate
 object ProgramPropertiesInput:
 
   case class Create(
-    name:        Option[NonEmptyString],
-    description: Option[NonEmptyString],
-    goa:         GoaPropertiesInput.Create,
-    existence:   Existence,
-    status:      Option[ProgramStatus],
-    active:      Option[Ior[LocalDate, LocalDate]]
+    name:           Option[NonEmptyString],
+    description:    Option[NonEmptyString],
+    goa:            GoaPropertiesInput.Create,
+    existence:      Existence,
+    explicitStatus: Nullable[ProgramStatus],
+    active:         Option[Ior[LocalDate, LocalDate]]
   )
 
   object Create:
     val Default: Create =
-      Create(None, None, GoaPropertiesInput.Create.Default, Existence.Present, None, None)
+      Create(None, None, GoaPropertiesInput.Create.Default, Existence.Present, Nullable.Absent, None)
 
     val Binding: Matcher[Create] =
       ObjectFieldsBinding.rmap:
@@ -37,33 +37,33 @@ object ProgramPropertiesInput:
           NonEmptyStringBinding.Option("description", rDescription),
           GoaPropertiesInput.Create.Binding.Option("goa", rGoa),
           ExistenceBinding.Option("existence", rExistence),
-          ProgramStatusBinding.Option("status", rStatus),
+          ProgramStatusBinding.Nullable("explicitStatus", rExplicitStatus),
           DateBinding.Option("activeStart", rActiveStart),
           DateBinding.Option("activeEnd",   rActiveEnd)
         ) =>
           val rActive = date.validateOptionalInputInterval("activeStart", "activeEnd", rActiveStart, rActiveEnd)
-          (rName, rDescription, rGoa, rExistence, rStatus, rActive).parMapN: (name, description, goa, existence, status, active) =>
+          (rName, rDescription, rGoa, rExistence, rExplicitStatus, rActive).parMapN: (name, description, goa, existence, explicitStatus, active) =>
             Create(
               name,
               description,
               goa.getOrElse(GoaPropertiesInput.Create.Default),
               existence.getOrElse(Existence.Present),
-              status,
+              explicitStatus,
               active
             )
 
   case class Edit(
-    name:        Nullable[NonEmptyString],
-    description: Nullable[NonEmptyString],
-    goa:         Option[GoaPropertiesInput.Edit],
-    existence:   Option[Existence],
-    status:      Option[ProgramStatus],
-    active:      Option[Ior[LocalDate, LocalDate]]
+    name:           Nullable[NonEmptyString],
+    description:    Nullable[NonEmptyString],
+    goa:            Option[GoaPropertiesInput.Edit],
+    existence:      Option[Existence],
+    explicitStatus: Nullable[ProgramStatus],
+    active:         Option[Ior[LocalDate, LocalDate]]
   )
 
   object Edit:
     val Default: Edit =
-      Edit(Nullable.Absent, Nullable.Absent, None, None, None, None)
+      Edit(Nullable.Absent, Nullable.Absent, None, None, Nullable.Absent, None)
 
     val Binding: Matcher[Edit] =
       ObjectFieldsBinding.rmap:
@@ -72,9 +72,9 @@ object ProgramPropertiesInput:
           NonEmptyStringBinding.Nullable("description", rDescription),
           GoaPropertiesInput.Edit.Binding.Option("goa", rGoa),
           ExistenceBinding.Option("existence", rExistence),
-          ProgramStatusBinding.Option("status", rStatus),
+          ProgramStatusBinding.Nullable("explicitStatus", rExplicitStatus),
           DateBinding.Option("activeStart", rActiveStart),
           DateBinding.Option("activeEnd",   rActiveEnd)
         ) =>
           val rActive = date.validateOptionalInputInterval("activeStart", "activeEnd", rActiveStart, rActiveEnd)
-          (rName, rDescription, rGoa, rExistence, rStatus, rActive).parMapN(Edit.apply)
+          (rName, rDescription, rGoa, rExistence, rExplicitStatus, rActive).parMapN(Edit.apply)

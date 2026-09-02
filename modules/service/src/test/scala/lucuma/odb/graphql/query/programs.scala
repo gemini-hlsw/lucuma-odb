@@ -391,4 +391,47 @@ class programs extends OdbSuite {
     }
   }
 
+  def setExplicitStatusAs(pid: Program.Id, value: String) =
+    query(
+      staff,
+      s"""
+        mutation {
+          updatePrograms(
+            input: {
+              SET: { explicitStatus: $value }
+              WHERE: { id: { EQ: ${pid.asJson} } }
+            }
+          ) {
+            programs { id }
+          }
+        }
+      """
+    ).void
+
+  // `status` filters on the effective status: the explicit override when set,
+  // otherwise the value derived from the active period. Evaluated in the
+  // database (`c_status` on `v_program`) so the filter pushes down.
+  test("program selection via status"):
+    val today = LocalDate.now()
+    for
+      pidActive   <- createProgramAs(pi)
+      pidComplete <- createProgramAs(pi)
+      _           <- setExplicitStatusAs(pidComplete, "COMPLETE")
+      pidExplicit <- createProgramAs(pi)
+      _           <- setExplicitStatusAs(pidExplicit, "INACTIVE")
+      pidDerived  <- createProgramAs(pi)
+      _           <- setProgramActiveAs(staff, pidDerived, today.plusDays(100), today.plusDays(200))
+      idFilter     = s"id: { IN: [${pidActive.asJson}, ${pidComplete.asJson}, ${pidExplicit.asJson}, ${pidDerived.asJson}] }"
+      active      <- programsWhere(pi, s"$idFilter, status: { EQ: ACTIVE }")
+      complete    <- programsWhere(pi, s"$idFilter, status: { EQ: COMPLETE }")
+      inactive    <- programsWhere(pi, s"$idFilter, status: { EQ: INACTIVE }")
+      notActive   <- programsWhere(pi, s"$idFilter, status: { NEQ: ACTIVE }")
+      inOrOut     <- programsWhere(pi, s"$idFilter, status: { IN: [COMPLETE, INACTIVE] }")
+    yield
+      assertEquals(active, List(pidActive))
+      assertEquals(complete, List(pidComplete))
+      assertEquals(inactive.toSet, Set(pidExplicit, pidDerived))
+      assertEquals(notActive.toSet, Set(pidComplete, pidExplicit, pidDerived))
+      assertEquals(inOrOut.toSet, Set(pidComplete, pidExplicit, pidDerived))
+
 }
