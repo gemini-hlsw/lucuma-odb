@@ -56,7 +56,7 @@
             {
               name = "odb-pgcli";
               help = "open pgcli on the local dev database";
-              command = ''PGPASSWORD=banana pgcli -h localhost -p 5432 -U jimmy -d lucuma-odb "$@"'';
+              command = ''PGPASSWORD=banana ${pkgs.pgcli}/bin/pgcli -h localhost -p 5432 -U jimmy -d lucuma-odb "$@"'';
             }
           ];
           env = [
