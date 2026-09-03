@@ -170,7 +170,7 @@ object ObservationWorkflowService {
             case ObservationValidationCode.ConfigurationRequestDenied => 6
             case ObservationValidationCode.ConfigurationRequestPending => 7
             case ObservationValidationCode.TooActivationUnapproved => 8
-            case _: ObservationValidationCode.Nonfatal => 9 // warnings sort after the errors
+            case _: ObservationValidationCode.Warning => 9 // warnings sort after the errors
 
         val validationStatus: ValidationState =
           if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined
@@ -183,7 +183,7 @@ object ObservationWorkflowService {
                   ObservationValidationCode.ConfigurationRequestDenied       |
                   ObservationValidationCode.ConfigurationRequestPending      |
                   ObservationValidationCode.TooActivationUnapproved          => Unapproved
-            case _: ObservationValidationCode.Nonfatal                       => Defined // with warnings
+            case _: ObservationValidationCode.Warning                        => Defined // with warnings
 
         def userStatus(validationStatus: ValidationState): Option[UserState] =
           info.effectiveUserState.flatMap:
@@ -221,8 +221,10 @@ object ObservationWorkflowService {
             case Unapproved => List(Inactive)
             case Defined    =>
 
-              // Can't move forward with [non-dismissed -- TODO] warnings
-              val hasWarnings = codes.map(_.severity).contains(ObservationValidationCode.Severity.Nonfatal)
+              // Can't move forward with non-dismissed warnings
+              val hasWarnings = 
+                val warnings = codes.flatMap(_.asWarning)
+                !warnings.forall(info.dismissedWarnings.contains)
 
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.

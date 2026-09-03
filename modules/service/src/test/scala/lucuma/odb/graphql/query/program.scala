@@ -358,4 +358,28 @@ class program extends OdbSuite {
 
       )
     }
-  }
+    
+  test("dimissed validation codes"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user = staff,
+        query =
+          s"""
+            query {
+              program(programId: "$pid") {
+                dismissedWarnings
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+              "program": {
+                "dismissedWarnings": []
+              }
+            }
+          """
+        )
+      )
+
+}

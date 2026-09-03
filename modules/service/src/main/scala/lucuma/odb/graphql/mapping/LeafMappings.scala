@@ -203,6 +203,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[Observation.Id](ObservationIdType),
       LeafMapping[ObservationReference](ObservationReferenceLabelType),
       LeafMapping[ObservationWorkflowState](ObservationWorkflowStateType),
+      LeafMapping[ObservationValidationCode](ObservationValidationCodeType),
       LeafMapping[ObserveClass](ObserveClassType),
       LeafMapping[KeckInstrument](KeckInstrumentType),
       LeafMapping[Observatory](ObservatoryType),
