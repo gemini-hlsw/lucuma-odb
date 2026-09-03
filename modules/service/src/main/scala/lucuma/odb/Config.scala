@@ -71,7 +71,8 @@ case class Config(
   commitHash:    CommitHash,                    // From Heroku Dyno Metadata
   goaUsers:      Set[User.Id],                  // Gemini Observatory Archive user id(s)
   obscalcPoll:   FiniteDuration,                // Obscalc poll period
-  httpClient:    Config.HttpClient              // Configuration for HTTP requests made by the ODB
+  httpClient:    Config.HttpClient,             // Configuration for HTTP requests made by the ODB
+  pdfSummary:    Config.PdfSummary              // Proposal-summary PDF daemon config
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -251,6 +252,20 @@ object Config:
       envOrProp("OBSCALC_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
       envOrProp("DATABASE_URL").as[URI] // passed by Heroku
     ).parTupled.as[Database]
+
+  /** The pdf-summary dyno: where pyexplore's Python lives and how long a render may take. */
+  case class PdfSummary(
+    python:         String,
+    renderTimeout:  FiniteDuration,
+    maxConnections: Int
+  )
+
+  object PdfSummary:
+    lazy val fromCiris: ConfigValue[Effect, PdfSummary] = (
+      envOrProp("PDF_SUMMARY_PYTHON").default("/opt/pyexplore/bin/python"),
+      envOrProp("PDF_SUMMARY_RENDER_TIMEOUT_SECONDS").as[FiniteDuration].default(10.minutes),
+      envOrProp("PDF_SUMMARY_MAX_CONNECTIONS").as[Int].default(4)
+    ).parMapN(PdfSummary.apply)
 
   case class Aws(
     accessKey:       NonEmptyString,
@@ -499,5 +514,6 @@ object Config:
     optValue("CommitHash", BuildInfo.gitHeadCommit).as[CommitHash].default(CommitHash.Zero),
     envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),
     envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds),
-    HttpClient.fromCiris
+    HttpClient.fromCiris,
+    PdfSummary.fromCiris
   ).parMapN(Config.apply)

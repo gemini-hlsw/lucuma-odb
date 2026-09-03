@@ -95,6 +95,14 @@ pull_request_rules:
       add:
       - otel
       remove: []
+- name: Label pdf-summary PRs
+  conditions:
+  - files~=^modules/pdf-summary/
+  actions:
+    label:
+      add:
+      - pdf-summary
+      remove: []
 - name: Label phase0 PRs
   conditions:
   - files~=^modules/phase0/

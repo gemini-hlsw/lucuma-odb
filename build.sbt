@@ -233,6 +233,7 @@ lazy val sbtDockerPublishLocal =
       "service/docker:publishLocal",
       "obscalc/docker:publishLocal",
       "calibrations/docker:publishLocal",
+      "pdfSummary/docker:publishLocal",
       "resourceService/docker:publishLocal"
     ),
     name = Some("Build Docker images")
@@ -248,7 +249,7 @@ lazy val appNames: Map[String, String] = Map(
 lazy val procTypes: Map[String, List[String]] = Map(
   "sso"      -> List("web"),
   "itc"      -> List("web"),
-  "odb"      -> List("web", "obscalc", "calibration"),
+  "odb"      -> List("web", "obscalc", "calibration", "summary"),
   "resource" -> List("web")
 )
 lazy val procTypeImageNames: Map[(String, String), String] = Map(
@@ -257,6 +258,7 @@ lazy val procTypeImageNames: Map[(String, String), String] = Map(
   ("odb", "web")         -> "lucuma-odb-service",
   ("odb", "obscalc")     -> "obscalc-service",
   ("odb", "calibration") -> "calibrations-service",
+  ("odb", "summary")     -> "pdf-summary-service",
   ("resource", "web")    -> "lucuma-resource-service"
 )
 lazy val environments: List[String] = List("dev", "staging", "production")
@@ -1045,6 +1047,47 @@ lazy val calibrations = project
     dockerExposedPorts ++= Seq(8082)
   )
 
+// The pyexplore commit the proposal-summary renderer is built from.  Bump it
+// deliberately, by PR; never track a branch, so a deploy always builds the same renderer.
+lazy val pyexploreRef = "d924f29"
+
+lazy val pdfSummary = project
+  .in(file("modules/pdf-summary"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
+  .settings(
+    name                        := "pdf-summary-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    reStart / envVars += "PORT" -> "8082",
+    description                     := "Lucuma ODB Proposal Summary PDF Service",
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
+    executableScriptName            := "lucuma-odb-pdf-summary-service",
+    dockerExposedPorts ++= Seq(8082),
+    // The renderer is Python (pyexplore): install it into the JRE image, in a
+    // venv the daemon runs through PDF_SUMMARY_PYTHON.
+    dockerCommands := {
+      import com.typesafe.sbt.packager.docker.Cmd
+      val cmds      = dockerCommands.value
+      val mainStage = cmds.lastIndexWhere {
+        case Cmd("FROM", _*) => true
+        case _               => false
+      }
+      val python    = Seq(
+        Cmd("USER", "root"),
+        Cmd(
+          "RUN",
+          "apt-get update",
+          "&& apt-get install -y --no-install-recommends python3 python3-venv git",
+          "&& python3 -m venv /opt/pyexplore",
+          s"""&& /opt/pyexplore/bin/pip install --no-cache-dir "pyexplore[pdf] @ git+https://github.com/andrewwstephens/pyexplore@$pyexploreRef"""",
+          "&& apt-get purge -y git && apt-get autoremove -y",
+          "&& rm -rf /var/lib/apt/lists/*"
+        )
+      )
+      cmds.patch(mainStage + 1, python, 0)
+    }
+  )
+
 lazy val phase0 = project
   .in(file("modules/phase0"))
   .enablePlugins(NoPublishPlugin)
@@ -1065,8 +1108,8 @@ lazy val phase0 = project
   )
 
 // Command aliases for starting/stopping all services
-addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart")
-addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop")
+addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart;pdfSummary/reStart")
+addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop;pdfSummary/reStop")
 
 // START RESOURCE
 
