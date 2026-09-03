@@ -68,13 +68,13 @@ object ItcImpl {
       ): F[TargetIntegrationTime] =
         T.span("ITC calculate")
           .use: span =>
-            val (request, bandOrLine) =
+            val (request: Json, bandOrLine: Either[Band, Wavelength]) =
               toItcParameters(
                 target,
                 observingMode,
                 constraints,
                 exposureTimeMode
-              ).leftMap(_.asJson): (Json, Either[Band, Wavelength])
+              ).leftMap(_.asJson)
 
             def traceParams: F[Unit] =
               exposureTimeMode match
@@ -159,13 +159,13 @@ object ItcImpl {
       ): F[TargetTimeAndGraphs] =
         T.span("Spectoscopy time and graphs")
           .use: span =>
-            val (request, bandOrLine) =
+            val (request: Json, bandOrLine: Either[Band, Wavelength]) =
               toItcParameters(
                 target,
                 observingMode,
                 constraints,
                 exposureTimeMode
-              ).leftMap(_.asJson): (Json, Either[Band, Wavelength])
+              ).leftMap(_.asJson)
 
             def traceParams: F[Unit] =
               exposureTimeMode match

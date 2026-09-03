@@ -290,8 +290,8 @@ object GuideService {
     val acqOffsets   = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
     val sciOffsets   = NonEmptySet.fromSet(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
 
-    val (site, observingModeType, agsWavelength) =
-      (params.observingMode match
+    val (site: Site, observingModeType: ObservingModeType, agsWavelength: Wavelength) =
+      params.observingMode match
         case c: exchange.Config                               =>
           // Exchange observations are not supported by AGS.  No guide probe is
           // defined for exchange modes, so `agsParamsFor` is always empty and
@@ -332,7 +332,6 @@ object GuideService {
           (Site.GN, ObservingModeType.Igrins2LongSlit, Igrins2CentralWavelength)
         case visitor.Config(mode, wavelength, _, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
-      ): (Site, ObservingModeType, Wavelength)
 
     // Extra static coordinates AGS should treat like science positions.
     // only GHOST supplies an optional one for the sky fiber position
