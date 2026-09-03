@@ -388,7 +388,7 @@ object Acquisition:
           (t, mode, selFilter) <- checked
           fpuStep              <- firstStepFilterAndExposure(mode, config.acquisitionCamera, selFilter).leftMap(sequenceError)
         yield
-          val (fpuStepFilter, fpuStepExposureTime): (GnirsFilter, TimeSpan) = fpuStep
+          val (fpuStepFilter, fpuStepExposureTime) = fpuStep: (GnirsFilter, TimeSpan)
           val steps: Steps = StepComputer.compute(config, mode, fpuStepFilter, fpuStepExposureTime, selFilter, t)
           Generator(builder, steps.initialAtom, steps.repeatingAtom): SequenceGenerator[GnirsDynamicConfig]
         ).pure[F]

@@ -183,9 +183,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos with UpdateObser
       assertEquals(
         gn.nextAtom.description.get :: gn.possibleFuture.map(_.description.get),
         List(
-           0.description,
-          -5.description,
-           0.description
+            0 .description,
+          (-5).description,
+            0 .description
         )
       )
 

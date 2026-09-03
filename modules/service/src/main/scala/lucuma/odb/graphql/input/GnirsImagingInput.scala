@@ -33,8 +33,8 @@ object GnirsImagingInput extends ImagingFilterCheck:
       WavelengthOrder.Increasing.some,
       Nullable.NonNull(
         TelescopeConfigGeneratorInput.UniformInput(
-          cornerA = Offset(Offset.P(4.arcsec),  Offset.Q(6.arcsec)),
-          cornerB = Offset(Offset.P(-1.arcsec), Offset.Q(-6.arcsec))
+          cornerA = Offset(Offset.P(  4 .arcsec), Offset.Q(  6 .arcsec)),
+          cornerB = Offset(Offset.P((-1).arcsec), Offset.Q((-6).arcsec))
         )
       ),
       none,

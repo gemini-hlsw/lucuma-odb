@@ -104,14 +104,15 @@ object Acquisition:
       // Very Bright / Bright use the fixed camera exposure and a single coadd; Faint uses the
       // acquisition exposure and coadds (it doubles as a sky frame, so it is taken at the
       // sky offset rather than at the keyhole offset).
-      val (fieldFilter, fieldExposureTime, fieldCoadds, fieldOffset): (GnirsFilter, TimeSpan, PosInt, Offset) =
-        mode match
+      val (fieldFilter, fieldExposureTime, fieldCoadds, fieldOffset) =
+        (mode match
           case GnirsAcquisitionMode.VeryBright =>
             (GnirsFilter.Order4, camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
           case GnirsAcquisitionMode.Bright     =>
             (selectedFilter,     camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
           case GnirsAcquisitionMode.Faint(sky) =>
             (selectedFilter,     acqExposureTime, acqCoadds,   sky)
+        ): (GnirsFilter, TimeSpan, PosInt, Offset)
 
       eval:
         for
