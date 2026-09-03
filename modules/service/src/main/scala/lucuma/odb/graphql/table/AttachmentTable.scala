@@ -10,7 +10,7 @@ import lucuma.odb.util.Codecs.*
 import skunk.circe.codec.all.*
 import skunk.codec.all.*
 
-trait AttachmentTable[F[_]] extends BaseMapping[F] {
+trait AttachmentTable[F[_]] extends BaseMapping[F]:
 
   object AttachmentTable extends TableDef("t_attachment") {
     val ProgramId      = col("c_program_id", program_id)
@@ -23,5 +23,7 @@ trait AttachmentTable[F[_]] extends BaseMapping[F] {
     val Checked        = col("c_checked", bool)
     val FileSize       = col("c_file_size", int8)
     val UpdatedAt      = col("c_updated_at", core_timestamp)
+    val Partner        = col("c_partner", partner.opt)
+    val SummaryStyle   = col("c_summary_style", summary_style.opt)
+    val SummaryStyleNN = col("c_summary_style", summary_style)
   }
-}

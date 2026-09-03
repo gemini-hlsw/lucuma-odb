@@ -273,7 +273,7 @@ object AttachmentFileService {
               InvalidRequest(DuplicateMaskNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_file_name"))       =>
               InvalidRequest(DuplicateFileNameMsg).asLeft
-            case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_attachment_type")) =>
+            case SqlState.UniqueViolation(e) if e.detail.exists(d => d.contains("c_attachment_type") || d.contains("c_partner")) =>
               InvalidRequest(duplicateTypeMsg(attachmentType)).asLeft
           }
       }

@@ -8,6 +8,7 @@ package mutation
 import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
+import io.circe.literal.*
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.KeckInstrument
@@ -21,7 +22,7 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.SignalToNoiseAt
 import lucuma.odb.data.OdbError
 import lucuma.odb.graphql.query.ExecutionTestSupportForGmos
-import lucuma.odb.graphql.query.ObservingModeSetupOperations
+import lucuma.odb.graphql.query.ObservingModeSetupOperations 
 
 class setObservationWorkflowState
   extends ExecutionTestSupportForGmos
@@ -456,5 +457,57 @@ class setObservationWorkflowState
     createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
       assertIO(queryObservationWorkflowState(oid), Defined) >>
       testTransitionsAs(staff, pid, oid, Defined, Inactive)
+
+  test("[Warnings]    Defined   <-> Inactive, Ready (pi, warning dismissed by staff)"):
+    createPhaseTwoObservationWithWarnings.flatMap: (pid, oid) =>
+      assertIO(queryObservationWorkflowState(oid), Defined) >>
+      expect(
+        user = staff,
+        query = 
+          s"""
+            mutation {
+              updatePrograms(
+                input: {
+                  SET: {
+                    dismissedWarnings: [
+                      LOW_TOTAL_SIGNAL_TO_NOISE
+                    ]
+                  }
+                  WHERE: {
+                    id: {
+                      EQ: "$pid"
+                    }
+                  }
+                }
+              ) {
+                hasMore
+                programs {
+                  id
+                  dismissedWarnings
+                }
+              }
+            }
+          """,
+        expected = Right(
+          json"""
+            {
+              "updatePrograms": {
+                "hasMore": false,
+                "programs": [
+                  {
+                    "id": $pid,
+                    "dismissedWarnings": [
+                      "LOW_TOTAL_SIGNAL_TO_NOISE"
+                    ]
+                  }
+                ]
+              }
+            }
+          """
+        )
+
+      ) >>
+      testTransitionsAs(pi, pid, oid, Defined, Inactive, Ready)
+
 
 }

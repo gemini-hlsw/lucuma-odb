@@ -14,6 +14,7 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ProgramStatus
 import lucuma.core.enums.ProgramType
 import lucuma.core.model.Access
@@ -220,9 +221,19 @@ object ProgramService {
               case _                                            => active.isEmpty
           )
 
-      def validateProgramStatus(status: Option[ProgramStatus]): Result[Unit] =
+      def validateExplicitStatus(explicitStatus: Nullable[ProgramStatus]): Result[Unit] =
         OdbError
-          .NotAuthorized(user.id, "Only staff may set the program status.".some)
+          .NotAuthorized(user.id, "Only staff may set the explicit program status.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => explicitStatus.isAbsent
+          )
+
+      def validatedismissedWarnings(status: Option[List[ObservationValidationCode]]): Result[Unit] =
+        OdbError
+          .NotAuthorized(user.id, "Only staff may set the dismissed validations.".some)
           .asFailure
           .unlessA(
             user.role.access match
@@ -275,8 +286,9 @@ object ProgramService {
 
             (for {
               _ <- ResultT.fromResult(validateActivePeriodUpdate(SETʹ.active))
-              _ <- ResultT.fromResult(validateProgramStatus(SETʹ.status))
+              _ <- ResultT.fromResult(validateExplicitStatus(SETʹ.explicitStatus))
               _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
+              _ <- ResultT.fromResult(validatedismissedWarnings(SETʹ.dismissedWarnings))
               p <- ResultT(create)
               _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
             } yield p).value
@@ -315,8 +327,8 @@ object ProgramService {
           (for
             _   <- ResultT.liftF(setup)
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-            _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
-            _   <- ResultT.fromResult(validateProgramStatus(SET.status))
+            _   <- ResultT.fromResult(validateExplicitStatus(SET.explicitStatus))
+              _ <- ResultT.fromResult(validatedismissedWarnings(SET.dismissedWarnings))
             ids <- ResultT(updatePrograms)
           yield ids).value
 
@@ -396,14 +408,15 @@ object ProgramService {
       NonEmptyList.fromList(
         List(
           SET.existence.map(sql"c_existence = $existence"),
-          SET.status.map(sql"c_program_status = $program_status"),
+          SET.explicitStatus.foldPresent(sql"c_explicit_status = ${program_status.opt}"),
           SET.name.foldPresent(sql"c_name = ${text_nonempty.opt}"),
           SET.description.foldPresent(sql"c_description = ${text_nonempty.opt}"),
           SET.goa.flatMap(_.proprietaryMonths).map(sql"c_goa_proprietary = $int4_nonneg"),
           SET.goa.flatMap(_.shouldNotify).map(sql"c_goa_should_notify = $bool"),
           SET.goa.flatMap(_.privateHeader).map(sql"c_goa_private_header = $bool"),
           SET.active.flatMap(_.left).map(sql"c_active_start = $date"),
-          SET.active.flatMap(_.right).map(sql"c_active_end = $date")
+          SET.active.flatMap(_.right).map(sql"c_active_end = $date"),
+          SET.dismissedWarnings.map(sql"c_dismissed_warnings = $_observation_validation_warning"),
         ).flatten
       )
 
@@ -428,7 +441,8 @@ object ProgramService {
           c_goa_should_notify,
           c_goa_private_header,
           c_existence,
-          c_program_status
+          c_explicit_status,
+          c_dismissed_warnings
         )
         VALUES (
           ${text_nonempty.opt},
@@ -437,7 +451,8 @@ object ProgramService {
           $bool,
           $bool,
           $existence,
-          $program_status
+          ${program_status.opt},
+          $_observation_validation_warning
         )
         RETURNING c_program_id
       """.query(program_id).contramap { c => (
@@ -447,7 +462,8 @@ object ProgramService {
         c.goa.shouldNotify,
         c.goa.privateHeader,
         c.existence,
-        c.status.getOrElse(ProgramStatus.Default)
+        c.explicitStatus.toOption,
+        c.dismissedWarnings.orEmpty,
       )}
 
     /** Insert a calibration program, without a user for a staff program */

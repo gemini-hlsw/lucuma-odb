@@ -4,13 +4,15 @@
 package lucuma.odb.service
 
 import cats.syntax.all.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.CalibrationWorkType
 import lucuma.odb.graphql.TestUsers
 
 import java.time.LocalDateTime
 
-class CalibrationCalcServiceSuite extends CalibrationCalcServiceSuiteSupport {
+class CalibrationCalcServiceSuite extends CalibrationCalcServiceSuiteSupport:
 
   override val pi = TestUsers.Standard.pi(1, 30)
   override val validUsers = List(pi)
@@ -143,4 +145,73 @@ class CalibrationCalcServiceSuite extends CalibrationCalcServiceSuiteSupport {
       assertEquals(count8, 8)
       assert(retryAt8.exists(_.toInstant.isBefore(java.time.Instant.now.plusSeconds(33 * 60))))
       assertEquals(error8, Some("still failing"))
-}
+
+  test("setting a calibration's time for the first time request recalculating a target"):
+    for
+      _   <- cleanup
+      pid <- createProgramAs(pi, "Calib Calc Test")
+      tid <- createTargetAs(pi, pid, "One")
+      oid <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
+      now <- timestampNow
+      _   <- setObservationTimeAndDuration(pi, oid, Some(now), None)
+      row <- stateAndWorkType(oid)
+    yield assertEquals(row, Some((CalculationState.Pending, CalibrationWorkType.Retarget)))
+
+  test("updating a calibration's time re-pends a ready retarget action"):
+    for
+      _    <- cleanup
+      pid  <- createProgramAs(pi, "Calib Calc Test")
+      tid  <- createTargetAs(pi, pid, "One")
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- setObservationCalibrationRole(List(oid), CalibrationRole.Twilight)
+      now  <- timestampNow
+      _    <- setObservationTimeAndDuration(pi, oid, Some(now), None)
+      pend <- loadObs(oid)
+      _    <- pend.traverse_(markReady)
+      s1   <- calculationState(oid)
+      _    <- setObservationTimeAndDuration(pi, oid, Some(Timestamp.unsafeFromInstantTruncated(now.toInstant.plusSeconds(3600))), None)
+      row  <- stateAndWorkType(oid)
+    yield
+      assertEquals(s1, CalculationState.Ready)
+      assertEquals(row, Some((CalculationState.Pending, CalibrationWorkType.Retarget)))
+      assertEquals(pend.map(_.workType), Some(CalibrationWorkType.Retarget))
+
+  test("a time edit during a retarget calculation re-pends on markReady"):
+    for
+      _    <- cleanup
+      pid  <- createProgramAs(pi, "Calib Calc Test")
+      tid  <- createTargetAs(pi, pid, "One")
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
+      now  <- timestampNow
+      _    <- setObservationTimeAndDuration(pi, oid, Some(now), None)
+      pend <- loadObs(oid)
+      _    <- setObservationTimeAndDuration(pi, oid, Some(Timestamp.unsafeFromInstantTruncated(now.toInstant.plusSeconds(3600))), None)
+      _    <- pend.traverse_(markReady)
+      row  <- stateAndWorkType(oid)
+    yield assertEquals(row, Some((CalculationState.Pending, CalibrationWorkType.Retarget)))
+
+  test("science observation time changes don't trigger recalculating the calibration target"):
+    for
+      _     <- cleanup
+      pid   <- createProgramAs(pi, "Calib Calc Test")
+      oid   <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+      now   <- timestampNow
+      _     <- setObservationTimeAndDuration(pi, oid, Some(now), None)
+      count <- rowCount
+    yield assertEquals(count, 0)
+
+  test("load returns the work type and keeps mixed batches separable"):
+    for
+      _      <- cleanup
+      pid    <- createProgramAs(pi, "Calib Calc Test")
+      oid1   <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+      oid2   <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+      now    <- timestampNow
+      _      <- insertPending(pid, oid1, now)
+      _      <- insertPending(pid, oid2, now, CalibrationWorkType.Retarget)
+      loaded <- load(10)
+    yield
+      assertEquals(loaded.find(_.observationId === oid1).map(_.workType), Some(CalibrationWorkType.Recalc))
+      assertEquals(loaded.find(_.observationId === oid2).map(_.workType), Some(CalibrationWorkType.Retarget))

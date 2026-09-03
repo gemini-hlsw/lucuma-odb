@@ -8,6 +8,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.util.CalculationState
 import lucuma.core.util.Timestamp
+import lucuma.odb.data.CalibrationWorkType
 import lucuma.odb.data.PendingRecalc
 import lucuma.odb.graphql.query.ExecutionTestSupportForFlamingos2
 import lucuma.odb.service.Services.ServiceAccess
@@ -48,13 +49,14 @@ trait CalibrationCalcServiceSuiteSupport extends ExecutionTestSupportForFlamingo
   def insertPending(
     pid:              Program.Id,
     oid:              Observation.Id,
-    lastInvalidation: Timestamp
+    lastInvalidation: Timestamp,
+    workType:         CalibrationWorkType = CalibrationWorkType.Recalc
   ): IO[Unit] =
     withSession: session =>
       session.execute(
         sql"""
-          INSERT INTO t_calibration_calc (c_program_id, c_observation_id, c_state, c_last_invalidation)
-          VALUES ($program_id, $observation_id, 'pending', $core_timestamp)
+          INSERT INTO t_calibration_calc (c_program_id, c_observation_id, c_state, c_last_invalidation, c_work_type)
+          VALUES ($program_id, $observation_id, 'pending', $core_timestamp, $calibration_work_type)
           ON CONFLICT (c_observation_id) DO UPDATE
             SET c_state = EXCLUDED.c_state,
                 c_last_invalidation = EXCLUDED.c_last_invalidation,
@@ -62,7 +64,16 @@ trait CalibrationCalcServiceSuiteSupport extends ExecutionTestSupportForFlamingo
                 c_failure_count = 0,
                 c_error_message = NULL
         """.command
-      )(pid, oid, lastInvalidation).void
+      )(pid, oid, lastInvalidation, workType).void
+
+  def stateAndWorkType(oid: Observation.Id): IO[Option[(CalculationState, CalibrationWorkType)]] =
+    withSession: session =>
+      session.option(
+        sql"""
+          SELECT c_state, c_work_type FROM t_calibration_calc
+          WHERE c_observation_id = $observation_id
+        """.query(calculation_state *: calibration_work_type)
+      )(oid)
 
   def insertState(
     pid:              Program.Id,

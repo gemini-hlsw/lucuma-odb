@@ -69,7 +69,7 @@ class createProposal extends OdbSuite with DatabaseOperations {
                   "aeonMultiFacility": null,
                   "jwstSynergy": false,
                   "usLongTerm": false,
-                  "considerForBand3": "UNSET"
+                  "considerForBand3": "CONSIDER"
                 }
               }
             }

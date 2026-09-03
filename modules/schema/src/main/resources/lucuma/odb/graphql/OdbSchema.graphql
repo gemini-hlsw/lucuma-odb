@@ -4961,11 +4961,11 @@ input ProgramPropertiesInput {
   existence: Existence
 
   """
-  Program status (defaults to ACTIVE for new programs).  Readable by anyone
-  with access to the program, but may be set only by those with staff access
-  or better.  Not nullable.
+  Explicit program status, masking the status derived from the active period.
+  Set to null to return to the derived status.  May be set or cleared only by
+  those with staff access or better.
   """
-  status: ProgramStatus
+  explicitStatus: ProgramStatus
 
   """
   Active period start date (inclusive) for this program.  The date is considered
@@ -4986,6 +4986,13 @@ input ProgramPropertiesInput {
   nullable.  Limited to dates between 1900 and 2100 (exclusive).
   """
   activeEnd: Date
+
+  """
+  List of validation codes to treat as 'dismissed' by the workflow computation. This
+  field can only be set by staff users. 
+  """
+  dismissedWarnings: [ObservationValidationCode!]
+
 }
 
 """
@@ -5497,7 +5504,7 @@ type Queue implements GeminiProposalType {
   exchangePartner: ExchangePartner
 
   """
-  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  Whether this proposal should be considered for Band 3. Defaults to CONSIDER
   on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
   be submitted.
   """
@@ -5852,7 +5859,7 @@ input QueueInput {
   exchangePartner: ExchangePartner
 
   """
-  Whether this proposal should be considered for Band 3. Defaults to UNSET
+  Whether this proposal should be considered for Band 3. Defaults to CONSIDER
   on creation; must be CONSIDER or DO_NOT_CONSIDER before the proposal can
   be submitted.
   """
@@ -8108,7 +8115,53 @@ type Attachment {
   checked: Boolean!
   fileSize: Long!
   updatedAt: Timestamp!
+
+  """
+  How an ODB-generated proposal summary was rendered.  Present exactly for
+  SUMMARY attachments; null for every other type.  Not settable.
+  """
+  proposalSummary: ProposalSummaryProperties
   program: Program!
+}
+
+"""
+Properties of an ODB-generated proposal summary PDF.
+"""
+type ProposalSummaryProperties {
+  """
+  The partner the summary was rendered for.  Null for the single summary of a
+  proposal with no partner splits.
+  """
+  partner: Partner
+
+  """
+  The style the summary was produced in.  Recorded at generation, so it stays
+  accurate if the partner-to-style mapping changes later.
+  """
+  style: ProposalSummaryStyle!
+}
+
+"""
+The layouts a proposal summary PDF can be rendered in.
+"""
+enum ProposalSummaryStyle {
+  "The default Gemini layout."
+  GEMINI_STANDARD
+
+  "Gemini layout for dual-anonymous review: investigators omitted."
+  GEMINI_DARP
+
+  "Gemini layout without the investigator list."
+  GEMINI_NO_INVESTIGATORS
+
+  "Gemini layout with the investigator list moved to the end."
+  GEMINI_INVESTIGATORS_AT_END
+
+  "The Chilean TAC layout."
+  CHILE
+
+  "The NOIRLab dual-anonymous review layout."
+  NOIRLAB_DARP
 }
 
 input AttachmentPropertiesInput {
@@ -17584,6 +17637,13 @@ enum ObservationValidationCode {
   the observation from being executed.
   """
   GENERIC_WARNING
+
+  "Total signal to noise is below recommended threshold."
+  LOW_TOTAL_SIGNAL_TO_NOISE
+
+  "Likelihood of observing conditions is below recommended percentage."
+  CONDITIONS_UNLIKELY
+
 }
 
 """
@@ -17771,16 +17831,23 @@ type Program {
   active: DateInterval!
 
   """
-  Whether the program is currently active, i.e. whether the current UTC date
-  falls within the `active` period (inclusive of both bounds).
-  """
-  isActive: Boolean!
-
-  """
-  Program status: whether the program is active for scheduling purposes and
-  whether it is considered complete.
+  Effective program status: `explicitStatus` when set, otherwise
+  `defaultStatus`.
   """
   status: ProgramStatus!
+
+  """
+  Explicitly declared program status, if any, masking the derived
+  `defaultStatus`.  May be set (and cleared) only by those with staff access
+  or better.
+  """
+  explicitStatus: ProgramStatus
+
+  """
+  Derived program status: ACTIVE when the current UTC date falls within the
+  `active` period (inclusive of both bounds), INACTIVE otherwise.
+  """
+  defaultStatus: ProgramStatus!
 
   """
   Proposal status of the program
@@ -17893,6 +17960,12 @@ type Program {
   against `resourceLimit`.
   """
   resourceCount: NonNegInt!
+
+  """
+  List of validation codes that have been dismissed for this program.
+  """
+  dismissedWarnings: [ObservationValidationCode!]!
+
 }
 
 """
@@ -22278,6 +22351,28 @@ input WhereEqProgramType {
 Filters on equality of the property.  All supplied
 criteria must match, but usually only one is selected.  E.g., 'EQ: "SUBMITTED'
 """
+input WhereEqProgramStatus {
+  """
+  Matches if the property is exactly the supplied value.
+  """
+  EQ: ProgramStatus
+
+  """
+  Matches if the property is not the supplied value.
+  """
+  NEQ: ProgramStatus
+
+  """
+  Matches if the property value is any of the supplied options.
+  """
+  IN: [ProgramStatus!]
+
+  """
+  Matches if the property value is none of the supplied values.
+  """
+  NIN: [ProgramStatus!]
+}
+
 input WhereEqProposalStatus {
   """
   Matches if the property is exactly the supplied value.
@@ -24473,11 +24568,10 @@ input WhereProgram {
   activeEnd: WhereOrderDate
 
   """
-  When true, matches programs whose active period `[activeStart, activeEnd]` contains the
-  current UTC date; when false, matches the complement. Evaluated in the database, so the
-  date is taken at transaction start.
+  Matches the effective program status. Evaluated in the database, so the
+  derived component is taken at transaction start.
   """
-  isActive: Boolean
+  status: WhereEqProgramStatus
 }
 
 input WhereProgramReference {

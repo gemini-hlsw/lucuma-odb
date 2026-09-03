@@ -57,6 +57,7 @@ import lucuma.core.util.Uid
 import lucuma.odb.data.ArchiveDuplication
 import lucuma.odb.data.AtomExecutionState
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.CalibrationWorkType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
@@ -70,6 +71,7 @@ import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
+import lucuma.odb.data.SummaryStyle
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -462,6 +464,12 @@ trait Codecs {
   val calculation_state: Codec[CalculationState] =
     enumerated(Type("e_calculation_state"))
 
+  val calibration_work_type: Codec[CalibrationWorkType] =
+    enumerated(Type("e_calibration_work_type"))
+
+  val summary_style: Codec[SummaryStyle] =
+    enumerated(Type("e_summary_style"))
+
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
 
@@ -746,6 +754,22 @@ trait Codecs {
       _.value,
       s => Tag(s).asRight,
       Type("_d_tag", List(Type("d_tag")))
+    )
+
+  // RCN: the set of codes here is likely to change a lot, so I'm storing them as 
+  // raw `tag` values to avoid having to maintain a enum in the database (it is very
+  // inconvenient to remove elements from an enum). Any invalid elements are
+  // filtered out.
+  val _observation_validation_warning: Codec[List[ObservationValidationCode.Warning]] =
+    _tag.imap[List[ObservationValidationCode.Warning]](
+      arr => 
+        arr.toList.flatMap: tag =>
+          Enumerated[ObservationValidationCode.Warning].fromTag(tag.value)
+    )(
+      vcs => 
+        Arr.fromFoldable:
+          vcs.map: vc =>
+            Tag(vc.tag)
     )
 
   val target_id: Codec[Target.Id] =

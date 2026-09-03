@@ -1143,7 +1143,7 @@ class setProposalStatus extends OdbSuite
     for
       cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester)
       pid <- createProgramWithNonPartnerPi(pi)
-      _   <- addProposal(pi, pid, cid.some, "queue: { explicitTooActivationCeiling: NONE, minPercentTime: 0 }".some)
+      _   <- addProposal(pi, pid, cid.some, "queue: { explicitTooActivationCeiling: NONE, minPercentTime: 0, considerForBand3: UNSET }".some)
       _   <- addSubmissionPrerequisites(pid)
       _   <- addPartnerSplits(pi, pid)
       _   <- addCoisAs(pi, pid)
