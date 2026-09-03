@@ -9,14 +9,12 @@ import cats.effect.std.Console
 import cats.effect.std.SecureRandom
 import cats.effect.std.Supervisor
 import cats.effect.std.UUIDGen
-import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.compression.Compression
 import fs2.concurrent.Topic
 import fs2.io.net.Network
-import grackle.Result
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
@@ -26,7 +24,6 @@ import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
-import lucuma.odb.graphql.topic.CalibTimeTopic
 import lucuma.odb.graphql.topic.CalibrationCalcTopic
 import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
@@ -35,7 +32,6 @@ import lucuma.odb.service.CalibrationCalcDaemon
 import lucuma.odb.service.HminBrightnessCache
 import lucuma.odb.service.S3FileService
 import lucuma.odb.service.Services
-import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.service.TelluricTargetsDaemon
 import lucuma.odb.service.TelluricTargetsService
 import lucuma.odb.service.UserService
@@ -131,14 +127,13 @@ object CMain extends MainParams {
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
   def topics[F[_]: Concurrent: Logger: Tracer](pool: Resource[F, Session[F]]):
-   Resource[F, (Topic[F, CalibrationCalcTopic.Element], Topic[F, CalibTimeTopic.Element], Topic[F, TelluricTargetTopic.Element])] =
+   Resource[F, (Topic[F, CalibrationCalcTopic.Element], Topic[F, TelluricTargetTopic.Element])] =
     for {
       sup <- Supervisor[F]
       ses <- pool
-      ctt <- Resource.eval(CalibTimeTopic(ses, 1024, sup))
       cct <- Resource.eval(CalibrationCalcTopic(ses, 1024, sup))
       trt <- Resource.eval(TelluricTargetTopic(ses, 1024, sup))
-    } yield (cct, ctt, trt)
+    } yield (cct, trt)
 
   // Drains the durable `t_calibration_calc` queue
   def runCalibrationCalcDaemon[F[_]: {Async, LoggerFactory as LF, Tracer as T}](
@@ -156,28 +151,6 @@ object CMain extends MainParams {
       topic            = calcTopic,
       services         = services
     )
-
-  // Calibration-time still uses NOTIFY-only.
-  // TODO:. We should consider moving it to a durable queue as well
-  def runCalibTimeDaemon[F[_]: {Async, Tracer as T, Logger as L}](
-    calibTopic: Topic[F, CalibTimeTopic.Element],
-    services:   Resource[F, Services[F]]
-  ): Resource[F, Unit] =
-    for {
-      _ <- Resource.eval(info"Calibrations Service starting")
-      _ <- Resource.eval(info"Start listening for calibration time changes")
-      _ <- Resource.eval(calibTopic.subscribe(100).evalMap: elem =>
-             T.rootSpan("calibration-time-event").surround:
-               services.useTransactionally:
-                 Services.asSuperUser:
-                   calibrationsService.recalculateCalibrationTarget(elem.programId, elem.observationId)
-                     .map(Result.success)
-             .handleErrorWith: e =>
-               L.error(e)(
-                 s"Error processing calib time event for ${elem.programId}/${elem.observationId}"
-               ).as(Result.unit)
-           .compile.drain.start.void)
-    } yield ()
 
   def runTelluricTargetsDaemon[F[_]: {Async, Parallel, Logger, LoggerFactory, Tracer}](
     connectionsLimit: Int,
@@ -242,7 +215,7 @@ object CMain extends MainParams {
       _                  <- Resource.eval(banner[F](c))
       pool               <- databasePoolResource[F](c.database)
       enums              <- Resource.eval(pool.use(Enums.load))
-      (ccT, ctT, trT)    <- topics(pool)
+      (ccT, trT)         <- topics(pool)
       user               <- Resource.eval(serviceUser[F](c))
       _                  <- Resource.eval(user.traverse_ : u =>
                               pool.use(s => Services.asSuperUser(UserService.fromSession(s).canonicalizeUser(u)))
@@ -257,7 +230,6 @@ object CMain extends MainParams {
       _                  <- Resource.eval(info"Loading ${hminCache.value.size} configurations for telluric brightness")
       servicesResource   = pool.evalMap(services(user, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, telClient, hminCache))
       _                  <- runCalibrationCalcDaemon(ccT, c.obscalcPoll, servicesResource)
-      _                  <- runCalibTimeDaemon(ctT, servicesResource)
       _                  <- runTelluricTargetsDaemon(c.database.calibrationWorkers, c.obscalcPoll, trT, servicesResource)
     } yield ExitCode.Success
 

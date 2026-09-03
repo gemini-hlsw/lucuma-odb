@@ -79,7 +79,7 @@ object CalibrationCalcService:
 
       object Statements:
         val pending: Codec[PendingRecalc] =
-          (program_id *: observation_id *: core_timestamp).to[PendingRecalc]
+          (program_id *: observation_id *: core_timestamp *: calibration_work_type).to[PendingRecalc]
 
         val ResetCalculating: Command[Void] =
           sql"""
@@ -108,7 +108,7 @@ object CalibrationCalcService:
             SET c_state = 'calculating'
             FROM tasks
             WHERE c.c_observation_id = tasks.c_observation_id
-            RETURNING c.c_program_id, c.c_observation_id, c.c_last_invalidation
+            RETURNING c.c_program_id, c.c_observation_id, c.c_last_invalidation, c.c_work_type
           """.query(pending)
 
         val LoadPendingCalcFor: Query[Observation.Id, PendingRecalc] =
@@ -126,7 +126,7 @@ object CalibrationCalcService:
             SET c_state = 'calculating'
             FROM task
             WHERE c.c_observation_id = task.c_observation_id
-            RETURNING c.c_program_id, c.c_observation_id, c.c_last_invalidation
+            RETURNING c.c_program_id, c.c_observation_id, c.c_last_invalidation, c.c_work_type
           """.query(pending)
 
         val SelectLastInvalidationForUpdate: Query[Observation.Id, Timestamp] =
