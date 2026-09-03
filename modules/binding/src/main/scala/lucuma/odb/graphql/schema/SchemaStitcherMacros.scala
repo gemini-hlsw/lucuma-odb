@@ -41,8 +41,7 @@ private object SchemaStitcherMacros:
     val location = x.valueOrAbort
     val cl       = Thread.currentThread().getContextClassLoader()
 
-    val sourceFile = Path.fromNioPath(x.asTerm.pos.sourceFile.getJPath.get)
-    val sourceStr  = sourceFile.toString
+    val sourceStr = x.asTerm.pos.sourceFile.path
 
     val mainPrefix = s"${separator}src${separator}main${separator}scala${separator}"
 

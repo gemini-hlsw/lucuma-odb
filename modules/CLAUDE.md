@@ -142,7 +142,7 @@ When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in 
 **The schema is compiled in, not read at runtime.** `SchemaStitcher.load` (`OdbMapping.scala`) is an **inline macro**: `SchemaStitcherMacros.fromResources` reads `OdbSchema.graphql` at *compile time* and bakes the parsed schema into `OdbMapping`'s bytecode. Editing `OdbSchema.graphql` alone therefore changes nothing at runtime — the service module must recompile. Zinc hashes file content rather than timestamps, so `touch OdbMapping.scala` does **not** force it either. Deleting the compiler's products for that one file is the cheapest fix — zinc recompiles a source whose class files are missing:
 
 ```bash
-rm -f modules/service/target/scala-3.8.4/classes/lucuma/odb/graphql/OdbMapping*.class
+rm -f modules/service/target/scala-3.9.0/classes/lucuma/odb/graphql/OdbMapping*.class
 ```
 
 Otherwise make a real edit to `OdbMapping.scala`, or `sbt service/clean` and pay for a full module rebuild. To check whether you are affected, compare timestamps: if `OdbMapping.class` is older than `OdbSchema.graphql`, the running schema is stale.
