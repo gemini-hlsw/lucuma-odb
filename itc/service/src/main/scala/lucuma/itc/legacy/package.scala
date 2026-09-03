@@ -124,7 +124,7 @@ def spectroscopyGraphParams(
 ): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
   val (sourceDefinition, bandOrLine) =
     buildSourceDefinition(target, atWavelength): (ItcSourceDefinition, Either[Band, Wavelength])
-  val parameters: ItcParameters                                                       =
+  val parameters: ItcParameters      =
     ItcParameters(
       source = sourceDefinition,
       observation = ItcObservationDetails(
@@ -154,8 +154,10 @@ def toItcParameters(
   exposureTimeMode: ExposureTimeMode
 ): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
   val (sourceDefinition, bandOrLine) =
-    buildSourceDefinition(target, exposureTimeMode.at): (ItcSourceDefinition, Either[Band, Wavelength])
-  val parameters: ItcParameters                                                       =
+    buildSourceDefinition(target,
+                          exposureTimeMode.at
+    ): (ItcSourceDefinition, Either[Band, Wavelength])
+  val parameters: ItcParameters      =
     ItcParameters(
       source = sourceDefinition,
       observation = ItcObservationDetails(
