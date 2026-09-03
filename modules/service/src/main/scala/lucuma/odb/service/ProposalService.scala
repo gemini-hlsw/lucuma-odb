@@ -1388,10 +1388,14 @@ object ProposalService {
         -- column; the email addresses come back whole because their validity
         -- belongs to lucuma-core's EmailAddress and no column here enforces
         -- it.  COALESCE covers the program that has no investigators at all.
+        --
+        -- The name is trimmed first because no constraint stops the API from
+        -- storing an empty or blank one, and the front end judges the same
+        -- name by whether it has any non-whitespace in it.
         LEFT JOIN LATERAL (
           SELECT
             COALESCE(BOOL_OR(pu.c_partner_link = 'has_unspecified_partner'), FALSE) AS c_has_unspecified_partner,
-            COALESCE(BOOL_OR(pu.c_display_name IS NULL), FALSE)                     AS c_has_no_name,
+            COALESCE(BOOL_OR(NULLIF(BTRIM(pu.c_display_name), '') IS NULL), FALSE)  AS c_has_no_name,
             COALESCE(BOOL_OR(pu.c_email IS NULL), FALSE)                            AS c_has_no_email,
             COALESCE(
               ARRAY_AGG(DISTINCT pu.c_email::text) FILTER (WHERE pu.c_email IS NOT NULL),

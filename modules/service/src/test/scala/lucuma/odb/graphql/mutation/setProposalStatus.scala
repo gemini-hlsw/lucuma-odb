@@ -1356,6 +1356,17 @@ class setProposalStatus extends OdbSuite
     yield ()
   }
 
+  // Neither the schema nor a column constraint stops a blank name from being
+  // stored, so the rule has to see past the whitespace -- as Explore does.
+  test("⨯ an investigator whose name is blank") {
+    for
+      cid <- createGeminiCallForProposalsAs(staff)
+      pid <- proposalMissing(cid)
+      _   <- clearPiFields(pid, """preferredProfile: { creditName: "   ", givenName: null, familyName: null }""")
+      _   <- submitExpecting(pid, MissingInvestigatorName)
+    yield ()
+  }
+
   // The two email rules accumulate independently, so a team with one of each
   // problem reports both.  Explore pins this too; the two must not drift.
   test("⨯ one investigator with no email and another with a bad one") {
