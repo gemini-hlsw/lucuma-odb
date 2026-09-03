@@ -115,6 +115,7 @@ object StartupDiagnostics:
           checkPostgresEnum(step_type),
           checkPostgresEnum(subaru_instrument),
           checkPostgresEnum(subaru_proposal_type),
+          checkPostgresEnum(summary_style),
           checkPostgresEnum(target_disposition),
           checkPostgresEnum(target_tracking_type),
           checkPostgresEnum(telluric_calibration_order),

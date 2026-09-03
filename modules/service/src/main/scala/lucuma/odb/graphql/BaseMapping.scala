@@ -36,6 +36,8 @@ trait BaseMapping[F[_]]
   lazy val AttachmentIdType                        = schema.ref("AttachmentId")
   lazy val AttachmentType                          = schema.ref("Attachment")
   lazy val AttachmentTypeType                      = schema.ref("AttachmentType")
+  lazy val ProposalSummaryPropertiesType           = schema.ref("ProposalSummaryProperties")
+  lazy val ProposalSummaryStyleType                = schema.ref("ProposalSummaryStyle")
   lazy val BasePositionType                        = schema.ref("BasePosition")
   lazy val BasePositionTypeType                    = schema.ref("BasePositionType")
   lazy val BiasType                                = schema.ref("Bias")

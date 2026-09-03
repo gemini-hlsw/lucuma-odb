@@ -13,7 +13,7 @@ import table.ProgramView
 trait AttachmentMapping[F[_]]
   extends AttachmentTable[F]
      with ProgramView[F]
-     with Predicates[F] {
+     with Predicates[F]:
 
   lazy val AttachmentMapping =
     ObjectMapping(AttachmentType)(
@@ -27,7 +27,13 @@ trait AttachmentMapping[F[_]]
       SqlField("checked", AttachmentTable.Checked),
       SqlField("fileSize", AttachmentTable.FileSize),
       SqlField("updatedAt", AttachmentTable.UpdatedAt),
+      SqlObject("proposalSummary"),
       SqlObject("program", Join(AttachmentTable.ProgramId, ProgramView.Id)),
     )
 
-}
+  lazy val ProposalSummaryPropertiesMapping =
+    ObjectMapping(ProposalSummaryPropertiesType)(
+      SqlField("synthetic_id", AttachmentTable.SummaryStyle, key = true, hidden = true),
+      SqlField("style", AttachmentTable.SummaryStyleNN),
+      SqlField("partner", AttachmentTable.Partner)
+    )
