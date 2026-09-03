@@ -140,6 +140,11 @@ object Generator:
   // Placeholder charge for a telluric whose target is not yet resolved.
   val UnresolvedTelluricTime: TimeSpan = 15.minTimeSpan
 
+  // Placeholder charge for a spectrophotometric standard whose proposal has yet
+  // to be accepted.  No sequence is produced for one, so there is nothing to
+  // derive a real estimate from.  See GeneratorParams.isSpecPhotoProposal.
+  val SpecPhotoTimeEstimate: TimeSpan = 20.minTimeSpan
+
   // This is a user-specifiable limit on how many `possibleFuture` steps should
   // be returned by the sequence generation.  It doesn't limit the overall
   // length of the sequence the way that the SequenceAtomLimit above does.
@@ -214,6 +219,18 @@ object Generator:
       private def isUnresolvedTelluric(ctx: GeneratorContext): Boolean =
         ctx.params.calibrationRole.contains(CalibrationRole.Telluric) && !ctx.params.hasTarget
 
+      private def flatDigest(ctx: GeneratorContext, charge: TimeSpan): ExecutionDigest =
+        ExecutionDigest(
+          SetupTime.Zero,
+          NonNegInt.MinValue,
+          SequenceDigest.Zero,
+          SequenceDigest.Zero.copy(
+            observeClass   = ctx.params.calibrationRole.sciClass,
+            timeEstimate   = CategorizedTime.Zero.sumCharge(ChargeClass.Program, charge),
+            executionState = ctx.params.executionState
+          )
+        )
+
       private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
         ExecutionDigest(
           SetupTime.Zero,
@@ -264,6 +281,7 @@ object Generator:
 
         if ctx.params.declaredState == Some(ExecutionState.DeclaredComplete) then done
         else if isUnresolvedTelluric(ctx) then EitherT.pure(unresolvedTelluricDigest(ctx))
+        else if ctx.params.isSpecPhotoProposal then EitherT.pure(flatDigest(ctx, SpecPhotoTimeEstimate))
         else
           ctx.params.observingMode.modeType match
             case ObservingModeType.Flamingos2Imaging  =>
@@ -345,7 +363,7 @@ object Generator:
 
         // EitherT[F, OdbError, StreamingExecutionConfig[F, A, B] forSome { type A, type B }] but we can't write that anymore
         val stream =
-          if isUnresolvedTelluric(ctx) then noSequence
+          if isUnresolvedTelluric(ctx) || ctx.params.isSpecPhotoProposal then noSequence
           else ctx.params.observingMode.modeType match
             case _: ExchangeObservingModeType         => noSequence
             case ObservingModeType.Flamingos2Imaging  => EitherT(streaming.selectOrGenerateFlamingos2Imaging(ctx))
@@ -412,7 +430,27 @@ object Generator:
             s <- executionSequence(stream.science)
           yield ExecutionConfig(stream.static, a, s)
 
+        // A waiting standard has no sequence yet.  Nothing is generated for one,
+        // so this must not reach the ITC or the mode generators, either of which
+        // can fail.  Standards are GMOS only.
+        def waitingStandardConfig(ctx: GeneratorContext): Option[InstrumentExecutionConfig] =
+          import lucuma.odb.sequence.gmos.InitialConfigs
+          Option.when(ctx.params.isSpecPhotoProposal):
+            ctx.params.observingMode.modeType match
+              case ObservingModeType.GmosNorthLongSlit | ObservingModeType.GmosNorthIfu =>
+                InstrumentExecutionConfig.GmosNorth(ExecutionConfig(InitialConfigs.GmosNorthStatic, none, none)).some
+              case ObservingModeType.GmosSouthLongSlit | ObservingModeType.GmosSouthIfu =>
+                InstrumentExecutionConfig.GmosSouth(ExecutionConfig(InitialConfigs.GmosSouthStatic, none, none)).some
+              case _                                                                    =>
+                none
+          .flatten
+
         def instrumentExecutionConfig(
+          ctx: GeneratorContext
+        )(using Transaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
+          waitingStandardConfig(ctx).fold(generateInstrumentConfig(ctx))(EitherT.rightT(_))
+
+        def generateInstrumentConfig(
           ctx: GeneratorContext
         )(using Transaction[F]): EitherT[F, OdbError, InstrumentExecutionConfig] =
           ctx.params.observingMode.modeType match
