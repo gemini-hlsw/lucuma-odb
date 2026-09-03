@@ -8,6 +8,7 @@ import cats.data.Ior
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.literal.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
@@ -59,6 +60,14 @@ class programResourceLimit extends OdbSuite:
   private def moveTarget(tid: Target.Id, pid: Program.Id): IO[Unit] =
     withSession: s =>
       s.execute(sql"update t_target set c_program_id = $program_id where c_target_id = $target_id".command)((pid, tid)).void
+
+  // Lower the resoure limit directly, not via the mutation, so the tests below start
+  // from a program that is already over its limit.
+  private def lowerResourceLimit(pid: Program.Id, limit: Int): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"update t_program set c_resource_limit = $int4 where c_program_id = $program_id".command
+      )((limit, pid)).void
 
   // Assert the maintained counter matches the count recomputed from scratch
   // (and equals the expected value, so we know it is actually counting).
@@ -197,4 +206,27 @@ class programResourceLimit extends OdbSuite:
       _    <- moveTarget(tid, pid2)                // cross-program move
       _    <- assertReconciled(pid, 3)
       _    <- assertReconciled(pid2, 1)
+    yield ()
+
+  test("an over-limit program still accepts writes that do not count"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- createGroupAs(pi, pid)                // count = 2
+      _   <- lowerResourceLimit(pid, 0)            // now over the limit
+      _   <- interceptOdbError(createTargetAs(pi, pid)):
+               case OdbError.ProgramResourceLimitExceeded(_) => ()
+      _   <- deleteTargetAs(pi, tid)               // soft delete does not count
+      _   <- assertReconciled(pid, 1)
+    yield ()
+
+  test("calibration and system resources stay exempt in an over-limit program"):
+    for
+      pid <- createProgramAs(pi)
+      gid <- createGroupAs(pi, pid)
+      oid <- createObservationAs(pi, pid)          // count = 2
+      _   <- lowerResourceLimit(pid, 0)            // now over the limit
+      _   <- setObservationCalibrationRole(List(oid), CalibrationRole.Telluric)
+      _   <- updateGroupSystem(gid, true)
+      _   <- assertReconciled(pid, 0)
     yield ()
