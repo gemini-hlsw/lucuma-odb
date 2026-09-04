@@ -36,6 +36,7 @@ PG_DATABASE=lucuma-odb
 export PGPASSWORD=banana
 
 SERVICE_LOG=/tmp/service-$ENVIRONMENT.log
+RESTORE_LOG=/tmp/restore-$ENVIRONMENT.log
 
 # Clean up on exit
 function clean_up {
@@ -84,10 +85,52 @@ echo "🍏 Removing pg_catalog.set_config."
 grep -v pg_catalog.set_config /tmp/$HEROKU_APP.temp > /tmp/$HEROKU_APP.sql
 
 echo "🍏 Restoring dump to local database."
-psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE < /tmp/$HEROKU_APP.sql > /dev/null 2>&1
+psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE < /tmp/$HEROKU_APP.sql > $RESTORE_LOG 2>&1 || true
 
 echo "🍏 Fixing program references (temporary, hopefully)."
-psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE -c 'update t_program SET c_program_id = c_program_id' > /dev/null 2>&1
+psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE -c 'update t_program SET c_program_id = c_program_id' >> $RESTORE_LOG 2>&1 || true
+
+# psql carries on after a failed statement and still exits 0, so a COPY that
+# trips a constraint quietly drops an entire table.  Some errors in a Heroku
+# dump are benign (ownership, extension comments), so report them rather than
+# aborting.
+RESTORE_ERRORS=$(grep -c 'ERROR:' $RESTORE_LOG || true)
+if [ "$RESTORE_ERRORS" -gt 0 ]; then
+  echo "🍎 The restore reported $RESTORE_ERRORS error(s):"
+  grep 'ERROR:' $RESTORE_LOG | sed -E 's/^psql:[^ ]* //' | sort -u | sed 's/^/     /'
+  echo "🍎 Full restore log: $RESTORE_LOG"
+fi
+
+# Independent of the log, check the invariant a botched restore violates: every
+# observation must have exactly one row in the mode table its discriminator
+# names.  t_observing_mode_registry maps the discriminator to the table, and
+# several discriminators may share one table, so compare per table.
+echo "🍏 Verifying observing mode tables."
+MODE_MISMATCH=$(psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE -q -At -F'|' 2>&1 <<'SQL'
+SELECT 'SELECT * FROM (' || string_agg(
+  format(
+    'SELECT %L AS mode_table, %L AS observing_modes, (SELECT count(*) FROM t_observation WHERE c_observing_mode_type = ANY(%L)) AS observations, (SELECT count(*) FROM %I) AS mode_rows',
+    r.c_table_name, r.c_modes, r.c_modes, r.c_table_name
+  ), ' UNION ALL '
+) || ') s WHERE observations <> mode_rows ORDER BY 1'
+  FROM (
+    SELECT c_table_name,
+           array_agg(c_observing_mode_type::text ORDER BY c_observing_mode_type::text) AS c_modes
+      FROM t_observing_mode_registry
+     GROUP BY c_table_name
+  ) r
+\gexec
+SQL
+)
+
+if [ -n "$MODE_MISMATCH" ]; then
+  echo "🍎 Observation counts do not match their observing mode tables (table|modes|observations|mode rows):"
+  echo "$MODE_MISMATCH" | sed 's/^/     /'
+  echo "🍎 The restore is incomplete; see $RESTORE_LOG."
+  if [ "$TEST_MIGRATION" = "true" ]; then
+    exit 1
+  fi
+fi
 
 if [ "$TEST_MIGRATION" = "false" ]; then
   exit 0
