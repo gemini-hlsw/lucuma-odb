@@ -12,6 +12,7 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.core.enums.Partner
+import lucuma.core.util.Enumerated
 import lucuma.core.model.Program
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -167,7 +168,11 @@ object PdfSummaryJobService:
             atts <- presignAttachments(job.programId)
             uuid <- UUIDGen[F].randomUUID
           yield
-            val fileName = NonEmptyString.unsafeFrom(s"${q.proposalRef.getOrElse(job.programId.toString)}-summary-${job.style.rendererName}.pdf")
+            // The partner, not the style, distinguishes one program's summaries:
+            // t_attachment is unique on (program, file name), and the style is a
+            // function of the partner anyway (see SummaryStyle.forPartner).
+            val partner  = job.partner.foldMap(p => s"-${Enumerated[Partner].tag(p)}")
+            val fileName = NonEmptyString.unsafeFrom(s"${q.proposalRef.getOrElse(job.programId.toString)}-summary$partner.pdf")
             val payload  = PdfSummaryJobPayload.build(q.program, q.observations, atts)
             Prepared(job, payload, fileName, s3FileService.filePath(job.programId, uuid, fileName))
         )

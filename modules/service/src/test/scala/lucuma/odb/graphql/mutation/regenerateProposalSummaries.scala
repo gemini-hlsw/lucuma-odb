@@ -173,7 +173,7 @@ class regenerateProposalSummaries extends OdbSuite
       jobs     <- jobsFor(pid)
     yield
       assertEquals(jobs.map(_.state), List("rendering", "rendering"))
-      assertEquals(prepared.map(_.fileName.value.endsWith(s"-summary-${SummaryStyle.GeminiInvestigatorsAtEnd.rendererName}.pdf")).head, true)
+      assertEquals(prepared.map(_.fileName.value.endsWith("-summary-ca.pdf")).head, true)
       val payload = prepared.head.payload.hcursor
       assertEquals(payload.downField("schemaVersion").as[String], PdfSummaryJobPayload.SchemaVersion.asRight)
       assertEquals(
