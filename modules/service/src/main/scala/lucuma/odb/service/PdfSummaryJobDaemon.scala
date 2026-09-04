@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -63,10 +63,12 @@ object PdfSummaryJobDaemon:
         renderer.render(prepared.payload, prepared.job.style, out).flatMap:
           case Left(err) => fail(prepared, err)
           case Right(()) =>
-            services.useNonTransactionally:
-              requireServiceAccessOrThrow:
-                pdfSummaryJobService.finalize(prepared, Files[F].readAll(out))
-            *> info"Summary job ${prepared.job.id} done"
+            Files[F].size(out).flatMap: bytes =>
+              info"Summary job ${prepared.job.id}: uploading ${prepared.fileName} ($bytes bytes) to s3 ${prepared.remotePath}" *>
+                services.useNonTransactionally:
+                  requireServiceAccessOrThrow:
+                    pdfSummaryJobService.finalize(prepared, Files[F].readAll(out))
+                *> info"Summary job ${prepared.job.id} done: uploaded to s3 ${prepared.remotePath}, attachment recorded"
       .handleErrorWith: e =>
         fail(prepared, PdfRenderer.Error(s"${e.getClass.getSimpleName}: ${e.getMessage}", permanent = false))
 

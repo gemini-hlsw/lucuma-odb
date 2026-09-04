@@ -10,6 +10,8 @@
   <logger name="lucuma-odb-test" level="ERROR" />
   <logger name="pdf-summary-service" level="INFO"/>
   <logger name="pdf-summary-jobs" level="INFO"/>
+  <!-- DEBUG here surfaces pyexplore's own stderr for each render. -->
+  <logger name="pdf-summary-renderer" level="DEBUG"/>
 
   <!-- Log slow queries -->
   <logger name="lucuma-odb-slow-query" level="WARN"/>

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -14,6 +14,8 @@ import fs2.text
 import io.circe.Json
 import lucuma.odb.data.SummaryStyle
 import munit.CatsEffectSuite
+import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 
 import scala.concurrent.duration.*
 
@@ -22,6 +24,8 @@ import scala.concurrent.duration.*
  * honours the same arguments and exit codes.
  */
 class PdfRendererSuite extends CatsEffectSuite {
+
+  given LoggerFactory[IO] = Slf4jFactory.create[IO]
 
   // Parses the arguments the renderer passes and behaves per style.
   val stub: String =

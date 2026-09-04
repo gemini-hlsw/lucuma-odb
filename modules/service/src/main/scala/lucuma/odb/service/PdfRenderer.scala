@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -14,6 +14,8 @@ import fs2.io.process.Processes
 import fs2.text
 import io.circe.Json
 import lucuma.odb.data.SummaryStyle
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.LoggerFactory
 
 import java.util.concurrent.TimeoutException
 import scala.concurrent.duration.FiniteDuration
@@ -33,6 +35,9 @@ object PdfRenderer:
   // How much of the renderer's stderr is kept as the job's error message.
   val MaxErrorLength: Int = 2000
 
+  // Its own logger so pyexplore's chatter can be turned up without turning up the daemon's.
+  val LoggerName: String = "pdf-summary-renderer"
+
   /** For tests: always succeeds, writing `content` to the output file. */
   def constant[F[_]: {Async, Files}](content: String): PdfRenderer[F] =
     (_, _, output) =>
@@ -47,7 +52,9 @@ object PdfRenderer:
    * handed over as a file so a large one never hits argument limits, and the
    * process is killed when `timeout` passes.
    */
-  def subprocess[F[_]: {Async, Files, Processes}](python: String, timeout: FiniteDuration): PdfRenderer[F] =
+  def subprocess[F[_]: {Async, Files, Processes, LoggerFactory as LF}](python: String, timeout: FiniteDuration): PdfRenderer[F] =
+    given Logger[F] = LF.getLoggerFromName(LoggerName)
+
     (payload, style, output) =>
       Files[F].tempFile(None, "summary-payload-", ".json", None).use: payloadFile =>
         val write =
@@ -65,7 +72,12 @@ object PdfRenderer:
           ).spawn[F].use: p =>
             p.stderr.through(text.utf8.decode).compile.string.both(p.exitValue)
 
-        write *> run.timeout(timeout).map:
+        // pyexplore logs to stderr at INFO; keep it on success too, since that
+        // is where it says what it left out of the PDF.
+        def logOutput(stderr: String): F[Unit] =
+          Logger[F].debug(s"Renderer output for $output:\n${stderr.trim}").whenA(stderr.trim.nonEmpty)
+
+        write *> run.timeout(timeout).flatTap((stderr, _) => logOutput(stderr)).map:
           case (_, 0)         => ().asRight
           case (stderr, code) => Error(trim(stderr, code), code === PermanentExitCode).asLeft
         .recover:
