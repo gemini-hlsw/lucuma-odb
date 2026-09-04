@@ -10,6 +10,8 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.parser.decode
+import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -91,6 +93,8 @@ class regenerateProposalSummaries extends OdbSuite
         prepared.traverse_(p => services.transactionally(services.pdfSummaryJobService.fail(p.job, error, permanent)))
 
   // A submittable proposal with two partners and one ITC-capable observation.
+  // Obscalc runs so the observation has a workflow state; until then it is
+  // UNDEFINED and left out of the tables.
   def setupProposal(splits: List[(Partner, Int)] = List((Partner.US, 70), (Partner.CA, 30))): IO[Program.Id] =
     for
       cid <- createGeminiCallForProposalsAs(staff)
@@ -98,7 +102,8 @@ class regenerateProposalSummaries extends OdbSuite
       _   <- addProposal(pi, pid, cid.some)
       _   <- addProposalPrerequisitesAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
-      _   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- runObscalcUpdateAs(service, pid, oid)
       _   <- if splits.isEmpty then IO.unit else addPartnerSplits(pi, pid, partnerSplits = splits)
       _   <- addCoisAs(pi, pid)
     yield pid
@@ -164,9 +169,16 @@ class regenerateProposalSummaries extends OdbSuite
         (Partner.US.some, SummaryStyle.NoirlabDarp,    "pending")
       ))
 
+  // The tables list only science observations that can be observed; the program
+  // tree keeps everything, as the pdf scripts expect.
   test("a claimed job is rendering and its payload can be built"):
     for
       pid      <- setupProposal()
+      tid      <- createTargetWithProfileAs(pi, pid)
+      inactive <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _        <- setObservationWorkflowState(pi, inactive, ObservationWorkflowState.Inactive)
+      calib    <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _        <- setObservationCalibrationRole(List(calib), CalibrationRole.SpectroPhotometric)
       _        <- submitProposal(pi, pid)
       prepared <- nextAll(pid)
       jobs     <- jobsFor(pid)
@@ -180,6 +192,10 @@ class regenerateProposalSummaries extends OdbSuite
         pid.toString.asRight
       )
       assertEquals(payload.downField("observations").as[List[Json]].map(_.size), 1.asRight)
+      assertEquals(
+        payload.downField("program").downField("data").downField("program").downField("observations").downField("matches").as[List[Json]].map(_.size),
+        3.asRight
+      )
 
   // The fixture omits the null fields of unused observing modes, so nested
   // objects are checked for containment; the envelope must match exactly.

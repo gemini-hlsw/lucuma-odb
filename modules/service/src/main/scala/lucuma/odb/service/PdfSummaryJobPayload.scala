@@ -17,11 +17,12 @@ import io.circe.syntax.*
  *    from the ODB, i.e. `{"data": {"program": ...}}`; `parse_response.parse`
  *    consumes it unchanged and ignores fields it does not know.
  *  - `attachments`: presigned GET URLs for the SCIENCE and TEAM PDFs.
- *  - `observations`: unfiltered observation entries carrying the ITC inputs
- *    snap needs; Python drops inactive/undefined observations and
- *    calibrations itself.
+ *  - `observations`: the science observations that go in the tables, with the
+ *    ITC inputs snap needs.  Inactive and undefined observations and
+ *    calibrations are left out here; Python drops them again, since it also
+ *    serves the standalone scripts that query the ODB directly.
  *
- * The fixture shared by both repositories is pyexplore's
+ * The json shared by both repositories is pyexplore's
  * `pdf/tests/fixtures/payload-v1.json`.
  */
 object PdfSummaryJobPayload:
@@ -49,6 +50,11 @@ object PdfSummaryJobPayload:
    * They are kept as separate roots on purpose: snap forwards `sourceProfile`
    * and `exposureTimeMode` straight to the ITC, so merging the two selections
    * (which would add a second unit to some quantities) would break ITC input.
+   *
+   * A plain string rather than a clue operation: the query runs in-process
+   * through `runGraphQLQuery`, its result is forwarded to Python as raw JSON, and
+   * the shape test executes it against the live schema on every build, which is
+   * what compile-time validation would have added.
    */
   val Query: String =
     s"""
@@ -122,7 +128,14 @@ query PdfSummaryJobPayload($$programId: ProgramId!) {
       matches { ...Observation }
     }
   }
-  observations(WHERE: { program: { id: { EQ: $$programId } } }, LIMIT: ${MaxObservations}) {
+  observations(
+    WHERE: {
+      program: { id: { EQ: $$programId } }
+      workflow: { workflowState: { NIN: [INACTIVE, UNDEFINED] } }
+      calibrationRole: { IS_NULL: true }
+    }
+    LIMIT: ${MaxObservations}
+  ) {
     hasMore
     matches { ...ItcObservation }
   }
