@@ -5,20 +5,20 @@ package lucuma.odb.graphql
 
 package mutation
 
-import lucuma.odb.data.OdbError
-import lucuma.core.model.Program
-import lucuma.core.model.PartnerLink
-import eu.timepit.refined.types.string.NonEmptyString
-import lucuma.core.model.User
-import lucuma.core.model.ProgramUser
 import cats.effect.IO
+import cats.syntax.all.*
+import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal.*
-import lucuma.core.enums.ProgramUserRole
-import lucuma.core.enums.ProgramUserRole.*
-import lucuma.core.model.UserProfile
 import lucuma.core.enums.EducationalStatus
 import lucuma.core.enums.Gender
-import cats.syntax.all.* 
+import lucuma.core.enums.ProgramUserRole
+import lucuma.core.enums.ProgramUserRole.*
+import lucuma.core.model.PartnerLink
+import lucuma.core.model.Program
+import lucuma.core.model.ProgramUser
+import lucuma.core.model.User
+import lucuma.core.model.UserProfile
+import lucuma.odb.data.OdbError 
 
 class requestWarningDismissal extends OdbSuite:
 

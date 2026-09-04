@@ -3,11 +3,11 @@
 
 package lucuma.odb.data
 
+import cats.kernel.Eq
+import cats.kernel.Order
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Decoder
-import cats.kernel.Eq
-import cats.kernel.Order
 
 opaque type EmailId = NonEmptyString
 
