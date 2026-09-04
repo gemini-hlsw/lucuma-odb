@@ -56,7 +56,7 @@ val refinedVersion               = "0.11.4"
 val skunkVersion                 = "1.1-c0fa0b0-SNAPSHOT"
 val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
-val slf4jVersion                 = "2.0.18"
+val slf4jVersion                 = "2.0.19"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.95"
