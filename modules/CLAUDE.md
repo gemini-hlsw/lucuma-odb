@@ -112,6 +112,11 @@ does for both telluric checks. Triggers are restored **post-data**, so they neve
 fire during a data load, and deferring to commit lets the two tables be written
 in either order within one transaction.
 
+`populate-db-from-heroku.sh` no longer discards `psql` output and now cross-checks
+each mode table's row count against `t_observation` through
+`t_observing_mode_registry`, so a silent partial restore of this kind gets
+reported.
+
 ## Adding a New Observing Mode — Checklist
 
 When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in these locations:
