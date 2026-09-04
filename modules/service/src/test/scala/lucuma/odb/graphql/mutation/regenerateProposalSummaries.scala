@@ -10,7 +10,6 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.parser.decode
-import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -27,7 +26,7 @@ import skunk.implicits.*
 import scala.io.Source
 
 class regenerateProposalSummaries extends OdbSuite
-  with ObservingModeSetupOperations {
+  with ObservingModeSetupOperations:
 
   val pi      = TestUsers.Standard.pi(1, 101)
   val pi2     = TestUsers.Standard.pi(2, 102)
@@ -100,7 +99,7 @@ class regenerateProposalSummaries extends OdbSuite
       _   <- addProposalPrerequisitesAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       _   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- addPartnerSplits(pi, pid, partnerSplits = splits)
+      _   <- if splits.isEmpty then IO.unit else addPartnerSplits(pi, pid, partnerSplits = splits)
       _   <- addCoisAs(pi, pid)
     yield pid
 
@@ -154,7 +153,7 @@ class regenerateProposalSummaries extends OdbSuite
   lazy val fixture: Json =
     decode[Json](Source.fromResource("lucuma/odb/summary/payload-v1.json").mkString).toOption.get
 
-  test("submission enqueues one pending job per partner") {
+  test("submission enqueues one pending job per partner"):
     for
       pid  <- setupProposal()
       _    <- submitProposal(pi, pid)
@@ -164,9 +163,8 @@ class regenerateProposalSummaries extends OdbSuite
         (Partner.CA.some, SummaryStyle.GeminiInvestigatorsAtEnd, "pending"),
         (Partner.US.some, SummaryStyle.NoirlabDarp,    "pending")
       ))
-  }
 
-  test("a claimed job is rendering and its payload can be built") {
+  test("a claimed job is rendering and its payload can be built"):
     for
       pid      <- setupProposal()
       _        <- submitProposal(pi, pid)
@@ -182,11 +180,10 @@ class regenerateProposalSummaries extends OdbSuite
         pid.toString.asRight
       )
       assertEquals(payload.downField("observations").as[List[Json]].map(_.size), 1.asRight)
-  }
 
   // The fixture omits the null fields of unused observing modes, so nested
   // objects are checked for containment; the envelope must match exactly.
-  test("the payload has the shape of the fixture shared with pyexplore") {
+  test("the payload has the shape of the json shared with pyexplore"):
     def keys(c: io.circe.ACursor): Set[String] = c.keys.toList.flatten.toSet
 
     def assertContains(payload: io.circe.ACursor, fix: io.circe.ACursor, path: String*): Unit =
@@ -224,24 +221,16 @@ class regenerateProposalSummaries extends OdbSuite
       assertContains(payloadObs, fixtureObs, "constraintSet")
       // The digest itself is only present once obscalc has run, so just its envelope is checked.
       assertContains(payloadObs, fixtureObs, "execution", "digest")
-  }
 
-  // Demo science proposals have no partner splits (a queue proposal cannot be
-  // submitted without them).
-  test("a proposal without partner splits gets a single default-style job") {
+  // A draft may be regenerated too; the PI gets a preview of the summary.
+  test("a proposal without partner splits gets a single default-style job"):
     for
-      cid  <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.DemoScience)
-      pid  <- createProgramWithNonPartnerPi(pi)
-      _    <- addDemoScienceProposal(pi, pid, cid)
-      _    <- addProposalPrerequisitesAs(pi, pid)
-      tid  <- createTargetWithProfileAs(pi, pid)
-      _    <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _    <- submitProposal(pi, pid)
+      pid  <- setupProposal(splits = Nil)
+      _    <- regenerate(pi, pid)
       jobs <- jobsFor(pid)
     yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiStandard)))
-  }
 
-  test("regenerating while a job is waiting is a no-op") {
+  test("regenerating while a job is waiting is a no-op"):
     for
       pid    <- setupProposal()
       _      <- submitProposal(pi, pid)
@@ -252,9 +241,8 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(after.map(_.id), before.map(_.id))
       assertEquals(after.map(_.state).toSet, Set("pending"))
       assertEquals(after.map(_.style), List(SummaryStyle.GeminiInvestigatorsAtEnd, SummaryStyle.NoirlabDarp))
-  }
 
-  test("regenerating while a job is rendering enqueues a new one") {
+  test("regenerating while a job is rendering enqueues a new one"):
     for
       pid    <- setupProposal()
       _      <- submitProposal(pi, pid)
@@ -264,9 +252,8 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals(after.size, before.size * 2)
       assertEquals(after.count(_.state === "pending"), before.size)
-  }
 
-  test("only staff and the proposal's investigators may regenerate") {
+  test("only staff and the proposal's investigators may regenerate"):
     for
       pid <- setupProposal()
       _   <- submitProposal(pi, pid)
@@ -275,23 +262,14 @@ class regenerateProposalSummaries extends OdbSuite
       _   <- regenerateExpectError(guest, pid, OdbError.NotAuthorized(guest.id).message)
       _   <- regenerate(staff, pid)
     yield ()
-  }
 
-  test("a program without a proposal cannot be summarized") {
+  test("a program without a proposal cannot be summarized"):
     for
       pid <- createProgramAs(pi)
       _   <- regenerateExpectError(pi, pid, s"Program $pid has no proposal to summarize.")
     yield ()
-  }
 
-  test("an unsubmitted proposal cannot be summarized") {
-    for
-      pid <- setupProposal()
-      _   <- regenerateExpectError(pi, pid, s"The proposal of program $pid has not been submitted.")
-    yield ()
-  }
-
-  test("a rendered job becomes a SUMMARY attachment for its partner, replacing the previous one, and is deleted") {
+  test("a rendered job becomes a SUMMARY attachment for its partner, replacing the previous one, and is deleted"):
     for
       pid    <- setupProposal()
       _      <- submitProposal(pi, pid)
@@ -306,9 +284,8 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(left, Nil)
       assertEquals(first.map(s => (s.partner, s.fileName.endsWith(".pdf"), s.style)), List((Some("CA"), true, "GEMINI_INVESTIGATORS_AT_END"), (Some("US"), true, "NOIRLAB_DARP")))
       assertEquals(second.map(_.partner), List(Some("CA"), Some("US")))
-  }
 
-  test("claiming honors the retry time") {
+  test("claiming honors the retry time"):
     for
       pid     <- setupProposal()
       _       <- submitProposal(pi, pid)
@@ -321,9 +298,8 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(none, Nil)
       assertEquals(claimed.size, 2)
       assertEquals(jobs.map(_.state).toSet, Set("rendering"))
-  }
 
-  test("a transient failure is retried with backoff until the attempt cap") {
+  test("a transient failure is retried with backoff until the attempt cap"):
     for
       pid   <- setupProposal(splits = List((Partner.US, 100)))
       _     <- submitProposal(pi, pid)
@@ -337,21 +313,19 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals((one.state, one.attempts, one.error, one.retryAt.isDefined), ("pending", 1, "ITC unreachable".some, true))
       assertEquals((three.state, three.attempts, three.retryAt), ("failed", PdfSummaryJobService.MaxAttempts, none))
-  }
 
-  test("a permanent failure is not retried") {
+  test("a permanent failure is not retried"):
     for
       pid <- setupProposal(splits = List((Partner.US, 100)))
       _   <- submitProposal(pi, pid)
       _   <- failAll(pid, "Unknown style", permanent = true)
       job <- jobsFor(pid).map(_.head)
     yield assertEquals((job.state, job.attempts, job.error), ("failed", 1, "Unknown style".some))
-  }
 
   // Stale renders are swept when the next job is asked for.  With both jobs
   // stale and one out of attempts, the sweep re-pends the first (which is then
   // claimed) and fails the second.
-  test("stale renders are re-pended, or failed when out of attempts") {
+  test("stale renders are re-pended, or failed when out of attempts"):
     for
       pid   <- setupProposal()
       _     <- submitProposal(pi, pid)
@@ -364,6 +338,4 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals(taken.map(_.job.id), List(jobs(0).id))
       assertEquals(after.map(_.state), List("rendering", "failed"))
-  }
 
-}

@@ -12,7 +12,6 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.core.enums.Partner
-import lucuma.core.enums.ProposalStatus
 import lucuma.core.model.Program
 import lucuma.core.util.Enumerated
 import lucuma.odb.data.OdbError
@@ -47,10 +46,7 @@ trait PdfSummaryJobService[F[_]]:
    */
   def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
-  /**
-   * The `regenerateProposalSummaries` mutation: authorize, then enqueue.  The
-   * proposal must have been submitted.
-   */
+  /** The `regenerateProposalSummaries` mutation: authorize, then enqueue. */
   def regenerate(pid: Program.Id)(using NoTransaction[F], Services.PiAccess): F[Result[Unit]]
 
   /**
@@ -114,9 +110,6 @@ object PdfSummaryJobService:
   def noProposal(pid: Program.Id): OdbError =
     OdbError.InvalidArgument(s"Program $pid has no proposal to summarize.".some)
 
-  def notSubmitted(pid: Program.Id): OdbError =
-    OdbError.InvalidArgument(s"The proposal of program $pid has not been submitted.".some)
-
   def instantiate[F[_]: {Concurrent, UUIDGen}](s3FileService: S3FileService[F])(using Services[F]): PdfSummaryJobService[F] =
     new PdfSummaryJobService[F]:
 
@@ -171,10 +164,9 @@ object PdfSummaryJobService:
 
         services.transactionallyT:
           for
-            _      <- ResultT(programUserService.userHasWriteAccess(pid).map(check(_, OdbError.NotAuthorized(user.id))))
-            status <- ResultT.liftF(session.option(Statements.SelectProposalStatus)(pid))
-            _      <- ResultT.fromResult(status.fold(noProposal(pid).asFailure)(s => check(s =!= ProposalStatus.NotSubmitted, notSubmitted(pid))))
-            _      <- ResultT.liftF(Services.asSuperUser(enqueue(pid)))
+            _ <- ResultT(programUserService.userHasWriteAccess(pid).map(check(_, OdbError.NotAuthorized(user.id))))
+            _ <- ResultT(session.unique(Statements.HasProposal)(pid).map(check(_, noProposal(pid))))
+            _ <- ResultT.liftF(Services.asSuperUser(enqueue(pid)))
           yield ()
         .value
 
@@ -236,14 +228,10 @@ object PdfSummaryJobService:
 
   object Statements:
 
-    // None when the program has no proposal.
-    val SelectProposalStatus: Query[Program.Id, ProposalStatus] =
+    val HasProposal: Query[Program.Id, Boolean] =
       sql"""
-        SELECT p.c_proposal_status
-        FROM t_program p
-        JOIN t_proposal r ON r.c_program_id = p.c_program_id
-        WHERE p.c_program_id = $program_id
-      """.query(proposal_status)
+        SELECT EXISTS (SELECT 1 FROM t_proposal WHERE c_program_id = $program_id)
+      """.query(bool)
 
     val SelectPartners: Query[Program.Id, Partner] =
       sql"""
