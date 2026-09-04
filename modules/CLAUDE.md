@@ -85,6 +85,33 @@ When adding a new observing mode, the migration must:
 
 **PostgreSQL domain types to use for offsets:** `d_angle_µas` (not `d_offset_component`, which doesn't exist).
 
+### Cross-table invariants belong in a trigger, never in a `CHECK`
+
+A `CHECK` may only look at the row it is checking. One that calls a function
+reading another table is unenforceable from the other side and, worse, silently
+breaks dump/restore: `CHECK` constraints are created in a dump's **pre-data**
+section, while `pg_dump` writes table data in **alphabetical order by table
+name**. A table sorting before `t_observation` is `COPY`ed while `t_observation`
+is still empty, so every row fails the check and — because a `COPY` is a single
+statement — **the whole table is rolled back**. `psql` prints the error and
+carries on, so the table just arrives empty.
+
+That is how `populate-db-from-heroku.sh dev` produced `t_flamingos_2_long_slit`
+with 0 rows against 576 in Heroku, while all 576 `flamingos_2_long_slit`
+discriminator rows in `t_observation` were present. The culprit was
+`CHECK (c_telluric_science_mode IS NULL OR is_telluric_calibration(c_observation_id))`
+from `V1293`, where `is_telluric_calibration` reads `t_observation`. Only dev was
+affected: production predated the column and staging had no row setting it, so
+the check was vacuously true there. `t_telluric_resolution` carried the same
+constraint and was spared purely because `t_t` sorts after `t_o`.
+
+Express such an invariant as a `CONSTRAINT TRIGGER ... DEFERRABLE INITIALLY
+DEFERRED` instead — the way `register_observing_mode` does for
+`check_observing_mode_consistency`, and `V1308__telluric_check_constraint_triggers.sql`
+does for both telluric checks. Triggers are restored **post-data**, so they never
+fire during a data load, and deferring to commit lets the two tables be written
+in either order within one transaction.
+
 ## Adding a New Observing Mode — Checklist
 
 When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in these locations:
