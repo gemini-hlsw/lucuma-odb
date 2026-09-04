@@ -4140,9 +4140,9 @@ type Mutation {
   """
   Regenerate the proposal summary PDFs for a proposal: one per partner it
   applies to, each in that partner's style, replacing the existing SUMMARY
-  attachments once rendered.  Rendering is asynchronous; a partner with a job
-  already pending is not queued twice, and completion shows up as the program's
-  SUMMARY attachments.
+  attachments once rendered.  
+  Rendering is asynchronous and completion shows up as the program's SUMMARY 
+  attachments.
   Requires staff access or PI/CoI membership in the program.
   """
   regenerateProposalSummaries(input: RegenerateProposalSummariesInput!): RegenerateProposalSummariesResult!
