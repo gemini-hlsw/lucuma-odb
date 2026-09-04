@@ -21,8 +21,7 @@ object SummaryStyle:
 
   val Default: SummaryStyle = GeminiStandard
 
-  // The OCS Phase 1 template map (P1PDF.templatesList).  A total match so
-  // that a new Partner forces a decision here.
+  // The OCS Phase 1 template map (P1PDF.templatesList).
   def forPartner(partner: Option[Partner]): SummaryStyle =
     partner.fold(Default):
       case Partner.CA => GeminiInvestigatorsAtEnd
