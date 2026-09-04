@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
@@ -388,7 +388,7 @@ object Acquisition:
           (t, mode, selFilter) <- checked
           fpuStep              <- firstStepFilterAndExposure(mode, config.acquisitionCamera, selFilter).leftMap(sequenceError)
         yield
-          val (fpuStepFilter, fpuStepExposureTime): (GnirsFilter, TimeSpan) = fpuStep
+          val (fpuStepFilter: GnirsFilter, fpuStepExposureTime: TimeSpan) = fpuStep
           val steps: Steps = StepComputer.compute(config, mode, fpuStepFilter, fpuStepExposureTime, selFilter, t)
           Generator(builder, steps.initialAtom, steps.repeatingAtom): SequenceGenerator[GnirsDynamicConfig]
         ).pure[F]

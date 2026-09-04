@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence
@@ -104,7 +104,7 @@ object Acquisition:
       // Very Bright / Bright use the fixed camera exposure and a single coadd; Faint uses the
       // acquisition exposure and coadds (it doubles as a sky frame, so it is taken at the
       // sky offset rather than at the keyhole offset).
-      val (fieldFilter, fieldExposureTime, fieldCoadds, fieldOffset): (GnirsFilter, TimeSpan, PosInt, Offset) =
+      val (fieldFilter: GnirsFilter, fieldExposureTime: TimeSpan, fieldCoadds: PosInt, fieldOffset: Offset) =
         mode match
           case GnirsAcquisitionMode.VeryBright =>
             (GnirsFilter.Order4, camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))

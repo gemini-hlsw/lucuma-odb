@@ -18,9 +18,9 @@ val catsVersion                  = "2.13.0"
 val circeVersion                 = "0.14.16"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.0"
-val clueVersion                  = "0.58.0"
+val clueVersion                  = "0.58.2"
 val declineVersion               = "2.6.2"
-val flywayVersion                = "13.4.0"
+val flywayVersion                = "13.5.0"
 val fs2AwsVersion                = "6.2.0"
 val fs2Version                   = "3.13.0"
 val grackleVersion               = "0.30.0"
@@ -34,11 +34,11 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.3"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.242.0"
-val lucumaGraphQLRoutesVersion   = "0.14.2"
+val lucumaCoreVersion            = "0.244.0"
+val lucumaGraphQLRoutesVersion   = "0.15.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
-val munitVersion                 = "1.3.5"
+val munitVersion                 = "1.3.6"
 val munitCatsEffectVersion       = "2.2.0"   // check test output if you attempt to update this
 val munitDisciplineVersion       = "2.0.0"   // check test output if you attempt to update this
 val munitScalacheckVersion       = "1.3.1"   // check test output if you attempt to update this
@@ -60,8 +60,8 @@ val slf4jVersion                 = "2.0.18"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
 
 ThisBuild / tlBaseVersion      := "0.95"
-ThisBuild / scalaVersion       := "3.8.4"
-ThisBuild / crossScalaVersions := Seq("3.8.4")
+ThisBuild / scalaVersion       := "3.9.0"
+ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
 
 ThisBuild / Test / fork              := false
@@ -71,7 +71,6 @@ ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=de
 
 // Disable plugin-injected CI steps, they will be run in a the dedicated `checks` job
 // instead of being repeated for each shard
-ThisBuild / lucumaCoverage           := false
 ThisBuild / tlCiHeaderCheck          := false
 ThisBuild / tlCiScalafmtCheck        := false
 ThisBuild / tlCiScalafixCheck        := false

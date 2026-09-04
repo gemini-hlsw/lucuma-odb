@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -323,10 +323,8 @@ object ItcService {
 
         params.itcInput match
           case ItcInputDerivation.Ready(p)      =>
-            callRemoteItc(oid, p).flatTap:
-              case Right(r)                       => services.transactionally(insertOrUpdate(pid, oid, p, r))
-              case Left(e @ OdbError.ItcError(_)) => services.transactionally(insertOrUpdateFailure(pid, oid, p, e))
-              case Left(_)                        => F.unit
+            callRemoteItc(oid, p).flatTap: r =>
+              services.transactionally(storeItc(pid, oid, p, r))
           case ItcInputDerivation.Incomplete(m) => missing(m)
           // No ITC applies to this mode; callers gate on Ready, so this is defensive.
           case ItcInputDerivation.NotApplicable =>
@@ -422,10 +420,49 @@ object ItcService {
       override def warmAll(
         programId: Program.Id
       )(using NoTransaction[F], SuperUserAccess): F[Unit] =
-        services
-          .transactionally(session.execute(Statements.SelectUncachedObservations)(programId))
-          .flatMap(_.parTraverseN(WarmConcurrency)(lookup(programId, _)))
-          .void
+        // The remote calls are the slow part and touch no database, so they are
+        // the only part that fans out. Everything else shares the one session
+        // this `Services` holds, and Skunk permits only one transaction on a
+        // session at a time.
+        //
+        // The writes stay one transaction per observation, as they were when
+        // each was its own `lookup`: `insertOrUpdate` tolerates an observation
+        // deleted out from under it, and a failed statement would otherwise
+        // abort a shared transaction and discard every other result too.
+        for
+          inputs  <- services.transactionally(selectWarmInputs(programId))
+          results <- inputs.parTraverseN(WarmConcurrency): (oid, input) =>
+                       callRemoteItc(oid, input).map((oid, input, _))
+          _       <- results.traverse_ { case (oid, input, result) =>
+                       services.transactionally(storeItc(programId, oid, input, result))
+                     }
+        yield ()
+
+      // The observations warmAll must actually call the remote service for,
+      // paired with the input to call it with. An observation to which no ITC
+      // applies, or whose parameters are incomplete, has nothing to warm.
+      private def selectWarmInputs(
+        programId: Program.Id
+      )(using Transaction[F]): F[List[(Observation.Id, ItcInput)]] =
+        for
+          oids   <- session.execute(Statements.SelectUncachedObservations)(programId)
+          params <- generatorParamsService.selectMany(programId, oids)
+        yield oids.flatMap: oid =>
+          params.get(oid).flatMap(_.toOption).flatMap(_.itcInput.toOption).tupleLeft(oid)
+
+      // Records the outcome of a remote call. A deterministic ITC failure is
+      // cached like a success; a transient one (a timeout, a dead service) is
+      // not cached at all, so that it is retried.
+      private def storeItc(
+        pid:    Program.Id,
+        oid:    Observation.Id,
+        input:  ItcInput,
+        result: Either[OdbError, Itc]
+      )(using Transaction[F]): F[Unit] =
+        result match
+          case Right(r)                       => insertOrUpdate(pid, oid, input, r)
+          case Left(e @ OdbError.ItcError(_)) => insertOrUpdateFailure(pid, oid, input, e)
+          case Left(_)                        => F.unit
 
       // According to the spec we default if the target is too bright
       // https://app.shortcut.com/lucuma/story/1999/determine-exposure-time-for-acquisition-images

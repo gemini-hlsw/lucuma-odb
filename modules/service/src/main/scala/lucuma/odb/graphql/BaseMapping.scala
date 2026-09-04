@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -36,6 +36,8 @@ trait BaseMapping[F[_]]
   lazy val AttachmentIdType                        = schema.ref("AttachmentId")
   lazy val AttachmentType                          = schema.ref("Attachment")
   lazy val AttachmentTypeType                      = schema.ref("AttachmentType")
+  lazy val ProposalSummaryPropertiesType           = schema.ref("ProposalSummaryProperties")
+  lazy val ProposalSummaryStyleType                = schema.ref("ProposalSummaryStyle")
   lazy val BasePositionType                        = schema.ref("BasePosition")
   lazy val BasePositionTypeType                    = schema.ref("BasePositionType")
   lazy val BiasType                                = schema.ref("Bias")
@@ -333,6 +335,7 @@ trait BaseMapping[F[_]]
   lazy val ObservationReferenceLabelType           = schema.ref("ObservationReferenceLabel")
   lazy val ObservationSelectResultType             = schema.ref("ObservationSelectResult")
   lazy val ObservationWorkflowStateType            = schema.ref("ObservationWorkflowState")
+  lazy val ObservationValidationCodeType           = schema.ref("ObservationValidationCode")
   lazy val ObservatoryType                         = schema.ref("Observatory")
   lazy val ObserveClassType                        = schema.ref("ObserveClass")
   lazy val ObservingModeGroupType                  = schema.ref("ObservingModeGroup")

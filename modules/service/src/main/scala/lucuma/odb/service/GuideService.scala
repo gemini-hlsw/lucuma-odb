@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -290,7 +290,7 @@ object GuideService {
     val acqOffsets   = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
     val sciOffsets   = NonEmptySet.fromSet(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
 
-    val (site, observingModeType, agsWavelength): (Site, ObservingModeType, Wavelength) =
+    val (site: Site, observingModeType: ObservingModeType, agsWavelength: Wavelength) =
       params.observingMode match
         case c: exchange.Config                               =>
           // Exchange observations are not supported by AGS.  No guide probe is

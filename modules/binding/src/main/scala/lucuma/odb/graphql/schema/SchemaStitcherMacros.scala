@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql.schema
@@ -41,8 +41,7 @@ private object SchemaStitcherMacros:
     val location = x.valueOrAbort
     val cl       = Thread.currentThread().getContextClassLoader()
 
-    val sourceFile = Path.fromNioPath(x.asTerm.pos.sourceFile.getJPath.get)
-    val sourceStr  = sourceFile.toString
+    val sourceStr = x.asTerm.pos.sourceFile.path
 
     val mainPrefix = s"${separator}src${separator}main${separator}scala${separator}"
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -273,7 +273,7 @@ object AttachmentFileService {
               InvalidRequest(DuplicateMaskNameMsg).asLeft
             case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_file_name"))       =>
               InvalidRequest(DuplicateFileNameMsg).asLeft
-            case SqlState.UniqueViolation(e) if e.detail.exists(_.contains("c_attachment_type")) =>
+            case SqlState.UniqueViolation(e) if e.detail.exists(d => d.contains("c_attachment_type") || d.contains("c_partner")) =>
               InvalidRequest(duplicateTypeMsg(attachmentType)).asLeft
           }
       }

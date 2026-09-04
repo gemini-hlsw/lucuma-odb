@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -15,6 +15,7 @@ import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
+import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
@@ -73,6 +74,7 @@ case class ObservationValidationInfo(
   scienceBand:            Option[ScienceBand],
   asterism:               List[Target],
   associatedUserState:    Option[ObservationWorkflowService.UserState], // state of science obs if this is a per-observation calibration (telluric or daytime pinhole)
+  dismissedWarnings:   List[ObservationValidationCode.Warning],
   generatorParams:        Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   cfpInfo:                Option[CfpInfo] = None,
   programAllocations:     Option[NonEmptyList[ScienceBand]] = None,
@@ -357,7 +359,9 @@ object ObservationValidationInfo {
           o.c_hour_angle_min,  
           o.c_hour_angle_max,
 
-          o.c_spec_wavelength
+          o.c_spec_wavelength,
+
+          p.c_dismissed_warnings
 
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
@@ -393,12 +397,13 @@ object ObservationValidationInfo {
         sky_background               *:
         water_vapor                  *:
         elevation_range              *:
-        wavelength_pm.opt
+        wavelength_pm.opt            *:
+        _observation_validation_warning
       )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl) =>
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2, ovcs)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.itc.legacy
@@ -68,7 +68,7 @@ object ItcImpl {
       ): F[TargetIntegrationTime] =
         T.span("ITC calculate")
           .use: span =>
-            val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
+            val (request: Json, bandOrLine: Either[Band, Wavelength]) =
               toItcParameters(
                 target,
                 observingMode,
@@ -159,7 +159,7 @@ object ItcImpl {
       ): F[TargetTimeAndGraphs] =
         T.span("Spectoscopy time and graphs")
           .use: span =>
-            val (request, bandOrLine): (Json, Either[Band, Wavelength]) =
+            val (request: Json, bandOrLine: Either[Band, Wavelength]) =
               toItcParameters(
                 target,
                 observingMode,

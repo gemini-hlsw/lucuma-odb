@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -2557,7 +2557,7 @@ class perScienceObservationCalibrations
       // CUSTOM_WIDTH_2_PIX maps 1:1 onto LONG_SLIT_2.
       assertEquals(mode, "FLAMINGOS_2_LONG_SLIT")
       assertEquals(fpu, Flamingos2Fpu.LongSlit2)
-      assertEquals(qs, List(60L, 40L, 20L, -20L, 40L, 60L).map(_ * 1_000_000L))
+      assertEquals(qs, List(60L, 40L, 20L, -20L, -40L, -60L).map(_ * 1_000_000L))
 
   private def updateFlamingos2MosSlitWidth(oid: Observation.Id, slitWidth: String): IO[Unit] =
     query(
@@ -2624,7 +2624,7 @@ class perScienceObservationCalibrations
       toid2 <- selectTelluricObservationFor(oid).map(_.get)
       ls   <- longSlitTelluric(toid2)
     yield
-      assertEquals(mos._3, List(60L, 40L, 20L, -20L, 40L, 60L).map(_ * 1_000_000L))
+      assertEquals(mos._3, List(60L, 40L, 20L, -20L, -40L, -60L).map(_ * 1_000_000L))
       // No stale MOS marker: the telluric falls back to the long slit nod pattern.
       assertEquals(ls._3, List(15L, -15L, -15L, 15L).map(_ * 1_000_000L))
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.util
@@ -71,6 +71,7 @@ import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
+import lucuma.odb.data.SummaryStyle
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TelescopeConfigGeneratorRole
 import lucuma.odb.data.TimeCharge.DiscountDiscriminator
@@ -466,6 +467,9 @@ trait Codecs {
   val calibration_work_type: Codec[CalibrationWorkType] =
     enumerated(Type("e_calibration_work_type"))
 
+  val summary_style: Codec[SummaryStyle] =
+    enumerated(Type("e_summary_style"))
+
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
 
@@ -750,6 +754,22 @@ trait Codecs {
       _.value,
       s => Tag(s).asRight,
       Type("_d_tag", List(Type("d_tag")))
+    )
+
+  // RCN: the set of codes here is likely to change a lot, so I'm storing them as 
+  // raw `tag` values to avoid having to maintain a enum in the database (it is very
+  // inconvenient to remove elements from an enum). Any invalid elements are
+  // filtered out.
+  val _observation_validation_warning: Codec[List[ObservationValidationCode.Warning]] =
+    _tag.imap[List[ObservationValidationCode.Warning]](
+      arr => 
+        arr.toList.flatMap: tag =>
+          Enumerated[ObservationValidationCode.Warning].fromTag(tag.value)
+    )(
+      vcs => 
+        Arr.fromFoldable:
+          vcs.map: vc =>
+            Tag(vc.tag)
     )
 
   val target_id: Codec[Target.Id] =

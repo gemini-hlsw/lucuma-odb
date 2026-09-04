@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.itc.legacy
@@ -122,9 +122,9 @@ def spectroscopyGraphParams(
   conditions:       ItcObservingConditions,
   exposureCount:    Int
 ): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
-  val (sourceDefinition, bandOrLine): (ItcSourceDefinition, Either[Band, Wavelength]) =
+  val (sourceDefinition: ItcSourceDefinition, bandOrLine: Either[Band, Wavelength]) =
     buildSourceDefinition(target, atWavelength)
-  val parameters: ItcParameters                                                       =
+  val parameters: ItcParameters                                                     =
     ItcParameters(
       source = sourceDefinition,
       observation = ItcObservationDetails(
@@ -153,9 +153,9 @@ def toItcParameters(
   conditions:       ItcObservingConditions,
   exposureTimeMode: ExposureTimeMode
 ): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
-  val (sourceDefinition, bandOrLine): (ItcSourceDefinition, Either[Band, Wavelength]) =
+  val (sourceDefinition: ItcSourceDefinition, bandOrLine: Either[Band, Wavelength]) =
     buildSourceDefinition(target, exposureTimeMode.at)
-  val parameters: ItcParameters                                                       =
+  val parameters: ItcParameters                                                     =
     ItcParameters(
       source = sourceDefinition,
       observation = ItcObservationDetails(

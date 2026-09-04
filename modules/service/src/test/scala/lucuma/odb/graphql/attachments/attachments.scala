@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -8,13 +8,16 @@ import cats.effect.IO
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Json
+import io.circe.literal.*
 import lucuma.core.enums.AttachmentType
+import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
 import lucuma.core.model.Attachment
 import lucuma.core.model.Program
 import lucuma.core.model.User
 import lucuma.core.util.Enumerated
 import lucuma.odb.FMain
+import lucuma.odb.data.SummaryStyle
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.util.Codecs.*
 import org.http4s.*
@@ -98,7 +101,13 @@ class attachments extends AttachmentsSuite {
   // ODB-generated attachment types have no write path through the routes, so a
   // row has to be planted directly to test reading and rejection of writes.
   // The remote path mirrors what S3FileService.filePath would have produced.
-  def insertAttachmentInDb(pid: Program.Id, ta: TestAttachment): IO[Attachment.Id] = {
+  // Summaries must record the style they were rendered in
+  def insertAttachmentInDb(
+    pid:     Program.Id,
+    ta:      TestAttachment,
+    partner: Option[Partner]      = none,
+    style:   Option[SummaryStyle] = none
+  ): IO[Attachment.Id] = {
     val query =
       sql"""
         insert into t_attachment (
@@ -107,18 +116,27 @@ class attachments extends AttachmentsSuite {
           c_file_name,
           c_description,
           c_file_size,
-          c_remote_path
+          c_remote_path,
+          c_partner,
+          c_summary_style
         )
-        select $program_id, $attachment_type, $text_nonempty, ${text_nonempty.opt}, $int8, $text_nonempty
+        select $program_id, $attachment_type, $text_nonempty, ${text_nonempty.opt}, $int8, $text_nonempty, ${lucuma.odb.util.Codecs.partner.opt}, ${summary_style.opt}
         returning c_attachment_id
       """.query(attachment_id)
-    val at   = Enumerated[AttachmentType].fromTag(ta.attachmentType).get
-    val path = NonEmptyString.unsafeFrom(s"$pid/${UUID.randomUUID()}/${ta.fileName}")
+    val at     = Enumerated[AttachmentType].fromTag(ta.attachmentType).get
+    val path   = NonEmptyString.unsafeFrom(s"$pid/${UUID.randomUUID()}/${ta.fileName}")
+    val styleʹ = style.orElse(Option.when(at === AttachmentType.Summary)(SummaryStyle.GeminiStandard))
     FMain.databasePoolResource[IO](databaseConfig).flatten
       .use(_.prepareR(query).use(_.unique(
-        (pid, at, NonEmptyString.unsafeFrom(ta.fileName), ta.description.flatMap(NonEmptyString.from(_).toOption), ta.bytes.length.toLong, path)
+        (pid, at, NonEmptyString.unsafeFrom(ta.fileName), ta.description.flatMap(NonEmptyString.from(_).toOption), ta.bytes.length.toLong, path, partner, styleʹ)
       )))
   }
+
+  def expectSqlError(fa: IO[?], fragment: String): IO[Unit] =
+    fa.attempt.map:
+      case Left(e: PostgresErrorException) => assert(e.message.contains(fragment), e.message)
+      case Left(e)                         => fail(s"Unexpected error: $e")
+      case Right(_)                        => fail("Expected the insert to be rejected")
 
   // Plants the row *and* its bytes in S3, so the read paths have something to serve.
   def insertAttachmentDirectly(pid: Program.Id, ta: TestAttachment): IO[Attachment.Id] =
@@ -143,6 +161,8 @@ class attachments extends AttachmentsSuite {
   val team2             = TestAttachment("team2.pdf", "team", none, "A second team file")
   val summaryPDF        = TestAttachment("summary.pdf", "summary", none, "A summary file")
   val summaryPDF2       = TestAttachment("summary2.pdf", "summary", none, "A replacement summary file")
+  val summaryPDF3       = TestAttachment("summary3.pdf", "summary", none, "A default-style summary file")
+  val summaryPDF4       = TestAttachment("summary4.pdf", "summary", none, "One summary too many")
   val summaryJPG        = TestAttachment("summary.jpg", "summary", none, "Doesn't matter")
   val customSedSED      = TestAttachment("sed.sed", "custom_sed", "It's custom".some, "A custom SED file")
   val customSedTXT      = TestAttachment("sed.TXT", "custom_sed", "It's custom".some, "Another custom SED file")
@@ -356,15 +376,44 @@ class attachments extends AttachmentsSuite {
     } yield ()
   }
 
-  test("only one summary allowed per program") {
-    for {
+  test("only one summary allowed per program and partner"):
+    for
       pid <- createProgramAs(pi)
-      _   <- insertAttachmentInDb(pid, summaryPDF)
       // the routes cannot create these, so the partial unique index is what
-      // actually enforces one-per-program
-      _   <- insertAttachmentInDb(pid, summaryPDF2).intercept[PostgresErrorException]
-    } yield ()
-  }
+      // actually enforces one per (program, partner)
+      _   <- insertAttachmentInDb(pid, summaryPDF, Partner.US.some, SummaryStyle.NoirlabDarp.some)
+      _   <- insertAttachmentInDb(pid, summaryPDF2, Partner.CA.some)
+      _   <- insertAttachmentInDb(pid, summaryPDF3)
+      _   <- expectSqlError(insertAttachmentInDb(pid, summaryPDF4, Partner.US.some), "unique_summary_attachments_index")
+      _   <- expectSqlError(insertAttachmentInDb(pid, summaryPDF4), "unique_summary_attachments_index")
+      _   <- expect(
+               pi,
+               s"""query { program(programId: "$pid") { attachments { fileName proposalSummary { partner style } } } }""",
+               json"""{ "program": { "attachments": [
+                 { "fileName": "summary.pdf",  "proposalSummary": { "partner": "US", "style": "NOIRLAB_DARP" } },
+                 { "fileName": "summary2.pdf", "proposalSummary": { "partner": "CA", "style": "GEMINI_STANDARD" } },
+                 { "fileName": "summary3.pdf", "proposalSummary": { "partner": null, "style": "GEMINI_STANDARD" } }
+               ] } }""".asRight
+             )
+    yield ()
+
+  test("user-uploaded attachments have no proposal summary properties"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- insertAttachment(pi, pid, science1).toAttachmentId
+      _   <- expect(
+               pi,
+               s"""query { program(programId: "$pid") { attachments { attachmentType proposalSummary { partner style } } } }""",
+               json"""{ "program": { "attachments": [ { "attachmentType": "SCIENCE", "proposalSummary": null } ] } }""".asRight
+             )
+    yield ()
+
+  test("only summaries carry a partner or style"):
+    for
+      pid <- createProgramAs(pi)
+      _   <- expectSqlError(insertAttachmentInDb(pid, team1, Partner.US.some), "attachment_partner_only_for_summary")
+      _   <- expectSqlError(insertAttachmentInDb(pid, team1, none, SummaryStyle.Chile.some), "attachment_summary_style_iff_summary")
+    yield ()
 
   test("can have multiple custom seds") {
     for {

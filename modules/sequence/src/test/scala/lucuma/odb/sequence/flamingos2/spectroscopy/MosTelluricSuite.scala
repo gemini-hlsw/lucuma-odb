@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.sequence.flamingos2.spectroscopy
@@ -123,7 +123,7 @@ class MosTelluricSuite extends FunSuite:
   test("the standard is stepped down the slit at p = 0"):
     val steps = generate().science.toList.head.steps.toList
 
-    assertEquals(steps.map(qArcsec), List(60.0, 40.0, 20.0, -20.0, 40.0, 60.0))
+    assertEquals(steps.map(qArcsec), List(60.0, 40.0, 20.0, -20.0, -40.0, -60.0))
     assertEquals(steps.map(_.telescopeConfig.offset.p.toAngle.toMicroarcseconds).toSet, Set(0L))
     assertEquals(steps.map(_.telescopeConfig.guiding).toSet, Set(StepGuideState.Enabled))
 
@@ -136,7 +136,7 @@ class MosTelluricSuite extends FunSuite:
   test("the arc is taken unguided at the last science offset"):
     val arc = generate().science.toList.last.steps.head
 
-    assertEquals(qArcsec(arc), 60.0)
+    assertEquals(qArcsec(arc), -60.0)
     assertEquals(arc.telescopeConfig.guiding, StepGuideState.Disabled)
     assert(arc.stepConfig.isInstanceOf[StepConfig.Gcal])
 

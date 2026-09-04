@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -82,13 +82,13 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
       NonEmptyString.from(s).toOption
   }
 
-  val tMinus10 = -10.fromNightStart
-  val t00 =  0.fromNightStart
-  val t10 = 10.fromNightStart
-  val t20 = 20.fromNightStart
-  val t30 = 30.fromNightStart
-  val t40 = 40.fromNightStart
-  val t50 = 50.fromNightStart
+  val tMinus10 = (-10).fromNightStart
+  val t00 =         0 .fromNightStart
+  val t10 =        10 .fromNightStart
+  val t20 =        20 .fromNightStart
+  val t30 =        30 .fromNightStart
+  val t40 =        40 .fromNightStart
+  val t50 =        50 .fromNightStart
 
   def invoiceQuery(oid: Observation.Id): String =
     s"""
@@ -675,8 +675,8 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
 
   test("timeChargeInvoice (daylight discount)") {
 
-    val t0 = -1.fromNightStart
-    val t1 =  1.fromNightStart
+    val t0 = (-1).fromNightStart
+    val t1 =   1 .fromNightStart
 
     val events = List(
       (SequenceCommand.Start, t0),
@@ -1333,11 +1333,11 @@ class timeAccounting extends OdbSuite with DatabaseOperations with ExecutionTest
 
   test("timeChargeInvoice (simultaneous discounts)"):
 
-    val tem20 = -20.fromNightEnd
-    val tem10 = -10.fromNightEnd
-    val te00 =   0.fromNightEnd
-    val te10  =  10.fromNightEnd
-    val te20  =  20.fromNightEnd
+    val tem20 = (-20).fromNightEnd
+    val tem10 = (-10).fromNightEnd
+    val te00 =     0 .fromNightEnd
+    val te10  =   10 .fromNightEnd
+    val te20  =   20 .fromNightEnd
 
     val events0 = List(
       (SequenceCommand.Start, tem20),

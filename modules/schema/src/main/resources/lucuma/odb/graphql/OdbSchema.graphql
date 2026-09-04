@@ -4986,6 +4986,13 @@ input ProgramPropertiesInput {
   nullable.  Limited to dates between 1900 and 2100 (exclusive).
   """
   activeEnd: Date
+
+  """
+  List of validation codes to treat as 'dismissed' by the workflow computation. This
+  field can only be set by staff users. 
+  """
+  dismissedWarnings: [ObservationValidationCode!]
+
 }
 
 """
@@ -8108,7 +8115,53 @@ type Attachment {
   checked: Boolean!
   fileSize: Long!
   updatedAt: Timestamp!
+
+  """
+  How an ODB-generated proposal summary was rendered.  Present exactly for
+  SUMMARY attachments; null for every other type.  Not settable.
+  """
+  proposalSummary: ProposalSummaryProperties
   program: Program!
+}
+
+"""
+Properties of an ODB-generated proposal summary PDF.
+"""
+type ProposalSummaryProperties {
+  """
+  The partner the summary was rendered for.  Null for the single summary of a
+  proposal with no partner splits.
+  """
+  partner: Partner
+
+  """
+  The style the summary was produced in.  Recorded at generation, so it stays
+  accurate if the partner-to-style mapping changes later.
+  """
+  style: ProposalSummaryStyle!
+}
+
+"""
+The layouts a proposal summary PDF can be rendered in.
+"""
+enum ProposalSummaryStyle {
+  "The default Gemini layout."
+  GEMINI_STANDARD
+
+  "Gemini layout for dual-anonymous review: investigators omitted."
+  GEMINI_DARP
+
+  "Gemini layout without the investigator list."
+  GEMINI_NO_INVESTIGATORS
+
+  "Gemini layout with the investigator list moved to the end."
+  GEMINI_INVESTIGATORS_AT_END
+
+  "The Chilean TAC layout."
+  CHILE
+
+  "The NOIRLab dual-anonymous review layout."
+  NOIRLAB_DARP
 }
 
 input AttachmentPropertiesInput {
@@ -17907,6 +17960,12 @@ type Program {
   against `resourceLimit`.
   """
   resourceCount: NonNegInt!
+
+  """
+  List of validation codes that have been dismissed for this program.
+  """
+  dismissedWarnings: [ObservationValidationCode!]!
+
 }
 
 """

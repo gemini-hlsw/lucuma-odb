@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -103,7 +103,8 @@ trait ProgramMapping[F[_]]
       SqlField("calibrationRole", ProgramView.CalibrationRole),
       SqlObject("goa"),
       SqlField("resourceLimit", ProgramView.ResourceLimit),
-      SqlField("resourceCount", ProgramView.ResourceCount)
+      SqlField("resourceCount", ProgramView.ResourceCount),
+      SqlField("dismissedWarnings", ProgramView.dismissedWarnings),
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

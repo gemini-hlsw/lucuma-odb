@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -33,8 +33,8 @@ object GnirsImagingInput extends ImagingFilterCheck:
       WavelengthOrder.Increasing.some,
       Nullable.NonNull(
         TelescopeConfigGeneratorInput.UniformInput(
-          cornerA = Offset(Offset.P(4.arcsec),  Offset.Q(6.arcsec)),
-          cornerB = Offset(Offset.P(-1.arcsec), Offset.Q(-6.arcsec))
+          cornerA = Offset(Offset.P(  4 .arcsec), Offset.Q(  6 .arcsec)),
+          cornerB = Offset(Offset.P((-1).arcsec), Offset.Q((-6).arcsec))
         )
       ),
       none,

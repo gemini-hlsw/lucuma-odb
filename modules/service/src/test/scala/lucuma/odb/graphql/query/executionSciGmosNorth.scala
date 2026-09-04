@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql.query
@@ -183,9 +183,9 @@ class executionSciGmosNorth extends ExecutionTestSupportForGmos with UpdateObser
       assertEquals(
         gn.nextAtom.description.get :: gn.possibleFuture.map(_.description.get),
         List(
-           0.description,
-          -5.description,
-           0.description
+            0 .description,
+          (-5).description,
+            0 .description
         )
       )
 

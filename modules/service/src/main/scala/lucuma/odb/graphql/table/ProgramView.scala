@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -15,19 +15,20 @@ trait ProgramView[F[_]] extends BaseMapping[F]:
   // Backed by the v_program view, which adds the computed c_resource_count
   // column on top of t_program (see V1182).
   object ProgramView extends TableDef("v_program"):
-    val Id              = col("c_program_id", program_id)
-    val Existence       = col("c_existence", existence)
-    val Name            = col("c_name", text_nonempty.opt)
-    val Description     = col("c_description", text_nonempty.opt)
-    val Status          = col("c_status", program_status)
-    val ExplicitStatus  = col("c_explicit_status", program_status.opt)
-    val DefaultStatus   = col("c_default_status", program_status)
-    val ProposalStatus  = col("c_proposal_status", proposal_status)
-    val CalibrationRole = col("c_calibration_role", calibration_role.opt)
-    val ActiveStart     = col("c_active_start", date)
-    val ActiveEnd       = col("c_active_end", date)
-    val ResourceCount   = col("c_resource_count", int4_nonneg)
-    val ResourceLimit   = col("c_resource_limit", int4_nonneg)
+    val Id                = col("c_program_id", program_id)
+    val Existence         = col("c_existence", existence)
+    val Name              = col("c_name", text_nonempty.opt)
+    val Description       = col("c_description", text_nonempty.opt)
+    val Status            = col("c_status", program_status)
+    val ExplicitStatus    = col("c_explicit_status", program_status.opt)
+    val DefaultStatus     = col("c_default_status", program_status)
+    val ProposalStatus    = col("c_proposal_status", proposal_status)
+    val CalibrationRole   = col("c_calibration_role", calibration_role.opt)
+    val ActiveStart       = col("c_active_start", date)
+    val ActiveEnd         = col("c_active_end", date)
+    val ResourceCount     = col("c_resource_count", int4_nonneg)
+    val ResourceLimit     = col("c_resource_limit", int4_nonneg)
+    val dismissedWarnings = col("c_dismissed_warnings", _observation_validation_warning)
 
     object Goa:
       val Proprietary   = col("c_goa_proprietary", int4_nonneg)
