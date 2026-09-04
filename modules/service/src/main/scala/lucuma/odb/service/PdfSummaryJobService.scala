@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -12,8 +12,9 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.core.enums.Partner
-import lucuma.core.util.Enumerated
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.model.Program
+import lucuma.core.util.Enumerated
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.SummaryStyle
@@ -46,7 +47,10 @@ trait PdfSummaryJobService[F[_]]:
    */
   def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
-  /** The `regenerateProposalSummaries` mutation: authorize, then enqueue. */
+  /**
+   * The `regenerateProposalSummaries` mutation: authorize, then enqueue.  The
+   * proposal must have been submitted.
+   */
   def regenerate(pid: Program.Id)(using NoTransaction[F], Services.PiAccess): F[Result[Unit]]
 
   /**
@@ -68,8 +72,9 @@ trait PdfSummaryJobService[F[_]]:
    * summary attachment for its partner, replacing any previous one, and delete
    * the job.  The replaced file, if any, is removed from storage after the
    * transaction commits; that removal is best effort, since an orphan in S3 is
-   * tolerable and a dangling attachment row is not.  Does nothing when the job
-   * is no longer `rendering`.
+   * tolerable and a dangling attachment row is not.  When the job is no longer
+   * `rendering` (swept as stale, and possibly re-claimed) nothing is recorded
+   * and the upload is removed instead.
    */
   def finalize(prepared: PdfSummaryJobService.Prepared, pdf: fs2.Stream[F, Byte])(using NoTransaction[F], ServiceAccess): F[Unit]
 
@@ -109,6 +114,9 @@ object PdfSummaryJobService:
   def noProposal(pid: Program.Id): OdbError =
     OdbError.InvalidArgument(s"Program $pid has no proposal to summarize.".some)
 
+  def notSubmitted(pid: Program.Id): OdbError =
+    OdbError.InvalidArgument(s"The proposal of program $pid has not been submitted.".some)
+
   def instantiate[F[_]: {Concurrent, UUIDGen}](s3FileService: S3FileService[F])(using Services[F]): PdfSummaryJobService[F] =
     new PdfSummaryJobService[F]:
 
@@ -128,10 +136,17 @@ object PdfSummaryJobService:
 
       private def extract(json: Json): Either[String, Queried] =
         val c = json.hcursor
+        // Both observation lists are capped at MaxObservations; a truncated one
+        // must not render.
+        def complete(obs: io.circe.ACursor): Either[String, Unit] =
+          obs.downField("hasMore").as[Boolean].leftMap(_.message)
+            .filterOrElse(!_, s"more than ${PdfSummaryJobPayload.MaxObservations} observations").void
         (
           c.downField("program").focus.filter(!_.isNull).toRight("program not found"),
-          c.downField("observations").downField("matches").as[List[Json]].leftMap(_.message)
-        ).tupled.map: (program, obs) =>
+          c.downField("observations").downField("matches").as[List[Json]].leftMap(_.message),
+          complete(c.downField("observations")),
+          complete(c.downField("program").downField("observations"))
+        ).tupled.map: (program, obs, _, _) =>
           val ref = program.hcursor.downField("proposal").downField("reference").downField("label").as[String].toOption
           Queried(program, obs, ref)
 
@@ -156,9 +171,10 @@ object PdfSummaryJobService:
 
         services.transactionallyT:
           for
-            _ <- ResultT(programUserService.userHasWriteAccess(pid).map(check(_, OdbError.NotAuthorized(user.id))))
-            _ <- ResultT(session.unique(Statements.HasProposal)(pid).map(check(_, noProposal(pid))))
-            _ <- ResultT.liftF(Services.asSuperUser(enqueue(pid)))
+            _      <- ResultT(programUserService.userHasWriteAccess(pid).map(check(_, OdbError.NotAuthorized(user.id))))
+            status <- ResultT.liftF(session.option(Statements.SelectProposalStatus)(pid))
+            _      <- ResultT.fromResult(status.fold(noProposal(pid).asFailure)(s => check(s =!= ProposalStatus.NotSubmitted, notSubmitted(pid))))
+            _      <- ResultT.liftF(Services.asSuperUser(enqueue(pid)))
           yield ()
         .value
 
@@ -183,29 +199,33 @@ object PdfSummaryJobService:
             session.execute(Statements.FailStale)((MaxAttempts, StaleRender.toSeconds)) *>
               session.execute(Statements.RependStale)(StaleRender.toSeconds) *>
               session.option(Statements.Claim)
+        // A job whose payload cannot be built is failed and the next one is
+        // tried, so that `None` really means the queue is empty.
         claim.flatMap(_.flatTraverse: job =>
           Services.asSuperUser(prepare(job)).flatMap:
             case Right(prepared) => prepared.some.pure[F]
             case Left(msg)       =>
-              services.transactionally(fail(job, s"Could not build the payload: $msg", permanent = true)).as(none)
+              services.transactionally(fail(job, s"Could not build the payload: $msg", permanent = true)) *> next
         )
 
       override def finalize(prepared: Prepared, pdf: fs2.Stream[F, Byte])(using NoTransaction[F], ServiceAccess): F[Unit] =
         val job = prepared.job
         Services.asSuperUser:
           for
-            size <- s3FileService.upload(prepared.remotePath, pdf)
-            old  <- services.transactionally:
-                      session.option(Statements.LockRendering)(job.id).flatMap:
-                        case None    => none.pure[F]
-                        case Some(_) =>
-                          for
-                            old  <- session.option(Statements.DeleteSummaryAttachment)((job.programId, job.partner))
-                            desc  = NonEmptyString.unsafeFrom(s"Proposal summary (${job.style.rendererName})")
-                            _    <- session.unique(Statements.InsertSummaryAttachment)((job.programId, prepared.fileName, desc, size, prepared.remotePath, job.partner, job.style))
-                            _    <- session.execute(Statements.DeleteJob)(job.id)
-                          yield old
-            _    <- old.traverse_(s3FileService.delete(_).handleError(_ => ()))
+            size     <- s3FileService.upload(prepared.remotePath, pdf)
+            // The file left over: the replaced summary, or this upload itself
+            // when the job was swept (and possibly re-claimed) mid-render.
+            obsolete <- services.transactionally:
+                          session.option(Statements.LockRendering)(job.id).flatMap:
+                            case None    => prepared.remotePath.some.pure[F]
+                            case Some(_) =>
+                              for
+                                old  <- session.option(Statements.DeleteSummaryAttachment)((job.programId, job.partner))
+                                desc  = NonEmptyString.unsafeFrom(s"Proposal summary (${job.style.rendererName})")
+                                _    <- session.unique(Statements.InsertSummaryAttachment)((job.programId, prepared.fileName, desc, size, prepared.remotePath, job.partner, job.style))
+                                _    <- session.execute(Statements.DeleteJob)(job.id)
+                              yield old
+            _        <- obsolete.traverse_(s3FileService.delete(_).handleError(_ => ()))
           yield ()
 
       override def fail(job: Claimed, error: String, permanent: Boolean)(using Transaction[F], ServiceAccess): F[Unit] =
@@ -216,10 +236,14 @@ object PdfSummaryJobService:
 
   object Statements:
 
-    val HasProposal: Query[Program.Id, Boolean] =
+    // None when the program has no proposal.
+    val SelectProposalStatus: Query[Program.Id, ProposalStatus] =
       sql"""
-        SELECT EXISTS (SELECT 1 FROM t_proposal WHERE c_program_id = $program_id)
-      """.query(bool)
+        SELECT p.c_proposal_status
+        FROM t_program p
+        JOIN t_proposal r ON r.c_program_id = p.c_program_id
+        WHERE p.c_program_id = $program_id
+      """.query(proposal_status)
 
     val SelectPartners: Query[Program.Id, Partner] =
       sql"""

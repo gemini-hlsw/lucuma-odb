@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service
@@ -28,6 +28,10 @@ object PdfSummaryJobPayload:
 
   val SchemaVersion: String = "1.0.0"
 
+  // Observations per proposal the payload can carry; a larger one fails the job
+  // rather than rendering a truncated summary.
+  val MaxObservations: Int = 1000
+
   case class AttachmentUrl(fileName: String, url: String) derives Encoder.AsObject
 
   def build(program: Json, observations: List[Json], attachments: List[AttachmentUrl]): Json =
@@ -47,9 +51,9 @@ object PdfSummaryJobPayload:
    * (which would add a second unit to some quantities) would break ITC input.
    */
   val Query: String =
-    """
-query PdfSummaryJobPayload($programId: ProgramId!) {
-  program(programId: $programId) {
+    s"""
+query PdfSummaryJobPayload($$programId: ProgramId!) {
+  program(programId: $$programId) {
     id
     name
     description
@@ -114,10 +118,12 @@ query PdfSummaryJobPayload($programId: ProgramId!) {
       }
     }
     observations {
+      hasMore
       matches { ...Observation }
     }
   }
-  observations(WHERE: { program: { id: { EQ: $programId } } }, LIMIT: 1000) {
+  observations(WHERE: { program: { id: { EQ: $$programId } } }, LIMIT: ${MaxObservations}) {
+    hasMore
     matches { ...ItcObservation }
   }
 }
