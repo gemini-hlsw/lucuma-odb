@@ -17966,6 +17966,11 @@ type Program {
   """
   dismissedWarnings: [ObservationValidationCode!]!
 
+  """
+  List of related emails sent by the system.
+  """
+  emails: [Email!]!
+
 }
 
 """
