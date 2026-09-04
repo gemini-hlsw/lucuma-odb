@@ -633,6 +633,26 @@ class perProgramPerConfigCalibrations
     }
   }
 
+  test("add calibrations is idempotent for IFU modes"):
+    for {
+      pid  <- createProgramAs(pi)
+      tid1 <- createTargetAs(pi, pid, "One")
+      tid2 <- createTargetAs(pi, pid, "Two")
+      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthIfu.some, tid1)
+      oid2 <- createObservationAs(pi, pid, ObservingModeType.GmosSouthIfu.some, tid2)
+      _    <- prepareObservation(pi, pid, oid1, tid1) *> prepareObservation(pi, pid, oid2, tid2)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
+      ob1  <- queryObservations(pid)
+      _    <- recalculateCalibrations(pid, when, oid1)
+      _    <- recalculateCalibrations(pid, when, oid2)
+      ob2  <- queryObservations(pid)
+    } yield {
+      // One specphot and one twilight per science mode.
+      assertEquals(ob1.countCalibrations, 4)
+      assertEquals(ob2.callibrationIds.toSet, ob1.callibrationIds.toSet)
+    }
+
   test("calibration observations can't be modified by the pi") {
     for {
       pid  <- createProgramAs(pi)
