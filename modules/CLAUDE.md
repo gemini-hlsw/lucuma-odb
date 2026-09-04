@@ -109,8 +109,8 @@ Express such an invariant as a `CONSTRAINT TRIGGER ... DEFERRABLE INITIALLY
 DEFERRED` instead — the way `register_observing_mode` does for
 `check_observing_mode_consistency`, and `V1308__telluric_check_constraint_triggers.sql`
 does for both telluric checks. Triggers are restored **post-data**, so they never
-fire during a data load, and deferring to commit lets the two tables be written
-in either order within one transaction.
+fire during a data load, and deferring to commit means the check itself is
+insensitive to statement ordering within a transaction (subject to other constraints such as FKs).
 
 ## Adding a New Observing Mode — Checklist
 

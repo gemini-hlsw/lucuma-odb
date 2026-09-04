@@ -18,9 +18,9 @@
 --
 -- Each invariant is expressed instead as a deferrable constraint trigger,
 -- matching what register_observing_mode already does for the cross-table
--- observing mode consistency check.  Triggers are restored post-data, so they
--- never fire during a data load, and deferring to commit means the two tables
--- may be written in either order within a transaction.
+-- observing mode consistency check. Triggers are restored post-data, so they
+-- never fire during a data load, and deferring to commit means the check itself
+-- is insensitive to statement ordering within a transaction (subject to other constraints such as FKs).
 
 -- Flamingos 2 long slit: only a telluric may name the mode it calibrates.
 
