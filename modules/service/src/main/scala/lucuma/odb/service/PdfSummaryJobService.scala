@@ -29,56 +29,33 @@ import scala.concurrent.duration.*
 import Services.Syntax.*
 
 /**
- * Proposal-summary PDF jobs (`t_summary_job`), a queue of (program, partner)
- * pairs to render.  The web side enqueues inside the caller's transaction.
- * The pdf-summary daemon takes the `next` job, renders it with pyexplore and
- * calls `finalize` with the PDF, or `fail`.  `next` and `finalize` open their
- * own transactions: the payload is a GraphQL query and the upload is a network
- * call, neither of which belongs inside one.  See `PdfSummaryJobPayload` for
- * the renderer contract.
+ * Proposal-summary PDF jobs (`t_summary_job`): one (program, partner) pair per
+ * job.  The web side enqueues; the daemon takes the `next` job, renders it and
+ * calls `finalize` or `fail`.  `next` and `finalize` manage their own
+ * transactions, since the payload query and the upload cannot run inside one.
  */
 trait PdfSummaryJobService[F[_]]:
 
-  /**
-   * Enqueue one job per partner the proposal applies to (one job with no
-   * partner when there are no partner splits).  A partner that already has a
-   * `pending` job is not enqueued again.  The program must have a proposal.
-   */
+  /** One job per partner with a split, or a single partnerless job; a `pending` duplicate is skipped. */
   def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
   /** The `regenerateProposalSummaries` mutation: authorize, then enqueue. */
   def regenerate(pid: Program.Id)(using NoTransaction[F], Services.PiAccess): F[Result[Unit]]
 
   /**
-   * Claim the oldest `pending` job whose retry time has passed, moving it to
-   * `rendering` and counting the attempt, then build its renderer payload
-   * (with presigned URLs for the proposal's attachments) and choose where the
-   * PDF will land.  A job whose payload cannot be built is marked `failed` and
-   * skipped.  `None` when nothing is waiting.  Requires a `Services` with a
-   * GraphQL mapping.
-   *
-   * First, `rendering` jobs older than `StaleRender` (their daemon died
-   * mid-render) are returned to `pending`, or to `failed` when they are out of
-   * attempts, so a crashed render is retried by whoever asks next.
+   * Sweep stale `rendering` jobs, then claim the oldest due `pending` job and
+   * build its payload.  `None` when the queue is empty.  Needs a `Services`
+   * with a GraphQL mapping.
    */
   def next(using NoTransaction[F], ServiceAccess): F[Option[PdfSummaryJobService.Prepared]]
 
   /**
-   * Upload the rendered PDF of a `rendering` job, record it as the program's
-   * summary attachment for its partner, replacing any previous one, and delete
-   * the job.  The replaced file, if any, is removed from storage after the
-   * transaction commits; that removal is best effort, since an orphan in S3 is
-   * tolerable and a dangling attachment row is not.  When the job is no longer
-   * `rendering` (swept as stale, and possibly re-claimed) nothing is recorded
-   * and the upload is removed instead.
+   * Upload the PDF, replace the partner's summary attachment and delete the
+   * job.  If the job was swept meanwhile the upload is discarded instead.
    */
   def finalize(prepared: PdfSummaryJobService.Prepared, pdf: fs2.Stream[F, Byte])(using NoTransaction[F], ServiceAccess): F[Unit]
 
-  /**
-   * Record a render failure.  A permanent failure, or one at the attempt cap,
-   * marks the job `failed`; otherwise it goes back to `pending` with an
-   * exponential backoff.
-   */
+  /** `failed` when permanent or out of attempts, else back to `pending` with backoff. */
   def fail(job: PdfSummaryJobService.Claimed, error: String, permanent: Boolean)(using Transaction[F], ServiceAccess): F[Unit]
 
 
@@ -110,7 +87,7 @@ object PdfSummaryJobService:
   def noProposal(pid: Program.Id): OdbError =
     OdbError.InvalidArgument(s"Program $pid has no proposal to summarize.".some)
 
-  def instantiate[F[_]: {Concurrent, UUIDGen}](s3FileService: S3FileService[F])(using Services[F]): PdfSummaryJobService[F] =
+  def instantiate[F[_]: {Concurrent, UUIDGen, Services}](s3FileService: S3FileService[F]): PdfSummaryJobService[F] =
     new PdfSummaryJobService[F]:
 
       private case class Queried(
@@ -129,18 +106,24 @@ object PdfSummaryJobService:
 
       private def extract(json: Json): Either[String, Queried] =
         val c = json.hcursor
-        // Both observation lists are capped at MaxObservations; a truncated one
-        // must not render.
+        // A truncated observation list must not render.
         def complete(obs: io.circe.ACursor): Either[String, Unit] =
           obs.downField("hasMore").as[Boolean].leftMap(_.message)
             .filterOrElse(!_, s"more than ${PdfSummaryJobPayload.MaxObservations} observations").void
-        (
-          c.downField("program").focus.filter(!_.isNull).toRight("program not found"),
+
+        ( c.downField("program").focus.filter(!_.isNull).toRight("program not found"),
           c.downField("observations").downField("matches").as[List[Json]].leftMap(_.message),
           complete(c.downField("observations")),
           complete(c.downField("program").downField("observations"))
         ).tupled.map: (program, obs, _, _) =>
-          val ref = program.hcursor.downField("proposal").downField("reference").downField("label").as[String].toOption
+          val ref =
+            program
+              .hcursor
+              .downField("proposal")
+              .downField("reference")
+              .downField("label")
+              .as[String]
+              .toOption
           Queried(program, obs, ref)
 
       private def presignAttachments(pid: Program.Id)(using SuperUserAccess): F[List[PdfSummaryJobPayload.AttachmentUrl]] =
@@ -176,10 +159,10 @@ object PdfSummaryJobService:
             atts <- presignAttachments(job.programId)
             uuid <- UUIDGen[F].randomUUID
           yield
-            // The partner, not the style, distinguishes one program's summaries:
-            // t_attachment is unique on (program, file name), and the style is a
-            // function of the partner anyway (see SummaryStyle.forPartner).
+            // File names are unique per program, and the partner is what tells
+            // one program's summaries apart.
             val partner  = job.partner.foldMap(p => s"-${Enumerated[Partner].tag(p)}")
+            // TODO: Review if the naming patter is ok for science
             val fileName = NonEmptyString.unsafeFrom(s"${q.proposalRef.getOrElse(job.programId.toString)}-summary$partner.pdf")
             val payload  = PdfSummaryJobPayload.build(q.program, q.observations, atts)
             Prepared(job, payload, fileName, s3FileService.filePath(job.programId, uuid, fileName))
@@ -191,8 +174,7 @@ object PdfSummaryJobService:
             session.execute(Statements.FailStale)((MaxAttempts, StaleRender.toSeconds)) *>
               session.execute(Statements.RependStale)(StaleRender.toSeconds) *>
               session.option(Statements.Claim)
-        // A job whose payload cannot be built is failed and the next one is
-        // tried, so that `None` really means the queue is empty.
+        // An unbuildable payload fails the job and moves on, so None means empty.
         claim.flatMap(_.flatTraverse: job =>
           Services.asSuperUser(prepare(job)).flatMap:
             case Right(prepared) => prepared.some.pure[F]
@@ -205,8 +187,7 @@ object PdfSummaryJobService:
         Services.asSuperUser:
           for
             size     <- s3FileService.upload(prepared.remotePath, pdf)
-            // The file left over: the replaced summary, or this upload itself
-            // when the job was swept (and possibly re-claimed) mid-render.
+            // The replaced summary, or this upload if the job was swept.
             obsolete <- services.transactionally:
                           session.option(Statements.LockRendering)(job.id).flatMap:
                             case None    => prepared.remotePath.some.pure[F]
