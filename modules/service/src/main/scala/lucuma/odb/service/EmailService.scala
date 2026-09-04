@@ -35,7 +35,7 @@ trait EmailService[F[_]] {
     to: EmailAddress,
     subject: NonEmptyString,
     textMessage: NonEmptyString,
-    htmlMessage: Option[NonEmptyString]
+    htmlMessage: Option[NonEmptyString] = None
   )(using Transaction[F], SuperUserAccess): F[Result[EmailId]]
 }
 
