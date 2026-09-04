@@ -16,13 +16,13 @@ import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.enums.GmosBinning
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthFpu
-import lucuma.core.enums.GmosNorthIfuFpu
 import lucuma.core.enums.GmosNorthGrating
+import lucuma.core.enums.GmosNorthIfuFpu
 import lucuma.core.enums.GmosRoi
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GmosSouthFpu
-import lucuma.core.enums.GmosSouthIfuFpu
 import lucuma.core.enums.GmosSouthGrating
+import lucuma.core.enums.GmosSouthIfuFpu
 import lucuma.core.enums.GmosXBinning
 import lucuma.core.enums.GmosYBinning
 import lucuma.core.enums.GnirsCamera
