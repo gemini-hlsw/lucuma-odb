@@ -18287,6 +18287,11 @@ type Program {
   """
   maxSchedulingMode: SchedulingMode!
 
+  """
+  List of related emails sent by the system.
+  """
+  emails: [Email!]!
+
 }
 
 """

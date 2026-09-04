@@ -60,7 +60,8 @@ trait ProgramMapping[F[_]]
      with GroupElementView[F]
      with UserInvitationTable[F]
      with KeyValueEffectHandler[F]
-     with AllocationTable[F] {
+     with AllocationTable[F]
+     with EmailTable[F] {
 
   def itcClient: ItcClient[F]
   def services(using User): Resource[F, Services[F]]
@@ -110,6 +111,7 @@ trait ProgramMapping[F[_]]
       SqlField("tooActivationCeiling", ProgramView.TooActivationCeiling),
       SqlField("maxTooActivation", ProgramView.MaxTooActivation),
       SqlField("maxSchedulingMode", ProgramView.MaxSchedulingMode),
+      SqlObject("emails", Join(ProgramView.Id, EmailTable.ProgramId)),
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
