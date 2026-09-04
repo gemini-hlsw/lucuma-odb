@@ -38,9 +38,19 @@ object PdfSummaryJobDaemon:
     pollPeriod: FiniteDuration,
     session:    Resource[F, Session[F]],
     services:   Resource[F, Services[F]],
-    renderer:   PdfRenderer[F]
+    renderer:   PdfRenderer[F],
+    keepFiles:  Boolean = false
   ): Resource[F, Unit] =
     given Logger[F] = LF.getLoggerFromName("pdf-summary-jobs")
+
+    // The PDF is uploaded and then thrown away, so `keepFiles` is the only way
+    // to look at what was actually rendered.  Debugging only: nothing sweeps
+    // these up, and each one is several megabytes.
+    val workspace: Resource[F, fs2.io.file.Path] =
+      if keepFiles then
+        Resource.eval(Files[F].createTempDirectory)
+          .evalTap(d => info"Keeping the rendered PDF in $d")
+      else Files[F].tempDirectory
 
     def logged(what: String)(fa: F[Unit]): F[Unit] =
       fa.handleErrorWith(e => Logger[F].error(e)(s"PDF summary job daemon: $what failed"))
@@ -58,7 +68,7 @@ object PdfSummaryJobDaemon:
 
     // Render outside any transaction or pooled session: it takes minutes.
     def render(prepared: PdfSummaryJobService.Prepared): F[Unit] =
-      Files[F].tempDirectory.use: dir =>
+      workspace.use: dir =>
         val out = dir / prepared.fileName.value
         renderer.render(prepared.payload, prepared.job.style, out).flatMap:
           case Left(err) => fail(prepared, err)

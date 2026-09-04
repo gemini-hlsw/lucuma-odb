@@ -192,9 +192,9 @@ object PMain extends MainParams {
                               schema
                             )
       servicesResource  = pool.evalMap(services(user, c.email, c.commitHash, ptc, httpClient, itcClient, gaiaClient, horizonsClient, s3FileService, mapping))
-      renderer          = PdfRenderer.subprocess[F](c.pdfSummary.python, c.pdfSummary.renderTimeout)
+      renderer          = PdfRenderer.subprocess[F](c.pdfSummary.python, c.pdfSummary.renderTimeout, c.pdfSummary.keepTempFiles)
       _                <- Resource.eval(info"PDF summary job daemon starting")
-      _                <- PdfSummaryJobDaemon.run(c.obscalcPoll, pool, servicesResource, renderer)
+      _                <- PdfSummaryJobDaemon.run(c.obscalcPoll, pool, servicesResource, renderer, c.pdfSummary.keepTempFiles)
     } yield ExitCode.Success
 
   def runF(using Logger[IO], LoggerFactory[IO]): IO[ExitCode] =

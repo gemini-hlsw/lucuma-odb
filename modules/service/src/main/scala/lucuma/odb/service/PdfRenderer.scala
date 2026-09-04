@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.effect.Async
+import cats.effect.Resource
 import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import fs2.Stream
@@ -52,11 +53,23 @@ object PdfRenderer:
    * handed over as a file so a large one never hits argument limits, and the
    * process is killed when `timeout` passes.
    */
-  def subprocess[F[_]: {Async, Files, Processes, LoggerFactory as LF}](python: String, timeout: FiniteDuration): PdfRenderer[F] =
+  def subprocess[F[_]: {Async, Files, Processes, LoggerFactory as LF}](
+    python:    String,
+    timeout:   FiniteDuration,
+    keepFiles: Boolean = false
+  ): PdfRenderer[F] =
     given Logger[F] = LF.getLoggerFromName(LoggerName)
 
+    // Kept payloads let a failed render be reproduced by hand:
+    // `python -m pyexplore.pdf.render --payload <file> --style ... --output ...`
+    val payloadFileResource: Resource[F, Path] =
+      if keepFiles then
+        Resource.eval(Files[F].createTempFile(None, "summary-payload-", ".json", None))
+          .evalTap(f => Logger[F].info(s"Keeping the renderer payload at $f"))
+      else Files[F].tempFile(None, "summary-payload-", ".json", None)
+
     (payload, style, output) =>
-      Files[F].tempFile(None, "summary-payload-", ".json", None).use: payloadFile =>
+      payloadFileResource.use: payloadFile =>
         val write =
           Stream.emit(payload.noSpaces).through(text.utf8.encode).through(Files[F].writeAll(payloadFile)).compile.drain
 

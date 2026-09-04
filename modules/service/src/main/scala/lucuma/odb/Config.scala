@@ -257,14 +257,18 @@ object Config:
   case class PdfSummary(
     python:         String,
     renderTimeout:  FiniteDuration,
-    maxConnections: Int
+    maxConnections: Int,
+    keepTempFiles:  Boolean
   )
 
   object PdfSummary:
     lazy val fromCiris: ConfigValue[Effect, PdfSummary] = (
       envOrProp("PDF_SUMMARY_PYTHON").default("/opt/pyexplore/bin/python"),
       envOrProp("PDF_SUMMARY_RENDER_TIMEOUT_SECONDS").as[FiniteDuration].default(10.minutes),
-      envOrProp("PDF_SUMMARY_MAX_CONNECTIONS").as[Int].default(4)
+      envOrProp("PDF_SUMMARY_MAX_CONNECTIONS").as[Int].default(4),
+      // For debugging: keeps the payload and the rendered PDF on disk, logging
+      // where each went.  Never on in a deployed dyno; nothing cleans them up.
+      envOrProp("PDF_SUMMARY_KEEP_TEMP_FILES").as[Boolean].default(false)
     ).parMapN(PdfSummary.apply)
 
   case class Aws(
