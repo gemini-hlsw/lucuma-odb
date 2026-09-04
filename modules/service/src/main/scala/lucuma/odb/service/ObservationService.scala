@@ -55,6 +55,7 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.Tag
+import lucuma.odb.data.TooWindow
 import lucuma.odb.graphql.input.ConstraintSetInput
 import lucuma.odb.graphql.input.ElevationRangeInput
 import lucuma.odb.graphql.input.ImagingScienceRequirementsInput
@@ -249,6 +250,22 @@ object ObservationService {
               OdbError.InvalidArgument(s"targetCoordinates matches more than $max observations; narrow the cone.".some).asFailure
             else Result(ids)
 
+      // Written after the insert rather than as part of it: the ToO window is
+      // optional and the insert's column list is positional.
+      private def setTooWindow(
+        oid:    Observation.Id,
+        window: Nullable[TooWindow]
+      )(using Transaction[F]): F[Unit] =
+        window.toOptionOption.fold(().pure[F]): o =>
+          val af =
+            sql"""
+              UPDATE t_observation
+                 SET c_too_window         = ${time_span.opt},
+                     c_too_window_forever = $bool
+               WHERE c_observation_id = $observation_id
+            """.apply(o.collect { case TooWindow.For(d) => d }, o.contains(TooWindow.Forever), oid)
+          session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
+
       private def setTimingWindows(
         oids:          List[Observation.Id],
         timingWindows: Option[List[TimingWindowInput]],
@@ -296,6 +313,10 @@ object ObservationService {
               .flatTap: rOid =>
                 rOid.flatTraverse: oid =>
                   Services.asSuperUser(setTimingWindows(List(oid), SET.scheduling.flatMap(_.timingWindows.toOption)))
+
+              .flatTap: rOid =>
+                rOid.flatTraverse: oid =>
+                  setTooWindow(oid, SET.scheduling.fold(Nullable.Absent)(_.tooWindow)).map(Result.apply)
 
               .flatMap: rOid =>
                 SET.attachments.fold(rOid.pure[F]): aids =>
@@ -1158,6 +1179,11 @@ object ObservationService {
         in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates) ++
         in.imaging.toList.flatMap(imagingRequirementsUpdates)
 
+    // Clearing the scheduling constraints clears the ToO window with them; an
+    // edit that does not mention them leaves it alone.
+    private def tooWindowEdit(SET: ObservationPropertiesInput.Edit): Nullable[TooWindow] =
+      SET.scheduling.fold(Nullable.Null, Nullable.Absent, _.tooWindow)
+
     def updates(SET: ObservationPropertiesInput.Edit): Result[Option[NonEmptyList[AppliedFragment]]] = {
       val upExistence         = sql"c_existence = $existence"
       val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
@@ -1165,11 +1191,15 @@ object ObservationService {
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
       val upSchedulingMode    = sql"c_scheduling_mode = $scheduling_mode"
+      val upTooWindow         = sql"c_too_window = ${time_span.opt}"
+      val upTooWindowForever  = sql"c_too_window_forever = $bool"
 
       val ups: List[AppliedFragment] =
         List(
           SET.existence.map(upExistence),
           SET.subtitle.foldPresent(upSubtitle),
+          tooWindowEdit(SET).foldPresent(o => upTooWindow(o.collect { case TooWindow.For(d) => d })),
+          tooWindowEdit(SET).foldPresent(o => upTooWindowForever(o.contains(TooWindow.Forever))),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),

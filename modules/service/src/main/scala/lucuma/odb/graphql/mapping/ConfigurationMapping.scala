@@ -23,6 +23,7 @@ import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ObservationView
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.json.region.query.given
+import lucuma.odb.json.time.query.given
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
@@ -50,6 +51,7 @@ trait ConfigurationMapping[F[_]]
       SqlObject("target"),
       SqlObject("conditions"),
       SqlObject("observingMode"),
+      SqlObject("schedulingWindow"),
     )
 
   private lazy val ObservationConfigurationMapping: ObjectMapping =
@@ -67,7 +69,28 @@ trait ConfigurationMapping[F[_]]
       EffectField("target", targetQueryHandler, List("id", "referenceTime")),
       SqlObject("conditions"),
       SqlObject("observingMode"),
+      // Computed rather than stored: the total time the observation's timing
+      // windows (or, for a ToO, its stated ToO window) leave it available.
+      EffectField("schedulingWindow", schedulingWindowQueryHandler, List("id")),
     )
+
+  def schedulingWindowQueryHandler: EffectHandler[F] =
+    new EffectHandler[F] {
+
+      def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
+        (for {
+          oids    <- ResultT(queries.parTraverse((_, cursor) => cursor.fieldAs[Observation.Id]("id")).pure[F])
+          results <- ResultT.liftF(services.use(s => Services.asSuperUser(s.schedulingWindowService.select(oids))))
+          res     <- ResultT.fromResult:
+                       oids.zip(queries).traverse: (oid, qc) =>
+                         val (query, parentCursor) = qc
+                         for {
+                           window       <- Result.fromOption(results.get(oid), s"No scheduling window for $oid.")
+                           childContext <- Query.childContext(parentCursor.context, query)
+                         } yield CirceCursor(childContext, window.asJson, Some(parentCursor), parentCursor.fullEnv)
+        } yield res).value
+
+    }
 
   def targetQueryHandler: EffectHandler[F] =
 

@@ -165,3 +165,24 @@ _Avoid_: status override, manual status.
 **Active Period**:
 The `[activeStart, activeEnd]` date interval during which a program's observations may be scheduled, defaulted from the Call for Proposals when there is one. Staff-editable. The source of the Default Status.
 _Avoid_: observing window (that is an observation-level concept), semester dates.
+
+### Scheduling Windows
+
+**Timing Window**:
+One entry in an observation's list of when it may (INCLUDE) or may not (EXCLUDE) be observed: a start, an optional end (at an instant, or after a duration), and an optional repeat. Stored in `t_timing_window`. The code's name for what science staff call a scheduling window, and always one entry — never the total.
+_Avoid_: scheduling window (for a single entry).
+
+**Scheduling Window**:
+The total time an observation is available for scheduling: the union of its INCLUDE timing windows minus its EXCLUDE ones, within the program's active period. Science staff say "the window" and mean this sum, never the length of one opening, and it is about how long the observation is *open* — unrelated to how long it takes to execute. An observation with no timing windows is available for the whole active period. Wall-clock rather than observable time, because a Target of Opportunity awaiting its alert has no coordinates. Computed by `SchedulingWindowService` and exposed as `Configuration.schedulingWindow`.
+_Avoid_: timing window (that is one entry), availability, visibility (that is the sky), duration (that is execution time).
+
+**ToO Window**:
+What a Target of Opportunity states instead of timing windows: how long it needs to be open once triggered, either a length or Forever. A ToO cannot state absolute dates, so the trigger supplies the start and opens a real timing window of this length. It is also the ToO's Scheduling Window, deliberately unclipped by the end of the semester, so a 24 hour ToO triggered on the last night is still a 24 hour ToO. Stored as `t_observation.c_too_window` / `c_too_window_forever`; unstated, the trigger falls back to `too_default_window()` (24 hours) for rapid and interrupting, and opens nothing for standard.
+_Avoid_: default window, automatic window (those name what the trigger creates, not what the PI stated).
+
+**Minimum Scheduling Window**:
+The Scheduling Window recorded on a configuration request when it is made, in `t_configuration_request.c_min_scheduling_window`, and approved at Phase 1 along with the conditions, target and observing mode. An observation is subsumed by an approved configuration while its scheduling window is at least this long; a shorter one — windows where there were none, or a smaller total — needs a change request. Zero means unconstrained, which is what requests predating the column carry.
+_Avoid_: MSW, program minimum (it is per configuration, not per program).
+
+**Stated versus Default**:
+Only what the PI stated is recorded and enforced. An unstated ToO window is *not* recorded as the activation's default, because that default follows from how disruptive the ToO is, which the proposal's activation ceiling already governs — recording it would police the same fact twice and make escalating a standard ToO to rapid read as the PI shortening their own window.

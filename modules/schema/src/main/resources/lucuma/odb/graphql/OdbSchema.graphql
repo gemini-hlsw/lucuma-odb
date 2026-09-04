@@ -4464,6 +4464,16 @@ input SchedulingConstraintsInput {
   """
   timingWindows: [TimingWindowInput!]
 
+  """
+  How long a Target of Opportunity should be open for once triggered.  A ToO
+  cannot state absolute dates, so it states a length here instead of timing
+  windows and the trigger supplies the start.  Set to null to fall back on the
+  default for its activation.  Shortening it after the proposal is accepted
+  requires an approved configuration request, as with any other scheduling
+  window.
+  """
+  tooWindow: TooWindowInput
+
 }
 
 """
@@ -4501,6 +4511,14 @@ type SchedulingConstraints {
   empty, there are no timing constraints for the observation.
   """
   timingWindows: [TimingWindow!]!
+
+  """
+  How long this Target of Opportunity is open for once triggered.  Null when the
+  PI stated nothing, in which case the activation supplies the default: 24 hours
+  for RAPID and INTERRUPTING, indefinitely for STANDARD.  Always null for an
+  observation that is not a Target of Opportunity.
+  """
+  tooWindow: TooWindow
 
 }
 
@@ -17008,6 +17026,42 @@ type Configuration {
   conditions: ConfigurationConditions!
   target: ConfigurationTarget # may not be available
   observingMode: ConfigurationObservingMode
+
+  """
+  The total time the observation is available for scheduling -- how long it is
+  open, unrelated to how long it takes to execute.  Computed from the timing
+  windows, within the program's active period; an observation with no timing
+  windows is available for the whole of it.  For a Target of Opportunity it is
+  the ToO window instead, which is a length rather than a set of dates and so is
+  never clipped by the end of the semester.
+
+  On an approved configuration this is the *minimum*: an observation whose
+  scheduling window has become shorter than the one recorded here is no longer
+  covered by the request and needs a new one.
+  """
+  schedulingWindow: TimeSpan!
+}
+
+"""
+How long a Target of Opportunity is open for once its trigger fires.  A ToO
+cannot state absolute dates, so it states a length instead and the trigger
+supplies the start.
+"""
+type TooWindow {
+  "True when the observation is open indefinitely once triggered."
+  forever: Boolean!
+
+  "How long the observation is open for; null when it is open indefinitely."
+  duration: TimeSpan
+}
+
+"""
+Sets how long a Target of Opportunity is open for once triggered.  Exactly one
+of `duration` and `forever` must be given.
+"""
+input TooWindowInput @oneOf {
+  duration: TimeSpanInput
+  forever: Boolean
 }
 
 type ConfigurationConditions {

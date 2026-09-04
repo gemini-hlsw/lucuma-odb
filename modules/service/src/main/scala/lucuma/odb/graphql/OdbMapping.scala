@@ -309,6 +309,7 @@ object OdbMapping {
           with TimeChargeDiscountMapping[F]
           with TimeChargeInvoiceMapping[F]
           with TimeSpanMapping[F]
+          with TooWindowMapping[F]
           with TimingWindowMappings[F]
           with UpdateAsterismsResultMapping[F]
           with UpdateCallsForProposalsResultMapping[F]
@@ -510,6 +511,7 @@ object OdbMapping {
                 ObscalcUpdateMapping,
                 ObservationEditMapping,
                 ObservationMapping,
+                TooWindowMapping,
                 ObservationReferenceMapping,
                 ObservingModeGroupMapping,
                 ObservingModeGroupSelectResultMapping,

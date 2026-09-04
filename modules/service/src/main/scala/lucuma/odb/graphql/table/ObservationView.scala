@@ -32,6 +32,12 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val BlindOffsetTargetId: ColumnRef   = col("c_blind_offset_target_id",    target_id.opt)
       val BlindOffsetType: ColumnRef       = col("c_blind_offset_type",         blind_offset_type)
       val SignalToNoiseTargetId: ColumnRef = col("c_signal_to_noise_target_id", target_id.opt)
+      object TooWindow:
+        val SyntheticId: ColumnRef         = col("c_too_window_id",          observation_id.embedded)
+        val DurationId: ColumnRef          = col("c_too_window_duration_id", observation_id.embedded)
+        val Duration: ColumnRef            = col("c_too_window",             time_span.embedded)
+        val Forever: ColumnRef             = col("c_too_window_forever",     bool)
+
       val TooActivation: ColumnRef         = col("c_too_activation",            too_activation)
 
       val SchedulingMode: ColumnRef        = col("c_scheduling_mode",           scheduling_mode)

@@ -36,9 +36,11 @@ import lucuma.core.model.Configuration.ObservingMode
 import lucuma.core.model.Configuration.ObservingMode.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
+import lucuma.core.util.TimeSpan
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.json.region.query.given
+import lucuma.odb.json.time.query.given
 
 object configurationrequest:
 
@@ -194,17 +196,19 @@ object configurationrequest:
       (
         hc.downField("conditions").as[Conditions],
         hc.downField("target").as[Option[Either[Coordinates, Region]]], // may be missing
-        hc.downField("observingMode").as[Option[ObservingMode]]
+        hc.downField("observingMode").as[Option[ObservingMode]],
+        hc.downField("schedulingWindow").as[TimeSpan]
       ).tupled.flatMap:
-        case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode))
-        case (conds, None, _)                  => Left(DecodingFailures.NoReferenceCoordinates)
-        case (conds, _, None)                  => Left(DecodingFailures.NoObservingMode)
+        case (conds, Some(coords), Some(mode), win) => Right(Configuration(conds, coords, mode, win))
+        case (conds, None, _, _)                    => Left(DecodingFailures.NoReferenceCoordinates)
+        case (conds, _, None, _)                    => Left(DecodingFailures.NoObservingMode)
 
     given Encoder[Configuration] = c =>
       Json.obj(
         "conditions" -> c.conditions.asJson,
         "target" -> c.target.asJson,
-        "observingMode" -> c.observingMode.asJson
+        "observingMode" -> c.observingMode.asJson,
+        "schedulingWindow" -> c.schedulingWindow.asJson
       )
 
     given Decoder[ConfigurationRequest] = hc =>

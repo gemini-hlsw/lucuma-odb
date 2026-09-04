@@ -9,6 +9,7 @@ import lucuma.core.util.TimeSpan
 import lucuma.odb.graphql.table.AllocationTable
 import lucuma.odb.graphql.table.ArchiveMatchView
 import lucuma.odb.graphql.table.ChronConditionsEntryView
+import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ExchangeView
 import lucuma.odb.graphql.table.ExposureTimeModeView
 import lucuma.odb.graphql.table.Flamingos2DynamicView
@@ -31,6 +32,7 @@ import lucuma.odb.graphql.table.VisitTable
 import lucuma.odb.graphql.table.VisitorTable
 
 trait TimeSpanMapping[F[_]] extends AllocationTable[F]
+                               with ConfigurationRequestView[F]
                                with ExchangeView[F]
                                with ExposureTimeModeView[F]
                                with Flamingos2DynamicView[F]
@@ -64,6 +66,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(GhostIfuType    / "slitViewingCameraExposureTime", GhostIfuView.SlitViewingCamera.ExposureTime)(GhostIfuView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(GhostStaticType / "slitViewingCameraExposureTime", GhostStaticView.SlitViewingCamera.ExposureTime)(GhostStaticView.SlitViewingCamera.Id),
       timeSpanMappingAtPath(ArchiveMatchType / "exposure", ArchiveMatchView.Exposure.Value)(ArchiveMatchView.Exposure.SyntheticId),
+      timeSpanMappingAtPath(ConfigurationRequestType / "configuration" / "schedulingWindow", ConfigurationRequestView.MinSchedulingWindow)(ConfigurationRequestView.Id),
       timeSpanMappingAtPath(GroupType / "maximumInterval", GroupView.MaxInterval)(GroupView.MaxIntervalId),
       timeSpanMappingAtPath(GroupType / "minimumInterval", GroupView.MinInterval)(GroupView.MinIntervalId),
       timeSpanMappingAtPath(LargeProgramType / "totalTime", ProposalView.LargeProgram.TotalTime)(ProposalView.ProgramId),
@@ -96,6 +99,7 @@ trait TimeSpanMapping[F[_]] extends AllocationTable[F]
       timeSpanMappingAtPath(TimingWindowEndAfterType / "after", TimingWindowView.End.After)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(TimingWindowRepeatType / "period", TimingWindowView.End.Repeat.Period)(TimingWindowView.End.SyntheticId),
       timeSpanMappingAtPath(ObservationType / "observationDuration", ObservationView.ObservationDuration.ObservationDuration)(ObservationView.ObservationDuration.SyntheticId),
+      timeSpanMappingAtPath(SchedulingConstraintsType / "tooWindow" / "duration", ObservationView.TooWindow.Duration)(ObservationView.TooWindow.DurationId),
       timeSpanMappingAtPath(VisitorType / "totalRequestTime", VisitorTable.TotalRequestTime)(VisitorTable.TotalRequestTimeId)
     )
 

@@ -351,6 +351,7 @@ object ConfigurationService {
                   id
                 }
                 configuration {
+                  schedulingWindow { microseconds }
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -444,6 +445,7 @@ object ConfigurationService {
                     id
                     status
                     configuration {
+                      schedulingWindow { microseconds }
                       conditions {
                         imageQuality
                         cloudExtinction
@@ -570,6 +572,7 @@ object ConfigurationService {
             matches {
               id
               configuration {
+                schedulingWindow { microseconds }
                 conditions {
                   imageQuality
                   cloudExtinction
@@ -665,6 +668,7 @@ object ConfigurationService {
                   id
                   status
                   configuration {
+                    schedulingWindow { microseconds }
                     conditions {
                       imageQuality
                       cloudExtinction
@@ -782,6 +786,7 @@ object ConfigurationService {
                 id
                 status
                 configuration {
+                  schedulingWindow { microseconds }
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -912,6 +917,7 @@ object ConfigurationService {
                   matches {
                     id
                     configuration {
+                      schedulingWindow { microseconds }
                       conditions {
                         imageQuality
                         cloudExtinction
@@ -996,6 +1002,7 @@ object ConfigurationService {
                 id
                 status
                 configuration {
+                  schedulingWindow { microseconds }
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -1122,7 +1129,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_min_scheduling_window
         FROM v_configuration_request
         WHERE (
           c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
@@ -1151,7 +1159,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_north_ifu_fpu is not distinct from ${gmos_north_ifu_fpu.opt} AND
           c_gmos_south_ifu_grating is not distinct from ${gmos_south_grating.opt} AND
-          c_gmos_south_ifu_fpu is not distinct from ${gmos_south_ifu_fpu.opt}
+          c_gmos_south_ifu_fpu is not distinct from ${gmos_south_ifu_fpu.opt} AND
+          c_min_scheduling_window = $time_span
         )
       """.query(
         (
@@ -1185,7 +1194,8 @@ object ConfigurationService {
           gmos_north_grating.opt       *:
           gmos_north_ifu_fpu.opt       *:
           gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt
+          gmos_south_ifu_fpu.opt       *:
+          time_span
         ).emap:
           { case
             id                       *:
@@ -1219,6 +1229,7 @@ object ConfigurationService {
             gmosNorthIfuFpu          *:
             gmosSouthIfuGrating      *:
             gmosSouthIfuFpu          *:
+            minSchedulingWindow      *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
@@ -1317,7 +1328,8 @@ object ConfigurationService {
                         waterVapor
                       ),
                       t,
-                      m
+                      m,
+                      minSchedulingWindow
                     )
                   )
 
@@ -1353,6 +1365,7 @@ object ConfigurationService {
         cfg.observingMode.gmosNorthIfu.map(_.fpu)                               *:
         cfg.observingMode.gmosSouthIfu.map(_.grating)                           *:
         cfg.observingMode.gmosSouthIfu.map(_.fpu)                               *:
+        cfg.schedulingWindow                                                    *:
         EmptyTuple
       }
 
@@ -1389,7 +1402,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_min_scheduling_window
         ) VALUES (
           (select c_program_id from t_observation where c_observation_id = $observation_id),
           ${text_nonempty.opt},
@@ -1420,7 +1434,8 @@ object ConfigurationService {
           ${gmos_north_grating.opt},
           ${gmos_north_ifu_fpu.opt},
           ${gmos_south_grating.opt},
-          ${gmos_south_ifu_fpu.opt}
+          ${gmos_south_ifu_fpu.opt},
+          $time_span
         )
         ON CONFLICT DO NOTHING
         RETURNING
@@ -1454,7 +1469,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_min_scheduling_window
       """.query(
         (
           configuration_request_id     *:
@@ -1487,7 +1503,8 @@ object ConfigurationService {
           gmos_north_grating.opt       *:
           gmos_north_ifu_fpu.opt       *:
           gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt
+          gmos_south_ifu_fpu.opt       *:
+          time_span
         ).emap:
           { case
             id                       *:
@@ -1521,6 +1538,7 @@ object ConfigurationService {
             gmosNorthIfuFpu          *:
             gmosSouthIfuGrating      *:
             gmosSouthIfuFpu          *:
+            minSchedulingWindow      *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
@@ -1621,7 +1639,8 @@ object ConfigurationService {
                         waterVapor
                       ),
                       t,
-                      m
+                      m,
+                      minSchedulingWindow
                     )
                   )
 
@@ -1662,6 +1681,7 @@ object ConfigurationService {
         cfg.observingMode.gmosNorthIfu.map(_.fpu)                               *:
         cfg.observingMode.gmosSouthIfu.map(_.grating)                           *:
         cfg.observingMode.gmosSouthIfu.map(_.fpu)                               *:
+        cfg.schedulingWindow                                                    *:
         EmptyTuple
       }
 
