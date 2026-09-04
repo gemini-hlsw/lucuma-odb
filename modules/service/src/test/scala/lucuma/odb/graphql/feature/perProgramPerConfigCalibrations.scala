@@ -633,6 +633,29 @@ class perProgramPerConfigCalibrations
     }
   }
 
+  // Every mode admitted by CalibrationsUtils.perProgramFilter needs to be tested for idempotency.
+  List(
+    ObservingModeType.GmosNorthLongSlit,
+    ObservingModeType.GmosSouthLongSlit,
+    ObservingModeType.GmosNorthIfu,
+    ObservingModeType.GmosSouthIfu
+  ).foreach: mode =>
+    test(s"add calibrations is idempotent for $mode"):
+      for {
+        pid <- createProgramAs(pi)
+        tid <- createTargetAs(pi, pid, "One")
+        oid <- createObservationAs(pi, pid, mode.some, tid)
+        _   <- prepareObservation(pi, pid, oid, tid)
+        _   <- recalculateCalibrations(pid, when, oid)
+        ob1 <- queryObservations(pid)
+        _   <- recalculateCalibrations(pid, when, oid)
+        ob2 <- queryObservations(pid)
+      } yield {
+        // One specphot and one twilight for the single science configuration.
+        assertEquals(ob1.countCalibrations, 2)
+        assertEquals(ob2.callibrationIds.toSet, ob1.callibrationIds.toSet)
+      }
+
   test("calibration observations can't be modified by the pi") {
     for {
       pid  <- createProgramAs(pi)
