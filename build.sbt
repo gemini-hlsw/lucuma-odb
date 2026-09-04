@@ -71,7 +71,6 @@ ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=de
 
 // Disable plugin-injected CI steps, they will be run in a the dedicated `checks` job
 // instead of being repeated for each shard
-ThisBuild / lucumaCoverage           := false
 ThisBuild / tlCiHeaderCheck          := false
 ThisBuild / tlCiScalafmtCheck        := false
 ThisBuild / tlCiScalafixCheck        := false
