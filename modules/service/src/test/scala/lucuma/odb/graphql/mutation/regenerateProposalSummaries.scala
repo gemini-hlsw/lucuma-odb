@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.graphql
@@ -10,6 +10,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.parser.decode
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -99,7 +100,7 @@ class regenerateProposalSummaries extends OdbSuite
       _   <- addProposalPrerequisitesAs(pi, pid)
       tid <- createTargetWithProfileAs(pi, pid)
       _   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
-      _   <- if splits.isEmpty then IO.unit else addPartnerSplits(pi, pid, partnerSplits = splits)
+      _   <- addPartnerSplits(pi, pid, partnerSplits = splits)
       _   <- addCoisAs(pi, pid)
     yield pid
 
@@ -225,10 +226,17 @@ class regenerateProposalSummaries extends OdbSuite
       assertContains(payloadObs, fixtureObs, "execution", "digest")
   }
 
+  // Demo science proposals have no partner splits (a queue proposal cannot be
+  // submitted without them).
   test("a proposal without partner splits gets a single default-style job") {
     for
-      pid  <- setupProposal(splits = Nil)
-      _    <- regenerate(pi, pid)
+      cid  <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.DemoScience)
+      pid  <- createProgramWithNonPartnerPi(pi)
+      _    <- addDemoScienceProposal(pi, pid, cid)
+      _    <- addProposalPrerequisitesAs(pi, pid)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      _    <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _    <- submitProposal(pi, pid)
       jobs <- jobsFor(pid)
     yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiStandard)))
   }
@@ -273,6 +281,13 @@ class regenerateProposalSummaries extends OdbSuite
     for
       pid <- createProgramAs(pi)
       _   <- regenerateExpectError(pi, pid, s"Program $pid has no proposal to summarize.")
+    yield ()
+  }
+
+  test("an unsubmitted proposal cannot be summarized") {
+    for
+      pid <- setupProposal()
+      _   <- regenerateExpectError(pi, pid, s"The proposal of program $pid has not been submitted.")
     yield ()
   }
 

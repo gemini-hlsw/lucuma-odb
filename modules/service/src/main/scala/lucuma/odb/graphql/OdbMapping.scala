@@ -269,7 +269,6 @@ object OdbMapping {
           with ProperMotionMapping[F]
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
-          with RegenerateProposalSummariesResultMapping[F]
           with ProposalReferenceMapping[F]
           with GeminiProposalTypeMapping[F]
           with KeckProposalTypeMapping[F]
@@ -280,6 +279,7 @@ object OdbMapping {
           with RecordVisitResultMapping[F]
           with RedeemUserInvitationResultMapping[F]
           with RefreshArchiveDuplicationResultMapping[F]
+          with RegenerateProposalSummariesResultMapping[F]
           with RegionMapping[F]
           with ResetAcquisitionResultMapping[F]
           with RevokeUserInvitationResultMapping[F]
@@ -532,7 +532,6 @@ object OdbMapping {
                 ProperMotionMapping,
                 ProperMotionRaMapping,
                 ProposalMapping,
-                RegenerateProposalSummariesResultMapping,
                 ProposalReferenceMapping,
                 GeminiProposalTypeMapping,
                 KeckProposalTypeMapping,
@@ -548,6 +547,7 @@ object OdbMapping {
                 RecordVisitResultMapping,
                 RedeemUserInvitationResultMapping,
                 RefreshArchiveDuplicationResultMapping,
+                RegenerateProposalSummariesResultMapping,
                 ResetAcquisitionResultMapping,
                 RevokeUserInvitationResultMapping,
                 SchedulingConstraintsMapping,

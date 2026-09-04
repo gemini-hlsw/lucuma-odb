@@ -12,7 +12,8 @@
 --   rendering -> (deleted)  (PDF uploaded, attachment row replaced)
 --   rendering -> pending    (transient failure, retried after c_retry_at;
 --                            or a stale job whose daemon died mid-render)
---   rendering -> failed     (permanent failure, or the attempt cap)
+--   rendering -> failed     (permanent failure, or the attempt cap; terminal,
+--                            c_error says why)
 
 CREATE TYPE e_summary_job_state AS ENUM(
   'pending',
