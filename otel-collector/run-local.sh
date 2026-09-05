@@ -10,6 +10,7 @@
 #
 # Optional overrides (defaults shown):
 #   PORT=8888 OTLP_USER=otlp OTLP_PASSWORD=banana ./run-local.sh
+#   OTLP_ALLOWED_ORIGINS=https://local.lucuma.xyz:8080,https://local.lucuma.xyz:8081
 #
 # Then point ODB at it:
 #   export ODB_OTEL_ENDPOINT=http://localhost:8888
@@ -24,6 +25,7 @@ CONTAINER="${CONTAINER:-otel-local}"
 PORT="${PORT:-8888}"
 OTLP_USER="${OTLP_USER:-otlp}"
 OTLP_PASSWORD="${OTLP_PASSWORD:-banana}"
+OTLP_ALLOWED_ORIGINS="${OTLP_ALLOWED_ORIGINS:-https://local.lucuma.xyz:8080,https://local.lucuma.xyz:8081,https://local.gemini.edu:8080}"
 
 require() {
   local name="$1"
@@ -59,6 +61,7 @@ docker run --rm -d --name "$CONTAINER" \
   -p "${PORT}:${PORT}" \
   -e PORT="$PORT" \
   -e OTLP_HTPASSWD="$HTPASSWD" \
+  -e OTLP_ALLOWED_ORIGINS="$OTLP_ALLOWED_ORIGINS" \
   -e GRAFANA_OTLP_ENDPOINT="$GRAFANA_OTLP_ENDPOINT" \
   -e GRAFANA_OTLP_TOKEN="$GRAFANA_OTLP_TOKEN" \
   "$IMAGE" >/dev/null
