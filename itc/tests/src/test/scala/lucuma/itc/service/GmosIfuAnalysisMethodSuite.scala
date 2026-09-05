@@ -64,24 +64,32 @@ class GmosIfuAnalysisMethodSuite extends munit.FunSuite:
   private def sum(skyFibres: Int, radius: Double, isIfu2: Boolean): AnalysisMethod =
     AnalysisMethod.Ifu.Sum(skyFibres = skyFibres, num = radius, isIfu2 = isIfu2)
 
-  // A 0.2" radius is one lenslet pitch, which encloses only the element on the field centre.
-  test("GMOS North defaults to summing one lenslet pitch"):
-    assertEquals(north(GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits)), sum(500, 0.2, true))
-    assertEquals(north(GmosFpuMask.Builtin(GmosNorthFpu.IfuBlue)), sum(250, 0.2, false))
-    assertEquals(north(GmosFpuMask.Builtin(GmosNorthFpu.IfuRed)), sum(250, 0.2, false))
+  private def single(skyFibres: Int, offset: Double): AnalysisMethod =
+    AnalysisMethod.Ifu.Single(skyFibres = skyFibres, offset = offset)
 
-  test("GMOS South defaults to summing one lenslet pitch"):
-    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.Ifu2Slits)), sum(500, 0.2, true))
-    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuBlue)), sum(250, 0.2, false))
-    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuRed)), sum(250, 0.2, false))
+  // Zero offset is the element on the field centre, which is where a centred target sits.
+  test("GMOS North defaults to the element on the field centre"):
+    assertEquals(north(GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits)), single(500, 0.0))
+    assertEquals(north(GmosFpuMask.Builtin(GmosNorthFpu.IfuBlue)), single(250, 0.0))
+    assertEquals(north(GmosFpuMask.Builtin(GmosNorthFpu.IfuRed)), single(250, 0.0))
+
+  test("GMOS South defaults to the element on the field centre"):
+    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.Ifu2Slits)), single(500, 0.0))
+    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuBlue)), single(250, 0.0))
+    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuRed)), single(250, 0.0))
 
   // Nod & shuffle nods the same fibres between object and sky, so it gets a single sky sample
-  // rather than a whole block. Sending 250 or 500 here would overstate the S/N by ~40%. It is
-  // also not the recipe's "two slit" unit: `Gmos.isIfu2()` tests for IFU_1 alone.
-  test("GMOS South nod & shuffle IFU gets a single sky fibre and is not two-slit"):
-    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuNS2Slits)), sum(1, 0.2, false))
-    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuNSBlue)), sum(1, 0.2, false))
-    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuNSRed)), sum(1, 0.2, false))
+  // rather than a whole block. Sending 250 or 500 here would overstate the S/N by ~40%.
+  test("GMOS South nod & shuffle IFU gets a single sky fibre"):
+    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuNS2Slits)), single(1, 0.0))
+    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuNSBlue)), single(1, 0.0))
+    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuNSRed)), single(1, 0.0))
+
+  // Only a summation carries the flag, and nod & shuffle is not the recipe's "two slit" unit:
+  // `Gmos.isIfu2()` tests for IFU_1 alone.
+  test("GMOS South nod & shuffle IFU is not two-slit"):
+    val radius = GmosIfuAnalysis.Sum(arcsec(BigDecimal("0.5"))).some
+    assertEquals(south(GmosFpuMask.Builtin(GmosSouthFpu.IfuNS2Slits), radius), sum(1, 0.5, false))
 
   test("an explicit summation radius is passed through in arcsec"):
     assertEquals(

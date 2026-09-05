@@ -12,6 +12,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.itc.GraphType
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.GmosNorthFpuParam
 import lucuma.itc.service.GmosSouthFpuParam
@@ -85,18 +86,10 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
         case Left(errs) => fail(s"${mode.description}: ${errs.mkString("; ")}")
         case Right(r)   => r
 
-  private def runWith(
-    mode:     ObservingMode,
-    analysis: ItcObservationDetails.AnalysisMethod
-  ): IO[IntegrationTimeRemoteResult] =
-    localItc
-      .calculate(bodyConf(sourceDefinition, obs, mode, analysis).asJson.noSpaces)
-      .map:
-        case Left(errs) => fail(s"${mode.description}: ${errs.mkString("; ")}")
-        case Right(r)   => r
-
   private def arcsec(v: BigDecimal): Angle =
     Angle.signedDecimalArcseconds.reverseGet(v)
+
+  private val pitch: Angle = GmosIfuAnalysis.DefaultSumRadius
 
   private def assertRealSignal(mode: ObservingMode): IO[Unit] =
     run(mode).map: r =>
@@ -124,25 +117,23 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
         assertEquals(r.signalToNoiseAt.map(_.wavelength), wv.some, s"for $f")
     }
 
-  // The default radius is one lenslet pitch, which encloses only the central element, so it must
-  // agree with measuring that single element directly. The boundary is exact: at 0.2" the six
-  // neighbours sit at 0.2" and 0.2016" and are excluded by a strict `<`, so a drift in the
-  // recipe's geometry constants would silently pull them in and inflate the S/N by ~2.4x.
-  test("gmos ifu default radius encloses exactly the central element".tag(LegacyITCTest)):
+  // The default is the central element, and one lenslet pitch is the radius that encloses only
+  // that element, so the two must agree. The boundary is exact: at 0.2" the six neighbours sit at
+  // 0.2" and 0.2016" and are excluded by a strict `<`, so a drift in the recipe's geometry
+  // constants would silently pull them in and inflate the summed S/N by ~2.4x.
+  test("gmos ifu one lenslet pitch encloses exactly the central element".tag(LegacyITCTest)):
     List(GmosNorthFpu.Ifu2Slits, GmosNorthFpu.IfuBlue).traverse_ { f =>
+      val mode = gnMode(f)
       for
-        dflt   <- run(gnMode(f))
-        single <- runWith(gnMode(f),
-                          ItcObservationDetails.AnalysisMethod.Ifu
-                            .Single(gnMode(f).ifuSky.get.fibres.value, 0.0)
-                  )
+        dflt   <- run(mode)
+        summed <- run(mode.copy(ifuAnalysis = GmosIfuAnalysis.Sum(pitch).some))
       yield
         assertEqualsDouble(dflt.ccds.head.singleSNRatio,
-                           single.ccds.head.singleSNRatio,
+                           summed.ccds.head.singleSNRatio,
                            1e-9,
                            s"$f"
         )
-        assertEqualsDouble(dflt.ccds.head.totalSNRatio, single.ccds.head.totalSNRatio, 1e-9, s"$f")
+        assertEqualsDouble(dflt.ccds.head.totalSNRatio, summed.ccds.head.totalSNRatio, 1e-9, s"$f")
     }
 
   // Widening the radius pulls in more fibres, which must raise the S/N until the added noise
@@ -150,9 +141,21 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
   test("gmos ifu summation radius changes the result".tag(LegacyITCTest)):
     val mode = gnMode(GmosNorthFpu.Ifu2Slits)
     for
-      narrow <- run(mode)
+      narrow <- run(mode.copy(ifuAnalysis = GmosIfuAnalysis.Sum(pitch).some))
       wider  <- run(mode.copy(ifuAnalysis = GmosIfuAnalysis.Sum(arcsec(0.5)).some))
     yield assert(
       wider.ccds.head.totalSNRatio > narrow.ccds.head.totalSNRatio,
-      s"0.5\" gave ${wider.ccds.head.totalSNRatio}, default gave ${narrow.ccds.head.totalSNRatio}"
+      s"0.5\" gave ${wider.ccds.head.totalSNRatio}, one pitch gave ${narrow.ccds.head.totalSNRatio}"
     )
+
+  // The two-slit IFU is the only mode with a signal-vs-pixel graph, and the recipe decides on the
+  // focal plane unit rather than the analysis, so the default sampling must still produce it.
+  test("gmos two slit ifu produces a pixel signal graph under the default".tag(LegacyITCTest)):
+    val mode = gnMode(GmosNorthFpu.Ifu2Slits)
+    localItc
+      .calculateGraphs(bodyConf(sourceDefinition, obs, mode, mode.analysisMethod).asJson.noSpaces)
+      .map:
+        case Left(errs) => fail(s"${mode.description}: ${errs.mkString("; ")}")
+        case Right(r)   =>
+          val types = r.groups.toList.flatMap(_.graphs.toList).map(_.graphType)
+          assert(types.contains(GraphType.SignalPixelGraph), s"got $types")

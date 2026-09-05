@@ -192,9 +192,8 @@ input GmosNImagingInput {
 How to sample a GMOS IFU field: exactly one of a summation radius or a single element offset.
 The number of fibres on sky is not settable — it follows from the focal plane unit.
 
-Omitting this on an IFU focal plane unit sums within one lenslet pitch (0.2 arcsec), which
-encloses only the element on the field centre. Supplying it with a non-IFU focal plane unit is
-an error.
+Omitting this on an IFU focal plane unit measures the single element on the field centre, which
+is where a centred target sits. Supplying it with a non-IFU focal plane unit is an error.
 """
 input GmosIfuAnalysisInput @oneOf {
   """
