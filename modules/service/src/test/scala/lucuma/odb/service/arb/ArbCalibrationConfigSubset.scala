@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2025 Association of Universities for Research in Astronomy, Inc. (AURA)
+// Copyright (c) 2016-2026 Association of Universities for Research in Astronomy, Inc. (AURA)
 // For license information see LICENSE or https://opensource.org/licenses/BSD-3-Clause
 
 package lucuma.odb.service.arb
@@ -48,3 +48,31 @@ object ArbCalibrationConfigSubset:
         f <- arbitrary[Flamingos2Filter]
         u <- arbitrary[Flamingos2Fpu]
       yield Flamingos2Configs(d, f, u)
+
+  given Arbitrary[GmosNIfuConfigs] =
+    Arbitrary:
+      for
+        g <- arbitrary[GmosNorthGrating]
+        f <- arbitrary[Option[GmosNorthFilter]]
+        u <- arbitrary[GmosNorthIfuFpu]
+        w <- arbitrary[Wavelength]
+        x <- arbitrary[GmosXBinning]
+        y <- arbitrary[GmosYBinning]
+        r <- arbitrary[GmosAmpReadMode]
+        a <- arbitrary[GmosAmpGain]
+        o <- arbitrary[GmosRoi]
+      yield GmosNIfuConfigs(g, f, u, w, x, y, r, a, o)
+
+  given Arbitrary[GmosSIfuConfigs] =
+    Arbitrary:
+      for
+        g <- arbitrary[GmosSouthGrating]
+        f <- arbitrary[Option[GmosSouthFilter]]
+        u <- arbitrary[GmosSouthIfuFpu]
+        w <- arbitrary[Wavelength]
+        x <- arbitrary[GmosXBinning]
+        y <- arbitrary[GmosYBinning]
+        r <- arbitrary[GmosAmpReadMode]
+        a <- arbitrary[GmosAmpGain]
+        o <- arbitrary[GmosRoi]
+      yield GmosSIfuConfigs(g, f, u, w, x, y, r, a, o)

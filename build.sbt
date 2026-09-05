@@ -18,7 +18,7 @@ val catsVersion                  = "2.13.0"
 val circeVersion                 = "0.14.16"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.0"
-val clueVersion                  = "0.58.0"
+val clueVersion                  = "0.58.2"
 val declineVersion               = "2.6.2"
 val flywayVersion                = "13.5.0"
 val fs2AwsVersion                = "6.2.0"
@@ -35,7 +35,7 @@ val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.3"
 val log4catsVersion              = "2.8.0"
 val lucumaCoreVersion            = "0.244.0"
-val lucumaGraphQLRoutesVersion   = "0.14.2"
+val lucumaGraphQLRoutesVersion   = "0.15.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.6"
@@ -71,7 +71,6 @@ ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=de
 
 // Disable plugin-injected CI steps, they will be run in a the dedicated `checks` job
 // instead of being repeated for each shard
-ThisBuild / lucumaCoverage           := false
 ThisBuild / tlCiHeaderCheck          := false
 ThisBuild / tlCiScalafmtCheck        := false
 ThisBuild / tlCiScalafixCheck        := false
