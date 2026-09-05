@@ -122,9 +122,9 @@ class createObservation_GmosIfu extends OdbSuite:
   private val defaultTelescopeConfigs =
     json"""[{ "offset": { "p": { "arcseconds": 0.000000 }, "q": { "arcseconds": 0.000000 } }, "guiding": "ENABLED" }]"""
 
-  // One lenslet pitch, which encloses only the element on the field centre.
+  // The element on the field centre, which is where a centred target sits.
   private val defaultAnalysis =
-    json"""{ "sumRadius": { "arcseconds": 0.200000 }, "singleOffset": null }"""
+    json"""{ "sumRadius": null, "singleOffset": { "arcseconds": 0.000000 } }"""
 
   test("create GMOS North IFU"):
     setup(northMode).flatMap: oid =>

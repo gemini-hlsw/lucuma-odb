@@ -14366,8 +14366,8 @@ type GmosNorthIfu {
   ifuAnalysis: GmosIfuAnalysis!
 
   """
-  Default IFU sampling: sum within one lenslet pitch (0.2 arcsec) of the field
-  centre, which encloses only the element on the target.
+  Default IFU sampling: the single element on the field centre, which is where a
+  centred target sits.
   """
   defaultIfuAnalysis: GmosIfuAnalysis!
 
@@ -14617,8 +14617,8 @@ type GmosSouthIfu {
   ifuAnalysis: GmosIfuAnalysis!
 
   """
-  Default IFU sampling: sum within one lenslet pitch (0.2 arcsec) of the field
-  centre, which encloses only the element on the target.
+  Default IFU sampling: the single element on the field centre, which is where a
+  centred target sits.
   """
   defaultIfuAnalysis: GmosIfuAnalysis!
 
