@@ -31,6 +31,7 @@ import skunk.codec.all.*
 import skunk.implicits.*
 
 import scala.io.Source
+import scala.util.Using
 
 class regenerateProposalSummaries extends OdbSuite
   with ObservingModeSetupOperations:
@@ -164,7 +165,7 @@ class regenerateProposalSummaries extends OdbSuite
         ))
 
   lazy val fixture: Json =
-    decode[Json](Source.fromResource("lucuma/odb/summary/payload-v1.json").mkString).toOption.get
+    decode[Json](Using.resource(Source.fromResource("lucuma/odb/summary/payload-v1.json"))(_.mkString)).toOption.get
 
   test("submission enqueues one pending job per partner"):
     for

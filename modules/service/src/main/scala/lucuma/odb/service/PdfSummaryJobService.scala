@@ -146,7 +146,7 @@ object PdfSummaryJobService:
         def check(ok: Boolean, error: => OdbError): Result[Unit] =
           if ok then Result.unit else error.asFailure
 
-        val allowed: F[Boolean] = user.role match
+        def allowed(using Transaction[F]): F[Boolean] = user.role match
           case StandardRole.Ngo(_, _) => false.pure[F]
           case _                      => programUserService.userHasWriteAccess(pid)
 
