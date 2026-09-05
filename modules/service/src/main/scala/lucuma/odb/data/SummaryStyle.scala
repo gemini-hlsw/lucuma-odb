@@ -3,6 +3,7 @@
 
 package lucuma.odb.data
 
+import lucuma.core.enums.Partner
 import lucuma.core.util.Enumerated
 
 /**
@@ -15,3 +16,18 @@ enum SummaryStyle(val tag: String, val rendererName: String) derives Enumerated:
   case GeminiInvestigatorsAtEnd extends SummaryStyle("gemini_investigators_at_end", "gemini-investigators-at-end")
   case Chile                    extends SummaryStyle("chile",                       "chile")
   case NoirlabDarp              extends SummaryStyle("noirlab_darp",                "noirlab-darp")
+
+object SummaryStyle:
+
+  val Default: SummaryStyle = GeminiStandard
+
+  // The OCS Phase 1 template map (P1PDF.templatesList).
+  def forPartner(partner: Option[Partner]): SummaryStyle =
+    partner.fold(Default):
+      case Partner.CA => GeminiInvestigatorsAtEnd
+      case Partner.CL => Chile
+      case Partner.KR => GeminiDarp
+      case Partner.US => NoirlabDarp
+      case Partner.AR |
+           Partner.BR |
+           Partner.UH => Default
