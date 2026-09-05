@@ -4140,10 +4140,10 @@ type Mutation {
   """
   Regenerate the proposal summary PDFs for a proposal: one per partner it
   applies to, each in that partner's style, replacing the existing SUMMARY
-  attachments once rendered.  
-  Rendering is asynchronous and completion shows up as the program's SUMMARY 
+  attachments once rendered.
+  Rendering is asynchronous and completion shows up as the program's SUMMARY
   attachments.
-  Requires staff access or PI/CoI membership in the program.
+  Requires write access to the program (staff, or membership as PI, CoI or support).
   """
   regenerateProposalSummaries(input: RegenerateProposalSummariesInput!): RegenerateProposalSummariesResult!
 
@@ -4999,7 +4999,7 @@ input ProgramPropertiesInput {
 
   """
   List of validation codes to treat as 'dismissed' by the workflow computation. This
-  field can only be set by staff users. 
+  field can only be set by staff users.
   """
   dismissedWarnings: [ObservationValidationCode!]
 

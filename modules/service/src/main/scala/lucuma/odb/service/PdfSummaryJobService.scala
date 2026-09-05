@@ -13,6 +13,7 @@ import io.circe.Json
 import io.circe.JsonObject
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
+import lucuma.core.model.StandardRole
 import lucuma.core.util.Enumerated
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -145,9 +146,13 @@ object PdfSummaryJobService:
         def check(ok: Boolean, error: => OdbError): Result[Unit] =
           if ok then Result.unit else error.asFailure
 
+        val allowed: F[Boolean] = user.role match
+          case StandardRole.Ngo(_, _) => false.pure[F]
+          case _                      => programUserService.userHasWriteAccess(pid)
+
         services.transactionallyT:
           for
-            _ <- ResultT(programUserService.userHasWriteAccess(pid).map(check(_, OdbError.NotAuthorized(user.id))))
+            _ <- ResultT(allowed.map(check(_, OdbError.NotAuthorized(user.id))))
             _ <- ResultT(session.unique(Statements.HasProposal)(pid).map(check(_, noProposal(pid))))
             _ <- ResultT.liftF(Services.asSuperUser(enqueue(pid)))
           yield ()

@@ -13,8 +13,13 @@ import io.circe.parser.decode
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ProgramUserRole
+import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.TimeAccountingCategory
+import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.SummaryStyle
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -269,14 +274,25 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(after.size, before.size * 2)
       assertEquals(after.count(_.state === "pending"), before.size)
 
-  test("only staff and the proposal's investigators may regenerate"):
+  test("staff, the proposal's investigators and its support may regenerate"):
     for
       pid <- setupProposal()
       _   <- submitProposal(pi, pid)
       _   <- regenerateExpectError(pi2, pid, OdbError.NotAuthorized(pi2.id).message)
-      _   <- regenerateExpectError(ngoCa, pid, OdbError.NotAuthorized(ngoCa.id).message)
       _   <- regenerateExpectError(guest, pid, OdbError.NotAuthorized(guest.id).message)
       _   <- regenerate(staff, pid)
+      mid <- addProgramUserAs(staff, pid, ProgramUserRole.SupportPrimary, PartnerLink.HasUnspecifiedPartner)
+      _   <- linkUserAs(staff, mid, pi2.id)
+      _   <- regenerate(pi2, pid)
+    yield ()
+
+  test("NGO users may not regenerate"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- regenerateExpectError(ngoCa, pid, OdbError.NotAuthorized(ngoCa.id).message)
+      _   <- setOneAllocationAs(staff, pid, TimeAccountingCategory.CA, ScienceBand.Band1, TimeSpan.fromHours(1).get)
+      _   <- regenerateExpectError(ngoCa, pid, OdbError.NotAuthorized(ngoCa.id).message)
     yield ()
 
   test("a program without a proposal cannot be summarized"):
