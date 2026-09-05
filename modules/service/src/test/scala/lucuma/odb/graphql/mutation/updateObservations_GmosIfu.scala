@@ -113,7 +113,7 @@ class updateObservations_GmosIfu extends OdbSuite:
       }
     """
 
-  private val defaultAnalysis = """{ "sumRadius": { "arcseconds": 0.200000 }, "singleOffset": null }"""
+  private val defaultAnalysis = """{ "sumRadius": null, "singleOffset": { "arcseconds": 0.000000 } }"""
   private val radiusHalf      = """{ "sumRadius": { "arcseconds": 0.500000 }, "singleOffset": null }"""
   private val offsetOne       = """{ "sumRadius": null, "singleOffset": { "arcseconds": 1.000000 } }"""
 

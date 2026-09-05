@@ -28,9 +28,9 @@ we could improve it in the future, but I don't want to have secrets on the clien
 
 * `otel-collector-config.yaml` — receivers, exporters, and pipelines for the collector.
 Secrets are injected via environment variables.
-* `nginx.conf.template` — nginx template, defines the allow list.
-* `entrypoint.sh` — materializes `OTLP_HTPASSWD` into
-  `/etc/nginx/.htpasswd`, and runs both processes.
+* `nginx.conf.template` — nginx template, includes the generated allow list.
+* `entrypoint.sh` — materializes `OTLP_HTPASSWD` into `/etc/nginx/.htpasswd`,
+  generates `/etc/nginx/origins.conf` from `OTLP_ALLOWED_ORIGINS`, and runs both processes.
 
 ### Heroku config vars
 
@@ -40,12 +40,24 @@ Secrets are injected via environment variables.
 | `GRAFANA_OTLP_ENDPOINT` | Full URL, e.g. `https://otlp-gateway-prod-us-east-3.grafana.net/otlp` |
 | `GRAFANA_OTLP_TOKEN` | Base64-encoded `instanceID:token` from Grafana Cloud |
 | `OTLP_HTPASSWD` | htpasswd entry for receiver auth, e.g. `otlp:$2y$05$...`. Generate with: `htpasswd -nbB otlp <password>` |
+| `OTLP_ALLOWED_ORIGINS` | Comma-separated browser origins that skip auth and get CORS headers, e.g. `https://explore.gemini.edu,https://local.lucuma.xyz:8080` |
 
 ### Browser origin allowlist
 
 Allow listed origins bypass Basic auth and receive CORS headers.
 Thus we avoid including the pwd or a token on the web applications though it
-is a weak form of protection. see `nginx.conf.template`
+is a weak form of protection.
+
+The list comes from the `OTLP_ALLOWED_ORIGINS` config var. Origins must match
+exactly (scheme, host and port, no trailing slash). Changing it only needs a
+dyno restart, no rebuild:
+
+```bash
+heroku config:set -a lucuma-otel-collector \
+  OTLP_ALLOWED_ORIGINS=https://explore.gemini.edu,https://explore-test.gemini.edu,https://explore-dev.lucuma.xyz,https://local.lucuma.xyz:8080,https://local.lucuma.xyz:8081,https://local.gemini.edu:8080,https://observe-test.hi.gemini.edu
+```
+
+If the var is unset, no origin is allowlisted and every request requires auth.
 
 ## Deploying changes
 
