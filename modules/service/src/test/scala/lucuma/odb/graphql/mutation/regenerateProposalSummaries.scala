@@ -84,7 +84,10 @@ class regenerateProposalSummaries extends OdbSuite
       services.pdfSummaryJobService.next.flatMap:
         case None    => List.empty.pure[IO]
         case Some(p) => loop(services).map(p :: _)
-    withServicesForObscalc(service)(loop).map(_.filter(_.job.programId === pid))
+    val dropOthers: IO[Unit] =
+      withSession: s =>
+        s.execute(sql"DELETE FROM t_summary_job WHERE c_program_id <> $program_id".command)(pid).void
+    dropOthers *> withServicesForObscalc(service)(loop)
 
   // Then render, upload and finalize.
   def renderAll(pid: Program.Id): IO[Unit] =
