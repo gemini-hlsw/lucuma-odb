@@ -30,8 +30,9 @@ object PdfRenderer:
   /** A failed render; `permanent` failures are not retried. */
   case class Error(message: String, permanent: Boolean)
 
-  // Exit code pyexplore uses for a payload it can never render (bad schema version, unknown style).
-  val PermanentExitCode: Int = 2
+  // Exit code pyexplore uses for a payload it can never render (bad schema
+  // version, unknown style).  Not 2: argparse exits 2 on a usage error.
+  val PermanentExitCode: Int = 3
 
   // How much of the renderer's stderr is kept as the job's error message.
   val MaxErrorLength: Int = 2000

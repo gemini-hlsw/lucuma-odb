@@ -39,7 +39,7 @@ class PdfRendererSuite extends CatsEffectSuite {
        |  shift
        |done
        |case "$style" in
-       |  chile)        echo "ValueError: Unknown style 'chile'" >&2; exit 2;;
+       |  chile)        echo "PermanentPayloadError: Unknown style 'chile'" >&2; exit 3;;
        |  noirlab-darp) echo "requests.ConnectionError: ITC unreachable" >&2; exit 1;;
        |  gemini-darp)  sleep 30;;
        |esac
@@ -68,9 +68,9 @@ class PdfRendererSuite extends CatsEffectSuite {
       assertEquals(out, payload.noSpaces.some)
   }
 
-  test("exit code 2 is a permanent failure carrying stderr") {
+  test("exit code 3 is a permanent failure carrying stderr") {
     render(SummaryStyle.Chile).map: (r, out) =>
-      assertEquals(r, PdfRenderer.Error("Renderer exited with code 2: ValueError: Unknown style 'chile'", permanent = true).asLeft)
+      assertEquals(r, PdfRenderer.Error("Renderer exited with code 3: PermanentPayloadError: Unknown style 'chile'", permanent = true).asLeft)
       assertEquals(out, none)
   }
 

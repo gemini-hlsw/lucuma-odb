@@ -1049,7 +1049,7 @@ lazy val calibrations = project
 
 // The pyexplore commit the proposal-summary renderer is built from.  Bump it
 // deliberately, by PR; never track a branch, so a deploy always builds the same renderer.
-lazy val pyexploreRef = "243b6b7d2763017888eea337c9a58753bb62d2bb"
+lazy val pyexploreRef = "f1e070eb6e3287474860e61dbcccb303799e7a9f"
 
 lazy val pdfSummary = project
   .in(file("modules/pdf-summary"))
