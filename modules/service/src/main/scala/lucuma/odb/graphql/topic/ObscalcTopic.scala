@@ -6,6 +6,7 @@ package lucuma.odb.graphql.topic
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
+import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
@@ -52,7 +53,7 @@ object ObscalcTopic:
       EditType
     ), Element](
       "Obscalc",
-      id"ch_obscalc_update",
+      ident"ch_obscalc_update",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, update._4, update._5, update._6, update._7, users)
     ) {
@@ -68,9 +69,12 @@ object ObscalcTopic:
         ).tupled
     }
 
-  def apply[F[_]: Concurrent: Logger: Tracer](
+  def create[F[_]: Concurrent: Logger](sup: Supervisor[F]): F[Topic[F, Element]] =
+    topic.create(sup)
+
+  def feed[F[_]: Concurrent: Logger: Tracer](
     s:         Session[F],
     maxQueued: Int,
-    sup:       Supervisor[F]
-  ): F[Topic[F, Element]] =
-    topic.create(s, maxQueued, sup)
+    top:       Topic[F, Element]
+  ): Stream[F, Unit] =
+    topic.feed(s, maxQueued, top)

@@ -51,7 +51,7 @@ object SsoMapping {
     def apply[F[_]](pool: Resource[F, Session[F]]): Resource[F, Channels[F]] =
       pool.map { s =>
         Channels(
-          apiKeyDeletions = s.channel(id"lucuma_api_key_deleted")
+          apiKeyDeletions = s.channel(ident"lucuma_api_key_deleted")
         )
       }
   }

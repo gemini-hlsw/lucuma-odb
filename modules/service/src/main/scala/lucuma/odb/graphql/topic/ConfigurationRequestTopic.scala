@@ -6,6 +6,7 @@ package lucuma.odb.graphql.topic
 import cats.effect.*
 import cats.effect.std.Supervisor
 import cats.implicits.*
+import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Program
@@ -29,7 +30,7 @@ object ConfigurationRequestTopic:
   private val topic =
     OdbTopic.define[(ConfigurationRequest.Id, Program.Id, EditType), Element](
       "Configuration Request",
-      id"ch_configuration_request_edit",
+      ident"ch_configuration_request_edit",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, users)
     ) {
@@ -41,9 +42,12 @@ object ConfigurationRequestTopic:
         ).tupled
     }
 
-  def apply[F[_]: Concurrent: Logger: Tracer](
+  def create[F[_]: Concurrent: Logger](sup: Supervisor[F]): F[Topic[F, Element]] =
+    topic.create(sup)
+
+  def feed[F[_]: Concurrent: Logger: Tracer](
     s:         Session[F],
     maxQueued: Int,
-    sup:       Supervisor[F]
-  ): F[Topic[F, Element]] =
-    topic.create(s, maxQueued, sup)
+    top:       Topic[F, Element]
+  ): Stream[F, Unit] =
+    topic.feed(s, maxQueued, top)

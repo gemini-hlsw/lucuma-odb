@@ -32,6 +32,7 @@ import lucuma.odb.data.Obscalc
 import lucuma.odb.graphql.OdbMapping
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.ObscalcTopic
+import lucuma.odb.graphql.topic.OdbTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
@@ -137,13 +138,13 @@ object CalcMain extends MainParams:
          Logger[F].error("Failed to get service user") *>
            MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
 
-  def topic[F[_]: Concurrent: Logger: Tracer](
+  def topic[F[_]: Temporal: Logger: Tracer](
     pool: Resource[F, Session[F]]
   ): Resource[F, Topic[F, ObscalcTopic.Element]] =
       for
         s <- Supervisor[F]
-        p <- pool
-        t <- Resource.eval(ObscalcTopic(p, 65536, s))
+        t <- Resource.eval(ObscalcTopic.create(s))
+        _ <- Resource.eval(OdbTopic.runFeeds("Obscalc", pool, s, p => List(ObscalcTopic.feed(p, 65536, t))))
       yield t
 
   def runObscalcDaemon[F[_]: {Async, Logger, Tracer as T}](

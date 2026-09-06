@@ -6,6 +6,7 @@ package lucuma.odb.graphql.topic
 import cats.effect.Concurrent
 import cats.effect.std.Supervisor
 import cats.syntax.all.*
+import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -32,7 +33,7 @@ object DatasetTopic:
   private val topic =
     OdbTopic.define[(Dataset.Id, Observation.Id, Program.Id, Boolean, EditType), Element](
       "Dataset",
-      id"ch_dataset_edit",
+      ident"ch_dataset_edit",
       _._3,
       (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
     ) {
@@ -46,9 +47,12 @@ object DatasetTopic:
         ).tupled
     }
 
-  def apply[F[_]: Concurrent: Logger: Tracer](
+  def create[F[_]: Concurrent: Logger](sup: Supervisor[F]): F[Topic[F, Element]] =
+    topic.create(sup)
+
+  def feed[F[_]: Concurrent: Logger: Tracer](
     s:         Session[F],
     maxQueued: Int,
-    sup:       Supervisor[F]
-  ): F[Topic[F, Element]] =
-    topic.create(s, maxQueued, sup)
+    top:       Topic[F, Element]
+  ): Stream[F, Unit] =
+    topic.feed(s, maxQueued, top)
