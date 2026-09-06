@@ -52,7 +52,7 @@ object TooTriggerTopic:
   private val topic =
     OdbTopic.define[(TooTrigger.Id, Observation.Id, Program.Id, TooTriggerStatus, TooActivation, EditType), Element](
       "TooTrigger",
-      id"ch_too_trigger_edit",
+      ident"ch_too_trigger_edit",
       _._3, // program id -> audience is anyone who can read the program
       (u, users) => Element(u._1, u._2, u._3, u._4, u._5, u._6, users)
     ) {

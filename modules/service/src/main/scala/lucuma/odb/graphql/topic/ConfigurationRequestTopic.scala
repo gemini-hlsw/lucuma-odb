@@ -30,7 +30,7 @@ object ConfigurationRequestTopic:
   private val topic =
     OdbTopic.define[(ConfigurationRequest.Id, Program.Id, EditType), Element](
       "Configuration Request",
-      id"ch_configuration_request_edit",
+      ident"ch_configuration_request_edit",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, users)
     ) {

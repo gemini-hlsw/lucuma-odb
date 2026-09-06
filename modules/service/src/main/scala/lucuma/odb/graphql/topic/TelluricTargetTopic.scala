@@ -32,7 +32,7 @@ object TelluricTargetTopic:
   private val topic =
     OdbTopic.define[(Observation.Id, Program.Id, Option[CalculationState], Option[CalculationState]), Element](
       "TelluricTarget",
-      id"ch_telluric_resolution",
+      ident"ch_telluric_resolution",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, update._4, users)
     ) {

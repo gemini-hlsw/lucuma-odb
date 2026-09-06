@@ -32,7 +32,7 @@ object CalibrationCalcTopic:
   private val topic =
     OdbTopic.define[(Observation.Id, Program.Id, Option[CalculationState], Option[CalculationState]), Element](
       "CalibrationCalc",
-      id"ch_calibration_calc",
+      ident"ch_calibration_calc",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, update._4, users)
     ) {

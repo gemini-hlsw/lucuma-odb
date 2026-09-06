@@ -37,7 +37,7 @@ object GroupTopic:
   private val topic =
     OdbTopic.define[(Option[Group.Id], Program.Id, EditType), Element](
       "Group",
-      id"ch_group_edit",
+      ident"ch_group_edit",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, users)
     ) {

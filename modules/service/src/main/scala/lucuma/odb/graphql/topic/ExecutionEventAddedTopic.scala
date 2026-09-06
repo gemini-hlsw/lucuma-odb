@@ -34,7 +34,7 @@ object ExecutionEventAddedTopic:
   private val topic =
     OdbTopic.define[(ExecutionEvent.Id, Program.Id, Observation.Id, Visit.Id, ExecutionEventType), Element](
       "ExecutionEvent",
-      id"ch_execution_event_added",
+      ident"ch_execution_event_added",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
     ) {

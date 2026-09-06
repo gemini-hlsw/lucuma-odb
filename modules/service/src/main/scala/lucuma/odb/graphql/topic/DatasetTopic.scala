@@ -33,7 +33,7 @@ object DatasetTopic:
   private val topic =
     OdbTopic.define[(Dataset.Id, Observation.Id, Program.Id, Boolean, EditType), Element](
       "Dataset",
-      id"ch_dataset_edit",
+      ident"ch_dataset_edit",
       _._3,
       (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
     ) {

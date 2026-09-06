@@ -53,7 +53,7 @@ object ObscalcTopic:
       EditType
     ), Element](
       "Obscalc",
-      id"ch_obscalc_update",
+      ident"ch_obscalc_update",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, update._4, update._5, update._6, update._7, users)
     ) {

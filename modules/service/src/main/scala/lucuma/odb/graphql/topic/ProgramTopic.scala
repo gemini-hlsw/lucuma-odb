@@ -32,7 +32,7 @@ object ProgramTopic:
   private val topic =
     OdbTopic.define[(Program.Id, EditType), Element](
       "Program",
-      id"ch_program_edit",
+      ident"ch_program_edit",
       _._1,
       (update, users) => Element(update._1, update._2, users)
     ) {
