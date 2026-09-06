@@ -2948,6 +2948,29 @@ input GmosSouthLongSlitAcquisitionInput {
 
 }
 
+input WarningDismissalInput {
+
+  """
+  One of programId, proposalReference, and programReference must be supplied.
+  """
+  programId: ProgramId
+  
+  """
+  One of programId, proposalReference, and programReference must be supplied.
+  """
+  proposalReference: ProposalReference
+  
+  """
+  One of programId, proposalReference, and programReference must be supplied.
+  """
+  programReference: ProgramReference
+
+  """
+  Email text to be sent. User interfaces should provide a default.
+  """
+  text: NonEmptyString
+}
+
 """
 Edit or create GMOS South Long Slit advanced configuration
 """
@@ -4300,6 +4323,15 @@ type Mutation {
   setObservationWorkflowState(
     input: SetObservationWorkflowStateInput!
   ): ObservationWorkflow
+
+  """
+  Sends emails from the current user (who must have write access to the referenced program) to the primary and
+  secondsy support staff, requesting review of warnings for potential dismissal.
+  """
+  requestWarningDismissal(
+    input: WarningDismissalInput!
+  ): [Email!]!
+
 }
 
 input SetObservationWorkflowStateInput {
@@ -17990,6 +18022,11 @@ type Program {
   List of validation codes that have been dismissed for this program.
   """
   dismissedWarnings: [ObservationValidationCode!]!
+
+  """
+  List of related emails sent by the system.
+  """
+  emails: [Email!]!
 
 }
 

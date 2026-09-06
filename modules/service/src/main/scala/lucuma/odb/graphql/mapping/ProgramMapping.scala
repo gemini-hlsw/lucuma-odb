@@ -58,7 +58,8 @@ trait ProgramMapping[F[_]]
      with GroupElementView[F]
      with UserInvitationTable[F]
      with KeyValueEffectHandler[F]
-     with AllocationTable[F] {
+     with AllocationTable[F]
+     with EmailTable[F] {
 
   def user: User
   def itcClient: ItcClient[F]
@@ -105,6 +106,7 @@ trait ProgramMapping[F[_]]
       SqlField("resourceLimit", ProgramView.ResourceLimit),
       SqlField("resourceCount", ProgramView.ResourceCount),
       SqlField("dismissedWarnings", ProgramView.dismissedWarnings),
+      SqlObject("emails", Join(ProgramView.Id, EmailTable.ProgramId)),
     )
 
   lazy val ProgramElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
