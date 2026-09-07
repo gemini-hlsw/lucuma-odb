@@ -390,41 +390,91 @@ jobs:
 
       - name: Get SSO Docker image SHA
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
-        run: 'echo "DOCKER_IMAGE_SHA_SSO_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || ''lucuma-sso'' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV'
+        run: |
+          sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web:${{ github.sha }} --format={{.Id}})
+          [ -n "$sha" ] || { echo "::error::no docker image for SSO/web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_SSO_WEB=$sha" >> $GITHUB_ENV
+          echo "SSO/web -> $sha"
 
       - name: Carry forward SSO Docker image SHA
         if: '!(contains(fromJSON(needs.affected.outputs.projects), ''ssoService''))'
-        run: 'echo "DOCKER_IMAGE_SHA_SSO_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_SSO_APP_NAME || ''lucuma-sso'' }}-dev/formation | jq -r --arg p "web" ''.[] | select(.type == $p) | .docker_image'')" >> $GITHUB_ENV'
+        run: |
+          prev=$(curl -s --fail-with-body -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/deployments?environment=development&task=deploy:SSO&per_page=1" | jq -c '.[0].payload.docker_image_shas // empty')
+          [ -n "$prev" ] || { echo "::error::no previous SSO deployment to carry forward"; exit 1; }
+          sha=$(printf '%s' "$prev" | jq -r --arg p "web" '.[$p] // empty')
+          [ -n "$sha" ] || { echo "::error::previous SSO deployment has no image for web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_SSO_WEB=$sha" >> $GITHUB_ENV
+          echo "SSO/web -> $sha (carried forward)"
 
       - name: Get ITC Docker image SHA
         if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
-        run: 'echo "DOCKER_IMAGE_SHA_ITC_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || ''itc'' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV'
+        run: |
+          sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev/web:${{ github.sha }} --format={{.Id}})
+          [ -n "$sha" ] || { echo "::error::no docker image for ITC/web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ITC_WEB=$sha" >> $GITHUB_ENV
+          echo "ITC/web -> $sha"
 
       - name: Carry forward ITC Docker image SHA
         if: '!(contains(fromJSON(needs.affected.outputs.projects), ''itcService''))'
-        run: 'echo "DOCKER_IMAGE_SHA_ITC_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ITC_APP_NAME || ''itc'' }}-dev/formation | jq -r --arg p "web" ''.[] | select(.type == $p) | .docker_image'')" >> $GITHUB_ENV'
+        run: |
+          prev=$(curl -s --fail-with-body -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/deployments?environment=development&task=deploy:ITC&per_page=1" | jq -c '.[0].payload.docker_image_shas // empty')
+          [ -n "$prev" ] || { echo "::error::no previous ITC deployment to carry forward"; exit 1; }
+          sha=$(printf '%s' "$prev" | jq -r --arg p "web" '.[$p] // empty')
+          [ -n "$sha" ] || { echo "::error::previous ITC deployment has no image for web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ITC_WEB=$sha" >> $GITHUB_ENV
+          echo "ITC/web -> $sha (carried forward)"
 
       - name: Get ODB Docker image SHA
         if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
         run: |
-          echo "DOCKER_IMAGE_SHA_ODB_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_SHA_ODB_OBSCALC=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
+          sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }} --format={{.Id}})
+          [ -n "$sha" ] || { echo "::error::no docker image for ODB/web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_WEB=$sha" >> $GITHUB_ENV
+          echo "ODB/web -> $sha"
+          sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc:${{ github.sha }} --format={{.Id}})
+          [ -n "$sha" ] || { echo "::error::no docker image for ODB/obscalc"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_OBSCALC=$sha" >> $GITHUB_ENV
+          echo "ODB/obscalc -> $sha"
+          sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration:${{ github.sha }} --format={{.Id}})
+          [ -n "$sha" ] || { echo "::error::no docker image for ODB/calibration"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$sha" >> $GITHUB_ENV
+          echo "ODB/calibration -> $sha"
 
       - name: Carry forward ODB Docker image SHA
         if: '!(contains(fromJSON(needs.affected.outputs.projects), ''service'') || contains(fromJSON(needs.affected.outputs.projects), ''obscalc'') || contains(fromJSON(needs.affected.outputs.projects), ''calibrations''))'
         run: |
-          echo "DOCKER_IMAGE_SHA_ODB_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/formation | jq -r --arg p "web" '.[] | select(.type == $p) | .docker_image')" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_SHA_ODB_OBSCALC=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/formation | jq -r --arg p "obscalc" '.[] | select(.type == $p) | .docker_image')" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/formation | jq -r --arg p "calibration" '.[] | select(.type == $p) | .docker_image')" >> $GITHUB_ENV
+          prev=$(curl -s --fail-with-body -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/deployments?environment=development&task=deploy:ODB&per_page=1" | jq -c '.[0].payload.docker_image_shas // empty')
+          [ -n "$prev" ] || { echo "::error::no previous ODB deployment to carry forward"; exit 1; }
+          sha=$(printf '%s' "$prev" | jq -r --arg p "web" '.[$p] // empty')
+          [ -n "$sha" ] || { echo "::error::previous ODB deployment has no image for web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_WEB=$sha" >> $GITHUB_ENV
+          echo "ODB/web -> $sha (carried forward)"
+          sha=$(printf '%s' "$prev" | jq -r --arg p "obscalc" '.[$p] // empty')
+          [ -n "$sha" ] || { echo "::error::previous ODB deployment has no image for obscalc"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_OBSCALC=$sha" >> $GITHUB_ENV
+          echo "ODB/obscalc -> $sha (carried forward)"
+          sha=$(printf '%s' "$prev" | jq -r --arg p "calibration" '.[$p] // empty')
+          [ -n "$sha" ] || { echo "::error::previous ODB deployment has no image for calibration"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$sha" >> $GITHUB_ENV
+          echo "ODB/calibration -> $sha (carried forward)"
 
       - name: Get RESOURCE Docker image SHA
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
-        run: 'echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || ''lucuma-resource'' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV'
+        run: |
+          sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web:${{ github.sha }} --format={{.Id}})
+          [ -n "$sha" ] || { echo "::error::no docker image for RESOURCE/web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$sha" >> $GITHUB_ENV
+          echo "RESOURCE/web -> $sha"
 
       - name: Carry forward RESOURCE Docker image SHA
         if: '!(contains(fromJSON(needs.affected.outputs.projects), ''resourceService''))'
-        run: 'echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_RESOURCE_APP_NAME || ''lucuma-resource'' }}-dev/formation | jq -r --arg p "web" ''.[] | select(.type == $p) | .docker_image'')" >> $GITHUB_ENV'
+        run: |
+          prev=$(curl -s --fail-with-body -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/deployments?environment=development&task=deploy:RESOURCE&per_page=1" | jq -c '.[0].payload.docker_image_shas // empty')
+          [ -n "$prev" ] || { echo "::error::no previous RESOURCE deployment to carry forward"; exit 1; }
+          sha=$(printf '%s' "$prev" | jq -r --arg p "web" '.[$p] // empty')
+          [ -n "$sha" ] || { echo "::error::previous RESOURCE deployment has no image for web"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$sha" >> $GITHUB_ENV
+          echo "RESOURCE/web -> $sha (carried forward)"
 
       - name: Record SSO deployment in GHA
         run: |
