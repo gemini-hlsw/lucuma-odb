@@ -38,7 +38,11 @@ import Services.Syntax.*
  */
 trait PdfSummaryJobService[F[_]]:
 
-  /** One job per partner with a split, or a single partnerless job; a `pending` duplicate is skipped. */
+  /**
+   * One job per partner with a split, or a single partnerless job; a `pending`
+   * duplicate is skipped.  Jobs and summary attachments for partners the
+   * proposal no longer has are pruned first.
+   */
   def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
   /** The `regenerateProposalSummaries` mutation: authorize, then enqueue. */
@@ -142,9 +146,13 @@ object PdfSummaryJobService:
           case ps  => ps.map(_.some)
 
       override def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit] =
-        partners(pid).flatMap(_.traverse_(partner =>
-          session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))
-        ))
+        for
+          _ <- session.execute(Statements.PruneJobs)((pid, pid))
+          _ <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
+          _ <- partners(pid).flatMap(_.traverse_(partner =>
+                 session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))
+               ))
+        yield ()
 
       override def regenerate(pid: Program.Id)(using NoTransaction[F], Services.PiAccess): F[Result[Unit]] =
         def check(ok: Boolean, error: => OdbError): Result[Unit] =
@@ -244,6 +252,36 @@ object PdfSummaryJobService:
           AND c_attachment_type IN ('science', 'team')
         ORDER BY c_attachment_type
       """.query(text_nonempty *: text_nonempty)
+
+    // Jobs and summaries for partners the proposal no longer has.
+    val PruneJobs: Command[(Program.Id, Program.Id)] =
+      sql"""
+        WITH splits AS (
+          SELECT DISTINCT c_partner FROM t_partner_split
+          WHERE c_program_id = $program_id AND c_percent > 0
+        )
+        DELETE FROM t_summary_job
+        WHERE c_program_id = $program_id
+          AND CASE WHEN EXISTS (SELECT 1 FROM splits)
+                   THEN c_partner IS NULL OR c_partner NOT IN (SELECT c_partner FROM splits)
+                   ELSE c_partner IS NOT NULL
+              END
+      """.command
+
+    val PruneSummaryAttachments: Command[(Program.Id, Program.Id)] =
+      sql"""
+        WITH splits AS (
+          SELECT DISTINCT c_partner FROM t_partner_split
+          WHERE c_program_id = $program_id AND c_percent > 0
+        )
+        DELETE FROM t_attachment
+        WHERE c_program_id = $program_id
+          AND c_attachment_type = 'summary'
+          AND CASE WHEN EXISTS (SELECT 1 FROM splits)
+                   THEN c_partner IS NULL OR c_partner NOT IN (SELECT c_partner FROM splits)
+                   ELSE c_partner IS NOT NULL
+              END
+      """.command
 
     // A no-op when a job for this partner is already waiting.
     val InsertJob: Command[(Program.Id, Option[Partner], SummaryStyle)] =
