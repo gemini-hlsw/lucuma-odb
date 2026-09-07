@@ -6,11 +6,15 @@ package lucuma.odb.service
 import cats.effect.MonadCancelThrow
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.TimingWindowInclusion
 import lucuma.core.model.Observation
+import lucuma.core.util.TimeSpan
+import lucuma.core.util.Timestamp
 import lucuma.odb.graphql.input.TimingWindowInput
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.AppliedFragment
+import skunk.Query
 import skunk.Transaction
 import skunk.codec.numeric.*
 import skunk.syntax.all.*
@@ -36,9 +40,36 @@ object TimingWindowService:
         timingWindows: List[TimingWindowInput]
       )(using SuperUserAccess): Result[(List[Observation.Id], Transaction[F]) => F[Unit]] =
         Result( (obsIds, _) =>
-          session.exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
+          stampChanged(obsIds, timingWindows) >>
+            session.exec(Statements.deleteObservationsTimingWindows(obsIds)) >>
             Statements.createObservationsTimingWindows(obsIds, timingWindows).fold(().pure[F])(session.exec)
         )
+
+      /**
+       * Moves the point an observation's scheduling availability is measured
+       * from, for those observations whose windows this edit actually changes.
+       *
+       * Re-stamping unconditionally would punish a PI for saving the same windows
+       * again: the measurement would restart from today and the observation could
+       * fall short of a minimum it has met all along.  Windows the database added
+       * on the observation's behalf are ignored, since they are not the PI
+       * declaring anything.
+       */
+      private def stampChanged(
+        obsIds:  List[Observation.Id],
+        incoming: List[TimingWindowInput]
+      ): F[Unit] =
+        if obsIds.isEmpty then ().pure[F]
+        else
+          val wanted = Statements.multiset(incoming.map(Statements.keyOf))
+          session
+            .execute(Statements.SelectDeclaredWindows(observation_id.list(obsIds.length)))(obsIds)
+            .map: rows =>
+              val existing = rows.groupMap(_._1)(_._2)
+              obsIds.filter(oid => Statements.multiset(existing.getOrElse(oid, Nil)) =!= wanted)
+            .flatMap:
+              case Nil     => ().pure[F]
+              case changed => session.exec(Statements.stampAvailabilityAnchor(changed))
 
       def cloneTimingWindows(
         originalId: Observation.Id,
@@ -48,6 +79,48 @@ object TimingWindowService:
     }
 
 object Statements {
+
+  /** Everything about a window that the PI chose, and so everything a change can consist of. */
+  type WindowKey = (TimingWindowInclusion, Timestamp, Option[Timestamp], Option[TimeSpan], Option[TimeSpan], Option[Int])
+
+  def keyOf(tw: TimingWindowInput): WindowKey =
+    (
+      tw.inclusion,
+      tw.startUtc,
+      tw.end.flatMap(_.atUtc),
+      tw.end.flatMap(_.after),
+      tw.end.flatMap(_.repeat.map(_.period)),
+      tw.end.flatMap(_.repeat.flatMap(_.times.map(_.value)))
+    )
+
+  /** Order is not part of a window set's identity, but multiplicity is. */
+  def multiset(keys: List[WindowKey]): Map[WindowKey, Int] =
+    keys.groupMapReduce(identity)(_ => 1)(_ + _)
+
+  def SelectDeclaredWindows(enc: skunk.Encoder[List[Observation.Id]]): Query[List[Observation.Id], (Observation.Id, WindowKey)] =
+    sql"""
+      SELECT
+        c_observation_id,
+        c_inclusion,
+        c_start,
+        c_end_at,
+        c_end_after,
+        c_repeat_period,
+        c_repeat_times
+      FROM t_timing_window
+      WHERE NOT c_automatic
+        AND c_observation_id IN ($enc)
+    """
+    .query(observation_id *: timing_window_inclusion *: core_timestamp *: core_timestamp.opt *: time_span.opt *: time_span.opt *: int4.opt)
+    .map { case (oid, i, s, ea, af, rp, rt) => (oid, (i, s, ea, af, rp, rt)) }
+
+  def stampAvailabilityAnchor(observationIds: List[Observation.Id]): AppliedFragment =
+    sql"""
+      UPDATE t_observation
+         SET c_availability_anchor = now()
+       WHERE c_observation_id IN ${observation_id.list(observationIds.length).values}
+    """.apply(observationIds)
+
   def deleteObservationsTimingWindows(
     observationIds: List[Observation.Id]
   ): AppliedFragment =

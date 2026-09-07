@@ -15,8 +15,11 @@ import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
 import lucuma.core.model.StandardRole.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
+import lucuma.odb.service.ConfigurationService.AvailabilityShortfall
+import lucuma.odb.service.ConfigurationService.RequestCoverage
 
 import Services.Syntax.*
 
@@ -32,18 +35,48 @@ object ObservationValidator:
   private def validateConfigurations[F[_]: Functor](
     infos: NonEmptyList[ObservationValidationInfo]
   )(using Services[F]): ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
-    ResultT(configurationService.selectRequests(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
+    ResultT(configurationService.selectRequestCoverage(infos.toList.map(i => (i.pid, i.oid)))).map: rs =>
       rs.view
         .map:
-          case ((_, oid), lst) =>
+          case ((_, oid), RequestCoverage(lst, shortfall)) =>
             oid -> {
               val m = ObservationValidationMap.empty
-              if lst.isEmpty then m.add(ObservationValidation.configurationRequestNotRequested)
+              if lst.isEmpty then m.add(notRequested(shortfall))
               else if lst.exists(_.status === ConfigurationRequestStatus.Approved) then m
               else if lst.forall(_.status === ConfigurationRequestStatus.Denied) then m.add(ObservationValidation.configurationRequestDenied)
               else m.add(ObservationValidation.configurationRequestPending)
             }
         .toMap
+
+  /**
+   * Nothing subsumes the observation, so approval has not been requested for the
+   * configuration it now has.  That is true whichever dimension moved, but the
+   * stock message names no cause, and availability is the one dimension a PI can
+   * trip without touching anything they would recognize as the science: trim a
+   * timing window and the observation quietly stops being approved.  So when
+   * availability is the only thing standing in the way, say so, with the bar and
+   * what was offered.
+   */
+  private def notRequested(shortfall: Option[AvailabilityShortfall]): ObservationValidation =
+    shortfall.fold(ObservationValidation.configurationRequestNotRequested): s =>
+      ObservationValidation.fromMsgs(
+        ObservationValidationCode.ConfigurationRequestNotRequested,
+        ObservationValidationCode.ConfigurationRequestNotRequested.description,
+        s"Less available than approved: open for ${describe(s.actual)}, where ${describe(s.required)} is needed."
+      )
+
+  /**
+   * Availability runs from hours to months, so say it the way a proposal would
+   * rather than as an ISO-8601 duration.
+   */
+  private def describe(ts: TimeSpan): String =
+    val totalHours = ts.toHours.toLong
+    val days       = totalHours / 24
+    val hours      = totalHours % 24
+    def plural(n: Long, unit: String) = s"$n $unit${if n === 1L then "" else "s"}"
+    (Option.when(days > 0)(plural(days, "day")).toList ++ Option.when(hours > 0)(plural(hours, "hour")).toList) match
+      case Nil   => "less than an hour"
+      case parts => parts.mkString(" ")
 
   def validate[F[_]: Applicative](
     infos:  Map[Observation.Id, ObservationValidationInfo],

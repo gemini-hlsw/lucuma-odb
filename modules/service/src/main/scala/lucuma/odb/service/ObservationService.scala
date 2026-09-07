@@ -44,6 +44,7 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Cone
 import lucuma.odb.data.Existence
@@ -202,11 +203,6 @@ object ObservationService {
     otid.fold(s"Missing $paramName")(tid => s"Missing $paramName for target $tid")
   def InvalidScienceBandMsg(b: ScienceBand) = s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
   val ConfigurationForReviewMsg = "Observation must be reviewed prior to execution."
-  object ConfigurationRequestMsg:
-    val Unavailable  = "Configuration approval status could not be determined."
-    val NotRequested = "Configuration is unapproved (approval has not been requested)."
-    val Denied       = "Configuration is unapproved (request was denied)."
-    val Pending      = "Configuration is unapproved (request is pending)."
 
   case class CloneIds(
     originalId: Observation.Id,
@@ -248,6 +244,21 @@ object ObservationService {
             if ids.sizeIs > max then
               OdbError.InvalidArgument(s"targetCoordinates matches more than $max observations; narrow the cone.".some).asFailure
             else Result(ids)
+
+      // Written after the insert rather than as part of it: the ToO window is
+      // optional and the insert's column list is positional.
+      private def setTooWindow(
+        oid:    Observation.Id,
+        window: Nullable[TimeSpan]
+      )(using Transaction[F]): F[Unit] =
+        window.toOptionOption.fold(().pure[F]): o =>
+          val af =
+            sql"""
+              UPDATE t_observation
+                 SET c_too_window = ${time_span.opt}
+               WHERE c_observation_id = $observation_id
+            """.apply(o, oid)
+          session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
       private def setTimingWindows(
         oids:          List[Observation.Id],
@@ -296,6 +307,10 @@ object ObservationService {
               .flatTap: rOid =>
                 rOid.flatTraverse: oid =>
                   Services.asSuperUser(setTimingWindows(List(oid), SET.scheduling.flatMap(_.timingWindows.toOption)))
+
+              .flatTap: rOid =>
+                rOid.flatTraverse: oid =>
+                  setTooWindow(oid, SET.scheduling.fold(Nullable.Absent)(_.tooWindow)).map(Result.apply)
 
               .flatMap: rOid =>
                 SET.attachments.fold(rOid.pure[F]): aids =>
@@ -1158,18 +1173,29 @@ object ObservationService {
         in.spectroscopy.toList.flatMap(spectroscopyRequirementsUpdates) ++
         in.imaging.toList.flatMap(imagingRequirementsUpdates)
 
+    // Clearing the scheduling constraints clears the ToO window with them; an
+    // edit that does not mention them leaves it alone.
+    private def tooWindowEdit(SET: ObservationPropertiesInput.Edit): Nullable[TimeSpan] =
+      SET.scheduling.fold(Nullable.Null, Nullable.Absent, _.tooWindow)
+
     def updates(SET: ObservationPropertiesInput.Edit): Result[Option[NonEmptyList[AppliedFragment]]] = {
-      val upExistence         = sql"c_existence = $existence"
-      val upSubtitle          = sql"c_subtitle = ${text_nonempty.opt}"
-      val upScienceBand       = sql"c_science_band = ${science_band.opt}"
-      val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
-      val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
-      val upSchedulingMode    = sql"c_scheduling_mode = $scheduling_mode"
+      val upExistence          = sql"c_existence = $existence"
+      val upSubtitle           = sql"c_subtitle = ${text_nonempty.opt}"
+      val upScienceBand        = sql"c_science_band = ${science_band.opt}"
+      val upObserverNotes      = sql"c_observer_notes = ${text_nonempty.opt}"
+      val upUseBlindOffset     = sql"c_use_blind_offset = $bool"
+      val upSchedulingMode     = sql"c_scheduling_mode = $scheduling_mode"
+      val upTooWindow          = sql"c_too_window = ${time_span.opt}"
+      val upAvailabilityAnchor = void"c_availability_anchor = now()"
 
       val ups: List[AppliedFragment] =
         List(
           SET.existence.map(upExistence),
           SET.subtitle.foldPresent(upSubtitle),
+          tooWindowEdit(SET).foldPresent(upTooWindow),
+          // Stating a ToO window is declaring one, so availability is measured
+          // afresh from here.
+          tooWindowEdit(SET).foldPresent(_ => upAvailabilityAnchor),
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),

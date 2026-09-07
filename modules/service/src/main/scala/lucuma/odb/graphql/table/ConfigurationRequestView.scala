@@ -19,6 +19,8 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     val Justification = col("c_justification", text_nonempty.opt)
     val Feedback = col("c_feedback", text_nonempty.opt)
     val CreatedAt = col("c_created_at", core_timestamp)
+    val MinAvailability           = col("c_min_availability",             time_span)
+    val TimeRemainingWhenDeclared = col("c_time_remaining_when_declared", time_span)
     val UpdatedAt = col("c_updated_at", core_timestamp)
 
     object Conditions:

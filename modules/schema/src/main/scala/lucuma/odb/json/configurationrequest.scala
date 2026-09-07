@@ -36,9 +36,12 @@ import lucuma.core.model.Configuration.ObservingMode
 import lucuma.core.model.Configuration.ObservingMode.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.ImageQuality
+import lucuma.core.model.SchedulingAvailability
+import lucuma.core.util.TimeSpan
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.json.region.query.given
+import lucuma.odb.json.time.query.given
 
 object configurationrequest:
 
@@ -190,21 +193,35 @@ object configurationrequest:
         case (Some(_), Some(_)) => Left(DecodingFailure("Cannot decode target; both coords and region are defined.", Nil))
 
     /** A decoder based on the GraphQL schema, used for recursive service queries. */
+    given Decoder[SchedulingAvailability] = hc =>
+      for
+        o <- hc.downField("timeOpen").as[TimeSpan]
+        r <- hc.downField("timeRemainingWhenDeclared").as[TimeSpan]
+      yield SchedulingAvailability(o, r)
+
+    given Encoder[SchedulingAvailability] = w =>
+      Json.obj(
+        "timeOpen"                  -> w.timeOpen.asJson,
+        "timeRemainingWhenDeclared" -> w.timeRemainingWhenDeclared.asJson
+      )
+
     given Decoder[Configuration] = hc =>
       (
         hc.downField("conditions").as[Conditions],
         hc.downField("target").as[Option[Either[Coordinates, Region]]], // may be missing
-        hc.downField("observingMode").as[Option[ObservingMode]]
+        hc.downField("observingMode").as[Option[ObservingMode]],
+        hc.downField("availability").as[SchedulingAvailability]
       ).tupled.flatMap:
-        case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode))
-        case (conds, None, _)                  => Left(DecodingFailures.NoReferenceCoordinates)
-        case (conds, _, None)                  => Left(DecodingFailures.NoObservingMode)
+        case (conds, Some(coords), Some(mode), win) => Right(Configuration(conds, coords, mode, win))
+        case (conds, None, _, _)                    => Left(DecodingFailures.NoReferenceCoordinates)
+        case (conds, _, None, _)                    => Left(DecodingFailures.NoObservingMode)
 
     given Encoder[Configuration] = c =>
       Json.obj(
         "conditions" -> c.conditions.asJson,
         "target" -> c.target.asJson,
-        "observingMode" -> c.observingMode.asJson
+        "observingMode" -> c.observingMode.asJson,
+        "availability" -> c.availability.asJson
       )
 
     given Decoder[ConfigurationRequest] = hc =>

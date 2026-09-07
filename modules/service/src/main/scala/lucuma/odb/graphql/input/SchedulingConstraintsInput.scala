@@ -6,12 +6,14 @@ package lucuma.odb.graphql.input
 import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.SchedulingMode
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 case class SchedulingConstraintsInput(
   schedulingMode: Option[SchedulingMode],
-  timingWindows:  Nullable[List[TimingWindowInput]]
+  timingWindows:  Nullable[List[TimingWindowInput]],
+  tooWindow:      Nullable[TimeSpan]
 ):
 
   /**
@@ -37,15 +39,16 @@ object SchedulingConstraintsInput:
       case List(
         SchedulingModeBinding.Option("schedulingMode", rMode),
         BooleanBinding.Option("isSplittable", rSplit),
-        TimingWindowInput.Binding.List.Nullable("timingWindows", rTiming)
+        TimingWindowInput.Binding.List.Nullable("timingWindows", rTiming),
+        TimeSpanInput.Binding.Nullable("tooWindow", rTooWindow)
       ) =>
-        (rMode, rSplit, rTiming).parMapN: (mode, split, timing) =>
+        (rMode, rSplit, rTiming, rTooWindow).parMapN: (mode, split, timing, tooWindow) =>
           (mode, split) match
             case (Some(_), Some(_)) =>
               Result.failure("Only one of `schedulingMode` and the deprecated `isSplittable` may be specified.")
             case (_, Some(s))       =>
               val m = if s then SchedulingMode.Unconstrained else SchedulingMode.NoSplitting
-              Result(SchedulingConstraintsInput(m.some, timing))
+              Result(SchedulingConstraintsInput(m.some, timing, tooWindow))
             case (_, None)          =>
-              Result(SchedulingConstraintsInput(mode, timing))
+              Result(SchedulingConstraintsInput(mode, timing, tooWindow))
         .flatten

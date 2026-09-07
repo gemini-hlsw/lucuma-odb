@@ -22,7 +22,8 @@ trait SchedulingConstraintsMapping[F[_]]
       SqlField("tooActivation", ObservationView.TooActivation),
       SqlField("schedulingMode", ObservationView.SchedulingMode),
       SqlField("isSplittable", ObservationView.IsSplittable),
-      SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId))
+      SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId)),
+      SqlObject("tooWindow")
     )
 
   lazy val SchedulingConstraintsElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {

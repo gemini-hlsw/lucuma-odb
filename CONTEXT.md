@@ -165,3 +165,28 @@ _Avoid_: status override, manual status.
 **Active Period**:
 The `[activeStart, activeEnd]` date interval during which a program's observations may be scheduled, defaulted from the Call for Proposals when there is one. Staff-editable. The source of the Default Status.
 _Avoid_: observing window (that is an observation-level concept), semester dates.
+
+### Scheduling Availability
+
+**Timing Window**:
+One entry in an observation's list of when it may (INCLUDE) or may not (EXCLUDE) be observed: a start, an optional end (at an instant, or after a duration), and an optional repeat. Stored in `t_timing_window`. Always one entry — never the total. Science staff call this a scheduling window; the code does not, so that "window" always means one entry.
+_Avoid_: scheduling window (for a single entry).
+
+**Scheduling Availability**:
+How available an observation is for scheduling, as a pair: `timeOpen`, the union of its INCLUDE timing windows minus its EXCLUDE ones, and `timeRemainingWhenDeclared`, the whole stretch that was measured over. Science staff say "the scheduling window" and mean the first of those, never the length of one opening; the code says availability, because it is a total rather than a period with a start and an end. It is about how long the observation is *open* — unrelated to how long it takes to execute. An observation with no timing windows is open for the whole stretch. Wall-clock rather than observable time — the time the target is actually up — since working that out needs to know where the target is and when the window falls, and a ToO awaiting its alert has neither: its target is unresolved and its window has no start until the trigger supplies one. Computed by `SchedulingAvailabilityService` and exposed as `Configuration.availability`.
+_Avoid_: scheduling window, timing window (that is one entry), visibility (that is the sky), duration (that is execution time).
+
+**Anchor**:
+The moment an observation's timing windows were last declared, in `t_observation.c_availability_anchor`. Its Scheduling Availability is measured from the *later* of the anchor and the start of the active period, so an observation designed before the semester opens — the ordinary case — is measured over the whole of it, and only a declaration made once the period is under way is measured from itself. Re-stamped only when the set of windows actually changes: never merely because time passed, and not by an identical re-save. Measuring from the anchor rather than always from the start of the semester is what stops elapsed time counting as availability: a window opening months ago and shutting in four hours offers four hours, not four months.
+_Avoid_: declaration date, created (the observation's creation is only the initial value).
+
+**ToO Window**:
+What a Target of Opportunity states instead of timing windows: a length, how long it needs to be open once triggered. A ToO cannot state absolute dates, so the trigger supplies the start and opens a real timing window of this length; it never clears the stated length, which stays part of the approved configuration. It is also the ToO's Scheduling Availability, deliberately unclipped by the end of the semester, so a 24 hour ToO triggered on the last night is still a 24 hour ToO. A nullable `t_observation.c_too_window`, null meaning unstated: the trigger then falls back to `too_default_window()` (24 hours) for rapid and interrupting, and opens nothing for standard. There is deliberately no explicit "forever" — it would differ from saying nothing only in suppressing that 24 hour default, and a PI who wants that states a length longer than the semester.
+_Avoid_: default window, automatic window (those name what the trigger creates, not what the PI stated).
+
+**Minimum Scheduling Availability**:
+The Scheduling Availability recorded on a configuration request when it is made, in `t_configuration_request.c_min_availability` (with `_span` beside it for provenance), and approved at Phase 1 along with the conditions, target and observing mode. An observation is subsumed while it is open for at least the lesser of this minimum and everything it had when it was declared — "as available as was approved, or as available as the calendar still allowed, whichever is less". The cap is what keeps an observation added mid-semester approvable: it cannot offer calendar that has run out, and requiring it to would make stating your availability worse than saying nothing. Zero means unconstrained, which is what requests predating the column carry.
+_Avoid_: MSW, minimum scheduling window, program minimum (it is per configuration, not per program).
+
+**Stated versus Default**:
+Only what the PI stated is recorded and enforced. An unstated ToO window is *not* recorded as the activation's default, because that default follows from how disruptive the ToO is, which the proposal's activation ceiling already governs — recording it would police the same fact twice and make escalating a standard ToO to rapid read as the PI shortening their own window.

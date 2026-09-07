@@ -28,7 +28,9 @@ import lucuma.core.model.Configuration.Conditions
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.SchedulingAvailability
 import lucuma.core.model.User
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Cone
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
@@ -57,6 +59,11 @@ trait ConfigurationService[F[_]] {
 
   /** Selects configuration requests relevant to the given program + observation pairs. The resulting map will contain every passed key. */
   def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]]
+
+  /** As `selectRequests`, but also saying why an observation that nothing subsumes is uncovered, when
+   *  the reason is that it has become less available than was approved. The resulting map will contain
+   *  every passed key. */
+  def selectRequestCoverage(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), ConfigurationService.RequestCoverage]]]
 
   /** Selects observations relevant to the given configuration requests, if any. The resulting map will contain every passed request id. */
   def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]]
@@ -88,6 +95,23 @@ object ConfigurationService {
 
   /** Cap on `coneCandidates` matches; see its scaladoc. */
   val MaxConeCandidates: Int = ConeSearch.MaxCandidates
+
+  /**
+   * What an observation fell short by: the availability it had to clear -- the
+   * lesser of what was approved and everything the observation still had when it
+   * was declared -- and what it actually offered.
+   */
+  case class AvailabilityShortfall(required: TimeSpan, actual: TimeSpan)
+
+  /**
+   * How an observation stands with its program's configuration requests: those
+   * that subsume it and, when none does and availability is the only thing in
+   * the way, what it fell short by.
+   */
+  case class RequestCoverage(
+    subsuming: List[ConfigurationRequest],
+    shortfall: Option[AvailabilityShortfall]
+  )
 
   extension [A](self: Result[A]) def suppressWarnings: Result[A] =
     self match
@@ -136,7 +160,10 @@ object ConfigurationService {
         else requirePiAccess(doUpdate)
 
       override def selectRequests(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]]] =
-        impl.selectRequests(pairs).value
+        impl.selectRequestCoverage(pairs).map(_.view.mapValues(_.subsuming).toMap).value
+
+      override def selectRequestCoverage(pairs: List[(Program.Id, Observation.Id)]): F[Result[Map[(Program.Id, Observation.Id), RequestCoverage]]] =
+        impl.selectRequestCoverage(pairs).value
 
       override def selectObservations(rids: List[ConfigurationRequest.Id]): F[Result[Map[ConfigurationRequest.Id, List[Observation.Id]]]] =
         impl.selectObservations(rids).value.map(_.suppressWarnings) // we can disregard warnings
@@ -245,15 +272,33 @@ object ConfigurationService {
         session.prepareR(af.fragment.query(configuration_request_id)).use: pq =>
           pq.stream(af.argument, 1024).compile.toList
 
-    def selectRequests(pairs: List[(Program.Id, Observation.Id)]): ResultT[F, Map[(Program.Id, Observation.Id), List[ConfigurationRequest]]] =
+    def selectRequestCoverage(pairs: List[(Program.Id, Observation.Id)]): ResultT[F, Map[(Program.Id, Observation.Id), RequestCoverage]] =
       queryRequestsAndConfigurations(pairs.map(_._1).distinct, pairs.map(_._2).distinct).map: (pmap, omap) =>
         pairs
           .fproduct: key =>
             (omap.get(key), pmap.get(key._1))
               .tupled
-              .foldMap: (cfg, nel) =>
-                nel.filter(_.configuration.subsumes(cfg))
+              .fold(RequestCoverage(Nil, none)): (cfg, nel) =>
+                val subsuming = nel.filter(_.configuration.subsumes(cfg))
+                RequestCoverage(subsuming, Option.when(subsuming.isEmpty)(availabilityShortfall(nel, cfg)).flatten)
           .toMap
+
+    // A request that matches on everything except availability says the
+    // observation was covered right up until it became less available, which is
+    // the one way to fall out of approval without touching anything the PI would
+    // recognize as the science.  Swapping in the observation's own availability
+    // makes that check pass by construction, leaving the other dimensions to
+    // decide.  Of the requests that near-miss, the most forgiving is the bar the
+    // observation actually had to clear.
+    private def availabilityShortfall(
+      requests: List[ConfigurationRequest],
+      cfg:      Configuration
+    ): Option[AvailabilityShortfall] =
+      requests
+        .filter(_.configuration.copy(availability = cfg.availability).subsumes(cfg))
+        .map(_.configuration.availability.timeOpen min cfg.availability.timeRemainingWhenDeclared)
+        .reduceOption(_ min _)
+        .map(AvailabilityShortfall(_, cfg.availability.timeOpen))
 
     def queryRequestsAndObservations(
       rids: List[ConfigurationRequest.Id]
@@ -351,6 +396,7 @@ object ConfigurationService {
                   id
                 }
                 configuration {
+                  availability { timeOpen { microseconds } timeRemainingWhenDeclared { microseconds } }
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -444,6 +490,7 @@ object ConfigurationService {
                     id
                     status
                     configuration {
+                      availability { timeOpen { microseconds } timeRemainingWhenDeclared { microseconds } }
                       conditions {
                         imageQuality
                         cloudExtinction
@@ -570,6 +617,7 @@ object ConfigurationService {
             matches {
               id
               configuration {
+                availability { timeOpen { microseconds } timeRemainingWhenDeclared { microseconds } }
                 conditions {
                   imageQuality
                   cloudExtinction
@@ -665,6 +713,7 @@ object ConfigurationService {
                   id
                   status
                   configuration {
+                    availability { timeOpen { microseconds } timeRemainingWhenDeclared { microseconds } }
                     conditions {
                       imageQuality
                       cloudExtinction
@@ -782,6 +831,7 @@ object ConfigurationService {
                 id
                 status
                 configuration {
+                  availability { timeOpen { microseconds } timeRemainingWhenDeclared { microseconds } }
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -912,6 +962,7 @@ object ConfigurationService {
                   matches {
                     id
                     configuration {
+                      availability { timeOpen { microseconds } timeRemainingWhenDeclared { microseconds } }
                       conditions {
                         imageQuality
                         cloudExtinction
@@ -996,6 +1047,7 @@ object ConfigurationService {
                 id
                 status
                 configuration {
+                  availability { timeOpen { microseconds } timeRemainingWhenDeclared { microseconds } }
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -1122,7 +1174,9 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_min_availability,
+          c_time_remaining_when_declared
         FROM v_configuration_request
         WHERE (
           c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
@@ -1151,7 +1205,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_north_ifu_fpu is not distinct from ${gmos_north_ifu_fpu.opt} AND
           c_gmos_south_ifu_grating is not distinct from ${gmos_south_grating.opt} AND
-          c_gmos_south_ifu_fpu is not distinct from ${gmos_south_ifu_fpu.opt}
+          c_gmos_south_ifu_fpu is not distinct from ${gmos_south_ifu_fpu.opt} AND
+          c_min_availability = $time_span
         )
       """.query(
         (
@@ -1185,7 +1240,9 @@ object ConfigurationService {
           gmos_north_grating.opt       *:
           gmos_north_ifu_fpu.opt       *:
           gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt
+          gmos_south_ifu_fpu.opt       *:
+          time_span                    *:
+          time_span
         ).emap:
           { case
             id                       *:
@@ -1219,6 +1276,8 @@ object ConfigurationService {
             gmosNorthIfuFpu          *:
             gmosSouthIfuGrating      *:
             gmosSouthIfuFpu          *:
+            minAvailability           *:
+            timeRemainingWhenDeclared *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
@@ -1317,7 +1376,8 @@ object ConfigurationService {
                         waterVapor
                       ),
                       t,
-                      m
+                      m,
+                      SchedulingAvailability(minAvailability, timeRemainingWhenDeclared)
                     )
                   )
 
@@ -1353,6 +1413,7 @@ object ConfigurationService {
         cfg.observingMode.gmosNorthIfu.map(_.fpu)                               *:
         cfg.observingMode.gmosSouthIfu.map(_.grating)                           *:
         cfg.observingMode.gmosSouthIfu.map(_.fpu)                               *:
+        cfg.availability.timeOpen                                           *:
         EmptyTuple
       }
 
@@ -1389,7 +1450,9 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_min_availability,
+          c_time_remaining_when_declared
         ) VALUES (
           (select c_program_id from t_observation where c_observation_id = $observation_id),
           ${text_nonempty.opt},
@@ -1420,7 +1483,9 @@ object ConfigurationService {
           ${gmos_north_grating.opt},
           ${gmos_north_ifu_fpu.opt},
           ${gmos_south_grating.opt},
-          ${gmos_south_ifu_fpu.opt}
+          ${gmos_south_ifu_fpu.opt},
+          $time_span,
+          $time_span
         )
         ON CONFLICT DO NOTHING
         RETURNING
@@ -1454,7 +1519,9 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_min_availability,
+          c_time_remaining_when_declared
       """.query(
         (
           configuration_request_id     *:
@@ -1487,7 +1554,9 @@ object ConfigurationService {
           gmos_north_grating.opt       *:
           gmos_north_ifu_fpu.opt       *:
           gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt
+          gmos_south_ifu_fpu.opt       *:
+          time_span                    *:
+          time_span
         ).emap:
           { case
             id                       *:
@@ -1521,6 +1590,8 @@ object ConfigurationService {
             gmosNorthIfuFpu          *:
             gmosSouthIfuGrating      *:
             gmosSouthIfuFpu          *:
+            minAvailability           *:
+            timeRemainingWhenDeclared *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
@@ -1621,7 +1692,8 @@ object ConfigurationService {
                         waterVapor
                       ),
                       t,
-                      m
+                      m,
+                      SchedulingAvailability(minAvailability, timeRemainingWhenDeclared)
                     )
                   )
 
@@ -1662,6 +1734,8 @@ object ConfigurationService {
         cfg.observingMode.gmosNorthIfu.map(_.fpu)                               *:
         cfg.observingMode.gmosSouthIfu.map(_.grating)                           *:
         cfg.observingMode.gmosSouthIfu.map(_.fpu)                               *:
+        cfg.availability.timeOpen                                           *:
+        cfg.availability.timeRemainingWhenDeclared                          *:
         EmptyTuple
       }
 

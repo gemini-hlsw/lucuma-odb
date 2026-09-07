@@ -4474,6 +4474,16 @@ input SchedulingConstraintsInput {
   """
   timingWindows: [TimingWindowInput!]
 
+  """
+  How long a Target of Opportunity should be open for once triggered.  A ToO
+  cannot state absolute dates, so it states a length here instead of timing
+  windows and the trigger supplies the start.  Set to null to fall back on the
+  default for its activation.  Shortening it after the proposal is accepted
+  requires an approved configuration request, as with any other scheduling
+  window.
+  """
+  tooWindow: TimeSpanInput
+
 }
 
 """
@@ -4511,6 +4521,14 @@ type SchedulingConstraints {
   empty, there are no timing constraints for the observation.
   """
   timingWindows: [TimingWindow!]!
+
+  """
+  How long this Target of Opportunity is open for once triggered.  Null when the
+  PI stated nothing, in which case the activation supplies the default: 24 hours
+  for RAPID and INTERRUPTING, indefinitely for STANDARD.  Always null for an
+  observation that is not a Target of Opportunity.
+  """
+  tooWindow: TimeSpan
 
 }
 
@@ -17033,6 +17051,50 @@ type Configuration {
   conditions: ConfigurationConditions!
   target: ConfigurationTarget # may not be available
   observingMode: ConfigurationObservingMode
+
+  """
+  How available the observation is for scheduling -- how long it is open,
+  unrelated to how long it takes to execute.  On an approved configuration it
+  reads as a minimum: an observation that has become less available than this is
+  no longer covered by the request and needs a new one.
+  """
+  availability: SchedulingAvailability!
+}
+
+"""
+How available an observation is for scheduling.
+
+Both figures are measured from the later of two moments -- when the observation's
+timing windows were last declared, and when the active period began -- through to
+the end of that period.  Observations are usually designed before the semester
+opens, and those are measured over the whole of it; only a declaration made after
+it has started shortens the stretch.
+
+Measuring from the declaration rather than always from the start of the semester
+is what stops time that had already elapsed from counting as availability;
+carrying the time that remained alongside it is what stops an approved minimum
+from demanding calendar that no longer exists.
+
+Neither figure moves as the semester goes on, so an observation never falls out
+of approval merely because time passed.
+"""
+type SchedulingAvailability {
+
+  """
+  How long the observation is open, within the stretch described by
+  `timeRemainingWhenDeclared`.  An observation with no timing windows is open for
+  the whole of it.  For a Target of Opportunity this is the ToO window instead,
+  which is a length rather than a set of dates and so is never clipped by the end
+  of the semester.
+  """
+  timeOpen: TimeSpan!
+
+  """
+  The whole stretch `timeOpen` is measured over: from the later of the
+  declaration and the start of the active period, to the end of that period, and
+  so the most the observation could possibly have offered.
+  """
+  timeRemainingWhenDeclared: TimeSpan!
 }
 
 type ConfigurationConditions {
