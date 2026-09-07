@@ -1148,6 +1148,8 @@ lazy val pdfSummary = project
     reStart / envVars += "PORT" -> "8083",
     // The Python renderer shares the dyno's memory with the JVM; leave it room.
     lucumaDockerHeapSubtract := 400,
+    // We need a bit larger stack space for the grackle mapping
+    bashScriptExtraDefines += """addJava "-Xss1m"""",
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
     executableScriptName            := "lucuma-odb-pdf-summary-service",
     // pyexplore is private: the token comes in as a BuildKit secret (never a
