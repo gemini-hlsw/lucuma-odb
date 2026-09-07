@@ -15,6 +15,7 @@ This file covers the ODB subsystem. The ITC subsystem has its own guide at `itc/
 | `service` | `modules/service` | Main ODB service: DB, Grackle mappings, GraphQL resolvers |
 | `obscalc` | `modules/obscalc` | Observation calculator service (depends on service) |
 | `calibrations` | `modules/calibrations` | Calibrations service (depends on service) |
+| `pdfSummary` | `modules/pdf-summary` | Proposal-summary PDF dyno (depends on service); see `pdf-summary-flow.md` |
 
 The `sso_*` projects are a separate auth subsystem in this repo; treat them as an independent concern.
 
@@ -42,7 +43,7 @@ sbt "service/testOnly lucuma.odb.graphql.mutation.createObservation_GnirsLongSli
 
 ```bash
 sbt service/reStart
-# or start all three services together:
+# or start all four services together:
 sbt allStart
 sbt allStop
 ```

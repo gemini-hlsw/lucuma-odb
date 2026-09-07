@@ -36,6 +36,11 @@ object PdfRenderer:
   // version, unknown style).  Not 2: argparse exits 2 on a usage error.
   val PermanentExitCode: Int = 3
 
+  // The only environment the renderer gets. It needs none of the ODB's secrets,
+  // and third-party code has a habit of dumping the environment into logs.
+  val EnvAllowlist: Set[String] =
+    Set("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "MPLCONFIGDIR", "PYTHONUNBUFFERED")
+
   // How much of the renderer's stderr is kept as the job's error message.
   private val MaxErrorLength: Int = 2000
 
@@ -77,7 +82,9 @@ object PdfRenderer:
               "--output", output.toString,
               "--itc-url", itcUrl.renderString
             )
-          ).spawn[F].use: p =>
+          ).withInheritEnv(false)
+            .withExtraEnv(sys.env.filter((k, _) => EnvAllowlist(k)))
+            .spawn[F].use: p =>
             // Drain stdout too, or a chatty renderer blocks on a full pipe and never exits.
             val stderrTail = p.stderr.through(text.utf8.decode).compile.fold("")((acc, s) => (acc + s).takeRight(MaxStderrLength))
             stderrTail.both(p.exitValue).both(p.stdout.compile.drain).map(_._1)
