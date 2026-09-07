@@ -64,6 +64,14 @@ object PdfSummaryJobDaemon:
           pdfSummaryJobService.fail(prepared.job, err.message, err.permanent)
       *> warn"Summary job ${prepared.job.id} failed (permanent: ${err.permanent}): ${err.message}"
 
+    // A render cut short by shutdown is not a failure: hand the job back now
+    // rather than leaving it `rendering` until the stale sweep.
+    def release(prepared: PdfSummaryJobService.Prepared): F[Unit] =
+      services.useTransactionally:
+        requireServiceAccessOrThrow:
+          pdfSummaryJobService.release(prepared.job)
+      *> info"Summary job ${prepared.job.id}: render interrupted, back to pending"
+
     def upload(prepared: PdfSummaryJobService.Prepared, out: fs2.io.file.Path): F[Unit] =
       Files[F].size(out).flatMap: bytes =>
         info"Summary job ${prepared.job.id}: uploading ${prepared.fileName} ($bytes bytes) to s3 ${prepared.remotePath}" *>
@@ -88,7 +96,7 @@ object PdfSummaryJobDaemon:
       logged(s"rendering job ${prepared.job.id}"):
         T.rootSpan("pdf-summary-job.render").surround:
           info"Summary job ${prepared.job.id}: rendering (attempt ${prepared.job.attempts})" *>
-            render(prepared)
+            render(prepared).onCancel(logged(s"releasing job ${prepared.job.id}")(release(prepared)))
 
     // Takes jobs until nothing is waiting.  A failure to take one ends the
     // drain; the next notification or poll starts another.
