@@ -45,6 +45,7 @@ class PdfRendererSuite extends CatsEffectSuite:
        |  noirlab-darp) echo "requests.ConnectionError: ITC unreachable" >&2; exit 1;;
        |  gemini-darp)  exec sleep 30;;
        |  gemini-no-investigators) head -c 300000 /dev/zero | tr '\0' x;;
+       |  gemini-investigators-at-end) head -c 300000 /dev/zero | tr '\0' e >&2; echo " the end" >&2; exit 1;;
        |esac
        |cp "$payload" "$output"
        |""".stripMargin
@@ -81,6 +82,14 @@ class PdfRendererSuite extends CatsEffectSuite:
     render(SummaryStyle.GeminiNoInvestigators, timeout = 5.seconds).map: (r, out) =>
       assertEquals(r, ().asRight)
       assertEquals(out, payload.noSpaces.some)
+
+  test("a renderer that floods stderr keeps only the tail of it"):
+    render(SummaryStyle.GeminiInvestigatorsAtEnd, timeout = 5.seconds).map: (r, _) =>
+      val Left(err) = r: @unchecked
+      assert(err.message.startsWith("Renderer exited with code 1: ..."))
+      assert(err.message.endsWith("the end"))
+      assert(err.message.length < 2100, err.message.length.toString)
+      assertEquals(err.permanent, false)
 
   test("any other exit code is a transient failure"):
     render(SummaryStyle.NoirlabDarp).map: (r, _) =>

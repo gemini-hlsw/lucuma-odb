@@ -39,6 +39,10 @@ object PdfRenderer:
   // How much of the renderer's stderr is kept as the job's error message.
   private val MaxErrorLength: Int = 2000
 
+  // How much of the renderer's stderr is kept at all; the rest is dropped as
+  // it streams so a runaway renderer cannot fill memory or the log.
+  private val MaxStderrLength: Int = 64 * 1024
+
   /**
    * Runs `python -m pyexplore.pdf.render` in this container.
    * The process is killed when `timeout` passes.
@@ -75,7 +79,8 @@ object PdfRenderer:
             )
           ).spawn[F].use: p =>
             // Drain stdout too, or a chatty renderer blocks on a full pipe and never exits.
-            p.stderr.through(text.utf8.decode).compile.string.both(p.exitValue).both(p.stdout.compile.drain).map(_._1)
+            val stderrTail = p.stderr.through(text.utf8.decode).compile.fold("")((acc, s) => (acc + s).takeRight(MaxStderrLength))
+            stderrTail.both(p.exitValue).both(p.stdout.compile.drain).map(_._1)
 
         // pyexplore logs to stderr at INFO; keep it on success too, since that
         // is where it says what it left out of the PDF.
