@@ -343,24 +343,44 @@ lazy val herokuRelease: List[WorkflowStep] =
 def imageShaEnvVar(system: String, proc: String): String =
   s"DOCKER_IMAGE_SHA_${system.toUpperCase}_${proc.toUpperCase}"
 
+// `echo "VAR=$(cmd)" >> $GITHUB_ENV` swallows a failing `cmd` -- the echo still succeeds and the
+// variable ends up empty, which would put `"web": ""` in the deployment record and only surface
+// much later as a broken rollback. So capture, check, and log.
+def recordImageSha(system: String, proc: String, lookup: String): String =
+  s"""|sha=$$($lookup)
+      |[ -n "$$sha" ] || { echo "::error::no docker image for ${system.toUpperCase}/$proc"; exit 1; }
+      |echo "${imageShaEnvVar(system, proc)}=$$sha" >> $$GITHUB_ENV
+      |echo "${system.toUpperCase}/$proc -> $$sha"""".stripMargin
+
 lazy val retrieveDockerImageShas: List[WorkflowStep] =
   systems.flatMap { system =>
     val app = appNames(system)
     List(
       WorkflowStep.Run(
         procTypes(system).map { proc =>
-          s"""echo "${imageShaEnvVar(system, proc)}=$$(docker inspect registry.heroku.com/$app-dev/$proc:$${{ github.sha }} --format={{.Id}})" >> $$GITHUB_ENV"""
+          recordImageSha(
+            system,
+            proc,
+            s"docker inspect registry.heroku.com/$app-dev/$proc:$${{ github.sha }} --format={{.Id}}"
+          )
         },
         name = Some(s"Get ${system.toUpperCase} Docker image SHA"),
         cond = Some(systemAffectedCond(system))
       ),
       // A system we didn't rebuild still needs an entry, or the deployment record for this commit
-      // would be incomplete and `rollback-servers.sh <env> <sha>` could not restore it. Read what
-      // dev is running now and carry it forward.
+      // would be incomplete and `rollback-servers.sh <env> <sha>` could not restore it. Copy the
+      // last record for this system: Heroku's formation API returns its own image object rather
+      // than the sha256 digest the record uses, so the previous record is the only source of a
+      // value of the right shape.
       WorkflowStep.Run(
-        procTypes(system).map { proc =>
-          s"""echo "${imageShaEnvVar(system, proc)}=$$(curl -s --fail-with-body -H "Authorization: Bearer $$HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/$app-dev/formation | jq -r --arg p "$proc" '.[] | select(.type == $$p) | .docker_image')" >> $$GITHUB_ENV"""
-        },
+        s"""|prev=$$(curl -s --fail-with-body -H "Authorization: Bearer $$GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$${{ github.repository }}/deployments?environment=development&task=deploy:${system.toUpperCase}&per_page=1" | jq -c '.[0].payload.docker_image_shas // empty')
+            |[ -n "$$prev" ] || { echo "::error::no previous ${system.toUpperCase} deployment to carry forward"; exit 1; }""".stripMargin ::
+          procTypes(system).map { proc =>
+            s"""|sha=$$(printf '%s' "$$prev" | jq -r --arg p "$proc" '.[$$p] // empty')
+                |[ -n "$$sha" ] || { echo "::error::previous ${system.toUpperCase} deployment has no image for $proc"; exit 1; }
+                |echo "${imageShaEnvVar(system, proc)}=$$sha" >> $$GITHUB_ENV
+                |echo "${system.toUpperCase}/$proc -> $$sha (carried forward)"""".stripMargin
+          },
         name = Some(s"Carry forward ${system.toUpperCase} Docker image SHA"),
         cond = Some(s"!${systemAffectedCond(system)}")
       )
