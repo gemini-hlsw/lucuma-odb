@@ -1696,7 +1696,7 @@ class perProgramPerConfigCalibrations
       fib  <- withServices(service): services =>
                 // listen to the raw notifications channel, ObsTopic filters bogus
                 // event out
-                services.session.channel(id"ch_observation_edit").listen(10)
+                services.session.channel(ident"ch_observation_edit").listen(10)
                   .interruptAfter(10.seconds)
                   .compile.toList.flatTap(ev.set).start
       _    <- deleteObservation(pi, oid2)

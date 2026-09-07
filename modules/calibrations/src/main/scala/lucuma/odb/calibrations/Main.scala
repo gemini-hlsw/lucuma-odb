@@ -25,6 +25,7 @@ import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.graphql.topic.CalibrationCalcTopic
+import lucuma.odb.graphql.topic.OdbTopic
 import lucuma.odb.graphql.topic.TelluricTargetTopic
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
@@ -126,13 +127,16 @@ object CMain extends MainParams {
     c.ssoClient.use: sso =>
       sso.get(Authorization(Credentials.Token(CIString("Bearer"), c.serviceJwt)))
 
-  def topics[F[_]: Concurrent: Logger: Tracer](pool: Resource[F, Session[F]]):
+  def topics[F[_]: Temporal: Logger: Tracer](pool: Resource[F, Session[F]]):
    Resource[F, (Topic[F, CalibrationCalcTopic.Element], Topic[F, TelluricTargetTopic.Element])] =
     for {
       sup <- Supervisor[F]
-      ses <- pool
-      cct <- Resource.eval(CalibrationCalcTopic(ses, 1024, sup))
-      trt <- Resource.eval(TelluricTargetTopic(ses, 1024, sup))
+      cct <- Resource.eval(CalibrationCalcTopic.create(sup))
+      trt <- Resource.eval(TelluricTargetTopic.create(sup))
+      _   <- Resource.eval(OdbTopic.runFeeds("Calibrations", pool, sup, ses => List(
+               CalibrationCalcTopic.feed(ses, 1024, cct),
+               TelluricTargetTopic.feed(ses, 1024, trt)
+             )))
     } yield (cct, trt)
 
   // Drains the durable `t_calibration_calc` queue

@@ -53,11 +53,28 @@ val postgresVersion              = "42.7.13"
 val pprintVersion                = "0.9.6"
 val redis4CatsVersion            = "2.0.6"
 val refinedVersion               = "0.11.4"
-val skunkVersion                 = "1.1-c0fa0b0-SNAPSHOT"
+val skunkVersion                 = "2.0-5551937-SNAPSHOT"
 val sqlFormatterVersion          = "2.0.5"
 val spireVersion                 = "0.18.0"
 val slf4jVersion                 = "2.0.19"
 val testcontainersScalaVersion   = "0.44.1" // check test output if you attempt to update this
+
+// ---------------------------------------------------------------------------
+// TEMPORARY: skunk 2 vs. grackle
+//
+// We need skunk 2 for its fix to LISTEN streams, which used to hang silently
+// instead of failing when their connection died (typelevel/skunk#1323).  The
+// latest grackle (0.30.0) still declares skunk 1.0.0, so sbt's eviction check
+// fails `update`, suspecting a breaking major bump.
+//
+// It is safe here: 2.0's only breaking change is in `Identifier`, which grackle
+// never references, and the query suites pass against a real database with no
+// linkage errors.  Remove this once grackle publishes against skunk 2.
+// ---------------------------------------------------------------------------
+ThisBuild / libraryDependencySchemes ++= Seq(
+  "org.tpolecat" %% "skunk-core"  % VersionScheme.Always,
+  "org.tpolecat" %% "skunk-circe" % VersionScheme.Always
+)
 
 ThisBuild / tlBaseVersion      := "0.95"
 ThisBuild / scalaVersion       := "3.9.0"

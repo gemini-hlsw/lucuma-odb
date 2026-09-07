@@ -33,6 +33,7 @@ import lucuma.odb.graphql.topic.ExecutionEventAddedTopic
 import lucuma.odb.graphql.topic.GroupTopic
 import lucuma.odb.graphql.topic.ObscalcTopic
 import lucuma.odb.graphql.topic.ObservationTopic
+import lucuma.odb.graphql.topic.OdbTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.topic.TooTriggerTopic
@@ -68,19 +69,29 @@ object OdbMapping {
   )
 
   object Topics {
-    def apply[F[_]: Concurrent: Logger: Tracer](pool: Resource[F, Session[F]]): Resource[F, Topics[F]] =
+    def apply[F[_]: Temporal: Logger: Tracer](pool: Resource[F, Session[F]]): Resource[F, Topics[F]] =
       for {
         sup <- Supervisor[F]
-        ses <- pool
-        pro <- Resource.eval(ProgramTopic(ses, 1024, sup))
-        obs <- Resource.eval(ObservationTopic(ses, 1024, sup))
-        oc  <- Resource.eval(ObscalcTopic(ses, 65536, sup))
-        tar <- Resource.eval(TargetTopic(ses, 1024, sup))
-        grp <- Resource.eval(GroupTopic(ses, 1024, sup))
-        cr  <- Resource.eval(ConfigurationRequestTopic(ses, 1024, sup))
-        exe <- Resource.eval(ExecutionEventAddedTopic(ses, 1024, sup))
-        dst <- Resource.eval(DatasetTopic(ses, 1024, sup))
-        tt  <- Resource.eval(TooTriggerTopic(ses, 1024, sup))
+        pro <- Resource.eval(ProgramTopic.create(sup))
+        obs <- Resource.eval(ObservationTopic.create(sup))
+        oc  <- Resource.eval(ObscalcTopic.create(sup))
+        tar <- Resource.eval(TargetTopic.create(sup))
+        grp <- Resource.eval(GroupTopic.create(sup))
+        cr  <- Resource.eval(ConfigurationRequestTopic.create(sup))
+        exe <- Resource.eval(ExecutionEventAddedTopic.create(sup))
+        dst <- Resource.eval(DatasetTopic.create(sup))
+        tt  <- Resource.eval(TooTriggerTopic.create(sup))
+        _   <- Resource.eval(OdbTopic.runFeeds("ODB", pool, sup, ses => List(
+                 ProgramTopic.feed(ses, 1024, pro),
+                 ObservationTopic.feed(ses, 1024, obs),
+                 ObscalcTopic.feed(ses, 65536, oc),
+                 TargetTopic.feed(ses, 1024, tar),
+                 GroupTopic.feed(ses, 1024, grp),
+                 ConfigurationRequestTopic.feed(ses, 1024, cr),
+                 ExecutionEventAddedTopic.feed(ses, 1024, exe),
+                 DatasetTopic.feed(ses, 1024, dst),
+                 TooTriggerTopic.feed(ses, 1024, tt)
+               )))
       } yield Topics(pro, obs, oc, tar, grp, cr, exe, dst, tt)
   }
 

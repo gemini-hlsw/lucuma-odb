@@ -6,6 +6,7 @@ package lucuma.odb.graphql.topic
 import cats.effect.Concurrent
 import cats.effect.std.Supervisor
 import cats.syntax.apply.*
+import fs2.Stream
 import fs2.concurrent.Topic
 import lucuma.core.model.ExecutionEvent
 import lucuma.core.model.Observation
@@ -33,7 +34,7 @@ object ExecutionEventAddedTopic:
   private val topic =
     OdbTopic.define[(ExecutionEvent.Id, Program.Id, Observation.Id, Visit.Id, ExecutionEventType), Element](
       "ExecutionEvent",
-      id"ch_execution_event_added",
+      ident"ch_execution_event_added",
       _._2,
       (update, users) => Element(update._1, update._2, update._3, update._4, update._5, users)
     ) {
@@ -47,11 +48,14 @@ object ExecutionEventAddedTopic:
         ).tupled
     }
 
-  def apply[F[_]: Concurrent: Logger: Tracer](
+  def create[F[_]: Concurrent: Logger](sup: Supervisor[F]): F[Topic[F, Element]] =
+    topic.create(sup)
+
+  def feed[F[_]: Concurrent: Logger: Tracer](
     s:         Session[F],
     maxQueued: Int,
-    sup:       Supervisor[F]
-  ): F[Topic[F, Element]] =
-    topic.create(s, maxQueued, sup)
+    top:       Topic[F, Element]
+  ): Stream[F, Unit] =
+    topic.feed(s, maxQueued, top)
 
 
