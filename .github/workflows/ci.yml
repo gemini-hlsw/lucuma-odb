@@ -18,6 +18,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
   MUNIT_FLAKY_OK: ${{ vars.MUNIT_FLAKY_OK }}
+  PYEXPLORE_TOKEN: ${{ secrets.PYEXPLORE_TOKEN }}
 
 
 concurrency:
@@ -283,7 +284,7 @@ jobs:
         run: sbt -v -J-Xmx6g +update
 
       - name: Clean
-        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
         run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' clean
 
       - name: Build SSO Docker images
@@ -295,15 +296,15 @@ jobs:
         run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' itcService/docker:publishLocal'
 
       - name: Build ODB Docker images
-        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal'
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary'))
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal pdfSummary/docker:publishLocal'
 
       - name: Build RESOURCE Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
         run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' resourceService/docker:publishLocal'
 
       - name: Log in to Heroku
-        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
         run: |
           npm install -g heroku
           heroku container:login
@@ -333,7 +334,7 @@ jobs:
           docker push registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev/web
 
       - name: Push ODB Docker images to Heroku
-        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary'))
         run: |
           docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }}
@@ -359,6 +360,14 @@ jobs:
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/calibration:${{ github.sha }}
           docker tag noirlab/calibrations-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
+          docker tag noirlab/pdf-summary-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/pdfsummary:${{ github.sha }}
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/pdfsummary:${{ github.sha }}
+          docker tag noirlab/pdf-summary-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/pdfsummary:${{ github.sha }}
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/pdfsummary:${{ github.sha }}
+          docker tag noirlab/pdf-summary-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/pdfsummary:${{ github.sha }}
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/pdfsummary:${{ github.sha }}
+          docker tag noirlab/pdf-summary-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/pdfsummary
+          docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/pdfsummary
 
       - name: Push RESOURCE Docker images to Heroku
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
@@ -381,8 +390,8 @@ jobs:
         run: 'heroku container:release web -a ${{ vars.HEROKU_ITC_APP_NAME || ''itc'' }}-dev -v'
 
       - name: Release dev ODB app in Heroku
-        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
-        run: 'heroku container:release web obscalc calibration -a ${{ vars.HEROKU_ODB_APP_NAME || ''lucuma-postgres-odb'' }}-dev -v'
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary'))
+        run: 'heroku container:release web obscalc calibration pdfsummary -a ${{ vars.HEROKU_ODB_APP_NAME || ''lucuma-postgres-odb'' }}-dev -v'
 
       - name: Release dev RESOURCE app in Heroku
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
@@ -425,7 +434,7 @@ jobs:
           echo "ITC/web -> $sha (carried forward)"
 
       - name: Get ODB Docker image SHA
-        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary'))
         run: |
           sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }} --format={{.Id}})
           [ -n "$sha" ] || { echo "::error::no docker image for ODB/web"; exit 1; }
@@ -439,9 +448,13 @@ jobs:
           [ -n "$sha" ] || { echo "::error::no docker image for ODB/calibration"; exit 1; }
           echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$sha" >> $GITHUB_ENV
           echo "ODB/calibration -> $sha"
+          sha=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/pdfsummary:${{ github.sha }} --format={{.Id}})
+          [ -n "$sha" ] || { echo "::error::no docker image for ODB/pdfsummary"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_PDFSUMMARY=$sha" >> $GITHUB_ENV
+          echo "ODB/pdfsummary -> $sha"
 
       - name: Carry forward ODB Docker image SHA
-        if: '!(contains(fromJSON(needs.affected.outputs.projects), ''service'') || contains(fromJSON(needs.affected.outputs.projects), ''obscalc'') || contains(fromJSON(needs.affected.outputs.projects), ''calibrations''))'
+        if: '!(contains(fromJSON(needs.affected.outputs.projects), ''service'') || contains(fromJSON(needs.affected.outputs.projects), ''obscalc'') || contains(fromJSON(needs.affected.outputs.projects), ''calibrations'') || contains(fromJSON(needs.affected.outputs.projects), ''pdfSummary''))'
         run: |
           prev=$(curl -s --fail-with-body -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/deployments?environment=development&task=deploy:ODB&per_page=1" | jq -c '.[0].payload.docker_image_shas // empty')
           [ -n "$prev" ] || { echo "::error::no previous ODB deployment to carry forward"; exit 1; }
@@ -457,6 +470,10 @@ jobs:
           [ -n "$sha" ] || { echo "::error::previous ODB deployment has no image for calibration"; exit 1; }
           echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$sha" >> $GITHUB_ENV
           echo "ODB/calibration -> $sha (carried forward)"
+          sha=$(printf '%s' "$prev" | jq -r --arg p "pdfsummary" '.[$p] // empty')
+          [ -n "$sha" ] || { echo "::error::previous ODB deployment has no image for pdfsummary"; exit 1; }
+          echo "DOCKER_IMAGE_SHA_ODB_PDFSUMMARY=$sha" >> $GITHUB_ENV
+          echo "ODB/pdfsummary -> $sha (carried forward)"
 
       - name: Get RESOURCE Docker image SHA
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
@@ -489,7 +506,7 @@ jobs:
       - name: Record ODB deployment in GHA
         run: |
           echo "Recording deployment ${{ github.sha }} for ODB to ${{ github.repository }}"
-          curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "ODB deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:ODB", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_ODB_WEB }}", "obscalc": "${{ env.DOCKER_IMAGE_SHA_ODB_OBSCALC }}", "calibration": "${{ env.DOCKER_IMAGE_SHA_ODB_CALIBRATION }}" } } }' 
+          curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "ODB deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:ODB", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_ODB_WEB }}", "obscalc": "${{ env.DOCKER_IMAGE_SHA_ODB_OBSCALC }}", "calibration": "${{ env.DOCKER_IMAGE_SHA_ODB_CALIBRATION }}", "pdfsummary": "${{ env.DOCKER_IMAGE_SHA_ODB_PDFSUMMARY }}" } } }' 
 
       - name: Record RESOURCE deployment in GHA
         run: |

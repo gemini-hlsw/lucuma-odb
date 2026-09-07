@@ -25,6 +25,7 @@
           CLOUDCUBE_SECRET_ACCESS_KEY = "SOPS_ENCRYPTED_CLOUDCUBE_SECRET";
           MAILGUN_API_KEY = "SOPS_ENCRYPTED_MAILGUN_KEY";
           MAILGUN_WEBHOOK_SIGNING_KEY = "SOPS_ENCRYPTED_WEBHOOK_KEY";
+          PYEXPLORE_TOKEN = "SOPS_ENCRYPTED_PYEXPLORE_TOKEN";
         };
 
       in {
@@ -152,6 +153,11 @@ yMvjw3Rl9GQnMoTGYsNsunNy4Q==
             {
               name = "MAILGUN_API_KEY";
               value = secretValues.MAILGUN_API_KEY;
+            }
+            {
+              # Read access to the private pyexplore repo, for the pdf-summary image build
+              name = "PYEXPLORE_TOKEN";
+              value = secretValues.PYEXPLORE_TOKEN;
             }
             {
               name = "CLOUDCUBE_ACCESS_KEY_ID";

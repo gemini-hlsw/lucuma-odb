@@ -115,6 +115,8 @@ val herokuToken  = "HEROKU_API_KEY"  -> "${{ secrets.HEROKU_API_KEY }}"
 val munitFlakyOk = "MUNIT_FLAKY_OK" -> "${{ vars.MUNIT_FLAKY_OK }}"
 ThisBuild / githubWorkflowEnv += herokuToken
 ThisBuild / githubWorkflowEnv += munitFlakyOk
+// pyexplore is private; the pdfSummary image clones it with this token.
+ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TOKEN }}")
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
 
@@ -259,7 +261,7 @@ lazy val systems: List[String] = List("sso", "itc", "odb", "resource")
 lazy val systemProjects: Map[String, List[Project]] = Map(
   "sso"      -> List(ssoService),
   "itc"      -> List(itcService),
-  "odb"      -> List(service, obscalc, calibrations),
+  "odb"      -> List(service, obscalc, calibrations, pdfSummary),
   "resource" -> List(resourceService)
 )
 
@@ -281,7 +283,7 @@ lazy val appNames: Map[String, String] = Map(
 lazy val procTypes: Map[String, List[String]] = Map(
   "sso"      -> List("web"),
   "itc"      -> List("web"),
-  "odb"      -> List("web", "obscalc", "calibration"),
+  "odb"      -> List("web", "obscalc", "calibration", "pdfsummary"),
   "resource" -> List("web")
 )
 lazy val procTypeImageNames: Map[(String, String), String] = Map(
@@ -290,6 +292,7 @@ lazy val procTypeImageNames: Map[(String, String), String] = Map(
   ("odb", "web")         -> "lucuma-odb-service",
   ("odb", "obscalc")     -> "obscalc-service",
   ("odb", "calibration") -> "calibrations-service",
+  ("odb", "pdfsummary")  -> "pdf-summary-service",
   ("resource", "web")    -> "lucuma-resource-service"
 )
 lazy val environments: List[String] = List("dev", "staging", "production")
@@ -1130,6 +1133,55 @@ lazy val calibrations = project
     dockerExposedPorts ++= Seq(8082)
   )
 
+// Pinned so a deploy always builds the same renderer; bump by PR.
+lazy val pyexploreRef = "29b4abb0b4d0b45934eef8daf85b2ff43cbfe5cc"
+
+lazy val pdfSummary = project
+  .in(file("modules/pdf-summary"))
+  .dependsOn(service)
+  .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging)
+  .settings(
+    name                        := "pdf-summary-service",
+    projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
+    description                     := "Lucuma ODB Proposal Summary PDF Service",
+    // Config requires PORT even though this dyno serves nothing; Heroku always sets it.
+    reStart / envVars += "PORT" -> "8083",
+    // The Python renderer shares the dyno's memory with the JVM; leave it room.
+    lucumaDockerHeapSubtract := 400,
+    bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
+    executableScriptName            := "lucuma-odb-pdf-summary-service",
+    // pyexplore is private: the token comes in as a BuildKit secret (never a
+    // layer) and is applied through git's env-only config, so nothing persists.
+    dockerBuildOptions ++= Seq("--secret", "id=pyexplore_token,env=PYEXPLORE_TOKEN"),
+    // The renderer is Python (pyexplore): install it into the JRE image, in a
+    // venv the daemon runs through PDF_SUMMARY_PYTHON.
+    dockerCommands := {
+      import com.typesafe.sbt.packager.docker.Cmd
+      val cmds      = dockerCommands.value
+      val mainStage = cmds.lastIndexWhere {
+        case Cmd("FROM", _*) => true
+        case _               => false
+      }
+      val python    = Seq(
+        Cmd("USER", "root"),
+        Cmd(
+          "RUN",
+          "--mount=type=secret,id=pyexplore_token,required=true",
+          "apt-get update",
+          "&& apt-get install -y --no-install-recommends python3 python3-venv git",
+          "&& python3 -m venv /opt/pyexplore",
+          "&& GIT_CONFIG_COUNT=1",
+          "GIT_CONFIG_KEY_0=url.https://x-access-token:$(cat /run/secrets/pyexplore_token)@github.com/.insteadOf",
+          "GIT_CONFIG_VALUE_0=https://github.com/",
+          s"""/opt/pyexplore/bin/pip install --no-cache-dir "pyexplore[pdf] @ git+https://github.com/andrewwstephens/pyexplore@$pyexploreRef"""",
+          "&& apt-get purge -y git && apt-get autoremove -y",
+          "&& rm -rf /var/lib/apt/lists/*"
+        )
+      )
+      cmds.patch(mainStage + 1, python, 0)
+    }
+  )
+
 lazy val phase0 = project
   .in(file("modules/phase0"))
   .enablePlugins(NoPublishPlugin)
@@ -1150,8 +1202,8 @@ lazy val phase0 = project
   )
 
 // Command aliases for starting/stopping all services
-addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart")
-addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop")
+addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart;pdfSummary/reStart")
+addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop;pdfSummary/reStop")
 
 // START RESOURCE
 
