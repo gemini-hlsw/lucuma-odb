@@ -10934,7 +10934,9 @@ type Flamingos2LongSlit {
   telescopeConfigs: SlitTelescopeConfigs!
 
   """
-  Default telescope configs.
+  Default telescope configs. For a telluric derived from a MOS observation
+  these are the MOS telluric offsets, so such a telluric normally has no
+  explicit override.
   """
   defaultTelescopeConfigs: SlitTelescopeConfigs!
 
@@ -12314,6 +12316,12 @@ type GnirsSpectroscopyLongSlit {
 
   "Effective telescope configs (explicit override coalesced with the default)."
   telescopeConfigs: SlitTelescopeConfigs!
+
+  """
+  Default telescope configs for the configuration. For a telluric calibration
+  these are the telluric offsets, so a telluric normally has no explicit
+  override.
+  """
   defaultTelescopeConfigs: SlitTelescopeConfigs!
   explicitTelescopeConfigs: SlitTelescopeConfigs
 }
@@ -12368,6 +12376,12 @@ type GnirsLongSlit {
 
   "Effective telescope configs (explicit override coalesced with the default)."
   telescopeConfigs: SlitTelescopeConfigs!
+
+  """
+  Default telescope configs for the configuration. For a telluric calibration
+  these are the telluric offsets, so a telluric normally has no explicit
+  override.
+  """
   defaultTelescopeConfigs: SlitTelescopeConfigs!
   explicitTelescopeConfigs: SlitTelescopeConfigs
 
