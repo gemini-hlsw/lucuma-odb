@@ -189,14 +189,10 @@ object CalibrationsService extends CalibrationObservations {
                   }.getOrElse(List.empty.pure[F])
           // Select a new target
           tgts <- o match {
-                  case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosNorthLongSlit)) =>
+                  case Some(_, cr, Some(ot), Some(PerProgramSite(site))) =>
                     session
                       .execute(Statements.selectCalibrationTargets(PerProgramPerConfigCalibrationTypes))(PerProgramPerConfigCalibrationTypes)
-                      .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GN, ot.toInstant, _)).map(_.bestTarget(cr)))
-                  case Some(oid, cr, Some(ot), Some(ObservingModeType.GmosSouthLongSlit)) =>
-                    session
-                      .execute(Statements.selectCalibrationTargets(PerProgramPerConfigCalibrationTypes))(PerProgramPerConfigCalibrationTypes)
-                      .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(Site.GS, ot.toInstant, _)).map(_.bestTarget(cr)))
+                      .map(targetCoordinates(ot.toInstant).map(CalibrationIdealTargets(site, ot.toInstant, _)).map(_.bestTarget(cr)))
                   case _ =>
                     none.pure[F]
                }
@@ -227,6 +223,15 @@ object CalibrationsService extends CalibrationObservations {
         session.execute(Statements.isCalibration)(obsId).map(_.headOption.getOrElse(false))
 
     }
+
+  // Retargeting applies to the modes with per-program calibrations, whose standard
+  // is chosen by site. Keep in step with CalibrationsUtils.perProgramFilter.
+  private object PerProgramSite:
+    def unapply(mode: ObservingModeType): Option[Site] =
+      mode match
+        case ObservingModeType.GmosNorthLongSlit | ObservingModeType.GmosNorthIfu => Site.GN.some
+        case ObservingModeType.GmosSouthLongSlit | ObservingModeType.GmosSouthIfu => Site.GS.some
+        case _                                                                    => none
 
   object Statements {
 
