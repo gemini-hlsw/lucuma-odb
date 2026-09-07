@@ -241,7 +241,8 @@ def setupWith(checkout: WorkflowStep): Def.Initialize[List[WorkflowStep]] = Def.
     githubWorkflowGeneratedCacheSteps.value.toList
 }
 
-lazy val sbtClean = WorkflowStep.Sbt(List("clean"), name = Some("Clean"))
+lazy val sbtClean =
+  WorkflowStep.Sbt(List("clean"), name = Some("Clean"), cond = Some(anyAffectedCond))
 
 lazy val sbtDockerPublishLocal: List[WorkflowStep] =
   systems.map { system =>
@@ -263,6 +264,9 @@ lazy val systemProjects: Map[String, List[Project]] = Map(
 )
 
 lazy val allSystemProjects: List[Project] = systems.flatMap(systemProjects)
+
+def anyAffectedCond: String =
+  lucumaAffectedCond(allSystemProjects.head, allSystemProjects.tail: _*)
 
 def systemAffectedCond(system: String): String = systemProjects(system) match {
   case head :: tail => lucumaAffectedCond(head, tail: _*)
@@ -299,7 +303,8 @@ lazy val systemProcTypes: List[(String, String, String)] =
 lazy val herokuLogin =
   WorkflowStep.Run(
     List("npm install -g heroku", "heroku container:login"),
-    name = Some("Log in to Heroku")
+    name = Some("Log in to Heroku"),
+    cond = Some(anyAffectedCond)
   )
 
 lazy val herokuPush: List[WorkflowStep] =
@@ -339,14 +344,26 @@ def imageShaEnvVar(system: String, proc: String): String =
   s"DOCKER_IMAGE_SHA_${system.toUpperCase}_${proc.toUpperCase}"
 
 lazy val retrieveDockerImageShas: List[WorkflowStep] =
-  systems.map { system =>
+  systems.flatMap { system =>
     val app = appNames(system)
-    WorkflowStep.Run(
-      procTypes(system).map { proc =>
-        s"""echo "${imageShaEnvVar(system, proc)}=$$(docker inspect registry.heroku.com/$app-dev/$proc:$${{ github.sha }} --format={{.Id}})" >> $$GITHUB_ENV"""
-      },
-      name = Some(s"Get ${system.toUpperCase} Docker image SHA"),
-      cond = Some(systemAffectedCond(system))
+    List(
+      WorkflowStep.Run(
+        procTypes(system).map { proc =>
+          s"""echo "${imageShaEnvVar(system, proc)}=$$(docker inspect registry.heroku.com/$app-dev/$proc:$${{ github.sha }} --format={{.Id}})" >> $$GITHUB_ENV"""
+        },
+        name = Some(s"Get ${system.toUpperCase} Docker image SHA"),
+        cond = Some(systemAffectedCond(system))
+      ),
+      // A system we didn't rebuild still needs an entry, or the deployment record for this commit
+      // would be incomplete and `rollback-servers.sh <env> <sha>` could not restore it. Read what
+      // dev is running now and carry it forward.
+      WorkflowStep.Run(
+        procTypes(system).map { proc =>
+          s"""echo "${imageShaEnvVar(system, proc)}=$$(curl -s --fail-with-body -H "Authorization: Bearer $$HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/$app-dev/formation | jq -r --arg p "$proc" '.[] | select(.type == $$p) | .docker_image')" >> $$GITHUB_ENV"""
+        },
+        name = Some(s"Carry forward ${system.toUpperCase} Docker image SHA"),
+        cond = Some(s"!${systemAffectedCond(system)}")
+      )
     )
   }
 
@@ -362,8 +379,7 @@ lazy val recordDeploymentMetadata: List[WorkflowStep] =
         s"""echo "Recording deployment $${{ github.sha }} for ${system.toUpperCase} to $${{ github.repository }}"""",
         s"""curl -s -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": "${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
       ),
-      name = Some(s"Record ${system.toUpperCase} deployment in GHA"),
-      cond = Some(systemAffectedCond(system))
+      name = Some(s"Record ${system.toUpperCase} deployment in GHA")
     )
   }
 
@@ -430,25 +446,24 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1)
   ),
-  lucumaAffectedJob(
-    WorkflowJob(
-      "deploy",
-      "Build and publish Docker images / Deploy to Heroku",
-      setupWith(CheckoutFullWithLfs).value :::
-        sbtClean ::
-        sbtDockerPublishLocal :::
-        herokuLogin ::
-        herokuPush :::
-        herokuRelease :::
-        retrieveDockerImageShas :::
-        recordDeploymentMetadata,
-      scalas = List(scalaVersion.value),
-      javas = githubWorkflowJavaVersions.value.toList.take(1),
-      cond = Some(allConds(mainCond, geminiRepoCond))
-    ),
-    // skip the job outright when the merge reaches none of the deployed systems
-    allSystemProjects.head,
-    allSystemProjects.tail: _*
+  // Runs on every merge, even when nothing is deployed: the deployment record has to be complete
+  // for every commit so a rollback never has to know which systems were promoted. Individual
+  // steps are gated per system instead.
+  WorkflowJob(
+    "deploy",
+    "Build and publish Docker images / Deploy to Heroku",
+    setupWith(CheckoutFullWithLfs).value :::
+      sbtClean ::
+      sbtDockerPublishLocal :::
+      herokuLogin ::
+      herokuPush :::
+      herokuRelease :::
+      retrieveDockerImageShas :::
+      recordDeploymentMetadata,
+    scalas = List(scalaVersion.value),
+    javas = githubWorkflowJavaVersions.value.toList.take(1),
+    needs = List(lucumaAffectedJobId),
+    cond = Some(allConds(mainCond, geminiRepoCond))
   )
 )
 
