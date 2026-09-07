@@ -40,13 +40,12 @@ import lucuma.odb.data.ItcAcquisition
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.ObservingMode.Syntax.*
-import lucuma.odb.sequence.sciClass
 import lucuma.odb.sequence.SetupTimeEstimateCalculator
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
-import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.StreamingExecutionConfig
 import lucuma.odb.sequence.exchange.Config as ExchangeConfig
+import lucuma.odb.sequence.sciClass
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
@@ -213,10 +212,7 @@ object Generator:
 
       // No target means no sequence, so charge a fixed time instead.
       private def isUnresolvedTelluric(ctx: GeneratorContext): Boolean =
-        ctx.params.calibrationRole.contains(CalibrationRole.Telluric) &&
-          (ctx.params.itcInput match
-            case ItcInputDerivation.Incomplete(_) => true
-            case _                                => false)
+        ctx.params.calibrationRole.contains(CalibrationRole.Telluric) && !ctx.params.hasTarget
 
       private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
         ExecutionDigest(
