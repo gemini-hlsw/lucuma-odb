@@ -739,52 +739,59 @@ class perProgramPerConfigCalibrations
     } yield ()
   }
 
-  test("calibration observations obs time can switch target") {
-    for {
-      pid  <- createProgramAs(pi)
-      tid1 <- createTargetAs(pi, pid, "One")
-      oid1 <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid1)
-      _    <- prepareObservation(pi, pid, oid1, tid1)
-      _    <- recalculateCalibrations(pid, when, oid1)
-      ob   <- queryObservations(pid)
-      (cid1, ct1) = ob.collect {
-        case CalibObs(cid, _, Some(_), Some(ct1), _, _, _) => (cid, ct1)
-      }.head
-      _    <- query(
-                user = pi,
-                query = s"""
-                  mutation {
-                    updateObservationsTimes(input: {
-                      SET: {
-                        observationTime: "2026-08-15T01:15:30Z"
-                      },
-                      WHERE: {
-                        id: { EQ: "$cid1" }
-                      }
-                    }) {
-                      observations {
-                        observationTime
+  // Every mode admitted by CalibrationsUtils.perProgramFilter must retarget on an obs time change.
+  List(
+    ObservingModeType.GmosNorthLongSlit,
+    ObservingModeType.GmosSouthLongSlit,
+    ObservingModeType.GmosNorthIfu,
+    ObservingModeType.GmosSouthIfu
+  ).foreach: mode =>
+    test(s"calibration observations obs time can switch target for $mode") {
+      for {
+        pid  <- createProgramAs(pi)
+        tid1 <- createTargetAs(pi, pid, "One")
+        oid1 <- createObservationAs(pi, pid, mode.some, tid1)
+        _    <- prepareObservation(pi, pid, oid1, tid1)
+        _    <- recalculateCalibrations(pid, when, oid1)
+        ob   <- queryObservations(pid)
+        (cid1, ct1) = ob.collect {
+          case CalibObs(cid, _, Some(_), Some(ct1), _, _, _) => (cid, ct1)
+        }.head
+        _    <- query(
+                  user = pi,
+                  query = s"""
+                    mutation {
+                      updateObservationsTimes(input: {
+                        SET: {
+                          observationTime: "2026-08-15T01:15:30Z"
+                        },
+                        WHERE: {
+                          id: { EQ: "$cid1" }
+                        }
+                      }) {
+                        observations {
+                          observationTime
+                        }
                       }
                     }
-                  }
-                """
-              )
-      // In reality this is done listening to events but we can explicitly call the function here
-      _     <- withServices(service) { services =>
-                  services.transactionally:
-                    Services.asSuperUser:
-                      services.calibrationsService.recalculateCalibrationTarget(pid, cid1)
-               }
-      ob2   <- queryObservations(pid)
-      (cid2, ct2) = ob2.collect {
-        case CalibObs(cid, _, Some(_), Some(ct2), _, _, _) => (cid, ct2)
-      }.head
-      // Some observation
-      _     <- assertIOBoolean(IO(ob2.map(_.id) === ob.map(_.id)))
-      // Target changed
-      _     <- assertIOBoolean(IO(ct1 =!= ct2 && cid1 === cid2))
-    } yield ()
-  }
+                  """
+                )
+        // In reality this is done listening to events but we can explicitly call the function here
+        _     <- withServices(service) { services =>
+                    services.transactionally:
+                      Services.asSuperUser:
+                        services.calibrationsService.recalculateCalibrationTarget(pid, cid1)
+                 }
+        ob2   <- queryObservations(pid)
+        (cid2, ct2) = ob2.collect {
+          case CalibObs(cid, _, Some(_), Some(ct2), _, _, _) => (cid, ct2)
+        }.head
+        // Some observation
+        _     <- assertIOBoolean(IO(ob2.map(_.id) === ob.map(_.id)))
+        // Target changed
+        _     <- assertIOBoolean(IO(ct1 =!= ct2 && cid1 === cid2))
+      } yield ()
+    }
 
   test("calibration observations can't be cloned") {
     for {
