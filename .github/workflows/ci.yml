@@ -252,6 +252,7 @@ jobs:
 
   deploy:
     name: Build and publish Docker images / Deploy to Heroku
+    needs: [affected]
     if: (github.ref == 'refs/heads/main' && startsWith(github.repository, 'gemini'))
     strategy:
       matrix:
@@ -281,13 +282,35 @@ jobs:
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
         run: sbt -v -J-Xmx6g +update
 
-      - name: Build Docker images
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' clean ssoService/docker:publishLocal itcService/docker:publishLocal service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal resourceService/docker:publishLocal'
+      - name: Clean
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' clean
 
-      - name: Push Docker images to Heroku
+      - name: Build SSO Docker images
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' ssoService/docker:publishLocal'
+
+      - name: Build ITC Docker images
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' itcService/docker:publishLocal'
+
+      - name: Build ODB Docker images
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal'
+
+      - name: Build RESOURCE Docker images
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
+        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' resourceService/docker:publishLocal'
+
+      - name: Log in to Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
         run: |
           npm install -g heroku
           heroku container:login
+
+      - name: Push SSO Docker images to Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
+        run: |
           docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web:${{ github.sha }}
           docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-staging/web:${{ github.sha }}
@@ -296,6 +319,10 @@ jobs:
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-production/web:${{ github.sha }}
           docker tag noirlab/lucuma-sso-service registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web
           docker push registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web
+
+      - name: Push ITC Docker images to Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
+        run: |
           docker tag noirlab/lucuma-itc-service registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev/web:${{ github.sha }}
           docker tag noirlab/lucuma-itc-service registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-staging/web:${{ github.sha }}
@@ -304,6 +331,10 @@ jobs:
           docker push registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-production/web:${{ github.sha }}
           docker tag noirlab/lucuma-itc-service registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev/web
           docker push registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev/web
+
+      - name: Push ODB Docker images to Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
+        run: |
           docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }}
           docker tag noirlab/lucuma-odb-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-staging/web:${{ github.sha }}
@@ -328,6 +359,10 @@ jobs:
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-production/calibration:${{ github.sha }}
           docker tag noirlab/calibrations-service registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
           docker push registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration
+
+      - name: Push RESOURCE Docker images to Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
+        run: |
           docker tag noirlab/lucuma-resource-service registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web:${{ github.sha }}
           docker push registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web:${{ github.sha }}
           docker tag noirlab/lucuma-resource-service registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-staging/web:${{ github.sha }}
@@ -337,29 +372,116 @@ jobs:
           docker tag noirlab/lucuma-resource-service registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web
           docker push registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web
 
-      - name: Release dev app in Heroku
-        run: |
-          heroku container:release web -a ${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev -v
-          heroku container:release web -a ${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev -v
-          heroku container:release web obscalc calibration -a ${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev -v
-          heroku container:release web -a ${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev -v
+      - name: Release dev SSO app in Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
+        run: 'heroku container:release web -a ${{ vars.HEROKU_SSO_APP_NAME || ''lucuma-sso'' }}-dev -v'
 
-      - name: Get Docker image SHA
+      - name: Release dev ITC app in Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
+        run: 'heroku container:release web -a ${{ vars.HEROKU_ITC_APP_NAME || ''itc'' }}-dev -v'
+
+      - name: Release dev ODB app in Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
+        run: 'heroku container:release web obscalc calibration -a ${{ vars.HEROKU_ODB_APP_NAME || ''lucuma-postgres-odb'' }}-dev -v'
+
+      - name: Release dev RESOURCE app in Heroku
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
+        run: 'heroku container:release web -a ${{ vars.HEROKU_RESOURCE_APP_NAME || ''lucuma-resource'' }}-dev -v'
+
+      - name: Get SSO Docker image SHA
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
+        run: 'echo "DOCKER_IMAGE_SHA_SSO_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || ''lucuma-sso'' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV'
+
+      - name: Carry forward SSO Docker image SHA
+        if: '!(contains(fromJSON(needs.affected.outputs.projects), ''ssoService''))'
+        run: 'echo "DOCKER_IMAGE_SHA_SSO_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_SSO_APP_NAME || ''lucuma-sso'' }}-dev/formation | jq -r --arg p "web" ''.[] | select(.type == $p) | .docker_image'')" >> $GITHUB_ENV'
+
+      - name: Get ITC Docker image SHA
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
+        run: 'echo "DOCKER_IMAGE_SHA_ITC_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || ''itc'' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV'
+
+      - name: Carry forward ITC Docker image SHA
+        if: '!(contains(fromJSON(needs.affected.outputs.projects), ''itcService''))'
+        run: 'echo "DOCKER_IMAGE_SHA_ITC_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ITC_APP_NAME || ''itc'' }}-dev/formation | jq -r --arg p "web" ''.[] | select(.type == $p) | .docker_image'')" >> $GITHUB_ENV'
+
+      - name: Get ODB Docker image SHA
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations'))
         run: |
-          echo "DOCKER_IMAGE_SHA_SSO_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_SHA_ITC_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
           echo "DOCKER_IMAGE_SHA_ODB_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
           echo "DOCKER_IMAGE_SHA_ODB_OBSCALC=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/obscalc:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
           echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$(docker inspect registry.heroku.com/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/calibration:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || 'lucuma-resource' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV
 
-      - name: Record deployment in GHA
+      - name: Carry forward ODB Docker image SHA
+        if: '!(contains(fromJSON(needs.affected.outputs.projects), ''service'') || contains(fromJSON(needs.affected.outputs.projects), ''obscalc'') || contains(fromJSON(needs.affected.outputs.projects), ''calibrations''))'
+        run: |
+          echo "DOCKER_IMAGE_SHA_ODB_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/formation | jq -r --arg p "web" '.[] | select(.type == $p) | .docker_image')" >> $GITHUB_ENV
+          echo "DOCKER_IMAGE_SHA_ODB_OBSCALC=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/formation | jq -r --arg p "obscalc" '.[] | select(.type == $p) | .docker_image')" >> $GITHUB_ENV
+          echo "DOCKER_IMAGE_SHA_ODB_CALIBRATION=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_ODB_APP_NAME || 'lucuma-postgres-odb' }}-dev/formation | jq -r --arg p "calibration" '.[] | select(.type == $p) | .docker_image')" >> $GITHUB_ENV
+
+      - name: Get RESOURCE Docker image SHA
+        if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
+        run: 'echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$(docker inspect registry.heroku.com/${{ vars.HEROKU_RESOURCE_APP_NAME || ''lucuma-resource'' }}-dev/web:${{ github.sha }} --format={{.Id}})" >> $GITHUB_ENV'
+
+      - name: Carry forward RESOURCE Docker image SHA
+        if: '!(contains(fromJSON(needs.affected.outputs.projects), ''resourceService''))'
+        run: 'echo "DOCKER_IMAGE_SHA_RESOURCE_WEB=$(curl -s --fail-with-body -H "Authorization: Bearer $HEROKU_API_KEY" -H "Accept: application/vnd.heroku+json; version=3.docker-releases" https://api.heroku.com/apps/${{ vars.HEROKU_RESOURCE_APP_NAME || ''lucuma-resource'' }}-dev/formation | jq -r --arg p "web" ''.[] | select(.type == $p) | .docker_image'')" >> $GITHUB_ENV'
+
+      - name: Record SSO deployment in GHA
         run: |
           echo "Recording deployment ${{ github.sha }} for SSO to ${{ github.repository }}"
           curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "SSO deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:SSO", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_SSO_WEB }}" } } }' 
+
+      - name: Record ITC deployment in GHA
+        run: |
           echo "Recording deployment ${{ github.sha }} for ITC to ${{ github.repository }}"
           curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "ITC deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:ITC", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_ITC_WEB }}" } } }' 
+
+      - name: Record ODB deployment in GHA
+        run: |
           echo "Recording deployment ${{ github.sha }} for ODB to ${{ github.repository }}"
           curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "ODB deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:ODB", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_ODB_WEB }}", "obscalc": "${{ env.DOCKER_IMAGE_SHA_ODB_OBSCALC }}", "calibration": "${{ env.DOCKER_IMAGE_SHA_ODB_CALIBRATION }}" } } }' 
+
+      - name: Record RESOURCE deployment in GHA
+        run: |
           echo "Recording deployment ${{ github.sha }} for RESOURCE to ${{ github.repository }}"
           curl -s -X POST https://api.github.com/repos/${{ github.repository }}/deployments -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "${{ github.sha }}", "environment": "development", "description": "RESOURCE deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:RESOURCE", "payload": { "docker_image_shas": { "web": "${{ env.DOCKER_IMAGE_SHA_RESOURCE_WEB }}" } } }' 
+
+  affected:
+    name: Affected Projects
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        scala: [3]
+        java: [temurin@25]
+    runs-on: ${{ matrix.os }}
+    outputs:
+      all: ${{ steps.report.outputs.all }}
+      projects: ${{ steps.report.outputs.projects }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Setup Java (temurin@25)
+        id: setup-java-temurin-25
+        if: matrix.java == 'temurin@25'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: sbt
+
+      - name: sbt update
+        if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
+        run: sbt -v -J-Xmx6g +update
+
+      - name: Compute affected projects
+        id: report
+        env:
+          LUCUMA_AFFECTED_PUSH_BASE: ${{ github.event.before }}
+        run: sbt -v -J-Xmx6g lucumaAffectedReport
