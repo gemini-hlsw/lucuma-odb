@@ -64,14 +64,14 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
       fpu      = GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits).some
     )
 
-  private def expectedStep(d: GmosNorth): Json =
+  private def expectedStep(d: GmosNorth, breakpoint: Breakpoint = Breakpoint.Enabled): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(d)},
         "stepConfig" : { "stepType":  "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(0, 0, StepGuideState.Enabled)},
         "observeClass" : "ACQUISITION",
-        "breakpoint": ${Breakpoint.Enabled.tag.toScreamingSnakeCase.asJson}
+        "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
       }
     """
 
@@ -136,9 +136,9 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
         expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
       ))
 
-  // `AcquisitionAtoms` only breaks after the initial atom's last step, so the repeating atom's
-  // breakpoint has to come from the steps themselves.
-  test("the repeating atom's step carries a breakpoint too"):
+  // The repeat is requested explicitly by the observer from the acquisition prompt, so it must
+  // run without stopping; a breakpoint there would stop the sequence before the step runs (sc-10293).
+  test("the repeating atom's step carries no breakpoint"):
     setup("").flatMap: oid =>
       expect(
         user     = pi,
@@ -161,7 +161,7 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
                       "description"  -> "Fine Adjustments".asJson,
                       "observeClass" -> "ACQUISITION".asJson,
                       "steps"        -> List(
-                        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
+                        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow), Breakpoint.Disabled)
                       ).asJson
                     )
                   ).asJson,
