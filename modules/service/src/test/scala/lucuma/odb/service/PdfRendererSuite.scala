@@ -47,6 +47,7 @@ class PdfRendererSuite extends CatsEffectSuite:
        |  gemini-no-investigators) head -c 300000 /dev/zero | tr '\0' x;;
        |  gemini-investigators-at-end) head -c 300000 /dev/zero | tr '\0' e >&2; echo " the end" >&2; exit 1;;
        |esac
+       |env | cut -d= -f1 > "$output-vars"
        |cp "$payload" "$output"
        |""".stripMargin
 
@@ -72,6 +73,16 @@ class PdfRendererSuite extends CatsEffectSuite:
     render(SummaryStyle.GeminiStandard).map: (r, out) =>
       assertEquals(r, ().asRight)
       assertEquals(out, payload.noSpaces.some)
+
+  test("the renderer sees only the allowlisted environment"):
+    fixture.use: (script, out) =>
+      for
+        _    <- PdfRenderer.subprocess[IO](script.toString, itcUrl, 10.seconds).render(payload, SummaryStyle.GeminiStandard, out)
+        keys <- Files[IO].readUtf8Lines(Path(s"$out-vars")).filter(_.nonEmpty).compile.toList
+      yield
+        // PWD, SHLVL and _ are set by the shell itself.
+        val leaked = keys.toSet -- PdfRenderer.EnvAllowlist -- Set("PWD", "SHLVL", "_")
+        assertEquals(leaked, Set.empty)
 
   test("exit code 3 is a permanent failure carrying stderr"):
     render(SummaryStyle.Chile).map: (r, out) =>
