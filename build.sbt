@@ -241,21 +241,33 @@ def setupWith(checkout: WorkflowStep): Def.Initialize[List[WorkflowStep]] = Def.
     githubWorkflowGeneratedCacheSteps.value.toList
 }
 
-lazy val sbtDockerPublishLocal =
-  WorkflowStep.Sbt(
-    List(
-      "clean",
-      "ssoService/docker:publishLocal",
-      "itcService/docker:publishLocal",
-      "service/docker:publishLocal",
-      "obscalc/docker:publishLocal",
-      "calibrations/docker:publishLocal",
-      "resourceService/docker:publishLocal"
-    ),
-    name = Some("Build Docker images")
-  )
+lazy val sbtClean = WorkflowStep.Sbt(List("clean"), name = Some("Clean"))
+
+lazy val sbtDockerPublishLocal: List[WorkflowStep] =
+  systems.map { system =>
+    WorkflowStep.Sbt(
+      systemProjects(system).map(p => s"${p.id}/docker:publishLocal"),
+      name = Some(s"Build ${system.toUpperCase} Docker images"),
+      cond = Some(systemAffectedCond(system))
+    )
+  }
 
 lazy val systems: List[String] = List("sso", "itc", "odb", "resource")
+
+// A system is deployed only when the merge can reach the projects its images are built from.
+lazy val systemProjects: Map[String, List[Project]] = Map(
+  "sso"      -> List(ssoService),
+  "itc"      -> List(itcService),
+  "odb"      -> List(service, obscalc, calibrations),
+  "resource" -> List(resourceService)
+)
+
+lazy val allSystemProjects: List[Project] = systems.flatMap(systemProjects)
+
+def systemAffectedCond(system: String): String = systemProjects(system) match {
+  case head :: tail => lucumaAffectedCond(head, tail: _*)
+  case Nil          => sys.error(s"no projects declared for $system")
+}
 lazy val appNames: Map[String, String] = Map(
   "sso"      -> "${{ vars.HEROKU_SSO_APP_NAME || 'lucuma-sso' }}",
   "itc"      -> "${{ vars.HEROKU_ITC_APP_NAME || 'itc' }}",
@@ -284,61 +296,76 @@ lazy val systemProcTypes: List[(String, String, String)] =
     proc   <- procTypes(system)
   } yield (system, app, proc)
 
-lazy val herokuPush =
+lazy val herokuLogin =
   WorkflowStep.Run(
-    List(
-      // Login
-      "npm install -g heroku",
-      "heroku container:login"
-    ) ++
-      systemProcTypes.flatMap { case (system, app, proc) =>
-        val procImage: String = procTypeImageNames((system, proc))
-        environments.flatMap( env =>
-          List(
-            s"docker tag noirlab/$procImage registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
-            s"docker push registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
-          )
-        ) ++
-        List( // Retag for easy release to dev
-          s"docker tag noirlab/$procImage registry.heroku.com/$app-dev/$proc",
-          s"docker push registry.heroku.com/$app-dev/$proc",
-        )
-      },
-    name = Some("Push Docker images to Heroku")
+    List("npm install -g heroku", "heroku container:login"),
+    name = Some("Log in to Heroku")
   )
 
-lazy val herokuRelease =
-  WorkflowStep.Run(
-    systems.map( system =>
-      s"heroku container:release ${procTypes(system).mkString(" ")} -a ${appNames(system)}-dev -v"
-    ),
-    name = Some("Release dev app in Heroku")
-  )
+lazy val herokuPush: List[WorkflowStep] =
+  systems.map { system =>
+    val app = appNames(system)
+    WorkflowStep.Run(
+      procTypes(system).flatMap { proc =>
+        val procImage: String = procTypeImageNames((system, proc))
+        environments.flatMap(env =>
+          List(
+            s"docker tag noirlab/$procImage registry.heroku.com/$app-$env/$proc:$${{ github.sha }}",
+            s"docker push registry.heroku.com/$app-$env/$proc:$${{ github.sha }}"
+          )
+        ) ++
+          List( // Retag for easy release to dev
+            s"docker tag noirlab/$procImage registry.heroku.com/$app-dev/$proc",
+            s"docker push registry.heroku.com/$app-dev/$proc"
+          )
+      },
+      name = Some(s"Push ${system.toUpperCase} Docker images to Heroku"),
+      cond = Some(systemAffectedCond(system))
+    )
+  }
+
+lazy val herokuRelease: List[WorkflowStep] =
+  systems.map { system =>
+    WorkflowStep.Run(
+      List(
+        s"heroku container:release ${procTypes(system).mkString(" ")} -a ${appNames(system)}-dev -v"
+      ),
+      name = Some(s"Release dev ${system.toUpperCase} app in Heroku"),
+      cond = Some(systemAffectedCond(system))
+    )
+  }
 
 def imageShaEnvVar(system: String, proc: String): String =
   s"DOCKER_IMAGE_SHA_${system.toUpperCase}_${proc.toUpperCase}"
 
-lazy val retrieveDockerImageShas = WorkflowStep.Run(
-  systemProcTypes.map { case (system, app, proc) =>
-    s"""echo "${imageShaEnvVar(system, proc)}=$$(docker inspect registry.heroku.com/$app-dev/$proc:$${{ github.sha }} --format={{.Id}})" >> $$GITHUB_ENV"""
-  },
-  name = Some("Get Docker image SHA")
-)
+lazy val retrieveDockerImageShas: List[WorkflowStep] =
+  systems.map { system =>
+    val app = appNames(system)
+    WorkflowStep.Run(
+      procTypes(system).map { proc =>
+        s"""echo "${imageShaEnvVar(system, proc)}=$$(docker inspect registry.heroku.com/$app-dev/$proc:$${{ github.sha }} --format={{.Id}})" >> $$GITHUB_ENV"""
+      },
+      name = Some(s"Get ${system.toUpperCase} Docker image SHA"),
+      cond = Some(systemAffectedCond(system))
+    )
+  }
 
 def dockerImageShasObject(system: String): String = "{ " +
   procTypes(system).map ( proc =>
     s""""${proc}": "$${{ env.${imageShaEnvVar(system, proc)} }}""""
   ).mkString(", ") + " }"
 
-lazy val recordDeploymentMetadata = WorkflowStep.Run(
-  systems.flatMap( system =>
-    List(
-      s"""echo "Recording deployment $${{ github.sha }} for ${system.toUpperCase} to $${{ github.repository }}"""",
-      s"""curl -s -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": "${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
+lazy val recordDeploymentMetadata: List[WorkflowStep] =
+  systems.map { system =>
+    WorkflowStep.Run(
+      List(
+        s"""echo "Recording deployment $${{ github.sha }} for ${system.toUpperCase} to $${{ github.repository }}"""",
+        s"""curl -s -X POST https://api.github.com/repos/$${{ github.repository }}/deployments -H "Authorization: Bearer $${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" -d '{ "ref": "$${{ github.sha }}", "environment": "development", "description": "${system.toUpperCase} deployment to dev", "auto_merge": false, "required_contexts": [], "task": "deploy:${system.toUpperCase}", "payload": { "docker_image_shas": ${dockerImageShasObject(system)} } }' """
+      ),
+      name = Some(s"Record ${system.toUpperCase} deployment in GHA"),
+      cond = Some(systemAffectedCond(system))
     )
-  ),
-  name = Some("Record deployment in GHA")
-)
+  }
 
 val mainCond                 = "github.ref == 'refs/heads/main'"
 val geminiRepoCond           = "startsWith(github.repository, 'gemini')"
@@ -403,19 +430,25 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
     scalas = List(scalaVersion.value),
     javas = githubWorkflowJavaVersions.value.toList.take(1)
   ),
-  WorkflowJob(
-    "deploy",
-    "Build and publish Docker images / Deploy to Heroku",
-    setupWith(CheckoutFullWithLfs).value :::
-      sbtDockerPublishLocal ::
-      herokuPush ::
-      herokuRelease ::
-      retrieveDockerImageShas ::
-      recordDeploymentMetadata ::
-      Nil,
-    scalas = List(scalaVersion.value),
-    javas = githubWorkflowJavaVersions.value.toList.take(1),
-    cond = Some(allConds(mainCond, geminiRepoCond))
+  lucumaAffectedJob(
+    WorkflowJob(
+      "deploy",
+      "Build and publish Docker images / Deploy to Heroku",
+      setupWith(CheckoutFullWithLfs).value :::
+        sbtClean ::
+        sbtDockerPublishLocal :::
+        herokuLogin ::
+        herokuPush :::
+        herokuRelease :::
+        retrieveDockerImageShas :::
+        recordDeploymentMetadata,
+      scalas = List(scalaVersion.value),
+      javas = githubWorkflowJavaVersions.value.toList.take(1),
+      cond = Some(allConds(mainCond, geminiRepoCond))
+    ),
+    // skip the job outright when the merge reaches none of the deployed systems
+    allSystemProjects.head,
+    allSystemProjects.tail: _*
   )
 )
 
