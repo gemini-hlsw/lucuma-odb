@@ -101,6 +101,16 @@ The LISTEN session dies with the database connection. The whole stream is
 wrapped in `.attempts` with a 5 second delay so the daemon restarts rather than
 sitting deaf until the next deploy.
 
+On shutdown (deploy, daily dyno cycling) the render in flight is cancelled,
+the Python process is killed, and the job is handed back with
+`PdfSummaryJobService.release`: state `pending`, attempt refunded, no backoff.
+The next daemon picks it up at once. Only a hard kill (R15, `kill -9`) leaves a
+job `rendering` until the stale sweep.
+
+The renderer runs with an allowlisted environment (`PdfRenderer.EnvAllowlist`:
+`PATH`, `HOME`, locale, `TMPDIR`, `MPLCONFIGDIR`, `PYTHONUNBUFFERED`), so
+pyexplore never sees the database URL, the service JWT or the S3 credentials.
+
 ## Renderer contract
 
 Exit codes from `pyexplore.pdf.render`, documented in pyexplore's
