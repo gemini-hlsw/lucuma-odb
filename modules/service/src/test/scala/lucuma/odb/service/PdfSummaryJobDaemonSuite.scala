@@ -81,6 +81,9 @@ class PdfSummaryJobDaemonSuite extends OdbSuite with ObservingModeSetupOperation
   def failing(error: PdfRenderer.Error): PdfRenderer[IO] =
     (_, _, _) => error.asLeft.pure[IO]
 
+  val hanging: PdfRenderer[IO] =
+    (_, _, _) => IO.never
+
   // The daemon as Main wires it, on this suite's database, with the given renderer.
   def daemon(renderer: PdfRenderer[IO])(body: IO[Unit]): IO[Unit] =
     withServicesResourceForObscalc(service): services =>
@@ -106,6 +109,18 @@ class PdfSummaryJobDaemonSuite extends OdbSuite with ObservingModeSetupOperation
       yield
         assertEquals(jobs, Nil)
         assertEquals(atts.map(_._1), List(Some("CA"), Some("US")))
+
+  test("a render interrupted by shutdown goes back to pending with the attempt refunded"):
+    def awaitRendering(pid: Program.Id): IO[Unit] =
+      jobsFor(pid).flatMap: jobs =>
+        if jobs.exists(_._1 == "rendering") then IO.unit
+        else IO.sleep(100.millis) *> awaitRendering(pid)
+    for
+      pid  <- setupProposal
+      _    <- daemon(hanging)(submitProposal(pi, pid) *> awaitRendering(pid).timeout(10.seconds))
+      jobs <- jobsFor(pid)
+    yield
+      assertEquals(jobs.map(j => (j._1, j._2)), List(("pending", 0), ("pending", 0)))
 
   test("a permanent render failure is recorded on the job"):
     daemon(failing(PdfRenderer.Error("Renderer exited with code 3: Unknown style", permanent = true))):

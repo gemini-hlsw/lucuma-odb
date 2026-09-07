@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.effect.std.UUIDGen
+import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
@@ -58,6 +59,9 @@ trait PdfSummaryJobService[F[_]]:
 
   /** `failed` when permanent or out of attempts, else back to `pending` with backoff. */
   def fail(job: PdfSummaryJobService.Claimed, error: String, permanent: Boolean)(using Transaction[F], ServiceAccess): F[Unit]
+
+  /** Back to `pending` at once, with the attempt refunded: the render was interrupted, not failed. */
+  def release(job: PdfSummaryJobService.Claimed)(using Transaction[F], ServiceAccess): F[Unit]
 
 
 object PdfSummaryJobService:
@@ -180,8 +184,10 @@ object PdfSummaryJobService:
               session.execute(Statements.RependStale)(StaleRender.toSeconds) *>
               session.option(Statements.Claim)
         // An unbuildable payload fails the job and moves on, so None means empty.
+        // The job is already `rendering` while the payload is built, so a
+        // shutdown here hands it back too.
         claim.flatMap(_.flatTraverse: job =>
-          Services.asSuperUser(prepare(job)).flatMap:
+          Services.asSuperUser(prepare(job)).onCancel(services.transactionally(release(job))).flatMap:
             case Right(prepared) => prepared.some.pure[F]
             case Left(msg)       =>
               services.transactionally(fail(job, s"Could not build the payload: $msg", permanent = true)) *> next
@@ -211,6 +217,9 @@ object PdfSummaryJobService:
           session.execute(Statements.MarkFailed)((error, job.id)).void
         else
           session.execute(Statements.Reschedule)((error, job.id)).void
+
+      override def release(job: Claimed)(using Transaction[F], ServiceAccess): F[Unit] =
+        session.execute(Statements.Release)(job.id).void
 
   object Statements:
 
@@ -324,6 +333,15 @@ object PdfSummaryJobService:
         SET c_state    = 'pending',
             c_error    = $text,
             c_retry_at = now() + make_interval(mins => power(4, c_attempts - 1)::int)
+        WHERE c_summary_job_id = $int8 AND c_state = 'rendering'
+      """.command
+
+    val Release: Command[Long] =
+      sql"""
+        UPDATE t_summary_job
+        SET c_state      = 'pending',
+            c_attempts   = c_attempts - 1,
+            c_started_at = NULL
         WHERE c_summary_job_id = $int8 AND c_state = 'rendering'
       """.command
 
