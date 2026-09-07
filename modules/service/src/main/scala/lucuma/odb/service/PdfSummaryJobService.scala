@@ -12,6 +12,7 @@ import grackle.Result
 import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
+import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
@@ -19,6 +20,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.SummaryStyle
+import lucuma.odb.service.AttachmentFileService.presignHeaders
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
@@ -137,8 +139,8 @@ object PdfSummaryJobService:
 
       private def presignAttachments(pid: Program.Id)(using SuperUserAccess): F[List[PdfSummaryJobPayload.AttachmentUrl]] =
         session.execute(Statements.SelectProposalAttachments)(pid).flatMap: as =>
-          as.traverse: (name, path) =>
-            s3FileService.presignedUrl(path).map(PdfSummaryJobPayload.AttachmentUrl(name.value, _))
+          as.traverse: (name, path, at) =>
+            s3FileService.presignedUrl(path, at.presignHeaders).map(PdfSummaryJobPayload.AttachmentUrl(name.value, _))
 
       private def partners(pid: Program.Id): F[List[Option[Partner]]] =
         session.execute(Statements.SelectPartners)(pid).map:
@@ -244,14 +246,14 @@ object PdfSummaryJobService:
         ORDER BY c_partner
       """.query(partner)
 
-    val SelectProposalAttachments: Query[Program.Id, (NonEmptyString, NonEmptyString)] =
+    val SelectProposalAttachments: Query[Program.Id, (NonEmptyString, NonEmptyString, AttachmentType)] =
       sql"""
-        SELECT c_file_name, c_remote_path
+        SELECT c_file_name, c_remote_path, c_attachment_type
         FROM t_attachment
         WHERE c_program_id = $program_id
           AND c_attachment_type IN ('science', 'team')
         ORDER BY c_attachment_type
-      """.query(text_nonempty *: text_nonempty)
+      """.query(text_nonempty *: text_nonempty *: attachment_type)
 
     // Jobs and summaries for partners the proposal no longer has.
     val PruneJobs: Command[(Program.Id, Program.Id)] =
