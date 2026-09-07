@@ -113,6 +113,9 @@ ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
 
 val herokuToken  = "HEROKU_API_KEY"  -> "${{ secrets.HEROKU_API_KEY }}"
 val munitFlakyOk = "MUNIT_FLAKY_OK" -> "${{ vars.MUNIT_FLAKY_OK }}"
+// notify of errors on the nightly cron
+ThisBuild / lucumaSlackNotifyWorkflows += "Legacy ITC Tests"
+
 ThisBuild / githubWorkflowEnv += herokuToken
 ThisBuild / githubWorkflowEnv += munitFlakyOk
 // pyexplore is private; the pdfSummary image clones it with this token.
@@ -420,6 +423,7 @@ lazy val sbtStaticChecks =
       "scalafmtSbtCheck",
       "lucumaScalafmtCheck",
       "lucumaScalafixCheck",
+      "lucumaSlackNotifyCheck",
       "scalafixAll --check",
       "mimaReportBinaryIssues",
       "doc"

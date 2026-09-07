@@ -233,7 +233,7 @@ jobs:
         run: sbt -v -J-Xmx6g +update
 
       - name: Static checks
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck 'scalafixAll --check' mimaReportBinaryIssues doc
+        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
 
       - name: Install npm dependencies
         if: github.event_name == 'pull_request'
