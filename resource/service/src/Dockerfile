@@ -25,5 +25,12 @@ COPY ./main/resources/db/migration/ /docker-entrypoint-initdb.d/
 # The server args disable durability to speed up the migrations.
 RUN docker-ensure-initdb.sh -c fsync=off -c synchronous_commit=off -c full_page_writes=off
 
+# Serve the data directory from an anonymous volume, populated from the image at container creation.
+# Left in the image layers, Postgres would run on overlayfs and every first write to a relation file
+# triggers a copy-up, which holds an interruptible lock: a backend that receives a signal (SIGUSR1
+# from NOTIFY, SIGALRM from timeouts) while waiting gets EINTR from open(), causing spurious
+# "could not open file ...: Interrupted system call" errors and backend crashes in tests.
+VOLUME /var/lib/postgresql-resource-data
+
 # Also disable durability at test time, to speed up database writes in tests
 CMD ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
