@@ -71,7 +71,8 @@ case class Config(
   commitHash:    CommitHash,                    // From Heroku Dyno Metadata
   goaUsers:      Set[User.Id],                  // Gemini Observatory Archive user id(s)
   obscalcPoll:   FiniteDuration,                // Obscalc poll period
-  httpClient:    Config.HttpClient              // Configuration for HTTP requests made by the ODB
+  httpClient:    Config.HttpClient,             // Configuration for HTTP requests made by the ODB
+  pdfSummary:    Config.PdfSummary              // Proposal-summary PDF daemon config
 ):
 
   // People send us their JWTs. We need to be able to extract them from the request, decode them,
@@ -175,6 +176,7 @@ object Config:
     maxConnections:            Int,
     maxCalibrationConnections: Int,
     maxObscalcConnections:     Int,
+    maxPdfSummaryConnections:  Int,
     host:                      String,
     port:                      Int,
     database:                  String,
@@ -211,13 +213,15 @@ object Config:
     val ReservedSessions = 1
 
     object Default:
-      val MaxConnections = Runtime.getRuntime.availableProcessors * 2 + 1
+      val MaxConnections        = Runtime.getRuntime.availableProcessors * 2 + 1
+      val PdfSummaryConnections = 4
 
     // postgres://username:password@host:port/database name
     def fromHerokuUri(
       maxConnections:            Int,
       maxCalibrationConnections: Int,
       maxObscalcConnections:     Int,
+      maxPdfSummaryConnections:  Int,
       uri:                       URI
     ): Option[Database] =
       uri.getUserInfo.split(":") match
@@ -226,6 +230,7 @@ object Config:
             maxConnections            = maxConnections,
             maxCalibrationConnections = maxCalibrationConnections,
             maxObscalcConnections     = maxObscalcConnections,
+            maxPdfSummaryConnections  = maxPdfSummaryConnections,
             host     = uri.getHost,
             port     = uri.getPort,
             database = uri.getPath.drop(1),
@@ -242,15 +247,32 @@ object Config:
     private given Show[URI] =
       Show.fromToString
 
-    private given ConfigDecoder[(Int, Int, Int, URI), Database] =
-      ConfigDecoder[(Int, Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
+    private given ConfigDecoder[(Int, Int, Int, Int, URI), Database] =
+      ConfigDecoder[(Int, Int, Int, Int, URI)].mapOption("Database")(Database.fromHerokuUri)
 
     lazy val fromCiris: ConfigValue[Effect, Database] = (
       envOrProp("ODB_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
       envOrProp("CALIBRATIONS_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
       envOrProp("OBSCALC_MAX_CONNECTIONS").as[Int].default(Default.MaxConnections),
+      // The pdf-summary dyno renders serially and holds no connection while doing so.
+      envOrProp("PDF_SUMMARY_MAX_CONNECTIONS").as[Int].default(Default.PdfSummaryConnections),
       envOrProp("DATABASE_URL").as[URI] // passed by Heroku
     ).parTupled.as[Database]
+
+  /** The pdf-summary dyno: where pyexplore's Python lives and how long a render may take. */
+  case class PdfSummary(
+    python:        String,
+    renderTimeout: FiniteDuration,
+    keepTempFiles: Boolean
+  )
+
+  object PdfSummary:
+    lazy val fromCiris: ConfigValue[Effect, PdfSummary] = (
+      envOrProp("PDF_SUMMARY_PYTHON").default("/opt/pyexplore/bin/python"),
+      envOrProp("PDF_SUMMARY_RENDER_TIMEOUT_SECONDS").as[FiniteDuration].default(10.minutes),
+      // Debugging only: nothing cleans up the kept files.
+      envOrProp("PDF_SUMMARY_KEEP_TEMP_FILES").as[Boolean].default(false)
+    ).parMapN(PdfSummary.apply)
 
   case class Aws(
     accessKey:       NonEmptyString,
@@ -499,5 +521,6 @@ object Config:
     optValue("CommitHash", BuildInfo.gitHeadCommit).as[CommitHash].default(CommitHash.Zero),
     envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),
     envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds),
-    HttpClient.fromCiris
+    HttpClient.fromCiris,
+    PdfSummary.fromCiris
   ).parMapN(Config.apply)
