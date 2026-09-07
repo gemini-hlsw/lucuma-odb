@@ -29,7 +29,7 @@ class PdfRendererSuite extends CatsEffectSuite:
   given LoggerFactory[IO] = Slf4jFactory.create[IO]
 
   // Parses the arguments the renderer passes and behaves per style.
-  // It is basically a stand-up for the python process to render the pdfs.The
+  // It is basically a stand-in for the Python process to render the PDFs.
   val stub: String =
     """|#!/bin/sh
        |while [ $# -gt 0 ]; do
