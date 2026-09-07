@@ -133,7 +133,8 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
 
   test("Normalization + diff workflow simulates calculateConfigurationsPerRole"):
     val base1 = arbitrary[GmosNConfigs].sample.get
-    val base2 = base1.copy(input = base1.input.copy(grating = GmosNorthGrating.R831_G5302))
+    val other = GmosNorthGrating.values.filter(_ =!= base1.input.grating).head
+    val base2 = base1.copy(input = base1.input.copy(grating = other))
 
     val matcher = SpecphotoGmosLS
 
