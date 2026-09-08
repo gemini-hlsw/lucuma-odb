@@ -67,9 +67,8 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
     assertEquals(subset1, subset2)
 
     subset1 match
-      case GmosNConfigs(_, _, _, _, _, _, _, _, roi) =>
-        assertEquals(roi, GmosRoi.CentralSpectrum)
-      case _ => fail("Expected GmosNConfigs")
+      case GmosNConfigs(input) => assertEquals(input.common.explicitRoi, GmosRoi.CentralSpectrum.some)
+      case _                   => fail("Expected GmosNConfigs")
 
   test("Twilight uses actual ROI from input"):
     val config1 = gnConfig(GmosRoi.CentralSpectrum)
@@ -83,17 +82,13 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
     // Should produce different config subsets due to ROI difference
     assertNotEquals(subset1, subset2)
 
-    subset1 match {
-      case GmosNConfigs(_, _, _, _, _, _, _, _, roi) =>
-        assertEquals(roi, GmosRoi.CentralSpectrum)
-      case _ => fail("Expected GmosNConfigs")
-    }
+    subset1 match
+      case GmosNConfigs(input) => assertEquals(input.common.explicitRoi, GmosRoi.CentralSpectrum.some)
+      case _                   => fail("Expected GmosNConfigs")
 
-    subset2 match {
-      case GmosNConfigs(_, _, _, _, _, _, _, _, roi) =>
-        assertEquals(roi, GmosRoi.FullFrame)
-      case _ => fail("Expected GmosNConfigs")
-    }
+    subset2 match
+      case GmosNConfigs(input) => assertEquals(input.common.explicitRoi, GmosRoi.FullFrame.some)
+      case _                   => fail("Expected GmosNConfigs")
 
   test("SpectroPhotometric matcher configsMatch ignores ROI differences"):
     val config1 = gnConfig(GmosRoi.CentralSpectrum)
@@ -138,18 +133,19 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
 
   test("Normalization + diff workflow simulates calculateConfigurationsPerRole"):
     val base1 = arbitrary[GmosNConfigs].sample.get
-    val base2 = arbitrary[GmosNConfigs].sample.get.copy(grating = GmosNorthGrating.R831_G5302)
+    val other = GmosNorthGrating.values.filter(_ =!= base1.input.grating).head
+    val base2 = base1.copy(input = base1.input.copy(grating = other))
 
     val matcher = SpecphotoGmosLS
 
     // different ROIs
     val sciConfigs = List(
-      base1.copy(roi = GmosRoi.FullFrame),
-      base1.copy(roi = GmosRoi.CentralSpectrum),
-      base2.copy(roi = GmosRoi.FullFrame)
+      base1.withRoi(GmosRoi.FullFrame),
+      base1.withRoi(GmosRoi.CentralSpectrum),
+      base2.withRoi(GmosRoi.FullFrame)
     )
 
-    val calibConfigs = List(base1.copy(roi = GmosRoi.CentralSpectrum))
+    val calibConfigs = List(base1.withRoi(GmosRoi.CentralSpectrum))
 
     val normalizedSci = sciConfigs.map(matcher.normalize).distinct
     val normalizedCalib = calibConfigs.map(matcher.normalize).distinct
@@ -160,7 +156,7 @@ class CalibrationMatchersSuite extends ScalaCheckSuite:
     // Should only need base2 calibration (base1 already exists)
     assertEquals(newConfigs.size, 1)
     newConfigs.headOption match
-      case Some(gn: GmosNConfigs) => assertEquals(gn.grating, base2.grating)
+      case Some(gn: GmosNConfigs) => assertEquals(gn.input.grating, base2.input.grating)
       case _                      => fail("Expected GmosNConfigs")
 
   property("Flamingos2LS matches identical configs"):

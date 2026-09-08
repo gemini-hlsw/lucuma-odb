@@ -89,9 +89,9 @@ object SpecphotoGmosLS extends CalibrationConfigMatcher:
 
   def normalize(config: CalibrationConfigSubset): CalibrationConfigSubset =
     config match
-      case gn: GmosNConfigs => gn.copy(roi = GmosRoi.CentralSpectrum)
-      case gs: GmosSConfigs => gs.copy(roi = GmosRoi.CentralSpectrum)
-      case other => other
+      case gn: GmosNConfigs => gn.withRoi(GmosRoi.CentralSpectrum)
+      case gs: GmosSConfigs => gs.withRoi(GmosRoi.CentralSpectrum)
+      case other            => other
 
 /**
  * The IFU is calibrated through the IFU itself, and unlike the long slit there is no ROI to relax:
