@@ -180,6 +180,7 @@ object StartupDiagnostics:
           checkPostgresLookupTable(gnirs_fpu_slit, "t_gnirs_fpu_slit"),
           checkPostgresLookupTable(gnirs_grating, "t_gnirs_grating"),
           checkPostgresLookupTable(gnirs_prism, "t_gnirs_prism"),
+          checkPostgresLookupTable(guide_probe, "t_guide_probe"),
           checkPostgresLookupTable(slit_offset_mode, "t_slit_offset_mode"),
           checkPostgresLookupTable(image_quality_preset, "t_image_quality"),
           checkPostgresLookupTable(imaging_capability, "t_imaging_capability"),
