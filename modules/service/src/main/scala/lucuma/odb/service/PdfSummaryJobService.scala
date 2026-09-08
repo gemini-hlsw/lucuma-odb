@@ -190,7 +190,8 @@ object PdfSummaryJobService:
       override def next(using NoTransaction[F], ServiceAccess): F[Option[Prepared]] =
         val claim: F[Option[Claimed]] =
           services.transactionally:
-            session.execute(Statements.FailStale)((MaxAttempts, StaleRender.toSeconds)) *>
+            session.execute(Statements.DeleteSupersededStale)(StaleRender.toSeconds) *>
+              session.execute(Statements.FailStale)((MaxAttempts, StaleRender.toSeconds)) *>
               session.execute(Statements.RependStale)(StaleRender.toSeconds) *>
               session.option(Statements.Claim)
         // An unbuildable payload fails the job and moves on, so None means empty.
@@ -226,10 +227,13 @@ object PdfSummaryJobService:
         if permanent || job.attempts >= MaxAttempts then
           session.execute(Statements.MarkFailed)((error, job.id)).void
         else
-          session.execute(Statements.Reschedule)((error, job.id)).void
+          // Dropping a superseded job first leaves the Reschedule a no-op.
+          session.execute(Statements.DeleteSuperseded)(job.id) *>
+            session.execute(Statements.Reschedule)((error, job.id)).void
 
       override def release(job: Claimed)(using Transaction[F], ServiceAccess): F[Unit] =
-        session.execute(Statements.Release)(job.id).void
+        session.execute(Statements.DeleteSuperseded)(job.id) *>
+          session.execute(Statements.Release)(job.id).void
 
   object Statements:
 
@@ -394,10 +398,48 @@ object PdfSummaryJobService:
           AND c_started_at < now() - make_interval(secs => $int8)
       """.command
 
+    // One row per (program, partner): a second stale render for the same key
+    // stays 'rendering' and is swept as superseded on the next pass.
     val RependStale: Command[Long] =
       sql"""
         UPDATE t_summary_job
         SET c_state = 'pending'
-        WHERE c_state = 'rendering'
-          AND c_started_at < now() - make_interval(secs => $int8)
+        WHERE c_summary_job_id IN (
+          SELECT DISTINCT ON (c_program_id, c_partner) c_summary_job_id
+          FROM t_summary_job
+          WHERE c_state = 'rendering'
+            AND c_started_at < now() - make_interval(secs => $int8)
+          ORDER BY c_program_id, c_partner, c_created_at
+        )
+      """.command
+
+    // A rendering job whose work a newer pending row already covers cannot go
+    // back to 'pending' without colliding on unique_waiting_summary_job_index.
+    // That newer row redoes the render, so this one is dropped instead.
+    val DeleteSuperseded: Command[Long] =
+      sql"""
+        DELETE FROM t_summary_job AS j
+        WHERE j.c_summary_job_id = $int8
+          AND j.c_state = 'rendering'
+          AND EXISTS (
+            SELECT 1
+            FROM t_summary_job AS o
+            WHERE o.c_program_id = j.c_program_id
+              AND o.c_partner IS NOT DISTINCT FROM j.c_partner
+              AND o.c_state = 'pending'
+          )
+      """.command
+
+    val DeleteSupersededStale: Command[Long] =
+      sql"""
+        DELETE FROM t_summary_job AS j
+        WHERE j.c_state = 'rendering'
+          AND j.c_started_at < now() - make_interval(secs => $int8)
+          AND EXISTS (
+            SELECT 1
+            FROM t_summary_job AS o
+            WHERE o.c_program_id = j.c_program_id
+              AND o.c_partner IS NOT DISTINCT FROM j.c_partner
+              AND o.c_state = 'pending'
+          )
       """.command
