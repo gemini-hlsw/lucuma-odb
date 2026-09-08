@@ -103,7 +103,7 @@ object GmosIfuInput extends AcquisitionFilterCheck:
       explicitRoi:              Option[GmosRoi],
       explicitLambdaDithers:    Option[List[WavelengthDither]],
       explicitTelescopeConfigs: Option[NonEmptyList[TelescopeConfig]]
-    ):
+    ) derives Eq:
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedLambdaDithers: Option[String] =
@@ -118,7 +118,7 @@ object GmosIfuInput extends AcquisitionFilterCheck:
       fpu:         GmosNorthIfuFpu,
       acquisition: Option[NorthAcquisition],
       common:      Common
-    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthIfuFpu]:
+    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthIfuFpu] derives Eq:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthIfu
 
@@ -135,7 +135,7 @@ object GmosIfuInput extends AcquisitionFilterCheck:
       fpu:         GmosSouthIfuFpu,
       acquisition: Option[SouthAcquisition],
       common:      Common
-    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthIfuFpu]:
+    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthIfuFpu] derives Eq:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthIfu
 

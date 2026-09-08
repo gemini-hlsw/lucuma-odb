@@ -168,23 +168,15 @@ object PerProgramPerConfigCalibrationsService:
         tid:       Target.Id
       )(using Transaction[F], Concurrent[F]): Option[F[Observation.Id]] =
         (site, calibRole, config) match
-          case (Site.GN, CalibrationRole.SpectroPhotometric, c: GmosNConfigs) =>
-            gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
-          case (Site.GS, CalibrationRole.SpectroPhotometric, c: GmosSConfigs) =>
-            gmosLongSlitSpecPhotObs(pid, gid, tid, props, c).some
-          case (Site.GN, CalibrationRole.Twilight, c: GmosNConfigs)           =>
-            gmosLongSlitTwilightObs(pid, gid, tid, props, c).some
-          case (Site.GS, CalibrationRole.Twilight, c: GmosSConfigs)           =>
-            gmosLongSlitTwilightObs(pid, gid, tid, props, c).some
-          case (Site.GN, CalibrationRole.SpectroPhotometric, c: GmosNIfuConfigs) =>
-            gmosIfuSpecPhotObs(pid, gid, tid, props, c, c.toIfuInput).some
-          case (Site.GS, CalibrationRole.SpectroPhotometric, c: GmosSIfuConfigs) =>
-            gmosIfuSpecPhotObs(pid, gid, tid, props, c, c.toIfuInput).some
-          case (Site.GN, CalibrationRole.Twilight, c: GmosNIfuConfigs)        =>
-            gmosIfuTwilightObs(pid, gid, tid, props, c, c.centralWavelength, c.toIfuInput).some
-          case (Site.GS, CalibrationRole.Twilight, c: GmosSIfuConfigs)        =>
-            gmosIfuTwilightObs(pid, gid, tid, props, c, c.centralWavelength, c.toIfuInput).some
-          case _                                                              =>
+          case (Site.GN, CalibrationRole.SpectroPhotometric, c: (GmosNConfigs | GmosNIfuConfigs)) =>
+            gmosSpecPhotObs(pid, gid, tid, props, c).some
+          case (Site.GS, CalibrationRole.SpectroPhotometric, c: (GmosSConfigs | GmosSIfuConfigs)) =>
+            gmosSpecPhotObs(pid, gid, tid, props, c).some
+          case (Site.GN, CalibrationRole.Twilight, c: (GmosNConfigs | GmosNIfuConfigs))           =>
+            gmosTwilightObs(pid, gid, tid, props, c).some
+          case (Site.GS, CalibrationRole.Twilight, c: (GmosSConfigs | GmosSIfuConfigs))           =>
+            gmosTwilightObs(pid, gid, tid, props, c).some
+          case _                                                                                    =>
             none
 
       private def generateGMOSLSCalibrations(

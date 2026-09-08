@@ -115,6 +115,18 @@ object AttachmentFileService {
       case AttachmentType.Summary => true
       case _                      => false
 
+    /**
+     * What a presigned GET should claim the file is.  PDFs can be displayed inline.
+     */
+    def presignHeaders: Option[S3FileService.ResponseHeaders] = at match
+      case AttachmentType.Science    |
+           AttachmentType.Team       |
+           AttachmentType.Summary    => S3FileService.ResponseHeaders.InlinePdf.some
+      case AttachmentType.Finder     |
+           AttachmentType.MosMask    |
+           AttachmentType.PreImaging |
+           AttachmentType.CustomSED  => none
+
   def checkNotOdbGenerated(at: AttachmentType): Either[AttachmentException, Unit] =
     if at.isOdbGenerated then InvalidRequest(odbGeneratedMsg(at)).asLeft
     else ().asRight
@@ -579,10 +591,13 @@ object AttachmentFileService {
         NoTransaction[F]
       ): F[Either[AttachmentException, String]] =
         (for {
-          path <- services.transactionallyEitherT {
-                      getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read).map(_._2)
-                  }
-          res  <- Services.asSuperUser(s3FileSvc.presignedUrl(path)).right
+          (path, at) <- services.transactionallyEitherT {
+                          for {
+                            (_, path) <- getAttachmentInfoAndCheckAccess(user, attachmentId, AccessRequired.Read)
+                            at        <- getAttachmentTypeById(attachmentId).asEitherT
+                          } yield (path, at)
+                        }
+          res        <- Services.asSuperUser(s3FileSvc.presignedUrl(path, at.presignHeaders)).right
         } yield res).value
 
     }

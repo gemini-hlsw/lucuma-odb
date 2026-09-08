@@ -140,7 +140,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       explicitRoi:         Option[GmosRoi],
       explicitλDithers:         Option[List[WavelengthDither]],
       explicitTelescopeConfigs: Option[SlitTelescopeConfigs]
-    ):
+    ) derives Eq:
 
       // Formatted to store in a text column in the database with a regex constraint
       val formattedλDithers: Option[String] =
@@ -159,7 +159,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       fpu:         GmosNorthFpu,
       common:      Common,
       acquisition: Option[NorthAcquisition]
-    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu]:
+    ) extends Create[GmosNorthGrating, GmosNorthFilter, GmosNorthFpu] derives Eq:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosNorthLongSlit
 
@@ -208,7 +208,7 @@ object GmosLongSlitInput extends AcquisitionFilterCheck:
       fpu:         GmosSouthFpu,
       common:      Common,
       acquisition: Option[SouthAcquisition]
-    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu]:
+    ) extends Create[GmosSouthGrating, GmosSouthFilter, GmosSouthFpu] derives Eq:
       def observingModeType: ObservingModeType =
         ObservingModeType.GmosSouthLongSlit
 

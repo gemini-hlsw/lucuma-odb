@@ -350,44 +350,17 @@ trait CalibrationObservations {
     props.collectFirst:
       case (sciConfig, p) if CalibrationConfigMatcher.matcherFor(sciConfig, role).configsMatch(sciConfig, config) => p
 
-  def gmosLongSlitSpecPhotObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
+  def gmosSpecPhotObs[F[_]: MonadThrow: Services: Transaction](
     pid:    Program.Id,
     gid:    Group.Id,
     tid:    Target.Id,
     props:  Map[CalibrationConfigSubset, CalObsProps],
-    config: CalibrationConfigSubset.Gmos[G, L, U]
+    config: CalibrationConfigSubset.Gmos
   ): F[Observation.Id] =
     val matchingProps: Option[CalObsProps] = propsForConfig(props, CalibrationRole.SpectroPhotometric, config)
     val wavelengthAt: Option[Wavelength]   = matchingProps.flatMap(_.wavelengthAt)
     val band: Option[ScienceBand]          = matchingProps.flatMap(_.band)
-    specPhotoObservation(pid, gid, tid, wavelengthAt, band, config.toLongSlitInput)
-
-  /**
-   * The IFU calibrations mirror the long slit ones, but the observing mode input comes from the
-   * IFU config subset: the calibration is taken through the same aperture as the science.
-   */
-  def gmosIfuSpecPhotObs[F[_]: MonadThrow: Services: Transaction](
-    pid:    Program.Id,
-    gid:    Group.Id,
-    tid:    Target.Id,
-    props:  Map[CalibrationConfigSubset, CalObsProps],
-    config: CalibrationConfigSubset,
-    input:  ObservingModeInput.Create
-  ): F[Observation.Id] =
-    val matchingProps: Option[CalObsProps] = propsForConfig(props, CalibrationRole.SpectroPhotometric, config)
-    specPhotoObservation(pid, gid, tid, matchingProps.flatMap(_.wavelengthAt), matchingProps.flatMap(_.band), input)
-
-  def gmosIfuTwilightObs[F[_]: MonadThrow: Services: Transaction](
-    pid:    Program.Id,
-    gid:    Group.Id,
-    tid:    Target.Id,
-    props:  Map[CalibrationConfigSubset, CalObsProps],
-    config: CalibrationConfigSubset,
-    cw:     Wavelength,
-    input:  ObservingModeInput.Create
-  ): F[Observation.Id] =
-    val band: Option[ScienceBand] = propsForConfig(props, CalibrationRole.Twilight, config).flatMap(_.band)
-    twilightObservation(pid, gid, tid, band, cw, input)
+    specPhotoObservation(pid, gid, tid, wavelengthAt, band, config.toInput)
 
   def roleConstraints(role: CalibrationRole) =
     role match
@@ -438,15 +411,15 @@ trait CalibrationObservations {
           )
       ).orError
 
-  def gmosLongSlitTwilightObs[F[_]: MonadThrow: Services: Transaction, G, L, U](
+  def gmosTwilightObs[F[_]: MonadThrow: Services: Transaction](
     pid:    Program.Id,
     gid:    Group.Id,
     tid:    Target.Id,
     props:  Map[CalibrationConfigSubset, CalObsProps],
-    config: CalibrationConfigSubset.Gmos[G, L, U]
+    config: CalibrationConfigSubset.Gmos
   ): F[Observation.Id] =
     val band: Option[ScienceBand] = propsForConfig(props, CalibrationRole.Twilight, config).flatMap(_.band)
-    twilightObservation(pid, gid, tid, band, config.centralWavelength, config.toLongSlitInput)
+    twilightObservation(pid, gid, tid, band, config.centralWavelength, config.toInput)
 
   private def twilightObservation[F[_]: Services: MonadThrow: Transaction](pid: Program.Id, gid: Group.Id, tid: Target.Id, band: Option[ScienceBand], cw: Wavelength, obsMode: ObservingModeInput.Create): F[Observation.Id] =
       observationService.createObservation(
