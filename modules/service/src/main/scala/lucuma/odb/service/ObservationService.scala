@@ -606,8 +606,9 @@ object ObservationService {
             (for {
               _ <- forbidSystemGroupMove
               _ <- ResultT.liftF(session.execute(sql"set constraints all deferred".command))
-              _ <- ResultT.liftF(moveObservations(SET.group, SET.groupIndex, which))
-              r <- ResultT(updates.value.recoverWith {
+              // The group move is inside the recover: a trigger may reject it
+              // (e.g. a science observation leaving its calibration group).
+              r <- ResultT((moveObservations(SET.group, SET.groupIndex, which) *> updates.value).recoverWith {
                      case SqlState.CheckViolation(ex) =>
                        OdbError.InvalidArgument(Some(constraintViolationMessage(ex))).asFailureF
                      case SqlState.RaiseException(ex) =>

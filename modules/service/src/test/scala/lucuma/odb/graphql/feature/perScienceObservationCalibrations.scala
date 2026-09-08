@@ -857,6 +857,33 @@ class perScienceObservationCalibrations
       assertEquals(allGroups2.toSet, allGroups3.toSet)
     }
 
+  test("a science observation cannot leave its obs calibration group while it holds tellurics"):
+    for
+      pid   <- createProgramAs(pi)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _     <- runObscalcUpdate(pid, oid)
+      _     <- recalculateCalibrations(pid, when, oid)
+      gid   <- queryObservation(oid).map(_.groupId.get)
+      _     <- expectOdbError(
+                 user  = serviceUser,
+                 query = s"""
+                   mutation {
+                     updateObservations(input: {
+                       SET: { groupId: null }
+                       WHERE: { id: { EQ: ${oid.asJson} } }
+                     }) {
+                       observations { id }
+                     }
+                   }
+                 """,
+                 expected = {
+                   case OdbError.UpdateFailed(Some(msg)) if msg.contains("cannot leave its calibration group") => ()
+                 }
+               )
+      after <- queryObservation(oid)
+    yield assertEquals(after.groupId, gid.some)
+
   test("Mixed add/delete in single recalculation"):
     for {
       pid         <- createProgramAs(pi)
