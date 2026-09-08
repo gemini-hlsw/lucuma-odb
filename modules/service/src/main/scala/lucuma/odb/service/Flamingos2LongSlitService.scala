@@ -14,12 +14,10 @@ import lucuma.core.enums.Flamingos2Fpu
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.odb.data.ExposureTimeModeRole
-import lucuma.odb.format.StoredSlitTelescopeConfigs
 import lucuma.odb.format.telescopeConfigs.*
 import lucuma.odb.graphql.input.Flamingos2LongSlitInput
 import lucuma.odb.sequence.flamingos2.longslit.Config
 import lucuma.odb.sequence.flamingos2.spectroscopy.AcquisitionConfig
-import lucuma.odb.sequence.flamingos2.spectroscopy.MosTelluricTelescopeConfigs
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
 import skunk.*
@@ -54,6 +52,12 @@ trait Flamingos2LongSlitService[F[_]]:
 
   def insertMosTelluric(mosOid: Observation.Id, telluricOid: Observation.Id, fpu: Flamingos2Fpu): F[Unit]
 
+  /**
+   * Reset the configuration of `oid` to MOS telluric defaults by clearing any
+   * explicit slit offset override. The MOS telluric pattern itself comes from
+   * v_flamingos_2_long_slit's default, keyed on c_telluric_science_mode, so
+   * there is nothing left to compute or store here.
+   */
   def resetMosTelluricConfig(oid: Observation.Id): F[Unit]
 
 object Flamingos2LongSlitService:
@@ -370,8 +374,9 @@ object Flamingos2LongSlitService:
      * Builds the telluric's long slit row from its MOS science observation: the
      * same configuration seen through the builtin slit matching the mask's
      * slitlets.  The decker is left unset so the long slit default applies
-     * rather than the MOS one, and the offsets follow from
-     * `applyF2MosTelluricDefaults`.
+     * rather than the MOS one, and the offsets come from
+     * v_flamingos_2_long_slit's MOS telluric default, keyed on
+     * c_telluric_science_mode (set below).
      */
     def insertMosTelluric(mosOid: Observation.Id, telluricOid: Observation.Id, fpu: Flamingos2Fpu): AppliedFragment =
       sql"""
@@ -412,16 +417,17 @@ object Flamingos2LongSlitService:
 
     /**
      * A MOS-derived telluric steps the standard down the slit instead of taking
-     * the long slit nod pattern.
+     * the long slit nod pattern. v_flamingos_2_long_slit computes that pattern
+     * itself as the default when c_telluric_science_mode is 'flamingos_2_mos',
+     * so resetting just clears any explicit override.
      */
     def applyF2MosTelluricDefaults(oid: Observation.Id): AppliedFragment =
-      val StoredSlitTelescopeConfigs(mode, configs) = storedSlitTelescopeConfigs(MosTelluricTelescopeConfigs)
       sql"""
         UPDATE t_flamingos_2_long_slit
-        SET c_slit_offset_mode  = $slit_offset_mode,
-            c_telescope_configs = $text
+        SET c_slit_offset_mode  = NULL,
+            c_telescope_configs = NULL
         WHERE c_observation_id = $observation_id
-      """.apply(mode, configs, oid)
+      """.apply(oid)
 
     def applyF2TelluricDefaults(oid: Observation.Id): AppliedFragment =
       sql"""

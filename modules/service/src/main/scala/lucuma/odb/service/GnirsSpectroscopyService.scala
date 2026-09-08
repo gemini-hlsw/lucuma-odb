@@ -79,7 +79,13 @@ trait GnirsSpectroscopyService[F[_]]:
     etms:       List[(ExposureTimeModeId, ExposureTimeModeId)]
   )(using Transaction[F]): F[Unit]
 
-  /** Reset `oid`'s configuration to telluric defaults (config-dependent slit offsets). */
+  /**
+   * Reset `oid`'s configuration by clearing any explicit slit offset override.
+   * The telluric offsets themselves now come from v_gnirs_spectroscopy's
+   * role-aware default, so this only clears an explicit override left over from
+   * a science configuration (or a stale telluric one); it no longer needs to
+   * compute the telluric pattern itself.
+   */
   def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit]
 
 object GnirsSpectroscopyService:
@@ -655,29 +661,16 @@ object GnirsSpectroscopyService:
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
-    // Reset `oid` to telluric slit-offset defaults. The telluric offsets parallel the
-    // science offsets computed by v_gnirs_spectroscopy (V1165/V1169), per the GNIRS
-    // configuration (cross-dispersed / short camera / long camera) and grating
-    // wavelength regime (filters Order2/Order1/PAH are >= 2.5 µm):
-    //   Cross-dispersed prisms        → [+1", -2", -2", +1"]
-    //   Short camera long slit        → [-2", +4", +4", -2"]
-    //   Long camera, filter >= 2.5 µm → [-3", +3", +3", -3"]
-    //   Long camera, filter < 2.5 µm  → [+1", -5", -5", +1"]
+    // Reset `oid` to telluric slit-offset defaults by clearing any explicit
+    // override. v_gnirs_spectroscopy now computes the telluric pattern itself,
+    // role-aware, as the default for a telluric calibration, so there is nothing
+    // left to compute or store here.
     def applyGnirsTelluricDefaults(oid: Observation.Id): AppliedFragment =
       sql"""
         UPDATE t_gnirs_spectroscopy
         SET
-          c_slit_offset_mode  = 'nod_along_slit',
-          c_telescope_configs = CASE
-            WHEN COALESCE(c_prism, c_initial_prism) IN ('Sxd', 'Lxd') THEN
-              '[{"q":{"microarcseconds":1000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"},{"q":{"microarcseconds":1000000},"guiding":"ENABLED"}]'
-            WHEN c_camera IN ('ShortBlue', 'ShortRed') THEN
-              '[{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"},{"q":{"microarcseconds":4000000},"guiding":"ENABLED"},{"q":{"microarcseconds":4000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-2000000},"guiding":"ENABLED"}]'
-            WHEN c_filter IN ('Order2', 'Order1', 'PAH') THEN
-              '[{"q":{"microarcseconds":-3000000},"guiding":"ENABLED"},{"q":{"microarcseconds":3000000},"guiding":"ENABLED"},{"q":{"microarcseconds":3000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-3000000},"guiding":"ENABLED"}]'
-            ELSE
-              '[{"q":{"microarcseconds":1000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-5000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-5000000},"guiding":"ENABLED"},{"q":{"microarcseconds":1000000},"guiding":"ENABLED"}]'
-          END
+          c_slit_offset_mode  = NULL,
+          c_telescope_configs = NULL
         WHERE c_observation_id = $observation_id
       """.apply(oid)
 

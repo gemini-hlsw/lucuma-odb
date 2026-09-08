@@ -48,8 +48,12 @@ trait Igrins2LongSlitService[F[_]]:
 
   def clone(originalId: Observation.Id, newId: Observation.Id): F[Unit]
 
-  /** Reset the configuration of `oid` to telluric `defaults.
-    */
+  /**
+   * Reset the configuration of `oid` to telluric defaults by clearing any
+   * explicit slit offset override (and any SVC sub-configuration). The
+   * telluric offsets themselves come from v_igrins_2_long_slit's default,
+   * which is already the NodAlongSlit pattern tellurics need.
+   */
   def resetTelluricConfig(oid: Observation.Id): F[Unit]
 
 object Igrins2LongSlitService:
@@ -275,19 +279,21 @@ object Igrins2LongSlitService:
           void"SET " |+| us.intercalate(void", ") |+| void" " |+|
           void"WHERE " |+| observationIdIn(oids)
 
-    // Tellurics need a fixed set of telescope configs, and never carry an SVC configuration
+    // Tellurics never carry an SVC configuration. Their slit offsets clear to
+    // NULL rather than being written explicitly: v_igrins_2_long_slit's default
+    // is already the NodAlongSlit pattern tellurics need, so there is nothing
+    // left to compute or store here.
     def applyIgrins2TelluricDefaults(oid: Observation.Id): AppliedFragment =
-      val (mode, configs) = SlitTelescopeConfigsFormat.reverseGet(Config.DefaultTelescopeConfigs)
       sql"""
         UPDATE t_igrins_2_long_slit
         SET
-          c_slit_offset_mode      = $slit_offset_mode,
-          c_telescope_configs     = $text,
+          c_slit_offset_mode      = NULL,
+          c_telescope_configs     = NULL,
           c_save_svc_images       = false,
           c_svc_exposure          = NULL,
           c_svc_telescope_configs = NULL
         WHERE c_observation_id = $observation_id
-      """.apply(mode, configs, oid)
+      """.apply(oid)
 
     def cloneIgrins2(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       sql"""
