@@ -8,6 +8,7 @@ import lucuma.core.enums.AttachmentType
 import lucuma.core.util.Enumerated
 import lucuma.odb.service.AttachmentFileService.presignHeaders
 import munit.FunSuite
+import org.http4s.MediaType
 
 class AttachmentPresignHeadersSuite extends FunSuite:
 
@@ -21,5 +22,5 @@ class AttachmentPresignHeadersSuite extends FunSuite:
       )
 
   test("the inline headers are the S3 read-time overrides"):
-    assertEquals(S3FileService.ResponseHeaders.InlinePdf.contentType, "application/pdf")
+    assertEquals(S3FileService.ResponseHeaders.InlinePdf.contentType, MediaType.application.pdf)
     assertEquals(S3FileService.ResponseHeaders.InlinePdf.contentDisposition, "inline")

@@ -20,6 +20,8 @@ import lucuma.core.model.Program
 import lucuma.odb.Config
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.refined.*
+import org.http4s.MediaType
+import org.http4s.util.Renderer
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -85,11 +87,11 @@ object S3FileService {
    * with the object.  Being read-time, they also apply to objects uploaded
    * before the override existed.
    */
-  case class ResponseHeaders(contentType: String, contentDisposition: String)
+  case class ResponseHeaders(contentType: MediaType, contentDisposition: String)
 
   object ResponseHeaders:
     /** Hand the file to the browser to display rather than to download. */
-    val InlinePdf: ResponseHeaders = ResponseHeaders("application/pdf", "inline")
+    val InlinePdf: ResponseHeaders = ResponseHeaders(MediaType.application.pdf, "inline")
 
   def noop[F[_]: Applicative]: S3FileService[F] =
     new S3FileService[F] {
@@ -181,7 +183,7 @@ object S3FileService {
           val objectRequest = headers
             .fold(builder)(h =>
               builder
-                .responseContentType(h.contentType)
+                .responseContentType(Renderer.renderString(h.contentType))
                 .responseContentDisposition(h.contentDisposition)
             )
             .build
