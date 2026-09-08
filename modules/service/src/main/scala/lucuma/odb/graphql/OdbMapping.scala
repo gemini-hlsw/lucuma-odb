@@ -37,7 +37,6 @@ import lucuma.odb.graphql.topic.OdbTopic
 import lucuma.odb.graphql.topic.ProgramTopic
 import lucuma.odb.graphql.topic.TargetTopic
 import lucuma.odb.graphql.topic.TooTriggerTopic
-import lucuma.odb.graphql.util.*
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.S3FileService
@@ -744,7 +743,7 @@ object OdbMapping {
 
           // Override `defaultRootCursor` to log the GraphQL query. This is optional.
           override def defaultRootCursor(query: Query, tpe: Type, parentCursor: Option[Cursor]): F[Result[(Query, Cursor)]] =
-            L.debug("\n\n" + PrettyPrinter.query(query).render(100) + "\n") >>
+            L.debug("\n\n" + query.render.take(100) + "\n") >>
             super.defaultRootCursor(query, tpe, parentCursor)
 
           // Slow/large query instrumentation. Allocated once per mapping instance rather than
