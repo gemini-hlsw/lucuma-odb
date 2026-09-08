@@ -19,10 +19,12 @@ class OdbMappingValidationSuite extends OdbSuite:
   val validUsers: List[User] = Nil
 
   // Grackle's validator is a StateT over Id whose recursion depth grows with the number of type
-  // mappings; at our size it overflows the default 1 MB thread stack from time to time.
+  // mappings. Measured for our mapping: under 256 KB once JIT-compiled, but up to 2 MB while
+  // those frames still run interpreted, which is how the default 1 MB stack overflows in CI from
+  // time to time. 8 MB is 4x the worst case and only reserves address space.
   private def onLargeStack[A](a: => A): IO[A] =
     IO.async_ : cb =>
-      val t: Thread = new Thread(null, () => cb(Either.catchNonFatal(a)), "odb-mapping-validation", 64L * 1024 * 1024)
+      val t: Thread = new Thread(null, () => cb(Either.catchNonFatal(a)), "odb-mapping-validation", 8L * 1024 * 1024)
       t.setDaemon(true)
       t.start()
 
