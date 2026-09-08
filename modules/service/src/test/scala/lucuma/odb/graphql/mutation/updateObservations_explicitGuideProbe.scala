@@ -4,21 +4,19 @@
 package lucuma.odb.graphql
 package mutation
 
+import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.User
+import lucuma.core.syntax.string.*
 import lucuma.odb.service.GuideProbeRules
 
-class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservationsOps:
-
-  val pi: User = TestUsers.Standard.pi(nextId, nextId)
-
-  override lazy val validUsers: List[User] = List(pi)
+class updateObservations_explicitGuideProbe extends query.ExecutionTestSupportForGmos with UpdateObservationsOps:
 
   val GuideProbeGraph: String =
     """
@@ -48,10 +46,10 @@ class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservat
       }
     """
 
-  def setProbe(probe: String): String =
+  def setProbe(probe: Option[GuideProbe]): String =
     s"""
       targetEnvironment: {
-        explicitGuideProbe: $probe
+        explicitGuideProbe: ${probe.fold("null")(_.tag.toScreamingSnakeCase)}
       }
     """
 
@@ -59,8 +57,8 @@ class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservat
     for
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
-      _   <- updateObservation(pi, oid, setProbe("PWFS1"), GuideProbeGraph, probes(GuideProbe.PWFS1.some, none, GuideProbe.PWFS1.some).asRight)
-      _   <- updateObservation(pi, oid, setProbe("null"), GuideProbeGraph, probes(none, none, none).asRight)
+      _   <- updateObservation(pi, oid, setProbe(GuideProbe.PWFS1.some), GuideProbeGraph, probes(GuideProbe.PWFS1.some, none, GuideProbe.PWFS1.some).asRight)
+      _   <- updateObservation(pi, oid, setProbe(none), GuideProbeGraph, probes(none, none, none).asRight)
     yield ()
 
   test("default guide probe is OIWFS for a sidereal GMOS target"):
@@ -84,7 +82,7 @@ class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservat
       pid <- createProgramAs(pi)
       tid <- createNonsiderealTargetAs(pi, pid)
       oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
-      _   <- updateObservation(pi, oid, setProbe("GMOS_OIWFS"), GuideProbeGraph, probes(GuideProbe.GmosOIWFS.some, GuideProbe.PWFS2.some, GuideProbe.GmosOIWFS.some).asRight)
+      _   <- updateObservation(pi, oid, setProbe(GuideProbe.GmosOIWFS.some), GuideProbeGraph, probes(GuideProbe.GmosOIWFS.some, GuideProbe.PWFS2.some, GuideProbe.GmosOIWFS.some).asRight)
     yield ()
 
   test("no default guide probe without an observing mode"):
@@ -100,7 +98,7 @@ class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservat
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, ObservingModeType.Flamingos2LongSlit.some)
       _   <- updateObservation(
-               pi, oid, setProbe("GMOS_OIWFS"), GuideProbeGraph,
+               pi, oid, setProbe(GuideProbe.GmosOIWFS.some), GuideProbeGraph,
                s"Observation $oid: ${GuideProbeRules.notAllowedMessage(ObservingModeType.Flamingos2LongSlit, GuideProbe.GmosOIWFS)}".asLeft
              )
     yield ()
@@ -121,7 +119,7 @@ class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservat
             }
           }
         }
-        ${setProbe("FLAMINGOS2_OIWFS")}
+        ${setProbe(GuideProbe.Flamingos2OIWFS.some)}
       """
     for
       pid <- createProgramAs(pi)
@@ -186,7 +184,7 @@ class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservat
     for
       pid <- createProgramAs(pi)
       oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some)
-      _   <- updateObservation(pi, oid, setProbe("PWFS2"), GuideProbeGraph, probes(GuideProbe.PWFS2.some, none, GuideProbe.PWFS2.some).asRight)
+      _   <- updateObservation(pi, oid, setProbe(GuideProbe.PWFS2.some), GuideProbeGraph, probes(GuideProbe.PWFS2.some, none, GuideProbe.PWFS2.some).asRight)
       _   <- expect(
                user  = pi,
                query = s"""
@@ -206,4 +204,31 @@ class updateObservations_explicitGuideProbe extends OdbSuite with UpdateObservat
                  }
                """.asRight
              )
+    yield ()
+
+  // Same rule as blind offsets: PIs only before execution, staff while ongoing.
+  def ongoingObservation: IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      v <- recordVisitAs(serviceUser, o)
+      s <- firstAcquisitionStepId(serviceUser, o)
+      _ <- addEndStepEvent(s, v)
+    yield o
+
+  test("pi cannot set the explicit guide probe on an ongoing observation"):
+    for
+      oid <- ongoingObservation
+      _   <- updateObservation(
+               pi, oid, setProbe(GuideProbe.PWFS1.some), GuideProbeGraph,
+               s"Observation $oid is ineligible for this operation due to its workflow state (Ongoing with allowed transition to Completed).".asLeft
+             )
+    yield ()
+
+  test("staff can set and clear the explicit guide probe on an ongoing observation"):
+    for
+      oid <- ongoingObservation
+      _   <- updateObservation(staff, oid, setProbe(GuideProbe.PWFS1.some), GuideProbeGraph, probes(GuideProbe.PWFS1.some, GuideProbe.GmosOIWFS.some, GuideProbe.PWFS1.some).asRight)
+      _   <- updateObservation(staff, oid, setProbe(none), GuideProbeGraph, probes(GuideProbe.GmosOIWFS.some, GuideProbe.GmosOIWFS.some, none).asRight)
     yield ()

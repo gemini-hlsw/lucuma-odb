@@ -52,8 +52,8 @@ object TargetEnvironmentInput:
     explicitGuideProbe:            Nullable[GuideProbe]
   ) extends TargetEnvironmentInput:
     def limitToPreExecution(access: Access): Boolean =
-      // staff can edit the blind offset for ongoing observations
-      access <= Access.Pi || asterism.isDefined || explicitBase.isDefined || explicitSignalToNoiseTargetId.isDefined || explicitGuideProbe.isDefined
+      // staff can edit the blind offset and guide probe for ongoing observations
+      access <= Access.Pi || asterism.isDefined || explicitBase.isDefined || explicitSignalToNoiseTargetId.isDefined
 
   object Edit:
     val Binding: Matcher[Edit] =
