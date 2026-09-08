@@ -8179,8 +8179,11 @@ Where a program's proposal summary regeneration stands.
 Aggregated over the program's per-partner summary renders, so with a partner
 split this reports the whole set at once: PENDING while any partner is still
 rendering, and FAILED only once every render has stopped and at least one
-failed.  `message` then carries one of those failures and does not say which
-partner it came from.
+failed.
+
+PENDING always terminates.  A render that stops responding is retried after
+30 minutes, up to 3 attempts with 1 and 4 minute backoffs, then marked FAILED,
+so no request stays PENDING for more than about two hours.
 """
 type ProposalSummaryGeneration {
   state: ProposalSummaryGenerationState!
@@ -8188,8 +8191,25 @@ type ProposalSummaryGeneration {
   "When the last regeneration was requested. Null when state is IDLE."
   requestedAt: Timestamp
 
-  "Why the last regeneration failed. Null unless state is FAILED."
-  message: String
+  """
+  The renders of the last regeneration that failed, one entry per partner.
+  Empty unless state is FAILED.
+  """
+  failures: [ProposalSummaryFailure!]!
+}
+
+"""
+One failed render of a proposal summary regeneration.
+"""
+type ProposalSummaryFailure {
+  """
+  The partner whose render failed.  Null for the single render of a proposal
+  with no partner splits, matching `ProposalSummaryProperties.partner`.
+  """
+  partner: Partner
+
+  "Why this render failed, in terms an investigator can act on."
+  message: String!
 }
 
 """

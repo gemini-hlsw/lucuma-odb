@@ -19,6 +19,7 @@ import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.SummaryStyle
@@ -164,7 +165,8 @@ class regenerateProposalSummaries extends OdbSuite
           a.hcursor.downField("proposalSummary").downField("style").as[String].toOption.get
         ))
 
-  case class Generation(state: String, requestedAt: Option[String], message: Option[String])
+  case class Failure(partner: Option[String], message: String)
+  case class Generation(state: String, requestedAt: Option[String], failures: List[Failure])
 
   def generation(user: User, pid: Program.Id): IO[Generation] =
     query(
@@ -172,7 +174,7 @@ class regenerateProposalSummaries extends OdbSuite
       s"""
         query {
           program(programId: "$pid") {
-            proposalSummaryGeneration { state requestedAt message }
+            proposalSummaryGeneration { state requestedAt failures { partner message } }
           }
         }
       """
@@ -181,7 +183,11 @@ class regenerateProposalSummaries extends OdbSuite
       Generation(
         c.downField("state").as[String].toOption.get,
         c.downField("requestedAt").as[Option[String]].toOption.flatten,
-        c.downField("message").as[Option[String]].toOption.flatten
+        c.downField("failures").as[List[Json]].toOption.get.map: j =>
+          Failure(
+            j.hcursor.downField("partner").as[Option[String]].toOption.flatten,
+            j.hcursor.downField("message").as[String].toOption.get
+          )
       )
 
   lazy val fixture: Json =
@@ -434,7 +440,7 @@ class regenerateProposalSummaries extends OdbSuite
       pid <- setupProposal()
       gen <- generation(pi, pid)
     yield
-      assertEquals(gen, Generation("IDLE", None, None))
+      assertEquals(gen, Generation("IDLE", None, Nil))
 
   test("a queued regeneration is PENDING with a requestedAt"):
     for
@@ -444,7 +450,7 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals(gen.state, "PENDING")
       assert(gen.requestedAt.isDefined, "requestedAt should be set while pending")
-      assertEquals(gen.message, None)
+      assertEquals(gen.failures, Nil)
 
   test("a rendering job still reads PENDING"):
     for
@@ -489,7 +495,8 @@ class regenerateProposalSummaries extends OdbSuite
       gen <- generation(pi, pid)
     yield
       assertEquals(gen.state, "FAILED")
-      assertEquals(gen.message, Some("the abstract broke the renderer"))
+      assertEquals(gen.failures.map(_.message), List("the abstract broke the renderer", "the abstract broke the renderer"))
+      assertEquals(gen.failures.flatMap(_.partner).sorted, List("CA", "US"))
 
   test("a transient failure stays PENDING with no message"):
     for
@@ -499,7 +506,7 @@ class regenerateProposalSummaries extends OdbSuite
       gen <- generation(pi, pid)
     yield
       assertEquals(gen.state, "PENDING")
-      assertEquals(gen.message, None)
+      assertEquals(gen.failures, Nil)
 
   // Without the failed-row cleanup in enqueue, the program would snap back to
   // FAILED as soon as the new jobs finished.
@@ -517,7 +524,7 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals(failed.state, "FAILED")
       assertEquals(queued.state, "PENDING")
-      assertEquals(queued.message, None)
+      assertEquals(queued.failures, Nil)
       assertEquals(done.state, "IDLE")
       assertEquals(jobs, Nil)
 
@@ -533,13 +540,15 @@ class regenerateProposalSummaries extends OdbSuite
       mid      <- generation(pi, pid)
       _        <- withServices(service): services =>
                     services.transactionally:
-                      services.pdfSummaryJobService.fail(prepared(1).job, "only CA failed", permanent = true)
+                      services.pdfSummaryJobService.fail(prepared(1).job, "only one failed", permanent = true)
       gen      <- generation(pi, pid)
     yield
       assertEquals(prepared.length, 2)
       assertEquals(mid.state, "PENDING")
       assertEquals(gen.state, "FAILED")
-      assertEquals(gen.message, Some("only CA failed"))
+      // Claim order is not fixed, so attribute to whichever partner we failed.
+      val failed = prepared(1).job.partner.map(Enumerated[Partner].tag(_).toUpperCase)
+      assertEquals(gen.failures, List(Failure(failed, "only one failed")))
 
   // The reverse order: one failure while the other partner is still rendering
   // must read PENDING with no message, or the client would show an error over
@@ -556,4 +565,14 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals(prepared.length, 2)
       assertEquals(gen.state, "PENDING")
-      assertEquals(gen.message, None)
+      assertEquals(gen.failures, Nil)
+
+  test("a partnerless proposal reports its failure with a null partner"):
+    for
+      pid <- setupProposal(splits = Nil)
+      _   <- regenerate(pi, pid)
+      _   <- failAll(pid, "no splits, still broke", permanent = true)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "FAILED")
+      assertEquals(gen.failures, List(Failure(None, "no splits, still broke")))

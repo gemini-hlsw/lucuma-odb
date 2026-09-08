@@ -7,7 +7,6 @@ package table
 
 import grackle.skunk.SkunkMapping
 import lucuma.odb.util.Codecs.*
-import skunk.codec.text.text
 
 trait SummaryGenerationView[F[_]] extends BaseMapping[F]:
 
@@ -17,4 +16,3 @@ trait SummaryGenerationView[F[_]] extends BaseMapping[F]:
     val ProgramId   = col("c_program_id", program_id)
     val State       = col("c_state", summary_generation_state)
     val RequestedAt = col("c_requested_at", core_timestamp.opt)
-    val Message     = col("c_error", text.opt)

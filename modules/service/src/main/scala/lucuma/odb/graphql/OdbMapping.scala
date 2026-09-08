@@ -543,6 +543,7 @@ object OdbMapping {
                 ProperMotionMapping,
                 ProperMotionRaMapping,
                 ProposalMapping,
+                ProposalSummaryFailureMapping,
                 ProposalSummaryGenerationMapping,
                 ProposalReferenceMapping,
                 GeminiProposalTypeMapping,

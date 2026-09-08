@@ -4,14 +4,22 @@
 package lucuma.odb.graphql
 package mapping
 
+import lucuma.odb.graphql.table.SummaryFailureView
 import lucuma.odb.graphql.table.SummaryGenerationView
 
-trait ProposalSummaryGenerationMapping[F[_]] extends SummaryGenerationView[F]:
+trait ProposalSummaryGenerationMapping[F[_]] extends SummaryGenerationView[F] with SummaryFailureView[F]:
 
   lazy val ProposalSummaryGenerationMapping: ObjectMapping =
     ObjectMapping(ProposalSummaryGenerationType)(
       SqlField("synthetic_id", SummaryGenerationView.ProgramId, key = true, hidden = true),
       SqlField("state", SummaryGenerationView.State),
       SqlField("requestedAt", SummaryGenerationView.RequestedAt),
-      SqlField("message", SummaryGenerationView.Message)
+      SqlObject("failures", Join(SummaryGenerationView.ProgramId, SummaryFailureView.ProgramId))
+    )
+
+  lazy val ProposalSummaryFailureMapping: ObjectMapping =
+    ObjectMapping(ProposalSummaryFailureType)(
+      SqlField("id", SummaryFailureView.Id, key = true, hidden = true),
+      SqlField("partner", SummaryFailureView.Partner),
+      SqlField("message", SummaryFailureView.Message)
     )
