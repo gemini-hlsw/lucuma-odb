@@ -64,6 +64,7 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.graphql.subscription.SubscriptionUtils
 import lucuma.odb.json.time.transport.given
 import lucuma.odb.json.wavelength.decoder.given
+import lucuma.odb.logic.Generator
 import lucuma.odb.service.Services
 import lucuma.odb.service.TelluricTargetsServiceSuiteSupport
 import lucuma.odb.smartgcal.data.Gnirs
@@ -856,6 +857,33 @@ class perScienceObservationCalibrations
       assertEquals(allGroups2.toSet, allGroups3.toSet)
     }
 
+  test("a science observation cannot leave its obs calibration group while it holds tellurics"):
+    for
+      pid   <- createProgramAs(pi)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _     <- runObscalcUpdate(pid, oid)
+      _     <- recalculateCalibrations(pid, when, oid)
+      gid   <- queryObservation(oid).map(_.groupId.get)
+      _     <- expectOdbError(
+                 user  = serviceUser,
+                 query = s"""
+                   mutation {
+                     updateObservations(input: {
+                       SET: { groupId: null }
+                       WHERE: { id: { EQ: ${oid.asJson} } }
+                     }) {
+                       observations { id }
+                     }
+                   }
+                 """,
+                 expected = {
+                   case OdbError.UpdateFailed(Some(msg)) if msg.contains("cannot leave its calibration group") => ()
+                 }
+               )
+      after <- queryObservation(oid)
+    yield assertEquals(after.groupId, gid.some)
+
   test("Mixed add/delete in single recalculation"):
     for {
       pid         <- createProgramAs(pi)
@@ -1490,6 +1518,25 @@ class perScienceObservationCalibrations
       assertEquals(storedDur, obscalcDur)
     }
 
+  test("a telluric for an unresolved ToO is charged a fixed placeholder time"):
+    for
+      pid  <- createProgramAs(pi)
+      tid  <- createOpportunityTargetAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- recalculateCalibrations(pid, when, oid)
+      toid <- selectTelluricObservationFor(oid).map(_.get)
+      _    <- sleep >> resolveTelluricTargets
+      meta <- selectMeta(toid)
+      _    <- runObscalcUpdate(pid, toid)
+      dig  <- withServicesForObscalc(serviceUser): services =>
+                services.transactionally:
+                  services.obscalcService.selectOne(toid).map:
+                    _.flatMap(_.result).flatMap(_.digest)
+    yield
+      assertEquals(meta.flatMap(_.resolvedTargetId), None)
+      assertEquals(dig.map(_.fullTimeEstimate.sum), Generator.UnresolvedTelluricTime.some)
+
   test("coordinate change triggers re-resolution with new hash"):
     val obsTime = Timestamp.fromInstantTruncated(when).get
 
@@ -2022,6 +2069,23 @@ class perScienceObservationCalibrations
         .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
       (mode, qs)
 
+  // Whether an IGRINS-2 long slit observation has an explicit telescope configs override.
+  private def queryIgrins2ExplicitTelescopeConfigs(oid: Observation.Id): IO[Boolean] =
+    query(
+      serviceUser,
+      s"""query {
+            observation(observationId: "$oid") {
+              observingMode {
+                igrins2LongSlit {
+                  explicitTelescopeConfigs { offsetMode }
+                }
+              }
+            }
+          }"""
+    ).map: c =>
+      c.hcursor.downField("observation").downField("observingMode")
+        .downField("igrins2LongSlit").downField("explicitTelescopeConfigs").focus.exists(!_.isNull)
+
   // The nod-along-slit ABBA default (lucuma-core NodAlongSlitDefaultTelescopeConfigs).
   private val Igrins2DefaultQs: List[BigDecimal] =
     List(-1.25, 1.25, 1.25, -1.25).map(BigDecimal(_))
@@ -2029,23 +2093,27 @@ class perScienceObservationCalibrations
   test("igrins2 telluric overrides custom science offsets with the NodAlongSlit defaults"):
     val customScience = List(-2.0, 2.0, 2.0, -2.0).map(BigDecimal(_))
     for {
-      pid     <- createProgramAs(pi)
-      tid     <- createTargetWithProfileAs(pi, pid)
+      pid         <- createProgramAs(pi)
+      tid         <- createTargetWithProfileAs(pi, pid)
       // Science has some custom offsets
-      oid     <- createIgrins2LongSlitObservationAs(pi, pid, Some(CustomScienceOffsets), tid)
-      _       <- runObscalcUpdate(pid, oid)
-      _       <- recalculateCalibrations(pid, when, oid)
-      sciSet  <- queryIgrins2OffsetSettings(oid)
-      toidOpt <- selectTelluricObservationFor(oid)
-      toid    = toidOpt.get
-      telSet  <- queryIgrins2OffsetSettings(toid)
+      oid         <- createIgrins2LongSlitObservationAs(pi, pid, Some(CustomScienceOffsets), tid)
+      _           <- runObscalcUpdate(pid, oid)
+      _           <- recalculateCalibrations(pid, when, oid)
+      sciSet      <- queryIgrins2OffsetSettings(oid)
+      toidOpt     <- selectTelluricObservationFor(oid)
+      toid        =  toidOpt.get
+      telSet      <- queryIgrins2OffsetSettings(toid)
+      telExplicit <- queryIgrins2ExplicitTelescopeConfigs(toid)
     } yield {
       // Science keeps its custom offsets
       assertEquals(sciSet._1, "NOD_ALONG_SLIT")
       assertEquals(sciSet._2, customScience)
-      // Telluric gets the default to NodAlongSlit offsets.
+      // Telluric gets the default NodAlongSlit offsets, with no explicit override --
+      // reverting it just falls back to this default, rather than to the science
+      // pattern.
       assertEquals(telSet._1, "NOD_ALONG_SLIT")
       assertEquals(telSet._2, Igrins2DefaultQs)
+      assert(!telExplicit)
     }
 
   private def updateIgrins2ScienceOffsets(oid: Observation.Id): IO[Unit] =
@@ -2175,8 +2243,11 @@ class perScienceObservationCalibrations
       assertEquals(tel, (false, telluricQs))
     }
 
-  // GNIRS along-slit q offsets (arcseconds) for the effective telescope configs.
-  private def queryGnirsAlongSlitOffsets(oid: Observation.Id): IO[List[BigDecimal]] =
+  // GNIRS along-slit q offsets (arcseconds) for the effective, default and explicit
+  // telescope configs (explicit is None when there is no override).
+  private def queryGnirsSlitTelescopeConfigs(
+    oid: Observation.Id
+  ): IO[(List[BigDecimal], List[BigDecimal], Option[List[BigDecimal]])] =
     query(
       user  = pi,
       query = s"""
@@ -2185,19 +2256,29 @@ class perScienceObservationCalibrations
             observingMode {
               gnirsSpectroscopy {
                 slit {
-                  telescopeConfigs {
-                    alongSlit { q { arcseconds } }
-                  }
+                  telescopeConfigs { alongSlit { q { arcseconds } } }
+                  defaultTelescopeConfigs { alongSlit { q { arcseconds } } }
+                  explicitTelescopeConfigs { alongSlit { q { arcseconds } } }
                 }
               }
             }
           }
         }"""
     ).map: c =>
-      c.hcursor
-        .downField("observation").downField("observingMode").downField("gnirsSpectroscopy")
-        .downField("slit").downField("telescopeConfigs").downField("alongSlit").as[List[Json]].toOption.orEmpty
-        .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
+      val slit =
+        c.hcursor
+          .downField("observation").downField("observingMode").downField("gnirsSpectroscopy")
+          .downField("slit")
+
+      def alongSlitQs(field: String): List[BigDecimal] =
+        slit.downField(field).downField("alongSlit").as[List[Json]].toOption.orEmpty
+          .flatMap(_.hcursor.downField("q").downField("arcseconds").as[BigDecimal].toOption)
+
+      val explicit =
+        if slit.downField("explicitTelescopeConfigs").focus.exists(_.isNull) then None
+        else Some(alongSlitQs("explicitTelescopeConfigs"))
+
+      (alongSlitQs("telescopeConfigs"), alongSlitQs("defaultTelescopeConfigs"), explicit)
 
   test("gnirs observation is placed in a obs calibration system group"):
     for {
@@ -2233,21 +2314,27 @@ class perScienceObservationCalibrations
 
   test("gnirs telluric is created with config-dependent telluric offsets"):
     for {
-      pid     <- createProgramAs(pi)
-      tid     <- createTargetWithProfileAs(pi, pid)
+      pid                      <- createProgramAs(pi)
+      tid                      <- createTargetWithProfileAs(pi, pid)
       // Short camera (SHORT_BLUE), long slit (MIRROR), ORDER3 (< 2.5 µm).
-      oid     <- createGnirsLongSlitObservationAs(pi, pid, tid)
-      _       <- runObscalcUpdate(pid, oid)
-      _       <- recalculateCalibrations(pid, when, oid)
-      sciOffs <- queryGnirsAlongSlitOffsets(oid)
-      toidOpt <- selectTelluricObservationFor(oid)
-      toid    =  toidOpt.get
-      telOffs <- queryGnirsAlongSlitOffsets(toid)
+      oid                      <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _                        <- runObscalcUpdate(pid, oid)
+      _                        <- recalculateCalibrations(pid, when, oid)
+      (sciEff, sciDef, sciExp) <- queryGnirsSlitTelescopeConfigs(oid)
+      toidOpt                  <- selectTelluricObservationFor(oid)
+      toid                     =  toidOpt.get
+      (telEff, telDef, telExp) <- queryGnirsSlitTelescopeConfigs(toid)
     } yield {
-      // Science uses the standard short-camera offsets...
-      assertEquals(sciOffs, List[BigDecimal](2, -4, -4, 2))
-      // ...and the telluric uses the corresponding telluric offsets.
-      assertEquals(telOffs, List[BigDecimal](-2, 4, 4, -2))
+      // Science uses the standard short-camera offsets, with no explicit override...
+      assertEquals(sciEff, List[BigDecimal](2, -4, -4, 2))
+      assertEquals(sciDef, List[BigDecimal](2, -4, -4, 2))
+      assertEquals(sciExp, None)
+      // ...and the telluric's default is the corresponding telluric offsets, also
+      // with no explicit override -- reverting it just falls back to this default,
+      // rather than to the science pattern.
+      assertEquals(telEff, List[BigDecimal](-2, 4, 4, -2))
+      assertEquals(telDef, List[BigDecimal](-2, 4, 4, -2))
+      assertEquals(telExp, None)
     }
 
   // Seed the SmartGcal flat & arc for the SXD science config used by the
@@ -2517,7 +2604,12 @@ class perScienceObservationCalibrations
     yield
       assert(result.isLeft, "a daytime pinhole must not be declinable")
 
-  private def longSlitTelluric(oid: Observation.Id): IO[(String, Flamingos2Fpu, List[Long])] =
+  // (mode, fpu, effective, default, explicit) for a Flamingos 2 long slit
+  // observation's along-slit q offsets (microarcseconds); explicit is None when
+  // there is no override.
+  private def longSlitTelluric(
+    oid: Observation.Id
+  ): IO[(String, Flamingos2Fpu, List[Long], List[Long], Option[List[Long]])] =
     query(
       user = pi,
       query = s"""
@@ -2527,9 +2619,9 @@ class perScienceObservationCalibrations
               mode
               flamingos2LongSlit {
                 fpu
-                telescopeConfigs {
-                  alongSlit { q { microarcseconds } }
-                }
+                telescopeConfigs { alongSlit { q { microarcseconds } } }
+                defaultTelescopeConfigs { alongSlit { q { microarcseconds } } }
+                explicitTelescopeConfigs { alongSlit { q { microarcseconds } } }
               }
             }
           }
@@ -2539,9 +2631,16 @@ class perScienceObservationCalibrations
       val mode = json.hcursor.downFields("observation", "observingMode").downField("mode").as[String].toOption.get
       val ls   = json.hcursor.downFields("observation", "observingMode", "flamingos2LongSlit")
       val fpu  = ls.downField("fpu").as[Flamingos2Fpu].toOption.get
-      val qs   = ls.downFields("telescopeConfigs", "alongSlit").as[List[Json]].toOption.orEmpty
-                   .flatMap(_.hcursor.downFields("q", "microarcseconds").as[Long].toOption)
-      (mode, fpu, qs)
+
+      def qs(field: String): List[Long] =
+        ls.downFields(field, "alongSlit").as[List[Json]].toOption.orEmpty
+          .flatMap(_.hcursor.downFields("q", "microarcseconds").as[Long].toOption)
+
+      val explicit =
+        if ls.downField("explicitTelescopeConfigs").focus.exists(_.isNull) then None
+        else Some(qs("explicitTelescopeConfigs"))
+
+      (mode, fpu, qs("telescopeConfigs"), qs("defaultTelescopeConfigs"), explicit)
 
   test("the F2 MOS telluric is a long slit observation on the equivalent FPU"):
     for
@@ -2553,11 +2652,16 @@ class perScienceObservationCalibrations
       telluric <- selectTelluricObservationFor(oid).map(_.get)
       result   <- longSlitTelluric(telluric)
     yield
-      val (mode, fpu, qs) = result
+      val (mode, fpu, qs, defaultQs, explicitQs) = result
       // CUSTOM_WIDTH_2_PIX maps 1:1 onto LONG_SLIT_2.
       assertEquals(mode, "FLAMINGOS_2_LONG_SLIT")
       assertEquals(fpu, Flamingos2Fpu.LongSlit2)
-      assertEquals(qs, List(60L, 40L, 20L, -20L, -40L, -60L).map(_ * 1_000_000L))
+      val mosTelluricQs = List(60L, 40L, 20L, -20L, -40L, -60L).map(_ * 1_000_000L)
+      assertEquals(qs, mosTelluricQs)
+      // The MOS telluric nod pattern is the default, so there is no explicit
+      // override to revert -- reverting it just falls back to this same default.
+      assertEquals(defaultQs, mosTelluricQs)
+      assertEquals(explicitQs, None)
 
   private def updateFlamingos2MosSlitWidth(oid: Observation.Id, slitWidth: String): IO[Unit] =
     query(
@@ -2624,9 +2728,17 @@ class perScienceObservationCalibrations
       toid2 <- selectTelluricObservationFor(oid).map(_.get)
       ls   <- longSlitTelluric(toid2)
     yield
-      assertEquals(mos._3, List(60L, 40L, 20L, -20L, -40L, -60L).map(_ * 1_000_000L))
+      val mosTelluricQs = List(60L, 40L, 20L, -20L, -40L, -60L).map(_ * 1_000_000L)
+      val longSlitQs    = List(15L, -15L, -15L, 15L).map(_ * 1_000_000L)
+      // Neither row ever gets an explicit override: both fall back to the row's
+      // own default, MOS-derived or plain long slit.
+      assertEquals(mos._3, mosTelluricQs)
+      assertEquals(mos._4, mosTelluricQs)
+      assertEquals(mos._5, None)
       // No stale MOS marker: the telluric falls back to the long slit nod pattern.
-      assertEquals(ls._3, List(15L, -15L, -15L, 15L).map(_ * 1_000_000L))
+      assertEquals(ls._3, longSlitQs)
+      assertEquals(ls._4, longSlitQs)
+      assertEquals(ls._5, None)
 
   private def setTelluricType(oid: Observation.Id, modeField: String, tag: String): IO[Unit] =
     query(

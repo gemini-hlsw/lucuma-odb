@@ -854,8 +854,8 @@ object ItcService {
         session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results)
           .void
           .recoverWith {
-            case SqlState.ForeignKeyViolation(ex) =>
-              L.info(ex)(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+            case SqlState.ForeignKeyViolation(_) =>
+              L.info(s"Failed to insert or update ITC result for program $pid, observation $oid. Probably due to a deleted calibration observation.")
           } *> updateDerivedAcquisitionSignalToNoise(oid, input, results.acquisition)
 
       /**
@@ -908,8 +908,8 @@ object ItcService {
         session.execute(Statements.FreezeItcResult)(oid, h, result)
           .void
           .recoverWith:
-            case SqlState.ForeignKeyViolation(ex) =>
-              L.info(ex)(s"Failed to freeze ITC result for observation $oid. Probably due to a deleted observation.")
+            case SqlState.ForeignKeyViolation(_) =>
+              L.info(s"Failed to freeze ITC result for observation $oid. Probably due to a deleted observation.")
           // Pin the derived acquisition S/N to the frozen classification, so the published
           // value and the sequence being executed agree from here on.
           *> updateDerivedAcquisitionSignalToNoise(oid, input, result.acquisition)
@@ -973,8 +973,8 @@ object ItcService {
         session.execute(Statements.UpdateItcAcquisition)(oid, acquisition)
           .void
           .recoverWith:
-            case SqlState.ForeignKeyViolation(ex) =>
-              L.info(ex)(s"Failed to update ITC acquisition for observation $oid. Probably due to a deleted observation.")
+            case SqlState.ForeignKeyViolation(_) =>
+              L.info(s"Failed to update ITC acquisition for observation $oid. Probably due to a deleted observation.")
           *> updateDerivedAcquisitionSignalToNoise(oid, input, acquisition)
 
       private def insertOrUpdateFailure(
@@ -988,8 +988,8 @@ object ItcService {
         session.execute(Statements.InsertOrUpdateItcFailure)(pid, oid, h, msg)
           .void
           .recoverWith:
-            case SqlState.ForeignKeyViolation(ex) =>
-              L.info(ex)(s"Failed to insert or update ITC failure for program $pid, observation $oid. Probably due to a deleted calibration observation.")
+            case SqlState.ForeignKeyViolation(_) =>
+              L.info(s"Failed to insert or update ITC failure for program $pid, observation $oid. Probably due to a deleted calibration observation.")
     }
 
   object Statements {

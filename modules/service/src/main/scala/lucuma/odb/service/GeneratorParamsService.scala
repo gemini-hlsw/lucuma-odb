@@ -242,8 +242,10 @@ object GeneratorParamsService {
         // A daytime pinhole flat is an internal GCAL calibration with no target.
         // It needs no asterism (and no ITC), so skip the target requirement; its
         // sequence is a single smart day flat that ignores target information.
+        // A telluric has no target until resolved (never, for an unresolved ToO);
+        // let it through so the generator can charge a placeholder time.
         val targetCheck =
-          if calibrationRole.contains(CalibrationRole.DaytimePinhole) then
+          if calibrationRole.exists(r => r === CalibrationRole.DaytimePinhole || r === CalibrationRole.Telluric) then
             ().asRight[NonEmptyList[MissingParam]]
           else
             params
@@ -266,6 +268,9 @@ object GeneratorParamsService {
         obsParams: ObsParams,
         config:    Option[ObservingMode]
       ): Either[Error, GeneratorParams] =
+
+        // A target-less observation still has one (empty) asterism row.
+        val hasTarget = obsParams.targets.exists(_.targetId.isDefined)
 
         def spectroscopyGeneratorParams(
           obsMode:              ObservingMode,
@@ -295,7 +300,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
         /**
          * Modes with no acquisition sequence are costed on science alone.
@@ -314,7 +319,7 @@ object GeneratorParamsService {
               .leftMap(MissingParamSet.fromParams)
               .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
         /**
          * GNIRS spectroscopy takes spectra at one or more central wavelengths,
@@ -351,7 +356,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
         // Shared by long slit and MOS.  Signal-to-noise is solved by the ITC, so
         // the read mode it is given is ignored; only Time & Count needs a real one.
@@ -371,6 +376,7 @@ object GeneratorParamsService {
               obsParams.scienceBand,
               exc,
               obsParams.calibrationRole,
+              hasTarget,
               obsParams.declaredState,
               obsParams.executionState,
               obsParams.stepCount,
@@ -430,7 +436,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gnm @ gnirs.imaging.Config(filters = fs) =>
             // An input per filter. In S/N mode the read mode is derived per step from
@@ -495,7 +501,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
@@ -638,7 +644,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -656,7 +662,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gn: gnirs.spectroscopy.Config =>
             // Acquisition (imaging) filter for the ITC: the explicit acquisition
@@ -731,6 +737,7 @@ object GeneratorParamsService {
               obsParams.scienceBand,
               vis,
               obsParams.calibrationRole,
+              hasTarget,
               obsParams.declaredState,
               obsParams.executionState,
               obsParams.stepCount,
