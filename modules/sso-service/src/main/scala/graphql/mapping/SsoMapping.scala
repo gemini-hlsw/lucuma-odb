@@ -247,6 +247,11 @@ object SsoMapping {
           case (QueryType, "user", Nil) =>
             Elab.transformChild(c => Unique(Filter(Eql(UserType / "id", Const(user.id)), c)))
 
+          // The ordering is required for correctness: flattened inner joins drop zero-key users.
+          case (UserType, "apiKeys", Nil) =>
+            Elab.transformChild: child =>
+              OrderBy(OrderSelections(List(OrderSelection[String](ApiKeyType / "id"))), child)
+
           case (QueryType, "role", Nil) =>
             Elab.transformChild(c => Unique(Filter(Eql(UserType / "id", Const(user.role.id)), c)))
 
