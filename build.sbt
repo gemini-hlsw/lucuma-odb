@@ -121,7 +121,7 @@ ThisBuild / githubWorkflowEnv += munitFlakyOk
 // pyexplore is private; the pdfSummary image clones it with this token.
 ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TOKEN }}")
 
-ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g"
+ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g -J-Xss4M"
 
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   Seq(
@@ -1098,6 +1098,8 @@ lazy val service = project
     reStart / envVars += "PORT" -> "8082",
     reStartArgs += "serve",
     description                     := "Lucuma ODB Service",
+    // Grackle validates the type mappings per new user; Heroku's default stack is too small
+    bashScriptExtraDefines += """addJava "-Xss1m"""",
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8 serve""",
     // Name of the launch script
