@@ -10,7 +10,8 @@ ENV POSTGRES_USER=$POSTGRES_USER
 ENV POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 ENV POSTGRES_DB=$POSTGRES_DB
 
-# Custom PGDATA directory to avoid volume mount issues
+# Custom PGDATA outside the base image's VOLUME (/var/lib/postgresql/data), otherwise the
+# data baked at build time is discarded at run time.
 ENV PGDATA=/var/lib/postgresql/odb-data
 
 # The database is throwaway, so durability is not needed: skip fsync during initdb
@@ -22,6 +23,13 @@ COPY ./main/resources/db/migration/ /docker-entrypoint-initdb.d/
 # Run initdb and the init scripts (migrations) without leaving a server running.
 # The server args disable durability to speed up the migrations.
 RUN docker-ensure-initdb.sh -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+
+# Serve the data directory from an anonymous volume, populated from the image at container creation.
+# Left in the image layers, Postgres would run on overlayfs and every first write to a relation file
+# triggers a copy-up, which holds an interruptible lock: a backend that receives a signal (SIGUSR1
+# from NOTIFY, SIGALRM from timeouts) while waiting gets EINTR from open(), causing spurious
+# "could not open file ...: Interrupted system call" errors and backend crashes in tests.
+VOLUME /var/lib/postgresql/odb-data
 
 # Also disable durability at test time, to speed up database writes in tests
 CMD ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
