@@ -1465,8 +1465,8 @@ object ObservationService {
 
     def selectExplicitGuideProbes(which: AppliedFragment): AppliedFragment =
       void"SELECT c_observation_id, c_observing_mode_type, c_explicit_guide_probe " |+|
-        void"FROM t_observation "                                                    |+|
-        void"WHERE c_explicit_guide_probe IS NOT NULL "                              |+|
+        void"FROM t_observation "                                                   |+|
+        void"WHERE c_explicit_guide_probe IS NOT NULL "                             |+|
         void"AND c_observation_id IN (" |+| which |+| void")"
 
     def validateUnsplittableSequence(

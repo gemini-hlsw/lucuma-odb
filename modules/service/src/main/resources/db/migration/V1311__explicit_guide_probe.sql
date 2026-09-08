@@ -5,10 +5,10 @@ CREATE TABLE t_guide_probe (
   c_long_name  varchar  NOT NULL
 );
 
-INSERT INTO t_guide_probe VALUES ('Pwfs1',           'PWFS1',    'Peripheral WFS 1');
-INSERT INTO t_guide_probe VALUES ('Pwfs2',           'PWFS2',    'Peripheral WFS 2');
-INSERT INTO t_guide_probe VALUES ('GmosOiwfs',       'GMOS OI',  'GMOS On-Instrument WFS');
-INSERT INTO t_guide_probe VALUES ('Flamingos2Oiwfs', 'F2 OI',    'Flamingos-2 On-Instrument WFS');
+INSERT INTO t_guide_probe VALUES ('Pwfs1',           'PWFS1',      'PWFS1');
+INSERT INTO t_guide_probe VALUES ('Pwfs2',           'PWFS2',      'PWFS2');
+INSERT INTO t_guide_probe VALUES ('GmosOiwfs',       'GMOS OIWFS', 'GMOS OIWFS');
+INSERT INTO t_guide_probe VALUES ('Flamingos2Oiwfs', 'F2 OIWFS',   'Flamingos-2 OIWFS');
 
 -- User override of the guide probe AGS uses; null means the default for the mode
 ALTER TABLE t_observation
