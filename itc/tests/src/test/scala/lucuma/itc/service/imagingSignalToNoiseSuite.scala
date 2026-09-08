@@ -397,3 +397,148 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
         }
         """
     )
+
+  test("gnirs signal to noise"):
+    query(
+      """
+        query {
+          imaging(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: O5_V
+                      },
+                      brightnesses: [
+                        {
+                          band: SLOAN_I,
+                          value: 9.484,
+                          units: VEGA_MAGNITUDE,
+                          error: 0.01
+                        },
+                        {
+                          band: B,
+                          value: 8.116,
+                          units: VEGA_MAGNITUDE
+                        },
+                        {
+                          band: V,
+                          value: 12.323,
+                          units: VEGA_MAGNITUDE,
+                          error: 0.01
+                        },
+                        {
+                          band: J,
+                          value: 14.442,
+                          units: VEGA_MAGNITUDE,
+                          error: 0.018
+                        },
+                        {
+                          band: H,
+                          value: 9.798,
+                          units: VEGA_MAGNITUDE,
+                          error: 0.029
+                        },
+                        {
+                          band: K,
+                          value: 10.65,
+                          units: VEGA_MAGNITUDE,
+                          error: 0.03
+                        }
+                      ]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  metersPerSecond: 7560
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: TWO_POINT_ZERO
+              },
+              cloudExtinction: {
+                preset: THREE_POINT_ZERO
+              },
+              skyBackground: BRIGHT,
+              waterVapor: WET,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gnirsImaging: {
+                exposureTimeMode: { signalToNoise: { value: 600, at: { picometers: 2200000 } } },
+                filter: K,
+                camera: SHORT_BLUE,
+                readMode: BRIGHT,
+                wellDepth: SHALLOW,
+                coadds: 1
+              }
+            }
+          }) {
+            brightest {
+              signalToNoiseAt {
+                wavelength {
+                  picometers
+                }
+                single
+                total
+              }
+              all {
+                exposureCount
+                exposureTime {
+                  seconds
+                }
+              }
+              selected {
+                exposureCount
+                exposureTime {
+                  seconds
+                }
+              }
+            }
+          }
+        }
+        """,
+      json"""
+        {
+          "data": {
+            "imaging" : {
+              "brightest" : {
+                "signalToNoiseAt" : {
+                  "wavelength" : {
+                    "picometers" : 2200000
+                  },
+                  "single" : 101.000,
+                  "total" : 102.000
+                },
+                "all" : [{
+                  "exposureCount" : 10,
+                  "exposureTime" : {
+                    "seconds" : 1.000000
+                  }
+                }, {
+                  "exposureCount" : 5,
+                  "exposureTime" : {
+                    "seconds" : 2.000000
+                  }
+                }],
+                "selected" : {
+                  "exposureCount" : 10,
+                  "exposureTime" : {
+                    "seconds" : 1.000000
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+    )
