@@ -7282,6 +7282,13 @@ input TargetEnvironmentInput {
   Default = Manual
   """
   blindOffsetType: BlindOffsetType
+
+  """
+  Overrides the guide probe that the automatic guide star search uses. The
+  probe must be usable by the observing mode. Assign null to clear the
+  override and fall back to the default probe for the mode and target type.
+  """
+  explicitGuideProbe: GuideProbe
 }
 
 """
@@ -21129,6 +21136,25 @@ type TargetEnvironment {
   The type of blind offset (automatic or manual) if a blind offset exists.
   """
   blindOffsetType: BlindOffsetType!
+
+  """
+  The guide probe the automatic guide star search uses: the explicit probe if
+  set, otherwise the default. Null when no default can be determined.
+  """
+  guideProbe: GuideProbe
+
+  """
+  The default guide probe for the observing mode and asterism track type. Null
+  when the observation has no observing mode or targets, or when the mode does
+  not support guiding.
+  """
+  defaultGuideProbe: GuideProbe
+
+  """
+  The user selected guide probe, if any, set via
+  `TargetEnvironmentInput.explicitGuideProbe`.
+  """
+  explicitGuideProbe: GuideProbe
 
   """
   The cassegrain rotator tracking mode.

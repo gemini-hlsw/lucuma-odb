@@ -13,8 +13,10 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationWorkflowState
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.CallForProposals
@@ -31,6 +33,7 @@ import lucuma.core.util.CalculatedValue
 import lucuma.core.util.CalculationState
 import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
+import lucuma.odb.service.GuideProbeRules
 import lucuma.odb.service.ObservationService
 import lucuma.odb.service.workflow.validator.CfpRaDecValidator
 
@@ -1183,4 +1186,47 @@ class observation_workflow
         ).asRight
       )
 
+
+  test("explicit guide probe left invalid by a mode change is a configuration error"):
+    val toFlamingos2 =
+      """
+        observingMode: {
+          flamingos2LongSlit: {
+            disperser: R1200_JH
+            filter: Y
+            fpu: LONG_SLIT_2
+            exposureTimeMode: {
+              signalToNoise: {
+                value: 20.0
+                at: { nanometers: 1234.56 }
+              }
+            }
+          }
+        }
+      """
+    val setup: IO[Observation.Id] =
+      for
+        pid <- createProgramAs(pi)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- updateObservation(pi, oid, "targetEnvironment: { explicitGuideProbe: GMOS_OIWFS }", "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $oid } ] } }""".asRight)
+        _   <- updateObservation(pi, oid, toFlamingos2, "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $oid } ] } }""".asRight)
+        _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Undefined,
+              List(ObservationWorkflowState.Inactive),
+              List(ObservationValidation.configuration(GuideProbeRules.notAllowedMessage(ObservingModeType.Flamingos2LongSlit, GuideProbe.GmosOIWFS)))
+            )
+          )
+        ).asRight
+      )
 }

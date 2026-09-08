@@ -68,6 +68,7 @@ object ObservationValidator:
       CfpRaDecValidator              |+|
       BandValidator                  |+|
       GhostVMagnitudeValidator       |+|
+      GuideProbeValidator            |+|
       TooActivationValidator         |+|
       OpportunityTargetValidator     |+|
       OtherConfigErrorValidator      |+|

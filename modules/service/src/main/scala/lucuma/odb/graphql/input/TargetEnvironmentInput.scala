@@ -6,6 +6,7 @@ package input
 
 import cats.syntax.parallel.*
 import cats.syntax.partialOrder.*
+import lucuma.core.enums.GuideProbe
 import lucuma.core.model.Access
 import lucuma.core.model.Target
 import lucuma.odb.data.BlindOffsetType
@@ -22,7 +23,8 @@ object TargetEnvironmentInput:
     explicitSignalToNoiseTargetId: Option[Target.Id],
     useBlindOffset:                Option[Boolean],
     blindOffsetTarget:             Option[TargetPropertiesInput.Create],
-    blindOffsetType:               BlindOffsetType
+    blindOffsetType:               BlindOffsetType,
+    explicitGuideProbe:            Option[GuideProbe]
   ) extends TargetEnvironmentInput
   object Create:
     val Binding: Matcher[Create] =
@@ -33,9 +35,10 @@ object TargetEnvironmentInput:
           TargetIdBinding.Option("explicitSignalToNoiseTargetId", rSnTarget),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Option("blindOffsetTarget", rBlindOffsetTarget),
-          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)
-        ) => (rBase, rAsterism, rSnTarget, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType)
-          .parMapN((b, a, sn, u, t, o) => Create(b, a, sn, u, t, o.getOrElse(BlindOffsetType.Manual)))
+          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType),
+          GuideProbeBinding.Option("explicitGuideProbe", rGuideProbe)
+        ) => (rBase, rAsterism, rSnTarget, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType, rGuideProbe)
+          .parMapN((b, a, sn, u, t, o, g) => Create(b, a, sn, u, t, o.getOrElse(BlindOffsetType.Manual), g))
       }
 
 
@@ -45,11 +48,12 @@ object TargetEnvironmentInput:
     explicitSignalToNoiseTargetId: Nullable[Target.Id],
     useBlindOffset:                Option[Boolean],
     blindOffsetTarget:             Nullable[TargetPropertiesInput.Create],
-    blindOffsetType:               BlindOffsetType
+    blindOffsetType:               BlindOffsetType,
+    explicitGuideProbe:            Nullable[GuideProbe]
   ) extends TargetEnvironmentInput:
     def limitToPreExecution(access: Access): Boolean =
       // staff can edit the blind offset for ongoing observations
-      access <= Access.Pi || asterism.isDefined || explicitBase.isDefined || explicitSignalToNoiseTargetId.isDefined
+      access <= Access.Pi || asterism.isDefined || explicitBase.isDefined || explicitSignalToNoiseTargetId.isDefined || explicitGuideProbe.isDefined
 
   object Edit:
     val Binding: Matcher[Edit] =
@@ -60,7 +64,8 @@ object TargetEnvironmentInput:
           TargetIdBinding.Nullable("explicitSignalToNoiseTargetId", rSnTarget),
           BooleanBinding.Option("useBlindOffset", rUseBlindOffset),
           TargetPropertiesInput.Binding.Nullable("blindOffsetTarget", rBlindOffsetTarget),
-          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType)
-        ) => (rBase, rAsterism, rSnTarget, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType)
-          .parMapN((b, a, sn, u, t, o) => Edit(b, a, sn, u, t, o.getOrElse(BlindOffsetType.Manual)))
+          BlindOffsetTypeBinding.Option("blindOffsetType", rBlindOffsetType),
+          GuideProbeBinding.Nullable("explicitGuideProbe", rGuideProbe)
+        ) => (rBase, rAsterism, rSnTarget, rUseBlindOffset, rBlindOffsetTarget, rBlindOffsetType, rGuideProbe)
+          .parMapN((b, a, sn, u, t, o, g) => Edit(b, a, sn, u, t, o.getOrElse(BlindOffsetType.Manual), g))
       }

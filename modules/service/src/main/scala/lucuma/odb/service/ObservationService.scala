@@ -17,6 +17,7 @@ import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.FocalPlane
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
@@ -359,7 +360,15 @@ object ObservationService {
         input.foldWithId(
           OdbError.InvalidArgument().asFailureF // typically handled by caller
         ): (SET, pid) =>
-          ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole)))
+          val probeCheck: Result[Unit] =
+            (SET.observingMode.flatMap(_.observingModeType), SET.targetEnvironment.flatMap(_.explicitGuideProbe))
+              .tupled
+              .filterNot(GuideProbeRules.isAllowed.tupled)
+              .fold(Result.unit): (mode, probe) =>
+                OdbError.InvalidArgument(GuideProbeRules.notAllowedMessage(mode, probe).some).asFailure
+
+          ResultT.fromResult(probeCheck)
+            .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
             .flatMap: oid =>
               SET
                 .asterism
@@ -558,6 +567,21 @@ object ObservationService {
                           s"Observations ${ids.map(_.show).mkString(", ")} cannot be moved out of their system group; move the group instead.".some
                         ).asFailure
 
+            // Runs after the mode update so the probe is checked against the new mode.
+            val validateExplicitGuideProbe: ResultT[F, Unit] =
+              ResultT:
+                val af = Statements.selectExplicitGuideProbes(which)
+                session
+                  .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt *: guide_probe))
+                  .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+                  .map: rows =>
+                    rows
+                      .collect:
+                        case (oid, Some(mode), probe) if !GuideProbeRules.isAllowed(mode, probe) =>
+                          OdbError.InvalidArgument(s"Observation $oid: ${GuideProbeRules.notAllowedMessage(mode, probe)}".some).asFailure.void
+                      .combineAllOption
+                      .getOrElse(Result.unit)
+
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
                 r <- ResultT(Statements.updateObservations(SET, which).traverse { af =>
@@ -594,6 +618,7 @@ object ObservationService {
                 _ <- if setsMode then validateTooActivationCeiling else ResultT.unit
 
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
+                _ <- if SET.targetEnvironment.exists(_.explicitGuideProbe.toOption.isDefined) then validateExplicitGuideProbe else ResultT.unit
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.scheduling.flatMap(_.timingWindows).foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
@@ -825,6 +850,7 @@ object ObservationService {
           SET.observerNotes,
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
+          SET.targetEnvironment.flatMap(_.explicitGuideProbe),
           calibrationRole,
           SET.scheduling.flatMap(_.schedulingMode).getOrElse(SchedulingMode.Unconstrained)
         )
@@ -847,6 +873,7 @@ object ObservationService {
       observerNotes:       Option[NonEmptyString],
       useBlindOffset:      Boolean,
       blindOffsetType:     BlindOffsetType,
+      explicitGuideProbe:  Option[GuideProbe],
       calibrationRole:     Option[CalibrationRole],
       schedulingMode:      SchedulingMode
     ): AppliedFragment = {
@@ -892,6 +919,7 @@ object ObservationService {
            observerNotes                                                                                                          ,
            useBlindOffset                                                                                                         ,
            blindOffsetType                                                                                                        ,
+           explicitGuideProbe                                                                                                     ,
            calibrationRole                                                                                                        ,
            schedulingMode
         )
@@ -939,6 +967,7 @@ object ObservationService {
       Option[NonEmptyString]           ,
       Boolean                          ,
       BlindOffsetType                  ,
+      Option[GuideProbe]               ,
       Option[CalibrationRole]          ,
       SchedulingMode
     )] =
@@ -977,6 +1006,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
+          c_explicit_guide_probe,
           c_calibration_role,
           c_scheduling_mode
         )
@@ -1014,6 +1044,7 @@ object ObservationService {
           ${text_nonempty.opt},
           $bool,
           $blind_offset_type,
+          ${guide_probe.opt},
           ${calibration_role.opt},
           $scheduling_mode
       """
@@ -1192,13 +1223,18 @@ object ObservationService {
            .toList
            .flatTraverse(explicitBaseUpdates)
 
+      val explicitGuideProbe: List[AppliedFragment] =
+        SET.targetEnvironment
+           .toList
+           .flatMap(te => te.explicitGuideProbe.foldPresent(p => sql"c_explicit_guide_probe = ${guide_probe.opt}"(p)))
+
       val constraintSet: Result[List[AppliedFragment]] =
         SET.constraintSet
            .toList
            .flatTraverse(constraintSetUpdates)
 
       (explicitBase, constraintSet).mapN { (eb, cs) =>
-        NonEmptyList.fromList(eb ++ cs ++ ups ++ posAngleConstraint ++ scienceRequirements)
+        NonEmptyList.fromList(eb ++ explicitGuideProbe ++ cs ++ ups ++ posAngleConstraint ++ scienceRequirements)
       }
     }
 
@@ -1296,6 +1332,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
+          c_explicit_guide_probe,
           c_scheduling_mode
         )
         SELECT
@@ -1333,6 +1370,7 @@ object ObservationService {
           c_observer_notes,
           c_use_blind_offset,
           c_blind_offset_type,
+          c_explicit_guide_probe,
           c_scheduling_mode
       FROM t_observation
       WHERE c_observation_id = $observation_id
@@ -1428,6 +1466,12 @@ object ObservationService {
           AND p.c_too_activation IS NOT NULL
           AND o.c_too_activation > p.c_too_activation
       """
+
+    def selectExplicitGuideProbes(which: AppliedFragment): AppliedFragment =
+      void"SELECT c_observation_id, c_observing_mode_type, c_explicit_guide_probe " |+|
+        void"FROM t_observation "                                                    |+|
+        void"WHERE c_explicit_guide_probe IS NOT NULL "                              |+|
+        void"AND c_observation_id IN (" |+| which |+| void")"
 
     def validateUnsplittableSequence(
       which: AppliedFragment,

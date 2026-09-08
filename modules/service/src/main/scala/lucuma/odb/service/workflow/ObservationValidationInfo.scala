@@ -13,6 +13,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState as CoreExecutionState
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationValidationCode
@@ -74,13 +75,14 @@ case class ObservationValidationInfo(
   scienceBand:            Option[ScienceBand],
   asterism:               List[Target],
   associatedUserState:    Option[ObservationWorkflowService.UserState], // state of science obs if this is a per-observation calibration (telluric or daytime pinhole)
-  dismissedWarnings:   List[ObservationValidationCode.Warning],
+  dismissedWarnings:      List[ObservationValidationCode.Warning],
   generatorParams:        Option[Either[GeneratorParamsService.Error, GeneratorParams]] = None,
   cfpInfo:                Option[CfpInfo] = None,
   programAllocations:     Option[NonEmptyList[ScienceBand]] = None,
   otherConfigErrors:      List[String] = Nil,
   keckInstrument:         Option[KeckInstrument] = None,   // set for exchange_keck observations
   subaruInstrument:       Option[SubaruInstrument] = None, // set for exchange_subaru observations
+  explicitGuideProbe:     Option[GuideProbe] = None,
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -349,20 +351,18 @@ object ObservationValidationInfo {
 
           -- conditions
           o.c_cloud_extinction,
-          o.c_image_quality,   
-          o.c_sky_background,  
+          o.c_image_quality,
+          o.c_sky_background,
           o.c_water_vapor,
 
           -- relative order is important here; we're decoding a 4-col vector for elevationrange
-          o.c_air_mass_min,    
-          o.c_air_mass_max,    
-          o.c_hour_angle_min,  
+          o.c_air_mass_min,
+          o.c_air_mass_max,
+          o.c_hour_angle_min,
           o.c_hour_angle_max,
-
           o.c_spec_wavelength,
-
-          p.c_dismissed_warnings
-
+          p.c_dismissed_warnings,
+          o.c_explicit_guide_probe
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
         -- v_proposal rather than t_proposal: it adds the effective ToO ceiling
@@ -376,34 +376,35 @@ object ObservationValidationInfo {
         WHERE o.c_observation_id IN ($enc)
       """
       .query(
-        program_id                   *:
-        program_type                 *:
-        observation_id               *:
-        observing_mode_type.opt      *:
-        right_ascension.opt          *:
-        declination.opt              *:
-        calibration_role.opt         *:
-        user_state.opt               *:
-        declared_execution_state.opt *:
-        proposal_status              *:
-        too_activation               *:
-        scheduling_mode              *:
-        too_activation.opt           *:
-        cfp_id.opt                   *:
-        science_band.opt             *:
-        user_state.opt               *:
-        cloud_extinction_preset      *:
-        image_quality_preset         *:
-        sky_background               *:
-        water_vapor                  *:
-        elevation_range              *:
-        wavelength_pm.opt            *:
-        _observation_validation_warning
+        program_id                      *:
+        program_type                    *:
+        observation_id                  *:
+        observing_mode_type.opt         *:
+        right_ascension.opt             *:
+        declination.opt                 *:
+        calibration_role.opt            *:
+        user_state.opt                  *:
+        declared_execution_state.opt    *:
+        proposal_status                 *:
+        too_activation                  *:
+        scheduling_mode                 *:
+        too_activation.opt              *:
+        cfp_id.opt                      *:
+        science_band.opt                *:
+        user_state.opt                  *:
+        cloud_extinction_preset         *:
+        image_quality_preset            *:
+        sky_background                  *:
+        water_vapor                     *:
+        elevation_range                 *:
+        wavelength_pm.opt               *:
+        _observation_validation_warning *:
+        guide_probe.opt
       )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs) =>
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2, ovcs)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
