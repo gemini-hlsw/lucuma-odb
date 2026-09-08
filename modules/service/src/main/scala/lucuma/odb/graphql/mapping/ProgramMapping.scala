@@ -52,6 +52,7 @@ trait ProgramMapping[F[_]]
      with ProposalView[F]
      with ObservationView[F]
      with AttachmentTable[F]
+     with SummaryGenerationView[F]
      with Predicates[F]
      with ProgramReferenceView[F]
      with ResultMapping[F]
@@ -102,6 +103,7 @@ trait ProgramMapping[F[_]]
       SqlObject("allocations", Join(ProgramView.Id, AllocationTable.ProgramId)),
       SqlField("calibrationRole", ProgramView.CalibrationRole),
       SqlObject("goa"),
+      SqlObject("proposalSummaryGeneration", Join(ProgramView.Id, SummaryGenerationView.ProgramId)),
       SqlField("resourceLimit", ProgramView.ResourceLimit),
       SqlField("resourceCount", ProgramView.ResourceCount),
       SqlField("dismissedWarnings", ProgramView.dismissedWarnings),

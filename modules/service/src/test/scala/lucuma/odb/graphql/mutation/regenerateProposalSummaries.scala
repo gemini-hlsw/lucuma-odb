@@ -164,6 +164,26 @@ class regenerateProposalSummaries extends OdbSuite
           a.hcursor.downField("proposalSummary").downField("style").as[String].toOption.get
         ))
 
+  case class Generation(state: String, requestedAt: Option[String], message: Option[String])
+
+  def generation(user: User, pid: Program.Id): IO[Generation] =
+    query(
+      user,
+      s"""
+        query {
+          program(programId: "$pid") {
+            proposalSummaryGeneration { state requestedAt message }
+          }
+        }
+      """
+    ).map: json =>
+      val c = json.hcursor.downField("program").downField("proposalSummaryGeneration")
+      Generation(
+        c.downField("state").as[String].toOption.get,
+        c.downField("requestedAt").as[Option[String]].toOption.flatten,
+        c.downField("message").as[Option[String]].toOption.flatten
+      )
+
   lazy val fixture: Json =
     decode[Json](Using.resource(Source.fromResource("lucuma/odb/summary/payload-v1.json"))(_.mkString)).toOption.get
 
@@ -409,3 +429,131 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(taken.map(_.job.id), List(jobs(0).id))
       assertEquals(after.map(_.state), List("rendering", "failed"))
 
+  test("a program that never requested a summary is IDLE"):
+    for
+      pid <- setupProposal()
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen, Generation("IDLE", None, None))
+
+  test("a queued regeneration is PENDING with a requestedAt"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "PENDING")
+      assert(gen.requestedAt.isDefined, "requestedAt should be set while pending")
+      assertEquals(gen.message, None)
+
+  test("a rendering job still reads PENDING"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- nextAll(pid)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "PENDING")
+
+  // The ordering requirement: the flip to IDLE must never be observable before
+  // the attachments that justify it.  finalize does both in one transaction.
+  test("a fully rendered program is IDLE and its summaries are visible in the same query"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- renderAll(pid)
+      res <- query(
+               pi,
+               s"""
+                 query {
+                   program(programId: "$pid") {
+                     proposalSummaryGeneration { state }
+                     attachments { attachmentType }
+                   }
+                 }
+               """
+             )
+    yield
+      val p     = res.hcursor.downField("program")
+      val state = p.downField("proposalSummaryGeneration").downField("state").as[String].toOption.get
+      val kinds = p.downField("attachments").as[List[Json]].toOption.get
+                    .flatMap(_.hcursor.downField("attachmentType").as[String].toOption)
+      assertEquals(state, "IDLE")
+      assertEquals(kinds.count(_ == "SUMMARY"), 2)
+
+  test("a permanent failure is FAILED and carries the error as message"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- failAll(pid, "the abstract broke the renderer", permanent = true)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "FAILED")
+      assertEquals(gen.message, Some("the abstract broke the renderer"))
+
+  test("a transient failure stays PENDING with no message"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- failAll(pid, "s3 hiccup", permanent = false)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "PENDING")
+      assertEquals(gen.message, None)
+
+  // Without the failed-row cleanup in enqueue, the program would snap back to
+  // FAILED as soon as the new jobs finished.
+  test("re-requesting after a failure clears it back to PENDING, then IDLE"):
+    for
+      pid    <- setupProposal()
+      _      <- submitProposal(pi, pid)
+      _      <- failAll(pid, "boom", permanent = true)
+      failed <- generation(pi, pid)
+      _      <- regenerate(staff, pid)
+      queued <- generation(pi, pid)
+      _      <- renderAll(pid)
+      done   <- generation(pi, pid)
+      jobs   <- jobsFor(pid)
+    yield
+      assertEquals(failed.state, "FAILED")
+      assertEquals(queued.state, "PENDING")
+      assertEquals(queued.message, None)
+      assertEquals(done.state, "IDLE")
+      assertEquals(jobs, Nil)
+
+  // A partner split renders several jobs; the aggregate must not go IDLE while
+  // one of them is still outstanding, and one failure makes the whole set FAILED.
+  test("with one partner failed and one rendered the program is FAILED"):
+    for
+      pid      <- setupProposal()
+      _        <- submitProposal(pi, pid)
+      // One claim takes both partners' jobs; settle them in opposite ways.
+      prepared <- nextAll(pid)
+      _        <- withServices(service)(_.pdfSummaryJobService.finalize(prepared.head, fs2.Stream.empty))
+      mid      <- generation(pi, pid)
+      _        <- withServices(service): services =>
+                    services.transactionally:
+                      services.pdfSummaryJobService.fail(prepared(1).job, "only CA failed", permanent = true)
+      gen      <- generation(pi, pid)
+    yield
+      assertEquals(prepared.length, 2)
+      assertEquals(mid.state, "PENDING")
+      assertEquals(gen.state, "FAILED")
+      assertEquals(gen.message, Some("only CA failed"))
+
+  // The reverse order: one failure while the other partner is still rendering
+  // must read PENDING with no message, or the client would show an error over
+  // a render that may yet succeed.
+  test("with one partner failed and one still rendering the program is PENDING with no message"):
+    for
+      pid      <- setupProposal()
+      _        <- submitProposal(pi, pid)
+      prepared <- nextAll(pid)
+      _        <- withServices(service): services =>
+                    services.transactionally:
+                      services.pdfSummaryJobService.fail(prepared.head.job, "US failed", permanent = true)
+      gen      <- generation(pi, pid)
+    yield
+      assertEquals(prepared.length, 2)
+      assertEquals(gen.state, "PENDING")
+      assertEquals(gen.message, None)
