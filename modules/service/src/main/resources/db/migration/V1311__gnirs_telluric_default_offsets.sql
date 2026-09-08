@@ -50,10 +50,12 @@ CREATE VIEW v_gnirs_spectroscopy AS
         WHEN ls.c_camera IN ('ShortRed',  'LongRed')  THEN 'Deep'
       END)::e_gnirs_well_depth AS c_well_depth_default,
       -- IFU telescope configs have no derived default (seeded at creation); only long slit.
-      -- ATTENTION: The telluric branch mirrors the science one below with flipped
-      -- signs, except for the Order2/Order1/PAH case, which is the same pattern for
-      -- both roles. These values used to be hardcoded in
-      -- GnirsSpectroscopyService.applyGnirsTelluricDefaults; keep the two in sync.
+      -- ATTENTION: The science branch is duplicated from lucuma-core
+      -- alongSlitDefaultTelescopeConfigs. Modify in sync. The telluric branch mirrors
+      -- it with flipped signs, except for the Order2/Order1/PAH case, which is the
+      -- same pattern for both roles. This view is the only source of the telluric
+      -- pattern: GnirsSpectroscopyService.applyGnirsTelluricDefaults no longer
+      -- writes it, it just clears the explicit override.
       CASE
         WHEN ls.c_observing_mode_type = 'gnirs_ifu' THEN NULL
         WHEN o.c_calibration_role = 'telluric' THEN
