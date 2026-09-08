@@ -573,10 +573,10 @@ object ObservationService {
                   .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt *: guide_probe))
                   .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
                   .map: rows =>
-                    rows
-                      .flatMap: (oid, mode, probe) =>
-                        mode.map(GuideProbeRules.check(_, probe, s"Observation $oid: "))
-                      .foldLeft(Result.unit)(_ |+| _)
+                    // parTraverse_ accumulates failures; Result's semigroup would downgrade them to warnings
+                    rows.parTraverse_ { case (oid, mode, probe) =>
+                      mode.traverse_(GuideProbeRules.check(_, probe, s"Observation $oid: "))
+                    }
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
