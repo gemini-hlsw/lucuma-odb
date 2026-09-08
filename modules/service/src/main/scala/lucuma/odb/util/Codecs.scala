@@ -71,6 +71,7 @@ import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
+import lucuma.odb.data.SummaryGenerationState
 import lucuma.odb.data.SummaryStyle
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TelescopeConfigGeneratorRole
@@ -469,6 +470,9 @@ trait Codecs {
 
   val summary_style: Codec[SummaryStyle] =
     enumerated(Type("e_summary_style"))
+
+  val summary_generation_state: Codec[SummaryGenerationState] =
+    enumerated(Type("e_summary_generation_state"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
