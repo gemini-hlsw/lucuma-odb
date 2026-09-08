@@ -170,14 +170,14 @@ class updateObservations_explicitGuideProbe extends query.ExecutionTestSupportFo
                     resolutionMode: STANDARD
                   }
                 }
-                targetEnvironment: { explicitGuideProbe: PWFS1 }
+                targetEnvironment: { explicitGuideProbe: GMOS_OIWFS }
               }
             }) {
               observation { id }
             }
           }
         """,
-        expected = List(GuideProbeRules.notAllowedMessage(ObservingModeType.GhostIfu, GuideProbe.PWFS1)).asLeft
+        expected = List(GuideProbeRules.notAllowedMessage(ObservingModeType.GhostIfu, GuideProbe.GmosOIWFS)).asLeft
       )
 
   test("clone copies the explicit guide probe"):

@@ -438,6 +438,8 @@ object GuideService {
             AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2)                                                      =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
+          case (_: ghost.ifu.Config, GuideProbe.PWFS1)                                                      =>
+            AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS1.some
           case (c: visitor.Config, GuideProbe.PWFS2)                                                        =>
             AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS2.some
           case (c: visitor.Config, GuideProbe.PWFS1)                                                        =>
