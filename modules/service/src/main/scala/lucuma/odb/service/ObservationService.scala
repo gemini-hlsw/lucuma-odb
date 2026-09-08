@@ -363,9 +363,7 @@ object ObservationService {
           val probeCheck: Result[Unit] =
             (SET.observingMode.flatMap(_.observingModeType), SET.targetEnvironment.flatMap(_.explicitGuideProbe))
               .tupled
-              .filterNot(GuideProbeRules.isAllowed.tupled)
-              .fold(Result.unit): (mode, probe) =>
-                OdbError.InvalidArgument(GuideProbeRules.notAllowedMessage(mode, probe).some).asFailure
+              .fold(Result.unit)(GuideProbeRules.check(_, _))
 
           ResultT.fromResult(probeCheck)
             .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
@@ -576,11 +574,9 @@ object ObservationService {
                   .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
                   .map: rows =>
                     rows
-                      .collect:
-                        case (oid, Some(mode), probe) if !GuideProbeRules.isAllowed(mode, probe) =>
-                          OdbError.InvalidArgument(s"Observation $oid: ${GuideProbeRules.notAllowedMessage(mode, probe)}".some).asFailure.void
-                      .combineAllOption
-                      .getOrElse(Result.unit)
+                      .flatMap: (oid, mode, probe) =>
+                        mode.map(GuideProbeRules.check(_, probe, s"Observation $oid: "))
+                      .foldLeft(Result.unit)(_ |+| _)
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {

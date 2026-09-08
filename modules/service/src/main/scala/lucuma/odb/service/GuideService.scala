@@ -1179,24 +1179,15 @@ object GuideService {
           o.c_observation_id,
           o.c_observing_mode_type,
           o.c_explicit_guide_probe,
-          EXISTS (
-            SELECT 1
-            FROM t_asterism_target a
-            JOIN t_target t ON t.c_target_id = a.c_target_id
-            WHERE a.c_observation_id = o.c_observation_id
-              AND t.c_existence = 'present'
-          ),
-          EXISTS (
-            SELECT 1
-            FROM t_asterism_target a
-            JOIN t_target t ON t.c_target_id = a.c_target_id
-            WHERE a.c_observation_id = o.c_observation_id
-              AND t.c_existence = 'present'
-              AND t.c_type = 'nonsidereal'
-          )
+          count(t.c_target_id) > 0,
+          coalesce(bool_or(t.c_type = 'nonsidereal'), false)
         FROM t_observation o
+        LEFT JOIN t_asterism_target a ON a.c_observation_id = o.c_observation_id
+        LEFT JOIN t_target t ON t.c_target_id = a.c_target_id AND t.c_existence = 'present'
         WHERE o.c_observation_id IN (
-      """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void")"
+      """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void""")
+        GROUP BY o.c_observation_id, o.c_observing_mode_type, o.c_explicit_guide_probe
+      """
 
     def getBlindOffsetTracking(oid: Observation.Id): AppliedFragment =
       sql"""

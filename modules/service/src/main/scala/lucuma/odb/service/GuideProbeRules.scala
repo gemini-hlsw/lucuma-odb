@@ -3,14 +3,18 @@
 
 package lucuma.odb.service
 
+import cats.syntax.all.*
+import grackle.Result
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.syntax.string.*
+import lucuma.odb.data.OdbError
+import lucuma.odb.data.OdbErrorExtensions.*
 
 // Probes AGS has geometry for per observing mode
-// TODO:. Move to lucuma-core
+// TODO: Move to lucuma-core
 object GuideProbeRules:
 
   private val Pwfs: Set[GuideProbe] =
@@ -41,3 +45,7 @@ object GuideProbeRules:
 
   def notAllowedMessage(mode: ObservingModeType, probe: GuideProbe): String =
     s"Guide probe ${probe.tag.toScreamingSnakeCase} cannot be used with observing mode ${mode.tag.toScreamingSnakeCase}."
+
+  def check(mode: ObservingModeType, probe: GuideProbe, prefix: String = ""): Result[Unit] =
+    if isAllowed(mode, probe) then Result.unit
+    else OdbError.InvalidArgument(s"$prefix${notAllowedMessage(mode, probe)}".some).asFailure
