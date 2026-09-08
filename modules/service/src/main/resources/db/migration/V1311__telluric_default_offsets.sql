@@ -1,11 +1,20 @@
--- A GNIRS long slit telluric's default slit offsets are the science offsets
--- flipped in sign (per GNIRS configuration), not the science offsets themselves
--- (these values used to live in GnirsSpectroscopyService.applyGnirsTelluricDefaults,
--- which wrote them into the explicit columns). Left as an explicit override, the
--- API reported a telluric as customizing a science default it never actually
--- chose, and reverting it restored the science pattern. Make the view's default
--- role-aware instead, so a telluric's own pattern is the default and nothing need
--- be stored explicitly.
+-- Telluric slit offsets are a role-aware default, not an explicit override.
+--
+-- The telluric resets for GNIRS long slit, Flamingos 2 MOS-derived tellurics
+-- and IGRINS-2 wrote the telluric offset pattern into the explicit columns
+-- while the views kept the science pattern as the default. The API therefore
+-- reported every telluric as customizing a science default it never chose, and
+-- reverting restored the science offsets.
+--
+-- For each mode: compute the telluric pattern in the view where it is not
+-- already the default, then null out existing tellurics whose explicit values
+-- merely duplicate that default. Those were only ever set by the reset code,
+-- never hand-edited; a telluric whose explicit value differs from the pattern
+-- was edited by hand and is left alone. Effective offsets are unchanged.
+
+------------------------------------------------------------------------------
+-- GNIRS long slit
+------------------------------------------------------------------------------
 
 -- The view selects ls.*, whose expansion is frozen at creation, so CREATE OR
 -- REPLACE will not do.
@@ -80,11 +89,7 @@ CREATE VIEW v_gnirs_spectroscopy AS
       END AS c_telescope_configs_default
   ) d;
 
--- Existing long slit tellurics whose explicit offsets just duplicate the (now
--- role-aware) default were only ever set by applyGnirsTelluricDefaults, never
--- hand-edited, so null them out and let them fall back to the default like new
--- ones do. A telluric whose explicit value differs from the pattern was edited
--- by hand and is left alone.
+-- Data fix: long slit tellurics still carrying the pattern applyGnirsTelluricDefaults wrote.
 UPDATE t_gnirs_spectroscopy ls
 SET c_slit_offset_mode = NULL, c_telescope_configs = NULL
 FROM v_gnirs_spectroscopy v
@@ -93,3 +98,65 @@ WHERE v.c_observation_id = ls.c_observation_id
   AND is_telluric_calibration(ls.c_observation_id)
   AND ls.c_slit_offset_mode = v.c_slit_offset_mode_default
   AND ls.c_telescope_configs::jsonb = v.c_telescope_configs_default::jsonb;
+
+------------------------------------------------------------------------------
+-- Flamingos 2 MOS
+------------------------------------------------------------------------------
+
+-- The view selects m.*, whose expansion is frozen at creation, so CREATE OR
+-- REPLACE will not do.
+DROP VIEW v_flamingos_2_long_slit;
+
+CREATE VIEW v_flamingos_2_long_slit AS
+  SELECT
+    m.*,
+    (
+      SELECT af.c_tag
+        FROM t_f2_filter af
+        JOIN t_f2_filter sf ON sf.c_tag = m.c_filter
+        WHERE af.c_is_acquisition_filter
+        ORDER BY abs(af.c_wavelength - sf.c_wavelength)
+        LIMIT 1
+    ) AS c_acquisition_filter_default,
+    d.c_slit_offset_mode_default,
+    d.c_telescope_configs_default,
+    COALESCE(m.c_slit_offset_mode,  d.c_slit_offset_mode_default)  AS c_slit_offset_mode_effective,
+    COALESCE(m.c_telescope_configs, d.c_telescope_configs_default) AS c_telescope_configs_effective
+  FROM t_flamingos_2_long_slit m
+  CROSS JOIN LATERAL (
+    SELECT
+      'nod_along_slit'::varchar AS c_slit_offset_mode_default,
+      CASE
+        WHEN m.c_telluric_science_mode = 'flamingos_2_mos' THEN
+          -- ATTENTION: duplicated from lucuma-core flamingos2.defaultSlitTelescopeConfigs
+          -- (Flamingos2SlitOffsetPreset.MosTelluric). Keep in sync.
+          '[{"q":{"microarcseconds":60000000},"guiding":"ENABLED"},{"q":{"microarcseconds":40000000},"guiding":"ENABLED"},{"q":{"microarcseconds":20000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-20000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-40000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-60000000},"guiding":"ENABLED"}]'
+        ELSE
+          -- ATTENTION: duplicated from lucuma-core flamingos2.defaultSlitTelescopeConfigs
+          -- (Flamingos2SlitOffsetPreset.Telluric). Keep in sync.
+          '[{"q":{"microarcseconds":15000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-15000000},"guiding":"ENABLED"},{"q":{"microarcseconds":-15000000},"guiding":"ENABLED"},{"q":{"microarcseconds":15000000},"guiding":"ENABLED"}]'
+      END AS c_telescope_configs_default
+  ) d;
+
+-- Data fix: MOS tellurics still carrying the pattern applyF2MosTelluricDefaults wrote.
+UPDATE t_flamingos_2_long_slit m
+SET c_slit_offset_mode = NULL, c_telescope_configs = NULL
+FROM v_flamingos_2_long_slit v
+WHERE v.c_observation_id = m.c_observation_id
+  AND m.c_telluric_science_mode = 'flamingos_2_mos'
+  AND m.c_slit_offset_mode = v.c_slit_offset_mode_default
+  AND m.c_telescope_configs::jsonb = v.c_telescope_configs_default::jsonb;
+
+------------------------------------------------------------------------------
+-- IGRINS-2
+------------------------------------------------------------------------------
+
+-- v_igrins_2_long_slit already computes the NodAlongSlit pattern tellurics need
+-- as its default, so only the data fix is required here.
+UPDATE t_igrins_2_long_slit m
+SET c_slit_offset_mode = NULL, c_telescope_configs = NULL
+FROM v_igrins_2_long_slit v
+WHERE v.c_observation_id = m.c_observation_id
+  AND is_telluric_calibration(m.c_observation_id)
+  AND m.c_slit_offset_mode = v.c_slit_offset_mode_default
+  AND m.c_telescope_configs::jsonb = v.c_telescope_configs_default::jsonb;
