@@ -5,47 +5,19 @@ package lucuma.odb.service
 
 import cats.syntax.all.*
 import grackle.Result
-import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.enums.VisitorObservingModeType
+import lucuma.core.model.probes
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 
-// Probes AGS has geometry for per observing mode
-// TODO: Move to lucuma-core
+// ODB-facing wrapper over lucuma-core's probe rules
 object GuideProbeRules:
-
-  private val Pwfs: Set[GuideProbe] =
-    Set(GuideProbe.PWFS1, GuideProbe.PWFS2)
-
-  def allowedProbes(mode: ObservingModeType): Set[GuideProbe] =
-    mode match
-      case _: ExchangeObservingModeType =>
-        Set.empty
-      case ObservingModeType.GmosNorthLongSlit | ObservingModeType.GmosSouthLongSlit |
-           ObservingModeType.GmosNorthImaging  | ObservingModeType.GmosSouthImaging  |
-           ObservingModeType.GmosNorthMos      | ObservingModeType.GmosSouthMos      |
-           ObservingModeType.GmosNorthIfu      | ObservingModeType.GmosSouthIfu      =>
-        Pwfs + GuideProbe.GmosOIWFS
-      case ObservingModeType.Flamingos2LongSlit | ObservingModeType.Flamingos2Imaging | ObservingModeType.Flamingos2Mos =>
-        Pwfs + GuideProbe.Flamingos2OIWFS
-      case ObservingModeType.Igrins2LongSlit                                                                         =>
-        Pwfs
-      case ObservingModeType.GnirsImaging | ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu              =>
-        Pwfs
-      case ObservingModeType.GhostIfu                                                                                =>
-        Set(GuideProbe.PWFS2)
-      case _: VisitorObservingModeType                                                                               =>
-        Pwfs
-
-  def isAllowed(mode: ObservingModeType, probe: GuideProbe): Boolean =
-    allowedProbes(mode).contains(probe)
 
   def notAllowedMessage(mode: ObservingModeType, probe: GuideProbe): String =
     s"Guide probe ${probe.tag.toScreamingSnakeCase} cannot be used with observing mode ${mode.tag.toScreamingSnakeCase}."
 
   def check(mode: ObservingModeType, probe: GuideProbe, prefix: String = ""): Result[Unit] =
-    if isAllowed(mode, probe) then Result.unit
+    if probes.isProbeAllowed(mode, probe) then Result.unit
     else OdbError.InvalidArgument(s"$prefix${notAllowedMessage(mode, probe)}".some).asFailure

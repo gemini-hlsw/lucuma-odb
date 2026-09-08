@@ -358,7 +358,7 @@ object GuideService {
         case _                   => Nil
 
     def agsParamsFor(trackType: TrackType, explicitProbe: Option[GuideProbe]): Option[AgsParams] =
-      explicitProbe.orElse(probes.guideProbe(observingModeType, trackType)).flatMap: probe =>
+      explicitProbe.orElse(probes.defaultGuideProbe(observingModeType, trackType)).flatMap: probe =>
         (params.observingMode, probe) match
           case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
             AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
@@ -498,7 +498,7 @@ object GuideService {
             .map: rows =>
               rows.map: (oid, mode, explicit, hasTargets, hasNonsidereal) =>
                 val trackType = if hasNonsidereal then TrackType.Nonsidereal else TrackType.Sidereal
-                val default   = mode.filter(_ => hasTargets).flatMap(probes.guideProbe(_, trackType))
+                val default   = mode.filter(_ => hasTargets).flatMap(probes.defaultGuideProbe(_, trackType))
                 oid -> GuideService.GuideProbeSelection(default, explicit)
               .toMap
 
