@@ -20,6 +20,8 @@ import lucuma.core.model.Program
 import lucuma.odb.Config
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.refined.*
+import org.http4s.MediaType
+import org.http4s.util.Renderer
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -68,13 +70,28 @@ trait S3FileService[F[_]] {
   /** Deletes a file from S3 */
   def delete(filePath: NonEmptyString)(using SuperUserAccess): F[Unit]
 
-  def presignedUrl(filePath: NonEmptyString)(using SuperUserAccess): F[String]
+  /**
+   * A time-limited GET URL.  `headers`, when given, overrides what S3 returns
+   * for `Content-Type` and `Content-Disposition`.
+   */
+  def presignedUrl(filePath: NonEmptyString, headers: Option[S3FileService.ResponseHeaders])(using SuperUserAccess): F[String]
 
   def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString
 }
 
 object S3FileService {
   val partSize: PartSizeMB = 5.refined
+
+  /**
+   * Response headers a presigned GET asks S3 to send instead of the ones stored
+   * with the object.  Being read-time, they also apply to objects uploaded
+   * before the override existed.
+   */
+  case class ResponseHeaders(contentType: MediaType, contentDisposition: String)
+
+  object ResponseHeaders:
+    /** Hand the file to the browser to display rather than to download. */
+    val InlinePdf: ResponseHeaders = ResponseHeaders(MediaType.application.pdf, "inline")
 
   def noop[F[_]: Applicative]: S3FileService[F] =
     new S3FileService[F] {
@@ -96,7 +113,7 @@ object S3FileService {
       def delete(filePath: NonEmptyString)(using SuperUserAccess): F[Unit] =
         Applicative[F].unit
 
-      def presignedUrl(filePath: NonEmptyString)(using SuperUserAccess): F[String] =
+      def presignedUrl(filePath: NonEmptyString, headers: Option[S3FileService.ResponseHeaders])(using SuperUserAccess): F[String] =
         "".pure[F]
 
       def filePath(programId: Program.Id, uuid: UUID, fileName: NonEmptyString)(using SuperUserAccess): NonEmptyString =
@@ -156,12 +173,19 @@ object S3FileService {
             .onError { case e => s.recordException(e, Attribute("error", true)) }
         }
 
-      def presignedUrl(filePath: NonEmptyString)(using SuperUserAccess): F[String] =
+      def presignedUrl(filePath: NonEmptyString, headers: Option[S3FileService.ResponseHeaders])(using SuperUserAccess): F[String] =
         T.span(s"getting presigned URL for file key: ${filePath.toKey}").use { s =>
-          val objectRequest = GetObjectRequest
+          val builder = GetObjectRequest
             .builder()
             .bucket(awsConfig.bucketName.value.value)
             .key(filePath.toKeyString)
+
+          val objectRequest = headers
+            .fold(builder)(h =>
+              builder
+                .responseContentType(Renderer.renderString(h.contentType))
+                .responseContentDisposition(h.contentDisposition)
+            )
             .build
 
           val presignRequest = GetObjectPresignRequest

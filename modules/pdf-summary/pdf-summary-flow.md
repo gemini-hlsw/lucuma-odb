@@ -18,7 +18,8 @@ periodic poll, so nothing is lost if the dyno is down.
 flowchart TD
     submit[setProposalStatus SUBMITTED] --> enqueue[PdfSummaryJobService.enqueue]
     regen[regenerateProposalSummaries mutation] --> enqueue
-    enqueue -->|one row per partner, state pending| jobs[(t_summary_job)]
+    enqueue -->|prune partners no longer on the proposal| jobs[(t_summary_job)]
+    enqueue -->|one row per partner, state pending| jobs
     jobs -->|NOTIFY ch_summary_job| daemon[PdfSummaryJobDaemon]
     poll[poll every OBSCALC_POLL_SECONDS] --> daemon
     daemon -->|claim: pending to rendering| jobs
@@ -33,6 +34,17 @@ flowchart TD
 A second request while a job for the same (program, partner) is already
 `pending` is a no-op (unique index). A request while it is `rendering` is
 allowed, so edits made during a render are picked up by the next one.
+
+`enqueue` first prunes: jobs and `SUMMARY` attachments whose partner is no
+longer on the proposal are deleted. With splits the partnerless row is the
+stale one; with no splits it is the only live one. The pruned S3 objects are
+left behind, since an S3 delete cannot be undone if the enclosing transaction
+rolls back and the attachment row is what is visible. A partner removed from
+the splits therefore keeps its stale PDF until the next submit or
+`regenerateProposalSummaries`, not from the moment of the edit.
+
+Pruning a `rendering` job is safe: `finalize` finds no row to lock and discards
+its own upload instead of attaching it.
 
 ## `t_summary_job`
 

@@ -321,6 +321,40 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(first.map(s => (s.partner, s.fileName.endsWith(".pdf"), s.style)), List((Some("CA"), true, "GEMINI_INVESTIGATORS_AT_END"), (Some("US"), true, "NOIRLAB_DARP")))
       assertEquals(second.map(_.partner), List(Some("CA"), Some("US")))
 
+  test("a partner dropped from the splits loses its job and its summary"):
+    for
+      pid    <- setupProposal()
+      _      <- submitProposal(pi, pid)
+      _      <- renderAll(pid)
+      before <- summaries(pi, pid)
+      // A submitted proposal is only editable by staff.
+      _      <- addPartnerSplits(staff, pid, partnerSplits = List((Partner.US, 100)))
+      _      <- regenerate(staff, pid)
+      jobs   <- jobsFor(pid)
+      after  <- summaries(pi, pid)
+    yield
+      assertEquals(before.map(_.partner), List(Some("CA"), Some("US")))
+      assertEquals(jobs.map(j => (j.partner, j.state)), List((Partner.US.some, "pending")))
+      assertEquals(after.map(_.partner), List(Some("US")))
+
+  // With no splits the partnerless summary is the live one; adding splits makes
+  // it the stale one.
+  test("gaining splits drops the partnerless summary"):
+    for
+      // A proposal with no splits cannot be submitted, so regenerate directly.
+      pid    <- setupProposal(splits = Nil)
+      _      <- regenerate(pi, pid)
+      _      <- renderAll(pid)
+      before <- summaries(pi, pid)
+      _      <- addPartnerSplits(pi, pid, partnerSplits = List((Partner.CL, 100)))
+      _      <- regenerate(staff, pid)
+      jobs   <- jobsFor(pid)
+      after  <- summaries(pi, pid)
+    yield
+      assertEquals(before.map(_.partner), List(None))
+      assertEquals(jobs.map(j => (j.partner, j.style)), List((Partner.CL.some, SummaryStyle.Chile)))
+      assertEquals(after, Nil)
+
   test("claiming honors the retry time"):
     for
       pid     <- setupProposal()

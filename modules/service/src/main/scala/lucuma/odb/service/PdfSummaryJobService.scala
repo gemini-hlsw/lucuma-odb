@@ -12,6 +12,7 @@ import grackle.Result
 import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
+import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.Partner
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
@@ -19,6 +20,7 @@ import lucuma.core.util.Enumerated
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.data.SummaryStyle
+import lucuma.odb.service.AttachmentFileService.presignHeaders
 import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
@@ -38,7 +40,11 @@ import Services.Syntax.*
  */
 trait PdfSummaryJobService[F[_]]:
 
-  /** One job per partner with a split, or a single partnerless job; a `pending` duplicate is skipped. */
+  /**
+   * One job per partner with a split, or a single partnerless job; a `pending`
+   * duplicate is skipped.  Jobs and summary attachments for partners the
+   * proposal no longer has are pruned first.
+   */
   def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit]
 
   /** The `regenerateProposalSummaries` mutation: authorize, then enqueue. */
@@ -133,8 +139,8 @@ object PdfSummaryJobService:
 
       private def presignAttachments(pid: Program.Id)(using SuperUserAccess): F[List[PdfSummaryJobPayload.AttachmentUrl]] =
         session.execute(Statements.SelectProposalAttachments)(pid).flatMap: as =>
-          as.traverse: (name, path) =>
-            s3FileService.presignedUrl(path).map(PdfSummaryJobPayload.AttachmentUrl(name.value, _))
+          as.traverse: (name, path, at) =>
+            s3FileService.presignedUrl(path, at.presignHeaders).map(PdfSummaryJobPayload.AttachmentUrl(name.value, _))
 
       private def partners(pid: Program.Id): F[List[Option[Partner]]] =
         session.execute(Statements.SelectPartners)(pid).map:
@@ -142,9 +148,13 @@ object PdfSummaryJobService:
           case ps  => ps.map(_.some)
 
       override def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit] =
-        partners(pid).flatMap(_.traverse_(partner =>
-          session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))
-        ))
+        for
+          _ <- session.execute(Statements.PruneJobs)((pid, pid))
+          _ <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
+          _ <- partners(pid).flatMap(_.traverse_(partner =>
+                 session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))
+               ))
+        yield ()
 
       override def regenerate(pid: Program.Id)(using NoTransaction[F], Services.PiAccess): F[Result[Unit]] =
         def check(ok: Boolean, error: => OdbError): Result[Unit] =
@@ -180,7 +190,8 @@ object PdfSummaryJobService:
       override def next(using NoTransaction[F], ServiceAccess): F[Option[Prepared]] =
         val claim: F[Option[Claimed]] =
           services.transactionally:
-            session.execute(Statements.FailStale)((MaxAttempts, StaleRender.toSeconds)) *>
+            session.execute(Statements.DeleteSupersededStale)(StaleRender.toSeconds) *>
+              session.execute(Statements.FailStale)((MaxAttempts, StaleRender.toSeconds)) *>
               session.execute(Statements.RependStale)(StaleRender.toSeconds) *>
               session.option(Statements.Claim)
         // An unbuildable payload fails the job and moves on, so None means empty.
@@ -216,10 +227,13 @@ object PdfSummaryJobService:
         if permanent || job.attempts >= MaxAttempts then
           session.execute(Statements.MarkFailed)((error, job.id)).void
         else
-          session.execute(Statements.Reschedule)((error, job.id)).void
+          // Dropping a superseded job first leaves the Reschedule a no-op.
+          session.execute(Statements.DeleteSuperseded)(job.id) *>
+            session.execute(Statements.Reschedule)((error, job.id)).void
 
       override def release(job: Claimed)(using Transaction[F], ServiceAccess): F[Unit] =
-        session.execute(Statements.Release)(job.id).void
+        session.execute(Statements.DeleteSuperseded)(job.id) *>
+          session.execute(Statements.Release)(job.id).void
 
   object Statements:
 
@@ -236,14 +250,44 @@ object PdfSummaryJobService:
         ORDER BY c_partner
       """.query(partner)
 
-    val SelectProposalAttachments: Query[Program.Id, (NonEmptyString, NonEmptyString)] =
+    val SelectProposalAttachments: Query[Program.Id, (NonEmptyString, NonEmptyString, AttachmentType)] =
       sql"""
-        SELECT c_file_name, c_remote_path
+        SELECT c_file_name, c_remote_path, c_attachment_type
         FROM t_attachment
         WHERE c_program_id = $program_id
           AND c_attachment_type IN ('science', 'team')
         ORDER BY c_attachment_type
-      """.query(text_nonempty *: text_nonempty)
+      """.query(text_nonempty *: text_nonempty *: attachment_type)
+
+    // Jobs and summaries for partners the proposal no longer has.
+    val PruneJobs: Command[(Program.Id, Program.Id)] =
+      sql"""
+        WITH splits AS (
+          SELECT DISTINCT c_partner FROM t_partner_split
+          WHERE c_program_id = $program_id AND c_percent > 0
+        )
+        DELETE FROM t_summary_job
+        WHERE c_program_id = $program_id
+          AND CASE WHEN EXISTS (SELECT 1 FROM splits)
+                   THEN c_partner IS NULL OR c_partner NOT IN (SELECT c_partner FROM splits)
+                   ELSE c_partner IS NOT NULL
+              END
+      """.command
+
+    val PruneSummaryAttachments: Command[(Program.Id, Program.Id)] =
+      sql"""
+        WITH splits AS (
+          SELECT DISTINCT c_partner FROM t_partner_split
+          WHERE c_program_id = $program_id AND c_percent > 0
+        )
+        DELETE FROM t_attachment
+        WHERE c_program_id = $program_id
+          AND c_attachment_type = 'summary'
+          AND CASE WHEN EXISTS (SELECT 1 FROM splits)
+                   THEN c_partner IS NULL OR c_partner NOT IN (SELECT c_partner FROM splits)
+                   ELSE c_partner IS NOT NULL
+              END
+      """.command
 
     // A no-op when a job for this partner is already waiting.
     val InsertJob: Command[(Program.Id, Option[Partner], SummaryStyle)] =
@@ -354,10 +398,48 @@ object PdfSummaryJobService:
           AND c_started_at < now() - make_interval(secs => $int8)
       """.command
 
+    // One row per (program, partner): a second stale render for the same key
+    // stays 'rendering' and is swept as superseded on the next pass.
     val RependStale: Command[Long] =
       sql"""
         UPDATE t_summary_job
         SET c_state = 'pending'
-        WHERE c_state = 'rendering'
-          AND c_started_at < now() - make_interval(secs => $int8)
+        WHERE c_summary_job_id IN (
+          SELECT DISTINCT ON (c_program_id, c_partner) c_summary_job_id
+          FROM t_summary_job
+          WHERE c_state = 'rendering'
+            AND c_started_at < now() - make_interval(secs => $int8)
+          ORDER BY c_program_id, c_partner, c_created_at
+        )
+      """.command
+
+    // A rendering job whose work a newer pending row already covers cannot go
+    // back to 'pending' without colliding on unique_waiting_summary_job_index.
+    // That newer row redoes the render, so this one is dropped instead.
+    val DeleteSuperseded: Command[Long] =
+      sql"""
+        DELETE FROM t_summary_job AS j
+        WHERE j.c_summary_job_id = $int8
+          AND j.c_state = 'rendering'
+          AND EXISTS (
+            SELECT 1
+            FROM t_summary_job AS o
+            WHERE o.c_program_id = j.c_program_id
+              AND o.c_partner IS NOT DISTINCT FROM j.c_partner
+              AND o.c_state = 'pending'
+          )
+      """.command
+
+    val DeleteSupersededStale: Command[Long] =
+      sql"""
+        DELETE FROM t_summary_job AS j
+        WHERE j.c_state = 'rendering'
+          AND j.c_started_at < now() - make_interval(secs => $int8)
+          AND EXISTS (
+            SELECT 1
+            FROM t_summary_job AS o
+            WHERE o.c_program_id = j.c_program_id
+              AND o.c_partner IS NOT DISTINCT FROM j.c_partner
+              AND o.c_state = 'pending'
+          )
       """.command
