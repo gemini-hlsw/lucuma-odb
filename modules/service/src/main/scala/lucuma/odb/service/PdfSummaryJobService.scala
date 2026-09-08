@@ -151,6 +151,10 @@ object PdfSummaryJobService:
         for
           _ <- session.execute(Statements.PruneJobs)((pid, pid))
           _ <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
+          // PruneJobs only drops partners the proposal lost, so a failure for a
+          // partner it still has would otherwise outlive the retry and make the
+          // program read 'failed' again the moment the new jobs finish.
+          _ <- session.execute(Statements.DeleteFailedJobs)(pid)
           _ <- partners(pid).flatMap(_.traverse_(partner =>
                  session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))
                ))
@@ -368,6 +372,12 @@ object PdfSummaryJobService:
         UPDATE t_summary_job
         SET c_state = 'failed', c_error = $text
         WHERE c_summary_job_id = $int8 AND c_state = 'rendering'
+      """.command
+
+    val DeleteFailedJobs: Command[Program.Id] =
+      sql"""
+        DELETE FROM t_summary_job
+        WHERE c_program_id = $program_id AND c_state = 'failed'
       """.command
 
     // Backoff: 1, 4, 16, ... minutes by attempt.
