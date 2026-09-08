@@ -62,7 +62,8 @@ trait ServiceOperations { this: OdbSuite =>
       explicitSignalToNoiseTargetId = Nullable.Absent,
       useBlindOffset = none,
       blindOffsetTarget = Nullable.NonNull(defaultCreateTargetInput(name)),
-      blindOffsetType = blindOffsetType
+      blindOffsetType = blindOffsetType,
+      explicitGuideProbe = Nullable.Absent
     )
 
   def createTargetViaServiceAs(

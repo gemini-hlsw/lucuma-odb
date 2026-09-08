@@ -89,6 +89,7 @@ import monocle.Lens
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Tracer
 import skunk.*
+import skunk.codec.all.bool
 import skunk.implicits.*
 
 import java.security.MessageDigest
@@ -119,6 +120,11 @@ trait GuideService[F[_]] {
   def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
   ): F[Result[Option[NonEmptyString]]]
+
+  /** Default, explicit, and effective guide probe for each observation. */
+  def getGuideProbes(oids: List[Observation.Id])(using
+    NoTransaction[F]
+  ): F[Map[Observation.Id, GuideService.GuideProbeSelection]]
 }
 
 object GuideService {
@@ -187,6 +193,12 @@ object GuideService {
       }
   }
 
+  case class GuideProbeSelection(
+    default:  Option[GuideProbe],
+    explicit: Option[GuideProbe]
+  ):
+    def effective: Option[GuideProbe] = explicit.orElse(default)
+
   private def generalError(error: String): OdbError =
     OdbError.GuideEnvironmentError(error.some)
   private def generatorError(error: OdbError): OdbError =
@@ -206,7 +218,8 @@ object GuideService {
     optObsDuration:      Option[TimeSpan],
     guideStarName:       Option[GuideStarName],
     guideStarHash:       Option[Md5Hash],
-    blindOffsetTargetId: Option[Target.Id]
+    blindOffsetTargetId: Option[Target.Id],
+    explicitGuideProbe:  Option[GuideProbe]
   ) {
     def obsTime: Result[Timestamp] =
       optObsTime.toResult(generalError(s"Observation time not set for observation $id.").asProblem)
@@ -253,6 +266,8 @@ object GuideService {
       given Encoder[Target.Id] = deriveEncoder
       md5.update(HashBytes.forJsonEncoder[Option[Target.Id]].hashBytes(blindOffsetTargetId))
 
+      md5.update(explicitGuideProbe.map(_.tag).hashBytes)
+
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
 
@@ -275,6 +290,8 @@ object GuideService {
       // we're not tracking what the "original" values are, so we can't say for sure...
       md5.update(optObsTime.hashBytes)
       md5.update(optObsDuration.hashBytes)
+
+      md5.update(explicitGuideProbe.map(_.tag).hashBytes)
 
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
@@ -340,8 +357,8 @@ object GuideService {
         case g: ghost.ifu.Config => g.skyPosition.toList
         case _                   => Nil
 
-    def agsParamsFor(trackType: TrackType): Option[AgsParams] =
-      probes.guideProbe(observingModeType, trackType).flatMap: probe =>
+    def agsParamsFor(trackType: TrackType, explicitProbe: Option[GuideProbe]): Option[AgsParams] =
+      explicitProbe.orElse(probes.defaultGuideProbe(observingModeType, trackType)).flatMap: probe =>
         (params.observingMode, probe) match
           case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
             AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
@@ -421,6 +438,8 @@ object GuideService {
             AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
           case (_: ghost.ifu.Config, GuideProbe.PWFS2)                                                      =>
             AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
+          case (_: ghost.ifu.Config, GuideProbe.PWFS1)                                                      =>
+            AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS1.some
           case (c: visitor.Config, GuideProbe.PWFS2)                                                        =>
             AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS2.some
           case (c: visitor.Config, GuideProbe.PWFS1)                                                        =>
@@ -469,6 +488,21 @@ object GuideService {
             _.option(af.argument).map(_.toResult(OdbError.InvalidObservation(oid, Some(s"Could not compute observation info for $oid.")).asProblem))
           )
       }
+
+      def getGuideProbes(oids: List[Observation.Id])(using
+        NoTransaction[F]
+      ): F[Map[Observation.Id, GuideService.GuideProbeSelection]] =
+        NonEmptyList.fromList(oids).fold(Map.empty.pure[F]): nel =>
+          val af = Statements.getGuideProbeInfo(nel)
+          session
+            .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt *: guide_probe.opt *: bool *: bool))
+            .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+            .map: rows =>
+              rows.map: (oid, mode, explicit, hasTargets, hasNonsidereal) =>
+                val trackType = if hasNonsidereal then TrackType.Nonsidereal else TrackType.Sidereal
+                val default   = mode.filter(_ => hasTargets).flatMap(probes.defaultGuideProbe(_, trackType))
+                oid -> GuideService.GuideProbeSelection(default, explicit)
+              .toMap
 
       def getAvailabilityHash(pid: Program.Id, oid: Observation.Id)(using
         NoTransaction[F]
@@ -733,7 +767,7 @@ object GuideService {
         candidates:    NonEmptyList[GuideStarCandidate],
         trackType:     TrackType
       ): F[Option[AgsAnalysis.Usable]] =
-        genInfo.agsParamsFor(trackType).flatTraverse: params =>
+        genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe).flatTraverse: params =>
           val result =
             Ags.agsAnalysis(obsInfo.constraints,
                             wavelength,
@@ -770,7 +804,7 @@ object GuideService {
                               case None    => Result.success(Nil).pure[F]
                               case Some(t) =>
                                 val trackType = CompositeTracking(t.asterism.map(_._2)).trackType
-                                genInfo.agsParamsFor(trackType).map: agsParams =>
+                                genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe).map: agsParams =>
                                   getAllCandidates(
                                     obsInfo.id,
                                     candPeriod.start,
@@ -870,7 +904,7 @@ object GuideService {
           endCutoff        = scienceCutoff.min(end)
           candidatesAt     = candidates.map(_.at(start.toInstant))
           trackType        = CompositeTracking(asterismTracking).trackType
-          agsParams       <- genInfo.agsParamsFor(trackType).toRight(generalError(s"Unable to get AGS params for observation ${obsInfo.id}"))
+          agsParams       <- genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe).toRight(generalError(s"Unable to get AGS params for observation ${obsInfo.id}"))
           angleMap         = getAvailabilityMap(
                                candidatesAt,
                                start,
@@ -974,7 +1008,7 @@ object GuideService {
 
           trackType      = CompositeTracking(asterismTracking).trackType
           agsParams     <- ResultT.fromResult(
-                             genInfo.agsParamsFor(trackType)
+                             genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe)
                                .toResult(generalError("No guide probe available for this observing mode.").asProblem)
                            )
           original      <- ResultT(
@@ -1135,10 +1169,27 @@ object GuideService {
           c_observation_duration,
           c_guide_target_name,
           c_guide_target_hash,
-          c_blind_offset_target_id
+          c_blind_offset_target_id,
+          c_explicit_guide_probe
         from t_observation
         where c_observation_id = $observation_id
       """.apply(oid)
+
+    def getGuideProbeInfo(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+      void"""
+        SELECT
+          o.c_observation_id,
+          o.c_observing_mode_type,
+          o.c_explicit_guide_probe,
+          count(t.c_target_id) > 0,
+          coalesce(bool_or(t.c_type = 'nonsidereal'), false)
+        FROM t_observation o
+        LEFT JOIN t_asterism_target a ON a.c_observation_id = o.c_observation_id
+        LEFT JOIN t_target t ON t.c_target_id = a.c_target_id AND t.c_existence = 'present'
+        WHERE o.c_observation_id IN (
+      """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void""")
+        GROUP BY o.c_observation_id, o.c_observing_mode_type, o.c_explicit_guide_probe
+      """
 
     def getBlindOffsetTracking(oid: Observation.Id): AppliedFragment =
       sql"""
@@ -1264,8 +1315,9 @@ object GuideService {
         time_span.opt              *:
         guide_target_name.opt      *:
         md5_hash.opt               *:
-        target_id.opt).emap {
-        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, blindOffsetTargetId) =>
+        target_id.opt                *:
+        guide_probe.opt).emap {
+        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -1297,7 +1349,7 @@ object GuideService {
             (ra, dec).mapN(Coordinates(_, _))
 
           elevRange.map(elev =>
-            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, blindOffsetTargetId)
+            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe)
           )
       }
 
