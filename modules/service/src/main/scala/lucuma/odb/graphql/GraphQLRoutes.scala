@@ -87,7 +87,8 @@ object GraphQLRoutes {
     goaClient:            GoaClient[F],
     emailConfig:          Config.Email,
     introspectionService: GraphQLService[F],
-    schema:               Schema
+    schema:               Schema,
+    validateMapping:      Boolean
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
@@ -129,7 +130,7 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                         _    <- OptionT.liftF(info(user, s"New service instance."))
-                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema)
+                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema, shouldValidate = validateMapping)
                         svc   = new GraphQLService(map, props.toList*) {
                                   override def query(
                                     request:       Operation,

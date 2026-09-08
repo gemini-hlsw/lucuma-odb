@@ -223,7 +223,8 @@ object FMain extends MainParams {
       S3FileService.s3PresignerResource(config.aws),
       config.httpClientResource,
       config.horizonsClientResource,
-      config.goaClient
+      config.goaClient,
+      validateMapping = true
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
@@ -244,6 +245,7 @@ object FMain extends MainParams {
     httpClientResource:   Resource[F, Client[F]],
     horizonsClientResource: Resource[F, HorizonsClient[F]],
     goaClientResource:      Resource[F, GoaClient[F]],
+    validateMapping:        Boolean
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool              <- databasePoolResource[F](databaseConfig)
@@ -260,7 +262,7 @@ object FMain extends MainParams {
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       schema            <- Resource.eval(OdbMapping.loadSchema[F])
       introspecService   = GraphQLService(IntrospectionMapping(schema))
-      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, ptc, httpClient, horizonsClient, goaClient, emailConfig, introspecService, schema)
+      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, ptc, httpClient, horizonsClient, goaClient, emailConfig, introspecService, schema, validateMapping)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)

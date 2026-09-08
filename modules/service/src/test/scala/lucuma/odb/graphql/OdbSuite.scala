@@ -491,11 +491,12 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       s3PresignerResource,
       httpClient.pure[Resource[IO, *]],
       horizonsClient.pure[Resource[IO, *]],
-      Resource.eval(goaClient)
+      Resource.eval(goaClient),
+      validateMapping = false // validated once, in OdbMappingValidationSuite
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
-  def mapping(using Tracer[IO], Meter[IO]): Resource[IO, Mapping[IO]] =
+  def mapping(shouldValidate: Boolean)(using Tracer[IO], Meter[IO]): Resource[IO, Mapping[IO]] =
     for {
       db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
@@ -506,7 +507,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       goa <- Resource.eval(goaClient)
       schema <- Resource.eval(OdbMapping.loadSchema[IO])
-      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = shouldValidate)
     } yield map
 
   /**
@@ -528,7 +529,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         ptc    <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
         goa    <- Resource.eval(goaClient)
         schema <- Resource.eval(OdbMapping.loadSchema[IO])
-        map     = OdbMapping(db, mon, user, top, gaiaClient, itcClient, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema)
+        map     = OdbMapping(db, mon, user, top, gaiaClient, itcClient, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = false)
       } yield (map, mon)
 
     def orRaise[A](r: Result[A]): IO[A] =
