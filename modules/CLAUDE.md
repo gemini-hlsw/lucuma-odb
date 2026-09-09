@@ -113,6 +113,12 @@ does for both telluric checks. Triggers are restored **post-data**, so they neve
 fire during a data load, and deferring to commit means the check itself is
 insensitive to statement ordering within a transaction (subject to other constraints such as FKs).
 
+`populate-db-from-heroku.sh` no longer discards `psql` output, and it now tallies
+what every `COPY` block and `setval` in the dump carries and compares that with
+the restored database, so a silent partial restore of this kind gets reported
+whatever table it hits. The comparison runs before the program-reference fixup,
+which mutates data through triggers and would otherwise show up as drift.
+
 ## Adding a New Observing Mode — Checklist
 
 When adding an instrument mode (e.g., `gnirs_long_slit`), changes are needed in these locations:

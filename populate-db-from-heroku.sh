@@ -36,6 +36,9 @@ PG_DATABASE=lucuma-odb
 export PGPASSWORD=banana
 
 SERVICE_LOG=/tmp/service-$ENVIRONMENT.log
+RESTORE_LOG=/tmp/restore-$ENVIRONMENT.log
+DUMP_COUNTS=/tmp/$HEROKU_APP.counts
+DUMP_SEQS=/tmp/$HEROKU_APP.seqs
 
 # Clean up on exit
 function clean_up {
@@ -46,7 +49,8 @@ function clean_up {
   if [ -n "$TAIL_PID" ]; then
     kill $TAIL_PID 2>/dev/null || true
   fi
-  rm -f /tmp/$HEROKU_APP.dump /tmp/$HEROKU_APP.temp /tmp/$HEROKU_APP.sql
+  rm -f /tmp/$HEROKU_APP.dump /tmp/$HEROKU_APP.temp /tmp/$HEROKU_APP.sql \
+        $DUMP_COUNTS $DUMP_SEQS
 }
 trap clean_up EXIT
 
@@ -80,14 +84,129 @@ heroku pg:backups:download --app $HEROKU_APP --output /tmp/$HEROKU_APP.dump
 echo "🍏 Translating binary dump to SQL."
 pg_restore --verbose --clean --if-exists --no-acl --no-owner -f /tmp/$HEROKU_APP.temp /tmp/$HEROKU_APP.dump > /dev/null 2>&1
 
-echo "🍏 Removing pg_catalog.set_config."
-grep -v pg_catalog.set_config /tmp/$HEROKU_APP.temp > /tmp/$HEROKU_APP.sql
+echo "🍏 Filtering SQL and tallying dump contents."
+# One pass over the dump: drop the set_config line as before, and record what
+# the dump says every table and sequence should hold.  Doing it here rather
+# than with a blind grep also makes the filter data-aware, so it can never
+# delete a COPY data row that happens to mention pg_catalog.set_config.
+LC_ALL=C awk -v counts="$DUMP_COUNTS" -v seqs="$DUMP_SEQS" -v q="'" '
+  BEGIN { printf("") > counts; printf("") > seqs }
+
+  # A COPY header is recognised only outside a block, so a data line that
+  # happens to look like one is treated as data.
+  indata == 0 && /^COPY .* FROM stdin;$/ {
+    ref = $0
+    sub(/^COPY[ \t]+/, "", ref)
+    sub(/[ \t]*\(.*$/, "", ref)
+    sub(/[ \t]+FROM[ \t]+stdin;[ \t]*$/, "", ref)
+    indata = 1; nrow = 0
+    print; next
+  }
+
+  # COPY text format escapes every backslash, so a line that is exactly \. is
+  # the terminator and every row is exactly one line.  Nothing inside a block
+  # is filtered.
+  indata == 1 {
+    if ($0 == "\\.") { printf("%s\t%d\n", ref, nrow) > counts; indata = 0 }
+    else nrow++
+    print; next
+  }
+
+  # SELECT pg_catalog.setval(<name>, <value>, <is_called>);
+  /^SELECT pg_catalog\.setval\(/ {
+    n = split($0, p, q)
+    if (n >= 3 && match(p[3], /-?[0-9]+/))
+      printf("%s\t%s\t%s\n", p[2], substr(p[3], RSTART, RLENGTH),
+             (index(p[3], "true") ? "t" : "f")) > seqs
+    print; next
+  }
+
+  # The old grep -v, now applied only outside a data block.
+  !/pg_catalog\.set_config/ { print }
+
+  END { if (indata) { print "unterminated COPY block for " ref > "/dev/stderr"; exit 1 } }
+' /tmp/$HEROKU_APP.temp > /tmp/$HEROKU_APP.sql
 
 echo "🍏 Restoring dump to local database."
-psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE < /tmp/$HEROKU_APP.sql > /dev/null 2>&1
+psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE < /tmp/$HEROKU_APP.sql > $RESTORE_LOG 2>&1 || true
+
+# psql carries on after a failed statement and still exits 0, so a COPY that
+# trips a constraint quietly drops an entire table.  Some errors in a Heroku
+# dump are benign (ownership, extension comments), so report them rather than
+# aborting.
+RESTORE_ERRORS=$(grep -c 'ERROR:' $RESTORE_LOG || true)
+if [ "$RESTORE_ERRORS" -gt 0 ]; then
+  echo "🍎 The restore reported $RESTORE_ERRORS error(s):"
+  grep 'ERROR:' $RESTORE_LOG | sed -E 's/^psql:[^ ]* //' | sort -u | sed 's/^/     /'
+  echo "🍎 Full restore log: $RESTORE_LOG"
+fi
+
+# Independent of the log, compare the restored database against the dump it
+# came from.  This runs before the program reference fixup below, which mutates
+# data through triggers (t_chron_program_update, t_obscalc) and advances the
+# per-semester reference sequences.
+echo "🍏 Verifying the restore against the dump."
+set +e
+RESTORE_MISMATCH=$(psql -h "$PG_HOST" -U "$PG_USER" -d "$PG_DATABASE" -q -At -F'|' \
+  -v ON_ERROR_STOP=1 \
+  -c 'CREATE TEMP TABLE dump_counts (ref text PRIMARY KEY, dump_rows bigint)' \
+  -c "\\copy dump_counts FROM '$DUMP_COUNTS'" \
+  -c 'CREATE TEMP TABLE dump_seqs (seq text PRIMARY KEY, dump_value bigint, is_called boolean)' \
+  -c "\\copy dump_seqs FROM '$DUMP_SEQS'" \
+  -f - <<'SQL'
+WITH counted AS MATERIALIZED (
+  -- The CASE keeps query_to_xml from being evaluated for a table that is
+  -- absent locally; it is VOLATILE, so it is never hoisted out.
+  SELECT ref, dump_rows,
+         CASE WHEN to_regclass(ref) IS NULL THEN NULL
+              ELSE (xpath('/row/c/text()',
+                     query_to_xml(format('SELECT count(*) AS c FROM ONLY %s', to_regclass(ref)::text),
+                                  false, true, '')))[1]::text::bigint
+         END AS local_rows
+    FROM dump_counts
+)
+SELECT 'table', ref, dump_rows::text, coalesce(local_rows::text, 'MISSING')
+  FROM counted
+ WHERE local_rows IS DISTINCT FROM dump_rows
+UNION ALL
+-- pg_sequences.last_value stays null until a sequence is actually read, so
+-- only compare values the dump says were called; otherwise require existence.
+SELECT 'sequence', d.seq, d.dump_value::text,
+       CASE WHEN to_regclass(d.seq) IS NULL THEN 'MISSING'
+            ELSE coalesce(s.last_value::text, 'unset') END
+  FROM dump_seqs d
+  LEFT JOIN pg_sequences s
+    ON to_regclass(d.seq) = format('%I.%I', s.schemaname, s.sequencename)::regclass
+ WHERE to_regclass(d.seq) IS NULL
+    OR (d.is_called AND s.last_value IS DISTINCT FROM d.dump_value)
+ ORDER BY 1, 2;
+SQL
+)
+RESTORE_STATUS=$?
+set -e
+
+# A failed \copy leaves psql at exit 0 with an empty table, which would report
+# "no mismatches" -- the very silent pass this check exists to catch.
+# ON_ERROR_STOP turns that into a non-zero status, so never ignore it.
+if [ $RESTORE_STATUS -ne 0 ]; then
+  echo "🍎 Restore verification did not run (psql exit $RESTORE_STATUS)."
+  exit 1
+fi
+
+if [ -n "$RESTORE_MISMATCH" ]; then
+  echo "🍎 The restore does not match the dump (kind|name|dump|local):"
+  echo "$RESTORE_MISMATCH" | sed 's/^/     /'
+  echo "🍎 The restore is incomplete; see $RESTORE_LOG."
+  if [ "$TEST_MIGRATION" = "true" ]; then
+    exit 1
+  fi
+fi
 
 echo "🍏 Fixing program references (temporary, hopefully)."
-psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE -c 'update t_program SET c_program_id = c_program_id' > /dev/null 2>&1
+if ! psql -h $PG_HOST -U $PG_USER -d $PG_DATABASE -v ON_ERROR_STOP=1 \
+     -c 'update t_program SET c_program_id = c_program_id' >> $RESTORE_LOG 2>&1; then
+  echo "🍎 The program reference fixup failed; see $RESTORE_LOG."
+fi
 
 if [ "$TEST_MIGRATION" = "false" ]; then
   exit 0
