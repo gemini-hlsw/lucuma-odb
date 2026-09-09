@@ -229,9 +229,11 @@ object ProposalService {
        * partner and their exchange community are read; it is empty only if the
        * program has no PI.  `piPartnerOffered` says whether the call offers that
        * Gemini partner, and is false when the PI has no Gemini partner to begin
-       * with.  `hasUnaffiliatedInvestigator` flags an investigator whose
-       * affiliation is still unspecified, and `hasUninvitedInvestigator` one who
-       * has neither redeemed an invitation nor has one still in flight.
+       * with.  The `hasInvestigator*` flags each report that some investigator
+       * is missing what every investigator must supply, and
+       * `hasUninvitedInvestigator` one who has neither redeemed an invitation
+       * nor has one still in flight.  `investigatorEmails` carries the
+       * addresses themselves, since their validity is decided in Scala.
        * `reviewerHasPhd` describes the Fast Turnaround reviewer -- the named one,
        * or the PI when none is named.
        */
@@ -267,7 +269,12 @@ object ProposalService {
         allowsNonPartnerPi: Option[Boolean],
         hasScienceAttachment: Boolean,
         hasTeamAttachment:    Boolean,
-        hasUnaffiliatedInvestigator: Boolean,
+        hasUnspecifiedInvestigatorPartner:       Boolean,
+        hasInvestigatorMissingName:              Boolean,
+        hasInvestigatorMissingEmail:             Boolean,
+        investigatorEmails:                      List[String],
+        hasInvestigatorMissingEducationalStatus: Boolean,
+        hasInvestigatorMissingAffiliation:       Boolean,
         hasUninvitedInvestigator:    Boolean,
         reviewerHasPhd:    Boolean,
         hasMentor:         Boolean
@@ -322,11 +329,6 @@ object ProposalService {
         val piEmailAddress: Option[EmailAddress] =
           piEmailStr.flatMap(nes =>
             EmailAddress.from(nes.value).toOption
-          )
-
-        def validatePiEmailAddress(pid: Program.Id): Result[Unit] =
-          piEmailStr.fold(submissionError(MissingPiEmail, pid).asFailure)(_ =>
-            piEmailAddress.fold(submissionError(InvalidPiEmail, pid).asFailure)(_ => Result.unit)
           )
 
         // The PI's Gemini partner, if they have one.  A non-partner PI is counted
@@ -395,7 +397,28 @@ object ProposalService {
             submissionError(InvalidPartnerSplits, pid).asFailure.unlessA(splitsValid),
             // Matching investigators against the splits is only meaningful once
             // every investigator is affiliated and the splits themselves add up.
-            validateRequestedPartners(pid).whenA(splitsValid && !hasUnaffiliatedInvestigator)
+            validateRequestedPartners(pid).whenA(splitsValid && !hasUnspecifiedInvestigatorPartner)
+          ).parTupled.void
+
+        /**
+         * What every investigator -- the PI and each co-investigator -- must
+         * supply before the proposal can be submitted.  The email addresses are
+         * checked here rather than in SQL because the pattern that defines a
+         * valid one belongs to lucuma-core's EmailAddress, and no column in the
+         * database enforces it.
+         */
+        private def validateInvestigators(pid: Program.Id): Result[Unit] =
+          (
+            submissionError(MissingInvestigatorName, pid).asFailure
+              .whenA(hasInvestigatorMissingName),
+            submissionError(MissingInvestigatorEmail, pid).asFailure
+              .whenA(hasInvestigatorMissingEmail),
+            submissionError(InvalidInvestigatorEmail, pid).asFailure
+              .whenA(investigatorEmails.exists(EmailAddress.from(_).isLeft)),
+            submissionError(MissingInvestigatorEducationalStatus, pid).asFailure
+              .whenA(hasInvestigatorMissingEducationalStatus),
+            submissionError(MissingInvestigatorAffiliation, pid).asFailure
+              .whenA(hasInvestigatorMissingAffiliation)
           ).parTupled.void
 
         private def validateFastTurnaround(pid: Program.Id): Result[Unit] =
@@ -436,8 +459,7 @@ object ProposalService {
             validateSplits(pid),
             submissionError(MissingBand3Consideration, pid).asFailure
               .whenA(scienceSubtype.contains(ScienceSubtype.Queue) && considerForBand3.contains(ConsiderForBand3.Unset)),
-            validateFastTurnaround(pid),
-            validatePiEmailAddress(pid)
+            validateFastTurnaround(pid)
           ).parTupled.unlessA(newStatus === ProposalStatus.NotSubmitted)
 
         /**
@@ -465,7 +487,8 @@ object ProposalService {
                 !scienceSubtype.contains(ScienceSubtype.FastTurnaround)
             ),
             submissionError(UnspecifiedInvestigatorPartner, pid).asFailure
-              .whenA(hasUnaffiliatedInvestigator),
+              .whenA(hasUnspecifiedInvestigatorPartner),
+            validateInvestigators(pid),
             submissionError(UninvitedInvestigator, pid).asFailure.whenA(hasUninvitedInvestigator),
             submissionError(NoDefinedObservations, pid).asFailure.unlessA(hasDefinedObservations),
             submissionError(UndefinedObservations, pid).asFailure.whenA(hasUndefinedObservations)
@@ -693,7 +716,7 @@ object ProposalService {
           _instrument.map(_.toList)
 
         val codec: Decoder[ProposalContext] =
-          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: bool *: observatory.opt *: bool *: partner_link.opt *: bool *: bool.opt *: bool *: bool *: bool *: bool *: bool *: bool).to[ProposalContext]
+          (proposal_status *: bool *: varchar_nonempty.opt *: text.opt *: text_nonempty.opt *: text_nonempty.opt *: proposal_reference.opt *: semester.opt *: science_subtype.opt *: int8 *: parts *: parts *: text_list *: instrumentList *: int4_nonneg *: core_timestamp *: core_timestamp.opt *: text_nonempty.opt *: CallForProposalsService.Statements.cfp_properties.opt *: consider_for_band_3.opt *: exchange_partner.opt *: bool *: observatory.opt *: bool *: partner_link.opt *: bool *: bool.opt *: bool *: bool *: bool *: bool *: bool *: text_list *: bool *: bool *: bool *: bool *: bool).to[ProposalContext]
 
         def lookup(pid: Program.Id): F[Result[ProposalContext]] =
           val af = Statements.selectProposalContext(user, pid)
@@ -1312,12 +1335,12 @@ object ProposalService {
             WHERE att.c_program_id = prog.c_program_id
               AND att.c_attachment_type = 'team'
           ) AS c_has_team_attachment,
-          EXISTS (
-            SELECT 1 FROM t_program_user pu
-            WHERE pu.c_program_id = prog.c_program_id
-              AND pu.c_role IN ('pi', 'coi', 'coi_ro')
-              AND pu.c_partner_link = 'has_unspecified_partner'
-          ) AS c_has_unaffiliated_investigator,
+          team.c_has_unspecified_partner,
+          team.c_has_no_name,
+          team.c_has_no_email,
+          team.c_emails,
+          team.c_has_no_educational_status,
+          team.c_has_no_affiliation,
           -- An investigator who has not redeemed an invitation and has none in
           -- flight: either none was ever sent, they declined it, or the mail to
           -- them failed.  A pending invitation whose email has not been posted
@@ -1360,6 +1383,30 @@ object ProposalService {
         LEFT JOIN v_gemini_cfp_exchange_partner cfp_ep
           ON cfp.c_cfp_id = cfp_ep.c_cfp_id
           AND cfp_ep.c_exchange_partner = prop.c_exchange_partner
+        -- Everything the investigators must supply, gathered in one pass.  A
+        -- rule about a value simply being absent is a BOOL_OR over a null
+        -- column; the email addresses come back whole because their validity
+        -- belongs to lucuma-core's EmailAddress and no column here enforces
+        -- it.  COALESCE covers the program that has no investigators at all.
+        --
+        -- The name is trimmed first because no constraint stops the API from
+        -- storing an empty or blank one, and the front end judges the same
+        -- name by whether it has any non-whitespace in it.
+        LEFT JOIN LATERAL (
+          SELECT
+            COALESCE(BOOL_OR(pu.c_partner_link = 'has_unspecified_partner'), FALSE) AS c_has_unspecified_partner,
+            COALESCE(BOOL_OR(NULLIF(BTRIM(pu.c_display_name), '') IS NULL), FALSE)  AS c_has_no_name,
+            COALESCE(BOOL_OR(pu.c_email IS NULL), FALSE)                            AS c_has_no_email,
+            COALESCE(
+              ARRAY_AGG(DISTINCT pu.c_email::text) FILTER (WHERE pu.c_email IS NOT NULL),
+              '{}'
+            )                                                                       AS c_emails,
+            COALESCE(BOOL_OR(pu.c_educational_status IS NULL), FALSE)                AS c_has_no_educational_status,
+            COALESCE(BOOL_OR(pu.c_affiliation IS NULL), FALSE)                       AS c_has_no_affiliation
+          FROM v_program_user pu
+          WHERE pu.c_program_id = prog.c_program_id
+            AND pu.c_role IN ('pi', 'coi', 'coi_ro')
+        ) team ON TRUE
         WHERE
           prog.c_program_id = $program_id
       """.apply(pid) |+|
