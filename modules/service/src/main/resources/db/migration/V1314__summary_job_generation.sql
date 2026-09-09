@@ -7,7 +7,7 @@
 
 CREATE TYPE e_summary_generation_state AS ENUM(
   'idle',
-  'pending',
+  'generating',
   'failed'
 );
 
@@ -30,13 +30,12 @@ CREATE CONSTRAINT TRIGGER ch_program_edit_summary_job_trigger
   FOR EACH ROW
   EXECUTE PROCEDURE ch_program_edit_summary_job();
 
--- Its own view rather than more columns on v_program: v_program selects
--- `p.*`, so appending to it now fails outright, since t_program has gained
--- columns since that view was last replaced.
+-- Its own view rather than more columns on v_program, so v_program stays
+-- untouched and the aggregate is only joined when the field is requested.
 CREATE VIEW v_summary_generation AS
   SELECT
     p.c_program_id,
-    CASE WHEN sg.c_active > 0 THEN 'pending'
+    CASE WHEN sg.c_active > 0 THEN 'generating'
          WHEN sg.c_failed > 0 THEN 'failed'
          ELSE                      'idle'
     END::e_summary_generation_state                  AS c_state,

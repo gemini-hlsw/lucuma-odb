@@ -4144,8 +4144,8 @@ type Mutation {
   Rendering is asynchronous, the new attachments and the flip back to IDLE
   arrive in one programEdit event.
 
-  A request while PENDING is a no-op, or queues at most one more render if the
-  previous one is already rendering.  The state stays PENDING either way.
+  A request while GENERATING is a no-op, or queues at most one more render if the
+  previous one is already rendering.  The state stays GENERATING either way.
 
   Requires write access to the program (staff, PI, CoI or support).
   """
@@ -8180,7 +8180,7 @@ type ProposalSummaryProperties {
 """
 State of a program's proposal summary regeneration.
 
-PENDING is expected to terminate under normal operation (timeouts and retries), but may remain PENDING if rendering is unavailable.
+GENERATING is expected to terminate under normal operation (timeouts and retries), but may remain GENERATING if rendering is unavailable.
 """
 type ProposalSummaryGeneration {
   "The state of `ProposalSummaryGeneration`."
@@ -8218,7 +8218,7 @@ enum ProposalSummaryGenerationState {
   IDLE
 
   "A regeneration is queued or rendering."
-  PENDING
+  GENERATING
 
   "Every render of the last regeneration stopped, and at least one failed."
   FAILED

@@ -17,6 +17,7 @@ import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosMosAcquisitionType
+import lucuma.core.enums.ProposalSummaryGenerationState
 import lucuma.core.math.Epoch
 import lucuma.core.math.SignalToNoise
 import lucuma.core.model.Attachment
@@ -57,7 +58,6 @@ import lucuma.odb.data.Existence
 import lucuma.odb.data.Extinction
 import lucuma.odb.data.PosAngleConstraintMode
 import lucuma.odb.data.StepExecutionState
-import lucuma.odb.data.SummaryGenerationState
 import lucuma.odb.data.SummaryStyle
 import lucuma.odb.data.Tag
 import lucuma.odb.data.TooTrigger
@@ -255,7 +255,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[TimingWindowInclusion](TimingWindowInclusionType),
       LeafMapping[TooActivation](TooActivationType),
       LeafMapping[TooTrigger.Id](TooTriggerIdType),
-      LeafMapping[SummaryGenerationState](ProposalSummaryGenerationStateType),
+      LeafMapping[ProposalSummaryGenerationState](ProposalSummaryGenerationStateType),
       LeafMapping[SummaryStyle](ProposalSummaryStyleType),
       LeafMapping[TooTriggerStatus](TooTriggerStatusType),
       LeafMapping[Long](TransactionIdType),

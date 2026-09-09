@@ -435,7 +435,7 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(taken.map(_.job.id), List(jobs(0).id))
       assertEquals(after.map(_.state), List("rendering", "failed"))
 
-  test("IDLE before any request, PENDING once queued and while rendering"):
+  test("IDLE before any request, GENERATING once queued and while rendering"):
     for
       pid    <- setupProposal()
       before <- generation(pi, pid)
@@ -445,10 +445,10 @@ class regenerateProposalSummaries extends OdbSuite
       active <- generation(pi, pid)
     yield
       assertEquals(before, Generation("IDLE", None, Nil))
-      assertEquals(queued.state, "PENDING")
+      assertEquals(queued.state, "GENERATING")
       assert(queued.requestedAt.isDefined, "requestedAt should be set while pending")
       assertEquals(queued.failures, Nil)
-      assertEquals(active.state, "PENDING")
+      assertEquals(active.state, "GENERATING")
 
   // The ordering requirement: the flip to IDLE must never be observable before
   // the attachments that justify it.  finalize does both in one transaction.
@@ -487,19 +487,19 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(gen.failures.map(_.message), List("the abstract broke the renderer", "the abstract broke the renderer"))
       assertEquals(gen.failures.flatMap(_.partner).sorted, List("CA", "US"))
 
-  test("a transient failure stays PENDING with no message"):
+  test("a transient failure stays GENERATING with no message"):
     for
       pid <- setupProposal()
       _   <- submitProposal(pi, pid)
       _   <- failAll(pid, "s3 hiccup", permanent = false)
       gen <- generation(pi, pid)
     yield
-      assertEquals(gen.state, "PENDING")
+      assertEquals(gen.state, "GENERATING")
       assertEquals(gen.failures, Nil)
 
   // Without the failed-row cleanup in enqueue, the program would snap back to
   // FAILED as soon as the new jobs finished.
-  test("re-requesting after a failure clears it back to PENDING, then IDLE"):
+  test("re-requesting after a failure clears it back to GENERATING, then IDLE"):
     for
       pid    <- setupProposal()
       _      <- submitProposal(pi, pid)
@@ -512,7 +512,7 @@ class regenerateProposalSummaries extends OdbSuite
       jobs   <- jobsFor(pid)
     yield
       assertEquals(failed.state, "FAILED")
-      assertEquals(queued.state, "PENDING")
+      assertEquals(queued.state, "GENERATING")
       assertEquals(queued.failures, Nil)
       assertEquals(done.state, "IDLE")
       assertEquals(jobs, Nil)
@@ -533,16 +533,16 @@ class regenerateProposalSummaries extends OdbSuite
       gen      <- generation(pi, pid)
     yield
       assertEquals(prepared.length, 2)
-      assertEquals(mid.state, "PENDING")
+      assertEquals(mid.state, "GENERATING")
       assertEquals(gen.state, "FAILED")
       // Claim order is not fixed, so attribute to whichever partner we failed.
       val failed = prepared(1).job.partner.map(Enumerated[Partner].tag(_).toUpperCase)
       assertEquals(gen.failures, List(Failure(failed, "only one failed")))
 
   // The reverse order: one failure while the other partner is still rendering
-  // must read PENDING with no message, or the client would show an error over
+  // must read GENERATING with no message, or the client would show an error over
   // a render that may yet succeed.
-  test("with one partner failed and one still rendering the program is PENDING with no message"):
+  test("with one partner failed and one still rendering the program is GENERATING with no message"):
     for
       pid      <- setupProposal()
       _        <- submitProposal(pi, pid)
@@ -553,7 +553,7 @@ class regenerateProposalSummaries extends OdbSuite
       gen      <- generation(pi, pid)
     yield
       assertEquals(prepared.length, 2)
-      assertEquals(gen.state, "PENDING")
+      assertEquals(gen.state, "GENERATING")
       assertEquals(gen.failures, Nil)
 
   test("a partnerless proposal reports its failure with a null partner"):
@@ -568,7 +568,7 @@ class regenerateProposalSummaries extends OdbSuite
 
   // The client selects the state in the mutation response instead of keeping
   // optimistic local state, so the request must be committed before we answer.
-  test("the mutation response already reads PENDING"):
+  test("the mutation response already reads GENERATING"):
     for
       pid <- setupProposal()
       _   <- expect(
@@ -580,6 +580,6 @@ class regenerateProposalSummaries extends OdbSuite
                    }
                  }
                """,
-               json"""{ "regenerateProposalSummaries": { "program": { "proposalSummaryGeneration": { "state": "PENDING" } } } }""".asRight
+               json"""{ "regenerateProposalSummaries": { "program": { "proposalSummaryGeneration": { "state": "GENERATING" } } } }""".asRight
              )
     yield ()
