@@ -300,6 +300,9 @@ trait Codecs {
   val email_address: Codec[EmailAddress] =
     codecFromPrism(EmailAddress.From, Type("citext"))
 
+  val guide_probe: Codec[GuideProbe] =
+    enumerated[GuideProbe](Type.varchar)
+
   val guide_target_name: Codec[GuideStarName] =
     codecFromPrism(GuideStarName.From, Type("text"))
 

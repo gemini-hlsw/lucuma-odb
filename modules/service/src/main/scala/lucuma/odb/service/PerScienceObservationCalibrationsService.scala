@@ -146,7 +146,8 @@ object PerScienceObservationCalibrationsService:
           explicitSignalToNoiseTargetId = none,
           useBlindOffset = false.some,
           blindOffsetTarget = none,
-          blindOffsetType = BlindOffsetType.Manual
+          blindOffsetType = BlindOffsetType.Manual,
+          explicitGuideProbe = none
         )
 
         val obsInput = ObservationPropertiesInput.Create(

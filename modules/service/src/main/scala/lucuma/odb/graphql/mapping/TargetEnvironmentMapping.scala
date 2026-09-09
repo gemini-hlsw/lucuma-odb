@@ -20,6 +20,7 @@ import grackle.syntax.*
 import io.circe.refined.given
 import lucuma.catalog.clients.GaiaClient
 import lucuma.core.enums.CassRotator
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -81,6 +82,9 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       SqlField("useBlindOffset", ObservationView.UseBlindOffset),
       blindOffsetTargetObject("blindOffsetTarget"),
       SqlField("blindOffsetType", ObservationView.BlindOffsetType),
+      SqlField("explicitGuideProbe", ObservationView.ExplicitGuideProbe),
+      EffectField("defaultGuideProbe", defaultGuideProbeHandler, List("id")),
+      EffectField("guideProbe", guideProbeHandler, List("id")),
       SqlField("instrument", ObservationView.Instrument, hidden = true),
       CursorField[CassRotator](
         "cassRotator",
@@ -194,6 +198,20 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
 
     effectHandler(readEnv, calculate)
   }
+
+  private def probeSelectionHandler(select: GuideService.GuideProbeSelection => Option[GuideProbe]): EffectHandler[F] =
+    batchedEffectHandler: oids =>
+      services.use: s =>
+        s.guideService
+          .getGuideProbes(oids)
+          .map: probes =>
+            oids.map(oid => oid -> Result(probes.get(oid).flatMap(select))).toMap
+
+  private lazy val defaultGuideProbeHandler: EffectHandler[F] =
+    probeSelectionHandler(_.default)
+
+  private lazy val guideProbeHandler: EffectHandler[F] =
+    probeSelectionHandler(_.effective)
 
   def guideTargetNameQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success

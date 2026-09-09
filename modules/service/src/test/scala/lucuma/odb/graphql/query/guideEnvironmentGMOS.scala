@@ -463,4 +463,43 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
       expect(pi, guideEnvironmentQuery(oid), expected = emptyGuideEnvironmentResult)
     }
 
+
+  test("sidereal target with explicit PWFS2"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        _ <- updateObservation(pi, o, "targetEnvironment: { explicitGuideProbe: PWFS2 }", "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $o } ] } }""".asRight)
+      } yield o
+    setup.flatMap { oid =>
+      expect(
+        pi,
+        s"""
+          query {
+            observation(observationId: "$oid") {
+              targetEnvironment {
+                guideProbe
+                guideEnvironment {
+                  guideTargets { probe }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "targetEnvironment": {
+                "guideProbe": "PWFS2",
+                "guideEnvironment": {
+                  "guideTargets": [ { "probe": "PWFS2" } ]
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+    }
 }

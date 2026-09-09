@@ -57,7 +57,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g +update
+        run: sbt -v -J-Xmx6g -J-Xss4M +update
 
       - name: Set up cert permissions (1)
         run: chmod 600 test-cert/server.key
@@ -117,7 +117,7 @@ jobs:
           TEST_SHARD_COUNT: 8
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
           RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' lucumaTestAffected
+        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' lucumaTestAffected
 
       - name: Docker compose down
         run: docker compose down
@@ -166,7 +166,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g +update
+        run: sbt -v -J-Xmx6g -J-Xss4M +update
 
       - name: Download target directories (3, 0)
         uses: actions/download-artifact@v6
@@ -200,7 +200,7 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_CREDENTIAL_HOST: ${{ secrets.SONATYPE_CREDENTIAL_HOST }}
-        run: sbt -v -J-Xmx6g tlCiRelease
+        run: sbt -v -J-Xmx6g -J-Xss4M tlCiRelease
 
   checks:
     name: Static checks and schema validation
@@ -230,10 +230,10 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g +update
+        run: sbt -v -J-Xmx6g -J-Xss4M +update
 
       - name: Static checks
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
+        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
 
       - name: Install npm dependencies
         if: github.event_name == 'pull_request'
@@ -281,27 +281,27 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g +update
+        run: sbt -v -J-Xmx6g -J-Xss4M +update
 
       - name: Clean
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
-        run: sbt -v -J-Xmx6g '++ ${{ matrix.scala }}' clean
+        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' clean
 
       - name: Build SSO Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' ssoService/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' ssoService/docker:publishLocal'
 
       - name: Build ITC Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' itcService/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' itcService/docker:publishLocal'
 
       - name: Build ODB Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary'))
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal pdfSummary/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal pdfSummary/docker:publishLocal'
 
       - name: Build RESOURCE Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
-        run: 'sbt -v -J-Xmx6g ''++ ${{ matrix.scala }}'' resourceService/docker:publishLocal'
+        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' resourceService/docker:publishLocal'
 
       - name: Log in to Heroku
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
@@ -545,10 +545,10 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g +update
+        run: sbt -v -J-Xmx6g -J-Xss4M +update
 
       - name: Compute affected projects
         id: report
         env:
           LUCUMA_AFFECTED_PUSH_BASE: ${{ github.event.before }}
-        run: sbt -v -J-Xmx6g lucumaAffectedReport
+        run: sbt -v -J-Xmx6g -J-Xss4M lucumaAffectedReport

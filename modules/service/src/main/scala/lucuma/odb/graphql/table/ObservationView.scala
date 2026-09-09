@@ -31,6 +31,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val UseBlindOffset: ColumnRef        = col("c_use_blind_offset",          bool)
       val BlindOffsetTargetId: ColumnRef   = col("c_blind_offset_target_id",    target_id.opt)
       val BlindOffsetType: ColumnRef       = col("c_blind_offset_type",         blind_offset_type)
+      val ExplicitGuideProbe: ColumnRef    = col("c_explicit_guide_probe",      guide_probe.opt)
       val SignalToNoiseTargetId: ColumnRef = col("c_signal_to_noise_target_id", target_id.opt)
       val TooActivation: ColumnRef         = col("c_too_activation",            too_activation)
 
