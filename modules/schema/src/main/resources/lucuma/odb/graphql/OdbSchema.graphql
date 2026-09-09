@@ -4138,12 +4138,16 @@ type Mutation {
   ): SetProgramResourceLimitResult!
 
   """
-  Regenerate the proposal summary PDFs for a proposal: one per partner it
-  applies to, each in that partner's style, replacing the existing SUMMARY
-  attachments once rendered.
-  Rendering is asynchronous and completion shows up as the program's SUMMARY
-  attachments.
-  Requires write access to the program (staff, or membership as PI, CoI or support).
+  Regenerate the proposal summary PDFs: one per partner, in that partner's
+  style, replacing the SUMMARY attachments once rendered.
+
+  Rendering is asynchronous, the new attachments and the flip back to IDLE
+  arrive in one programEdit event.
+
+  A request while PENDING is a no-op, or queues at most one more render if the
+  previous one is already rendering.  The state stays PENDING either way.
+
+  Requires write access to the program (staff, PI, CoI or support).
   """
   regenerateProposalSummaries(input: RegenerateProposalSummariesInput!): RegenerateProposalSummariesResult!
 
@@ -8174,18 +8178,15 @@ type ProposalSummaryProperties {
 }
 
 """
-Where a program's proposal summary regeneration stands.
+State of a program's proposal summary regeneration.
 
-Aggregated over the program's per-partner summary renders, so with a partner
-split this reports the whole set at once: PENDING while any partner is still
-rendering, and FAILED only once every render has stopped and at least one
-failed.
+PENDING while any partner is still rendering, and FAILED only once every render
+has stopped and at least one failed.
 
-PENDING always terminates.  A render that stops responding is retried after
-30 minutes, up to 3 attempts with 1 and 4 minute backoffs, then marked FAILED,
-so no request stays PENDING for more than about two hours.
+PENDING always terminates given an internal timeout and amount of retries.
 """
 type ProposalSummaryGeneration {
+  "The state of `ProposalSummaryGeneration`."
   state: ProposalSummaryGenerationState!
 
   "When the last regeneration was requested. Null when state is IDLE."
@@ -8204,7 +8205,7 @@ One failed render of a proposal summary regeneration.
 type ProposalSummaryFailure {
   """
   The partner whose render failed.  Null for the single render of a proposal
-  with no partner splits, matching `ProposalSummaryProperties.partner`.
+  with no partner splits.
   """
   partner: Partner
 
@@ -18048,7 +18049,7 @@ type Program {
   goa: GoaProperties!
 
   """
-  Where this program's proposal summary regeneration stands.
+  State of this program's proposal summary regeneration.
   """
   proposalSummaryGeneration: ProposalSummaryGeneration!
 

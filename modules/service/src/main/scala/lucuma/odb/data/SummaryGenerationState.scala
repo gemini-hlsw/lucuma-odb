@@ -6,9 +6,7 @@ package lucuma.odb.data
 import lucuma.core.util.Enumerated
 
 /**
- * Where a program's proposal summary regeneration stands, aggregated over the
- * program's per-partner summary jobs.  `Pending` outranks `Failed`: a fresh
- * request supersedes a stale failure.
+ * TODO: Move to lucuma-core.
  */
 enum SummaryGenerationState(val tag: String) derives Enumerated:
   case Idle    extends SummaryGenerationState("idle")

@@ -151,9 +151,6 @@ object PdfSummaryJobService:
         for
           _ <- session.execute(Statements.PruneJobs)((pid, pid))
           _ <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
-          // PruneJobs only drops partners the proposal lost, so a failure for a
-          // partner it still has would otherwise outlive the retry and make the
-          // program read 'failed' again the moment the new jobs finish.
           _ <- session.execute(Statements.DeleteFailedJobs)(pid)
           _ <- partners(pid).flatMap(_.traverse_(partner =>
                  session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))

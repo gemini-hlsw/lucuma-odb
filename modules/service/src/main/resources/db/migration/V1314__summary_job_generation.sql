@@ -11,12 +11,8 @@ CREATE TYPE e_summary_generation_state AS ENUM(
   'failed'
 );
 
-CREATE INDEX summary_job_program_index ON t_summary_job (c_program_id);
-
 -- Same shape as ch_attachment_edit (V0934), COALESCE so DELETE works.  NOTIFY
--- is delivered at commit, and finalize writes the attachment and deletes the
--- job in one transaction, so a client never sees 'idle' before the SUMMARY
--- attachments that made it idle.
+-- programEdit when pdf jobs change.
 CREATE OR REPLACE FUNCTION ch_program_edit_summary_job()
   RETURNS trigger AS $$
 DECLARE
@@ -37,11 +33,6 @@ CREATE CONSTRAINT TRIGGER ch_program_edit_summary_job_trigger
 -- Its own view rather than more columns on v_program: v_program selects
 -- `p.*`, so appending to it now fails outright, since t_program has gained
 -- columns since that view was last replaced.
---
--- One row per program, so the GraphQL field can be non-null.  'pending'
--- outranks 'failed': a fresh request supersedes a stale failure.  The lateral
--- aggregate always yields a row, so a program with no jobs falls through to
--- 'idle' with no null handling.
 CREATE VIEW v_summary_generation AS
   SELECT
     p.c_program_id,
@@ -59,9 +50,7 @@ CREATE VIEW v_summary_generation AS
     WHERE j.c_program_id = p.c_program_id
   ) sg ON true;
 
--- The failed renders of the last regeneration, one row per partner, so the
--- client can mark the stale PDF instead of distrusting the whole set.  Empty
--- while anything is still in flight, matching v_summary_generation's 'failed'.
+-- The failed renders of the last regeneration, one row per partner.
 CREATE VIEW v_summary_failure AS
   SELECT
     j.c_summary_job_id,

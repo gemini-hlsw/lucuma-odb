@@ -435,31 +435,20 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(taken.map(_.job.id), List(jobs(0).id))
       assertEquals(after.map(_.state), List("rendering", "failed"))
 
-  test("a program that never requested a summary is IDLE"):
+  test("IDLE before any request, PENDING once queued and while rendering"):
     for
-      pid <- setupProposal()
-      gen <- generation(pi, pid)
+      pid    <- setupProposal()
+      before <- generation(pi, pid)
+      _      <- submitProposal(pi, pid)
+      queued <- generation(pi, pid)
+      _      <- nextAll(pid)
+      active <- generation(pi, pid)
     yield
-      assertEquals(gen, Generation("IDLE", None, Nil))
-
-  test("a queued regeneration is PENDING with a requestedAt"):
-    for
-      pid <- setupProposal()
-      _   <- submitProposal(pi, pid)
-      gen <- generation(pi, pid)
-    yield
-      assertEquals(gen.state, "PENDING")
-      assert(gen.requestedAt.isDefined, "requestedAt should be set while pending")
-      assertEquals(gen.failures, Nil)
-
-  test("a rendering job still reads PENDING"):
-    for
-      pid <- setupProposal()
-      _   <- submitProposal(pi, pid)
-      _   <- nextAll(pid)
-      gen <- generation(pi, pid)
-    yield
-      assertEquals(gen.state, "PENDING")
+      assertEquals(before, Generation("IDLE", None, Nil))
+      assertEquals(queued.state, "PENDING")
+      assert(queued.requestedAt.isDefined, "requestedAt should be set while pending")
+      assertEquals(queued.failures, Nil)
+      assertEquals(active.state, "PENDING")
 
   // The ordering requirement: the flip to IDLE must never be observable before
   // the attachments that justify it.  finalize does both in one transaction.
@@ -576,3 +565,21 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals(gen.state, "FAILED")
       assertEquals(gen.failures, List(Failure(None, "no splits, still broke")))
+
+  // The client selects the state in the mutation response instead of keeping
+  // optimistic local state, so the request must be committed before we answer.
+  test("the mutation response already reads PENDING"):
+    for
+      pid <- setupProposal()
+      _   <- expect(
+               pi,
+               s"""
+                 mutation {
+                   regenerateProposalSummaries(input: { programId: "$pid" }) {
+                     program { proposalSummaryGeneration { state } }
+                   }
+                 }
+               """,
+               json"""{ "regenerateProposalSummaries": { "program": { "proposalSummaryGeneration": { "state": "PENDING" } } } }""".asRight
+             )
+    yield ()
