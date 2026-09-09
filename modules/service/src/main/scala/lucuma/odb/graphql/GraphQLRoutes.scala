@@ -10,6 +10,7 @@ import cats.effect.std.SecureRandom
 import cats.implicits.*
 import cats.kernel.Order
 import fs2.Stream
+import grackle.Mapping
 import grackle.Operation
 import grackle.Result
 import grackle.Schema
@@ -17,12 +18,15 @@ import grackle.skunk.SkunkMonitor
 import io.circe.Json
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.goa.GoaClient
+import lucuma.core.model.ServiceUser
 import lucuma.core.model.User
+import lucuma.core.util.Gid
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
+import lucuma.odb.graphql.mapping.ConeCandidatesMapping
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
@@ -92,6 +96,15 @@ object GraphQLRoutes {
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
+      def mapping(user: User): Mapping[F] & ConeCandidatesMapping[F] =
+        OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema, shouldValidate = false)
+
+      // The type mappings do not depend on the user, so validate them once here rather than on
+      // every user's first query.
+      val validateOnce: Resource[F, Unit] =
+        Resource.eval:
+          OdbMapping.validate(mapping(ServiceUser(Gid[User.Id].minBound, "mapping-validation"))).whenA(validateMapping)
+
       // Sometimes we get invalid cursors on startup; this works around the error by doing the thing again.
       extension [A](fa: F[A]) def retryOnInvalidCursorName: F[A] =
         fa.recoverWith {
@@ -109,7 +122,7 @@ object GraphQLRoutes {
       def debug(user: User, message: String): F[Unit] =
         Logger[F].debug(s"${user.id}/${user.displayName}: $message")
 
-      Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
+      validateOnce *> Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
         LucumaGraphQLRoutes.forService[F](
           {
             case None    => introspectionService.some.pure[F] // only allow introspection
@@ -130,7 +143,7 @@ object GraphQLRoutes {
                         _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
 
                         _    <- OptionT.liftF(info(user, s"New service instance."))
-                        map   = OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema, shouldValidate = validateMapping)
+                        map   = mapping(user)
                         svc   = new GraphQLService(map, props.toList*) {
                                   override def query(
                                     request:       Operation,
