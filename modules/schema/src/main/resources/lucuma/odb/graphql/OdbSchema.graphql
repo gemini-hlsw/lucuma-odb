@@ -8180,10 +8180,7 @@ type ProposalSummaryProperties {
 """
 State of a program's proposal summary regeneration.
 
-PENDING while any partner is still rendering, and FAILED only once every render
-has stopped and at least one failed.
-
-PENDING always terminates given an internal timeout and amount of retries.
+PENDING is expected to terminate under normal operation (timeouts and retries), but may remain PENDING if rendering is unavailable.
 """
 type ProposalSummaryGeneration {
   "The state of `ProposalSummaryGeneration`."
