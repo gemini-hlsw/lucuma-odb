@@ -8186,7 +8186,7 @@ type ProposalSummaryGeneration {
   "The state of `ProposalSummaryGeneration`."
   state: ProposalSummaryGenerationState!
 
-  "When the last regeneration was requested. Null when state is IDLE."
+  "When the oldest render still outstanding was requested. Null when state is IDLE."
   requestedAt: Timestamp
 
   """
