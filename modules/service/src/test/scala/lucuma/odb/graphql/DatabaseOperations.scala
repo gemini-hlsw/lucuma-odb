@@ -94,8 +94,8 @@ import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.syntax.instrument.*
 import lucuma.odb.util.Codecs.*
 import lucuma.refined.*
-import org.typelevel.otel4s.metrics.Meter.Implicits.noop
-import org.typelevel.otel4s.trace.Tracer.Implicits.noop
+import org.typelevel.otel4s.metrics.MeterProvider
+import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
 import skunk.codec.boolean.*
 import skunk.codec.text.text
@@ -106,6 +106,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 trait DatabaseOperations { this: OdbSuite =>
+
+  given TracerProvider[IO] = TracerProvider.noop
+  given MeterProvider[IO]  = MeterProvider.noop
 
   // Executes the obscalc update for an observation on demand.  In production,
   // this is handled by a background worker but for testing it is useful to
