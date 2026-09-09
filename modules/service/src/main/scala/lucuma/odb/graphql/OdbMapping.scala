@@ -279,6 +279,7 @@ object OdbMapping {
           with ProperMotionMapping[F]
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
+          with ProposalSummaryGenerationMapping[F]
           with ProposalReferenceMapping[F]
           with GeminiProposalTypeMapping[F]
           with KeckProposalTypeMapping[F]
@@ -542,6 +543,8 @@ object OdbMapping {
                 ProperMotionMapping,
                 ProperMotionRaMapping,
                 ProposalMapping,
+                ProposalSummaryFailureMapping,
+                ProposalSummaryGenerationMapping,
                 ProposalReferenceMapping,
                 GeminiProposalTypeMapping,
                 KeckProposalTypeMapping,

@@ -19,6 +19,7 @@ import lucuma.core.enums.TimeAccountingCategory
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.SummaryStyle
@@ -163,6 +164,31 @@ class regenerateProposalSummaries extends OdbSuite
           a.hcursor.downField("fileName").as[String].toOption.get,
           a.hcursor.downField("proposalSummary").downField("style").as[String].toOption.get
         ))
+
+  case class Failure(partner: Option[String], message: String)
+  case class Generation(state: String, requestedAt: Option[String], failures: List[Failure])
+
+  def generation(user: User, pid: Program.Id): IO[Generation] =
+    query(
+      user,
+      s"""
+        query {
+          program(programId: "$pid") {
+            proposalSummaryGeneration { state requestedAt failures { partner message } }
+          }
+        }
+      """
+    ).map: json =>
+      val c = json.hcursor.downField("program").downField("proposalSummaryGeneration")
+      Generation(
+        c.downField("state").as[String].toOption.get,
+        c.downField("requestedAt").as[Option[String]].toOption.flatten,
+        c.downField("failures").as[List[Json]].toOption.get.map: j =>
+          Failure(
+            j.hcursor.downField("partner").as[Option[String]].toOption.flatten,
+            j.hcursor.downField("message").as[String].toOption.get
+          )
+      )
 
   lazy val fixture: Json =
     decode[Json](Using.resource(Source.fromResource("lucuma/odb/summary/payload-v1.json"))(_.mkString)).toOption.get
@@ -409,3 +435,151 @@ class regenerateProposalSummaries extends OdbSuite
       assertEquals(taken.map(_.job.id), List(jobs(0).id))
       assertEquals(after.map(_.state), List("rendering", "failed"))
 
+  test("IDLE before any request, GENERATING once queued and while rendering"):
+    for
+      pid    <- setupProposal()
+      before <- generation(pi, pid)
+      _      <- submitProposal(pi, pid)
+      queued <- generation(pi, pid)
+      _      <- nextAll(pid)
+      active <- generation(pi, pid)
+    yield
+      assertEquals(before, Generation("IDLE", None, Nil))
+      assertEquals(queued.state, "GENERATING")
+      assert(queued.requestedAt.isDefined, "requestedAt should be set while pending")
+      assertEquals(queued.failures, Nil)
+      assertEquals(active.state, "GENERATING")
+
+  // The ordering requirement: the flip to IDLE must never be observable before
+  // the attachments that justify it.  finalize does both in one transaction.
+  test("a fully rendered program is IDLE and its summaries are visible in the same query"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- renderAll(pid)
+      res <- query(
+               pi,
+               s"""
+                 query {
+                   program(programId: "$pid") {
+                     proposalSummaryGeneration { state }
+                     attachments { attachmentType }
+                   }
+                 }
+               """
+             )
+    yield
+      val p     = res.hcursor.downField("program")
+      val state = p.downField("proposalSummaryGeneration").downField("state").as[String].toOption.get
+      val kinds = p.downField("attachments").as[List[Json]].toOption.get
+                    .flatMap(_.hcursor.downField("attachmentType").as[String].toOption)
+      assertEquals(state, "IDLE")
+      assertEquals(kinds.count(_ == "SUMMARY"), 2)
+
+  test("a permanent failure is FAILED and carries the error as message"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- failAll(pid, "the abstract broke the renderer", permanent = true)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "FAILED")
+      assertEquals(gen.failures.map(_.message), List("the abstract broke the renderer", "the abstract broke the renderer"))
+      assertEquals(gen.failures.flatMap(_.partner).sorted, List("CA", "US"))
+
+  test("a transient failure stays GENERATING with no message"):
+    for
+      pid <- setupProposal()
+      _   <- submitProposal(pi, pid)
+      _   <- failAll(pid, "s3 hiccup", permanent = false)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "GENERATING")
+      assertEquals(gen.failures, Nil)
+
+  // Without the failed-row cleanup in enqueue, the program would snap back to
+  // FAILED as soon as the new jobs finished.
+  test("re-requesting after a failure clears it back to GENERATING, then IDLE"):
+    for
+      pid    <- setupProposal()
+      _      <- submitProposal(pi, pid)
+      _      <- failAll(pid, "boom", permanent = true)
+      failed <- generation(pi, pid)
+      _      <- regenerate(staff, pid)
+      queued <- generation(pi, pid)
+      _      <- renderAll(pid)
+      done   <- generation(pi, pid)
+      jobs   <- jobsFor(pid)
+    yield
+      assertEquals(failed.state, "FAILED")
+      assertEquals(queued.state, "GENERATING")
+      assertEquals(queued.failures, Nil)
+      assertEquals(done.state, "IDLE")
+      assertEquals(jobs, Nil)
+
+  // A partner split renders several jobs; the aggregate must not go IDLE while
+  // one of them is still outstanding, and one failure makes the whole set FAILED.
+  test("with one partner failed and one rendered the program is FAILED"):
+    for
+      pid      <- setupProposal()
+      _        <- submitProposal(pi, pid)
+      // One claim takes both partners' jobs; settle them in opposite ways.
+      prepared <- nextAll(pid)
+      _        <- withServices(service)(_.pdfSummaryJobService.finalize(prepared.head, fs2.Stream.empty))
+      mid      <- generation(pi, pid)
+      _        <- withServices(service): services =>
+                    services.transactionally:
+                      services.pdfSummaryJobService.fail(prepared(1).job, "only one failed", permanent = true)
+      gen      <- generation(pi, pid)
+    yield
+      assertEquals(prepared.length, 2)
+      assertEquals(mid.state, "GENERATING")
+      assertEquals(gen.state, "FAILED")
+      // Claim order is not fixed, so attribute to whichever partner we failed.
+      val failed = prepared(1).job.partner.map(Enumerated[Partner].tag(_).toUpperCase)
+      assertEquals(gen.failures, List(Failure(failed, "only one failed")))
+
+  // The reverse order: one failure while the other partner is still rendering
+  // must read GENERATING with no message, or the client would show an error over
+  // a render that may yet succeed.
+  test("with one partner failed and one still rendering the program is GENERATING with no message"):
+    for
+      pid      <- setupProposal()
+      _        <- submitProposal(pi, pid)
+      prepared <- nextAll(pid)
+      _        <- withServices(service): services =>
+                    services.transactionally:
+                      services.pdfSummaryJobService.fail(prepared.head.job, "US failed", permanent = true)
+      gen      <- generation(pi, pid)
+    yield
+      assertEquals(prepared.length, 2)
+      assertEquals(gen.state, "GENERATING")
+      assertEquals(gen.failures, Nil)
+
+  test("a partnerless proposal reports its failure with a null partner"):
+    for
+      pid <- setupProposal(splits = Nil)
+      _   <- regenerate(pi, pid)
+      _   <- failAll(pid, "no splits, still broke", permanent = true)
+      gen <- generation(pi, pid)
+    yield
+      assertEquals(gen.state, "FAILED")
+      assertEquals(gen.failures, List(Failure(None, "no splits, still broke")))
+
+  // The client selects the state in the mutation response instead of keeping
+  // optimistic local state, so the request must be committed before we answer.
+  test("the mutation response already reads GENERATING"):
+    for
+      pid <- setupProposal()
+      _   <- expect(
+               pi,
+               s"""
+                 mutation {
+                   regenerateProposalSummaries(input: { programId: "$pid" }) {
+                     program { proposalSummaryGeneration { state } }
+                   }
+                 }
+               """,
+               json"""{ "regenerateProposalSummaries": { "program": { "proposalSummaryGeneration": { "state": "GENERATING" } } } }""".asRight
+             )
+    yield ()

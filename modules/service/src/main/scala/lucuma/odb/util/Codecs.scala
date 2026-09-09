@@ -20,6 +20,7 @@ import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.ImagingCapability
 import lucuma.core.enums.ImagingVariantType
+import lucuma.core.enums.ProposalSummaryGenerationState
 import lucuma.core.math.Angle
 import lucuma.core.math.BoundedInterval
 import lucuma.core.math.Coordinates
@@ -472,6 +473,9 @@ trait Codecs {
 
   val summary_style: Codec[SummaryStyle] =
     enumerated(Type("e_summary_style"))
+
+  val summary_generation_state: Codec[ProposalSummaryGenerationState] =
+    enumerated(Type("e_summary_generation_state"))
 
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]

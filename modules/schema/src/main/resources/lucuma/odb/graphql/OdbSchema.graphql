@@ -4138,12 +4138,16 @@ type Mutation {
   ): SetProgramResourceLimitResult!
 
   """
-  Regenerate the proposal summary PDFs for a proposal: one per partner it
-  applies to, each in that partner's style, replacing the existing SUMMARY
-  attachments once rendered.
-  Rendering is asynchronous and completion shows up as the program's SUMMARY
-  attachments.
-  Requires write access to the program (staff, or membership as PI, CoI or support).
+  Regenerate the proposal summary PDFs: one per partner, in that partner's
+  style, replacing the SUMMARY attachments once rendered.
+
+  Rendering is asynchronous, the new attachments and the flip back to IDLE
+  arrive in one programEdit event.
+
+  A request while GENERATING is a no-op, or queues at most one more render if the
+  previous one is already rendering.  The state stays GENERATING either way.
+
+  Requires write access to the program (staff, PI, CoI or support).
   """
   regenerateProposalSummaries(input: RegenerateProposalSummariesInput!): RegenerateProposalSummariesResult!
 
@@ -8171,6 +8175,53 @@ type ProposalSummaryProperties {
   accurate if the partner-to-style mapping changes later.
   """
   style: ProposalSummaryStyle!
+}
+
+"""
+State of a program's proposal summary regeneration.
+
+GENERATING is expected to terminate under normal operation (timeouts and retries), but may remain GENERATING if rendering is unavailable.
+"""
+type ProposalSummaryGeneration {
+  "The state of `ProposalSummaryGeneration`."
+  state: ProposalSummaryGenerationState!
+
+  "When the oldest render still outstanding was requested. Null when state is IDLE."
+  requestedAt: Timestamp
+
+  """
+  The renders of the last regeneration that failed, one entry per partner.
+  Empty unless state is FAILED.
+  """
+  failures: [ProposalSummaryFailure!]!
+}
+
+"""
+One failed render of a proposal summary regeneration.
+"""
+type ProposalSummaryFailure {
+  """
+  The partner whose render failed.  Null for the single render of a proposal
+  with no partner splits.
+  """
+  partner: Partner
+
+  "Why this render failed, in terms an investigator can act on."
+  message: String!
+}
+
+"""
+The states of `ProposalSummaryGeneration`.
+"""
+enum ProposalSummaryGenerationState {
+  "No regeneration has been requested, or the last one finished."
+  IDLE
+
+  "A regeneration is queued or rendering."
+  GENERATING
+
+  "Every render of the last regeneration stopped, and at least one failed."
+  FAILED
 }
 
 """
@@ -17993,6 +18044,11 @@ type Program {
   Observatory archive properties related to this program.
   """
   goa: GoaProperties!
+
+  """
+  State of this program's proposal summary regeneration.
+  """
+  proposalSummaryGeneration: ProposalSummaryGeneration!
 
   """
   Maximum number of resources (observations, groups, targets, attachments, and
