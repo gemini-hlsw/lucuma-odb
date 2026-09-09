@@ -10,7 +10,7 @@ import lucuma.odb.util.Codecs.*
 
 trait SummaryGenerationView[F[_]] extends BaseMapping[F]:
 
-  // Backed by v_summary_generation (V1311), which aggregates t_summary_job to
+  // Backed by v_summary_generation (V1314), which aggregates t_summary_job to
   // one row per program.
   object SummaryGenerationView extends TableDef("v_summary_generation"):
     val ProgramId   = col("c_program_id", program_id)
