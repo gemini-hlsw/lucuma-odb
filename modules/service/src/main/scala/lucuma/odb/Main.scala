@@ -181,7 +181,7 @@ object FMain extends MainParams {
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Tracer: Meter: Network: Console: Logger](
+  def databasePoolResource[F[_]: Temporal: TracerProvider: MeterProvider: Network: Console: Logger](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] =
     Resource.eval(AtomicCell[F].of(config.maxConnections)).flatMap: cell =>
@@ -204,7 +204,7 @@ object FMain extends MainParams {
       .resource
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Compression: Async: Parallel: Trace: Tracer: TracerProvider: Meter: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Compression: Async: Parallel: Trace: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     config: Config
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     routesResource(
@@ -228,7 +228,7 @@ object FMain extends MainParams {
     )
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: Meter: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
+  def routesResource[F[_]: Async: Parallel: Tracer: TracerProvider: MeterProvider: Logger: LoggerFactory: Network: Console: SecureRandom](
     databaseConfig:       Config.Database,
     awsConfig:            Config.Aws,
     emailConfig:          Config.Email,
@@ -287,7 +287,7 @@ object FMain extends MainParams {
         .migrate()
     }
 
-  private def dbSessionBuilder[F[_]: Temporal: Console: Network: Meter](
+  private def dbSessionBuilder[F[_]: Temporal: Console: Network: TracerProvider: MeterProvider](
     config: Config.Database,
     database: Option[String] = None
   ) =
@@ -309,8 +309,8 @@ object FMain extends MainParams {
     config:   Config.Database,
     database: Option[String] = None
   ): Resource[F, Session[F]] =
-    import Meter.Implicits.noop
-    import Tracer.Implicits.noop
+    given TracerProvider[F] = TracerProvider.noop
+    given MeterProvider[F]  = MeterProvider.noop
     dbSessionBuilder(config, database).single
 
   def resetDatabase[F[_]: Async : Console : Network](config: Config.Database): F[Unit] = {

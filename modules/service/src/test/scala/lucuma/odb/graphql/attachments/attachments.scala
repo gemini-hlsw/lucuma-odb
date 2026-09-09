@@ -21,8 +21,6 @@ import lucuma.odb.data.SummaryStyle
 import lucuma.odb.service.AttachmentFileService
 import lucuma.odb.util.Codecs.*
 import org.http4s.*
-import org.typelevel.otel4s.metrics.Meter.Implicits.noop
-import org.typelevel.otel4s.trace.Tracer.Implicits.noop
 import skunk.*
 import skunk.codec.all.*
 import skunk.exception.PostgresErrorException

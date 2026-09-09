@@ -474,7 +474,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   private val horizonsClient: HorizonsClient[IO] =
     HorizonsClient.forTesting(horizonsFixture)
 
-  private def httpApp(using Tracer[IO], TracerProvider[IO], Meter[IO], MeterProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
+  private def httpApp(using Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, WebSocketBuilder2[IO] => HttpApp[IO]] =
     FMain.routesResource[IO](
       databaseConfig,
       awsConfig,
@@ -496,7 +496,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
-  def mapping(shouldValidate: Boolean)(using Tracer[IO], Meter[IO]): Resource[IO, Mapping[IO]] =
+  def mapping(shouldValidate: Boolean)(using Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, Mapping[IO]] =
     for {
       db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
@@ -519,7 +519,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
    */
   def queryWithSqlStats(user: User, document: String, variables: Option[JsonObject] = None): IO[(Json, List[SqlStats])] =
     import Tracer.Implicits.noop
-    import Meter.Implicits.noop
+    given TracerProvider[IO] = TracerProvider.noop
+    given MeterProvider[IO]  = MeterProvider.noop
     val res =
       for {
         db     <- FMain.databasePoolResource[IO](databaseConfig)
@@ -642,8 +643,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     super.beforeAll()
 
     dbInitialization.foreach { init =>
-      import Tracer.Implicits.noop
-      import Meter.Implicits.noop
+      given TracerProvider[IO] = TracerProvider.noop
+      given MeterProvider[IO]  = MeterProvider.noop
       FMain
         .databasePoolResource[IO](databaseConfig)
         .flatten
@@ -874,7 +875,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
   def servicesFor(u: User): Resource[IO, Session[IO] => Services[IO]] =
     import Tracer.Implicits.noop
-    import Meter.Implicits.noop
+    given TracerProvider[IO] = TracerProvider.noop
+    given MeterProvider[IO]  = MeterProvider.noop
 
     for
       db   <- FMain.databasePoolResource[IO](databaseConfig)
@@ -921,7 +923,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // which in turn does a GraphQL call).
   def withServicesForObscalc[A](u: ServiceUser)(f: ServiceAccess ?=> Services[IO] => IO[A]): IO[A] =
     import Tracer.Implicits.noop
-    import Meter.Implicits.noop
+    given TracerProvider[IO] = TracerProvider.noop
+    given MeterProvider[IO]  = MeterProvider.noop
 
     val res =
       for
@@ -957,7 +960,8 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
   // Services on a fresh pooled session per use.
   def withServicesResourceForObscalc[A](u: ServiceUser)(f: Resource[IO, Services[IO]] => IO[A]): IO[A] =
     import Tracer.Implicits.noop
-    import Meter.Implicits.noop
+    given TracerProvider[IO] = TracerProvider.noop
+    given MeterProvider[IO]  = MeterProvider.noop
 
     val res =
       for

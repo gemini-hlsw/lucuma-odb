@@ -92,7 +92,7 @@ object ResourceMain extends IOApp.Simple {
   )
 
   def routesResource[
-    F[_]: {Async, Tracer, TracerProvider, Meter, MeterProvider, Logger, Console, Network, Files,
+    F[_]: {Async, Tracer, TracerProvider, MeterProvider, Logger, Console, Network, Files,
       Compression}
   ](
     databaseConfig: DatabaseConfiguration,
@@ -117,7 +117,7 @@ object ResourceMain extends IOApp.Simple {
     .withHttpWebSocketApp(wsb => app(wsb).orNotFound)
     .build
 
-  def databasePool[F[_]: {Temporal, Tracer, Meter, Console, Network}](
+  def databasePool[F[_]: {Temporal, TracerProvider, MeterProvider, Console, Network}](
     config: DatabaseConfiguration
   ): Resource[F, Resource[F, Session[F]]] =
     Session
@@ -135,8 +135,8 @@ object ResourceMain extends IOApp.Simple {
     config:   DatabaseConfiguration,
     database: Option[String] = None
   ): Resource[F, Session[F]] =
-    import Meter.Implicits.noop
-    import Tracer.Implicits.noop
+    given TracerProvider[F] = TracerProvider.noop
+    given MeterProvider[F]  = MeterProvider.noop
     Session
       .Builder[F]
       .withHost(config.host.renderString)

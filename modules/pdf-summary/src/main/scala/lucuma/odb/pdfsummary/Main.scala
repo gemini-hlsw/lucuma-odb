@@ -45,6 +45,7 @@ import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
@@ -96,7 +97,7 @@ object PMain extends MainParams:
             |""".stripMargin
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
-  def databasePoolResource[F[_]: Temporal: Tracer: Meter: Network: Console](
+  def databasePoolResource[F[_]: Temporal: TracerProvider: MeterProvider: Network: Console](
     config: Config.Database,
     max:    Int
   ): Resource[F, Resource[F, Session[F]]] =
@@ -151,7 +152,7 @@ object PMain extends MainParams:
         error"Failed to get service user" *>
           MonadThrow[F].raiseError(new RuntimeException("Failed to get service user"))
 
-  def server[F[_]: Async: Compression: Files: Processes: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: Meter: Console: Network: SecureRandom]: Resource[F, ExitCode] =
+  def server[F[_]: Async: Compression: Files: Processes: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: MeterProvider: Console: Network: SecureRandom]: Resource[F, ExitCode] =
     for {
       c                <- Resource.eval(Config.fromCiris.load[F])
       _                <- Resource.eval(banner[F](c))
@@ -201,5 +202,6 @@ object PMain extends MainParams:
       given Trace[IO]          = otel.trace
       given Meter[IO]          = otel.meter
       given TracerProvider[IO] = otel.tracerProvider
+      given MeterProvider[IO]  = otel.meterProvider
       _                        <- server[IO]
     yield ExitCode.Success).useForever

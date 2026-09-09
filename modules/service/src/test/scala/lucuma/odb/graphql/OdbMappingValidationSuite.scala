@@ -7,8 +7,9 @@ import cats.effect.IO
 import cats.syntax.all.*
 import grackle.ValidationFailure
 import lucuma.core.model.User
-import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
+import org.typelevel.otel4s.trace.TracerProvider
 
 /**
  * Validates the OdbMapping type mappings once. Every other suite builds its mappings unchecked,
@@ -29,8 +30,9 @@ class OdbMappingValidationSuite extends OdbSuite:
       t.start()
 
   test("type mappings validate without failures"):
-    given Tracer[IO] = Tracer.noop
-    given Meter[IO]  = Meter.noop
+    given Tracer[IO]         = Tracer.noop
+    given TracerProvider[IO] = TracerProvider.noop
+    given MeterProvider[IO]  = MeterProvider.noop
     mapping(shouldValidate = true).use: map =>
       onLargeStack(map.validate()).map: (failures: List[ValidationFailure]) =>
         assert(failures.isEmpty, failures.map(_.toErrorMessage).mkString("\n"))

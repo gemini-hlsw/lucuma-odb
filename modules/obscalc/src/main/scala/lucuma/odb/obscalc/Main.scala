@@ -49,6 +49,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 import org.typelevel.otel4s.metrics.Meter
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import skunk.*
@@ -106,7 +107,7 @@ object CalcMain extends MainParams:
     banner.linesIterator.toList.traverse_(Logger[F].info(_))
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Tracer: Meter: Network: Console](
+  def databasePoolResource[F[_]: Temporal: TracerProvider: MeterProvider: Network: Console](
     config: Config.Database
   ): Resource[F, Resource[F, Session[F]]] =
     Session.Builder[F]
@@ -259,7 +260,7 @@ object CalcMain extends MainParams:
    * Our main server, as a resource that starts up our server on acquire and shuts it all down
    * in cleanup, yielding an `ExitCode`. Users will `use` this resource and hold it forever.
    */
-  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Trace: Tracer: Meter: TracerProvider: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
+  def server[F[_]: Async: Compression: Parallel: Logger: LoggerFactory: Trace: Tracer: TracerProvider: MeterProvider: Console: Network: SecureRandom]: Resource[F, F[Outcome[F, Throwable, Unit]]] =
     for
       c          <- Resource.eval(Config.fromCiris.load[F])
       _          <- Resource.eval(banner[F](c))
@@ -319,6 +320,7 @@ object CalcMain extends MainParams:
       given Meter[IO]  = otel.meter
       given Trace[IO]  = otel.trace
       given TracerProvider[IO]  = otel.tracerProvider
+      given MeterProvider[IO]   = otel.meterProvider
       o    <- server[IO]
     yield o).use: o =>
       o.flatMap:

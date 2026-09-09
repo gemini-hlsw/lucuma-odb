@@ -43,10 +43,10 @@ import org.http4s.server.*
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.typelevel.otel4s.metrics.Meter
-import org.typelevel.otel4s.metrics.Meter.Implicits.noop
+import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.Tracer.Implicits.noop
+import org.typelevel.otel4s.trace.TracerProvider
 import skunk.{Command as _, *}
 
 import scala.concurrent.duration.*
@@ -146,7 +146,7 @@ object FMain extends AnsiColor {
   val ServiceName = "lucuma-sso"
 
   /** A resource that yields a Skunk session pool. */
-  def databasePoolResource[F[_]: Temporal: Tracer: Meter: Network: Console](
+  def databasePoolResource[F[_]: Temporal: Network: Console](
     config: DatabaseConfig
   ): Resource[F, Resource[F, Session[F]]] =
     dbSessionBuilder(config)
@@ -208,7 +208,7 @@ object FMain extends AnsiColor {
         OrcidService(config.orcidHost, config.clientId, config.clientSecret, client)
 
   /** A resource that yields our HttpRoutes, wrapped in accessory middleware. */
-  def routesResource[F[_]: Async: Trace: Tracer: Meter: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
+  def routesResource[F[_]: Async: Trace: Tracer: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool        <- databasePoolResource[F](config.database)
       schema      <- SsoMapping.loadSchema[F].toResource
@@ -264,10 +264,12 @@ object FMain extends AnsiColor {
   implicit def kleisliLogger[F[_]: Logger, A]: Logger[Kleisli[F, A, *]] =
     Logger[F].mapK(Kleisli.liftK)
 
-  private def dbSessionBuilder[F[_]: Temporal: Console: Network: Meter](
+  private def dbSessionBuilder[F[_]: Temporal: Console: Network](
     config: DatabaseConfig,
     database: Option[String] = None
   ) =
+    given TracerProvider[F] = TracerProvider.noop
+    given MeterProvider[F]  = MeterProvider.noop
     Session.Builder[F]
       .withHost(config.host)
       .withPort(config.port)
@@ -281,8 +283,6 @@ object FMain extends AnsiColor {
     config:   DatabaseConfig,
     database: Option[String] = None
   ): Resource[F, Session[F]] =
-    import Tracer.Implicits.noop
-    import Meter.Implicits.noop
     dbSessionBuilder(config, database).single
 
   def resetDatabase[F[_]: Async : Console : Network](config: DatabaseConfig): F[Unit] =
@@ -327,8 +327,6 @@ object FMain extends AnsiColor {
   def standaloneDatabase[F[_]: Temporal: Network: Console](
     config: DatabaseConfig
   ): Resource[F, Database[F]] = {
-    import Tracer.Implicits.noop
-    import Meter.Implicits.noop
     import Trace.Implicits.noop
     databasePoolResource(config).flatten.map(Database.fromSession(_))
   }
