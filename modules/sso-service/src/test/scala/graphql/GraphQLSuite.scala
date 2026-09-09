@@ -35,6 +35,19 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
   implicit def gidQueryParamEncoder[A: Gid]: QueryParamEncoder[A] =
     QueryParamEncoder[String].contramap(Gid[A].fromString.reverseGet)
 
+  private def postGraphQL(bearerToken: String, query: String, sso: Client[IO]): IO[Json] =
+    sso.fetchAs[Json](
+      Request[IO](
+        method  = Method.POST,
+        uri     = SsoRoot / "graphql",
+        headers = Headers(Authorization(Credentials.Token(CIString("Bearer"), bearerToken))),
+      ).withEntity(
+        Json.obj(
+          "query" -> Json.fromString(query)
+        )
+      )
+    )
+
   def doQueryAs(user: StandardUser, query: String, sso: Client[IO]): IO[Json] =
     for
       jwt <- sso.expect[String](Request[IO](method = Method.POST, uri = SsoRoot / "api" / "v1" / "refresh-token"))
@@ -48,21 +61,17 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
         )
       )
 
-      // Run a query!
-      result <- sso.fetchAs[Json](
-        Request[IO](
-          method  = Method.POST,
-          uri     = SsoRoot / "graphql",
-          headers = Headers(Authorization(Credentials.Token(CIString("Bearer"), ApiKey.fromString.reverseGet(apiKey)))),
-        ).withEntity(
-          Json.obj(
-            "query" -> Json.fromString(query)
-          )
-        )
-      )
+      result <- postGraphQL(ApiKey.fromString.reverseGet(apiKey), query, sso)
     yield result
 
-  def queryAs(person: OrcidPerson, query: StandardUser => String, extraRole: Option[RoleRequest | StandardRole.Id], withOrcidId: Option[OrcidId]): IO[Json] =
+  // Authenticates with the session JWT directly, creating no API key, so the user may have zero.
+  def doQueryViaJwt(query: String, sso: Client[IO]): IO[Json] =
+    for
+      jwt    <- sso.expect[String](Request[IO](method = Method.POST, uri = SsoRoot / "api" / "v1" / "refresh-token"))
+      result <- postGraphQL(jwt, query, sso)
+    yield result
+
+  def queryAs(person: OrcidPerson, query: StandardUser => String, extraRole: Option[RoleRequest | StandardRole.Id], withOrcidId: Option[OrcidId], run: (StandardUser, String, Client[IO]) => IO[Json] = doQueryAs): IO[Json] =
     def setRole(rid: StandardRole.Id)  = (SsoRoot / "auth" / "v1" / "set-role").withQueryParam("role", rid.toString)
     SsoSimulator[IO].use: (db, sim, sso, _, _) =>
       val stage1  = (SsoRoot / "auth" / "v1" / "stage1").withQueryParam("state", ExploreRoot)
@@ -85,11 +94,11 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
                 tok2   <- sso.get(setRole(rid))(CookieReader[IO].getSessionToken)
                 user2  <- db.use(_.getStandardUserFromToken(tok2))
               yield user2
-        result <- doQueryAs(user2, query(user2), sso)
+        result <- run(user2, query(user2), sso)
       yield result
     .onError(e => IO(println(e)))
 
-  case class As private (person: OrcidPerson, withOrcidId: Option[OrcidId], withRole: Option[RoleRequest | StandardRole.Id]) {
+  case class As private (person: OrcidPerson, withOrcidId: Option[OrcidId], withRole: Option[RoleRequest | StandardRole.Id], useJwt: Boolean) {
 
     def withOrcidId(oid: OrcidId): As =
       copy(withOrcidId = Some(oid))
@@ -100,6 +109,9 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
     def withRole(rid: StandardRole.Id): As = 
       copy(withRole = Some(rid))
 
+    def viaJwt: As =
+      copy(useJwt = true)
+
     // just ensure the user exists
     def canonicalizeUser: IO[Unit] =
       query("bogus").void
@@ -108,13 +120,15 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
       queryWithUser(_ => query)
 
     def queryWithUser(query: StandardUser => String): IO[Json] =
-      queryAs(person, query, withRole, withOrcidId)
+      val run: (StandardUser, String, Client[IO]) => IO[Json] =
+        if useJwt then (_, q, sso) => doQueryViaJwt(q, sso) else doQueryAs
+      queryAs(person, query, withRole, withOrcidId, run)
 
     def expectQuery(query: String, expected: Json): IO[Unit] =
       expectQueryWithUser(_ => query, expected)
 
     def expectQueryWithUser(query: StandardUser => String, expected: => Json): IO[Unit] =
-      queryAs(person, query, withRole, withOrcidId).map: result =>
+      queryWithUser(query).map: result =>
         if result != expected then
           println(s"Result: $result\n\nExpected: $expected")
         assertEq(expected, result)
@@ -131,7 +145,7 @@ trait GraphQLSuite { this: SsoSuite & Fixture =>
 
   object As {
     def apply(person: OrcidPerson): As =
-      apply(person, None, None)
+      apply(person, None, None, useJwt = false)
   }
 
   val AsAlice: As = As(Alice).withOrcidId(AliceOrcidId)
