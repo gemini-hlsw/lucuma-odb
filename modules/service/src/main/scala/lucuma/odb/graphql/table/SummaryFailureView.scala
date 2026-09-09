@@ -12,7 +12,7 @@ import skunk.codec.text.text
 
 trait SummaryFailureView[F[_]] extends BaseMapping[F]:
 
-  // Backed by v_summary_failure (V1311): the failed jobs of a program with
+  // Backed by v_summary_failure (V1314): the failed jobs of a program with
   // nothing left in flight.
   object SummaryFailureView extends TableDef("v_summary_failure"):
     val Id        = col("c_summary_job_id", int8)
