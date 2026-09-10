@@ -877,6 +877,24 @@ object OdbMapping {
     )
 
 
+  /**
+   * Validates the type mappings of `mapping` against its schema, raising a `ValidationException`
+   * if there are problems. The type mappings are the same for every user, so this is meant to run
+   * once per process, with every other mapping built unchecked.
+   *
+   * TEMPORARY: the validation runs on a dedicated thread with an 8 MB stack. Grackle 0.30.0's
+   * `MappingValidator` recurses over the type mappings without stack safety and, with a schema
+   * this size, overflows the default thread stack depending on JIT state (it fails intermittently,
+   * not every time). The fix (typelevel/grackle#940) is merged but unreleased; once a grackle
+   * release includes it, replace this with a plain `Sync[F].delay(mapping.unsafeValidate())`.
+   */
+  def validate[F[_]: Async](mapping: Mapping[F]): F[Unit] =
+    Async[F].async_ : cb =>
+      val run: Runnable = () => cb(try Right(mapping.unsafeValidate()) catch case t => Left(t))
+      val t: Thread     = new Thread(null, run, "odb-mapping-validation", 8L * 1024 * 1024)
+      t.setDaemon(true)
+      t.start()
+
   def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
     // NOTE: `load` is an inline macro -- it reads the .graphql at *compile time* and bakes the
     // schema into this class.  Editing OdbSchema.graphql therefore has no effect until this file
