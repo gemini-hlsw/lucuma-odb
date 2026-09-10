@@ -502,4 +502,42 @@ class guideEnvironmentGMOS extends ExecutionTestSupportForGmos with GuideEnviron
         """.asRight
       )
     }
+
+  test("explicit guide probe change discards the cached guide star"):
+    val setup: IO[Observation.Id] =
+      for {
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, List(t))
+        _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+        // Pins the star and writes c_guide_target_hash with no explicit probe.
+        _ <- setGuideTargetName(pi, o, defaultTargetName.some)
+        _ <- updateObservation(pi, o, "targetEnvironment: { explicitGuideProbe: PWFS2 }", "observations { id }", json"""{ "updateObservations": { "observations": [ { "id": $o } ] } }""".asRight)
+      } yield o
+    setup.flatMap: oid =>
+      query(
+        pi,
+        s"""
+          query {
+            observation(observationId: "$oid") {
+              targetEnvironment {
+                guideProbe
+                guideEnvironment {
+                  guideTargets { name probe }
+                }
+              }
+            }
+          }
+        """
+      ).map: json =>
+        val env = json.hcursor
+          .downField("observation")
+          .downField("targetEnvironment")
+        assertEquals(env.downField("guideProbe").as[String].toOption, "PWFS2".some)
+        val targets = env.downField("guideEnvironment").downField("guideTargets").as[List[Json]].toOption.get
+        assertEquals(targets.map(_.hcursor.downField("probe").as[String].toOption), List("PWFS2".some))
+        assert(
+          !targets.exists(_.hcursor.downField("name").as[String].toOption.contains(defaultTargetName)),
+          "cached guide star was reused after the explicit guide probe changed"
+        )
 }
