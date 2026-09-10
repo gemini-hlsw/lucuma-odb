@@ -37,7 +37,10 @@ object GnirsSpectroscopyValidator:
     "Cross-dispersed mode is not available in the L or M bands."
 
   val ShortBlueLxd: String =
-    "The short blue camera must be used with the SXD prism."
+    "The short blue camera cannot be used with the LXD prism."
+
+  val RedCameraCrossDispersed: String =
+    "The red cameras cannot be used in cross-dispersed mode."
 
   val RedCameraAcquisitionFilter: String =
     "Acquisitions with the red cameras must be done in the PAH, H, K or H2 filters."
@@ -50,6 +53,9 @@ object GnirsSpectroscopyValidator:
 
   def deckerMismatch(decker: GnirsDecker, expected: GnirsDecker): String =
     s"Decker ${decker.longName} does not match the FPU, camera and prism (expected ${expected.longName})."
+
+  val RedCameras: Set[GnirsCamera] =
+    Set(GnirsCamera.ShortRed, GnirsCamera.LongRed)
 
   val RedCameraAcquisitionFilters: Set[GnirsFilter] =
     Set(GnirsFilter.PAH, GnirsFilter.Order4, GnirsFilter.Order3, GnirsFilter.H2)
@@ -112,6 +118,10 @@ object GnirsSpectroscopyValidator:
       val shortBlueLxd: ObservationValidationMap =
         when(c.camera === GnirsCamera.ShortBlue && c.prism === GnirsPrism.Lxd)(error(ShortBlueLxd))
 
+      // Not offered by the configuration options, but the camera can be set directly.
+      val redCameraCrossDispersed: ObservationValidationMap =
+        when(RedCameras(c.camera) && c.prism =!= GnirsPrism.Mirror)(error(RedCameraCrossDispersed))
+
       // The XD filter has no range of its own, so it is never checked.
       val filterCoverage: ObservationValidationMap =
         c.filter.spectroscopyRange.foldMap: range =>
@@ -130,7 +140,7 @@ object GnirsSpectroscopyValidator:
           if isThermal(c.primaryCentralWavelength) then when(!RedCameraAcquisitionFilters(f))(error(RedCameraAcquisitionFilter))
           else when(!BlueCameraAcquisitionFilters(f))(error(BlueCameraAcquisitionFilter))
 
-      crossDispersedThermal |+| shortBlueLxd |+| filterCoverage |+| decker |+| acquisitionFilter
+      crossDispersedThermal |+| shortBlueLxd |+| redCameraCrossDispersed |+| filterCoverage |+| decker |+| acquisitionFilter
 
   def exposure(itcFor: Observation.Id => Option[Itc]): ObservationValidator = info =>
     (config(info), itcFor(info.oid).map(_.science)).tupled.foldMap:

@@ -58,6 +58,23 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
       }
     """
 
+  // The default IFU configuration (D111, MIRROR, SHORT_BLUE, LR-IFU, K filter at
+  // 2200 nm, 30 s) with the given overrides.
+  private def gnirsIfu(
+    explicitDecker: Option[String] = None
+  ): String =
+    s"""
+      gnirsSpectroscopy: {
+        grating: D111
+        prism: MIRROR
+        camera: SHORT_BLUE
+        ifu: { fpu: LOW_RESOLUTION }
+        filter: ORDER3
+        centralWavelengths: [ ${centralWavelength(2200, 30)} ]
+        ${explicitDecker.foldMap(d => s"explicitDecker: $d")}
+      }
+    """
+
   private def validations(oid: Observation.Id): IO[List[(ObservationValidationCode, List[String])]] =
     query(
       pi,
@@ -125,6 +142,12 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
       error(GnirsSpectroscopyValidator.ShortBlueLxd)
     )
 
+  test("red camera with a cross-dispersed prism is an error"):
+    expectConfigurationValidations(
+      gnirsLongSlit(camera = "SHORT_RED", prism = "SXD", filter = "CROSS_DISPERSED"),
+      error(GnirsSpectroscopyValidator.RedCameraCrossDispersed)
+    )
+
   test("filter that does not cover the central wavelength is a warning"):
     expectConfigurationValidations(
       gnirsLongSlit(filter = "ORDER4"),
@@ -145,6 +168,18 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
 
   test("explicit decker matching the configuration is fine"):
     expectConfigurationValidations(gnirsLongSlit(explicitDecker = "SHORT_CAM_LONG_SLIT".some))
+
+  test("IFU default configuration has no configuration validations"):
+    expectConfigurationValidations(gnirsIfu())
+
+  test("IFU explicit decker for the other resolution is a warning"):
+    expectConfigurationValidations(
+      gnirsIfu(explicitDecker = "HIGH_RESOLUTION_IFU".some),
+      warning(GnirsSpectroscopyValidator.deckerMismatch(GnirsDecker.HighResolutionIfu, GnirsDecker.LowResolutionIfu))
+    )
+
+  test("IFU explicit decker matching the resolution is fine"):
+    expectConfigurationValidations(gnirsIfu(explicitDecker = "LOW_RESOLUTION_IFU".some))
 
   test("explicit PAH acquisition filter below 2.5 µm is an error"):
     expectConfigurationValidations(
@@ -173,6 +208,13 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
     expectConfigurationValidations(
       gnirsLongSlit(explicitReadMode = "VERY_BRIGHT".some),
       warning(GnirsSpectroscopyValidator.exposureUnusuallyLong(GnirsReadMode.VeryBright, 1.secTimeSpan, nm(2200)))
+    )
+
+  test("a configuration warning does not hide an exposure error"):
+    expectConfigurationValidations(
+      gnirsLongSlit(filter = "ORDER4", seconds = 5, explicitReadMode = "VERY_FAINT".some),
+      error(GnirsSpectroscopyValidator.exposureTooShort(GnirsReadMode.VeryFaint, nm(2200))),
+      warning(GnirsSpectroscopyValidator.filterMismatch(GnirsFilter.Order4, nm(2200)))
     )
 
   test("automatic read mode never triggers exposure validations"):
