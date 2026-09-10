@@ -146,17 +146,20 @@ trait ArbItc:
     Cogen[List[(GnirsFilter, Zipper[ItcResult])]].contramap: a =>
       a.science.toNel.toList
 
+  // Unlike the imaging filters, the wavelengths are deliberately not distinct and not
+  // sorted: the results are an ordered list, one per entry in the observation's central
+  // wavelength list, and a wavelength may repeat.
   given Arbitrary[ItcScience.GnirsSpectroscopy] =
     Arbitrary:
       for
         w0 <- arbitrary[Wavelength]
-        ws <- Gen.listOf(arbitrary[Wavelength]).map(ws => (w0 :: ws).distinct)
+        ws <- Gen.listOf(arbitrary[Wavelength]).map(w0 :: _)
         zs <- Gen.listOfN(ws.size, arbitrary[Zipper[ItcResult]])
-      yield ItcScience.GnirsSpectroscopy(NonEmptyList.fromListUnsafe(ws.zip(zs)).toNem)
+      yield ItcScience.GnirsSpectroscopy(NonEmptyList.fromListUnsafe(ws.zip(zs)))
 
   given Cogen[ItcScience.GnirsSpectroscopy] =
     Cogen[List[(Wavelength, Zipper[ItcResult])]].contramap: a =>
-      a.science.toNel.toList
+      a.science.toList
 
   given Arbitrary[ItcScience.Spectroscopy] =
     Arbitrary:

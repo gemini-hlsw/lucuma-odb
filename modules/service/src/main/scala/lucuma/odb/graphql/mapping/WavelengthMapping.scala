@@ -97,9 +97,9 @@ trait WavelengthMapping[F[_]]
       wavelengthMappingAtPath(
         GnirsCentralWavelengthConfigType / "centralWavelength",
         GnirsCentralWavelengthConfigTable.CentralWavelength,
-        // The child table's primary key: one wavelength object per row.
+        // The child table's primary key: one wavelength object per list entry.
         GnirsCentralWavelengthConfigTable.ObservationId,
-        GnirsCentralWavelengthConfigTable.CentralWavelength,
-        GnirsCentralWavelengthConfigTable.Version
+        GnirsCentralWavelengthConfigTable.Version,
+        GnirsCentralWavelengthConfigTable.Index
       ),
     )

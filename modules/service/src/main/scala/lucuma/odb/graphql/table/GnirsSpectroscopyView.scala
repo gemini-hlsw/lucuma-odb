@@ -84,11 +84,13 @@ trait GnirsSpectroscopyView[F[_]] extends BaseMapping[F]:
     val TelluricType: ColumnRef     = col("c_telluric_type", jsonb)
 
   /**
-   * The central wavelengths, one row per wavelength per row version.  Each row
-   * owns its own exposure time mode row in t_exposure_time_mode.
+   * The central wavelengths, one row per list entry per row version.  Each row owns
+   * its own exposure time mode row in t_exposure_time_mode.  The wavelength may
+   * repeat, so the row is identified by its position in the user-specified list.
    */
   object GnirsCentralWavelengthConfigTable extends TableDef("t_gnirs_central_wavelength_config"):
     val ObservationId: ColumnRef     = col("c_observation_id", observation_id)
+    val Index: ColumnRef             = col("c_index", int2_nonneg)
     val CentralWavelength: ColumnRef = col("c_central_wavelength", wavelength_pm)
     val Version: ColumnRef           = col("c_version", observing_mode_row_version)
     val Coadds: ColumnRef            = col("c_coadds", int4_pos)

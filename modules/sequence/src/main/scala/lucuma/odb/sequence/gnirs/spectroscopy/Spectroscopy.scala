@@ -6,7 +6,7 @@ package gnirs.spectroscopy
 
 import cats.Monad
 import cats.data.EitherT
-import cats.data.NonEmptyMap
+import cats.data.NonEmptyList
 import cats.syntax.applicative.*
 import cats.syntax.either.*
 import fs2.Pure
@@ -36,7 +36,7 @@ object Spectroscopy:
     config:         Config,
     acquisitionItc: Either[OdbError, IntegrationTime],
     gnirsAcqType:   Option[GnirsAcquisitionType],
-    scienceItc:     Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]],
+    scienceItc:     Either[OdbError, NonEmptyList[(Wavelength, IntegrationTime)]],
     calRole:        Option[CalibrationRole]
   ): F[Either[OdbError, StreamingExecutionConfig[Pure, GnirsStaticConfig, GnirsDynamicConfig]]] =
     val static = staticFrom(config)

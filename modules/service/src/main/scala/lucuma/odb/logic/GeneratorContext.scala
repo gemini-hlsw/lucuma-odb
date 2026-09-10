@@ -64,8 +64,8 @@ case class GeneratorContext(
           m.toNel.toList.foreach(addKeyedResultSet)
         case ItcScience.GnirsImaging(m)      =>
           m.toNel.toList.foreach(addKeyedResultSet)
-        case ItcScience.GnirsSpectroscopy(m) =>
-          m.toNel.toList.foreach(addKeyedResultSet)
+        case ItcScience.GnirsSpectroscopy(l) =>
+          l.toList.foreach(addKeyedResultSet)
         case ItcScience.Spectroscopy(sci)    =>
           addResultSet(sci)
 

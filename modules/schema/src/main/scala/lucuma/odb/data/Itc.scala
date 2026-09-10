@@ -5,6 +5,7 @@ package lucuma.odb.data
 
 import cats.Eq
 import cats.Order
+import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
 import cats.derived.*
 import cats.syntax.all.*
@@ -114,8 +115,8 @@ object ItcScience:
    * wavelength).  Saturates rather than overflowing: the value only feeds the
    * sequence-size guard, which any saturated total will trip anyway.
    */
-  private def sumExposureCounts[A](
-    science: NonEmptyMap[A, Zipper[ItcResult]]
+  private def sumExposureCounts(
+    science: NonEmptyList[Zipper[ItcResult]]
   ): PosInt =
     PosInt.unsafeFrom:
       science.foldLeft(0): (cnt, z) =>
@@ -140,7 +141,7 @@ object ItcScience:
       Type.Flamingos2Imaging
 
     override def scienceExposureCount: PosInt =
-      sumExposureCounts(science)
+      sumExposureCounts(science.toNel.map(_._2))
 
   val flamingos2Imaging: Prism[ItcScience, Flamingos2Imaging] =
     GenPrism[ItcScience, Flamingos2Imaging]
@@ -174,7 +175,7 @@ object ItcScience:
       Type.GmosNorthImaging
 
     override def scienceExposureCount: PosInt =
-      sumExposureCounts(science)
+      sumExposureCounts(science.toNel.map(_._2))
 
   object GmosNorthImaging:
     given Eq[GmosNorthImaging] =
@@ -194,7 +195,7 @@ object ItcScience:
       Type.GmosSouthImaging
 
     override def scienceExposureCount: PosInt =
-      sumExposureCounts(science)
+      sumExposureCounts(science.toNel.map(_._2))
 
   object GmosSouthImaging:
     given Eq[GmosSouthImaging] =
@@ -214,7 +215,7 @@ object ItcScience:
       Type.GnirsImaging
 
     override def scienceExposureCount: PosInt =
-      sumExposureCounts(science)
+      sumExposureCounts(science.toNel.map(_._2))
 
   object GnirsImaging:
     given Eq[GnirsImaging] =
@@ -224,18 +225,20 @@ object ItcScience:
     GenPrism[ItcScience, GnirsImaging]
 
   /**
-   * GNIRS spectroscopy results.  There are results per central wavelength, each
-   * a separate configuration with its own exposure time mode and coadds.
+   * GNIRS spectroscopy results: one result set per entry in the observation's
+   * ordered central wavelength list, in that same order.  Positional rather than
+   * keyed by wavelength -- a wavelength may repeat, each occurrence being an
+   * independent configuration with its own exposure time mode and coadds.
    */
   case class GnirsSpectroscopy(
-    science: NonEmptyMap[Wavelength, Zipper[ItcResult]]
+    science: NonEmptyList[(Wavelength, Zipper[ItcResult])]
   ) extends ItcScience:
 
     override def dataType: Type =
       Type.GnirsSpectroscopy
 
     override def scienceExposureCount: PosInt =
-      sumExposureCounts(science)
+      sumExposureCounts(science.map(_._2))
 
   object GnirsSpectroscopy:
     given Eq[GnirsSpectroscopy] =

@@ -58,3 +58,23 @@ def derivedAcquisitionExposureTimeMode(
     acquisitionSignalToNoise(acquisitionType.getOrElse(GnirsAcquisitionType.Faint)),
     at
   )
+
+/**
+ * The 1-based occurrence ordinal of each wavelength within `ws`, in list order, or
+ * `None` where that wavelength occurs only once.
+ *
+ * A repeated GNIRS central wavelength is an independent configuration -- its own
+ * exposure time mode, coadds and ITC result -- so anything that names a configuration
+ * by its wavelength has to say which occurrence it means.  Everything that does
+ * (sequence atom titles, the low signal-to-noise warning, the configuration and
+ * exposure checks) shares this rule, so the observer sees one numbering throughout;
+ * and `None` for a wavelength that occurs once leaves every message an all-distinct
+ * observation produces exactly as it was.
+ */
+def wavelengthOccurrences(ws: List[Wavelength]): List[Option[Int]] =
+  ws.zipWithIndex.map: (w, i) =>
+    Option.when(ws.count(_ === w) > 1)(ws.take(i).count(_ === w) + 1)
+
+/** Appends an occurrence ordinal to an already-formatted wavelength, if there is one. */
+def withOccurrence(label: String, occurrence: Option[Int]): String =
+  occurrence.fold(label)(n => s"$label #$n")

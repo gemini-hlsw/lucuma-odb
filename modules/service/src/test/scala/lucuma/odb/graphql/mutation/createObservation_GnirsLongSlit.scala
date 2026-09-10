@@ -1241,3 +1241,249 @@ class createObservation_GnirsLongSlit extends OdbSuite:
             }
           """)
         )
+
+  // The central wavelength list is ordered by the user, not by wavelength: the order given
+  // is the order the sequence executes the wavelengths in, and the first entry is the one
+  // acquisition is sized for.  A wavelength may also repeat, each occurrence being an
+  // independent configuration.
+  private def createWithWavelengths(pid: String, tid: String, wavelengths: String, selection: String): String =
+    s"""
+      mutation {
+        createObservation(input: {
+          programId: "$pid"
+          SET: {
+            targetEnvironment: { asterism: [ "$tid" ] }
+            scienceRequirements: {
+              spectroscopy: {
+                wavelength: { nanometers: 2200 }
+                resolution: 1000
+                wavelengthCoverage: { nanometers: 200 }
+                focalPlane: SINGLE_SLIT
+                focalPlaneAngle: { microarcseconds: 0 }
+              }
+            }
+            observingMode: {
+              gnirsSpectroscopy: {
+                grating: D111
+                prism: MIRROR
+                camera: SHORT_BLUE
+                slit: { fpu: LONG_SLIT_0_30 }
+                filter: ORDER3
+                centralWavelengths: $wavelengths
+              }
+            }
+          }
+        }) {
+          observation {
+            observingMode {
+              gnirsSpectroscopy { $selection }
+            }
+          }
+        }
+      }
+    """
+
+  private def timeAndCount(nm: Int, count: Int): String =
+    s"""
+      {
+        centralWavelength: { nanometers: $nm }
+        exposureTimeMode: {
+          timeAndCount: { time: { seconds: 30.0 } count: $count at: { nanometers: $nm } }
+        }
+      }
+    """
+
+  test("create GNIRS Long Slit preserves the central wavelength order as given"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query = createWithWavelengths(
+            pid.toString,
+            tid.toString,
+            s"[ ${timeAndCount(2300, 3)} ${timeAndCount(2100, 4)} ${timeAndCount(2200, 5)} ]",
+            """
+              centralWavelengths        { centralWavelength { nanometers } }
+              initialCentralWavelengths { centralWavelength { nanometers } }
+            """
+          ),
+          // Descending-then-ascending: neither sorted order nor reverse-sorted order, so a
+          // reintroduced sort anywhere in the round trip shows up here.
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsSpectroscopy": {
+                      "centralWavelengths": [
+                        { "centralWavelength": { "nanometers": 2300.000 } },
+                        { "centralWavelength": { "nanometers": 2100.000 } },
+                        { "centralWavelength": { "nanometers": 2200.000 } }
+                      ],
+                      "initialCentralWavelengths": [
+                        { "centralWavelength": { "nanometers": 2300.000 } },
+                        { "centralWavelength": { "nanometers": 2100.000 } },
+                        { "centralWavelength": { "nanometers": 2200.000 } }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  test("create GNIRS Long Slit accepts a repeated central wavelength with its own exposure time mode"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query = createWithWavelengths(
+            pid.toString,
+            tid.toString,
+            s"""[
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } }
+                }
+                coadds: 2
+              }
+              {
+                centralWavelength: { nanometers: 2200 }
+                exposureTimeMode: {
+                  timeAndCount: { time: { seconds: 60.0 } count: 7 at: { nanometers: 2200 } }
+                }
+                coadds: 4
+              }
+            ]""",
+            """
+              centralWavelengths {
+                centralWavelength { nanometers }
+                coadds
+                exposureTimeMode { timeAndCount { time { seconds } count } }
+              }
+            """
+          ),
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsSpectroscopy": {
+                      "centralWavelengths": [
+                        {
+                          "centralWavelength": { "nanometers": 2200.000 },
+                          "coadds": 2,
+                          "exposureTimeMode": {
+                            "timeAndCount": { "time": { "seconds": 30.000000 }, "count": 3 }
+                          }
+                        },
+                        {
+                          "centralWavelength": { "nanometers": 2200.000 },
+                          "coadds": 4,
+                          "exposureTimeMode": {
+                            "timeAndCount": { "time": { "seconds": 60.000000 }, "count": 7 }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  // Identical entries are the case that breaks if the exposure time mode resolution key
+  // does not carry the list index: nothing else tells the two rows apart.
+  test("create GNIRS Long Slit accepts two identical central wavelength entries"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query = createWithWavelengths(
+            pid.toString,
+            tid.toString,
+            s"[ ${timeAndCount(2200, 3)} ${timeAndCount(2200, 3)} ]",
+            """
+              centralWavelengths {
+                centralWavelength { nanometers }
+                exposureTimeMode { timeAndCount { count } }
+              }
+            """
+          ),
+          expected = Right(json"""
+            {
+              "createObservation": {
+                "observation": {
+                  "observingMode": {
+                    "gnirsSpectroscopy": {
+                      "centralWavelengths": [
+                        {
+                          "centralWavelength": { "nanometers": 2200.000 },
+                          "exposureTimeMode": { "timeAndCount": { "count": 3 } }
+                        },
+                        {
+                          "centralWavelength": { "nanometers": 2200.000 },
+                          "exposureTimeMode": { "timeAndCount": { "count": 3 } }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          """)
+        )
+
+  // The cap and the empty check are the two ends of the same validation, and the upper
+  // one also pins the Int -> Short narrowing behind `c_index`: the last accepted entry
+  // sits at index 99, which must survive the round trip through the smallint column and
+  // come back last.
+  private def wavelengthList(n: Int): String =
+    (0 until n).map(i => timeAndCount(1000 + i, 3)).mkString("[ ", " ", " ]")
+
+  test("create GNIRS Long Slit accepts the maximum central wavelength list"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        query(
+          user  = pi,
+          query = createWithWavelengths(
+            pid.toString,
+            tid.toString,
+            wavelengthList(100),
+            "centralWavelengths { centralWavelength { nanometers } }"
+          )
+        ).map: js =>
+          val ws =
+            js.hcursor
+              .downFields("createObservation", "observation", "observingMode", "gnirsSpectroscopy", "centralWavelengths")
+              .values
+              .toList
+              .flatten
+              .flatMap(_.hcursor.downFields("centralWavelength", "nanometers").as[BigDecimal].toOption)
+              .map(_.toInt)
+          assertEquals(ws, (0 until 100).map(1000 + _).toList)
+
+  test("create GNIRS Long Slit rejects a central wavelength list over the maximum"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query = createWithWavelengths(pid.toString, tid.toString, wavelengthList(101), "centralWavelengths { coadds }"),
+          expected = Left(List(
+            "Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: At most 100 central wavelengths may be specified for GNIRS spectroscopy observations."
+          ))
+        )
+
+  test("create GNIRS Long Slit rejects an empty central wavelength list"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query = createWithWavelengths(pid.toString, tid.toString, "[]", "centralWavelengths { coadds }"),
+          expected = Left(List(
+            "Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: At least one central wavelength must be specified for GNIRS spectroscopy observations."
+          ))
+        )

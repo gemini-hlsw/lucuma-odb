@@ -111,23 +111,34 @@ trait ItcCodec:
       // Emitted only when set (only GNIRS pins an acquisition type).
       ).deepMerge(a.gnirsAcqType.fold(Json.obj())(t => Json.obj("gnirsAcqType" -> t.asJson)))
 
-  private def keyedScienceNemDecoder[A: Decoder: Order](
+  /**
+   * The wire shape shared by every keyed science result set: a JSON array of
+   * `{ key, results }` objects.  GNIRS spectroscopy keeps it as an ordered list,
+   * since a central wavelength may repeat; the imaging modes collapse it into a
+   * `NonEmptyMap` (see `keyedScienceNemDecoder`).
+   */
+  private def keyedScienceNelDecoder[A: Decoder](
     fieldName: String,
-    keyName:   String = "filter"
-  ): Decoder[NonEmptyMap[A, Zipper[ItcResult]]] =
+    keyName:   String
+  ): Decoder[NonEmptyList[(A, Zipper[ItcResult])]] =
     Decoder.instance: c =>
       c.downField(fieldName)
        .values
        .flatMap(it => NonEmptyList.fromList(it.toList))
        .toRight(DecodingFailure("Expecting at least one ITC result set.", c.history))
        .flatMap: nel =>
-         val res = nel.traverse: json =>
+         nel.traverse: json =>
            val c = json.hcursor
            for
              key     <- c.downField(keyName).as[A]
              results <- c.downField("results").as[Zipper[ItcResult]]
            yield key -> results
-         res.map(_.toNem)
+
+  private def keyedScienceNemDecoder[A: Decoder: Order](
+    fieldName: String,
+    keyName:   String = "filter"
+  ): Decoder[NonEmptyMap[A, Zipper[ItcResult]]] =
+    keyedScienceNelDecoder[A](fieldName, keyName).map(_.toNem)
 
   given Decoder[ItcScience.GhostIfu] =
     Decoder.instance: c =>
@@ -149,23 +160,28 @@ trait ItcCodec:
     keyedScienceNemDecoder[GnirsFilter]("gnirsImagingScience").map(ItcScience.GnirsImaging.apply)
 
   given (using Decoder[Wavelength]): Decoder[ItcScience.GnirsSpectroscopy] =
-    keyedScienceNemDecoder[Wavelength]("gnirsSpectroscopyScience", "centralWavelength")
+    keyedScienceNelDecoder[Wavelength]("gnirsSpectroscopyScience", "centralWavelength")
       .map(ItcScience.GnirsSpectroscopy.apply)
 
   given Decoder[ItcScience.Spectroscopy] =
     Decoder.instance:
       _.downField("spectroscopyScience").as[Zipper[ItcResult]].map(ItcScience.Spectroscopy.apply)
 
-  private def keyedScienceNemEncoder[A: Encoder](
-    keyName: String = "filter"
-  )(using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[NonEmptyMap[A, Zipper[ItcResult]]] =
+  private def keyedScienceNelEncoder[A: Encoder](
+    keyName: String
+  )(using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[NonEmptyList[(A, Zipper[ItcResult])]] =
     Encoder.instance: a =>
       Json.fromValues:
-        a.toNel.toList.map: (key, results) =>
+        a.toList.map: (key, results) =>
           Json.obj(
             keyName   -> key.asJson,
             "results" -> results.asJson
           )
+
+  private def keyedScienceNemEncoder[A: Encoder](
+    keyName: String = "filter"
+  )(using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[NonEmptyMap[A, Zipper[ItcResult]]] =
+    keyedScienceNelEncoder[A](keyName).contramap(_.toNel)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.GhostIfu] =
     Encoder.instance: a =>
@@ -207,7 +223,7 @@ trait ItcCodec:
     Encoder.instance: a =>
       Json.obj(
         "itcType"                  -> ItcScience.Type.GnirsSpectroscopy.asJson,
-        "gnirsSpectroscopyScience" -> a.science.asJson(using keyedScienceNemEncoder[Wavelength]("centralWavelength"))
+        "gnirsSpectroscopyScience" -> a.science.asJson(using keyedScienceNelEncoder[Wavelength]("centralWavelength"))
       )
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcScience.Spectroscopy] =

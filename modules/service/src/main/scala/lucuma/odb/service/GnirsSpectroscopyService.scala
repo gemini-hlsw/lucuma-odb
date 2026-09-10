@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import coulomb.syntax.*
+import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import grackle.Result
 import grackle.ResultT
@@ -93,6 +94,12 @@ object GnirsSpectroscopyService:
   private val DefaultCoadds: PosInt = PosInt.unsafeFrom(1)
 
   val CentralWavelengthConfigTableName: String = "t_gnirs_central_wavelength_config"
+
+  /**
+   * One central wavelength entry together with its position in the list, used as the
+   * key when resolving exposure time modes.  See `resolveKeys`.
+   */
+  private case class WavelengthKey(index: NonNegShort, config: GnirsCentralWavelengthConfigInput)
 
   def instantiate[F[_]: {Concurrent as F, Services}]: GnirsSpectroscopyService[F] =
 
@@ -207,7 +214,7 @@ object GnirsSpectroscopyService:
             val af = Statements.selectGnirsSpectroscopy(oids)
             session.prepareR(af.fragment.query(observation_id *: gnirsLS)).use: pq =>
               pq.stream(af.argument, chunkSize = 1024).compile.toList.map: rows =>
-                // One row per central wavelength, ordered by increasing wavelength.
+                // One row per central wavelength, in the user-specified order.
                 // `groupBy` preserves that order within each group.
                 rows
                   .groupBy(_._1)
@@ -217,31 +224,34 @@ object GnirsSpectroscopyService:
                   .toMap
 
       /**
-       * The ETM resolution key is the central wavelength; coadds ride along so the
-       * child rows can be written from the resolved result.
+       * Pairs each central wavelength with the exposure time mode to resolve for it.
+       *
+       * The key is the whole entry together with its position, and both halves matter.
+       * `ExposureTimeModeService` inserts the resolved modes grouped by distinct
+       * exposure time mode, so the position cannot be recovered from the order it hands
+       * back; and two entries may now be identical, so nothing else distinguishes them.
+       * Coadds ride along too, so the child rows can be written from the result alone.
        */
-      private def resolveKey(
-        w: GnirsCentralWavelengthConfigInput
-      ): (Wavelength, Option[ExposureTimeMode]) =
-        (w.centralWavelength, w.exposureTimeMode)
+      private def resolveKeys(
+        ws: NonEmptyList[GnirsCentralWavelengthConfigInput]
+      ): NonEmptyList[(WavelengthKey, Option[ExposureTimeMode])] =
+        ws.zipWithIndex.map: (w, i) =>
+          (WavelengthKey(NonNegShort.unsafeFrom(i.toShort), w), w.exposureTimeMode)
 
-      private def stripAcquisition[E](
-        m: Map[Observation.Id, (E, NonEmptyList[(Wavelength, E)])]
-      ): Map[Observation.Id, NonEmptyList[(Wavelength, E)]] =
+      private def stripAcquisition[K, E](
+        m: Map[Observation.Id, (E, NonEmptyList[(K, E)])]
+      ): Map[Observation.Id, NonEmptyList[(K, E)]] =
         m.view.mapValues(_._2).toMap
 
       private def insertWavelengths(
-        input:   NonEmptyList[GnirsCentralWavelengthConfigInput],
-        etms:    Map[Observation.Id, NonEmptyList[(Wavelength, ExposureTimeModeId)]],
+        etms:    Map[Observation.Id, NonEmptyList[(WavelengthKey, ExposureTimeModeId)]],
         version: ObservingModeRowVersion
       ): F[Unit] =
-        val coaddsFor: Map[Wavelength, PosInt] =
-          input.toList.map(w => w.centralWavelength -> w.coadds.getOrElse(DefaultCoadds)).toMap
         NonEmptyList
           .fromList:
             etms.toList.flatMap: (oid, ws) =>
-              ws.toList.map: (wav, eid) =>
-                (oid, wav, coaddsFor.getOrElse(wav, DefaultCoadds), eid)
+              ws.toList.map: (k, eid) =>
+                (oid, k.index, k.config.centralWavelength, k.config.coadds.getOrElse(DefaultCoadds), eid)
           .traverse_ : rs =>
             session.exec(Statements.insertWavelengths(rs, version))
 
@@ -264,19 +274,19 @@ object GnirsSpectroscopyService:
           r   <- ResultT(exposureTimeModeService.resolve(
                    "GNIRS Spectroscopy",
                    acqEtm,
-                   input.centralWavelengths.map(resolveKey),
+                   resolveKeys(input.centralWavelengths),
                    req,
                    which,
                    gnirs.derivedAcquisitionExposureTimeMode(input.acquisition.flatMap(_.explicitAcqType.toOption), _)
                  ))
 
           ids <- ResultT.liftF(exposureTimeModeService.insertResolvedAcquisitionAndScience(r, acquisitionIsExplicit = acqEtm.isDefined))
-          _   <- ResultT.liftF(insertWavelengths(input.centralWavelengths, stripAcquisition(ids), ObservingModeRowVersion.Initial))
+          _   <- ResultT.liftF(insertWavelengths(stripAcquisition(ids), ObservingModeRowVersion.Initial))
 
           // The 'current' rows need their own ETM rows (each wavelength row backs
           // exactly one ETM), so resolve the science side a second time.
           cur <- ResultT.liftF(exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
-          _   <- ResultT.liftF(insertWavelengths(input.centralWavelengths, cur, ObservingModeRowVersion.Current))
+          _   <- ResultT.liftF(insertWavelengths(cur, ObservingModeRowVersion.Current))
         yield ()).value
 
       override def delete(which: List[Observation.Id])(using Transaction[F]): F[Unit] =
@@ -295,9 +305,9 @@ object GnirsSpectroscopyService:
         SET.centralWavelengths.fold(ResultT.unit): ws =>
           for
             _   <- ResultT.liftF(session.exec(ImagingStatements.deleteCurrentScienceFiltersAndEtms(CentralWavelengthConfigTableName, oids)))
-            r   <- ResultT(exposureTimeModeService.resolve("GNIRS Spectroscopy", none, ws.map(resolveKey), none, which))
+            r   <- ResultT(exposureTimeModeService.resolve("GNIRS Spectroscopy", none, resolveKeys(ws), none, which))
             cur <- ResultT.liftF(exposureTimeModeService.insertResolvedScienceOnly(stripAcquisition(r)))
-            _   <- ResultT.liftF(insertWavelengths(ws, cur, ObservingModeRowVersion.Current))
+            _   <- ResultT.liftF(insertWavelengths(cur, ObservingModeRowVersion.Current))
           yield ()
 
       // Absent leaves the acquisition ETM alone, an explicit mode replaces it, and null
@@ -414,7 +424,7 @@ object GnirsSpectroscopyService:
       """(Void) |+|
       void"WHERE ls.c_observation_id IN (" |+|
         observationIds.map(sql"$observation_id").intercalate(void",") |+|
-      void") ORDER BY ls.c_observation_id, w.c_central_wavelength"
+      void") ORDER BY ls.c_observation_id, w.c_index"
 
     // None => no explicit acquisition type; resolved from the exposure time at
     // sequence-generation time (mirrors read mode handling).
@@ -709,13 +719,14 @@ object GnirsSpectroscopyService:
 
     /** Inserts the central wavelength rows for one row version. */
     def insertWavelengths(
-      rows:    NonEmptyList[(Observation.Id, Wavelength, PosInt, ExposureTimeModeId)],
+      rows:    NonEmptyList[(Observation.Id, NonNegShort, Wavelength, PosInt, ExposureTimeModeId)],
       version: ObservingModeRowVersion
     ): AppliedFragment =
       val insertInto: AppliedFragment =
         void"""
           INSERT INTO t_gnirs_central_wavelength_config (
             c_observation_id,
+            c_index,
             c_central_wavelength,
             c_version,
             c_coadds,
@@ -724,9 +735,9 @@ object GnirsSpectroscopyService:
         """
 
       val values =
-        rows.map: (oid, wav, coadds, eid) =>
-          sql"($observation_id, $wavelength_pm, $observing_mode_row_version, $int4_pos, $exposure_time_mode_id)"(
-            oid, wav, version, coadds, eid
+        rows.map: (oid, idx, wav, coadds, eid) =>
+          sql"($observation_id, $int2_nonneg, $wavelength_pm, $observing_mode_row_version, $int4_pos, $exposure_time_mode_id)"(
+            oid, idx, wav, version, coadds, eid
           )
 
       insertInto |+| values.intercalate(void", ")
@@ -753,6 +764,7 @@ object GnirsSpectroscopyService:
         )
         INSERT INTO t_gnirs_central_wavelength_config (
           c_observation_id,
+          c_index,
           c_central_wavelength,
           c_version,
           c_coadds,
@@ -761,6 +773,7 @@ object GnirsSpectroscopyService:
         )
         SELECT
           $observation_id,
+          w.c_index,
           w.c_central_wavelength,
           w.c_version,
           w.c_coadds,
