@@ -19,7 +19,6 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.Access
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
@@ -193,7 +192,6 @@ object GnirsSpectroscopyInput:
   ):
     def observingModeType: Option[ObservingModeType] = fpu.map(modeTypeFor)
     def updatesAcquisition: Boolean = acquisition.isDefined
-    def limitToPreExecution(access: Access): Boolean = false
 
     /**
      * True if the input modifies fields that only Staff (or higher) may set.
