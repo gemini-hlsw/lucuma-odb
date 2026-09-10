@@ -145,7 +145,7 @@ object GnirsSpectroscopyValidator:
   def exposure(itcFor: Observation.Id => Option[Itc]): ObservationValidator = info =>
     (config(info), itcFor(info.oid).map(_.science)).tupled.foldMap:
       case (c, ItcScience.GnirsSpectroscopy(science)) =>
-        science.toNel.foldMap: (w, z) =>
+        science.foldMap: (w, z) =>
           exposureChecks(c, w, z.focus.value.exposureTime)
       case _                                          =>
         ObservationValidationMap.empty
