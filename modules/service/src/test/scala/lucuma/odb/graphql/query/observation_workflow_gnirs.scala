@@ -7,6 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.syntax.*
+import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObservationValidationCode
@@ -40,6 +41,7 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
     nm:               Int          = 2200,
     seconds:          BigDecimal   = 30,
     explicitReadMode: Option[String] = None,
+    explicitDecker:   Option[String] = None,
     acqFilter:        Option[String] = None
   ): String =
     s"""
@@ -51,6 +53,7 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
         filter: $filter
         centralWavelengths: [ ${centralWavelength(nm, seconds)} ]
         ${explicitReadMode.foldMap(m => s"explicitReadMode: $m")}
+        ${explicitDecker.foldMap(d => s"explicitDecker: $d")}
         ${acqFilter.foldMap(f => s"acquisition: { explicitFilter: $f }")}
       }
     """
@@ -127,6 +130,21 @@ class observation_workflow_gnirs extends ExecutionTestSupportForGnirs:
       gnirsLongSlit(filter = "ORDER4"),
       warning(GnirsSpectroscopyValidator.filterMismatch(GnirsFilter.Order4, nm(2200)))
     )
+
+  test("explicit acquisition decker is a warning"):
+    expectConfigurationValidations(
+      gnirsLongSlit(explicitDecker = "ACQUISITION".some),
+      warning(GnirsSpectroscopyValidator.DeckerAcquisitionMirror)
+    )
+
+  test("explicit decker for the wrong camera is a warning"):
+    expectConfigurationValidations(
+      gnirsLongSlit(explicitDecker = "LONG_CAM_LONG_SLIT".some),
+      warning(GnirsSpectroscopyValidator.deckerMismatch(GnirsDecker.LongCamLongSlit, GnirsDecker.ShortCamLongSlit))
+    )
+
+  test("explicit decker matching the configuration is fine"):
+    expectConfigurationValidations(gnirsLongSlit(explicitDecker = "SHORT_CAM_LONG_SLIT".some))
 
   test("explicit PAH acquisition filter below 2.5 µm is an error"):
     expectConfigurationValidations(

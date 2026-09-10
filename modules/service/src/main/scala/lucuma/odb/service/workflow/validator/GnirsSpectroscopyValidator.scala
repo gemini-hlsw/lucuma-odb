@@ -5,12 +5,14 @@ package lucuma.odb.service.workflow.validator
 
 import cats.syntax.all.*
 import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationValidation
+import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
@@ -25,9 +27,9 @@ import lucuma.odb.service.workflow.ObservationValidator
  * GNIRS spectroscopy checks ported from the OCS p2checker `GnirsRule`.  The
  * checks that need only the observing mode run in the first validation stage
  * (`configuration`); those that need the ITC exposure time run in the second
- * (`exposure`).  Checks on values the ODB derives itself (decker, automatic
- * acquisition filter, read mode when not explicit) are not ported since they
- * cannot fail.
+ * (`exposure`).  Values the ODB derives itself can only be wrong when the user
+ * overrides them, so the decker and read mode checks fire on explicit choices
+ * and the acquisition filter check on an explicit filter.
  */
 object GnirsSpectroscopyValidator:
 
@@ -42,6 +44,12 @@ object GnirsSpectroscopyValidator:
 
   val BlueCameraAcquisitionFilter: String =
     "Acquisitions with the blue cameras must be done in the X, J, H, H2 or K band filters."
+
+  val DeckerAcquisitionMirror: String =
+    "Decker does not match Acquisition Mirror."
+
+  def deckerMismatch(decker: GnirsDecker, expected: GnirsDecker): String =
+    s"Decker ${decker.longName} does not match the FPU, camera and prism (expected ${expected.longName})."
 
   val RedCameraAcquisitionFilters: Set[GnirsFilter] =
     Set(GnirsFilter.PAH, GnirsFilter.Order4, GnirsFilter.Order3, GnirsFilter.H2)
@@ -87,6 +95,12 @@ object GnirsSpectroscopyValidator:
   private def isThermal(wavelength: Wavelength): Boolean =
     wavelength >= GnirsFilter.ThermalAcquisitionCutoff
 
+  // The same derivation the DB view uses for the default decker.
+  private def defaultDecker(c: Config): GnirsDecker =
+    c.fpu match
+      case GnirsFpu.Spectroscopy.Slit(value = _) => GnirsDecker.forCameraAndPrism(c.camera, c.prism)
+      case GnirsFpu.Spectroscopy.Ifu(value = i)  => GnirsDecker.forIfu(i)
+
   val configuration: ObservationValidator = info =>
     config(info).foldMap: c =>
       val wavelengths: List[Wavelength] =
@@ -103,13 +117,20 @@ object GnirsSpectroscopyValidator:
         c.filter.spectroscopyRange.foldMap: range =>
           wavelengths.filterNot(range.contains).foldMap(w => warning(filterMismatch(c.filter, w)))
 
+      // Science steps run with the acquisition mirror out, and the acquisition
+      // steps always use the acquisition decker, so an explicit acquisition
+      // decker can only be a mistake.
+      val decker: ObservationValidationMap =
+        if c.decker === GnirsDecker.Acquisition then warning(DeckerAcquisitionMirror)
+        else when(c.decker =!= defaultDecker(c))(warning(deckerMismatch(c.decker, defaultDecker(c))))
+
       // Automatic selection is always valid; only an explicit choice can be wrong.
       val acquisitionFilter: ObservationValidationMap =
         c.acquisition.explicitFilter.foldMap: f =>
           if isThermal(c.primaryCentralWavelength) then when(!RedCameraAcquisitionFilters(f))(error(RedCameraAcquisitionFilter))
           else when(!BlueCameraAcquisitionFilters(f))(error(BlueCameraAcquisitionFilter))
 
-      crossDispersedThermal |+| shortBlueLxd |+| filterCoverage |+| acquisitionFilter
+      crossDispersedThermal |+| shortBlueLxd |+| filterCoverage |+| decker |+| acquisitionFilter
 
   def exposure(itcFor: Observation.Id => Option[Itc]): ObservationValidator = info =>
     (config(info), itcFor(info.oid).map(_.science)).tupled.foldMap:
