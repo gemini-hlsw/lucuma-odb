@@ -886,7 +886,7 @@ object OdbMapping {
    * `MappingValidator` recurses over the type mappings without stack safety and, with a schema
    * this size, overflows the default thread stack depending on JIT state (it fails intermittently,
    * not every time). The fix (typelevel/grackle#940) is merged but unreleased; once a grackle
-   * release includes it, replace this with a plain `Sync[F].delay(mapping.unsafeValidate())`.
+   * release includes it, replace this with a plain `mapping.validateInto[F]()`.
    */
   def validate[F[_]: Async](mapping: Mapping[F]): F[Unit] =
     Async[F].async_ : cb =>

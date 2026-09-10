@@ -17744,6 +17744,9 @@ enum ObservationValidationCode {
   "Likelihood of observing conditions is below recommended percentage."
   CONDITIONS_UNLIKELY
 
+  "The observation configuration is unusual and should be reviewed."
+  CONFIGURATION_WARNING
+
 }
 
 """

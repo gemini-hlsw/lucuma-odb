@@ -62,22 +62,24 @@ object ObservationValidator:
       ObservationValidationMap.empty
 
     val scienceValidator1: ObservationValidator =
-      GeneratorValidator             |+|
-      CfpInstrumentValidator         |+|
-      ExchangeValidator              |+|
-      CfpRaDecValidator              |+|
-      BandValidator                  |+|
-      GhostVMagnitudeValidator       |+|
-      GuideProbeValidator            |+|
-      TooActivationValidator         |+|
-      OpportunityTargetValidator     |+|
-      OtherConfigErrorValidator      |+|
+      GeneratorValidator                       |+|
+      CfpInstrumentValidator                   |+|
+      ExchangeValidator                        |+|
+      CfpRaDecValidator                        |+|
+      BandValidator                            |+|
+      GhostVMagnitudeValidator                 |+|
+      GnirsSpectroscopyValidator.configuration |+|
+      GuideProbeValidator                      |+|
+      TooActivationValidator                   |+|
+      OpportunityTargetValidator               |+|
+      OtherConfigErrorValidator                |+|
       ConditionsProbabilityValidator
 
     val scienceValidator2: ObservationValidator =
-      ItcValidator(itcFor)                |+| 
-      AcquisitionValidator(itcFor)        |+| 
-      TotalSignalToNoiseValidator(itcFor)
+      ItcValidator(itcFor)                     |+|
+      AcquisitionValidator(itcFor)             |+|
+      TotalSignalToNoiseValidator(itcFor)      |+|
+      GnirsSpectroscopyValidator.exposure(itcFor)
 
     // And our validation results
 
@@ -93,7 +95,9 @@ object ObservationValidator:
     val scienceResults2: Map[Observation.Id, ObservationValidationMap] =
       science
         .view
-        .filterKeys(k => scienceResults1.get(k).forall(_.isEmpty)) // ensure there are no warnigs in stage 1
+        // Warnings alone must not skip stage 2: they can be dismissed, which would
+        // then let an observation reach Ready without the ITC and exposure checks.
+        .filterKeys(k => scienceResults1.get(k).forall(!_.hasErrors))
         .mapValues(scienceValidator2)
         .toMap
 
@@ -102,7 +106,7 @@ object ObservationValidator:
 
     val toCheck: List[ObservationValidationInfo] =
       science.values.toList.filter: info =>
-        info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(_.isEmpty)
+        info.isAccepted && !info.isExchange && prelimV.get(info.oid).forall(!_.hasErrors)
 
     val configValidations: ResultT[F, Map[Observation.Id, ObservationValidationMap]] =
       NonEmptyList
