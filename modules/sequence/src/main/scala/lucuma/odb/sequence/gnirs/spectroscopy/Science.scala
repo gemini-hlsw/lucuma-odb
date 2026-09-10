@@ -324,15 +324,25 @@ object Science:
     suffix.fold(base)(t => NonEmptyString.unsafeFrom(s"${base.value} ($t)"))
 
   /**
-   * The atom title suffix for each central wavelength, in list order: `None` when
-   * the observation has a single wavelength (so existing sequences keep their bare
-   * titles), the wavelength when it has several, and the wavelength plus a 1-based
-   * occurrence ordinal when that wavelength repeats -- duplicate entries are
-   * independent configurations and the observer must be able to tell their
-   * segments apart.
+   * The atom title suffix for each entry of `ws`, in list order: `None` throughout when
+   * the observation has a single central wavelength (so existing sequences keep their
+   * bare titles), the wavelength when it has several, and the wavelength plus a 1-based
+   * occurrence ordinal when that wavelength repeats *within `ws`* -- duplicate entries
+   * are independent configurations and the observer must be able to tell their segments
+   * apart.
+   *
+   * `multi` is the observation's own multi-wavelength-ness, which is not always
+   * `ws.length > 1`: the daytime pinhole sequence titles one atom per *distinct*
+   * wavelength, so a `[2200, 2200]` observation hands a single-element list to a
+   * sequence that still needs its wavelength named.  Passing it separately keeps the
+   * pinhole titles agreeing with the science ones, and leaves the ordinals off the
+   * pinholes, where -- being distinct -- there is no second atom to distinguish from.
    */
-  private def titleSuffixes(ws: NonEmptyList[CentralWavelengthConfig]): NonEmptyList[Option[String]] =
-    if ws.length <= 1 then ws.map(_ => none[String])
+  private def titleSuffixes(
+    ws:    NonEmptyList[CentralWavelengthConfig],
+    multi: Boolean
+  ): NonEmptyList[Option[String]] =
+    if !multi then ws.map(_ => none[String])
     else
       ws.zipWithIndex.map: (sw, i) =>
         val w = sw.centralWavelength
@@ -404,7 +414,7 @@ object Science:
       NonEmptyList.fromListUnsafe(config.wavelengths.toList.distinctBy(_.centralWavelength))
 
     distinctWavelengths
-      .zip(titleSuffixes(distinctWavelengths))
+      .zip(titleSuffixes(distinctWavelengths, config.wavelengths.length > 1))
       .traverse: (sw, suffix) =>
         EitherT(expander.expandStep(static, flat(sw)))
           .map: steps =>
@@ -477,7 +487,7 @@ object Science:
     val gen = for
       ts <- pairs
       ds <- StepDefinition.computeAll(config, ts, static, expander, calRole).leftMap(m => definitionError(observationId, m))
-      bs <- ds.zip(ts).zip(titleSuffixes(config.wavelengths)).traverse: (dwt, suffix) =>
+      bs <- ds.zip(ts).zip(titleSuffixes(config.wavelengths, config.wavelengths.length > 1)).traverse: (dwt, suffix) =>
               val (d, wt) = dwt
               for
                 e <- cycleEstimate(d)
