@@ -33,6 +33,7 @@ import lucuma.core.enums.Observatory
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.SlewStage
@@ -3246,6 +3247,23 @@ trait DatabaseOperations { this: OdbSuite =>
           SELECT insert_invitation($program_user_id, $user_id, $program_id, $email_address, NULL)
         """.query(text)
       )((puid, u.id, pid, EmailAddress.unsafeFrom("coi@dobbs.com"))).void
+
+  /**
+   * Sets the proposal status directly, bypassing the API's submit rules.  Runs
+   * on a fresh session so it can stand in for a concurrent submission.
+   */
+  def setProposalStatusDirectly(pid: Program.Id, status: ProposalStatus): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_program set c_proposal_status = $proposal_status where c_program_id = $program_id".command
+      )(status, pid).void
+
+  /** Completes the observation as a PI declaring it does, with no executed sequence. */
+  def declareCompleteDirectly(oid: Observation.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_observation set c_declared_state = 'declared_complete' where c_observation_id = $observation_id".command
+      )(oid).void
 
   /** Adds co-investigators and invites each one, as submission requires. */
   def addCoisAs(u: User, pid: Program.Id, ps: List[Partner] = List(Partner.CA, Partner.US)): IO[Unit] =

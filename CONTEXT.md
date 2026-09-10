@@ -48,10 +48,13 @@ The best-effort reading of an Archive Vocabulary term in GPP's own vocabulary, e
 _Avoid_: parsing, normalization, conversion (all imply the projection is total).
 
 **Submission Freeze**:
-The rule that an observation's Archive Duplication Search snapshot becomes read-only once its proposal is submitted, so the Match Count seen by the TAC and the PDF is exactly what the PI last saw. Before submission every refresh overwrites the snapshot; after submission refresh is rejected.
+The rule that an observation's Archive Duplication Search snapshot is read-only from submission until acceptance, so the Match Count seen by the TAC and the PDF is exactly what the PI last saw. A proposal that is not accepted stays frozen. Acceptance lifts the freeze, so newly requested targets in an accepted program can be checked; before submission and after acceptance every refresh overwrites the snapshot.
+
+**Completion Freeze**:
+The rule that a completed observation's Archive Duplication Search snapshot is read-only, whatever the proposal status. Its own data is now in GOA, so a re-check could only find itself. Completion is either declared by the PI or reached by execution, as the materialized workflow state reports it. Unlike submission, a completion that lands while a search is in flight is not serialised against the snapshot write; the window is short and the search is advisory.
 
 **Stale Snapshot**:
-A stored Archive Duplication Search snapshot whose provenance no longer matches the observation: the GOA query URLs the search policy would build today differ from the ones recorded with the snapshot. Materialized as `t_obscalc.c_archive_stale` by the background obscalc calculation and exposed as `stale` in GraphQL. Never true for an observation that was never searched, that has nothing searchable now, or whose proposal is under the Submission Freeze. Staleness looks only at the observation side; GOA gaining new files does not stale a snapshot.
+A stored Archive Duplication Search snapshot whose provenance no longer matches the observation: the GOA query URLs the search policy would build today differ from the ones recorded with the snapshot. Materialized as `t_obscalc.c_archive_stale` by the background obscalc calculation and exposed as `stale` in GraphQL. Never true for an observation that was never searched, that has nothing searchable now, or that is under the Submission Freeze or the Completion Freeze. Staleness looks only at the observation side; GOA gaining new files does not stale a snapshot.
 _Avoid_: outdated, dirty, invalid (the snapshot remains valid evidence of what was asked).
 
 ### Focal Plane Units

@@ -5,11 +5,13 @@ package lucuma.odb.service
 
 import cats.effect.IO
 import cats.syntax.all.*
+import grackle.Result
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.goa.GoaClientMock
 import lucuma.catalog.goa.GoaParams
 import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
 import lucuma.core.enums.VisitorObservingModeType
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -77,16 +79,12 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       _   <- addDemoScienceProposal(pi, pid, cid)
     yield pid
 
-  /**
-   * Freezes the snapshot the way submission does, without the API's submit
-   * rules.  Runs on a fresh session -- independent of the one the search under
-   * test holds -- so it stands in for a concurrent submission and cannot nest.
-   */
-  private def markSubmitted(pid: Program.Id): IO[Unit] =
-    withFreshSession: s =>
-      s.execute(
-        sql"update t_program set c_proposal_status = 'submitted' where c_program_id = $program_id".command
-      )(pid).void
+  private def proposedObservation: IO[(Program.Id, Observation.Id)] =
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+    yield (pid, oid)
 
   /**
    * A client that submits the proposal as a side effect of being queried,
@@ -96,12 +94,15 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
   private def submittingDuring(pid: Program.Id, underlying: GoaClient[IO]): GoaClient[IO] =
     new GoaClient[IO]:
       def query(params: GoaParams) =
-        markSubmitted(pid) >> underlying.query(params)
+        setProposalStatusDirectly(pid, ProposalStatus.Submitted) >> underlying.query(params)
 
-  private def refresh(client: GoaClient[IO])(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
+  private def refreshResult(client: GoaClient[IO])(oid: Observation.Id): IO[Result[ArchiveDuplication.Snapshot]] =
     withServices(pi): services =>
       given Services[IO] = services
-      ArchiveDuplicationSearchService.instantiate(client).refresh(oid).flatMap(_.get)
+      ArchiveDuplicationSearchService.instantiate(client).refresh(oid)
+
+  private def refresh(client: GoaClient[IO])(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
+    refreshResult(client)(oid).flatMap(_.get)
 
   /** What is actually in the database, as opposed to what `refresh` returned. */
   private def stored(oid: Observation.Id): IO[ArchiveDuplication.Snapshot] =
@@ -186,9 +187,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
     // the (mocked) GOA call, so the write it would make is refused and the snapshot
     // the PI last saw survives.
     for
-      pid <- proposedProgram
-      tid <- createTargetAs(pi, pid)
-      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      (pid, oid) <- proposedObservation
       _   <- refresh(mockOf("a.fits"))(oid)
       s   <- refresh(submittingDuring(pid, mockOf("b.fits")))(oid)
       db  <- stored(oid)
@@ -279,13 +278,13 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
   private def holdingSnapshotLock[A](oid: Observation.Id)(use: IO[A]): IO[A] =
     withFreshSession: s =>
       s.transaction.use: _ =>
-        s.unique(ArchiveDuplicationSearchService.Statements.LockProposalStatus)(oid) >> use
+        s.unique(ArchiveDuplicationSearchService.Statements.LockFreezeState)(oid) >> use
 
   /** SQLSTATE `lock_not_available`. */
   private val LockNotAvailable = "55P03"
 
   /**
-   * Submits the way `markSubmitted` does, but with a bounded lock wait, so a
+   * Submits the way `setProposalStatusDirectly` does, but with a bounded lock wait, so a
    * lock this cannot get surfaces as an error rather than hanging the suite.
    */
   private def submitAwaitingLock(pid: Program.Id): IO[Unit] =
@@ -314,9 +313,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   test("the snapshot lock blocks a concurrent submission"):
     for
-      pid <- proposedProgram
-      tid <- createTargetAs(pi, pid)
-      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      (pid, oid) <- proposedObservation
       e   <- holdingSnapshotLock(oid)(submitAwaitingLock(pid).attempt)
     yield e match
       case Left(ex: PostgresErrorException) => assertEquals(ex.code, LockNotAvailable)
@@ -324,6 +321,10 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       case Right(_)                         => fail("a submission slipped past the snapshot lock")
 
   // --- staleness ---
+
+  /** Searches, then changes the observing mode so the stored queries no longer match. */
+  private def staleSnapshot(oid: Observation.Id): IO[Unit] =
+    refresh(mockOf("a.fits"))(oid) >> setLongSlitMode(oid)
 
   private def staleness(oid: Observation.Id): IO[Boolean] =
     withServices(pi): services =>
@@ -422,8 +423,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
   test("replacing the observing mode after a search is stale"):
     for
       oid <- gmosObservation
-      _   <- refresh(mockOf("a.fits"))(oid)
-      _   <- setLongSlitMode(oid)
+      _   <- staleSnapshot(oid)
       s   <- staleness(oid)
     yield assert(s)
 
@@ -463,14 +463,73 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   test("a frozen snapshot is never stale: its refresh is rejected, so the flag could prompt nothing"):
     for
-      pid <- proposedProgram
-      tid <- createTargetAs(pi, pid)
-      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
-      _   <- refresh(mockOf("a.fits"))(oid)
-      _   <- setLongSlitMode(oid)
-      _   <- markSubmitted(pid)
+      (pid, oid) <- proposedObservation
+      _   <- staleSnapshot(oid)
+      _   <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
       s   <- staleness(oid)
     yield assert(!s)
+
+  test("the freeze lifts once the proposal is accepted, so the snapshot can go stale again"):
+    for
+      (pid, oid) <- proposedObservation
+      _   <- staleSnapshot(oid)
+      _   <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
+      _   <- setProposalStatusDirectly(pid, ProposalStatus.Accepted)
+      s   <- staleness(oid)
+    yield assert(s)
+
+  test("the freeze holds for a proposal that was not accepted"):
+    for
+      (pid, oid) <- proposedObservation
+      _   <- staleSnapshot(oid)
+      _   <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
+      _   <- setProposalStatusDirectly(pid, ProposalStatus.NotAccepted)
+      s   <- staleness(oid)
+      r   <- refreshResult(mockOf("a.fits"))(oid)
+    yield
+      assert(!s)
+      assertRejected(r, "not accepted")
+
+  test("a completed observation is frozen: never stale, refresh rejected"):
+    for
+      oid <- gmosObservation
+      _   <- staleSnapshot(oid)
+      _   <- declareCompleteDirectly(oid)
+      s   <- staleness(oid)
+      r   <- refreshResult(mockOf("a.fits"))(oid)
+    yield
+      assert(!s)
+      assertRejected(r, "completed")
+
+  test("completion reached by execution freezes the snapshot too"):
+    for
+      oid <- gmosObservation
+      _   <- staleSnapshot(oid)
+      _   <- runObscalc(oid)
+      s1  <- servedStaleFlag(oid)
+      _   <- markWorkflowCompleted(oid)
+      s2  <- servedStaleFlag(oid)
+      s   <- staleness(oid)
+      r   <- refreshResult(mockOf("a.fits"))(oid)
+    yield
+      assertEquals(s1, true.some)
+      assertEquals(s2, false.some)
+      assert(!s)
+      assertRejected(r, "completed")
+
+  private def assertRejected(r: Result[ArchiveDuplication.Snapshot], reason: String): Unit =
+    r match
+      case Result.Failure(ps) =>
+        assert(ps.exists(_.message.contains(reason)), ps.toString)
+      case other              =>
+        fail(s"expected a rejection, got $other")
+
+  /** The workflow state obscalc would materialize once every atom has executed. */
+  private def markWorkflowCompleted(oid: Observation.Id): IO[Unit] =
+    withFreshSession: s =>
+      s.execute(
+        sql"update t_obscalc set c_workflow_state = 'completed' where c_observation_id = $observation_id".command
+      )(oid).void
 
   private def servedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
     withFreshSession: s =>
@@ -478,20 +537,31 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
 
   test("a materialized stale flag is masked once the proposal is submitted"):
     for
-      pid <- proposedProgram
-      tid <- createTargetAs(pi, pid)
-      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
-      _   <- refresh(mockOf("a.fits"))(oid)
-      _   <- setLongSlitMode(oid)
+      (pid, oid) <- proposedObservation
+      _   <- staleSnapshot(oid)
       _   <- runObscalc(oid)
       s1  <- servedStaleFlag(oid)
-      _   <- markSubmitted(pid)
+      _   <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
       s2  <- servedStaleFlag(oid)
       m   <- storedStaleFlag(oid)
     yield
       assertEquals(s1, true.some)
       assertEquals(s2, false.some)
       // The stored flag is untouched; the view derives the answer.
+      assertEquals(m, true.some)
+
+  test("a materialized stale flag is masked once the observation is completed"):
+    for
+      oid <- gmosObservation
+      _   <- staleSnapshot(oid)
+      _   <- runObscalc(oid)
+      s1  <- servedStaleFlag(oid)
+      _   <- declareCompleteDirectly(oid)
+      s2  <- servedStaleFlag(oid)
+      m   <- storedStaleFlag(oid)
+    yield
+      assertEquals(s1, true.some)
+      assertEquals(s2, false.some)
       assertEquals(m, true.some)
 
   private def storedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
@@ -508,8 +578,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
   test("the obscalc worker materializes staleness, and a refresh resets it"):
     for
       oid <- gmosObservation
-      _   <- refresh(mockOf("a.fits"))(oid)
-      _   <- setLongSlitMode(oid)
+      _   <- staleSnapshot(oid)
       _   <- runObscalc(oid)
       s1  <- storedStaleFlag(oid)
       // A refresh resets the flag at once, without waiting for obscalc.
@@ -553,8 +622,7 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
   test("a re-invalidated calculation does not write the staleness it derived"):
     for
       oid <- gmosObservation
-      _   <- refresh(mockOf("a.fits"))(oid)
-      _   <- setLongSlitMode(oid)
+      _   <- staleSnapshot(oid)
       _   <- runObscalcAfter(oid)(resetFlagAndInvalidate(oid))
       m   <- storedStaleFlag(oid)
       st  <- storedCalcState(oid)

@@ -4096,7 +4096,8 @@ type Mutation {
   Re-runs the Archive Duplication Search for an observation, replacing its
   stored result with what the Gemini Observatory Archive holds now.
 
-  Rejected once the observation's proposal has been submitted.
+  Rejected after the proposal was submitted but after it is accepted it can
+  be called again in case new targets are added/changed.
   """
   refreshArchiveDuplication(
     input: RefreshArchiveDuplicationInput!
@@ -17015,7 +17016,7 @@ type ArchiveDuplication {
   Whether the snapshot no longer describes the observation as it now stands:
   the archive queries the search would run today differ from `queryUrls`.
   Never true when nothing was searched, when nothing can be searched now, or
-  after submission.
+  when frozen depending on the proposal state.
   """
   stale: Boolean!
 

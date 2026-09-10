@@ -40,8 +40,12 @@ import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
 import org.typelevel.otel4s.trace.Span
 import org.typelevel.otel4s.trace.Tracer
+import skunk.Decoder
+import skunk.Fragment
 import skunk.Query
 import skunk.Transaction
+import skunk.codec.boolean.bool
+import skunk.Void
 import skunk.syntax.all.*
 
 /**
@@ -65,12 +69,29 @@ import ArchiveDuplicationSearchService.Statements
 import Services.Syntax.*
 
 /**
- * Submission freezes the snapshot, so that the count the TAC and the proposal
- * PDF see is the one the PI last saw.
+ * Enum for reasons why a snapshot is read-only
+ * * the TAC is reviewing the proposal.
+ * * The proposal was not accepted.
+ * * The observation is complete.
  */
-extension (ps: ProposalStatus)
-  def isFrozen: Boolean =
-    ps >= ProposalStatus.Submitted
+enum FreezeReason:
+  case Submitted
+  case NotAccepted
+  case Completed
+
+  def message: String = this match
+    case Submitted   => "The Archive Duplication Search cannot be re-run because the proposal has been submitted and is awaiting a decision."
+    case NotAccepted => "The Archive Duplication Search cannot be re-run because the proposal was not accepted."
+    case Completed   => "The Archive Duplication Search cannot be re-run because the observation has been completed."
+
+object FreezeReason:
+
+  /** Only an unsubmitted or accepted proposal may re-check an incomplete observation. */
+  def of(proposalStatus: ProposalStatus, completed: Boolean): Option[FreezeReason] =
+    proposalStatus match
+      case ProposalStatus.NotSubmitted | ProposalStatus.Accepted => Option.when(completed)(Completed)
+      case ProposalStatus.Submitted                              => Submitted.some
+      case ProposalStatus.NotAccepted                            => NotAccepted.some
 
 /** What the query policy needs, as loaded from the database. */
 final case class QueryContext(
@@ -78,7 +99,7 @@ final case class QueryContext(
   explicitBase:   Option[Coordinates],
   referenceTime:  Option[Timestamp],
   asterism:       List[Target],
-  proposalStatus: ProposalStatus
+  freeze:         Option[FreezeReason]
 ):
   lazy val pointings: List[GoaQueryPolicy.TargetPointing] =
     asterism.map(GoaQueryPolicy.TargetPointing.fromTarget)
@@ -90,15 +111,16 @@ object QueryContext:
     observationId: Observation.Id
   )(using Services[F], Transaction[F]): F[Option[QueryContext]] =
     session.option(Statements.SelectObservation)(observationId).flatMap:
-      case None                              => none.pure
-      case Some((omt, ra, dec, refTime, ps)) =>
+      case None                                  =>
+        none.pure
+      case Some((omt, ra, dec, refTime, freeze)) =>
         val explicitBase = (ra, dec).mapN(Coordinates.apply)
         for
           mode     <- Services.asSuperUser(omt.traverse: t =>
                         observingModeServices.selectObservingMode(List((observationId, t)))
                       ).map(_.flatMap(_.get(observationId)))
           asterism <- Services.asSuperUser(asterismService.getAsterism(observationId))
-        yield QueryContext(mode, explicitBase, refTime, asterism.map(_._2), ps).some
+        yield QueryContext(mode, explicitBase, refTime, asterism.map(_._2), freeze).some
 
 /** The asterism center, resolved only when the search actually uses it. */
 def resolveCenter[F[_]: {Concurrent, Clock}](
@@ -132,9 +154,9 @@ def isArchiveSearchStale[F[_]: {Concurrent, Clock}](
     case None             => false.pure[F]  // never searched
     case Some(storedUrls) =>
       QueryContext.load(observationId).flatMap:
-        case None                                     => false.pure[F]  // observation gone
-        case Some(ctx) if ctx.proposalStatus.isFrozen => false.pure[F]
-        case Some(ctx)                                =>
+        case None                              => false.pure  // observation gone
+        case Some(ctx) if ctx.freeze.isDefined => false.pure
+        case Some(ctx)                         =>
           resolveCenter(observationId, ctx).map: center =>
             val urls = queryUrlsOf(queriesFor(ctx, center))
             urls.nonEmpty && urls =!= storedUrls
@@ -179,12 +201,11 @@ object ArchiveDuplicationSearchService:
       private def loadContext(observationId: Observation.Id)(using NoTransaction[F]): F[Result[QueryContext]] =
         services.transactionally:
           QueryContext.load(observationId).map:
-            case None                                     =>
+            case None      =>
               OdbError.InvalidObservation(observationId).asFailure
-            case Some(ctx) if ctx.proposalStatus.isFrozen =>
-              OdbError.InvalidObservation(observationId, frozen).asFailure
-            case Some(ctx)                                =>
-              Result(ctx)
+            case Some(ctx) =>
+              ctx.freeze.fold(Result(ctx)): reason =>
+                OdbError.InvalidObservation(observationId, reason.message.some).asFailure
 
       private def search(
         observationId: Observation.Id,
@@ -272,39 +293,34 @@ object ArchiveDuplicationSearchService:
               .as(ArchiveDuplication.Snapshot(summary, matches))
 
       /**
-       * Applies a snapshot write, but only while the proposal is still ours to
-       * replace.  `loadContext` already rejects a frozen proposal, but the
-       * multi-second GOA call runs between that check and this write, so a
-       * proposal submitted in the meantime would otherwise overwrite the frozen
-       * snapshot the TAC is meant to see.  Re-reading the status here — inside
-       * the writing transaction and behind a `FOR NO KEY UPDATE` lock on the
-       * program row, which serialises against the submission `UPDATE` — makes the
-       * freeze hold at the one place that writes the snapshot, as the ADR
-       * requires.  A refused write returns whatever is currently stored.
-       *
-       * The lock spans this transaction only.  The GOA call has already returned
-       * by the time it opens, which is why `refresh` takes `NoTransaction`.
+       * Writes the snapshot unless a freeze is now in force.
        */
       private def storeUnlessFrozen(
         observationId: Observation.Id
       )(write: Transaction[F] ?=> F[ArchiveDuplication.Snapshot])(using NoTransaction[F]): F[ArchiveDuplication.Snapshot] =
         services.transactionally:
-          session.option(Statements.LockProposalStatus)(observationId).flatMap:
-            case Some(ps) if !ps.isFrozen => write
-            case _                        => archiveDuplicationService.select(observationId)
-
-      private val frozen: Option[String] =
-        "The Archive Duplication Search cannot be re-run because the proposal has been submitted.".some
+          session.option(Statements.LockFreezeState)(observationId).flatMap:
+            case Some(None) => write
+            case _          => archiveDuplicationService.select(observationId)
 
   object Statements:
 
     /**
      * Observing mode, explicit base and reference time, as the policy needs
-     * them, plus the proposal status, which decides whether the snapshot is
-     * still ours to replace.
+     * them, plus the freeze.
      */
     type ObservationRow =
-      (Option[ObservingModeType], Option[RightAscension], Option[Declination], Option[Timestamp], ProposalStatus)
+      (Option[ObservingModeType], Option[RightAscension], Option[Declination], Option[Timestamp], Option[FreezeReason])
+
+    /** Proposal status and completion, read as the freeze they imply. */
+    val freeze_reason: Decoder[Option[FreezeReason]] =
+      (proposal_status *: bool).map(FreezeReason.of)
+
+    val FreezeColumns: Fragment[Void] =
+      sql"""
+        p.c_proposal_status,
+        observation_completed(o.c_declared_state, oc.c_workflow_state)
+      """
 
     val SelectObservation: Query[Observation.Id, ObservationRow] =
       sql"""
@@ -313,11 +329,12 @@ object ArchiveDuplicationSearchService:
           o.c_explicit_ra,
           o.c_explicit_dec,
           COALESCE(o.c_observation_time, o.c_reference_time),
-          p.c_proposal_status
+          $FreezeColumns
         FROM v_observation o
         JOIN t_program p ON p.c_program_id = o.c_program_id
+        LEFT JOIN t_obscalc oc ON oc.c_observation_id = o.c_observation_id
         WHERE o.c_observation_id = $observation_id
-      """.query(observing_mode_type.opt *: right_ascension.opt *: declination.opt *: core_timestamp.opt *: proposal_status)
+      """.query(observing_mode_type.opt *: right_ascension.opt *: declination.opt *: core_timestamp.opt *: freeze_reason)
 
     /** What the stored search actually asked. */
     val SelectStoredQueryUrls: Query[Observation.Id, List[String]] =
@@ -328,9 +345,8 @@ object ArchiveDuplicationSearchService:
       """.query(text_list)
 
     /**
-     * The observation's proposal status, taking a row lock on the program so a
-     * submission that lands during the GOA call cannot slip in between this read
-     * and the snapshot write that follows it in the same transaction.
+     * The freeze inputs, taking a row lock on the program so a submission that
+     * lands during the GOA call cannot slip in before the snapshot write.
      *
      * `FOR NO KEY UPDATE` rather than `FOR UPDATE`, for the reason V1227 gives:
      * `FOR UPDATE` is the only mode conflicting with the `FOR KEY SHARE` that
@@ -344,11 +360,12 @@ object ArchiveDuplicationSearchService:
      * `UPDATE` a key update taking `FOR UPDATE`.  That is exactly the lock V1280
      * removed, for the same reason given here.)
      */
-    val LockProposalStatus: Query[Observation.Id, ProposalStatus] =
+    val LockFreezeState: Query[Observation.Id, Option[FreezeReason]] =
       sql"""
-        SELECT p.c_proposal_status
+        SELECT $FreezeColumns
         FROM t_observation o
         JOIN t_program p ON p.c_program_id = o.c_program_id
+        LEFT JOIN t_obscalc oc ON oc.c_observation_id = o.c_observation_id
         WHERE o.c_observation_id = $observation_id
         FOR NO KEY UPDATE OF p
-      """.query(proposal_status)
+      """.query(freeze_reason)
