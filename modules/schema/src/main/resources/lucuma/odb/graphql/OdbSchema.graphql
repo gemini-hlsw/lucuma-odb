@@ -12607,8 +12607,8 @@ input GnirsSpectroscopyInput {
 
   """
   The central wavelengths at which spectra are taken, in the order the sequence
-  should execute them.  Required on create, and must contain at least one entry;
-  a wavelength may be repeated, each occurrence being an independent
+  should execute them.  Required on create, and must contain between 1 and 100
+  entries; a wavelength may be repeated, each occurrence being an independent
   configuration.  When given on edit, it replaces the existing list wholesale.
   """
   centralWavelengths: [GnirsCentralWavelengthConfigInput!]
@@ -12656,8 +12656,8 @@ input GnirsLongSlitInput {
 
   """
   The central wavelengths at which spectra are taken, in the order the sequence
-  should execute them.  Required on create, and must contain at least one entry;
-  a wavelength may be repeated, each occurrence being an independent
+  should execute them.  Required on create, and must contain between 1 and 100
+  entries; a wavelength may be repeated, each occurrence being an independent
   configuration.  When given on edit, it replaces the existing list wholesale.
   """
   centralWavelengths: [GnirsCentralWavelengthConfigInput!]
@@ -12705,8 +12705,8 @@ input GnirsIfuInput {
 
   """
   The central wavelengths at which spectra are taken, in the order the sequence
-  should execute them.  Required on create, and must contain at least one entry;
-  a wavelength may be repeated, each occurrence being an independent
+  should execute them.  Required on create, and must contain between 1 and 100
+  entries; a wavelength may be repeated, each occurrence being an independent
   configuration.  When given on edit, it replaces the existing list wholesale.
   """
   centralWavelengths: [GnirsCentralWavelengthConfigInput!]

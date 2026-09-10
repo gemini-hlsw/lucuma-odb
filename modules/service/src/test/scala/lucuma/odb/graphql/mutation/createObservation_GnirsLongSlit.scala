@@ -1437,6 +1437,46 @@ class createObservation_GnirsLongSlit extends OdbSuite:
           """)
         )
 
+  // The cap and the empty check are the two ends of the same validation, and the upper
+  // one also pins the Int -> Short narrowing behind `c_index`: the last accepted entry
+  // sits at index 99, which must survive the round trip through the smallint column and
+  // come back last.
+  private def wavelengthList(n: Int): String =
+    (0 until n).map(i => timeAndCount(1000 + i, 3)).mkString("[ ", " ", " ]")
+
+  test("create GNIRS Long Slit accepts the maximum central wavelength list"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        query(
+          user  = pi,
+          query = createWithWavelengths(
+            pid.toString,
+            tid.toString,
+            wavelengthList(100),
+            "centralWavelengths { centralWavelength { nanometers } }"
+          )
+        ).map: js =>
+          val ws =
+            js.hcursor
+              .downFields("createObservation", "observation", "observingMode", "gnirsSpectroscopy", "centralWavelengths")
+              .values
+              .toList
+              .flatten
+              .flatMap(_.hcursor.downFields("centralWavelength", "nanometers").as[BigDecimal].toOption)
+              .map(_.toInt)
+          assertEquals(ws, (0 until 100).map(1000 + _).toList)
+
+  test("create GNIRS Long Slit rejects a central wavelength list over the maximum"):
+    createProgramAs(pi).flatMap: pid =>
+      createTargetAs(pi, pid).flatMap: tid =>
+        expect(
+          user  = pi,
+          query = createWithWavelengths(pid.toString, tid.toString, wavelengthList(101), "centralWavelengths { coadds }"),
+          expected = Left(List(
+            "Argument 'input.SET.observingMode.gnirsSpectroscopy' is invalid: At most 100 central wavelengths may be specified for GNIRS spectroscopy observations."
+          ))
+        )
+
   test("create GNIRS Long Slit rejects an empty central wavelength list"):
     createProgramAs(pi).flatMap: pid =>
       createTargetAs(pi, pid).flatMap: tid =>

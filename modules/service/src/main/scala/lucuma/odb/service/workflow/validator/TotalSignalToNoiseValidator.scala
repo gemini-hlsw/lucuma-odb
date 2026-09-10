@@ -56,11 +56,33 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
         case GmosSouthImaging(science)  => warningsForMap(science)
         case GnirsImaging(science)      => warningsForMap(science)
         case Spectroscopy(science)      => warningsForZipper(science)
-        case GnirsSpectroscopy(science) => warningsForKeyed(science) { w => f"${Wavelength.decimalNanometers.reverseGet(w)}%4.3f nm".some }
+        case GnirsSpectroscopy(science) => warningsForKeyed(gnirsSpectroscopyLabels(science.map(_._1)).zipWith(science)((l, r) => (l, r._2)))(_.some)
  
 object TotalSignalToNoiseValidator:
 
   val MinRecommended = TotalSN(SignalToNoise.unsafeFromBigDecimalExact(3))
+
+  /**
+   * Names each GNIRS spectroscopy central wavelength for the warning that may refer to
+   * it, in list order.
+   *
+   * A repeated central wavelength is an independent configuration with its own exposure
+   * time mode, coadds and ITC result, so the wavelength alone does not say which one
+   * fell short.  A 1-based occurrence ordinal is appended when -- and only when -- that
+   * wavelength repeats, leaving the labels of the single-wavelength and all-distinct
+   * cases exactly as they were.  This mirrors the sequence atom titles (see
+   * `gnirs.spectroscopy.Science.titleSuffixes`), so a warning and the sequence segment
+   * it refers to name the configuration the same way.
+   */
+  private[validator] def gnirsSpectroscopyLabels(
+    ws: NonEmptyList[Wavelength]
+  ): NonEmptyList[String] =
+    def nm(w: Wavelength): String =
+      f"${Wavelength.decimalNanometers.reverseGet(w)}%4.3f nm"
+
+    ws.zipWithIndex.map: (w, i) =>
+      if ws.toList.count(_ === w) <= 1 then nm(w)
+      else s"${nm(w)} #${ws.toList.take(i).count(_ === w) + 1}"
 
   def warning(extra: Option[String], actual: TotalSN): ObservationValidation =
     ObservationValidation.Warning.lowTotalSignalToNoise(extra, MinRecommended, actual)
