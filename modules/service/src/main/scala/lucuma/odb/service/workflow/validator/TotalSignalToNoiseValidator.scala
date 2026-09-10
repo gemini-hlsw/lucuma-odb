@@ -24,6 +24,8 @@ import lucuma.odb.data.ItcScience.GnirsImaging
 import lucuma.odb.data.ItcScience.GnirsSpectroscopy
 import lucuma.odb.data.ItcScience.Spectroscopy
 import lucuma.odb.data.ObservationValidationMap
+import lucuma.odb.sequence.gnirs.wavelengthOccurrences
+import lucuma.odb.sequence.gnirs.withOccurrence
 
 // warn if < 3
 case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) extends ObservationValidator:
@@ -68,11 +70,9 @@ object TotalSignalToNoiseValidator:
    *
    * A repeated central wavelength is an independent configuration with its own exposure
    * time mode, coadds and ITC result, so the wavelength alone does not say which one
-   * fell short.  A 1-based occurrence ordinal is appended when -- and only when -- that
-   * wavelength repeats, leaving the labels of the single-wavelength and all-distinct
-   * cases exactly as they were.  This mirrors the sequence atom titles (see
-   * `gnirs.spectroscopy.Science.titleSuffixes`), so a warning and the sequence segment
-   * it refers to name the configuration the same way.
+   * fell short.  The ordinal comes from `gnirs.wavelengthOccurrences`, shared with the
+   * sequence atom titles and the GNIRS configuration checks, so a warning and the
+   * sequence segment it refers to name the configuration the same way.
    */
   private[validator] def gnirsSpectroscopyLabels(
     ws: NonEmptyList[Wavelength]
@@ -80,9 +80,9 @@ object TotalSignalToNoiseValidator:
     def nm(w: Wavelength): String =
       f"${Wavelength.decimalNanometers.reverseGet(w)}%4.3f nm"
 
+    val occurrences = wavelengthOccurrences(ws.toList)
     ws.zipWithIndex.map: (w, i) =>
-      if ws.toList.count(_ === w) <= 1 then nm(w)
-      else s"${nm(w)} #${ws.toList.take(i).count(_ === w) + 1}"
+      withOccurrence(nm(w), occurrences(i))
 
   def warning(extra: Option[String], actual: TotalSN): ObservationValidation =
     ObservationValidation.Warning.lowTotalSignalToNoise(extra, MinRecommended, actual)

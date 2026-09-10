@@ -344,10 +344,9 @@ object Science:
   ): NonEmptyList[Option[String]] =
     if !multi then ws.map(_ => none[String])
     else
+      val occurrences = wavelengthOccurrences(ws.toList.map(_.centralWavelength))
       ws.zipWithIndex.map: (sw, i) =>
-        val w = sw.centralWavelength
-        if ws.toList.count(_.centralWavelength === w) <= 1 then nm(sw).some
-        else s"${nm(sw)} #${ws.toList.take(i).count(_.centralWavelength === w) + 1}".some
+        withOccurrence(nm(sw), occurrences(i)).some
 
   // "GNIRS Spectroscopy" rather than "Long Slit": this generator serves the IFU too.
   private def zeroExposureTime(oid: Observation.Id): OdbError =
