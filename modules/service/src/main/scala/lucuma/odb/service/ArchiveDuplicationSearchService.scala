@@ -44,8 +44,8 @@ import skunk.Decoder
 import skunk.Fragment
 import skunk.Query
 import skunk.Transaction
-import skunk.codec.boolean.bool
 import skunk.Void
+import skunk.codec.boolean.bool
 import skunk.syntax.all.*
 
 /**

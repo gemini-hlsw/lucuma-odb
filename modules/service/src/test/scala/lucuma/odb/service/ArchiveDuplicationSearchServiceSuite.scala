@@ -10,8 +10,8 @@ import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.goa.GoaClientMock
 import lucuma.catalog.goa.GoaParams
 import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
-import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.enums.ProposalStatus
+import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
@@ -563,6 +563,15 @@ class ArchiveDuplicationSearchServiceSuite extends OdbSuite:
       assertEquals(s1, true.some)
       assertEquals(s2, false.some)
       assertEquals(m, true.some)
+
+  test("the worker stores a completed observation as not stale"):
+    for
+      oid <- gmosObservation
+      _   <- staleSnapshot(oid)
+      _   <- declareCompleteDirectly(oid)
+      _   <- runObscalc(oid)
+      m   <- storedStaleFlag(oid)
+    yield assertEquals(m, false.some)
 
   private def storedStaleFlag(oid: Observation.Id): IO[Option[Boolean]] =
     withFreshSession: s =>
