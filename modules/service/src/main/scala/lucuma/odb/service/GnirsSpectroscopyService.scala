@@ -642,8 +642,8 @@ object GnirsSpectroscopyService:
         SET.explicitFocusMotorSteps.toOptionOption.map(upFocus),
         SET.explicitReadMode.toOptionOption.map(upReadMode),
         SET.explicitWellDepth.toOptionOption.map(upWellDepth),
-        SET.explicitGrating.toOptionOption.map(upGrating),
-        SET.explicitPrism.toOptionOption.map(upPrism),
+        SET.explicitGrating.toOptionOption.orElse(SET.grating.toOptionOption).map(upGrating),
+        SET.explicitPrism.toOptionOption.orElse(SET.prism.toOptionOption).map(upPrism),
         SET.telluricType.map(upTelluricType)
       ).flatten ++ upTelescope.toList.flatten ++ acqUpdates
 
