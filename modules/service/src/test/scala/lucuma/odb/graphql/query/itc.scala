@@ -811,9 +811,10 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
         }
       """
 
-    // One result set per central wavelength, ordered by increasing wavelength.
-    // The fake ITC echoes the requested Time & Count count (3) for science; the
-    // acquisition pass uses the fake default.
+    // One result set per central wavelength, in the order the wavelengths were
+    // submitted (2300, 2100, 2200) rather than sorted -- the results pair with the
+    // configuration positionally.  The fake ITC echoes the requested Time & Count
+    // count (3) for science; the acquisition pass uses the fake default.
     val expected: Json =
       json"""
         {
@@ -821,19 +822,101 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
             "itc": {
               "gnirsSpectroscopyScience": [
                 {
+                  "centralWavelength": { "nanometers": 2300.000 },
+                  "results": { "selected": { "exposureCount": 3 } }
+                },
+                {
                   "centralWavelength": { "nanometers": 2100.000 },
                   "results": { "selected": { "exposureCount": 3 } }
                 },
                 {
                   "centralWavelength": { "nanometers": 2200.000 },
                   "results": { "selected": { "exposureCount": 3 } }
-                },
-                {
-                  "centralWavelength": { "nanometers": 2300.000 },
-                  "results": { "selected": { "exposureCount": 3 } }
                 }
               ],
               "acquisition": { "selected": { "exposureCount": ${FakeItcResult.exposureCount.value} } }
+            }
+          }
+        }
+      """
+
+    for
+      p <- createProgram
+      t <- createTargetWithProfileAs(user, p)
+      o <- createGnirsLongSlitObservationAs(user, p, t)
+      _ <- setWavelengths(o)
+      _ <- expect(user = user, query = q(o), expected = expected.asRight)
+    yield ()
+
+  test("GNIRS spectroscopy: a repeated central wavelength gets its own ITC result"):
+
+    // Two entries at the same wavelength but with different exposure time modes.  They
+    // are independent configurations, so each gets its own ITC call and its own result
+    // set -- results are paired with the configuration positionally, not looked up by
+    // wavelength.
+    def setWavelengths(oid: Observation.Id): IO[Unit] =
+      query(
+        user,
+        s"""
+          mutation {
+            updateObservations(input: {
+              SET: {
+                observingMode: {
+                  gnirsSpectroscopy: {
+                    centralWavelengths: [
+                      {
+                        centralWavelength: { nanometers: 2200 }
+                        exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } } }
+                      }
+                      {
+                        centralWavelength: { nanometers: 2200 }
+                        exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 7 at: { nanometers: 2200 } } }
+                      }
+                    ]
+                  }
+                }
+              }
+              WHERE: { id: { EQ: "$oid" } }
+            }) {
+              observations { id }
+            }
+          }
+        """
+      ).void
+
+    def q(oid: Observation.Id): String =
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            itc {
+              ... on ItcGnirsSpectroscopy {
+                gnirsSpectroscopyScience {
+                  centralWavelength { nanometers }
+                  results { selected { exposureCount } }
+                }
+              }
+            }
+          }
+        }
+      """
+
+    // The fake ITC echoes the requested Time & Count count, so the two entries are
+    // distinguishable even though they share a wavelength.
+    val expected: Json =
+      json"""
+        {
+          "observation": {
+            "itc": {
+              "gnirsSpectroscopyScience": [
+                {
+                  "centralWavelength": { "nanometers": 2200.000 },
+                  "results": { "selected": { "exposureCount": 3 } }
+                },
+                {
+                  "centralWavelength": { "nanometers": 2200.000 },
+                  "results": { "selected": { "exposureCount": 7 } }
+                }
+              ]
             }
           }
         }

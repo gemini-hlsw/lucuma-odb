@@ -4,6 +4,7 @@
 package lucuma.odb.service.workflow
 package validator
 
+import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
 import cats.syntax.all.*
 import lucuma.core.data.Zipper
@@ -36,9 +37,12 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
       .map(warning(extra, _))
       .foldMap(ObservationValidationMap.singleton)
 
-  def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(f: A => Option[String]): ObservationValidationMap =
-    map.toNel.foldMap: (a, z) =>
+  def warningsForKeyed[A](keyed: NonEmptyList[(A, Zipper[ItcResult])])(f: A => Option[String]): ObservationValidationMap =
+    keyed.foldMap: (a, z) =>
       warningsForZipper(z, f(a))
+
+  def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(f: A => Option[String]): ObservationValidationMap =
+    warningsForKeyed(map.toNel)(f)
 
   def warningsForMap[A](map: NonEmptyMap[A, Zipper[ItcResult]])(using e: Enumerated[A]): ObservationValidationMap =
     warningsForMap(map)(e.tag(_).some)
@@ -52,7 +56,7 @@ case class TotalSignalToNoiseValidator(itcFor: Observation.Id => Option[Itc]) ex
         case GmosSouthImaging(science)  => warningsForMap(science)
         case GnirsImaging(science)      => warningsForMap(science)
         case Spectroscopy(science)      => warningsForZipper(science)
-        case GnirsSpectroscopy(science) => warningsForMap(science) { w => f"${Wavelength.decimalNanometers.reverseGet(w)}%4.3f nm".some }
+        case GnirsSpectroscopy(science) => warningsForKeyed(science) { w => f"${Wavelength.decimalNanometers.reverseGet(w)}%4.3f nm".some }
  
 object TotalSignalToNoiseValidator:
 

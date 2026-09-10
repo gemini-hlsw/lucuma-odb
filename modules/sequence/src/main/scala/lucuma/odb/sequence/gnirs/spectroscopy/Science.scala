@@ -8,7 +8,6 @@ package spectroscopy
 import cats.Monad
 import cats.data.EitherT
 import cats.data.NonEmptyList
-import cats.data.NonEmptyMap
 import cats.data.NonEmptyVector
 import cats.data.State
 import cats.syntax.either.*
@@ -209,7 +208,8 @@ object Science:
   case class WavelengthBlock(
     steps:         StepDefinition,
     cycleEstimate: TimeSpan,
-    goalCycles:    NonNegInt
+    goalCycles:    NonNegInt,
+    titleSuffix:   Option[String]
   )
 
   /**
@@ -228,8 +228,6 @@ object Science:
     blocks:  NonEmptyVector[WavelengthBlock],
     builder: AtomBuilder[GnirsDynamicConfig]
   ) extends SequenceGenerator[GnirsDynamicConfig]:
-
-    private val multi: Boolean = blocks.length > 1
 
     /**
      * Nominal on-sky time given to one wavelength before moving to the next.
@@ -260,11 +258,11 @@ object Science:
       val scienceTime: TimeSpan = b.cycleEstimate *| cycles
 
       val scienceAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] =
-        ProtoAtom(atomTitle(ScienceCycleTitle, b.steps.wavelength, multi).some, b.steps.scienceSteps)
+        ProtoAtom(atomTitle(ScienceCycleTitle, b.titleSuffix).some, b.steps.scienceSteps)
 
       b.steps.cals.fold(cycles -> List.fill(cycles)(scienceAtom)): cals =>
         val gcalAtom: ProtoAtom[ProtoStep[GnirsDynamicConfig]] =
-          ProtoAtom(atomTitle(NighttimeCalTitle, b.steps.wavelength, multi).some, cals)
+          ProtoAtom(atomTitle(NighttimeCalTitle, b.titleSuffix).some, cals)
 
         cycles ->
           Option
@@ -320,19 +318,40 @@ object Science:
 
   /**
    * Atom title for a block of steps taken at one central wavelength: bare when
-   * the observation has a single wavelength (so existing sequences are
-   * unchanged), suffixed with the wavelength when it has several, so the
-   * observer can tell the segments apart.
+   * the suffix is absent, parenthesised after the base otherwise.
    */
-  private def atomTitle(base: NonEmptyString, sw: CentralWavelengthConfig, multi: Boolean): NonEmptyString =
-    if multi then NonEmptyString.unsafeFrom(s"${base.value} (${nm(sw)})") else base
+  private def atomTitle(base: NonEmptyString, suffix: Option[String]): NonEmptyString =
+    suffix.fold(base)(t => NonEmptyString.unsafeFrom(s"${base.value} ($t)"))
+
+  /**
+   * The atom title suffix for each central wavelength, in list order: `None` when
+   * the observation has a single wavelength (so existing sequences keep their bare
+   * titles), the wavelength when it has several, and the wavelength plus a 1-based
+   * occurrence ordinal when that wavelength repeats -- duplicate entries are
+   * independent configurations and the observer must be able to tell their
+   * segments apart.
+   */
+  private def titleSuffixes(ws: NonEmptyList[CentralWavelengthConfig]): NonEmptyList[Option[String]] =
+    if ws.length <= 1 then ws.map(_ => none[String])
+    else
+      ws.zipWithIndex.map: (sw, i) =>
+        val w = sw.centralWavelength
+        if ws.toList.count(_.centralWavelength === w) <= 1 then nm(sw).some
+        else s"${nm(sw)} #${ws.toList.take(i).count(_.centralWavelength === w) + 1}".some
 
   // "GNIRS Spectroscopy" rather than "Long Slit": this generator serves the IFU too.
   private def zeroExposureTime(oid: Observation.Id): OdbError =
     definitionError(oid, "GNIRS Spectroscopy requires a positive exposure time.")
 
-  private def missingItcResult(oid: Observation.Id, sw: CentralWavelengthConfig): OdbError =
-    definitionError(oid, s"No ITC result for central wavelength ${nm(sw)}.")
+  // The ITC fans out one science call per central wavelength, in list order, so the
+  // results pair with the configuration positionally.  Both of these indicate a bug
+  // upstream rather than anything the user did.
+  private def itcResultCountMismatch(oid: Observation.Id, expected: Int, actual: Int): OdbError =
+    definitionError(oid, s"Expected $expected ITC result(s), one per central wavelength, but found $actual.")
+
+  private def itcResultMismatch(oid: Observation.Id, sw: CentralWavelengthConfig, actual: Wavelength): OdbError =
+    val a = f"${actual.toNanometers.value.value.toDouble}%.0f nm"
+    definitionError(oid, s"ITC result wavelength $a does not match the configured ${nm(sw)}.")
 
   private def exposureTimeTooLong(oid: Observation.Id, sw: CentralWavelengthConfig, estimate: TimeSpan): OdbError =
     definitionError(oid, s"Estimated science cycle time (${estimate.toMinutes} minutes) at ${nm(sw)} for $oid must be less than ${MaxSciencePeriod.toMinutes} minutes.")
@@ -378,16 +397,18 @@ object Science:
           f <- SeqState.flatStep(TelescopeConfig(Offset.Zero, StepGuideState.Disabled), ObserveClass.DayCal)
         yield f
 
+    // `distinctBy` keeps the first occurrence, so a repeated wavelength contributes one
+    // flat carrying that occurrence's coadds.  Arbitrary between duplicates, but harmless:
+    // these are DayCal steps and cost no program time.
     val distinctWavelengths: NonEmptyList[CentralWavelengthConfig] =
       NonEmptyList.fromListUnsafe(config.wavelengths.toList.distinctBy(_.centralWavelength))
 
-    val multi: Boolean = distinctWavelengths.length > 1
-
     distinctWavelengths
-      .traverse: sw =>
+      .zip(titleSuffixes(distinctWavelengths))
+      .traverse: (sw, suffix) =>
         EitherT(expander.expandStep(static, flat(sw)))
           .map: steps =>
-            ProtoAtom(atomTitle(DaytimePinholeTitle, sw, multi).some, steps)
+            ProtoAtom(atomTitle(DaytimePinholeTitle, suffix).some, steps)
       .bimap(
         m => definitionError(observationId, m),
         atoms =>
@@ -404,7 +425,7 @@ object Science:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
-    times:         Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]],
+    times:         Either[OdbError, NonEmptyList[(Wavelength, IntegrationTime)]],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
     calRole match
@@ -420,21 +441,31 @@ object Science:
     namespace:     UUID,
     expander:      SmartGcalExpander[F, GnirsStaticConfig, GnirsDynamicConfig],
     config:        Config,
-    times:         Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]],
+    times:         Either[OdbError, NonEmptyList[(Wavelength, IntegrationTime)]],
     calRole:       Option[CalibrationRole]
   ): F[Either[OdbError, SequenceGenerator[GnirsDynamicConfig]]] =
 
-    // Pair each configured wavelength with its ITC result, in configuration
-    // order.  A wavelength with no result is a programming error upstream, not
-    // something to silently drop.
+    // Pair each configured wavelength with its ITC result positionally: there is one
+    // ITC call per list entry, made in list order, and a wavelength may repeat, so the
+    // results cannot be looked up by wavelength.  The wavelengths are checked as they
+    // are zipped; a mismatch is a programming error upstream, not something to
+    // silently accept.
     val pairs: EitherT[F, OdbError, NonEmptyList[(CentralWavelengthConfig, IntegrationTime)]] =
       EitherT.fromEither:
-        times.flatMap: m =>
-          config.wavelengths.traverse: sw =>
-            m(sw.centralWavelength)
-              .toRight(missingItcResult(observationId, sw))
-              .flatMap: t =>
-                Either.cond(t.exposureTime.toNonNegMicroseconds.value > 0, (sw, t), zeroExposureTime(observationId))
+        times.flatMap: ts =>
+          Either
+            .cond(
+              ts.length === config.wavelengths.length,
+              (),
+              itcResultCountMismatch(observationId, config.wavelengths.length, ts.length)
+            )
+            .flatMap: _ =>
+              config.wavelengths.zip(ts).traverse: (sw, wt) =>
+                val (w, t) = wt
+                for
+                  _ <- Either.cond(w === sw.centralWavelength, (), itcResultMismatch(observationId, sw, w))
+                  _ <- Either.cond(t.exposureTime.toNonNegMicroseconds.value > 0, (), zeroExposureTime(observationId))
+                yield (sw, t)
 
     // A science cycle must fit inside the calibration validity period at every
     // wavelength; the error names the offending one.
@@ -446,11 +477,12 @@ object Science:
     val gen = for
       ts <- pairs
       ds <- StepDefinition.computeAll(config, ts, static, expander, calRole).leftMap(m => definitionError(observationId, m))
-      bs <- ds.zip(ts).traverse: (d, wt) =>
+      bs <- ds.zip(ts).zip(titleSuffixes(config.wavelengths)).traverse: (dwt, suffix) =>
+              val (d, wt) = dwt
               for
                 e <- cycleEstimate(d)
                 c <- EitherT.fromEither(d.cycleCount(wt._2).leftMap(m => definitionError(observationId, m)))
-              yield WavelengthBlock(d, e, c)
+              yield WavelengthBlock(d, e, c, suffix)
     yield Generator(
       bs.toNev,
       AtomBuilder.instantiate(estimator, static, namespace, SequenceType.Science)

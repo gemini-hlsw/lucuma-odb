@@ -643,3 +643,72 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
 
         val wavelengthChanges = changes.filter(_._1 == "GNIRS Wavelength")
         assertEquals(wavelengthChanges.map(_._2), List(BigDecimal("10.000000")))
+
+  test("[gnirs] a repeated central wavelength runs as two segments, titled apart, with no turret move"):
+    // The same wavelength listed twice is two independent configurations, so it runs as
+    // two segments each closed by its own calibrations -- exactly as two distinct
+    // wavelengths would.  Because the wavelength is the same in both, the titles carry a
+    // 1-based occurrence ordinal so the observer can tell the segments apart, and the
+    // grating turret never moves, so no GNIRS Wavelength overhead is charged.
+    val setup: IO[Observation.Id] =
+      for
+        oid <- gnirsObs
+        _   <- query(
+                 pi,
+                 s"""
+                   mutation {
+                     updateObservations(input: {
+                       SET: {
+                         observingMode: {
+                           gnirsSpectroscopy: {
+                             centralWavelengths: [
+                               {
+                                 centralWavelength: { nanometers: 2200 }
+                                 exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } } }
+                               }
+                               {
+                                 centralWavelength: { nanometers: 2200 }
+                                 exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 2200 } } }
+                               }
+                             ]
+                           }
+                         }
+                       }
+                       WHERE: { id: { EQ: "$oid" } }
+                     }) { observations { id } }
+                   }
+                 """
+               ).void
+      yield oid
+
+    def titled(atom: Json, description: String): Json =
+      atom.deepMerge(Json.obj("description" -> description.asJson))
+
+    setup.flatMap: oid =>
+      val sci1 = titled(
+        gnirsExpectedScienceAtom(DynamicSnapshot, (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)),
+        "Science Cycle (2200 nm #1)"
+      )
+      val cal1 = titled(calAtom(0, 2), "Nighttime Calibrations (2200 nm #1)")
+      val sci2 = titled(
+        gnirsExpectedScienceAtom(DynamicSnapshot, (0, 2, Enabled), (0, -4, Enabled), (0, -4, Enabled), (0, 2, Enabled)),
+        "Science Cycle (2200 nm #2)"
+      )
+      val cal2 = titled(calAtom(0, 2), "Nighttime Calibrations (2200 nm #2)")
+
+      expect(
+        user     = pi,
+        query    = gnirsScienceQuery(oid),
+        expected =
+          Json.obj(
+            "executionConfig" -> Json.obj(
+              "gnirs" -> Json.obj(
+                "science" -> Json.obj(
+                  "nextAtom"       -> sci1,
+                  "possibleFuture" -> List(cal1, sci2, cal2).asJson,
+                  "hasMore"        -> false.asJson
+                )
+              )
+            )
+          ).asRight
+      )
