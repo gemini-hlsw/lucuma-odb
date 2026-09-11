@@ -892,7 +892,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
   test("gmos north case with variables") {
     query(
       """
-        query($spectroscopy: SpectroscopyInput) {\n          spectroscopy(input: $spectroscopy) {\n            brightestIndex         }\n        }\n
+        query($spectroscopy: SpectroscopyInput!) {\n          spectroscopy(input: $spectroscopy) {\n            brightestIndex         }\n        }\n
       """,
       """
         {
