@@ -45,7 +45,7 @@ val munitScalacheckVersion       = "1.3.0"   // check test output if you attempt
 val scalacheckEffectMunitVersion = "2.1.0"
 val natchezHttp4sVersion         = "0.6.2"
 val natchezVersion               = "0.3.10"
-val openTelemetryVersion         = "1.64.0"
+val openTelemetryVersion         = "1.64.0" // must match otel4s-oteljava, see .scala-steward.conf
 val openTelemetryInstrVersion    = "2.26.1-alpha"
 val otel4sVersion                = "1.1.0"
 val paigesVersion                = "0.4.4"
@@ -977,16 +977,36 @@ lazy val schema =
       npmPublish       := npmPublishForDir("npm").value
     )
 
+val checkOtelVersion = taskKey[Unit](
+  "Fail if openTelemetryVersion has drifted from what otel4s-oteljava declares."
+)
+
 lazy val otel = project
   .in(file("modules/otel"))
   .settings(
     name := "lucuma-odb-otel",
+    checkOtelVersion := {
+      val _ = update.value
+      OtelCheck.declaredOtelVersion(
+        csrCacheDirectory.value,
+        otel4sVersion,
+        scalaBinaryVersion.value
+      ) match {
+        case Some(v) if v != openTelemetryVersion =>
+          sys.error(
+            s"openTelemetryVersion is $openTelemetryVersion but otel4s-oteljava $otel4sVersion " +
+              s"declares $v. Set both to $v and move the io.opentelemetry pin in .scala-steward.conf."
+          )
+        case Some(_) => ()
+        case None    => streams.value.log.warn("Could not read the otel4s-oteljava pom; skipping version check.")
+      }
+    },
+    Compile / compile := (Compile / compile).dependsOn(checkOtelVersion).value,
     libraryDependencies ++= Seq(
       "org.tpolecat"                     %% "natchez-core"                              % natchezVersion,
       "org.tpolecat"                     %% "natchez-noop"                              % natchezVersion,
       "org.typelevel"                    %% "otel4s-oteljava"                           % otel4sVersion,
       "org.typelevel"                    %% "otel4s-instrumentation-metrics"            % otel4sVersion,
-      "io.opentelemetry"                  % "opentelemetry-sdk-extension-autoconfigure" % openTelemetryVersion,
       "io.opentelemetry"                  % "opentelemetry-exporter-otlp"               % openTelemetryVersion,
       "io.opentelemetry.instrumentation"  % "opentelemetry-runtime-telemetry"           % openTelemetryInstrVersion,
       "org.typelevel"                    %% "log4cats-core"                             % log4catsVersion,
