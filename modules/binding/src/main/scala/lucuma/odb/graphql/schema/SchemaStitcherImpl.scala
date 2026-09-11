@@ -39,7 +39,8 @@ private class SchemaStitcherImpl private[schema] (
             dependenciesTree(List.empty, root, src, imports)
               .map(x => collapseToList(AllElements, x))
               .map(x => merge(x, List.empty))
-              .map(_.map(_.asString).mkString(lineSeparator))
+              .flatMap(_.traverse(_.asString))
+              .map(_.mkString(lineSeparator))
               .flatMap(Schema(_))
 
   // An import statement always starts with '#', so only those lines are worth handing to the parser.
@@ -90,30 +91,24 @@ private case class DependencyNode(
 )
 
 private case class SchemaNode(name: Path, src: String, elements: Elements) {
-  def asString: String = elements match {
-    case AllElements    => src
+  def asString: Result[String] = elements match {
+    case AllElements    => Result.success(src)
     case ElementList(l) => asString(l)
   }
 
-  def asString(l: NonEmptySet[NonEmptyString]): String =
+  def asString(l: NonEmptySet[NonEmptyString]): Result[String] =
     Schema(src) match {
-      case Result.Success(b)    =>
-        resolveTypes(
-          b.types,
-          l.toList.flatMap(x => b.types.find(_.name === x.toString)),
-          List.empty
-        )
-          .map(SchemaRenderer.renderTypeDefn)
-          .mkString(lineSeparator)
-      case Result.Warning(_, b) =>
-        resolveTypes(
-          b.types,
-          l.toList.flatMap(x => b.types.find(_.name === x.toString)),
-          List.empty
-        )
-          .map(SchemaRenderer.renderTypeDefn)
-          .mkString(lineSeparator)
-      case _                    => ""
+      case Result.Failure(ps) =>
+        Result.Failure(ps.prepend(Problem(s"Error parsing imported schema $name")))
+      case r                  =>
+        r.map: b =>
+          resolveTypes(
+            b.types,
+            l.toList.flatMap(x => b.types.find(_.name === x.toString)),
+            List.empty
+          )
+            .map(SchemaRenderer.renderTypeDefn)
+            .mkString(lineSeparator)
     }
 
   def resolveTypes(
