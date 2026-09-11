@@ -114,6 +114,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       ReplaceIgrins2Sequence,
       ReplaceGnirsSequence,
       ReplaceGhostSequence,
+      RequestWarningDismissal,
       ResetAcquisition,
       RevokeUserInvitation,
       SetAllocations,
@@ -399,6 +400,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
                     .map(_.fold(_.asFailure, _ => oid.success))
                     .nestMap: oid =>
                       Filter(Predicates.resetAcquisitionResult.observation.id.eql(oid), child)
+
+  private lazy val RequestWarningDismissal: MutationField =
+    MutationField("requestWarningDismissal", WarningDismissalInput.Binding): (input, child) =>
+      services.useNonTransactionally:
+        selectForWarningDismissal(input).flatMap: res =>
+          res.flatTraverse: checked =>
+            observationWorkflowService.requestWarningDismissal(checked).nestMap: ids =>
+              Filter(
+                Predicates.email.id.in(ids),
+                child
+              )
 
   private lazy val CloneTarget: MutationField =
     MutationField("cloneTarget", CloneTargetInput.Binding): (input, child) =>
