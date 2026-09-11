@@ -69,6 +69,34 @@ class SchemaStitcherTest extends FunSuite {
     }
   }
 
+  test("SchemaStitcher should report a failure when an imported schema does not parse") {
+    val src    = SchemaSource.fromStringMap(
+      Map(
+        Path("importer.graphql") -> """
+          |#import TypeA from "broken.graphql"
+          |
+          |type Query {
+          |  query1: TypeA!
+          |}
+        """.stripMargin,
+        Path("broken.graphql")   -> """
+          |type TypeA {
+          |  attr0: Missing!
+          |}
+        """.stripMargin
+      )
+    )
+    val result = SchemaStitcher(Path("importer.graphql"), src).build
+    result match {
+      case Result.Failure(ps) =>
+        assert(
+          ps.exists(_.message.contains("broken.graphql")),
+          s"failure does not name the imported file: $ps"
+        )
+      case other              => fail(s"Expected a failure, got: $other")
+    }
+  }
+
   test("SchemaStitcher should keep unreferenced types when there are no imports") {
     SchemaStitcher(Path("noImportSchema.graphql"), schemaResolver).build match {
       case Success(s) =>
@@ -110,6 +138,10 @@ object SchemaStitcherTest {
     |
     |type TypeX {
     |  attr0: [TypeA]!
+    |}
+    |
+    |type Query {
+    |  query1: TypeA!
     |}
   """.stripMargin
 

@@ -222,7 +222,7 @@ class exactConstraintsSuite extends GraphQLSuite:
   test("exactconditions: spectroscopy with variables using exact values"):
     query(
       """
-        query($spectroscopy: SpectroscopyInput) {
+        query($spectroscopy: SpectroscopyInput!) {
           spectroscopy(input: $spectroscopy) {
             brightestIndex
           }
