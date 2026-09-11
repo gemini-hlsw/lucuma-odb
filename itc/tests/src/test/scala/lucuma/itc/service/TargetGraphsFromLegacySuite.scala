@@ -4,7 +4,6 @@
 package lucuma.itc.service
 
 import cats.data.NonEmptyChain
-import cats.data.NonEmptyList
 import cats.syntax.all.*
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
@@ -25,20 +24,24 @@ class TargetGraphsFromLegacySuite extends munit.FunSuite:
   private val at: Wavelength = Wavelength.fromIntNanometers(1001).get
 
   private def finalSeries(order: Int, peak: Double): ItcSeries =
-    ItcSeries(
-      s"Final S/N Order ${order + 3}",
-      SeriesDataType.FinalS2NData,
-      NonEmptyList.of(0.0, peak),
-      ItcXAxis(1000.0, 1001.0, 2)
-    )
+    ItcSeries
+      .from(
+        s"Final S/N Order ${order + 3}",
+        SeriesDataType.FinalS2NData,
+        IArray(0.0, peak),
+        ItcXAxis(1000.0, 1001.0, 2)
+      )
+      .get
 
   private def singleSeries(order: Int, peak: Double): ItcSeries =
-    ItcSeries(
-      s"Single S/N Order ${order + 3}",
-      SeriesDataType.SingleS2NData,
-      NonEmptyList.of(0.0, peak),
-      ItcXAxis(1000.0, 1001.0, 2)
-    )
+    ItcSeries
+      .from(
+        s"Single S/N Order ${order + 3}",
+        SeriesDataType.SingleS2NData,
+        IArray(0.0, peak),
+        ItcXAxis(1000.0, 1001.0, 2)
+      )
+      .get
 
   private def ccd(single: Double, total: Double): ItcRemoteCcd =
     ItcRemoteCcd(single, total, 3.0, 4.0, 5.0, Nil)
@@ -126,12 +129,14 @@ class TargetGraphsFromLegacySuite extends munit.FunSuite:
   }
 
   private def slitSeries(slit: String, tpe: SeriesDataType, peak: Double): ItcSeries =
-    ItcSeries(
-      s"$slit Slit S/N",
-      tpe,
-      NonEmptyList.of(0.0, peak),
-      ItcXAxis(1000.0, 1001.0, 2)
-    )
+    ItcSeries
+      .from(
+        s"$slit Slit S/N",
+        tpe,
+        IArray(0.0, peak),
+        ItcXAxis(1000.0, 1001.0, 2)
+      )
+      .get
 
   // The GMOS two-slit IFU reports a blue and a red slit series per CCD, so the series arrive
   // in CCD-major pairs. Pairing by plain index would give CCD 2 a CCD 0 series and never read
@@ -186,7 +191,7 @@ class TargetGraphsFromLegacySuite extends munit.FunSuite:
     atStart: Double,
     atEnd:   Double
   ): ItcSeries =
-    ItcSeries(s"$slit Slit S/N", tpe, NonEmptyList.of(atStart, atEnd), ItcXAxis(1000.0, 1001.0, 2))
+    ItcSeries.from(s"$slit Slit S/N", tpe, IArray(atStart, atEnd), ItcXAxis(1000.0, 1001.0, 2)).get
 
   // The peak and the value at the requested wavelength are found by separate code paths, and a
   // slit can win one without winning the other. Here blue peaks higher overall but red is higher

@@ -4,7 +4,6 @@
 package lucuma.itc.legacy
 
 import cats.data.NonEmptyChain
-import cats.data.NonEmptyList
 import cats.syntax.all.*
 import eu.timepit.refined.numeric.NonNegative
 import eu.timepit.refined.refineV
@@ -35,6 +34,7 @@ import lucuma.itc.ItcGraphGroup
 import lucuma.itc.ItcSeries
 import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
+import lucuma.itc.iarray.given
 import lucuma.itc.legacy.syntax.all.*
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
@@ -579,7 +579,7 @@ private[legacy] object codecs:
     for
       title  <- c.downField("title").as[String]
       dt     <- c.downField("dataType").as[SeriesDataType]
-      dataY  <- c.downField("dataY").as[NonEmptyList[Double]]
+      dataY  <- c.downField("dataY").as[IArray[Double]]
       xaxis  <- c.downField("xAxis").as[ItcXAxis]
       series <- ItcSeries
                   .fromLegacy(title, dt, dataY, xaxis)

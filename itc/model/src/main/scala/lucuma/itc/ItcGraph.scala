@@ -5,7 +5,6 @@ package lucuma.itc
 
 import cats.Eq
 import cats.data.NonEmptyChain
-import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.all.*
 import io.circe.Decoder
@@ -19,6 +18,8 @@ import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.core.util.Enumerated
+
+import scala.collection.immutable.ArraySeq
 
 enum SeriesDataType(val tag: String) derives Enumerated:
   case SignalData     extends SeriesDataType("signal_data")
@@ -57,23 +58,59 @@ case class ItcXAxis(start: Double, end: Double, count: Int) derives Decoder, Enc
   def indexOf(w: Wavelength): Option[Int] =
     indexOf(w.toNanometers.value.value.toDouble)
 
+/**
+ * Codecs for the unboxed sample arrays held by `ItcSeries`.
+ *
+ * A chart series runs to a couple of thousand samples, and the previous `NonEmptyList[Double]` cost
+ * a cons cell plus a boxed `Double` for every one of them. These instances keep the samples in a
+ * primitive array on both sides of the wire: `decodeArray` fills an `Array[Double]` in a single
+ * pass, and the encoder wraps the array in place rather than copying it into a `List`. Circe still
+ * boxes each element as it renders, which is unavoidable.
+ *
+ * Kept in an object so importers can target them: they are instances for a very general type.
+ */
+object iarray:
+  given decodeIArrayDouble: Decoder[IArray[Double]] =
+    Decoder.decodeArray[Double].map(IArray.unsafeFromArray)
+
+  given encodeIArrayDouble: Encoder[IArray[Double]] =
+    Encoder
+      .encodeSeq[Double]
+      .contramap(a => ArraySeq.unsafeWrapArray(a.asInstanceOf[Array[Double]]))
+
+  // Only ItcGraph's derived Eq needs this, which is test-only; a while loop would avoid the
+  // wrapped-array boxing if it ever reaches a hot path.
+  given eqIArrayDouble: Eq[IArray[Double]] = Eq.instance(_.sameElements(_))
+
+import iarray.given
+
 case class ItcYAxis(min: Double, indexOfMin: Int, max: Double, indexOfMax: Int)
     derives Decoder,
       Encoder.AsObject
 object ItcYAxis:
-  def fromData(data: NonEmptyList[Double]): ItcYAxis =
-    val (minTuple, maxTuple, _) = data.foldLeft(((Double.MaxValue, 0), (Double.MinValue, 0), 0)) {
-      case ((min, max, count), y) =>
-        val newMin = if (y < min._1) (y, count) else min
-        val newMax = if (y > max._1) (y, count) else max
-        (newMin, newMax, count + 1)
-    }
-    ItcYAxis(minTuple._1, minTuple._2, maxTuple._1, maxTuple._2)
+  // Indexed loop rather than a fold: this runs over every sample of every series and the fold
+  // allocated a tuple per element.
+  def fromData(data: IArray[Double]): ItcYAxis =
+    var min      = Double.MaxValue
+    var minIndex = 0
+    var max      = Double.MinValue
+    var maxIndex = 0
+    var i        = 0
+    while i < data.length do
+      val y = data(i)
+      if y < min then
+        min = y
+        minIndex = i
+      if y > max then
+        max = y
+        maxIndex = i
+      i += 1
+    ItcYAxis(min, minIndex, max, maxIndex)
 
 case class ItcSeries(
   title:      String,
   seriesType: SeriesDataType,
-  dataY:      NonEmptyList[Double],
+  dataY:      IArray[Double],
   xAxis:      ItcXAxis,
   yAxis:      ItcYAxis
 ) derives Encoder.AsObject:
@@ -81,16 +118,23 @@ case class ItcSeries(
     xAxis.wavelengthAt(yAxis.indexOfMax).tupleRight(yAxis.max)
 
   def yValueAtWavelength(w: Wavelength): Option[Double] =
-    xAxis.indexOf(w).flatMap(i => dataY.toList.lift(i))
+    xAxis.indexOf(w).filter(i => i >= 0 && i < dataY.length).map(dataY.apply)
 
 object ItcSeries:
-  def apply(
+  /**
+   * Returns None if `dataY` is empty, since ItcYAxis is not meaningful without at least one sample.
+   * The case class constructor is still public, so this is a convention rather than an invariant:
+   * callers building a series from raw samples should prefer `from`.
+   */
+  def from(
     title:      String,
     seriesType: SeriesDataType,
-    dataY:      NonEmptyList[Double],
+    dataY:      IArray[Double],
     xAxis:      ItcXAxis
-  ): ItcSeries =
-    ItcSeries(title, seriesType, dataY, xAxis, ItcYAxis.fromData(dataY))
+  ): Option[ItcSeries] =
+    Option.when(dataY.nonEmpty)(
+      ItcSeries(title, seriesType, dataY, xAxis, ItcYAxis.fromData(dataY))
+    )
 
   /**
    * Build a series out of legacy data, dropping the samples at or below 0 nm and trimming the
@@ -110,16 +154,13 @@ object ItcSeries:
   def fromLegacy(
     title:      String,
     seriesType: SeriesDataType,
-    dataY:      NonEmptyList[Double],
+    dataY:      IArray[Double],
     xAxis:      ItcXAxis
   ): Option[ItcSeries] =
     val trimmedTitle = title.trim
     xAxis.nonPositiveCount match
-      case 0 => ItcSeries(trimmedTitle, seriesType, dataY, xAxis).some
-      case n =>
-        NonEmptyList
-          .fromList(dataY.toList.drop(n))
-          .map(ItcSeries(trimmedTitle, seriesType, _, xAxis.drop(n)))
+      case 0 => ItcSeries.from(trimmedTitle, seriesType, dataY, xAxis)
+      case n => ItcSeries.from(trimmedTitle, seriesType, dataY.drop(n), xAxis.drop(n))
 
 case class ItcGraph(graphType: GraphType, series: List[ItcSeries]) derives Eq, Encoder.AsObject
 

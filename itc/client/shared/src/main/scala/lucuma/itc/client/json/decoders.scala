@@ -26,6 +26,7 @@ import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.TargetIntegrationTime
 import lucuma.itc.TargetIntegrationTimeOutcome
 import lucuma.itc.client.*
+import lucuma.itc.iarray.given
 
 // Decoders for the client don't need to be as generic as the ones for the server.
 object decoders:
