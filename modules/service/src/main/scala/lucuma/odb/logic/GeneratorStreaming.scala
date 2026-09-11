@@ -4,7 +4,7 @@
 package lucuma.odb.logic
 
 import cats.data.EitherT
-import cats.data.NonEmptyMap
+import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.applicative.*
 import cats.syntax.either.*
@@ -213,16 +213,19 @@ object GeneratorStreaming:
         .toRight(OdbError.InvalidObservation(oid, s"Expecting a spectroscopy ITC result for this observation".some))
         .map(_.science.focus.value)
 
-  // Science integration times for a GNIRS spectroscopy observation, one per
-  // central wavelength.
+  // Science integration times for a GNIRS spectroscopy observation, one per entry
+  // in the central wavelength list, in that same order.  Ordered rather than keyed
+  // by wavelength: a wavelength may repeat, each occurrence being an independent
+  // configuration.  The wavelength rides along so the positional pairing done at
+  // sequence generation can check itself.
   def gnirsSpectroscopyScienceTimes(
     oid: Observation.Id,
     itc: Either[OdbError, Itc]
-  ): Either[OdbError, NonEmptyMap[Wavelength, IntegrationTime]] =
+  ): Either[OdbError, NonEmptyList[(Wavelength, IntegrationTime)]] =
     itc.flatMap: i =>
       ItcScience.gnirsSpectroscopy.getOption(i.science)
         .toRight(OdbError.InvalidObservation(oid, s"Expecting a GNIRS spectroscopy ITC result for this observation".some))
-        .map(_.science.map(_.focus.value))
+        .map(_.science.map((w, z) => (w, z.focus.value)))
 
   // Acquisition integration time for a mode that has an acquisition sequence.  A
   // Failed acquisition (a cached deterministic ITC failure) or a NotApplicable

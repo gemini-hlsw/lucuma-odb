@@ -5,8 +5,8 @@ package lucuma.itc.legacy
 
 import cats.effect.Sync
 import cats.syntax.all.*
+import io.circe.Decoder
 import io.circe.Json
-import io.circe.parser.decode
 import io.circe.parser.parse
 import lucuma.itc.Error
 import lucuma.itc.legacy
@@ -38,9 +38,8 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
       .success
       .orElse(c.downField("ItcImagingResult").success)
 
-  private def hasAllNullExposureTimes(json: String): Boolean =
-    parse(json).toOption
-      .flatMap(resultKey)
+  private def hasAllNullExposureTimes(json: Json): Boolean =
+    resultKey(json)
       .exists: result =>
         result
           .downField("times")
@@ -49,9 +48,8 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
           .toOption
           .exists(_.forall(_.hcursor.downField("exposureTime").focus.exists(_.isNull)))
 
-  private def hasAllNullCcdSNRatios(json: String): Boolean =
-    parse(json).toOption
-      .flatMap(resultKey)
+  private def hasAllNullCcdSNRatios(json: Json): Boolean =
+    resultKey(json)
       .exists: result =>
         result
           .downField("ccds")
@@ -69,9 +67,33 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
     // The ocs calculateExposureTime and calculateSignalToNoise are exactly the same.
     .getMethod("calculateExposureTime", classOf[String])
 
-  private val LegacyRight    = """Right\((.*)\)""".r
-  private val LegacyLeft     = """Left\(([\s\S]*?)\)""".r
-  private val LegacyLeftList = """Left\(List\(([\s\S]*?)\)\)""".r
+  private val RightWrapper = "Right("
+  private val LeftWrapper  = "Left("
+
+  /**
+   * The legacy side returns `Either[String, String].toString`, so the payload arrives wrapped in
+   * `Right(...)` or `Left(...)`.
+   *
+   * Stripping that with substring rather than a regex avoids running a match across the whole
+   * result.
+   */
+  private def unwrap(res: String, wrapper: String): Option[String] =
+    Option.when(res.startsWith(wrapper) && res.endsWith(")")):
+      res.substring(wrapper.length, res.length - 1)
+
+  private def parseResult[A: Decoder](
+    res:        String,
+    outOfRange: Json => Boolean,
+    leftErrors: String => List[String]
+  ): Either[List[String], A] =
+    unwrap(res, RightWrapper) match
+      case Some(payload) =>
+        parse(payload) match
+          case Left(e)                         => Left(List(e.getMessage))
+          case Right(json) if outOfRange(json) => Left(List(OutOfRangeMsg))
+          case Right(json)                     => json.as[A].leftMap(e => List(e.getMessage))
+      case None          =>
+        unwrap(res, LeftWrapper).fold(List(res))(leftErrors).asLeft
 
   /**
    * This method does a call to the method ItcCalculation.calculation via reflection. This is done
@@ -90,21 +112,7 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
-      val result = res match
-        case LegacyRight(result) if hasAllNullCcdSNRatios(result) =>
-          Left(List(OutOfRangeMsg))
-        case LegacyRight(result)                                  =>
-          decode[legacy.GraphsRemoteResult](result).leftMap { e =>
-            List(e.getMessage())
-          }
-        case LegacyLeft(result)                                   =>
-          Left(List(result))
-        case LegacyLeft(result1, result2)                         =>
-          Left(List(result1, result2))
-        case m                                                    =>
-          Left(List(m))
-
-      result
+      parseResult[legacy.GraphsRemoteResult](res, hasAllNullCcdSNRatios, List(_))
 
   def calculateTimeAndGraphs(
     jsonParams: String
@@ -114,21 +122,7 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
-      val result = res match
-        case LegacyRight(result) if hasAllNullCcdSNRatios(result) =>
-          Left(List(OutOfRangeMsg))
-        case LegacyRight(result)                                  =>
-          decode[legacy.TimeAndGraphsRemoteResult](result).leftMap { e =>
-            List(e.getMessage())
-          }
-        case LegacyLeft(result)                                   =>
-          Left(List(result))
-        case LegacyLeft(result1, result2)                         =>
-          Left(List(result1, result2))
-        case m                                                    =>
-          Left(List(m))
-
-      result
+      parseResult[legacy.TimeAndGraphsRemoteResult](res, hasAllNullCcdSNRatios, List(_))
 
   /**
    * This method does a call to the method ItcCalculation.calculate via reflection.
@@ -141,18 +135,4 @@ case class LocalItc[F[_]: {Sync as F}](classLoader: ClassLoader):
         .invoke(null, jsonParams) // null as it is a static method
         .asInstanceOf[String]
 
-      val result = res match
-        case LegacyRight(result) if hasAllNullExposureTimes(result) =>
-          Left(List(OutOfRangeMsg))
-        case LegacyRight(result)                                    =>
-          decode[IntegrationTimeRemoteResult](result).leftMap { e =>
-            List(e.getMessage())
-          }
-        case LegacyLeft(result)                                     =>
-          Left(result.split("\n").toList)
-        case LegacyLeftList(result)                                 =>
-          Left(result.split("\n").toList)
-        case m                                                      =>
-          Left(List(m))
-
-      result
+      parseResult[IntegrationTimeRemoteResult](res, hasAllNullExposureTimes, _.split("\n").toList)

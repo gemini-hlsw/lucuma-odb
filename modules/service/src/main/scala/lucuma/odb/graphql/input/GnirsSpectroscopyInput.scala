@@ -4,7 +4,6 @@
 package lucuma.odb.graphql
 package input
 
-import cats.Order.given
 import cats.data.NonEmptyList
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -19,7 +18,6 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.ObservingModeType
-import lucuma.core.model.Access
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.TelluricType
 import lucuma.core.model.sequence.TelescopeConfig
@@ -30,21 +28,29 @@ import lucuma.odb.graphql.binding.*
 object GnirsSpectroscopyInput:
 
   /**
-   * Validates a central wavelength list: at least one entry, no duplicated
-   * wavelength (each one backs a distinct row in t_gnirs_central_wavelength_config),
-   * returned sorted by increasing wavelength, which is the order the sequence
-   * executes them in.
+   * The most central wavelengths a single GNIRS spectroscopy observation may carry.
+   * Each one is a separate configuration with its own ITC call and its own segment
+   * of the science sequence, and the visit-length budget is shared out between them,
+   * so a very long list stops producing a useful sequence well before this.
+   */
+  private[input] val MaxWavelengths: Int = 100
+
+  /**
+   * Validates a central wavelength list: at least one entry and no more than
+   * `MaxWavelengths`.  The order is the user's and is preserved -- it is the order
+   * the sequence executes them in -- and a wavelength may repeat, each occurrence
+   * being an independent configuration with its own exposure time mode, coadds and
+   * ITC result.
    */
   private[input] def resolveWavelengths(
     ws: List[GnirsCentralWavelengthConfigInput]
   ): Result[NonEmptyList[GnirsCentralWavelengthConfigInput]] =
-    val duplicates = ws.groupBy(_.centralWavelength).filter(_._2.sizeIs > 1).keys.toList
-    if duplicates.nonEmpty then
+    if ws.sizeIs > MaxWavelengths then
       Matcher.validationFailure:
-        s"Duplicate central wavelengths are not allowed: ${duplicates.sorted.map(_.toNanometers.value.value).mkString(", ")} nm."
+        s"At most $MaxWavelengths central wavelengths may be specified for GNIRS spectroscopy observations."
     else
       Result.fromOption(
-        NonEmptyList.fromList(ws.sortBy(_.centralWavelength)),
+        NonEmptyList.fromList(ws),
         Matcher.validationProblem("At least one central wavelength must be specified for GNIRS spectroscopy observations.")
       )
 
@@ -193,7 +199,6 @@ object GnirsSpectroscopyInput:
   ):
     def observingModeType: Option[ObservingModeType] = fpu.map(modeTypeFor)
     def updatesAcquisition: Boolean = acquisition.isDefined
-    def limitToPreExecution(access: Access): Boolean = false
 
     /**
      * True if the input modifies fields that only Staff (or higher) may set.

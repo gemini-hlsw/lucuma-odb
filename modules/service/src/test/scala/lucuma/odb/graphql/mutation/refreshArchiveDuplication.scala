@@ -17,14 +17,13 @@ import lucuma.catalog.goa.GoaParams
 import lucuma.catalog.goa.GoaQueryError
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.enums.GeminiCallForProposalsType.DemoScience
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
 import lucuma.core.model.User
 import lucuma.odb.data.OdbError
-import lucuma.odb.util.Codecs.program_id
-import skunk.syntax.all.*
 
 class refreshArchiveDuplication extends OdbSuite with query.ObservingModeSetupOperations:
 
@@ -85,18 +84,6 @@ class refreshArchiveDuplication extends OdbSuite with query.ObservingModeSetupOp
       tid <- createTargetAs(pi, pid)
       oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
     yield oid
-
-  /**
-   * Submission is what freezes the snapshot, and the API will not submit a
-   * program whose observations are undefined -- which is a different rule than
-   * the one under test.  So the status is set directly, to reach the state a
-   * PI reaches by submitting a finished proposal.
-   */
-  private def markSubmitted(pid: Program.Id): IO[Unit] =
-    withSession: s =>
-      s.execute(
-        sql"update t_program set c_proposal_status = 'submitted' where c_program_id = $program_id".command
-      )(pid).void
 
   private def storedDuplication(oid: Observation.Id, fields: String): IO[Json] =
     query(
@@ -203,23 +190,54 @@ class refreshArchiveDuplication extends OdbSuite with query.ObservingModeSetupOp
       json"""{ "state": "NOT_CHECKED", "matchCount": 0, "matches": [] }"""
     )
 
+  /**
+   * Searches once, applies `freeze`, then checks that a refresh against a
+   * changed archive is rejected for `reason` and leaves the snapshot as it was.
+   */
+  private def assertRefreshRejected(oid: Observation.Id, freeze: IO[Unit], reason: String): IO[Unit] =
+    for
+      _      <- archive.set(Archive.Holding(records("a.fits")))
+      _      <- refreshArchiveDuplicationAs(pi, oid)
+      before <- storedDuplication(oid, "state matchCount matches { name }")
+      _      <- freeze
+      _      <- archive.set(Archive.Holding(records("x.fits", "y.fits")))
+      _      <- interceptOdbError(refreshArchiveDuplicationAs(pi, oid)):
+                  case OdbError.InvalidObservation(_, Some(msg)) =>
+                    assert(msg.contains(reason), msg)
+      after  <- storedDuplication(oid, "state matchCount matches { name }")
+    yield
+      assertEquals(before, json"""{ "state": "CHECKED", "matchCount": 1, "matches": [{ "name": "a.fits" }] }""")
+      assertEquals(after, before)
+
   test("submitting freezes the snapshot the PI last saw"):
+    for
+      pid <- proposedProgram
+      tid <- createTargetAs(pi, pid)
+      oid <- createGmosNorthImagingObservationAs(pi, pid, tid)
+      _   <- assertRefreshRejected(oid, setProposalStatusDirectly(pid, ProposalStatus.Submitted), "submitted")
+    yield ()
+
+  test("the freeze lifts once the proposal has been accepted"):
     for
       pid    <- proposedProgram
       tid    <- createTargetAs(pi, pid)
       oid    <- createGmosNorthImagingObservationAs(pi, pid, tid)
       _      <- archive.set(Archive.Holding(records("a.fits")))
       _      <- refreshArchiveDuplicationAs(pi, oid)
-      before <- storedDuplication(oid, "state matchCount matches { name }")
-      _      <- markSubmitted(pid)
+      _      <- setProposalStatusDirectly(pid, ProposalStatus.Submitted)
+      _      <- setProposalStatusDirectly(pid, ProposalStatus.Accepted)
       _      <- archive.set(Archive.Holding(records("x.fits", "y.fits")))
-      _      <- interceptOdbError(refreshArchiveDuplicationAs(pi, oid)):
-                  case OdbError.InvalidObservation(_, Some(msg)) =>
-                    assert(msg.contains("submitted"), msg)
-      after  <- storedDuplication(oid, "state matchCount matches { name }")
+      js     <- refreshArchiveDuplicationAs(pi, oid, "matchCount matches { name }")
+      db     <- storedDuplication(oid, "matchCount matches { name }")
     yield
-      assertEquals(before, json"""{ "state": "CHECKED", "matchCount": 1, "matches": [{ "name": "a.fits" }] }""")
-      assertEquals(after, before)
+      assertEquals(js, json"""{ "matchCount": 2, "matches": [{ "name": "x.fits" }, { "name": "y.fits" }] }""")
+      assertEquals(db, js)
+
+  test("refresh is rejected for a completed observation"):
+    for
+      oid <- observation()
+      _   <- assertRefreshRejected(oid, declareCompleteDirectly(oid), "completed")
+    yield ()
 
   test("an unreachable archive is reported as an error state, not a failed mutation"):
     for

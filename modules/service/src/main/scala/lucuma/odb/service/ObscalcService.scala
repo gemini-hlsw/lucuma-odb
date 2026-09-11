@@ -349,8 +349,12 @@ object ObscalcService:
             calculateWithAtomDigests(pending)
               .flatMap: (result, atomDigests) =>
                 services.transactionally:
+                  // Completion freezes the snapshot, and the stored workflow state is one cycle behind.
+                  val archiveStale =
+                    if result.workflow.state === ObservationWorkflowState.Completed then false.pure[F]
+                    else isArchiveSearchStale(pending.observationId)
                   sequenceService.insertAtomDigests(pending.observationId, atomDigests) *>
-                  isArchiveSearchStale(pending.observationId).flatMap: stale =>
+                  archiveStale.flatMap: stale =>
                     (result.odbError match
                       case Some(OdbError.RemoteServiceCallError(_)) => storeResult(pending, result, basePosition, stale.some, CalculationState.Retry)
                       case _                                        => storeResult(pending, result, basePosition, stale.some, CalculationState.Ready))

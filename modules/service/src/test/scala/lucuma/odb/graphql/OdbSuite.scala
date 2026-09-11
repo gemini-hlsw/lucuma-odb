@@ -496,7 +496,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     ).map(_.map(_.orNotFound))
 
   /** Resource yielding an instantiated OdbMapping, which we can use for some whitebox testing. */
-  def mapping(shouldValidate: Boolean)(using Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, Mapping[IO]] =
+  def mapping(using Tracer[IO], TracerProvider[IO], MeterProvider[IO]): Resource[IO, Mapping[IO]] =
     for {
       db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
@@ -507,7 +507,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       goa <- Resource.eval(goaClient)
       schema <- Resource.eval(OdbMapping.loadSchema[IO])
-      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = shouldValidate)
+      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = false)
     } yield map
 
   /**

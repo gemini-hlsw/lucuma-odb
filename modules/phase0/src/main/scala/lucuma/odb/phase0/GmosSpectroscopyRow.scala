@@ -45,7 +45,8 @@ object GmosSpectroscopyRow {
         val gn = for {
           _ <- Either.raiseWhen(r.instrument =!= inst)(s"Cannot parse a ${r.instrument.tag} as ${inst.tag}")
           g <- Enumerated[G].all.find(a => g(a) === r.disperser).toRight(s"Cannot find disperser: ${r.disperser}. Does a value exist in the Enumerated?")
-          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f).toRight(s"Cannot find filter: $f. Does a value exist in the Enumerated?") }
+          // The matrix writes combined filters as "g + OG515" while the short name is "g+OG515".
+          l <- r.filter.traverse { f => Enumerated[L].all.find(a => l(a) === f.filterNot(_.isWhitespace)).toRight(s"Cannot find filter: $f. Does a value exist in the Enumerated?") }
           // For MOS rows there is no builtin FPU then we return none
           u <- (if (r.fpuOption === FpuOption.Multislit) none[U].asRight[String]
                 else Enumerated[U].all.find(a => u(a) === r.fpu).map(_.some).toRight(s"Cannot find FPU: ${r.fpu}. Does a value exist in the Enumerated?"))

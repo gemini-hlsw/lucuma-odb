@@ -4096,7 +4096,9 @@ type Mutation {
   Re-runs the Archive Duplication Search for an observation, replacing its
   stored result with what the Gemini Observatory Archive holds now.
 
-  Rejected once the observation's proposal has been submitted.
+  Rejected while the proposal is submitted or was not accepted, and for a
+  completed observation whatever the proposal status.  Allowed again once the
+  proposal is accepted, so newly added or changed targets can be checked.
   """
   refreshArchiveDuplication(
     input: RefreshArchiveDuplicationInput!
@@ -12312,9 +12314,11 @@ type GnirsSpectroscopy {
   initialPrism: GnirsPrism!
 
   """
-  The central wavelengths at which spectra are taken, in increasing wavelength
-  order.  Each one is a separate configuration with its own exposure time mode,
-  coadds, ITC calculation and calibrations.
+  The central wavelengths at which spectra are taken, in the order they were
+  specified and in which the sequence executes them.  Each entry is a separate
+  configuration with its own exposure time mode, coadds, ITC calculation and
+  calibrations; a wavelength may appear more than once, each occurrence being
+  independent.
   """
   centralWavelengths: [GnirsCentralWavelengthConfig!]!
 
@@ -12414,9 +12418,11 @@ type GnirsLongSlit {
   initialPrism: GnirsPrism!
 
   """
-  The central wavelengths at which spectra are taken, in increasing wavelength
-  order.  Each one is a separate configuration with its own exposure time mode,
-  coadds, ITC calculation and calibrations.
+  The central wavelengths at which spectra are taken, in the order they were
+  specified and in which the sequence executes them.  Each entry is a separate
+  configuration with its own exposure time mode, coadds, ITC calculation and
+  calibrations; a wavelength may appear more than once, each occurrence being
+  independent.
   """
   centralWavelengths: [GnirsCentralWavelengthConfig!]!
 
@@ -12481,9 +12487,11 @@ type GnirsIfu {
   initialPrism: GnirsPrism!
 
   """
-  The central wavelengths at which spectra are taken, in increasing wavelength
-  order.  Each one is a separate configuration with its own exposure time mode,
-  coadds, ITC calculation and calibrations.
+  The central wavelengths at which spectra are taken, in the order they were
+  specified and in which the sequence executes them.  Each entry is a separate
+  configuration with its own exposure time mode, coadds, ITC calculation and
+  calibrations; a wavelength may appear more than once, each occurrence being
+  independent.
   """
   centralWavelengths: [GnirsCentralWavelengthConfig!]!
 
@@ -12598,9 +12606,10 @@ Edit or create GNIRS Spectroscopy configuration (long slit or IFU).
 input GnirsSpectroscopyInput {
 
   """
-  The central wavelengths at which spectra are taken.  Required on create, and
-  must contain at least one entry with no duplicated wavelength.  When given on
-  edit, it replaces the existing list wholesale.
+  The central wavelengths at which spectra are taken, in the order the sequence
+  should execute them.  Required on create, and must contain between 1 and 100
+  entries; a wavelength may be repeated, each occurrence being an independent
+  configuration.  When given on edit, it replaces the existing list wholesale.
   """
   centralWavelengths: [GnirsCentralWavelengthConfigInput!]
 
@@ -12646,9 +12655,10 @@ Edit or create GNIRS Long Slit configuration.
 input GnirsLongSlitInput {
 
   """
-  The central wavelengths at which spectra are taken.  Required on create, and
-  must contain at least one entry with no duplicated wavelength.  When given on
-  edit, it replaces the existing list wholesale.
+  The central wavelengths at which spectra are taken, in the order the sequence
+  should execute them.  Required on create, and must contain between 1 and 100
+  entries; a wavelength may be repeated, each occurrence being an independent
+  configuration.  When given on edit, it replaces the existing list wholesale.
   """
   centralWavelengths: [GnirsCentralWavelengthConfigInput!]
 
@@ -12694,9 +12704,10 @@ Edit or create GNIRS IFU configuration.
 input GnirsIfuInput {
 
   """
-  The central wavelengths at which spectra are taken.  Required on create, and
-  must contain at least one entry with no duplicated wavelength.  When given on
-  edit, it replaces the existing list wholesale.
+  The central wavelengths at which spectra are taken, in the order the sequence
+  should execute them.  Required on create, and must contain between 1 and 100
+  entries; a wavelength may be repeated, each occurrence being an independent
+  configuration.  When given on edit, it replaces the existing list wholesale.
   """
   centralWavelengths: [GnirsCentralWavelengthConfigInput!]
 
@@ -16358,7 +16369,9 @@ type ItcGnirsImagingResultSet {
 
 """
 Combines a GNIRS spectroscopy central wavelength with an `ItcResultSet`. In
-other words, ITC results for all targets but a single central wavelength.
+other words, ITC results for all targets but a single entry in the observation's
+central wavelength list.  The wavelength does not identify the entry, since it
+may be repeated; see `ItcGnirsSpectroscopy.gnirsSpectroscopyScience`.
 """
 type ItcGnirsSpectroscopyResultSet {
   centralWavelength: Wavelength!
@@ -16421,8 +16434,10 @@ type ItcGnirsImaging implements Itc {
 }
 
 """
-GNIRS spectroscopy ITC results.  Each central wavelength is a separate
-configuration and is paired with its own result set.
+GNIRS spectroscopy ITC results: one result set per entry in the observation's
+central wavelength list, in the same order, so the nth element here corresponds
+to the nth `centralWavelengths` element.  Each entry is a separate configuration,
+and a central wavelength may therefore appear more than once.
 """
 type ItcGnirsSpectroscopy implements Itc {
   itcType: ItcType!
@@ -17015,7 +17030,8 @@ type ArchiveDuplication {
   Whether the snapshot no longer describes the observation as it now stands:
   the archive queries the search would run today differ from `queryUrls`.
   Never true when nothing was searched, when nothing can be searched now, or
-  after submission.
+  when a refresh would be rejected: the proposal is submitted or was not
+  accepted, or the observation is completed.
   """
   stale: Boolean!
 
@@ -17740,6 +17756,9 @@ enum ObservationValidationCode {
 
   "Likelihood of observing conditions is below recommended percentage."
   CONDITIONS_UNLIKELY
+
+  "The observation configuration is unusual and should be reviewed."
+  CONFIGURATION_WARNING
 
 }
 

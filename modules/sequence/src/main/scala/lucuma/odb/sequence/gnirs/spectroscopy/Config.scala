@@ -41,11 +41,13 @@ case class Config(
 ) derives Eq:
 
   /**
-   * The configuration the sequence starts with.  Used where a single
-   * representative setting is required: the acquisition filter (both when
-   * generating the acquisition sequence and when sizing it via the ITC) and the
-   * HR-IFU alignment flat.  Wavelengths are stored in increasing order, so this
-   * is the shortest.
+   * The configuration the sequence starts with: the first entry in the list, in
+   * the order the user specified.  Used where a single representative setting is
+   * required -- the acquisition filter and camera (both when generating the
+   * acquisition sequence and when sizing it via the ITC) and the HR-IFU alignment
+   * flat.  Reordering the list therefore changes what acquisition is sized for,
+   * which is deliberate: the observer controls it by choosing which wavelength
+   * comes first.
    */
   def primaryWavelength: CentralWavelengthConfig =
     wavelengths.head

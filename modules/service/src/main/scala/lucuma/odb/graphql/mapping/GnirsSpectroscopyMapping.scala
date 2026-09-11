@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package mapping
 
+import eu.timepit.refined.types.numeric.NonNegShort
 import grackle.Query.Binding
 import grackle.Query.Filter
 import grackle.Query.OrderBy
@@ -17,7 +18,6 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.math.Angle
 import lucuma.core.math.Offset
-import lucuma.core.math.Wavelength
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ObservingModeRowVersion
 import lucuma.odb.graphql.predicate.Predicates
@@ -66,17 +66,18 @@ trait GnirsSpectroscopyMapping[F[_]]
     )
 
   /**
-   * One central wavelength with the exposure time mode and coadds that apply
-   * there.  Keyed on (observation, wavelength, version) to match the table's
-   * primary key.
+   * One entry in the ordered central wavelength list: a wavelength with the exposure
+   * time mode and coadds that apply there.  Keyed on (observation, version, index) to
+   * match the table's primary key -- the wavelength itself may repeat, so it cannot
+   * identify the row.
    */
   lazy val GnirsCentralWavelengthConfigMapping: ObjectMapping =
     ObjectMapping(GnirsCentralWavelengthConfigType)(
       SqlField("observationId",     GnirsCentralWavelengthConfigTable.ObservationId, key = true, hidden = true),
-      // `centralWavelength` is an object in the schema (see WavelengthMapping), so the
-      // key is a hidden field on the same column.  It doubles as the sort key.
-      SqlField("centralWavelengthKey", GnirsCentralWavelengthConfigTable.CentralWavelength, key = true, hidden = true),
       SqlField("version",           GnirsCentralWavelengthConfigTable.Version, key = true, hidden = true),
+      // Not exposed in the schema: `centralWavelengths` is a list returned in this
+      // order, so the array position already conveys it.  Doubles as the sort key.
+      SqlField("index",             GnirsCentralWavelengthConfigTable.Index, key = true, hidden = true),
       SqlObject("centralWavelength"),
       SqlField("coadds",            GnirsCentralWavelengthConfigTable.Coadds),
       SqlObject("exposureTimeMode", Join(GnirsCentralWavelengthConfigTable.ExposureTimeModeId, ExposureTimeModeView.Id))
@@ -206,12 +207,12 @@ trait GnirsSpectroscopyMapping[F[_]]
       SqlField("observationId", GnirsSpectroscopyView.ObservationId, key = true, hidden = true) +: ifuFields*
     )
 
-  // Order the central wavelengths by increasing wavelength -- the order the
+  // Return the central wavelengths in the user-specified order -- the order the
   // sequence executes them in -- and limit to one row version.
   private def wavelengthElaborator(v: ObservingModeRowVersion): Elab[Unit] =
     Elab.transformChild: child =>
       OrderBy(
-        OrderSelections(List(OrderSelection[Wavelength](GnirsCentralWavelengthConfigType / "centralWavelengthKey"))),
+        OrderSelections(List(OrderSelection[NonNegShort](GnirsCentralWavelengthConfigType / "index"))),
         Filter(Predicates.gnirsSpectroscopyWavelength.version.eql(v), child)
       )
 

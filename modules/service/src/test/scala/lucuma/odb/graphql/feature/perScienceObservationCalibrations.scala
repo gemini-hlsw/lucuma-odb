@@ -2378,7 +2378,24 @@ class perScienceObservationCalibrations
                 services.smartGcalService.insertGnirs(100 + i, r)
 
   // A cross-dispersed GNIRS observation (SXD prism).
-  private def createGnirsXdObservationAs(user: User, pid: Program.Id, tid: Target.Id): IO[Observation.Id] =
+  private val atomShapeQuery: String =
+    """
+      description
+      observeClass
+      steps {
+        stepConfig { stepType }
+        observeClass
+      }
+    """
+
+  private def createGnirsXdObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tid:  Target.Id,
+    // Repeat an entry to exercise the multi-wavelength titles; one flat is still
+    // generated per *distinct* wavelength.
+    wavelengthsNm: List[Int] = List(1650)
+  ): IO[Observation.Id] =
     query(
       user = user,
       query = s"""
@@ -2396,10 +2413,9 @@ class perScienceObservationCalibrations
                   slit: { fpu: LONG_SLIT_0_30 }
                   filter: ORDER3
                   centralWavelengths: [
-                    {
-                      centralWavelength: { nanometers: 1650 }
-                      exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1650 } } }
-                    }
+                    ${wavelengthsNm
+                        .map(nm => s"{ centralWavelength: { nanometers: $nm } exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: $nm } } } }")
+                        .mkString("\n")}
                   ]
                 }
               }
@@ -2445,15 +2461,6 @@ class perScienceObservationCalibrations
   test("daytime pinhole flat generates a sequence without a target or ITC"):
     // The pinhole calibration has no asterism; generation must not require a
     // target or call the ITC.  Its sequence is a single smart day flat.
-    val atomShapeQuery: String =
-      """
-        description
-        observeClass
-        steps {
-          stepConfig { stepType }
-          observeClass
-        }
-      """
     for {
       pid    <- createProgramAs(pi)
       tid    <- createTargetWithProfileAs(pi, pid)
@@ -2472,6 +2479,48 @@ class perScienceObservationCalibrations
                           "science" -> Json.obj(
                             "nextAtom" -> Json.obj(
                               "description"  -> "Daytime Pinhole".asJson,
+                              "observeClass" -> "DAY_CAL".asJson,
+                              "steps"        -> Json.arr(
+                                Json.obj(
+                                  "stepConfig"   -> Json.obj("stepType" -> "GCAL".asJson),
+                                  "observeClass" -> "DAY_CAL".asJson
+                                )
+                              )
+                            ),
+                            "possibleFuture" -> Json.arr(),
+                            "hasMore"        -> false.asJson
+                          )
+                        )
+                      )
+                    ).asRight
+                )
+    } yield ()
+
+  test("gnirs XD daytime pinhole names its wavelength when the science list repeats one"):
+    // One pinhole flat per *distinct* wavelength, so a [1650, 1650] observation gets a
+    // single atom -- but it is still a multi-wavelength observation, so the title has to
+    // name the wavelength, matching the science segments that read "(1650 nm #1)" and
+    // "(1650 nm #2)".  Deciding that from the distinct list instead would title this one
+    // bare "Daytime Pinhole".  No occurrence ordinal here: the pinholes are distinct by
+    // construction, so there is no second 1650 nm atom to tell this one apart from.
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1650, 1650))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      pinOid <- selectDaytimePinholeObservationFor(oid).map(_.get)
+      _      <- expect(
+                  user     = pi,
+                  query    = executionConfigQuery(pinOid, "gnirs", "science", atomShapeQuery, None),
+                  expected =
+                    Json.obj(
+                      "executionConfig" -> Json.obj(
+                        "gnirs" -> Json.obj(
+                          "science" -> Json.obj(
+                            "nextAtom" -> Json.obj(
+                              "description"  -> "Daytime Pinhole (1650 nm)".asJson,
                               "observeClass" -> "DAY_CAL".asJson,
                               "steps"        -> Json.arr(
                                 Json.obj(

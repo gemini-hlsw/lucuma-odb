@@ -3,12 +3,10 @@
 
 package lucuma.odb.service
 
-import cats.Order
 import cats.Parallel
 import cats.data.EitherT
 import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.data.NonEmptyMap
 import cats.effect.Async
 import cats.effect.Concurrent
 import cats.effect.Resource
@@ -622,48 +620,52 @@ object ItcService {
       /**
        * A science result set keyed by something that varies per ITC call: the
        * filter for imaging modes, the central wavelength for GNIRS spectroscopy.
+       * The results arrive as an ordered list, one per call.  The imaging modes
+       * collapse it into a NonEmptyMap, since their keys are distinct by
+       * construction; GNIRS spectroscopy keeps the order, because a central
+       * wavelength may repeat and each occurrence is its own configuration.
        */
       sealed trait Keyed[A]:
         def pf: PartialFunction[InstrumentMode, A]
-        def wrap(nem: NonEmptyMap[A, Zipper[ItcResult]]): ItcScience
+        def wrap(nel: NonEmptyList[(A, Zipper[ItcResult])]): ItcScience
 
       object Keyed:
         case object Flamingos2Imaging extends Keyed[Flamingos2Filter]:
           override def pf: PartialFunction[InstrumentMode, Flamingos2Filter] =
             case InstrumentMode.Flamingos2Imaging(filter = f) => f
 
-          override def wrap(nem: NonEmptyMap[Flamingos2Filter, Zipper[ItcResult]]): ItcScience =
-            ItcScience.Flamingos2Imaging(nem)
+          override def wrap(nel: NonEmptyList[(Flamingos2Filter, Zipper[ItcResult])]): ItcScience =
+            ItcScience.Flamingos2Imaging(nel.toNem)
 
         case object GmosNorthImaging extends Keyed[GmosNorthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosNorthFilter] =
             case InstrumentMode.GmosNorthImaging(filter = f) => f
 
-          override def wrap(nem: NonEmptyMap[GmosNorthFilter, Zipper[ItcResult]]): ItcScience =
-            ItcScience.GmosNorthImaging(nem)
+          override def wrap(nel: NonEmptyList[(GmosNorthFilter, Zipper[ItcResult])]): ItcScience =
+            ItcScience.GmosNorthImaging(nel.toNem)
 
         case object GmosSouthImaging extends Keyed[GmosSouthFilter]:
           override def pf: PartialFunction[InstrumentMode, GmosSouthFilter] =
                case InstrumentMode.GmosSouthImaging(filter = f) => f
 
-          override def wrap(nem: NonEmptyMap[GmosSouthFilter, Zipper[ItcResult]]): ItcScience =
-            ItcScience.GmosSouthImaging(nem)
+          override def wrap(nel: NonEmptyList[(GmosSouthFilter, Zipper[ItcResult])]): ItcScience =
+            ItcScience.GmosSouthImaging(nel.toNem)
 
         case object GnirsImaging extends Keyed[GnirsFilter]:
           override def pf: PartialFunction[InstrumentMode, GnirsFilter] =
             case InstrumentMode.GnirsImaging(filter = f) => f
 
-          override def wrap(nem: NonEmptyMap[GnirsFilter, Zipper[ItcResult]]): ItcScience =
-            ItcScience.GnirsImaging(nem)
+          override def wrap(nel: NonEmptyList[(GnirsFilter, Zipper[ItcResult])]): ItcScience =
+            ItcScience.GnirsImaging(nel.toNem)
 
         case object GnirsSpectroscopy extends Keyed[Wavelength]:
           override def pf: PartialFunction[InstrumentMode, Wavelength] =
             case InstrumentMode.GnirsSpectroscopy(centralWavelength = w) => w
 
-          override def wrap(nem: NonEmptyMap[Wavelength, Zipper[ItcResult]]): ItcScience =
-            ItcScience.GnirsSpectroscopy(nem)
+          override def wrap(nel: NonEmptyList[(Wavelength, Zipper[ItcResult])]): ItcScience =
+            ItcScience.GnirsSpectroscopy(nel)
 
-      private def callRemoteKeyedItc[A: Order, I](
+      private def callRemoteKeyedItc[A, I](
         oid:     Observation.Id,
         modes:   NonEmptyList[InstrumentMode],
         inputs:  NonEmptyList[I],
@@ -700,7 +702,7 @@ object ItcService {
           fs <- EitherT.fromEither(extractKeys(modes.toList, Nil))
           cs <- EitherT(clientCalculationResults)
           ts <- EitherT.fromEither(toTargetResults(targets, cs, snTarget))
-        yield im.wrap(fs.zip(ts).toNem)
+        yield im.wrap(fs.zip(ts))
 
 
       private def callRemoteItc(
@@ -749,7 +751,7 @@ object ItcService {
 
         // Imaging modes have no acquisition ITC of their own (GNIRS folds one in
         // below), so their keyed science result is the whole thing.
-        def imagingScience[A: Order](
+        def imagingScience[A](
           oid: Observation.Id,
           im:  ItcInput.Imaging,
           k:   Keyed[A]

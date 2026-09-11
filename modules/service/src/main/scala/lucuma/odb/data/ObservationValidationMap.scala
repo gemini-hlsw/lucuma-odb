@@ -35,4 +35,6 @@ object ObservationValidationMap extends NewType[SortedMap[ObservationValidationC
 
     def toList: List[ObservationValidation] = m.value.toList.map(ObservationValidation.apply)
 
+    def hasErrors: Boolean = m.value.keys.exists(!_.isWarning)
+
 type ObservationValidationMap = ObservationValidationMap.Type
