@@ -4,7 +4,6 @@
 package lucuma.itc.tests
 
 import cats.data.NonEmptyChain
-import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.applicative.*
 import cats.syntax.either.*
@@ -94,7 +93,7 @@ trait MockItcBase extends Itc[IO]:
             List(
               ItcSeries("title",
                         SeriesDataType.FinalS2NData,
-                        NonEmptyList.of(1000.0, 1001.0),
+                        IArray(1000.0, 1001.0),
                         ItcXAxis(1, 2, 2),
                         ItcYAxis(1000.0, 0, 1001.0, 1)
               )

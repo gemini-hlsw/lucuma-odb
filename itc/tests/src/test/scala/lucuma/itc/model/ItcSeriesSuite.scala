@@ -3,7 +3,6 @@
 
 package lucuma.itc.model
 
-import cats.data.NonEmptyList
 import cats.syntax.all.*
 import lucuma.core.math.Wavelength
 import lucuma.itc.ItcSeries
@@ -13,19 +12,19 @@ import munit.FunSuite
 
 class ItcSeriesSuite extends FunSuite:
 
-  private def series(xAxis: ItcXAxis, dataY: NonEmptyList[Double]): Option[ItcSeries] =
+  private def series(xAxis: ItcXAxis, dataY: IArray[Double]): Option[ItcSeries] =
     ItcSeries.fromLegacy("title", SeriesDataType.FinalS2NData, dataY, xAxis)
 
   // 11 samples at 1 nm spacing, the first three at -2, -1 and 0 nm
-  private val axis: ItcXAxis              = ItcXAxis(-2.0, 8.0, 11)
-  private val dataY: NonEmptyList[Double] =
-    NonEmptyList.fromListUnsafe(List(999.0, 998.0, 997.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0))
+  private val axis: ItcXAxis        = ItcXAxis(-2.0, 8.0, 11)
+  private val dataY: IArray[Double] =
+    IArray(999.0, 998.0, 997.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0)
 
   test("ItcSeries.fromLegacy leaves a positive axis alone"):
     val x = ItcXAxis(1.0, 5.0, 5)
-    val y = NonEmptyList.of(1.0, 2.0, 3.0, 4.0, 5.0)
+    val y = IArray(1.0, 2.0, 3.0, 4.0, 5.0)
     assertEquals(series(x, y).map(_.xAxis), x.some)
-    assertEquals(series(x, y).map(_.dataY), y.some)
+    assertEquals(series(x, y).map(_.dataY.toList), y.toList.some)
 
   test("ItcSeries.fromLegacy drops the samples at or below 0 nm"):
     val s = series(axis, dataY).get
@@ -52,12 +51,12 @@ class ItcSeriesSuite extends FunSuite:
     assertEquals(s.wavelengthAtMaxAndMax.map(_._1), Wavelength.fromIntNanometers(8))
 
   test("ItcSeries.fromLegacy is empty when no sample is above 0 nm"):
-    assertEquals(series(ItcXAxis(-5.0, -1.0, 5), NonEmptyList.of(1.0, 2.0, 3.0, 4.0, 5.0)), none)
+    assertEquals(series(ItcXAxis(-5.0, -1.0, 5), IArray(1.0, 2.0, 3.0, 4.0, 5.0)), none)
 
   test("ItcSeries.fromLegacy trims the title"):
     // The first CCD of a multi-CCD GMOS graph has an empty CCD name appended
     val x = ItcXAxis(1.0, 5.0, 5)
-    val y = NonEmptyList.of(1.0, 2.0, 3.0, 4.0, 5.0)
+    val y = IArray(1.0, 2.0, 3.0, 4.0, 5.0)
     val s = ItcSeries.fromLegacy("Blue Slit Signal ", SeriesDataType.SignalData, y, x)
     assertEquals(s.map(_.title), "Blue Slit Signal".some)
 
