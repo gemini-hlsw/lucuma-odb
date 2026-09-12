@@ -5,6 +5,8 @@ resolvers += "gemini-hlsw".at(
   "https://raw.githubusercontent.com/gemini-hlsw/maven-repo/master/releases"
 )
 
+// The original spray/sbt-revolver has no sbt 2 build; this fork does and keeps the same API.
+addSbtPlugin("com.indoorvivants"   % "sbt-revolver"      % "0.11.2")
 addSbtPlugin("com.timushev.sbt"    % "sbt-updates"       % "0.7.0")
 addSbtPlugin("edu.gemini"          % "sbt-lucuma-lib"    % SbtLucumaVersion)
 addSbtPlugin("edu.gemini"          % "sbt-lucuma-docker" % SbtLucumaVersion)
