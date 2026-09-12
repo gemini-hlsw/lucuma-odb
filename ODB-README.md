@@ -38,10 +38,10 @@ psql -h localhost -U jimmy -d postgres -e -c 'create database "lucuma-odb"'
 You can now run the app, and you can do `docker-compose stop`.  If you do
 `down` and then `up` though you'll need to clear out the db again.
 
-### Using reStart
+### Using bgRun
 
-Alternatively, you can run the app from within SBT with `service/reStart`
-(stopping with `service/reStop`).  By default, this command will fail after
+Alternatively, you can run the app from within SBT with `service/bgRun serve`
+(stopping with `devStop`).  By default, this command will fail after
 running `docker-compose` `down` and then `up` as described above.  You can
 supply optional arguments to simplify development though:
 
@@ -120,7 +120,7 @@ migrations are ready to run when the application starts.
 7. Start the application in `sbt`.  This will cause the new migration to run and any errors
 will be revealed.
 ```
-service/reStart
+service/bgRun serve
 ```
 
 ## Mailgun
