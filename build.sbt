@@ -80,24 +80,6 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 
 LocalRootProject / name := "lucuma-odb-root"
 
-// sbt 2 lints settings nothing reads. These belong to sbt-native-packager's Debian, Rpm and
-// Linux formats, which we never build: the services ship as Docker images.
-Global / excludeLintKeys ++= Set(
-  Debian / daemonGroup,
-  Debian / daemonGroupGid,
-  Debian / daemonUser,
-  Debian / daemonUserUid,
-  Debian / executableScriptName,
-  Linux / javaOptions,
-  Rpm / daemonGroupGid,
-  Rpm / daemonUserUid,
-  Rpm / executableScriptName,
-  Rpm / name,
-  Universal / executableScriptName,
-  UniversalDocs / name,
-  UniversalSrc / name
-)
-
 ThisBuild / tlBaseVersion      := "0.96"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
