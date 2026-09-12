@@ -75,7 +75,7 @@ Run from repository root.
 ### Start ITC service (hot-reload)
 
 ```bash
-sbt ~itcService/reStart
+sbt "~itcService/bgRun"
 ```
 
 ### Run standard ITC tests

@@ -1,4 +1,6 @@
 import NativePackagerHelper.*
+// `<task>.inputFiles` is no longer auto-imported in sbt 2.
+import sbt.internal.FileChangesMacro.inputFiles
 
 ThisBuild / resolvers += Resolver.sonatypeCentralSnapshots
 
@@ -76,6 +78,8 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.tpolecat" %% "skunk-circe" % VersionScheme.Always
 )
 
+LocalRootProject / name := "lucuma-odb-root"
+
 ThisBuild / tlBaseVersion      := "0.96"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
@@ -94,21 +98,12 @@ ThisBuild / tlCiScalafixCheck        := false
 ThisBuild / tlCiMimaBinaryIssueCheck := false
 ThisBuild / tlCiDocCheck             := false
 
-ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
-  val projNames = cmd
-    .split(";")
-    .flatMap(
-      Some(_)
-        .filter(_.contains("/reStart"))
-        .flatMap(_.trim.split("/reStart") match {
-          case Array(projName) => Some(projName)
-          case _               => None
-        })
-    )
-  projNames.foldLeft(state) { (acc, projName) =>
-    val projRef = ProjectRef((ThisBuild / baseDirectory).value, projName)
-    Project.extract(state).runTask(projRef / reStop, state)._1
-  }
+// sbt-revolver has no sbt 2 build; the dev loop uses sbt's own background jobs (bgRun/bgList).
+lazy val devStop = taskKey[Unit]("Stop every background job")
+
+ThisBuild / devStop := Def.uncached {
+  val jobs = bgJobService.value
+  jobs.jobs.foreach(jobs.stop)
 }
 
 val herokuToken  = "HEROKU_API_KEY"  -> "${{ secrets.HEROKU_API_KEY }}"
@@ -255,7 +250,7 @@ lazy val sbtClean =
 lazy val sbtDockerPublishLocal: List[WorkflowStep] =
   systems.map { system =>
     WorkflowStep.Sbt(
-      systemProjects(system).map(p => s"${p.id}/docker:publishLocal"),
+      systemProjects(system).map(p => s"${p.id}/Docker/publishLocal"),
       name = Some(s"Build ${system.toUpperCase} Docker images"),
       cond = Some(systemAffectedCond(system))
     )
@@ -274,10 +269,10 @@ lazy val systemProjects: Map[String, List[Project]] = Map(
 lazy val allSystemProjects: List[Project] = systems.flatMap(systemProjects)
 
 def anyAffectedCond: String =
-  lucumaAffectedCond(allSystemProjects.head, allSystemProjects.tail: _*)
+  lucumaAffectedCond(allSystemProjects.head, allSystemProjects.tail*)
 
 def systemAffectedCond(system: String): String = systemProjects(system) match {
-  case head :: tail => lucumaAffectedCond(head, tail: _*)
+  case head :: tail => lucumaAffectedCond(head, tail*)
   case Nil          => sys.error(s"no projects declared for $system")
 }
 lazy val appNames: Map[String, String] = Map(
@@ -427,7 +422,8 @@ lazy val sbtStaticChecks =
       "lucumaScalafmtCheck",
       "lucumaScalafixCheck",
       "lucumaSlackNotifyCheck",
-      "scalafixAll --check",
+      "scalafix --check",
+      "Test/scalafix --check",
       "mimaReportBinaryIssues",
       "doc"
     ),
@@ -515,14 +511,14 @@ lazy val ssoFrontendClient =
     .settings(
       name := "lucuma-sso-frontend-client",
       libraryDependencies ++= Seq(
-        "io.circe"      %%% "circe-core"          % circeVersion,
-        "io.circe"      %%% "circe-generic"       % circeVersion,
-        "io.circe"      %%% "circe-parser"        % circeVersion,
-        "io.circe"      %%% "circe-refined"       % circeRefinedVersion,
-        "edu.gemini"    %%% "lucuma-core"         % lucumaCoreVersion,
-        "edu.gemini"    %%% "lucuma-core-testkit" % lucumaCoreVersion,
-        "org.scalameta" %%% "munit"               % munitVersion % Test,
-        "org.typelevel" %%% "discipline-munit"    % munitDisciplineVersion  % Test,
+        "io.circe"      %% "circe-core"          % circeVersion,
+        "io.circe"      %% "circe-generic"       % circeVersion,
+        "io.circe"      %% "circe-parser"        % circeVersion,
+        "io.circe"      %% "circe-refined"       % circeRefinedVersion,
+        "edu.gemini"    %% "lucuma-core"         % lucumaCoreVersion,
+        "edu.gemini"    %% "lucuma-core-testkit" % lucumaCoreVersion,
+        "org.scalameta" %% "munit"               % munitVersion % Test,
+        "org.typelevel" %% "discipline-munit"    % munitDisciplineVersion  % Test,
       )
     )
 
@@ -579,8 +575,7 @@ lazy val ssoService = project
       "com.dimafeng"        %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
 
     ),
-    reStart / envVars += "PORT" -> "8082",
-    reStartArgs       += "serve",
+    run / envVars += "PORT" -> "8082",
     description                     := "Lucuma SSO Service",
     // Name of the launch script
     executableScriptName            := "lucuma-sso-service",
@@ -588,7 +583,7 @@ lazy val ssoService = project
     // Truncate DYNO on first dot. For web dyno, execute "serve", otherwise execute whatever the dyno type is (eg: "create-service-user" or "create-jwt").
     bashScriptExtraDefines += """DYNO_TYPE=${DYNO%%.*}; if [[ "$DYNO_TYPE" == "web" ]]; then set -- serve; else set; set -- $DYNO_TYPE $1 $2; fi""",
     // Load resources during compile so they are available for GraphQL schema macros
-    (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
+    (Compile / compile) := Def.uncached((Compile / compile).dependsOn(Compile / copyResources).value)
   )
 
 lazy val ssoBackendExample = project
@@ -619,13 +614,13 @@ lazy val itcModel = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "lucuma-itc",
     libraryDependencies ++= Seq(
-      "io.circe"      %%% "circe-generic" % circeVersion,
-      "io.circe"      %%% "circe-refined" % circeRefinedVersion,
-      "org.typelevel" %%% "cats-core"     % catsVersion,
-      "edu.gemini"    %%% "lucuma-core"   % lucumaCoreVersion,
-      "eu.timepit"    %%% "refined"       % refinedVersion,
-      "eu.timepit"    %%% "refined-cats"  % refinedVersion,
-      "org.typelevel" %%% "kittens"       % kittensVersion
+      "io.circe"      %% "circe-generic" % circeVersion,
+      "io.circe"      %% "circe-refined" % circeRefinedVersion,
+      "org.typelevel" %% "cats-core"     % catsVersion,
+      "edu.gemini"    %% "lucuma-core"   % lucumaCoreVersion,
+      "eu.timepit"    %% "refined"       % refinedVersion,
+      "eu.timepit"    %% "refined-cats"  % refinedVersion,
+      "org.typelevel" %% "kittens"       % kittensVersion
     )
   )
 
@@ -662,7 +657,7 @@ lazy val ocsGitBranch   = taskKey[String]("ocs git branch")
 lazy val ocsGitDescribe = taskKey[String]("ocs git describe")
 lazy val ocsLocal       = taskKey[Boolean]("ocs local changes")
 
-ThisBuild / ocsBuildInfo := {
+ThisBuild / ocsBuildInfo := Def.uncached {
   import scala.util.matching.*
 
   val buildInfoFile = (itcService / baseDirectory).value / "ocslib" / "build-info.json"
@@ -704,7 +699,7 @@ lazy val itcService = project
     projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     description              := "ITC Server",
     scalacOptions -= "-Vtype-diffs",
-    reStart / javaOptions := Seq(
+    run / javaOptions := Seq(
       "-Dcats.effect.stackTracing=DISABLED",
       "-Dcats.effect.tracing.mode=none"
     ),
@@ -753,15 +748,18 @@ lazy val itcService = project
     dockerExposedPorts ++= Seq(6060),
     // Add the ocslib jars to the distribution
     Universal / mappings ++= {
-      val dir = baseDirectory.value / "ocslib"
-      (dir ** AllPassFilter).pair(relativeTo(dir.getParentFile))
+      val conv = fileConverter.value
+      val dir  = baseDirectory.value / "ocslib"
+      (dir ** AllPassFilter).pair(relativeTo(dir.getParentFile)).map { (f, path) =>
+        conv.toVirtualFile(f.toPath) -> path
+      }
     },
     // The heap needs to be a lot smaller than the dyno size. This may be
     // because the JVM tricks to load the 367M of old itc jar files increases the
     // `metaspace` size by that amount. It's a nice theory, at least.
     lucumaDockerHeapSubtract := 400,
     // Load resources during compile so they are available for GraphQL schema macros
-    (Compile / compile) := ((Compile / compile) dependsOn (Compile / copyResources)).value
+    (Compile / compile) := Def.uncached((Compile / compile).dependsOn(Compile / copyResources).value)
   )
 
 lazy val itcClient = crossProject(JVMPlatform, JSPlatform)
@@ -771,22 +769,22 @@ lazy val itcClient = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "lucuma-itc-client",
     libraryDependencies ++= Seq(
-      "edu.gemini"    %%% "lucuma-core"       % lucumaCoreVersion,
-      "org.typelevel" %%% "cats-core"         % catsVersion,
-      "org.typelevel" %%% "cats-effect"       % catsEffectVersion,
-      "org.http4s"    %%% "http4s-circe"      % http4sVersion,
-      "org.http4s"    %%% "http4s-dsl"        % http4sVersion,
-      "io.circe"      %%% "circe-literal"     % circeVersion,
-      "edu.gemini"    %%% "clue-model"        % clueVersion,
-      "edu.gemini"    %%% "clue-http4s"       % clueVersion,
-      "edu.gemini"    %%% "clue-core"         % clueVersion,
-      "io.circe"      %%% "circe-generic"     % circeVersion,
-      "org.tpolecat"  %%% "natchez-http4s"    % natchezHttp4sVersion,
-      "org.typelevel" %%% "spire"             % spireVersion,
-      "org.typelevel" %%% "spire-extras"      % spireVersion,
-      "org.typelevel" %%% "kittens"           % kittensVersion,
-      "org.typelevel" %%% "munit-cats-effect" % munitCatsEffectVersion % Test,
-      "com.lihaoyi"   %%% "pprint"            % pprintVersion          % Test
+      "edu.gemini"    %% "lucuma-core"       % lucumaCoreVersion,
+      "org.typelevel" %% "cats-core"         % catsVersion,
+      "org.typelevel" %% "cats-effect"       % catsEffectVersion,
+      "org.http4s"    %% "http4s-circe"      % http4sVersion,
+      "org.http4s"    %% "http4s-dsl"        % http4sVersion,
+      "io.circe"      %% "circe-literal"     % circeVersion,
+      "edu.gemini"    %% "clue-model"        % clueVersion,
+      "edu.gemini"    %% "clue-http4s"       % clueVersion,
+      "edu.gemini"    %% "clue-core"         % clueVersion,
+      "io.circe"      %% "circe-generic"     % circeVersion,
+      "org.tpolecat"  %% "natchez-http4s"    % natchezHttp4sVersion,
+      "org.typelevel" %% "spire"             % spireVersion,
+      "org.typelevel" %% "spire-extras"      % spireVersion,
+      "org.typelevel" %% "kittens"           % kittensVersion,
+      "org.typelevel" %% "munit-cats-effect" % munitCatsEffectVersion % Test,
+      "com.lihaoyi"   %% "pprint"            % pprintVersion          % Test
     )
   )
 
@@ -814,13 +812,13 @@ lazy val itcTestkit = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "lucuma-itc-testkit",
     libraryDependencies ++= Seq(
-      "edu.gemini"        %%% "lucuma-core-testkit" % lucumaCoreVersion,
-      "org.typelevel"     %%% "cats-testkit"        % catsVersion,
-      "dev.optics"        %%% "monocle-law"         % monocleVersion,
-      "org.typelevel"     %%% "spire-laws"          % spireVersion,
-      "eu.timepit"        %%% "refined-scalacheck"  % refinedVersion,
-      "io.circe"          %%% "circe-testing"       % circeVersion,
-      "io.chrisdavenport" %%% "cats-scalacheck"     % catsScalacheckVersion
+      "edu.gemini"        %% "lucuma-core-testkit" % lucumaCoreVersion,
+      "org.typelevel"     %% "cats-testkit"        % catsVersion,
+      "dev.optics"        %% "monocle-law"         % monocleVersion,
+      "org.typelevel"     %% "spire-laws"          % spireVersion,
+      "eu.timepit"        %% "refined-scalacheck"  % refinedVersion,
+      "io.circe"          %% "circe-testing"       % circeVersion,
+      "io.chrisdavenport" %% "cats-scalacheck"     % catsScalacheckVersion
     )
   )
 
@@ -831,12 +829,12 @@ lazy val itcTests = project
   .settings(
     name := "lucuma-itc-tests",
     libraryDependencies ++= Seq(
-      "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
-      "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
+      "org.typelevel" %% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
+      "com.lihaoyi"   %% "pprint"                 % pprintVersion              % Test,
       "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
-      "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
-      "org.scalameta" %%% "munit"                  % munitVersion               % Test,
-      "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
+      "org.typelevel" %% "log4cats-slf4j"         % log4catsVersion            % Test,
+      "org.scalameta" %% "munit"                  % munitVersion               % Test,
+      "org.typelevel" %% "discipline-munit"       % munitDisciplineVersion     % Test
     )
   )
 
@@ -846,22 +844,18 @@ lazy val itcLegacyTests = project
   .dependsOn(itcService, itcClient.jvm, itcTestkit.jvm)
   .settings(
     name := "lucuma-itc-legacy-tests",
-    // Skip legacy tests unless explicitly enabled
-    Test / test := {
-      if (sys.env.get("RUN_LEGACY_TESTS").contains("true")) {
-        (Test / test).value
-      } else {
-        streams.value.log.info("Skipping ITC legacy tests (set RUN_LEGACY_TESTS=true to enable)")
-        ()
-      }
+    // Skip legacy tests unless RUN_LEGACY_TESTS=true. `test` is an InputTask in sbt 2, so it
+    // cannot be redefined in terms of itself; emptying definedTests skips the suites instead.
+    Test / definedTests ~= { tests =>
+      if (sys.env.get("RUN_LEGACY_TESTS").contains("true")) tests else Nil
     },
     libraryDependencies ++= Seq(
-      "org.typelevel" %%% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
-      "com.lihaoyi"   %%% "pprint"                 % pprintVersion              % Test,
+      "org.typelevel" %% "munit-cats-effect"      % munitCatsEffectVersion     % Test,
+      "com.lihaoyi"   %% "pprint"                 % pprintVersion              % Test,
       "org.http4s"     %% "http4s-jdk-http-client" % http4sJdkHttpClientVersion % Test,
-      "org.typelevel" %%% "log4cats-slf4j"         % log4catsVersion            % Test,
-      "org.scalameta" %%% "munit"                  % munitVersion               % Test,
-      "org.typelevel" %%% "discipline-munit"       % munitDisciplineVersion     % Test
+      "org.typelevel" %% "log4cats-slf4j"         % log4catsVersion            % Test,
+      "org.scalameta" %% "munit"                  % munitVersion               % Test,
+      "org.typelevel" %% "discipline-munit"       % munitDisciplineVersion     % Test
     )
   )
 
@@ -893,11 +887,13 @@ lazy val createNpmProject = taskKey[Unit]("Create NPM project, package.json and 
 lazy val npmPublish       = taskKey[Unit]("Run npm publish")
 
 def npmPublishForDir(dir: String) = Def.task {
-  val publishDir = target.value / dir
+  Def.uncached {
+    val publishDir = target.value / dir
 
-  val _ = createNpmProject.value
-  scala.sys.process.Process(List("npm", "publish", "--tag", "latest"), publishDir).!!
-  streams.value.log.info(s"Published NPM package from ${publishDir}")
+    val _ = createNpmProject.value
+    scala.sys.process.Process(List("npm", "publish", "--tag", "latest"), publishDir).!!
+    streams.value.log.info(s"Published NPM package from ${publishDir}")
+  }
 }
 
 lazy val schema =
@@ -908,17 +904,17 @@ lazy val schema =
     .settings(
       name             := "lucuma-odb-schema",
       libraryDependencies ++= Seq(
-        "io.circe"      %%% "circe-parser"               % circeVersion,
-        "io.circe"      %%% "circe-literal"              % circeVersion,
-        "io.circe"      %%% "circe-refined"              % circeRefinedVersion,
-        "edu.gemini"    %%% "lucuma-core"                % lucumaCoreVersion,
-        "io.circe"      %%% "circe-testing"              % circeVersion           % Test,
-        "edu.gemini"    %%% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
-        "org.scalameta" %%% "munit"                      % munitVersion           % Test,
-        "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
-        "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test
+        "io.circe"      %% "circe-parser"               % circeVersion,
+        "io.circe"      %% "circe-literal"              % circeVersion,
+        "io.circe"      %% "circe-refined"              % circeRefinedVersion,
+        "edu.gemini"    %% "lucuma-core"                % lucumaCoreVersion,
+        "io.circe"      %% "circe-testing"              % circeVersion           % Test,
+        "edu.gemini"    %% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
+        "org.scalameta" %% "munit"                      % munitVersion           % Test,
+        "org.scalameta" %% "munit-scalacheck"           % munitScalacheckVersion % Test,
+        "org.typelevel" %% "discipline-munit"           % munitDisciplineVersion % Test
       ),
-      createNpmProject := {
+      createNpmProject := Def.uncached {
         val npmDir  = target.value / "npm"
         val rootDir = (ThisBuild / baseDirectory).value
 
@@ -946,7 +942,7 @@ lazy val schema =
              |  "name": "@gemini-hlsw/lucuma-odb-schemas",
              |  "version": "$semVerWithPrerelease",
              |  "type": "module",
-             |  "license": "${licenses.value.head._1}",
+             |  "license": "${licenses.value.head.spdxId}",
              |  "exports": {
              |    "./package.json": "./package.json",
              |    "./odb": "./${odbSchemaFile.getName}",
@@ -989,7 +985,7 @@ lazy val otel = project
   .in(file("modules/otel"))
   .settings(
     name := "lucuma-odb-otel",
-    checkOtelVersion := {
+    checkOtelVersion := Def.uncached {
       val _ = update.value
       OtelCheck.declaredOtelVersion(
         csrCacheDirectory.value,
@@ -1005,7 +1001,7 @@ lazy val otel = project
         case None    => streams.value.log.warn("Could not read the otel4s-oteljava pom; skipping version check.")
       }
     },
-    Compile / compile := (Compile / compile).dependsOn(checkOtelVersion).value,
+    Compile / compile := Def.uncached((Compile / compile).dependsOn(checkOtelVersion).value),
     libraryDependencies ++= Seq(
       "org.tpolecat"                     %% "natchez-core"                              % natchezVersion,
       "org.tpolecat"                     %% "natchez-noop"                              % natchezVersion,
@@ -1119,8 +1115,7 @@ lazy val service = project
       "io.opentelemetry"                  % "opentelemetry-sdk-testing"                  % openTelemetryVersion         % Test,
       "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion       % Test,
     ),
-    reStart / envVars += "PORT" -> "8082",
-    reStartArgs += "serve",
+    run / envVars += "PORT" -> "8082",
     description                     := "Lucuma ODB Service",
     // Grackle validates the type mappings per new user; Heroku's default stack is too small
     bashScriptExtraDefines += """addJava "-Xss1m"""",
@@ -1138,7 +1133,7 @@ lazy val obscalc = project
   .settings(
     name                        := "obscalc-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082",
+    run / envVars += "PORT" -> "8082",
     description                     := "Lucuma ODB ObsCalc Service",
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
@@ -1154,7 +1149,7 @@ lazy val calibrations = project
   .settings(
     name                        := "calibrations-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    reStart / envVars += "PORT" -> "8082",
+    run / envVars += "PORT" -> "8082",
     description                     := "Lucuma ODB Calibrations Service",
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
@@ -1175,7 +1170,7 @@ lazy val pdfSummary = project
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
     description                     := "Lucuma ODB Proposal Summary PDF Service",
     // Config requires PORT even though this dyno serves nothing; Heroku always sets it.
-    reStart / envVars += "PORT" -> "8083",
+    run / envVars += "PORT" -> "8083",
     // The Python renderer shares the dyno's memory with the JVM; leave it room.
     lucumaDockerHeapSubtract := 400,
     // We need a bit larger stack space for the grackle mapping
@@ -1234,8 +1229,11 @@ lazy val phase0 = project
   )
 
 // Command aliases for starting/stopping all services
-addCommandAlias("allStart", ";service/reStart;obscalc/reStart;calibrations/reStart;pdfSummary/reStart")
-addCommandAlias("allStop", ";service/reStop;obscalc/reStop;calibrations/reStop;pdfSummary/reStop")
+addCommandAlias(
+  "allStart",
+  "service/bgRun serve; obscalc/bgRun; calibrations/bgRun; pdfSummary/bgRun"
+)
+addCommandAlias("allStop", "devStop")
 
 // START RESOURCE
 
@@ -1296,11 +1294,11 @@ lazy val resourceService = project
       "org.http4s"    %% "http4s-jdk-http-client"                % http4sJdkHttpClientVersion   % Test,
       "edu.gemini"    %% "clue-http4s"                           % clueVersion                  % Test
     ),
-    reStart / envVars += "PORT" -> "8484",
+    run / envVars += "PORT" -> "8484",
     executableScriptName        := "resource-service",
     dockerExposedPorts ++= Seq(8484),
     // Load resources during compile so they are available for GraphQL schema macros
-    (Compile / compile)         := (Compile / compile).dependsOn(Compile / copyResources).value
+    (Compile / compile)         := Def.uncached((Compile / compile).dependsOn(Compile / copyResources).value)
   )
 
 lazy val resourceCommonSettings = lucumaGlobalSettings ++ Seq(
