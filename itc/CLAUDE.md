@@ -75,7 +75,7 @@ Run from repository root.
 ### Start ITC service (hot-reload)
 
 ```bash
-sbt "~itcService/devRun"
+sbt ~itcService/reStart
 ```
 
 ### Run standard ITC tests

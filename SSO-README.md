@@ -176,10 +176,10 @@ Docker-compose also starts up a local nginx server that serves an example client
 
 - http://local.lucuma.xyz:8081/playground.html
 
-### Using devRun
+### Using reStart
 
-Alternatively, you can run the app from within SBT with `service/devRun`
-(stopping with `devStop`).  By default, this command will fail after
+Alternatively, you can run the app from within SBT with `service/reStart`
+(stopping with `service/reStop`).  By default, this command will fail after
 running `docker-compose` `down` and then `up` as described above.  You can
 supply optional arguments to simplify development though:
 

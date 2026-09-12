@@ -42,16 +42,20 @@ sbt "service/testOnly lucuma.odb.graphql.mutation.createObservation_GnirsLongSli
 ### Run service (hot-reload, port 8082)
 
 ```bash
-sbt service/devRun
-# devRun supplies the `serve` subcommand; extra arguments are appended:
-sbt "service/devRun --reset"
+sbt service/reStart
+# reStartArgs supplies the `serve` subcommand; extra arguments are appended:
+sbt "service/reStart --reset"
 # or start all four services together:
 sbt allStart
 sbt allStop
 ```
 
-`run / envVars` sets `PORT=8082`; the ODB endpoint is `http://localhost:8082/odb`.
-`bgList` shows the running jobs; `allStop` is an alias for `devStop`, which stops all of them.
+`reStart / envVars` sets `PORT=8082`; the ODB endpoint is `http://localhost:8082/odb`.
+
+sbt 2 keeps a background server, and a forked service inherits **that server's** environment
+rather than the shell you typed in. After changing anything the service reads from the
+environment, kill the server (or `shutdown`) before restarting, or you will keep running against
+the old values.
 
 ### Static checks
 
