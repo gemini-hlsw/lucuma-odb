@@ -4,6 +4,7 @@
 package lucuma.odb.graphql
 package input
 
+import cats.data.NonEmptyList
 import cats.syntax.foldable.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
@@ -64,7 +65,7 @@ object GnirsAcquisitionInput:
       case _             =>
         Result(a)
 
-  val Binding: Matcher[GnirsAcquisitionInput] =
+  private def binding(acquisitionFilters: NonEmptyList[GnirsFilter]): Matcher[GnirsAcquisitionInput] =
     ObjectFieldsBinding.rmap:
       case List(
         GnirsFilterBinding.Nullable("explicitFilter", rFilter),
@@ -76,10 +77,18 @@ object GnirsAcquisitionInput:
         (
           rFilter.flatMap: n =>
             n.traverse: f =>
-              if GnirsFilter.AcquisitionFilters.contains_(f) then f.success
-              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${GnirsFilter.AcquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
+              if acquisitionFilters.contains_(f) then f.success
+              else OdbError.InvalidArgument(s"'explicitFilter' must contain one of: ${acquisitionFilters.map(_.tag.toScreamingSnakeCase).mkString_(", ")}".some).asFailure
           ,
           rAcqType, rCoadds, rSkyOffset, rEtm
         ).parMapN(GnirsAcquisitionInput.apply)
          .map(a => a.copy(coadds = coaddsForEtm(a.explicitExposureTimeMode, a.coadds)))
          .flatMap(validateSkyOffset)
+
+  // The acquisition filters differ by mode: a spectroscopic acquisition images through the
+  // spectroscopy orders, an imaging one through the photometric imaging filters.
+  val SpectroscopyBinding: Matcher[GnirsAcquisitionInput] =
+    binding(GnirsFilter.SpectroscopyAcquisitionFilters)
+
+  val ImagingBinding: Matcher[GnirsAcquisitionInput] =
+    binding(GnirsFilter.ImagingAcquisitionFilters)

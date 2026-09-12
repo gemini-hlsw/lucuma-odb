@@ -49,7 +49,6 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
           case GnirsFilter.Y      => IntegrationTime(300.msTimeSpan, 1.refined).some
           case GnirsFilter.H2     => IntegrationTime(2.secTimeSpan,  3.refined).some
           case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined).some
-          case GnirsFilter.Order3 => IntegrationTime(5.secTimeSpan,  1.refined).some
           case _                  => none
       // Time-and-count echoes the user's request, as the real ITC does.
       case InstrumentMode.GnirsImaging(ExposureTimeMode.TimeAndCountMode(time, count, _), _, _, _, _, _, _) =>
@@ -257,10 +256,11 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
   test("Very Bright keeps an explicit K filter, at the table's long-camera K exposure"):
     // The case reported on the story: a very bright target with K explicitly selected used
     // to image the keyhole in H. The table's long-camera K row now applies, 15s, 1 coadd.
-    val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.Order3, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
-    val (onTargetBreak, onTarget) = onTargetSteps(5.secTimeSpan, 1, GnirsFilter.Order3, "LONG_BLUE")
+    // The explicit type pins Very Bright even though the K ITC exposure is 30s.
+    val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.K, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "LONG_BLUE")
     imagingObs("LONG_BLUE", "Y").flatMap: oid =>
-      setImagingAcquisition(oid, "{ explicitAcquisitionType: VERY_BRIGHT, explicitFilter: ORDER3 }") *>
+      setImagingAcquisition(oid, "{ explicitAcquisitionType: VERY_BRIGHT, explicitFilter: K }") *>
         expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
   test("Acquisition coadds come from the acquisition config in time-and-count mode"):

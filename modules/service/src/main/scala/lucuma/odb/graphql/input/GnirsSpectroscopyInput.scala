@@ -161,7 +161,7 @@ object GnirsSpectroscopyInput:
           IntBinding.Option("explicitFocusMotorSteps", rFocus),
           GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
-          AcquisitionInput.Binding.Option("acquisition", rAcq),
+          AcquisitionInput.SpectroscopyBinding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rCentralWavelengths, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
@@ -240,7 +240,7 @@ object GnirsSpectroscopyInput:
           IntBinding.Nullable("explicitFocusMotorSteps", rFocus),
           GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
-          AcquisitionInput.Binding.Option("acquisition", rAcq),
+          AcquisitionInput.SpectroscopyBinding.Option("acquisition", rAcq),
           TelluricTypeBinding.Option("telluricType", rTelluricType)
         ) =>
           (rCentralWavelengths, rFilter, rSlit, rIfu, rCamera, rGrating, rPrism,
