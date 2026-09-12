@@ -99,7 +99,16 @@ ThisBuild / tlCiMimaBinaryIssueCheck := false
 ThisBuild / tlCiDocCheck             := false
 
 // sbt-revolver has no sbt 2 build; the dev loop uses sbt's own background jobs (bgRun/bgList).
+// `bgRun` has no equivalent of `reStartArgs`, so devRun supplies each service's default
+// subcommand and appends whatever else is typed: `service/devRun --reset` runs `serve --reset`.
+lazy val devRun  = inputKey[JobHandle]("Run this service in the background")
 lazy val devStop = taskKey[Unit]("Stop every background job")
+
+def devRunSetting(defaults: String*) =
+  devRun := Def.inputTaskDyn {
+    val extra = Def.spaceDelimited("<arg>").parsed
+    (Compile / bgRun).toTask((defaults.toList ::: extra.toList).map(" " + _).mkString)
+  }.evaluated
 
 ThisBuild / devStop := Def.uncached {
   val jobs = bgJobService.value
@@ -575,7 +584,9 @@ lazy val ssoService = project
       "com.dimafeng"        %% "testcontainers-scala-postgresql" % testcontainersScalaVersion % Test,
 
     ),
-    run / envVars += "PORT" -> "8082",
+    run / fork      := true,
+    run / envVars   += "PORT" -> "8082",
+    devRunSetting("serve"),
     description                     := "Lucuma SSO Service",
     // Name of the launch script
     executableScriptName            := "lucuma-sso-service",
@@ -699,6 +710,8 @@ lazy val itcService = project
     projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
     description              := "ITC Server",
     scalacOptions -= "-Vtype-diffs",
+    run / fork        := true,
+    devRunSetting(),
     run / javaOptions := Seq(
       "-Dcats.effect.stackTracing=DISABLED",
       "-Dcats.effect.tracing.mode=none"
@@ -1115,7 +1128,9 @@ lazy val service = project
       "io.opentelemetry"                  % "opentelemetry-sdk-testing"                  % openTelemetryVersion         % Test,
       "org.typelevel"                    %% "munit-cats-effect"                          % munitCatsEffectVersion       % Test,
     ),
-    run / envVars += "PORT" -> "8082",
+    run / fork      := true,
+    run / envVars   += "PORT" -> "8082",
+    devRunSetting("serve"),
     description                     := "Lucuma ODB Service",
     // Grackle validates the type mappings per new user; Heroku's default stack is too small
     bashScriptExtraDefines += """addJava "-Xss1m"""",
@@ -1133,7 +1148,9 @@ lazy val obscalc = project
   .settings(
     name                        := "obscalc-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    run / envVars += "PORT" -> "8082",
+    run / fork      := true,
+    run / envVars   += "PORT" -> "8082",
+    devRunSetting(),
     description                     := "Lucuma ODB ObsCalc Service",
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
@@ -1149,7 +1166,9 @@ lazy val calibrations = project
   .settings(
     name                        := "calibrations-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
-    run / envVars += "PORT" -> "8082",
+    run / fork      := true,
+    run / envVars   += "PORT" -> "8082",
+    devRunSetting(),
     description                     := "Lucuma ODB Calibrations Service",
     // Add command line parameters
     bashScriptExtraDefines += """set -- -Dfile.encoding=UTF-8""",
@@ -1170,7 +1189,9 @@ lazy val pdfSummary = project
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
     description                     := "Lucuma ODB Proposal Summary PDF Service",
     // Config requires PORT even though this dyno serves nothing; Heroku always sets it.
-    run / envVars += "PORT" -> "8083",
+    run / fork      := true,
+    run / envVars   += "PORT" -> "8083",
+    devRunSetting(),
     // The Python renderer shares the dyno's memory with the JVM; leave it room.
     lucumaDockerHeapSubtract := 400,
     // We need a bit larger stack space for the grackle mapping
@@ -1231,7 +1252,7 @@ lazy val phase0 = project
 // Command aliases for starting/stopping all services
 addCommandAlias(
   "allStart",
-  "service/bgRun serve; obscalc/bgRun; calibrations/bgRun; pdfSummary/bgRun"
+  "service/devRun; obscalc/devRun; calibrations/devRun; pdfSummary/devRun"
 )
 addCommandAlias("allStop", "devStop")
 
@@ -1294,7 +1315,9 @@ lazy val resourceService = project
       "org.http4s"    %% "http4s-jdk-http-client"                % http4sJdkHttpClientVersion   % Test,
       "edu.gemini"    %% "clue-http4s"                           % clueVersion                  % Test
     ),
-    run / envVars += "PORT" -> "8484",
+    run / fork      := true,
+    run / envVars   += "PORT" -> "8484",
+    devRunSetting(),
     executableScriptName        := "resource-service",
     dockerExposedPorts ++= Seq(8484),
     // Load resources during compile so they are available for GraphQL schema macros

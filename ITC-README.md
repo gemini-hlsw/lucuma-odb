@@ -7,7 +7,7 @@ This is a graphql server acting as a proxy for the old ocs2-based itc server
 It is possible to run locally using sbt
 
 ```
-   sbt "~itcService/bgRun"
+   sbt "~itcService/devRun"
 ```
 
 `devStop` stops it; `bgList` shows what is running.

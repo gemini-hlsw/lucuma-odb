@@ -42,7 +42,9 @@ sbt "service/testOnly lucuma.odb.graphql.mutation.createObservation_GnirsLongSli
 ### Run service (hot-reload, port 8082)
 
 ```bash
-sbt "service/bgRun serve"
+sbt service/devRun
+# devRun supplies the `serve` subcommand; extra arguments are appended:
+sbt "service/devRun --reset"
 # or start all four services together:
 sbt allStart
 sbt allStop
