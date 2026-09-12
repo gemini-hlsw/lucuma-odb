@@ -514,37 +514,44 @@ class executionAcqGnirs extends ExecutionTestSupportForGnirs:
           """.asRight
         )
 
-  test("VeryBright acquisition forces the FPU image to H even with an explicit non-H filter"):
-    val setup: IO[Observation.Id] =
-      for
-        p <- createProgram
-        t <- createTargetWithProfileAs(pi, p)
-        o <- createGnirsLongSlitObservationAs(pi, p, t)
-        _ <- setAcquisitionTimeAndCount(o, BigDecimal(VeryBrightAcqµs) / 1_000_000, 1, 1645) // 0.3s ⇒ VeryBright
-        _ <- setAcquisitionFilter(o, "ORDER6")           // X would otherwise be 10s on the short camera
-      yield o
+  // VeryBright only changes the default filter (H2, which the table maps to H). An
+  // explicit filter goes through the same per-camera table as in Bright/Faint mode.
+  // The remaining steps use the selected filter at the ITC (VeryBright) exposure.
+  // Columns: camera, selected filter, FPU-image filter, FPU-image exposure µs.
+  List(
+    ("SHORT_BLUE", "H2",     "ORDER4", HShortµs), // the default: H2 → H
+    ("SHORT_BLUE", "ORDER6", "ORDER6", XShortµs), // explicit X stays X (was forced to H)
+    ("LONG_BLUE",  "ORDER3", "ORDER3", KLongµs)   // the story's report: explicit K on the long camera
+  ).foreach: (camera, selected, fpuFilter, fpuµs) =>
+    test(s"$camera VeryBright acquisition with $selected filter — FPU image filter/exposure"):
+      val setup: IO[Observation.Id] =
+        for
+          p <- createProgram
+          t <- createTargetWithProfileAs(pi, p)
+          o <- createGnirsLongSlitObservationAs(pi, p, t)
+          _ <- setCamera(o, camera)
+          _ <- setAcquisitionTimeAndCount(o, BigDecimal(VeryBrightAcqµs) / 1_000_000, 1, 1645) // 0.3s ⇒ VeryBright
+          _ <- setAcquisitionFilter(o, selected)
+        yield o
 
-    // VeryBright always images the FPU in H (Order4) at the short-camera H exposure (3s);
-    // the remaining steps still use the selected X filter at the ITC (VeryBright) exposure.
-    setup.flatMap: oid =>
-      expect(
-        user     = pi,
-        query    = firstAtomConfigQuery(oid),
-        expected = json"""
-          {
-            "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
-              ${firstAtomConfig(HShortµs,        1, "ORDER4", "BRIGHT")},
-              ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")},
-              ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")},
-              ${firstAtomConfig(VeryBrightAcqµs, 1, "ORDER6", "VERY_BRIGHT")}
+      setup.flatMap: oid =>
+        expect(
+          user     = pi,
+          query    = firstAtomConfigQuery(oid),
+          expected = json"""
+            {
+              "executionConfig": { "gnirs": { "acquisition": { "nextAtom": { "steps": [
+                ${firstAtomConfig(fpuµs,           1, fpuFilter, "BRIGHT")},
+                ${firstAtomConfig(VeryBrightAcqµs, 1, selected,  "VERY_BRIGHT")},
+                ${firstAtomConfig(VeryBrightAcqµs, 1, selected,  "VERY_BRIGHT")},
+                ${firstAtomConfig(VeryBrightAcqµs, 1, selected,  "VERY_BRIGHT")}
+              ] } } } }
+            }
+          """.asRight
+        )
 
-            ] } } } }
-          }
-        """.asRight
-      )
-
-  // PAH on the short camera is always an error, regardless of mode (including VeryBright,
-  // which otherwise images the FPU in H). Columns: ITC seconds, acquisition-type label.
+  // PAH on the short camera is always an error, regardless of mode. Columns: ITC seconds,
+  // acquisition-type label.
   List(
     (5.0, "Bright"),     // 5s   ⇒ Bright
     (30.0, "Faint"),     // 30s  ⇒ Faint
