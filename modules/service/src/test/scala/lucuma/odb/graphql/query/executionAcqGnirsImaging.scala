@@ -178,16 +178,18 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
       o <- createObservationWithModeAs(pi, p, List(t), mode)
     yield o
 
-  test("Bright: field image in first filter (fixed short-camera exposure), on-target in first filter"):
-    // First filter J classifies as Bright (6s). Field image: (10,0), J, 3s, 1 coadd.
+  test("Bright: field image in first filter at the table's J exposure, on-target in first filter"):
+    // First filter J classifies as Bright (6s). Field image: (10,0), J, 15s (the table's
+    // short-camera J row, which covers the photometric J as well as Order5), 1 coadd.
     // On-target: (0,0), J, 2s (ITC), 3 coadds.
-    val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.J, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
+    val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.J, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
     val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "SHORT_BLUE")
     imagingObs("SHORT_BLUE", "J").flatMap: oid =>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
   test("Very Bright: field image in H (Order4), on-target in H2"):
-    // First filter Y classifies as Very Bright (0.3s). Field image: (10,0), H (Order4),
+    // First filter Y classifies as Very Bright (0.3s), so the selected filter defaults to
+    // the narrow-band H2, which the table images in H. Field image: (10,0), H (Order4),
     // 3s, 1 coadd. On-target: (0,0), H2, 2s (H2 ITC pass), 3 coadds.
     val field                     = acqStep(3.secTimeSpan, 1, GnirsFilter.Order4, "SHORT_BLUE", 10, 0, StepGuideState.Disabled)
     val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.H2, "SHORT_BLUE")
@@ -202,10 +204,10 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     imagingObs("SHORT_BLUE", "K").flatMap: oid =>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
-  test("Long camera uses a 15s keyhole exposure"):
-    // Same Bright classification as the short-camera case, but the long camera's fixed
-    // keyhole exposure is 15s (vs 3s short).
-    val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.J, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
+  test("Long camera images the J keyhole in H"):
+    // Same Bright classification as the short-camera case, but the table sends J (and X)
+    // to H on the long camera, at that camera's 15s H exposure.
+    val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.Order4, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
     val (onTargetBreak, onTarget) = onTargetSteps(2.secTimeSpan, 3, GnirsFilter.J, "LONG_BLUE")
     imagingObs("LONG_BLUE", "J").flatMap: oid =>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
@@ -250,6 +252,16 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
     imagingObs("SHORT_BLUE", "Y").flatMap: oid =>
       setImagingAcquisition(oid, "{ explicitAcquisitionType: VERY_BRIGHT, explicitFilter: ORDER4 }") *>
       expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
+
+  test("Very Bright keeps an explicit K filter, at the table's long-camera K exposure"):
+    // The case reported on the story: a very bright target with K explicitly selected used
+    // to image the keyhole in H. The table's long-camera K row now applies, 15s, 1 coadd.
+    // The explicit type pins Very Bright even though the K ITC exposure is 30s.
+    val field                     = acqStep(15.secTimeSpan, 1, GnirsFilter.K, "LONG_BLUE", 10, 0, StepGuideState.Disabled)
+    val (onTargetBreak, onTarget) = onTargetSteps(30.secTimeSpan, 1, GnirsFilter.K, "LONG_BLUE")
+    imagingObs("LONG_BLUE", "Y").flatMap: oid =>
+      setImagingAcquisition(oid, "{ explicitAcquisitionType: VERY_BRIGHT, explicitFilter: K }") *>
+        expect(pi, gnirsAcqImagingQuery(oid), expectedAcquisition(field, onTargetBreak, onTarget).asRight)
 
   test("Acquisition coadds come from the acquisition config in time-and-count mode"):
     // In time-and-count mode the ITC echoes the requested exposure and the explicit
