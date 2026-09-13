@@ -128,7 +128,12 @@ ThisBuild / githubWorkflowEnv += munitFlakyOk
 // pyexplore is private; the pdfSummary image clones it with this token.
 ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TOKEN }}")
 
-ThisBuild / githubWorkflowSbtCommand := "sbt -v -J-Xmx6g -J-Xss4M"
+// sbt 2 runs a background server, and JVM options only take effect when that server starts, so
+// `-J` flags on a later invocation are ignored. Setting them for the whole job means whichever
+// step boots the server gets them. Locally the same job is done by .jvmopts, which is gitignored.
+ThisBuild / githubWorkflowEnv += ("SBT_OPTS" -> "-Xmx6g -Xss4M")
+
+ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   Seq(
