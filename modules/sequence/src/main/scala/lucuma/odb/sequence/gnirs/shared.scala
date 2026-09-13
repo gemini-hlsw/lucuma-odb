@@ -3,8 +3,8 @@
 
 package lucuma.odb.sequence.gnirs
 
-import cats.syntax.eq.*
 import cats.syntax.either.*
+import cats.syntax.eq.*
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
