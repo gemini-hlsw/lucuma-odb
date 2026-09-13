@@ -68,7 +68,7 @@ object GnirsImagingInput extends ImagingFilterCheck:
           GnirsCameraBinding.Option("camera", rCamera),
           GnirsReadModeBinding.Option("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Option("explicitWellDepth", rWellDepth),
-          AcquisitionInput.Binding.Option("acquisition", rAcq)
+          AcquisitionInput.ImagingBinding.Option("acquisition", rAcq)
         ) =>
           (
             rVariant,
@@ -120,7 +120,7 @@ object GnirsImagingInput extends ImagingFilterCheck:
           GnirsCameraBinding.Option("camera", rCamera),
           GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
           GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
-          AcquisitionInput.Binding.Option("acquisition", rAcq)
+          AcquisitionInput.ImagingBinding.Option("acquisition", rAcq)
         ) =>
           (
             rVariant,

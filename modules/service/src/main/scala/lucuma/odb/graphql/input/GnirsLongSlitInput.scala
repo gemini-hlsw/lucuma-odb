@@ -35,7 +35,7 @@ object GnirsLongSlitInput:
         IntBinding.Nullable("explicitFocusMotorSteps", rFocus),
         GnirsReadModeBinding.Nullable("explicitReadMode", rReadMode),
         GnirsWellDepthBinding.Nullable("explicitWellDepth", rWellDepth),
-        GnirsSpectroscopyInput.AcquisitionInput.Binding.Option("acquisition", rAcq),
+        GnirsSpectroscopyInput.AcquisitionInput.SpectroscopyBinding.Option("acquisition", rAcq),
         TelluricTypeBinding.Option("telluricType", rTelluricType)
       ) =>
         (rCentralWavelengths, rFilter, rFpu, rTelescopeConfigs, rCamera, rGrating, rPrism,

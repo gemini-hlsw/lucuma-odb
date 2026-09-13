@@ -9,6 +9,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.util.arb.ArbEnumerated
 import lucuma.itc.client.ImagingParameters
@@ -40,12 +41,13 @@ trait ArbGeneratorParams:
       bnd <- arbitrary[Option[ScienceBand]]
       cfg <- arbitrary[Config.GmosNorth]
       rol <- arbitrary[Option[CalibrationRole]]
+      pst <- arbitrary[Option[ProposalStatus]]
       tgt <- arbitrary[Boolean]
       dc  <- arbitrary[Option[DeclaredExecutionState]]
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, tgt, dc, es, sc, sp)
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
@@ -54,12 +56,13 @@ trait ArbGeneratorParams:
       bnd <- arbitrary[Option[ScienceBand]]
       cfg <- arbitrary[Config.GmosSouth]
       rol <- arbitrary[Option[CalibrationRole]]
+      pst <- arbitrary[Option[ProposalStatus]]
       tgt <- arbitrary[Boolean]
       dc  <- arbitrary[Option[DeclaredExecutionState]]
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, tgt, dc, es, sc, sp)
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:

@@ -9,6 +9,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Instances.given
@@ -20,12 +21,24 @@ case class GeneratorParams(
   scienceBand:      Option[ScienceBand],
   observingMode:    ObservingMode,
   calibrationRole:  Option[CalibrationRole],
+  proposalStatus:   Option[ProposalStatus],
   hasTarget:        Boolean,
   declaredState:    Option[DeclaredExecutionState],
   executionState:   ExecutionState,
   stepCount:        Long,
   isSplittable:     Boolean
-)
+):
+
+  // The standard star is chosen to suit the observation time, so a real
+  // estimate moves whenever the time moves.  Until the proposal is accepted the
+  // standard is generated from a nominal exposure instead.
+  def isSpecPhotoProposal: Boolean =
+    calibrationRole.contains(CalibrationRole.SpectroPhotometric) &&
+      (proposalStatus match
+        case Some(ProposalStatus.Accepted) => false
+        case Some(_)                       => true
+        case None                          => false
+      )
 
 object GeneratorParams:
 
@@ -36,6 +49,7 @@ object GeneratorParams:
         a.scienceBand,
         a.observingMode,
         a.calibrationRole,
+        a.proposalStatus,
         a.hasTarget,
         a.declaredState,
         a.executionState,
@@ -50,6 +64,7 @@ object GeneratorParams:
         a.scienceBand.hashBytes,
         a.observingMode.hashBytes,
         a.calibrationRole.hashBytes,
+        a.proposalStatus.hashBytes,
         a.hasTarget.hashBytes,
         a.declaredState.hashBytes,
         a.executionState.hashBytes,

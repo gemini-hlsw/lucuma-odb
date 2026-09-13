@@ -216,6 +216,30 @@ ODB_OTEL_KEY=$(echo -n "<instance-id>:<api-key>" | base64)
 
 The instance ID and API key are found in the Grafana Cloud page under the OpenTelemetry connection page.
 
+### Dependency Versions
+
+`otel4s-oteljava` is compiled against one specific `opentelemetry-java` release, and the
+extra `io.opentelemetry` artifacts we declare directly (`opentelemetry-exporter-otlp`,
+`opentelemetry-runtime-telemetry`) must not run ahead of it. Scala Steward used to bump
+them independently, which put mismatched SDK versions on the classpath.
+
+Two things hold the line today:
+
+- `.scala-steward.conf` pins `io.opentelemetry` to the matching version prefix and groups
+  the remaining otel updates into one PR.
+- `otel/compile` runs `checkOtelVersion`, which reads the `opentelemetry-sdk` version out
+  of the cached `otel4s-oteljava` pom (see `project/OtelCheck.scala`) and fails the build
+  if `openTelemetryVersion` in `build.sbt` disagrees.
+
+When bumping `otel4sVersion`, set `openTelemetryVersion` to whatever the build error names
+and move the prefix in `.scala-steward.conf`.
+
+**TODO (sbt 2):** this is a check because sbt 1 cannot import a BOM and cannot read a
+resolved version while building `libraryDependencies`. sbt 2 supports BOM dependencies, so
+the version should instead be *derived*: import the opentelemetry BOM that otel4s already
+depends on, drop `openTelemetryVersion` and the version off each `io.opentelemetry` line,
+and delete `project/OtelCheck.scala` along with the `updates.pin` entry.
+
 ## SQL Query Instrumentation
 
 The GraphQL `fetch` layer (grackle -> skunk) records timing and row-count attributes on every

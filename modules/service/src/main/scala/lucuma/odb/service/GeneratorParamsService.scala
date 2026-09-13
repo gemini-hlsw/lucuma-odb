@@ -27,6 +27,7 @@ import lucuma.core.enums.Flamingos2ReadMode
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
 import lucuma.core.math.RadialVelocity
@@ -300,7 +301,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
         /**
          * Modes with no acquisition sequence are costed on science alone.
@@ -319,7 +320,7 @@ object GeneratorParamsService {
               .leftMap(MissingParamSet.fromParams)
               .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
         /**
          * GNIRS spectroscopy takes spectra at one or more central wavelengths,
@@ -356,7 +357,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
 
         // Shared by long slit and MOS.  Signal-to-noise is solved by the ITC, so
         // the read mode it is given is ignored; only Time & Count needs a real one.
@@ -376,6 +377,7 @@ object GeneratorParamsService {
               obsParams.scienceBand,
               exc,
               obsParams.calibrationRole,
+              obsParams.proposalStatus,
               hasTarget,
               obsParams.declaredState,
               obsParams.executionState,
@@ -436,7 +438,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gnm @ gnirs.imaging.Config(filters = fs) =>
             // An input per filter. In S/N mode the read mode is derived per step from
@@ -501,7 +503,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
@@ -644,7 +646,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -662,7 +664,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
 
           case gn: gnirs.spectroscopy.Config =>
             // Acquisition (imaging) filter for the ITC: the explicit acquisition
@@ -737,6 +739,7 @@ object GeneratorParamsService {
               obsParams.scienceBand,
               vis,
               obsParams.calibrationRole,
+              obsParams.proposalStatus,
               hasTarget,
               obsParams.declaredState,
               obsParams.executionState,
@@ -783,6 +786,7 @@ object GeneratorParamsService {
   case class ParamsRow(
     observationId:         Observation.Id,
     calibrationRole:       Option[CalibrationRole],
+    proposalStatus:        Option[ProposalStatus],
     constraints:           ConstraintSet,
     exposureTimeMode:      Option[ExposureTimeMode],
     observingMode:         Option[ObservingModeType],
@@ -811,6 +815,7 @@ object GeneratorParamsService {
   case class ObsParams(
     observationId:         Observation.Id,
     calibrationRole:       Option[CalibrationRole],
+    proposalStatus:        Option[ProposalStatus],
     constraints:           ConstraintSet,
     exposureTimeMode:      Option[ExposureTimeMode],
     observingMode:         Option[ObservingModeType],
@@ -830,6 +835,7 @@ object GeneratorParamsService {
         ObsParams(
           oParams.head.observationId,
           oParams.head.calibrationRole,
+          oParams.head.proposalStatus,
           oParams.head.constraints,
           oParams.head.exposureTimeMode,
           oParams.head.observingMode,
@@ -870,6 +876,7 @@ object GeneratorParamsService {
     val params: Decoder[ParamsRow] =
       (observation_id          *:
        calibration_role.opt    *:
+       proposal_status.opt     *:
        constraint_set          *:
        exposure_time_mode.opt  *:
        observing_mode_type.opt *:
@@ -885,13 +892,21 @@ object GeneratorParamsService {
        execution_state         *:
        int8                    *:
        scheduling_mode
-      ).map( (oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req) =>
-        ParamsRow(oid, role, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, None))
+      ).map( (oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req) =>
+        ParamsRow(oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, None))
+
+    // v_generator_params knows nothing about proposals.
+    private def ProposalJoin(tab: String): String =
+      s"""
+        LEFT JOIN t_program  pg ON pg.c_program_id = $tab.c_program_id
+        LEFT JOIN t_proposal pr ON pr.c_program_id = $tab.c_program_id
+      """
 
     private def ParamColumns(tab: String): String =
       s"""
         $tab.c_observation_id,
         $tab.c_calibration_role,
+        CASE WHEN pr.c_program_id IS NOT NULL THEN pg.c_proposal_status END,
         $tab.c_image_quality,
         $tab.c_cloud_extinction,
         $tab.c_sky_background,
@@ -929,6 +944,7 @@ object GeneratorParamsService {
         SELECT
           #${ParamColumns("gp")}
         FROM v_generator_params gp
+        #${ProposalJoin("gp")}
         WHERE
       """(Void) |+|
         sql"""gp.c_program_id = $program_id""".apply(programId) |+|
@@ -944,6 +960,7 @@ object GeneratorParamsService {
         SELECT
           #${ParamColumns("gp")}
         FROM v_generator_params gp
+        #${ProposalJoin("gp")}
         WHERE
       """(Void) |+|
         void"""gp.c_observation_id IN (""" |+|
@@ -965,6 +982,7 @@ object GeneratorParamsService {
         SELECT
           #${ParamColumns("gp")}
         FROM v_generator_params gp
+        #${ProposalJoin("gp")}
         INNER JOIN t_observation ob ON gp.c_observation_id = ob.c_observation_id
         WHERE
       """(Void) |+|
