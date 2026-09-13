@@ -132,6 +132,26 @@ ThisBuild / githubWorkflowEnv += ("SBT_OPTS" -> "-Xmx6g -Xss4M")
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
+// sbt-typelevel accumulates the per-project target directories in whatever order sbt happens to
+// apply project settings, which is not stable across machines. That made githubWorkflowCheck fail
+// on CI against a locally generated file whose only difference was the ordering. Sorting them
+// here runs wherever generation runs, CI included, so both sides agree.
+ThisBuild / githubWorkflowGeneratedUploadSteps ~= { steps =>
+  val prefixes = List("mkdir -p ", "tar cf targets.tar ")
+  steps.map {
+    case run: WorkflowStep.Run =>
+      run.withCommands(run.commands.map { cmd =>
+        prefixes.find(cmd.startsWith) match {
+          case Some(prefix) =>
+            prefix + cmd.drop(prefix.length).split(' ').sorted.mkString(" ")
+          case None => cmd
+        }
+      })
+    case other => other
+  }
+}
+
+
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   Seq(
     WorkflowStep.Run(List("chmod 600 test-cert/server.key"), name = Some("Set up cert permissions (1)")),
