@@ -4,8 +4,10 @@
 package lucuma.odb.sequence.gnirs
 
 import cats.syntax.eq.*
+import cats.syntax.either.*
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsCamera
+import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -78,3 +80,41 @@ def wavelengthOccurrences(ws: List[Wavelength]): List[Option[Int]] =
 /** Appends an occurrence ordinal to an already-formatted wavelength, if there is one. */
 def withOccurrence(label: String, occurrence: Option[Int]): String =
   occurrence.fold(label)(n => s"$label #$n")
+
+/**
+ * The filter and (fixed, single-coadd) exposure time for the first acquisition image —
+ * the slit image in spectroscopy, the keyhole image in imaging — as a function of the
+ * camera (short = 0.15"/pix, long = 0.05"/pix) and the selected acquisition filter.
+ *
+ * PAH can never be used on the short camera (the sky is too bright) — that yields an
+ * error. Otherwise the values come from a per-camera table, whatever the acquisition
+ * mode: VeryBright only changes the *default* selected filter (H2, which maps to H
+ * here), an explicit filter is honoured like any other:
+ *
+ *   Short:  X=10s, J=15s, H=3s, K=3s, H2→H(3s), PAH→error (sky too bright)
+ *   Long:   X→H, J→H, H=15s, K=15s, H2→H(15s), PAH=0.5s
+ *
+ * See https://app.shortcut.com/lucuma/story/8880/gnirs-acquisition-initial-slit-image
+ *
+ * The table is keyed on the *band*, not on a single filter, because GNIRS has two J and
+ * two K filters: the spectroscopy order filters (Order5, Order3) that automatic
+ * spectroscopic selection produces, and the photometric ones (J, K) that an imaging
+ * science sequence uses. A matched row keeps the selected filter and only fixes the
+ * exposure; every other filter (H2, L/M orders, Y, …) falls back to H.
+ */
+def firstStepFilterAndExposure(
+  camera:         GnirsCamera,
+  selectedFilter: GnirsFilter
+): Either[String, (GnirsFilter, TimeSpan)] =
+  // "Use H": image in H (Order4) at the camera's H exposure (short 3s, long 15s).
+  val useH: (GnirsFilter, TimeSpan) =
+    (GnirsFilter.Order4, keyholeExposureTime(camera))
+  (selectedFilter, camera.pixelScale) match
+    case (GnirsFilter.PAH, GnirsPixelScale.PixelScale_0_15)                    =>
+      s"PAH acquisition filter cannot be used with short camera".asLeft
+    case (GnirsFilter.Order6,                 GnirsPixelScale.PixelScale_0_15) => (selectedFilter, 10.secTimeSpan).asRight // X, short
+    case (GnirsFilter.Order5 | GnirsFilter.J, GnirsPixelScale.PixelScale_0_15) => (selectedFilter, 15.secTimeSpan).asRight // J, short
+    case (GnirsFilter.Order3 | GnirsFilter.K, GnirsPixelScale.PixelScale_0_15) => (selectedFilter,  3.secTimeSpan).asRight // K, short
+    case (GnirsFilter.Order3 | GnirsFilter.K, GnirsPixelScale.PixelScale_0_05) => (selectedFilter, 15.secTimeSpan).asRight // K, long
+    case (GnirsFilter.PAH,                    GnirsPixelScale.PixelScale_0_05) => (selectedFilter, 500.msTimeSpan).asRight // PAH, long
+    case _                                                                     => useH.asRight // H, H2, long-camera X/J, L/M orders, Y, …

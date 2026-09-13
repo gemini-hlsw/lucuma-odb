@@ -10,6 +10,7 @@ import cats.Order
 import cats.data.NonEmptyList
 import cats.data.State
 import cats.syntax.applicative.*
+import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import eu.timepit.refined.types.numeric.PosInt
@@ -52,11 +53,11 @@ import java.util.UUID
  *
  * There are three brightness types (classified by the ITC exactly as for spectroscopy):
  *
- *   - Very Bright: offset (10,0) field image in H (Order4) with the fixed per-camera
- *     exposure, then an on-target (0,0) image in the narrow-band H2 with the ITC exposure.
- *   - Bright: offset (10,0) field image in the selected filter with the fixed
- *     per-camera exposure, then an on-target (0,0) image in the same filter with the ITC
- *     exposure.
+ *   - Very Bright / Bright: offset (10,0) field image with the filter and fixed
+ *     single-coadd exposure from `firstStepFilterAndExposure` (the same per-camera table
+ *     the spectroscopy slit image uses), then an on-target (0,0) image in the selected
+ *     filter with the ITC exposure.  Very Bright differs only in defaulting the selected
+ *     filter to the narrow-band H2, which the table images in H.
  *   - Faint: sky-offset field image (for keyhole measurement and sky subtraction) and
  *     an on-target (0,0) image, both in the selected filter, both with the ITC
  *     exposure.
@@ -90,28 +91,28 @@ object Acquisition:
   private object StepComputer extends GnirsSequenceState:
 
     def compute(
-      camera:         GnirsCamera,
-      mode:           GnirsAcquisitionMode,
-      selectedFilter: GnirsFilter,
-      acqCoadds:      PosInt,
-      time:           IntegrationTime
+      camera:              GnirsCamera,
+      mode:                GnirsAcquisitionMode,
+      selectedFilter:      GnirsFilter,
+      keyholeFilter:       GnirsFilter,
+      keyholeExposureTime: TimeSpan,
+      acqCoadds:           PosInt,
+      time:                IntegrationTime
     ): Steps =
       val acqExposureTime: TimeSpan = time.exposureTime
-      // The fixed per-camera keyhole exposure (short 3s, long 15s).
-      val camExposureTime: TimeSpan = keyholeExposureTime(camera)
 
       // The field/keyhole image: filter, exposure and coadds depend on the brightness type.
-      // Very Bright / Bright use the fixed camera exposure and a single coadd; Faint uses the
-      // acquisition exposure and coadds (it doubles as a sky frame, so it is taken at the
-      // sky offset rather than at the keyhole offset).
+      // Very Bright / Bright take it at the keyhole offset with the table's filter and fixed
+      // single-coadd exposure.  Faint instead doubles it as the sky frame for the on-target
+      // image, so it is taken at the sky offset and must match that image's filter, exposure
+      // and coadds -- the table would decouple the pair and cost the sky subtraction a faint
+      // target needs.
       val (fieldFilter: GnirsFilter, fieldExposureTime: TimeSpan, fieldCoadds: PosInt, fieldOffset: Offset) =
         mode match
-          case GnirsAcquisitionMode.VeryBright =>
-            (GnirsFilter.Order4, camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
-          case GnirsAcquisitionMode.Bright     =>
-            (selectedFilter,     camExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
-          case GnirsAcquisitionMode.Faint(sky) =>
-            (selectedFilter,     acqExposureTime, acqCoadds,   sky)
+          case GnirsAcquisitionMode.VeryBright | GnirsAcquisitionMode.Bright =>
+            (keyholeFilter,  keyholeExposureTime, SingleCoadd, Offset(Offset.P(10.arcsec), Offset.Q(0.arcsec)))
+          case GnirsAcquisitionMode.Faint(sky)                               =>
+            (selectedFilter, acqExposureTime,     acqCoadds,   sky)
 
       eval:
         for
@@ -183,11 +184,16 @@ object Acquisition:
           _.exposureTime.toNonNegMicroseconds.value > 0,
           sequenceError("GNIRS Imaging requires a positive acquisition exposure time.")
         )
-        .map: t =>
+        .flatMap: t =>
           val mode           = config.acquisition.resolvedMode(t, GnirsAcquisitionMode.Faint.DefaultImagingSkyOffset, pinnedAcqType)
           val selFilter      = config.acquisition.selectedFilter(mode, firstFilter)
           val coadds: PosInt = config.acquisition.resolvedCoadds(t)
-          val steps: Steps   = StepComputer.compute(config.camera, mode, selFilter, coadds, t)
-          Generator(builder, steps.initialAtom, steps.repeatingAtom)
+          // PAH on the short camera is rejected whatever the brightness type, as in
+          // spectroscopy, even though only Very Bright / Bright image through the table.
+          firstStepFilterAndExposure(config.camera, selFilter)
+            .leftMap(sequenceError)
+            .map: (keyholeFilter, keyholeExposure) =>
+              val steps: Steps = StepComputer.compute(config.camera, mode, selFilter, keyholeFilter, keyholeExposure, coadds, t)
+              Generator(builder, steps.initialAtom, steps.repeatingAtom)
 
     generator.pure[F]

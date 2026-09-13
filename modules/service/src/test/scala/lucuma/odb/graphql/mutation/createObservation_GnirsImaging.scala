@@ -333,10 +333,12 @@ class createObservation_GnirsImaging extends OdbSuite:
           }
         """.asRight)
 
-  test("create GNIRS imaging rejects a non-acquisition explicit filter"):
-    createWithAcquisition("{ explicitFilter: Y }", "explicitFilter").flatMap: q =>
+  // ORDER5 is the spectroscopy J order, which images no better than H; an imaging
+  // acquisition uses the photometric J instead.
+  test("create GNIRS imaging rejects a non-imaging explicit acquisition filter"):
+    createWithAcquisition("{ explicitFilter: ORDER5 }", "explicitFilter").flatMap: q =>
       expect(pi, q,
-        List("Argument 'input.SET.observingMode.gnirsImaging.acquisition' is invalid: 'explicitFilter' must contain one of: ORDER6, ORDER5, ORDER4, H2, ORDER3, PAH").asLeft)
+        List("Argument 'input.SET.observingMode.gnirsImaging.acquisition' is invalid: 'explicitFilter' must contain one of: Y, ORDER6, J, ORDER4, H2, K").asLeft)
 
   test("create GNIRS imaging rejects a sky offset without FAINT acquisition type"):
     createWithAcquisition(

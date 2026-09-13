@@ -18,12 +18,10 @@ import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Pure
 import fs2.Stream
 import lucuma.core.enums.GnirsAcquisitionType
-import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsDecker
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsFpuOther
-import lucuma.core.enums.GnirsPixelScale
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.ObserveClass
@@ -72,43 +70,6 @@ object Acquisition:
     fpu match
       case GnirsFpu.Spectroscopy.Slit(_) => GnirsAcquisitionMode.Faint.DefaultSlitSkyOffset
       case GnirsFpu.Spectroscopy.Ifu(_)  => GnirsAcquisitionMode.Faint.DefaultIfuSkyOffset
-
-  /**
-   * The filter and (fixed, single-coadd) exposure time for the FPU image — the first
-   * acquisition step — as a function of the acquisition mode, the camera (short =
-   * 0.15"/pix, long = 0.05"/pix) and the selected acquisition filter.
-   *
-   * PAH can never be used on the short camera (the sky is too bright), regardless of
-   * mode — that yields an error. Otherwise VeryBright always images the FPU in H
-   * (Order4), and for Bright/Faint the values come from a per-camera table (the X/J/H/K
-   * bands are the spectroscopy order filters Order6/Order5/Order4/Order3 that auto
-   * selection produces):
-   *
-   *   Short:  X=10s, J=15s, H=3s, K=3s, H2→H(3s), PAH→error (sky too bright)
-   *   Long:   X→H, J→H, H=15s, K=15s, H2→H(15s), PAH=0.5s
-   *
-   * See https://app.shortcut.com/lucuma/story/8880/gnirs-acquisition-initial-slit-image
-   *
-   * Any other filter (e.g. a user-selected filter) falls back to H.
-   */
-  private def firstStepFilterAndExposure(
-    mode:           GnirsAcquisitionMode,
-    camera:         GnirsCamera,
-    selectedFilter: GnirsFilter
-  ): Either[String, (GnirsFilter, TimeSpan)] =
-    // "Use H": image the FPU in H (Order4) at the camera's H exposure (short 3s, long 15s).
-    val useH: (GnirsFilter, TimeSpan) =
-      (GnirsFilter.Order4, keyholeExposureTime(camera))
-    (mode, selectedFilter, camera.pixelScale) match
-      case (_, GnirsFilter.PAH, GnirsPixelScale.PixelScale_0_15)    =>
-        s"PAH acquisition filter cannot be used with short camera".asLeft
-      case (GnirsAcquisitionMode.VeryBright, _, _)                  => useH.asRight
-      case (_, GnirsFilter.Order6, GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.Order6, 10.secTimeSpan).asRight // X, short
-      case (_, GnirsFilter.Order5, GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.Order5, 15.secTimeSpan).asRight // J, short
-      case (_, GnirsFilter.Order3, GnirsPixelScale.PixelScale_0_15) => (GnirsFilter.Order3,  3.secTimeSpan).asRight // K, short
-      case (_, GnirsFilter.Order3, GnirsPixelScale.PixelScale_0_05) => (GnirsFilter.Order3, 15.secTimeSpan).asRight // K, long
-      case (_, GnirsFilter.PAH,    GnirsPixelScale.PixelScale_0_05) => (GnirsFilter.PAH,    500.msTimeSpan).asRight // PAH, long
-      case _                                                        => useH.asRight // H, H2, long-camera X/J, L/M orders, broadband J/K, …
 
   /** A calibration step's read mode is determined by its (SmartGcal-provided) exposure time. */
   private def adjustReadMode(s: ProtoStep[GnirsDynamicConfig]): ProtoStep[GnirsDynamicConfig] =
@@ -386,7 +347,7 @@ object Acquisition:
       case GnirsFpu.Spectroscopy.Slit(_)  =>
         (for
           (t, mode, selFilter) <- checked
-          fpuStep              <- firstStepFilterAndExposure(mode, config.acquisitionCamera, selFilter).leftMap(sequenceError)
+          fpuStep              <- firstStepFilterAndExposure(config.acquisitionCamera, selFilter).leftMap(sequenceError)
         yield
           val (fpuStepFilter: GnirsFilter, fpuStepExposureTime: TimeSpan) = fpuStep
           val steps: Steps = StepComputer.compute(config, mode, fpuStepFilter, fpuStepExposureTime, selFilter, t)
