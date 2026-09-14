@@ -125,4 +125,9 @@ object GnirsSequenceService:
           COALESCE(c_well_depth, c_well_depth_default)
         FROM v_gnirs_spectroscopy
         WHERE c_observation_id = $observation_id
-      """.query(gnirs_static)
+        UNION ALL
+        SELECT
+          COALESCE(c_well_depth, c_well_depth_default)
+        FROM v_gnirs_imaging
+        WHERE c_observation_id = $observation_id
+      """.query(gnirs_static).contramap(o => (o, o))
