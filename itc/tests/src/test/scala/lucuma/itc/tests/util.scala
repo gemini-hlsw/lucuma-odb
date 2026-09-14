@@ -5,8 +5,6 @@ package lucuma.itc.tests
 
 import cats.effect.IO
 import cats.syntax.option.*
-import fs2.io.file.Files
-import fs2.io.file.Path
 import lucuma.core.model.Attachment
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes
@@ -24,8 +22,6 @@ import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.otel4s.trace.Tracer
 
-import java.nio.file.Paths as JPaths
-
 def app(
   itc: Itc[IO]
 )(using Logger[IO], Tracer[IO]): IO[WebSocketBuilder2[IO] => HttpApp[IO]] =
@@ -41,8 +37,10 @@ given CustomSed.Resolver[IO] = new CustomSedDatResolver[IO] {
     IO:
       id match
         case DummyId   =>
-          val fs2Path = Path.fromNioPath(JPaths.get(getClass.getResource("/sed.dat").toURI))
-          Files[IO].readUtf8Lines(fs2Path)
+          fs2.io
+            .readClassLoaderResource[IO]("sed.dat")
+            .through(fs2.text.utf8.decode)
+            .through(fs2.text.lines)
         case InvalidId =>
           fs2.Stream.emit("someText someOtherText")
         case _         =>
