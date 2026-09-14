@@ -76,16 +76,9 @@ object Acquisition:
     field: ProtoStep[D],
     ifu:   ProtoStep[D]
   ):
-    /**
-     * The step grouping. sc-10044 specifies a breakpoint after every step of the initial atom, so
-     * they are marked here rather than relying on `AcquisitionAtoms`, which only breaks after the
-     * initial atom's last step and never inside a repeat. The repeated through-IFU step carries
-     * no breakpoint: the observer explicitly requests it from the acquisition prompt, and a
-     * breakpoint there would stop the sequence before the step runs (sc-10293).
-     */
     def acquisitionSteps: AcquisitionSteps[D] =
       AcquisitionSteps(
-        NonEmptyList.of(field.withBreakpoint, ifu.withBreakpoint),
+        NonEmptyList.of(field, ifu),
         NonEmptyList.of(ifu)
       )
 
