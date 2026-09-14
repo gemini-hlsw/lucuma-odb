@@ -34,8 +34,9 @@ import java.util.UUID
 object Mos:
 
   /**
-   * Maximum time that may pass between "Nighttime Calibrations" atoms.  MOS
-   * calibrates every 2 hours where long slit calibrates every 90 minutes.
+   * Science time a block may run before it must close with a "Nighttime
+   * Calibrations" atom.  MOS calibrates every 2 hours where long slit
+   * calibrates every 90 minutes.
    */
   val MaxSciencePeriod: TimeSpan =
     2.hourTimeSpan

@@ -13,7 +13,6 @@ import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2Dynamic
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig as F2Static
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.OdbError
@@ -23,9 +22,13 @@ import java.util.UUID
 
 object LongSlit:
 
-  /** Maximum time that may pass between "Nighttime Calibrations" atoms. */
+  /**
+   * Science time a block may run before it must close with a "Nighttime
+   * Calibrations" atom.  Flamingos 2 never reaches the thermal infrared, so the
+   * near infrared period always applies.
+   */
   val MaxSciencePeriod: TimeSpan =
-    90.minuteTimeSpan
+    InfraredCalibration.NearInfraredPeriod
 
   def instantiate[F[_]: Monad](
     observationId:  Observation.Id,

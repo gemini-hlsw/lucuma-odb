@@ -72,10 +72,10 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (60, 0, Disabled), (0, 0, Enabled), (0, 0, Enabled), (60, 0, Disabled)),
+                  "nextAtom" -> flamingos2ExpectedGcals((60, 0)),
                   "possibleFuture" -> List(
                     flamingos2ExpectedScienceAtom(ExposureTime, (60, 0, Disabled), (0, 0, Enabled), (0, 0, Enabled), (60, 0, Disabled)),
-                    flamingos2ExpectedGcals((60, 0))
+                    flamingos2ExpectedScienceAtom(ExposureTime, (60, 0, Disabled), (0, 0, Enabled), (0, 0, Enabled), (60, 0, Disabled))
                   ).asJson,
                   "hasMore" -> false.asJson
                 )
@@ -133,10 +133,10 @@ class executionSciFlamingos2_4x5min extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled)),
+                  "nextAtom" -> flamingos2ExpectedGcals((300, 65)),
                   "possibleFuture" -> List(
                     flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled)),
-                    flamingos2ExpectedGcals((300, 65))
+                    flamingos2ExpectedScienceAtom(ExposureTime, (300, 55, Disabled), (0, -5, Enabled), (0, 5, Enabled), (300, 65, Disabled))
                   ).asJson,
                   "hasMore" -> false.asJson
                 )

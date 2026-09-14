@@ -22,6 +22,18 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(ExposureTime, PosInt.unsafeFrom(4))
 
+  val abba: Json =
+    flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled))
+
+  // The nighttime calibrations open the sequence, so a partially executed
+  // calibration atom has only the arc left.
+  val arcOnly: Json =
+    Json.obj(
+      "description"  -> "Nighttime Calibrations".asJson,
+      "observeClass" -> "NIGHT_CAL".asJson,
+      "steps"        -> List(flamingos2ExpectedArc(0, 15)).asJson
+    )
+
   test("simple generation - limited future"):
     val setup: IO[Observation.Id] =
       for
@@ -39,8 +51,8 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
-                  "possibleFuture" -> List(flamingos2ExpectedGcals((0, 15))).asJson,
+                  "nextAtom" -> flamingos2ExpectedGcals((0, 15)),
+                  "possibleFuture" -> List(abba).asJson,
                   "hasMore" -> false.asJson
                 )
               )
@@ -48,7 +60,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
           ).asRight
       )
 
-  test("one science"):
+  test("one calibration step"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -68,8 +80,8 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
-                  "possibleFuture" -> List(flamingos2ExpectedGcals((0, 15))).asJson,
+                  "nextAtom" -> arcOnly,
+                  "possibleFuture" -> List(abba).asJson,
                   "hasMore" -> false.asJson
                 )
               )
@@ -77,7 +89,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
           ).asRight
       )
 
-  test("one cycle"):
+  test("one calibration atom"):
     val setup: IO[Observation.Id] =
       for
         p  <- createProgram
@@ -97,7 +109,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedGcals((0, 15)),
+                  "nextAtom" -> abba,
                   "possibleFuture" -> List.empty[Json].asJson,
                   "hasMore" -> false.asJson
                 )
@@ -224,7 +236,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         query    = flamingos2ScienceQuery(oid, 1.some),
         expected = expectedUnsplittableExecutionConfig(
           "flamingos2",
-          flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
-          flamingos2ExpectedGcals((0, 15))
+          flamingos2ExpectedGcals((0, 15)),
+          abba
         ).asRight
       )

@@ -122,18 +122,18 @@ class SelectSingleByLstRuleSuite extends FunSuite:
 
   test("params hash changes when the observing night changes for single-telluric"):
     val nextNight = timestampAt(obsInstant.plusSeconds(24 * 3600))
-    val h1 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(obsTime))
-    val h2 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(nextNight))
+    val h1 = TelluricTargetsService.searchParamsHash(searchInput, false, site, Some(obsTime))
+    val h2 = TelluricTargetsService.searchParamsHash(searchInput, false, site, Some(nextNight))
     assertNotEquals(h1, h2)
 
   test("params hash is stable within the same observing night"):
     val laterSameNight = timestampAt(obsInstant.plusSeconds(3 * 3600))
-    val h1 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(obsTime))
-    val h2 = TelluricTargetsService.searchParamsHash(searchInput, 1.hourTimeSpan, site, Some(laterSameNight))
+    val h1 = TelluricTargetsService.searchParamsHash(searchInput, false, site, Some(obsTime))
+    val h2 = TelluricTargetsService.searchParamsHash(searchInput, false, site, Some(laterSameNight))
     assertEquals(h1, h2)
 
-  test("params hash ignores the date for multi-telluric durations"):
+  test("params hash ignores the date for multi-telluric observations"):
     val nextNight = timestampAt(obsInstant.plusSeconds(24 * 3600))
-    val h1 = TelluricTargetsService.searchParamsHash(searchInput, 2.hourTimeSpan, site, Some(obsTime))
-    val h2 = TelluricTargetsService.searchParamsHash(searchInput, 2.hourTimeSpan, site, Some(nextNight))
+    val h1 = TelluricTargetsService.searchParamsHash(searchInput, true, site, Some(obsTime))
+    val h2 = TelluricTargetsService.searchParamsHash(searchInput, true, site, Some(nextNight))
     assertEquals(h1, h2)

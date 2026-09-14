@@ -34,6 +34,7 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.otel.*
 import lucuma.odb.otel.given
+import lucuma.odb.sequence.InfraredCalibration
 import lucuma.odb.sequence.gnirs as gnirs
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
@@ -62,7 +63,14 @@ object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
 
-      private val MultiTelluricThreshold: TimeSpan = TelluricTargetsService.MultiTelluricThreshold
+      // Science longer than this gets a telluric before and after.  GNIRS follows
+      // the infrared calibration period of its tightest central wavelength.
+      private def multiTelluricThreshold(config: CalibrationConfigSubset): TimeSpan =
+        config match
+          case g: CalibrationConfigSubset.GnirsSpectroscopyConfigs =>
+            g.config.wavelengths.map(sw => InfraredCalibration.period(sw.centralWavelength)).minimum
+          case _                                                   =>
+            TelluricTargetsService.MultiTelluricThreshold
 
       private def groupNameForObservation(
         config: CalibrationConfigSubset,
@@ -192,15 +200,16 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
-        duration:   TimeSpan
+        duration:   TimeSpan,
+        multi:      Boolean
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        if (duration > MultiTelluricThreshold)
-          // Over 1.5h: 1 telluric before and 1 after
+        if (multi)
+          // 1 telluric before and 1 after
           for {
             sciIdx <- obsGroupIndex(scienceOid)
             bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
@@ -209,7 +218,7 @@ object PerScienceObservationCalibrationsService:
             c2     <- createTelluricObs(pid, scienceOid, groupId, aftIdx, duration, TelluricCalibrationOrder.After)
           } yield List(c1, c2)
         else
-          // Less than 1.5h: one telluric after science
+          // one telluric after science
           for {
             sciIdx <- obsGroupIndex(scienceOid)
             aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
@@ -248,17 +257,18 @@ object PerScienceObservationCalibrationsService:
                                   else Option.empty[TimeSpan].pure[F]
             _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
             _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
+            threshold          = multiTelluricThreshold(obs.data)
             requiredCount      = duration match
-                                  case Some(d) if d > MultiTelluricThreshold => 2
-                                  case Some(_)                               => 1
-                                  case None                                  => 0
+                                  case Some(d) if d > threshold => 2
+                                  case Some(_)                  => 1
+                                  case None                     => 0
             // Delete/recreate if count changes
             (created, deleted) <- if (existing.size != requiredCount)
                                     for
                                       _ <- NonEmptyList.fromList(deletable)
                                             .traverse_(observationService.deleteCalibrationObservations)
                                       c <- duration.fold(List.empty[Observation.Id].pure):
-                                             createTelluricCalibrations(pid, obs.id, gid, _)
+                                             createTelluricCalibrations(pid, obs.id, gid, _, requiredCount == 2)
                                     yield (c, deletable)
                                   else
                                     (List.empty, List.empty).pure[F]

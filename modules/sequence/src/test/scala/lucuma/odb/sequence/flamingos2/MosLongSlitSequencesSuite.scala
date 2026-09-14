@@ -54,8 +54,10 @@ import java.util.UUID
 /**
  * Flamingos 2 MOS and long slit generate the same science sequence apart from the
  * aperture, but calibrate on their own cadences: 90 minutes for long slit, 2 hours
- * for MOS.  The per-step aperture is covered by the executionSciFlamingos2Mos
- * GraphQL suite; the cadence boundary is only reachable here.
+ * for MOS.  Every block opens with flats and arcs; a block whose science runs
+ * past the cadence closes with them too.  The per-step aperture is covered by
+ * the executionSciFlamingos2Mos GraphQL suite; the cadence boundary is only
+ * reachable here.
  */
 class MosLongSlitSequencesSuite extends FunSuite:
 
@@ -164,27 +166,43 @@ class MosLongSlitSequencesSuite extends FunSuite:
     assert(ls.nonEmpty, "expected a non-empty long slit sequence")
     assertEquals(ms.map(normalized), ls.map(normalized))
 
-  test("100 minutes of science: long slit calibrates mid-block, MOS does not"):
+  test("60 minutes of science: a single opening set of calibrations"):
+    assertEquals(
+      titles(generateLongSlit(3)),
+      List("Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle")
+    )
+
+  test("100 minutes of science: long slit closes the block with calibrations, MOS does not"):
     // 5 cycles at 20 minutes each, past the 90 minute cadence but short of 2 hours.
     val cycles = 5
     assert(CycleEstimate *| cycles === 100.minuteTimeSpan)
 
     assertEquals(
       titles(generateLongSlit(cycles)),
-      List("ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
+      List("Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
     )
 
     assertEquals(
       titles(generateMos(cycles)),
-      List("ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
+      List("Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle")
     )
 
-  test("past 2 hours of science, MOS calibrates mid-block too"):
+  test("past 2 hours of science, MOS closes the block with calibrations too"):
     // 7 cycles = 140 minutes, past the MOS cadence.
     val cycles = 7
     assert(CycleEstimate *| cycles === 140.minuteTimeSpan)
 
     assertEquals(
       titles(generateMos(cycles)),
-      List("ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
+      List("Nighttime Calibrations", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "ABBA Cycle", "Nighttime Calibrations")
+    )
+
+  test("past 3 hours of science, a second block opens with calibrations"):
+    // 10 cycles = 200 minutes: 9 fill the 3 hour visit, the 10th starts a new block.
+    val cycles = 10
+    assert(CycleEstimate *| cycles === 200.minuteTimeSpan)
+
+    assertEquals(
+      titles(generateLongSlit(cycles)),
+      List("Nighttime Calibrations") ++ List.fill(9)("ABBA Cycle") ++ List("Nighttime Calibrations", "Nighttime Calibrations", "ABBA Cycle")
     )

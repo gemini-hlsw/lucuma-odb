@@ -36,7 +36,10 @@ object TelluricTargets:
   )
 
   /**
-   * Identifies an observation that needs resolving
+   * Identifies an observation that needs resolving.
+   *
+   * @param multiTelluric true when the science observation has a telluric
+   *                      before and after, false when it has a single one
    */
   case class Pending(
     observationId:        Observation.Id,
@@ -46,5 +49,6 @@ object TelluricTargets:
     failureCount:         Int,
     scienceDuration:      TimeSpan,
     paramsHash:           Option[Md5Hash],
-    calibrationOrder:     TelluricCalibrationOrder
+    calibrationOrder:     TelluricCalibrationOrder,
+    multiTelluric:        Boolean
   )

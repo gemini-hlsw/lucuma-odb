@@ -2312,6 +2312,77 @@ class perScienceObservationCalibrations
       assert(twt.targetName.isDefined)
     }
 
+  // Thermal infrared GNIRS: 11 x 6 minute exposures (3 cycles of 4) run past the
+  // 1 hour period but short of the 90 minute one.
+  private def configureGnirsThermalIrHour(oid: Observation.Id): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  camera: LONG_BLUE
+                  explicitGrating: D10
+                  slit: { fpu: LONG_SLIT_0_20 }
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: 3300 }
+                      exposureTimeMode: {
+                        timeAndCount: {
+                          time: { minutes: 6 }
+                          count: 11
+                          at: { nanometers: 3300 }
+                        }
+                      }
+                    }
+                  ]
+                  explicitWellDepth: DEEP
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
+  private def telluricCount(pid: Program.Id, oid: Observation.Id): IO[(TimeSpan, Int)] =
+    for {
+      _        <- runObscalcUpdate(pid, oid)
+      duration <- queryObservationDuration(oid)
+      _        <- recalculateCalibrations(pid, when, oid)
+      obs      <- queryObservation(oid)
+      inGroup  <- queryObservationsInGroup(obs.groupId.get)
+    } yield (duration.get, inGroup.count(_.calibrationRole.contains(CalibrationRole.Telluric)))
+
+  test("gnirs past 2.6 μm gets a telluric before and after once science runs past an hour"):
+    for {
+      pid              <- createProgramAs(pi)
+      tid              <- createTargetWithProfileAs(pi, pid)
+      oid              <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _                <- configureGnirsThermalIrHour(oid)
+      (duration, cals) <- telluricCount(pid, oid)
+    } yield {
+      assert(duration > 1.hourTimeSpan && duration < 90.minuteTimeSpan, s"unexpected science duration $duration")
+      assertEquals(cals, 2)
+    }
+
+  test("gnirs below 2.6 μm keeps a single telluric for the same science duration"):
+    for {
+      pid              <- createProgramAs(pi)
+      tid              <- createTargetWithProfileAs(pi, pid)
+      oid              <- createGnirsLongSlitObservationAs(pi, pid, tid)
+      _                <- setScienceTimeAndCount(oid, 360, 11, 2200)
+      (duration, cals) <- telluricCount(pid, oid)
+    } yield {
+      assert(duration > 1.hourTimeSpan && duration < 90.minuteTimeSpan, s"unexpected science duration $duration")
+      assertEquals(cals, 1)
+    }
+
   test("gnirs telluric is created with config-dependent telluric offsets"):
     for {
       pid                      <- createProgramAs(pi)

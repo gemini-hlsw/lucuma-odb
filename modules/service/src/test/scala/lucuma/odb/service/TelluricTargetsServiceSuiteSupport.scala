@@ -238,7 +238,8 @@ trait TelluricTargetsServiceSuiteSupport extends ExecutionTestSupportForFlamingo
       failureCount = 0,
       scienceDuration = scienceDuration,
       paramsHash = None,
-      calibrationOrder = calibrationOrder
+      calibrationOrder = calibrationOrder,
+      multiTelluric = false
     )
 
   def createMetaEntry(

@@ -26,7 +26,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
 import lucuma.core.model.UnnormalizedSED
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.NewType
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
@@ -37,6 +36,7 @@ import lucuma.odb.graphql.input.CatalogInfoInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.InfraredCalibration
 import lucuma.odb.sequence.flamingos2.longslit.Config as F2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as F2MosConfig
 import lucuma.odb.sequence.syntax.hash.*
@@ -161,8 +161,12 @@ case class TelluricSearchParams(
 
 object TelluricTargetsService:
 
-  /** Science durations above this threshold request two tellurics (Before + After). */
-  val MultiTelluricThreshold: TimeSpan = 90.minTimeSpan
+  /**
+   * Science durations above this threshold request two tellurics (Before +
+   * After).  GNIRS derives its own from the central wavelength; see
+   * `PerScienceObservationCalibrationsService`.
+   */
+  val MultiTelluricThreshold: TimeSpan = InfraredCalibration.NearInfraredPeriod
 
   /** Buffer from twilight LST used by the single-telluric RA/LST selection rule. */
   private val TwilightBufferHours: Double = 0.75
@@ -180,13 +184,13 @@ object TelluricTargetsService:
    * Hash of the inputs that determine the selected telluric star.
    */
   private[service] def searchParamsHash(
-    input:    TelluricSearchInput,
-    duration: TimeSpan,
-    site:     Site,
-    obsTime:  Option[Timestamp]
+    input:         TelluricSearchInput,
+    multiTelluric: Boolean,
+    site:          Site,
+    obsTime:       Option[Timestamp]
   ): Md5Hash =
     val nightBytes =
-      if duration > MultiTelluricThreshold then Array.emptyByteArray
+      if multiTelluric then Array.emptyByteArray
       else
         obsTime.fold(Array.emptyByteArray): ot =>
           ObservingNight
@@ -464,7 +468,7 @@ object TelluricTargetsService:
         def searchAndResolve(params: TelluricSearchParams): F[Option[(Either[String, Target.Id], Md5Hash)]] =
           val searchInput = mkSearchInput(params, pending.scienceDuration.min(MaxTelluricDuration))
           val paramsHash =
-            TelluricTargetsService.searchParamsHash(searchInput, pending.scienceDuration, params.site, params.obsTime)
+            TelluricTargetsService.searchParamsHash(searchInput, pending.multiTelluric, params.site, params.obsTime)
 
           def observationExists: F[Boolean] =
             session.prepareR(Statements.ObservationExists)
@@ -480,10 +484,10 @@ object TelluricTargetsService:
                   Logger[F].error(e)(s"Telluric search failed for ${pending.observationId}")
                     .as((msg.asLeft[Target.Id], paramsHash).some)
                 case Right(results) =>
-                  // For multi-telluric (duration > 1.5h) match the requested order.
-                  // For single-telluric (duration <= 1.5h) apply the RA vs. twilight LST rule.
+                  // For multi-telluric match the requested order.
+                  // For single-telluric apply the RA vs. twilight LST rule.
                   val matchingStar =
-                    if pending.scienceDuration > MultiTelluricThreshold then
+                    if pending.multiTelluric then
                       results.find(_._1.order == pending.calibrationOrder)
                         .orElse(results.headOption)
                     else
@@ -562,7 +566,7 @@ object TelluricTargetsService:
       object Statements:
 
         val pending: Codec[TelluricTargets.Pending] =
-          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt *: telluric_calibration_order)
+          (observation_id *: program_id *: observation_id *: core_timestamp *: int4 *: time_span *: md5_hash.opt *: telluric_calibration_order *: bool)
             .to[TelluricTargets.Pending]
 
         val meta: Codec[TelluricTargets.Meta] =
@@ -570,8 +574,13 @@ object TelluricTargetsService:
            core_timestamp *: core_timestamp *: core_timestamp.opt *: int4 *:
            target_id.opt *: text.opt *: time_span *: telluric_calibration_order).to[TelluricTargets.Meta]
 
+        // A science observation with more than one request has a telluric
+        // before and after it.
         private val pendingColumns: String =
-          "c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash, c_calibration_order"
+          """c_observation_id, c_program_id, c_science_observation_id, c_last_invalidation, c_failure_count, c_science_duration, c_params_hash, c_calibration_order,
+             (SELECT count(*) > 1
+              FROM   t_telluric_resolution s
+              WHERE  s.c_science_observation_id = t_telluric_resolution.c_science_observation_id)"""
 
         private val metaColumns: String =
           """c_observation_id, c_program_id, c_science_observation_id, c_state,
