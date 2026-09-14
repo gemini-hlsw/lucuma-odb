@@ -969,15 +969,21 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       ce <- Enumerated[CloudExtinction.Preset].all
       wv <- Enumerated[WaterVapor].all
       sb <- Enumerated[SkyBackground].all
-    } yield ItcObservingConditions(iq.toImageQuality.toArcSeconds,
+    } yield ItcObservingConditions(ItcImageQuality.Exact(iq.toImageQuality.toArcSeconds),
                                    ce.toCloudExtinction.toVegaMagnitude,
                                    wv,
                                    sb,
                                    2
     )
 
+  // The exact FWHM the GraphQL query asks for
+  private def arcsec(iq: ItcImageQuality): BigDecimal =
+    iq match
+      case ItcImageQuality.Exact(a)     => a
+      case ItcImageQuality.Percentile20 => fail("conditions iterate over exact image qualities")
+
   val conditions = ItcObservingConditions(
-    ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds,
+    ItcImageQuality.Exact(ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds),
     CloudExtinction.Preset.OnePointZero.toCloudExtinction.toVegaMagnitude,
     WaterVapor.Median,
     SkyBackground.Bright,
@@ -1016,7 +1022,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
             ],
             constraints: {
-              imageQuality: { arcsec: ${c.iq} },
+              imageQuality: { arcsec: ${arcsec(c.iq)} },
               cloudExtinction: { extinction: ${c.cc} },
               skyBackground: ${c.sb.tag.toScreamingSnakeCase},
               waterVapor: ${c.wv.tag.toScreamingSnakeCase},

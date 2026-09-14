@@ -42,7 +42,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
   //   Y  → 0.3s × 1      → Very Bright (with an H2 pass of 2s × 3)
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
-      case InstrumentMode.GnirsImaging(ExposureTimeMode.SignalToNoiseMode(_, _), filter, _, _, _, _, _) =>
+      case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.SignalToNoiseMode(_, _), filter = filter) =>
         filter match
           case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined).some
           case GnirsFilter.K      => IntegrationTime(30.secTimeSpan, 1.refined).some
@@ -51,7 +51,7 @@ class executionAcqGnirsImaging extends ExecutionTestSupportForGnirs:
           case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined).some
           case _                  => none
       // Time-and-count echoes the user's request, as the real ITC does.
-      case InstrumentMode.GnirsImaging(ExposureTimeMode.TimeAndCountMode(time, count, _), _, _, _, _, _, _) =>
+      case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.TimeAndCountMode(time, count, _)) =>
         IntegrationTime(time, count).some
       case _ => none
 

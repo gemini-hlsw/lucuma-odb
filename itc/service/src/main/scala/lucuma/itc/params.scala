@@ -9,8 +9,19 @@ import cats.syntax.all.*
 import lucuma.core.enums.*
 import lucuma.core.model.ElevationRange
 
+/**
+ * Image quality as the legacy ITC takes it: either the delivered FWHM at the science wavelength or
+ * one of its percentile bins, which it scales itself with wavelength and airmass. For the moment,
+ * we only need the 20% percentile, used for ALTAIR LGS+P1.
+ */
+enum ItcImageQuality derives Hash:
+  case Exact(arcsec: BigDecimal)
+
+  /** The 20% bin, the delivered image quality assumed for Altair LGS+P1. */
+  case Percentile20
+
 case class ItcObservingConditions(
-  iq:      BigDecimal,
+  iq:      ItcImageQuality,
   cc:      BigDecimal,
   wv:      WaterVapor,
   sb:      SkyBackground,

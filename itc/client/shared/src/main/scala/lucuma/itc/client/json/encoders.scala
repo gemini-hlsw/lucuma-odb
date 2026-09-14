@@ -5,10 +5,14 @@ package lucuma.itc.client.json
 
 import io.circe.*
 import io.circe.syntax.*
+import lucuma.core.enums.FieldLens
+import lucuma.core.math.Angle
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.util.TimeSpan
+import lucuma.itc.AltairParameters
 import lucuma.itc.client.*
+import lucuma.itc.client.json.syntax.*
 
 // Decoders for the client don't need to be as generic as the ones for the server.
 private[client] object encoders:
@@ -41,3 +45,24 @@ private[client] object encoders:
         )
       )
   }
+
+  private def arcsecJson(x: Angle): Json =
+    Json.obj("arcseconds" -> Angle.signedDecimalArcseconds.get(x).asJson)
+
+  // The GraphQL `AltairInput`: a mode plus the fields that mode needs.
+  given Encoder[AltairParameters] = Encoder.instance:
+    case AltairParameters.Ngs(separation, brightness, fieldLens) =>
+      Json.obj(
+        "mode"                -> Json.fromString("NGS"),
+        "guideStarSeparation" -> arcsecJson(separation),
+        "guideStarBrightness" -> brightness.value.value.asJson,
+        "fieldLens"           -> fieldLens.asScreamingJson
+      )
+    case AltairParameters.Lgs(separation, brightness)            =>
+      Json.obj(
+        "mode"                -> Json.fromString("LGS"),
+        "guideStarSeparation" -> arcsecJson(separation),
+        "guideStarBrightness" -> brightness.value.value.asJson
+      )
+    case AltairParameters.LgsP1                                  =>
+      Json.obj("mode" -> Json.fromString("LGS_P1"))
