@@ -206,3 +206,58 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
         "Execution sequences containing over 1000 atoms are not supported."
       ).asLeft)
     yield ()
+
+  private def replaceSequenceQuery(inputString: String): String =
+    s"""
+      mutation {
+        replaceFlamingos2Sequence(input: $inputString) {
+          sequence {
+            description
+          }
+        }
+      }
+    """
+
+  test("no recorded static config - MOS"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2MosObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Mos", stepInput(Flamingos2Filter.J)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = json"""
+          {
+            "replaceFlamingos2Sequence": {
+              "sequence": [ { "description": "Mos" } ]
+            }
+          }
+        """.asRight
+      )
+
+  test("no recorded static config - imaging"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2ImagingObservationAs(pi, p, t)
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Img", stepInput(Flamingos2Filter.J)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = json"""
+          {
+            "replaceFlamingos2Sequence": {
+              "sequence": [ { "description": "Img" } ]
+            }
+          }
+        """.asRight
+      )
