@@ -26,6 +26,7 @@ import lucuma.core.model.sequence.gmos.GmosFpuMask
 import lucuma.itc.Conversions
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.GmosNorthFpuParam
+import lucuma.itc.service.ItcImageQuality
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.Main.ReverseClassLoader
 import lucuma.itc.service.ObservingMode
@@ -89,7 +90,7 @@ class LegacyITCGmosR150BlueSuite extends munit.CatsEffectSuite:
   )
 
   lazy val conditions = ItcObservingConditions(
-    ImageQuality.Preset.OnePointZero.toImageQuality.toArcSeconds,
+    ItcImageQuality.Exact(ImageQuality.Preset.OnePointZero.toImageQuality.toArcSeconds),
     CloudExtinction.Preset.PointThree.toCloudExtinction.toVegaMagnitude,
     WaterVapor.Wet,
     SkyBackground.Bright,

@@ -15667,6 +15667,35 @@ type GuideEnvironment {
 }
 
 """
+Altair (Gemini North adaptive optics) guiding mode.
+"""
+enum AltairMode {
+  """
+  Natural guide star drives both high order correction and tip/tilt.
+  """
+  NGS
+
+  """
+  Laser drives high order correction, a natural star on the Altair WFS provides tip/tilt/focus.
+  """
+  LGS
+
+  """
+  Laser drives high order correction, a natural star on PWFS1 provides tip/tilt/focus.
+  """
+  LGS_P1
+}
+
+"""
+Altair field lens position.
+"""
+enum FieldLens {
+  IN
+
+  OUT
+}
+
+"""
 Enumeration for Guide Probes
 """
 enum GuideProbe {

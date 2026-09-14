@@ -15,6 +15,7 @@ import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.BrightnessUnits.*
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Redshift
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
@@ -28,6 +29,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.display.*
 import lucuma.core.syntax.string.*
+import lucuma.itc.AltairParameters
 import lucuma.itc.GraphType
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcGraph
@@ -36,6 +38,7 @@ import lucuma.itc.ItcSeries
 import lucuma.itc.ItcXAxis
 import lucuma.itc.SeriesDataType
 import lucuma.itc.legacy.syntax.all.*
+import lucuma.itc.service.ItcImageQuality
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.syntax.all.given
@@ -55,18 +58,22 @@ private[legacy] object codecs:
 
   given Encoder[ItcObservingConditions] =
     import lucuma.itc.legacy.syntax.conditions.*
-    Encoder.forProduct5("exactiq", "exactcc", "wv", "sb", "airmass") { a =>
-      (Json.obj(
-         "arcsec"            -> Json.fromBigDecimal(
-           a.iq.round(MathContext.DECIMAL32)
-         )
-       ),
-       Json.obj("extinction" -> Json.fromBigDecimal(a.cc)),
-       a.wv.ocs2Tag,
-       a.sb.ocs2Tag,
-       toItcAirmass(a.airmass)
+    (a: ItcObservingConditions) =>
+      // The legacy codec takes either an exact FWHM or one of its percentile bins, not both
+      val iq: (String, Json) = a.iq match
+        case ItcImageQuality.Exact(arcsec) =>
+          "exactiq" -> Json.obj(
+            "arcsec" -> Json.fromBigDecimal(arcsec.round(MathContext.DECIMAL32))
+          )
+        case ItcImageQuality.Percentile20  =>
+          "iq" -> Json.fromString("PERCENT_20")
+      Json.obj(
+        iq,
+        "exactcc" -> Json.obj("extinction" -> Json.fromBigDecimal(a.cc)),
+        "wv"      -> a.wv.ocs2Tag.asJson,
+        "sb"      -> a.sb.ocs2Tag.asJson,
+        "airmass" -> toItcAirmass(a.airmass).asJson
       )
-    }
 
   given Encoder[Wavelength] = w =>
     Json.fromString:
@@ -299,8 +306,31 @@ private[legacy] object codecs:
         "pixelScale"        -> Json.fromString(a.camera.pixelScale.ocs2Tag),
         "readMode"          -> Json.fromString(a.readMode.ocs2Tag),
         "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
-        "altair"            -> Json.Null
+        "altair"            -> encodeAltair(a.altair)
       )
+
+  // The legacy AltairParameters block. LGS+P1 has no legacy model and is computed without Altair,
+  // see `legacy.conditionsFor`.
+  private[legacy] def encodeAltair(altair: Option[AltairParameters]): Json =
+    def block(
+      separation: Angle,
+      brightness: BrightnessValue,
+      fieldLens:  FieldLens,
+      wfsMode:    String
+    ): Json =
+      Json.obj(
+        "guideStarSeparation" -> Angle.signedDecimalArcseconds.get(separation).asJson,
+        "guideStarMagnitude"  -> brightness.value.value.asJson,
+        "fieldLens"           -> Json.fromString(fieldLens.ocs2Tag),
+        "wfsMode"             -> Json.fromString(wfsMode)
+      )
+    altair match
+      case Some(AltairParameters.Ngs(separation, brightness, fieldLens)) =>
+        block(separation, brightness, fieldLens, "NGS")
+      case Some(AltairParameters.Lgs(separation, brightness))            =>
+        block(separation, brightness, FieldLens.In, "LGS")
+      case Some(AltairParameters.LgsP1) | None                           =>
+        Json.Null
 
   private val encodeGnirsImaging: Encoder[ObservingMode.ImagingMode.Gnirs] = a =>
     Json.obj(
@@ -313,7 +343,7 @@ private[legacy] object codecs:
       "slitWidth"         -> Json.fromString("ACQUISITION"),
       "camera"            -> Json.fromString(a.camera.ocs2Tag),
       "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
-      "altair"            -> Json.Null
+      "altair"            -> encodeAltair(a.altair)
     )
 
   private given Encoder[ItcInstrumentDetails] = (a: ItcInstrumentDetails) =>

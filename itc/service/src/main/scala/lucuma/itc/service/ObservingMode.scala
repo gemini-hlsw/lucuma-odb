@@ -14,6 +14,7 @@ import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.itc.AltairParameters
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.service.ItcObservationDetails.AnalysisMethod
 import lucuma.itc.service.hashes.given
@@ -25,6 +26,9 @@ sealed trait ObservingMode {
   def instrument: Instrument
   def analysisMethod: ItcObservationDetails.AnalysisMethod
   def portDisposition: PortDisposition
+
+  // Altair is only offered behind GNIRS for now
+  def altair: Option[AltairParameters] = None
 
   def description: String
 }
@@ -195,16 +199,17 @@ object ObservingMode {
     }
 
     final case class GnirsSpectroscopy(
-      centralWavelength: Wavelength,
-      filter:            GnirsFilter,
-      fpu:               GnirsFpu.Spectroscopy,
-      prism:             GnirsPrism,
-      grating:           GnirsGrating,
-      camera:            GnirsCamera,
-      readMode:          GnirsReadMode,
-      wellDepth:         GnirsWellDepth,
-      coadds:            PosInt,
-      portDisposition:   PortDisposition
+      centralWavelength:   Wavelength,
+      filter:              GnirsFilter,
+      fpu:                 GnirsFpu.Spectroscopy,
+      prism:               GnirsPrism,
+      grating:             GnirsGrating,
+      camera:              GnirsCamera,
+      readMode:            GnirsReadMode,
+      wellDepth:           GnirsWellDepth,
+      coadds:              PosInt,
+      portDisposition:     PortDisposition,
+      override val altair: Option[AltairParameters]
     ) extends SpectroscopyMode derives Hash {
       val instrument: Instrument =
         Instrument.Gnirs
@@ -289,12 +294,13 @@ object ObservingMode {
     }
 
     final case class Gnirs(
-      filter:          GnirsFilter,
-      camera:          GnirsCamera,
-      readMode:        GnirsReadMode,
-      wellDepth:       GnirsWellDepth,
-      coadds:          PosInt,
-      portDisposition: PortDisposition
+      filter:              GnirsFilter,
+      camera:              GnirsCamera,
+      readMode:            GnirsReadMode,
+      wellDepth:           GnirsWellDepth,
+      coadds:              PosInt,
+      portDisposition:     PortDisposition,
+      override val altair: Option[AltairParameters]
     ) extends ImagingMode derives Hash {
       val instrument: Instrument = Instrument.Gnirs
 

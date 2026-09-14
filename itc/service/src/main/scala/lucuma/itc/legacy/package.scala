@@ -11,6 +11,8 @@ import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.SourceProfile
+import lucuma.itc.AltairParameters
+import lucuma.itc.service.ItcImageQuality
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
@@ -106,6 +108,16 @@ case class ItcParameters(
 
 case class ItcInstrumentDetails(mode: ObservingMode)
 
+// Altair LGS+P1 has no legacy model: the correction is modest and independent of the guide star, so
+// it is computed without Altair at the 20% image quality bin.
+private[legacy] def conditionsFor(
+  observingMode: ObservingMode,
+  conditions:    ItcObservingConditions
+): ItcObservingConditions =
+  observingMode.altair match
+    case Some(AltairParameters.LgsP1) => conditions.copy(iq = ItcImageQuality.Percentile20)
+    case _                            => conditions
+
 private def buildSourceDefinition(
   target:       TargetData,
   atWavelength: Wavelength
@@ -138,7 +150,7 @@ def spectroscopyGraphParams(
         ),
         analysisMethod = observingMode.analysisMethod
       ),
-      conditions = conditions,
+      conditions = conditionsFor(observingMode, conditions),
       telescope = ItcTelescopeDetails(
         wfs = ItcWavefrontSensor.OIWFS,
         instrumentPort = observingMode.portDisposition
@@ -162,7 +174,7 @@ def toItcParameters(
         calculationMethod = getCalculationMethod(observingMode, exposureTimeMode),
         analysisMethod = observingMode.analysisMethod
       ),
-      conditions = conditions,
+      conditions = conditionsFor(observingMode, conditions),
       telescope = ItcTelescopeDetails(
         wfs = ItcWavefrontSensor.OIWFS,
         instrumentPort = observingMode.portDisposition

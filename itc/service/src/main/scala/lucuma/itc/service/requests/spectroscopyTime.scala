@@ -118,17 +118,17 @@ object AsterismSpectroscopyTimeRequest:
               blueDetector
             )
         case GnirsSpectroscopyInput(
-              _,
-              centralWavelength,
-              filter,
-              fpu,
-              prism,
-              grating,
-              camera,
-              readMode,
-              wellDepth,
-              coadds,
-              port
+              centralWavelength = centralWavelength,
+              filter = filter,
+              fpu = fpu,
+              prism = prism,
+              grating = grating,
+              camera = camera,
+              readMode = readMode,
+              wellDepth = wellDepth,
+              coadds = coadds,
+              port = port,
+              altair = altair
             ) =>
           Result.success:
             ObservingMode.SpectroscopyMode.GnirsSpectroscopy(
@@ -141,7 +141,8 @@ object AsterismSpectroscopyTimeRequest:
               readMode,
               wellDepth,
               coadds,
-              port
+              port,
+              altair
             )
         case _                                 =>
           Result.failure("Invalid spectroscopy mode")

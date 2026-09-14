@@ -40,7 +40,8 @@ class LegacyITCGnirsImgSignalToNoiseSuite extends CommonITCLegacySuite:
     readMode = GnirsReadMode.Bright,
     wellDepth = GnirsWellDepth.Shallow,
     coadds = PosInt.unsafeFrom(1),
-    portDisposition = PortDisposition.Bottom
+    portDisposition = PortDisposition.Bottom,
+    altair = None
   )
 
   override def instrument = ItcInstrumentDetails(gnirs)

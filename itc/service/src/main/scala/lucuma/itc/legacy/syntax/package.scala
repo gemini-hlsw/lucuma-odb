@@ -26,6 +26,7 @@ object all
     with GnirsSlitWidthSyntax
     with GnirsFpuIfuSyntax
     with GnirsWellDepthSyntax
+    with FieldLensSyntax
     with ConditionsSyntax
     with CoolStarModelSyntax
     with StellarLibrarySpectrumSyntax
