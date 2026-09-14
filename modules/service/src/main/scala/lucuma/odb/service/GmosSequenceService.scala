@@ -112,6 +112,9 @@ object GmosSequenceService:
               InitialConfigs.GmosNorthStatic.some
             case ObservingModeType.GmosNorthImaging  =>
               InitialConfigs.GmosNorthStatic.copy(mosPreImaging = mosPreImaging(variant)).some
+            case ObservingModeType.GmosNorthMos      |
+                 ObservingModeType.GmosNorthIfu      =>
+              InitialConfigs.GmosNorthStatic.some
             case _                                   =>
               none
 
@@ -158,6 +161,9 @@ object GmosSequenceService:
               InitialConfigs.GmosSouthStatic.some
             case ObservingModeType.GmosSouthImaging  =>
               InitialConfigs.GmosSouthStatic.copy(mosPreImaging = mosPreImaging(variant)).some
+            case ObservingModeType.GmosSouthMos      |
+                 ObservingModeType.GmosSouthIfu      =>
+              InitialConfigs.GmosSouthStatic.some
             case _                                   =>
               none
 
