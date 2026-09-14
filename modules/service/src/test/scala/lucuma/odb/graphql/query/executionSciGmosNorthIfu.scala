@@ -98,8 +98,7 @@ class executionSciGmosNorthIfu extends ExecutionTestSupportForGmos:
       fpu      = GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits).some
     )
 
-  // sc-10044 specifies a breakpoint after every step, not only the last of the initial atom.
-  private def expectedAcqStep(d: GmosNorth, breakpoint: Breakpoint = Breakpoint.Enabled): Json =
+  private def expectedAcqStep(d: GmosNorth, breakpoint: Breakpoint): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(d)},
@@ -124,8 +123,8 @@ class executionSciGmosNorthIfu extends ExecutionTestSupportForGmos:
                     "description"  -> "Initial Acquisition".asJson,
                     "observeClass" -> "ACQUISITION".asJson,
                     "steps"        -> List(
-                      expectedAcqStep(fieldStep(GmosRoi.Ccd2)),
-                      expectedAcqStep(ifuStep(GmosRoi.FullFrame, 40.secTimeSpan, GmosAmpReadMode.Fast))
+                      expectedAcqStep(fieldStep(GmosRoi.Ccd2), Breakpoint.Disabled),
+                      expectedAcqStep(ifuStep(GmosRoi.FullFrame, 40.secTimeSpan, GmosAmpReadMode.Fast), Breakpoint.Enabled)
                     ).asJson
                   ),
                   "possibleFuture" -> Json.arr(),

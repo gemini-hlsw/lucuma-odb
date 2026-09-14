@@ -10,6 +10,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
+import lucuma.core.enums.Breakpoint
 import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
@@ -23,6 +24,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.sequence.gmos.DynamicConfig.GmosNorth
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gmos.GmosFpuMask
+import lucuma.core.syntax.string.*
 import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 
@@ -60,14 +62,14 @@ class executionAcqGmosIfuReadMode extends ExecutionTestSupportForGmos:
       fpu      = GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits).some
     )
 
-  private def expectedStep(d: GmosNorth): Json =
+  private def expectedStep(d: GmosNorth, breakpoint: Breakpoint): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(d)},
         "stepConfig" : { "stepType":  "SCIENCE" },
         "telescopeConfig": ${expectedTelescopeConfig(0, 0, StepGuideState.Enabled)},
         "observeClass" : "ACQUISITION",
-        "breakpoint": "ENABLED"
+        "breakpoint": ${breakpoint.tag.toScreamingSnakeCase.asJson}
       }
     """
 
@@ -91,7 +93,7 @@ class executionAcqGmosIfuReadMode extends ExecutionTestSupportForGmos:
                   "nextAtom" -> Json.obj(
                     "description"  -> "Initial Acquisition".asJson,
                     "observeClass" -> "ACQUISITION".asJson,
-                    "steps"        -> List(expectedStep(fieldStep), expectedStep(ifuStep)).asJson
+                    "steps"        -> List(expectedStep(fieldStep, Breakpoint.Disabled), expectedStep(ifuStep, Breakpoint.Enabled)).asJson
                   ),
                   "possibleFuture" -> Json.arr(),
                   "hasMore" -> true.asJson

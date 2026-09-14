@@ -64,7 +64,7 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
       fpu      = GmosFpuMask.Builtin(GmosNorthFpu.Ifu2Slits).some
     )
 
-  private def expectedStep(d: GmosNorth, breakpoint: Breakpoint = Breakpoint.Enabled): Json =
+  private def expectedStep(d: GmosNorth, breakpoint: Breakpoint = Breakpoint.Disabled): Json =
     json"""
       {
         "instrumentConfig" : ${gmosNorthExpectedInstrumentConfig(d)},
@@ -119,26 +119,27 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
     setup("").flatMap: oid =>
       expectInitialAtom(oid, List(
         expectedStep(fieldStep(GmosRoi.Ccd2)),
-        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
+        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow), Breakpoint.Enabled)
       ))
 
   test("an explicit acquisition ROI drives both steps"):
     setup("acquisition: { explicitRoi: STAMP_FULL_FRAME }").flatMap: oid =>
       expectInitialAtom(oid, List(
         expectedStep(fieldStep(GmosRoi.CentralStamp)),
-        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
+        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow), Breakpoint.Enabled)
       ))
 
   test("a Full Frame acquisition ROI uses it for the field image too"):
     setup("acquisition: { explicitRoi: FULL_FRAME }").flatMap: oid =>
       expectInitialAtom(oid, List(
         expectedStep(fieldStep(GmosRoi.FullFrame)),
-        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
+        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow), Breakpoint.Enabled)
       ))
 
-  // The repeat is requested explicitly by the observer from the acquisition prompt, so it must
-  // run without stopping; a breakpoint there would stop the sequence before the step runs (sc-10293).
-  test("the repeating atom's step carries no breakpoint"):
+  // A breakpoint halts before its step, so the first step of an atom never carries one: the field
+  // image would stop before anything is taken, and the repeat is requested explicitly by the observer
+  // from the acquisition prompt (sc-10293).
+  test("only the initial atom's through-IFU step carries a breakpoint"):
     setup("").flatMap: oid =>
       expect(
         user     = pi,
@@ -153,7 +154,7 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
                     "observeClass" -> "ACQUISITION".asJson,
                     "steps"        -> List(
                       expectedStep(fieldStep(GmosRoi.Ccd2)),
-                      expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
+                      expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow), Breakpoint.Enabled)
                     ).asJson
                   ),
                   "possibleFuture" -> List(
@@ -161,7 +162,7 @@ class executionAcqGmosIfu extends ExecutionTestSupportForGmos:
                       "description"  -> "Fine Adjustments".asJson,
                       "observeClass" -> "ACQUISITION".asJson,
                       "steps"        -> List(
-                        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow), Breakpoint.Disabled)
+                        expectedStep(ifuStep(GmosRoi.FullFrame, 240.secTimeSpan, GmosAmpReadMode.Slow))
                       ).asJson
                     )
                   ).asJson,
