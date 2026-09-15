@@ -5,14 +5,17 @@ package lucuma.odb.service
 
 import cats.effect.Async
 import cats.implicits.*
+import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
+import lucuma.core.data.EmailAddress
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState as CoreExecutionState
 import lucuma.core.enums.ObservationValidationCode
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.ProgramUserRole
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.model.Access
 import lucuma.core.model.Observation
@@ -20,15 +23,20 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.model.User
+import lucuma.odb.data.EmailId
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.graphql.input.WarningDismissalInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.service.Services.SuperUserAccess
+import lucuma.odb.service.Services.asSuperUser
 import lucuma.odb.util.Codecs.*
 import skunk.*
 import skunk.codec.boolean.*
+import skunk.codec.text.varchar
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -87,6 +95,10 @@ sealed trait ObservationWorkflowService[F[_]] {
     which: AppliedFragment,
     states: Set[ObservationWorkflowState]
   )(using NoTransaction[F], SuperUserAccess): F[Result[List[Target.Id]]]
+
+  def requestWarningDismissal(
+    input: AccessControl.CheckedWithId[WarningDismissalInput, Program.Id]
+  )(using NoTransaction[F]): F[Result[List[EmailId]]]
 
 }
 
@@ -473,6 +485,46 @@ object ObservationWorkflowService {
                             OdbError.InvalidTarget(tid, msg.some)
                               .asProblemNec
 
+      def requestWarningDismissal(
+        input: AccessControl.CheckedWithId[WarningDismissalInput, Program.Id]
+      )(using NoTransaction[F]): F[Result[List[EmailId]]] =
+        input.foldWithId(OdbError.InvalidArgument().asFailureF): (input, pid) =>
+          services.transactionally:
+            session.prepareR(Statements.SelectProgramUsers).use: pq =>
+              pq.stream(pid, 1024).compile.toList.flatMap: list =>
+                  
+                // Our user info, filtered down to usable entires
+                case class Info(role: ProgramUserRole, userId: Option[User.Id], email: EmailAddress)
+                val infos: List[Info] = 
+                  list.flatMap: (role, oUid, oStr) =>
+                    oStr.flatMap: str =>
+                      EmailAddress
+                        .from(str)
+                        .toOption
+                        .map(Info(role, oUid, _))
+
+                // Pick out the current user and the support users  
+                import ProgramUserRole.*
+                val sender     = infos.find(_.userId === Some(user.id))
+                val recipients = infos.filter(i => i.role === SupportPrimary || i.role === SupportSecondary)
+
+                // Assuming we have a sender and at least one recipient, send the emails.
+                (sender, recipients) match
+                  case (None, _)=> OdbError.EmailSendError(s"Current user ${user.id} email address is missing or invalid.".some).asFailureF
+                  case (_, Nil) => OdbError.EmailSendError(s"Both $SupportPrimary and $SupportSecondary email addresses are missing or invalid.".some).asFailureF
+                  case (Some(sender), rs) =>
+                    asSuperUser:
+                      recipients
+                        .traverse: recipient =>
+                          emailService.send(
+                            programId = pid,
+                            from = sender.email,
+                            to = recipient.email,
+                            subject = NonEmptyString.unsafeFrom(s"$pid: request to review warnings"),
+                            textMessage = input.text
+                          )
+                        .map(_.sequence)
+
   }
 
   object Statements {
@@ -515,6 +567,18 @@ object ObservationWorkflowService {
         ON t.c_target_id = a.c_target_id
         WHERE t.c_target_id IN (""" |+| whichTargets |+| void""")
         """
+
+    val SelectProgramUsers: Query[Program.Id, (ProgramUserRole, Option[User.Id], Option[String])] =
+        sql"""
+          SELECT
+            c_role,
+            c_user_id,
+            c_preferred_email
+          FROM
+            t_program_user
+          WHERE
+            c_program_id = $program_id
+        """.query(program_user_role *: user_id.opt *: varchar.opt)
 
   }
 
