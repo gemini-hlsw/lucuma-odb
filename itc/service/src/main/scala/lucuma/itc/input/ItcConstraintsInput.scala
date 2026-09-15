@@ -12,7 +12,6 @@ import lucuma.core.model.CloudExtinction
 import lucuma.core.model.ImageQuality
 import lucuma.itc.CloudExtinctionInput
 import lucuma.itc.ImageQualityInput
-import lucuma.itc.service.ItcImageQuality
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.binding.BigDecimalBinding
@@ -52,7 +51,7 @@ case class ItcConstraintsInput(
       elevationRange.create.flatMap(e => Result.fromEither(ItcObservingConditions.airmass(e)))
 
     (imageQuality.toArcSeconds, cloudExtinction.toVegaMagnitude, erResult).parMapN: (iq, ce, er) =>
-      ItcObservingConditions(ItcImageQuality.Exact(iq), ce, waterVapor, skyBackground, er.toDouble)
+      ItcObservingConditions(iq, ce, waterVapor, skyBackground, er.toDouble)
 
 }
 

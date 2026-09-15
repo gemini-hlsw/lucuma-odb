@@ -27,7 +27,6 @@ import lucuma.core.model.SpectralDefinition
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
-import lucuma.itc.service.ItcImageQuality
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.Main.ReverseClassLoader
@@ -188,7 +187,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
 
   // Common observing conditions - this will be used in tests
   def defaultConditions = ItcObservingConditions(
-    ItcImageQuality.Exact(ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds),
+    ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds,
     CloudExtinction.Preset.OnePointZero.toCloudExtinction.toVegaMagnitude,
     WaterVapor.Median,
     SkyBackground.Bright,
@@ -234,7 +233,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
       sourceDefinition,
       obs.copy(analysisMethod = analysis),
       ItcObservingConditions(
-        ItcImageQuality.Exact(ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds),
+        ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds,
         CloudExtinction.Preset.OnePointZero.toCloudExtinction.toVegaMagnitude,
         WaterVapor.Median,
         SkyBackground.Dark,
@@ -405,9 +404,7 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
         localItc
           .calculate(
             params
-              .copy(conditions =
-                params.conditions.copy(iq = ItcImageQuality.Exact(iq.toImageQuality.toArcSeconds))
-              )
+              .copy(conditions = params.conditions.copy(iq = iq.toImageQuality.toArcSeconds))
               .asJson
               .noSpaces
           )

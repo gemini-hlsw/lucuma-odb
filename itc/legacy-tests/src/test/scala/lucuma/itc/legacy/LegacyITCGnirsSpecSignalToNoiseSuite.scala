@@ -22,7 +22,6 @@ import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
 import lucuma.itc.AltairParameters
 import lucuma.itc.legacy.codecs.given
-import lucuma.itc.service.ItcImageQuality
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
 
@@ -137,14 +136,13 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
       ).asJson.noSpaces
     assertIOBoolean(result.map(_.fold(_.exists(_.contains("guide star")), _ => false)))
 
-  // LGS+P1 is sent without Altair at the 20% image quality bin
-  test("gnirs 20% image quality bin".tag(LegacyITCTest)):
-    val params = bodyConf(sourceDefinition, obs, gnirs)
+  // LGS+P1 goes out without Altair at the 20% image quality bin
+  test("gnirs altair LGS+P1".tag(LegacyITCTest)):
     val result = localItc.calculate:
-      params
-        .copy(conditions = params.conditions.copy(iq = ItcImageQuality.Percentile20))
-        .asJson
-        .noSpaces
+      bodyConf(sourceDefinition,
+               obs,
+               gnirs.copy(altair = Some(AltairParameters.LgsP1))
+      ).asJson.noSpaces
     assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
   test("gnirs grating".tag(LegacyITCTest)):
