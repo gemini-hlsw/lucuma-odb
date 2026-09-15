@@ -31,7 +31,6 @@ import lucuma.itc.legacy.ItcImpl
 import lucuma.itc.legacy.LocalItc
 import lucuma.itc.service.GmosNorthFpuParam
 import lucuma.itc.service.Itc
-import lucuma.itc.service.ItcImageQuality
 import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
 import lucuma.itc.service.TargetData
@@ -129,7 +128,7 @@ object ItcBenchmarkSetup:
     )
 
     val conditions = ItcObservingConditions(
-      ItcImageQuality.Exact(ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds),
+      ImageQuality.Preset.PointEight.toImageQuality.toArcSeconds,
       CloudExtinction.Preset.OnePointZero.toCloudExtinction.toVegaMagnitude,
       WaterVapor.Median,
       SkyBackground.Gray,
