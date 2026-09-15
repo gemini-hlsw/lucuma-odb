@@ -42,9 +42,8 @@ import Services.Syntax.*
 
 trait GroupMapping[F[_]] extends GroupView[F] with ProgramView[F] with GroupElementView[F] with KeyValueEffectHandler[F] with Predicates[F]:
 
-  def user: User
   def itcClient: ItcClient[F]
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def emailConfig: Config.Email

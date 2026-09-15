@@ -19,8 +19,7 @@ import lucuma.odb.service.Services
 
 trait CallForProposalsMapping[F[_]] extends CallForProposalsView[F]:
 
-  def user: User
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   lazy val CallForProposalsPartnerMapping: TypeMapping =
     ObjectMapping(CallForProposalsPartnerType)(

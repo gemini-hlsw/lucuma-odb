@@ -40,8 +40,7 @@ trait StepRecordMapping[F[_]] extends StepRecordView[F]
                                  with Predicates[F]
                                  with SelectSubquery
                                  with VisitTable[F] {
-  def user: User
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   lazy val StepRecordMapping: ObjectMapping =
     ObjectMapping(StepRecordType)(

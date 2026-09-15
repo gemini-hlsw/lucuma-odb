@@ -108,7 +108,6 @@ object OdbMapping {
   def apply[F[_]: {Async, Parallel, Tracer as T, Logger as L, LoggerFactory as LF, SecureRandom}](
     database:        Resource[F, Session[F]],
     monitor0:        SkunkMonitor[F],
-    user0:           User,
     topics0:         Topics[F],
     gaiaClient0:     GaiaClient[F],
     itcClient0:      ItcClient[F],
@@ -359,13 +358,12 @@ object OdbMapping {
           override val goaUsers = goaUsers0
           override val gaiaClient = gaiaClient0
           override val itcClient = itcClient0
-          override val user: User = user0
           override val topics: Topics[F] = topics0
           override val timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode = tec
           override val httpClient: Client[F] = httpClient0
           override val emailConfig: Config.Email = emailConfig0
 
-          override val services: Resource[F, Services[F]] =
+          override def services(using user: User): Resource[F, Services[F]] =
             pool.map: session =>
               Services.forUser(
                 user,
@@ -373,7 +371,6 @@ object OdbMapping {
                   apply(
                     Resource.pure(s),     // Always use the provided session
                     monitor0,             // Same args as the outer mapping
-                    user0,
                     topics0,
                     gaiaClient0,
                     itcClient0,
@@ -844,7 +841,6 @@ object OdbMapping {
   def forObscalc[F[_]: Async: Parallel: Tracer: Logger: LoggerFactory: SecureRandom](
     database:       Resource[F, Session[F]],
     monitor:        SkunkMonitor[F],
-    user:           User,
     goaUsers:       Set[User.Id],
     gaiaClient:     GaiaClient[F],
     itcClient:      ItcClient[F],
@@ -860,7 +856,6 @@ object OdbMapping {
     apply(
       database,
       monitor,
-      user,
       null,    // Topics[F]
       gaiaClient,
       itcClient,
@@ -879,14 +874,15 @@ object OdbMapping {
 
   /**
    * Validates the type mappings of `mapping` against its schema, raising a `ValidationException`
-   * if there are problems. The type mappings are the same for every user, so this is meant to run
-   * once per process, with every other mapping built unchecked.
+   * if there are problems. It runs once per process, and the `GraphQLService` is then built with
+   * `GraphQLService.unvalidated`.
    *
    * TEMPORARY: the validation runs on a dedicated thread with an 8 MB stack. Grackle 0.30.0's
    * `MappingValidator` recurses over the type mappings without stack safety and, with a schema
    * this size, overflows the default thread stack depending on JIT state (it fails intermittently,
-   * not every time). The fix (typelevel/grackle#940) is merged but unreleased; once a grackle
-   * release includes it, replace this with a plain `mapping.validateInto[F]()`.
+   * not every time). The fix (typelevel/grackle#940) is merged but unreleased. Once a Grackle
+   * release includes it, delete this method and build the service with `GraphQLService.apply`
+   * from lucuma-graphql-routes, which validates the mapping itself.
    */
   def validate[F[_]: Async](mapping: Mapping[F]): F[Unit] =
     Async[F].async_ : cb =>

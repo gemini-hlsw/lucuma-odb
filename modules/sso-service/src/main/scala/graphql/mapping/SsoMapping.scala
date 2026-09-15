@@ -22,6 +22,7 @@ import grackle.Value.NullValue
 import grackle.Value.StringValue
 import grackle.skunk.SkunkMapping
 import grackle.skunk.SkunkMonitor
+import lucuma.common.middleware.UserContext
 import lucuma.core.enums.Partner
 import lucuma.core.model
 import lucuma.core.model.Access
@@ -64,13 +65,12 @@ object SsoMapping {
     pool:     Resource[F, Session[F]],
     monitor:  SkunkMonitor[F],
     loadedSchema: Schema
-  ): StandardUser => Mapping[F] =
-    (user: StandardUser) => {
+  ): Mapping[F] = {
       // Directly-computed result for `createApiKey` mutation.
       def createApiKey(env: Env): F[Result[String]] =
-        env
-          .getR[StandardRole.Id]("roleId")
-          .flatTraverse: roleId =>
+        (env.getR[StandardUser](UserContext.EnvKey), env.getR[StandardRole.Id]("roleId"))
+          .parTupled
+          .flatTraverse: (user, roleId) =>
             if (user.role :: user.otherRoles).exists(_.id === roleId) then
               pool.map(Database.fromSession(_)).use: db =>
                 db.createApiKey(roleId)
@@ -80,34 +80,36 @@ object SsoMapping {
 
       // Add a role
       def addRole(env: Env): F[Result[StandardRole.Id]] =
-        if user.role.access < Access.Admin then
-          Result.failure(s"User ${user.id} is not authorized to perform this action.").pure[F]
-        else
-          (
-            env.getR[User.Id]("userId"), 
-            env.getR[RoleRequest]("roleRequest"),
-          ) .parTupled
-            .flatTraverse:
-              case (uid, roleRequest) =>
-                pool.map(Database.fromSession(_)).use: db =>
-                  db.canonicalizeRole(uid, roleRequest)
-                    .map(Result.success)
+        env.getR[StandardUser](UserContext.EnvKey).flatTraverse: user =>
+          if user.role.access < Access.Admin then
+            Result.failure(s"User ${user.id} is not authorized to perform this action.").pure[F]
+          else
+            (
+              env.getR[User.Id]("userId"),
+              env.getR[RoleRequest]("roleRequest"),
+            ) .parTupled
+              .flatTraverse:
+                case (uid, roleRequest) =>
+                  pool.map(Database.fromSession(_)).use: db =>
+                    db.canonicalizeRole(uid, roleRequest)
+                      .map(Result.success)
 
       def deleteRole(env: Env): F[Result[Boolean]] =
-        if user.role.access < Access.Admin then
-          Result.failure(s"User ${user.id} is not authorized to perform this action.").pure[F]
-        else
-          (
-            env.getR[StandardRole.Id]("roleId"), 
-          ) .flatTraverse:
-              case (roleId) =>
-                pool.map(Database.fromSession(_)).use: db =>
-                  db.deleteRole(roleId).as(Result.success(true))
+        env.getR[StandardUser](UserContext.EnvKey).flatTraverse: user =>
+          if user.role.access < Access.Admin then
+            Result.failure(s"User ${user.id} is not authorized to perform this action.").pure[F]
+          else
+            (
+              env.getR[StandardRole.Id]("roleId"),
+            ) .flatTraverse:
+                case (roleId) =>
+                  pool.map(Database.fromSession(_)).use: db =>
+                    db.deleteRole(roleId).as(Result.success(true))
 
       def deleteApiKey(env: Env): F[Result[Boolean]] =
-        env
-          .getR[PosLong]("id")
-          .flatTraverse: id =>
+        (env.getR[StandardUser](UserContext.EnvKey), env.getR[PosLong]("id"))
+          .parTupled
+          .flatTraverse: (user, id) =>
             pool.map(Database.fromSession(_)).use: db =>
               db.deleteApiKey(id, Some(user.id)).map(Result.success)
 
@@ -217,35 +219,37 @@ object SsoMapping {
             NonNegIntBinding.Option("LIMIT", rLIMIT),
             BooleanBinding("includeDisabled", rIncludeDisabled)
           )) =>
-            Elab.transformChild { child =>
-              (rWHERE, rOFFSET, rLIMIT, rIncludeDisabled).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDisabled) =>
-                val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-                ResultMapping.selectResult(child, limit) { q =>
-                  FilterOrderByOffsetLimit(
-                    pred = Some(
-                      and(List(
-                        OFFSET.map(Predicates.user.id.gtEql).getOrElse(True),
-                        Predicates.user.enabled.includeDisabled(includeDisabled),
-                        or(List(
-                          Predicates.user.id.eql(user.id), // you can see yourself
-                          if user.role.access >= Access.Staff then True else False // and nobody else unless you're staff or better
-                        )),
-                        WHERE.getOrElse(True)
-                      ))
-                    ),
-                    oss = Some(List(
-                      OrderSelection[lucuma.core.model.User.Id](UserType / "id"),
-                    )),
-                    offset = None,
-                    limit = Some(limit + 1), // Select one extra row here.
-                    child = q
-                  )
+            Elab.envE[StandardUser](UserContext.EnvKey).flatMap: user =>
+              Elab.transformChild { child =>
+                (rWHERE, rOFFSET, rLIMIT, rIncludeDisabled).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDisabled) =>
+                  val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+                  ResultMapping.selectResult(child, limit) { q =>
+                    FilterOrderByOffsetLimit(
+                      pred = Some(
+                        and(List(
+                          OFFSET.map(Predicates.user.id.gtEql).getOrElse(True),
+                          Predicates.user.enabled.includeDisabled(includeDisabled),
+                          or(List(
+                            Predicates.user.id.eql(user.id), // you can see yourself
+                            if user.role.access >= Access.Staff then True else False // and nobody else unless you're staff or better
+                          )),
+                          WHERE.getOrElse(True)
+                        ))
+                      ),
+                      oss = Some(List(
+                        OrderSelection[lucuma.core.model.User.Id](UserType / "id"),
+                      )),
+                      offset = None,
+                      limit = Some(limit + 1), // Select one extra row here.
+                      child = q
+                    )
+                  }
                 }
               }
-            }
 
           case (QueryType, "user", Nil) =>
-            Elab.transformChild(c => Unique(Filter(Eql(UserType / "id", Const(user.id)), c)))
+            Elab.envE[StandardUser](UserContext.EnvKey).flatMap: user =>
+              Elab.transformChild(c => Unique(Filter(Eql(UserType / "id", Const(user.id)), c)))
 
           // The ordering is required for correctness: flattened inner joins drop zero-key users.
           case (UserType, "apiKeys", Nil) =>
@@ -253,7 +257,8 @@ object SsoMapping {
               OrderBy(OrderSelections(List(OrderSelection[String](ApiKeyType / "id"))), child)
 
           case (QueryType, "role", Nil) =>
-            Elab.transformChild(c => Unique(Filter(Eql(UserType / "id", Const(user.role.id)), c)))
+            Elab.envE[StandardUser](UserContext.EnvKey).flatMap: user =>
+              Elab.transformChild(c => Unique(Filter(Eql(UserType / "id", Const(user.role.id)), c)))
 
           case (MutationType, "createApiKey", List(Binding("role", Value.StringValue(id)))) =>
             val rRoleId = Result.fromOption(StandardRole.Id.parse(id), s"Not a valid role id: $id")
@@ -273,11 +278,12 @@ object SsoMapping {
             Binding("partner", pValue))
           ) =>
             import lucuma.sso.service.database.{ RoleType => RT }
-            Elab
-              .liftR:
-                if user.role.access < Access.Admin then
-                  Result.failure(s"User ${user.id} is not authorized to perform this action.")
-                else (
+            Elab.envE[StandardUser](UserContext.EnvKey).flatMap: user =>
+              Elab
+                .liftR:
+                  if user.role.access < Access.Admin then
+                    Result.failure(s"User ${user.id} is not authorized to perform this action.")
+                  else (
                     Result.fromOption(lucuma.core.model.User.Id.parse(id), s"Not a valid user id: $id"),
                     Result.fromOption(RT.parse(roleType), s"Not a valid role type: $roleType"),
                     pValue match
@@ -292,9 +298,9 @@ object SsoMapping {
                       case (uid, RT.Ngo, Some(p))                    => Result.success((uid, RoleRequest.Ngo(p)))
                       case (_, RT.Pi | RT.Staff | RT.Admin, Some(_)) => Result.failure("Only NGO roles may specify a partner.")
                       case (_, RT.Ngo, None)                         => Result.failure("NGO roles must specify a partner.")
-              .flatMap:
-                case (uid, rr) =>
-                  Elab.env("userId" -> uid, "roleRequest" -> rr)
+                .flatMap:
+                  case (uid, rr) =>
+                    Elab.env("userId" -> uid, "roleRequest" -> rr)
 
         }
 

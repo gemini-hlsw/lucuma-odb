@@ -8,6 +8,7 @@ import cats.effect.Resource
 import grackle.Query.EffectHandler
 import grackle.skunk.SkunkMapping
 import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTimeRange
 import lucuma.core.util.CalculatedValue
 import lucuma.odb.graphql.predicate.Predicates
@@ -31,7 +32,7 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
                                with ProposalView[F]
                                with KeyValueEffectHandler[F] {
 
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   lazy val ProposalMapping =
     ObjectMapping(ProposalType)(

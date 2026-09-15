@@ -17,6 +17,7 @@ import grackle.ResultT
 import grackle.circe.CirceMappingLike
 import io.circe.Encoder
 import io.circe.syntax.*
+import lucuma.core.model.User
 
 import scala.reflect.ClassTag
 
@@ -27,14 +28,15 @@ import scala.reflect.ClassTag
 trait KeyValueEffectHandler[F[_]: MonadCancelThrow] extends CirceMappingLike[F] {
 
   def keyValueEffectHandler[K : ClassTag : Eq, T: Encoder](keyField: String)(
-    calculate: K => F[T]
+    calculate: User ?=> K => F[T]
   ):  EffectHandler[F] =
 
     new EffectHandler[F] {
       override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
+          usr <- ResultT.fromResult(UserEnv.fromQueries(queries))
           ctx <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[K](keyField) }.pure[F])
-          all <- ctx.distinct.traverse { k => ResultT(calculate(k).map(Result.success)).tupleLeft(k) }
+          all <- ctx.distinct.traverse { k => ResultT(calculate(using usr)(k).map(Result.success)).tupleLeft(k) }
           res <- ResultT(ctx
                    .flatMap(k => all.find(r => r._1 === k).map(_._2).toList)
                    .zip(queries)

@@ -281,7 +281,6 @@ object CalcMain extends MainParams:
                       OdbMapping.forObscalc(
                         Resource.pure(s),
                         SkunkMonitor.noopMonitor[F],
-                        user,
                         c.goaUsers,
                         gaiaClient,
                         itc,

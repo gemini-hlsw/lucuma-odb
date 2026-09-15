@@ -19,6 +19,7 @@ import grackle.circe.CirceMappingLike
 import grackle.syntax.*
 import io.circe.Json
 import io.circe.syntax.*
+import lucuma.core.model.User
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.json.time.query.given
 import lucuma.odb.service.Services
@@ -36,20 +37,21 @@ trait EventRangeEffectHandler[F[_]: MonadCancelThrow] extends CirceMappingLike[F
 
   def eventRangeEffectHandler[T : ClassTag : Eq](
     fieldName: String,
-    services:  Resource[F, Services[F]],
+    services:  User ?=> Resource[F, Services[F]],
     range:     Services[F] ?=> T => Transaction[F] ?=> F[Option[TimestampInterval]]
   ): EffectHandler[F] =
 
     new EffectHandler[F] {
-      def calculateInterval(id: T): F[Result[Json]] =
+      def calculateInterval(id: T)(using User): F[Result[Json]] =
         services.useTransactionally {
           range(id).map(_.asJson.success)
         }
 
       override def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
+          usr  <- ResultT.fromResult(UserEnv.fromQueries(queries))
           ids  <- ResultT(queries.traverse { case (_, cursor) => cursor.fieldAs[T](fieldName)}.pure[F])
-          jsns <- ids.distinct.traverse(id => ResultT(calculateInterval(id)).tupleLeft(id))
+          jsns <- ids.distinct.traverse(id => ResultT(calculateInterval(id)(using usr)).tupleLeft(id))
           res  <- ResultT(
                     ids
                       .flatMap { id => jsns.find(r => r._1 === id).map(_._2).toList }

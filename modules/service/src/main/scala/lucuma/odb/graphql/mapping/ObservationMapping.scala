@@ -22,6 +22,7 @@ import io.circe.syntax.*
 import lucuma.core.model.Attachment
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ItcAcquisition
@@ -54,7 +55,7 @@ trait ObservationMapping[F[_]]
      with ObservationReferenceView[F] {
 
   def itcClient: ItcClient[F]
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
 
@@ -131,7 +132,7 @@ trait ObservationMapping[F[_]]
 
     val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Itc]] =
+    val calculate: User ?=> (Program.Id, Observation.Id, Unit) => F[Result[Itc]] =
       (pid, oid, _) =>
         services.use { implicit s =>
           itcService
@@ -174,8 +175,9 @@ trait ObservationMapping[F[_]]
             CirceCursor(childContext, reqs(key).asJson, Some(cursor), cursor.fullEnv)
 
     // Do it!
-    services.useTransactionally:
-      query.value
+    UserEnv.traverse(UserEnv.fromQueries(pairs)):
+      services.useTransactionally:
+        query.value
 
   }
 

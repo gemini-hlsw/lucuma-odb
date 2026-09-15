@@ -10,6 +10,7 @@ import grackle.Result
 import grackle.skunk.SkunkMapping
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
+import lucuma.core.model.User
 import lucuma.odb.data.Cone
 import lucuma.odb.service.Services
 
@@ -19,15 +20,15 @@ import lucuma.odb.service.Services
  */
 trait ConeCandidatesMapping[F[_]] { this: SkunkMapping[F] =>
 
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   /** Selects the ids of configuration requests whose target reference
    *  coordinates lie within `cone` (exact great-circle). */
-  def configurationRequestConeCandidates(cone: Cone): F[Result[List[ConfigurationRequest.Id]]] =
+  def configurationRequestConeCandidates(cone: Cone)(using User): F[Result[List[ConfigurationRequest.Id]]] =
     services.use(_.configurationService.coneCandidates(cone))
 
   /** Selects the ids of observations whose stored J2000 base position lies
    *  within `cone` (exact great-circle). */
-  def observationConeCandidates(cone: Cone): F[Result[List[Observation.Id]]] =
+  def observationConeCandidates(cone: Cone)(using User): F[Result[List[Observation.Id]]] =
     services.use(_.observationService.coneCandidates(cone))
 }

@@ -61,9 +61,8 @@ trait ProgramMapping[F[_]]
      with KeyValueEffectHandler[F]
      with AllocationTable[F] {
 
-  def user: User
   def itcClient: ItcClient[F]
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
   def commitHash: CommitHash
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def emailConfig: Config.Email
@@ -129,20 +128,21 @@ trait ProgramMapping[F[_]]
     case (ProgramType, "notes", List(
       BooleanBinding("includeDeleted", rIncludeDeleted)
     )) =>
-      Elab.transformChild: child =>
-        rIncludeDeleted.map: includeDeleted =>
-          OrderBy(
-            OrderSelections(List(
-              OrderSelection[ProgramNote.Id](ProgramNoteType / "id")
-            )),
-            Filter(
-              Predicate.And(
-                Predicates.programNote.existence.includeDeleted(includeDeleted),
-                Predicates.programNote.isVisibleTo(user)
-              ),
-              child
+      UserEnv.elab: user =>
+        Elab.transformChild: child =>
+          rIncludeDeleted.map: includeDeleted =>
+            OrderBy(
+              OrderSelections(List(
+                OrderSelection[ProgramNote.Id](ProgramNoteType / "id")
+              )),
+              Filter(
+                Predicate.And(
+                  Predicates.programNote.existence.includeDeleted(includeDeleted),
+                  Predicates.programNote.isVisibleTo(user)
+                ),
+                child
+              )
             )
-          )
 
     case (ProgramType, "observations", List(
       BooleanBinding("includeDeleted", rIncludeDeleted),

@@ -27,7 +27,6 @@ import lucuma.core.model.ProgramNote
 import lucuma.core.model.ProgramReference
 import lucuma.core.model.ProposalReference
 import lucuma.core.model.Target
-import lucuma.core.model.User
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.data.OdbError
@@ -157,7 +156,6 @@ object AccessControl:
 
 trait AccessControl[F[_]] extends Predicates[F] {
 
-  def user: User
   def timeEstimateCalculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   def itcClient: ItcClient[F]
   def commitHash: CommitHash
@@ -177,7 +175,7 @@ trait AccessControl[F[_]] extends Predicates[F] {
     includeDeleted:      Option[Boolean],
     WHERE:               Option[Predicate],
     includeCalibrations: Boolean
-  ): Result[AppliedFragment] =
+  )(using Services[F]): Result[AppliedFragment] =
     idSelectFromPredicate(
       ObservationType,
       and(List(
@@ -622,7 +620,6 @@ trait AccessControl[F[_]] extends Predicates[F] {
             AccessControl.unchecked(input.allocations, pid, program_id)
         .value
 
-  @annotation.nowarn("msg=unused implicit parameter")
   def selectForUpdate(
     input: UpdateAttachmentsInput
   )(using Services[F]): F[Result[AccessControl.Checked[AttachmentPropertiesInput.Edit]]] =

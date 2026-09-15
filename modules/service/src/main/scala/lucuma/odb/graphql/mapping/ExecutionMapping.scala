@@ -46,10 +46,9 @@ trait ExecutionMapping[F[_]] extends ObservationEffectHandler[F]
   private val FutureLimitParam = "futureLimit"
   private val ResetAcqParam    = "reset"
 
-  def user: User
   def itcClient: ItcClient[F]
   def httpClient: Client[F]
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   lazy val ExecutionMapping: ObjectMapping =
     ObjectMapping(ExecutionType)(

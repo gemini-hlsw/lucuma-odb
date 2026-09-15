@@ -20,9 +20,7 @@ import io.laserdisc.pure.s3.tagless.S3AsyncClientOp
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
-import lucuma.common.middleware.IntrospectionMapping
 import lucuma.core.model.User
-import lucuma.graphql.routes.GraphQLService
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.AttachmentRoutes
@@ -150,8 +148,8 @@ object FMain extends MainParams {
 
   import MainArgs.*
 
-  // Time GraphQL service instances are cached
-  val GraphQLServiceTTL = 30.minutes
+  // Time the user of an `Authorization` header is cached
+  val AuthCacheTTL = 30.minutes
 
   /** A startup action that prints a banner. */
   def banner[F[_]: Applicative: Logger](config: Config): F[Unit] =
@@ -261,8 +259,7 @@ object FMain extends MainParams {
       enums             <- Resource.eval(pool.use(Enums.load))
       ptc               <- Resource.eval(pool.use(TimeEstimateCalculatorImplementation.fromSession(_, enums)))
       schema            <- Resource.eval(OdbMapping.loadSchema[F])
-      introspecService   = GraphQLService(IntrospectionMapping(schema))
-      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], GraphQLServiceTTL, userSvc, ptc, httpClient, horizonsClient, goaClient, emailConfig, introspecService, schema, validateMapping)
+      graphQLRoutes     <- GraphQLRoutes(gaiaClient, itcClient, commitHash, goaUsers, ssoClient, pool, SkunkMonitor.noopMonitor[F], AuthCacheTTL, userSvc, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema, validateMapping)
       s3ClientOps       <- s3OpsResource
       s3Presigner       <- s3PresignerResource
       s3FileService      = S3FileService.fromS3ConfigAndClient(awsConfig, s3ClientOps, s3Presigner)

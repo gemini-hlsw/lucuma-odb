@@ -5,10 +5,8 @@ package lucuma.sso.service
 package graphql
 
 import cats.effect.*
-import cats.implicits.*
-import grackle.Schema
 import grackle.skunk.SkunkMonitor
-import lucuma.common.middleware.IntrospectionMapping
+import lucuma.common.middleware.UserContext
 import lucuma.core.model.StandardUser
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
@@ -23,24 +21,19 @@ import skunk.Session
 
 object GraphQLRoutes {
 
-  def apply[F[_]: Async: Trace: Tracer: Logger](
-    client:   SsoClient[F, StandardUser],
-    pool:     Resource[F, Session[F]],
-    channels: SsoMapping.Channels[F],
-    monitor:  SkunkMonitor[F],
-    wsb:      WebSocketBuilder2[F],
-    schema: Schema,
+  /** The GraphQL service of SSO, which serves every request. */
+  def service[F[_]: Async: Trace: Tracer: Logger](pool: Resource[F, Session[F]]): Resource[F, GraphQLService[F]] =
+    for {
+      schema   <- Resource.eval(SsoMapping.loadSchema[F])
+      channels <- SsoMapping.Channels(pool)
+      service  <- Resource.eval(GraphQLService[F](SsoMapping(channels, pool, SkunkMonitor.noopMonitor[F], schema)))
+    } yield service
+
+  def apply[F[_]: Async: Tracer: Logger](
+    client:  SsoClient[F, StandardUser],
+    service: GraphQLService[F],
+    wsb:     WebSocketBuilder2[F],
   ): HttpRoutes[F] =
-    val introspectionService = new GraphQLService(IntrospectionMapping[F](schema)).some
-    LucumaGraphQLRoutes.forService[F](
-      oa =>
-        oa.flatTraverse(client.get)
-          .map:
-            case None       =>
-              introspectionService // no auth: only schema introspection is allowed
-            case Some(user) =>
-              new GraphQLService(SsoMapping(channels, pool, monitor, schema)(user)).some,
-      wsb
-    )
+    LucumaGraphQLRoutes.forService[F](service, UserContext.authenticator(client), wsb)
 
 }

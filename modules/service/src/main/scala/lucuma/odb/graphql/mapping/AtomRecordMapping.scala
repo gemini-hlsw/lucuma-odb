@@ -31,8 +31,7 @@ trait AtomRecordMapping[F[_]] extends AtomRecordView[F]
                                  with SelectSubquery
                                  with StepRecordView[F]
                                  with VisitTable[F]:
-  def user: User
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   lazy val AtomRecordMapping: ObjectMapping =
     ObjectMapping(AtomRecordType)(
