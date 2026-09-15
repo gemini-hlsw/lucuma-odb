@@ -7,6 +7,7 @@ import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
@@ -26,6 +27,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
@@ -51,6 +53,7 @@ import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
 import lucuma.odb.util.Codecs.*
+import lucuma.refined.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -79,6 +82,25 @@ object ObsExtract:
       case c: Igrins2Config           => c.telluricType =!= TelluricType.NoTelluric
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
+
+  /**
+   * Expected number of night-time calibrations for an observation.
+   */
+  def calibrationCount(
+    mode:        ObservingMode,
+    role:        Option[CalibrationRole],
+    scienceTime: TimeSpan
+  ): NonNegInt =
+    val wantsTelluric = role.isEmpty && (mode match
+      case c: Flamingos2Config        => c.telluricType =!= TelluricType.NoTelluric
+      case c: Flamingos2MosConfig     => c.telluricType =!= TelluricType.NoTelluric
+      case c: Igrins2Config           => c.telluricType =!= TelluricType.NoTelluric
+      case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
+      case _                          => false
+    )
+    if !wantsTelluric then NonNegInt.MinValue
+    else if scienceTime > TelluricTargetsService.MultiTelluricThreshold then 2.refined
+    else 1.refined
 
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 

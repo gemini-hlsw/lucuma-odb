@@ -34,7 +34,7 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.4"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.253.0"
+val lucumaCoreVersion            = "0.253.0-6-b1e3568-20260923T215506Z-SNAPSHOT"
 val lucumaGraphQLRoutesVersion   = "0.16.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -918,6 +918,7 @@ lazy val schema =
         "edu.gemini"    %%% "lucuma-core"                % lucumaCoreVersion,
         "io.circe"      %%% "circe-testing"              % circeVersion           % Test,
         "edu.gemini"    %%% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
+        "edu.gemini"    %%% "lucuma-refined"             % lucumaRefinedVersion   % Test,
         "org.scalameta" %%% "munit"                      % munitVersion           % Test,
         "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
         "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test
