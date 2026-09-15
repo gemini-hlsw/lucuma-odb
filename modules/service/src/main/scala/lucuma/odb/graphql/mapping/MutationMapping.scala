@@ -68,7 +68,7 @@ import skunk.Transaction
 
 import scala.reflect.ClassTag
 
-trait MutationMapping[F[_]] extends AccessControl[F] {
+trait MutationMapping[F[_]] extends AccessControl[F] with UserEnv {
 
   private lazy val mutationFields: List[MutationField] =
     List(
@@ -145,8 +145,7 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
     mutationFields.foldMap(_.elaborator)
 
   // Resources defined in the final cake.
-  def services: Resource[F, Services[F]]
-  def user: User
+  def services(using User): Resource[F, Services[F]]
   def httpClient: Client[F]
   def gaiaClient: GaiaClient[F]
   def itcClient: ItcClient[F]
@@ -170,13 +169,17 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
         OdbError.ProgramResourceLimitExceeded(Some(ex.message)).asFailure
 
   private object MutationField {
-    def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => F[Result[Query]]) =
+    def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: User ?=> (I, Query) => F[Result[Query]]) =
       new MutationField {
         val FieldMapping =
-          RootEffect.computeChild(fieldName) { (child, _, _) =>
+          RootEffect.computeChild(fieldName) { (child, _, rootEnv) =>
             child match {
               case Environment(env, child2) =>
-                Nested(env.getR[I]("input").flatTraverse(i => recoverProgramResourceLimit(f(i, child2))))
+                Nested(
+                  (UserEnv.fromEnv(rootEnv), env.getR[I]("input"))
+                    .parTupled
+                    .flatTraverse { case (usr, i) => recoverProgramResourceLimit(f(using usr)(i, child2)) }
+                )
                   .map(child3 => Environment(env, child3))
                   .value
               case _ =>
@@ -191,18 +194,22 @@ trait MutationMapping[F[_]] extends AccessControl[F] {
       }
 
     /** A mutation that yields a Json result. */
-    def json[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: I => F[Result[Json]]) =
+    def json[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: User ?=> I => F[Result[Json]]) =
       new MutationField {
         val FieldMapping =
           RootEffect.computeJson(fieldName): (_, env) =>
-            Nested(env.getR[I]("input").flatTraverse(i => recoverProgramResourceLimit(f(i)))).value
+            Nested(
+              (UserEnv.fromEnv(env), env.getR[I]("input"))
+                .parTupled
+                .flatTraverse { case (usr, i) => recoverProgramResourceLimit(f(using usr)(i)) }
+            ).value
         val elaborator =
           case (MutationType, `fieldName`, List(inputBinding("input", rInput))) =>
             Elab.liftR(rInput).flatMap: i =>
               Elab.env("input" -> i)
       }
 
-    def encodable[I: ClassTag: TypeName, A: io.circe.Encoder](fieldName: String, inputBinding: Matcher[I])(f: I => F[Result[A]]) =
+    def encodable[I: ClassTag: TypeName, A: io.circe.Encoder](fieldName: String, inputBinding: Matcher[I])(f: User ?=> I => F[Result[A]]) =
       json(fieldName, inputBinding)(i => f(i).map(_.map(_.asJson)))
 
   }

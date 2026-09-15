@@ -127,13 +127,13 @@ object PMain extends MainParams:
     gaiaClient:     GaiaClient[F],
     horizonsClient: HorizonsClient[F],
     s3FileService:  S3FileService[F],
-    mapping:        User => Session[F] => Mapping[F]
+    mapping:        Session[F] => Mapping[F]
   )(pool: Session[F]): F[Services[F]] =
     user match
       case Some(u) if u.role.access === Access.Service =>
         Services.forUser(
           u,
-          mapping(u).some,
+          mapping.some,
           emailConfig,
           commitHash,
           calculator,
@@ -172,11 +172,10 @@ object PMain extends MainParams:
       s3FileService     = S3FileService.fromS3ConfigAndClient(c.aws, s3ClientOps, s3Presigner)
       schema           <- Resource.eval(OdbMapping.loadSchema[F])
       // Payload preparation runs a GraphQL query, so the services need a mapping.
-      mapping           = (u: User) => (s: Session[F]) =>
+      mapping           = (s: Session[F]) =>
                             OdbMapping.forObscalc(
                               Resource.pure(s),
                               SkunkMonitor.noopMonitor[F],
-                              u,
                               c.goaUsers,
                               gaiaClient,
                               itcClient,

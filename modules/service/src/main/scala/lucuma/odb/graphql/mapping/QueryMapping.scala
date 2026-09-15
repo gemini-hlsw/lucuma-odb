@@ -72,7 +72,7 @@ import lucuma.odb.logic.Generator.FutureLimit
 import lucuma.odb.service.Services
 import skunk.Transaction
 
-trait QueryMapping[F[_]] extends Predicates[F] {
+trait QueryMapping[F[_]] extends Predicates[F] with UserEnv {
   this: SkunkMapping[F] =>
 
   private val ObservationIdParam  = "observationId"
@@ -80,8 +80,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   private val FutureLimitParam    = "futureLimit"
 
   // Resources defined in the final cake.
-  def user: model.User
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
   def itcClient: ItcClient[F]
   def goaUsers: Set[User.Id]
 
@@ -152,6 +151,8 @@ trait QueryMapping[F[_]] extends Predicates[F] {
   import Services.Syntax.*
 
   val executionConfig: (Path, Env) => F[Result[Json]] = (_, env) =>
+    UserEnv.traverse(UserEnv.fromEnv(env)) {
+
     def checkAccess(pid: Program.Id)(using Services[F], Transaction[F]): ResultT[F, Unit] =
       ResultT:
         programUserService.userHasReadAccess(pid).map: ok =>
@@ -181,8 +182,11 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       (o, l) <- ResultT(gatherArgs)
       r      <- ResultT(generate(o, l))
     yield r).value
+    }
 
   private val goaDataDownloadAccess: (Path, Env) => F[Result[Json]] = (_, e) =>
+    UserEnv.traverse(UserEnv.fromEnv(e)) {
+
     val notAuthorized = OdbError.NotAuthorized(user.id, "Only the GOA user may access this field.".some).asFailure
     val goaUserCheck  = user match
       case StandardUser(id, r, rs, _) => notAuthorized.unlessA(goaUsers.contains(id) || ((r::rs).map(_.access).max >= Access.Staff))
@@ -222,6 +226,7 @@ trait QueryMapping[F[_]] extends Predicates[F] {
 
     services.useTransactionally:
       go.map(_.map(_.asJson).asJson).value
+    }
 
   // Elaborators below
 
@@ -236,27 +241,28 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild { child =>
-          (programPredicate(rPid, rProp, rProg, Predicates.asterismGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    WHERE.getOrElse(True),
-                    program,
-                    Predicates.asterismGroup.program.existence.includeDeleted(includeDeleted),
-                    Predicates.asterismGroup.program.isVisibleTo(user),
-                  ))
-                ),
-                oss = None,
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (programPredicate(rPid, rProp, rProg, Predicates.asterismGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      WHERE.getOrElse(True),
+                      program,
+                      Predicates.asterismGroup.program.existence.includeDeleted(includeDeleted),
+                      Predicates.asterismGroup.program.isVisibleTo(user),
+                    ))
+                  ),
+                  oss = None,
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
     }
 
   private lazy val CallForProposals: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -327,16 +333,17 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       DatasetIdBinding.Option("datasetId", rDid),
       DatasetReferenceBinding.Option("datasetReference", rRef)
     )) =>
-      Elab.transformChild { child =>
-        datasetPredicate(rDid, rRef, Predicates.dataset).map { dataset =>
-          Unique(
-            Filter(
-              And(dataset, Predicates.dataset.observation.program.isVisibleTo(user)),
-              child
+      withUser:
+        Elab.transformChild { child =>
+          datasetPredicate(rDid, rRef, Predicates.dataset).map { dataset =>
+            Unique(
+              Filter(
+                And(dataset, Predicates.dataset.observation.program.isVisibleTo(user)),
+                child
+              )
             )
-          )
+          }
         }
-      }
 
   private lazy val Datasets: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
     val WhereDatasetBinding = WhereDataset.binding(Path.from(DatasetType), allowCone = true)
@@ -346,26 +353,27 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         DatasetIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  OFFSET.map(Predicates.dataset.id.gtEql).getOrElse(True),
-                  Predicates.dataset.observation.program.isVisibleTo(user),
-                  WHERE.getOrElse(True)
-                ))),
-                oss = Some(List(
-                  OrderSelection[lucuma.core.model.sequence.Dataset.Id](DatasetType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(and(List(
+                    OFFSET.map(Predicates.dataset.id.gtEql).getOrElse(True),
+                    Predicates.dataset.observation.program.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.sequence.Dataset.Id](DatasetType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
     }
 
   private lazy val DatasetChronicleEntries: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -376,34 +384,35 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         LongBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
-        // The GOA user can perform this query.
-        val GoaPredicate: Predicate =
-          user match
-            case StandardUser(id, r, rs, _) => if goaUsers.contains(id) then Predicate.True else Predicate.False
-            case _                          => Predicate.False
+        withUser:
+          // The GOA user can perform this query.
+          val GoaPredicate: Predicate =
+            user match
+              case StandardUser(id, r, rs, _) => if goaUsers.contains(id) then Predicate.True else Predicate.False
+              case _                          => Predicate.False
 
-        Elab.transformChild: child =>
-          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  OFFSET.map(Predicates.datasetChronicleEntry.id.gtEql).getOrElse(True),
-                  Predicate.Or(
-                    GoaPredicate,
-                    Predicates.datasetChronicleEntry.observation.program.isVisibleTo(user)
-                  ),
-                  WHERE.getOrElse(True)
-                ))),
-                oss = Some(List(
-                  OrderSelection[Long](DatasetChronicleEntryType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+          Elab.transformChild: child =>
+            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(and(List(
+                    OFFSET.map(Predicates.datasetChronicleEntry.id.gtEql).getOrElse(True),
+                    Predicate.Or(
+                      GoaPredicate,
+                      Predicates.datasetChronicleEntry.observation.program.isVisibleTo(user)
+                    ),
+                    WHERE.getOrElse(True)
+                  ))),
+                  oss = Some(List(
+                    OrderSelection[Long](DatasetChronicleEntryType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
-          }
     }
 
   private lazy val ConstraintSetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -417,30 +426,31 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild { child =>
-          (programPredicate(rPid, rProp, rProg, Predicates.constraintSetGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    WHERE.getOrElse(True),
-                    program,
-                    Predicates.constraintSetGroup.observations.matches.existence.includeDeleted(includeDeleted),
-                    Predicates.constraintSetGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
-                    Predicates.constraintSetGroup.observations.matches.program.isVisibleTo(user),
-                  ))
-                ),
-                oss = Some(List(
-                  OrderSelection[String](ConstraintSetGroupType / "key")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (programPredicate(rPid, rProp, rProg, Predicates.constraintSetGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      WHERE.getOrElse(True),
+                      program,
+                      Predicates.constraintSetGroup.observations.matches.existence.includeDeleted(includeDeleted),
+                      Predicates.constraintSetGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
+                      Predicates.constraintSetGroup.observations.matches.program.isVisibleTo(user),
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[String](ConstraintSetGroupType / "key")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
       }
 
   private lazy val Events: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -451,26 +461,27 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         ExecutionEventIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  OFFSET.map(Predicates.executionEvent.id.gtEql).getOrElse(True),
-                  Predicates.executionEvent.observation.program.isVisibleTo(user),
-                  WHERE.getOrElse(True)
-                ))),
-                oss = Some(List(
-                  OrderSelection[lucuma.core.model.ExecutionEvent.Id](ExecutionEventType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, LIMIT) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(and(List(
+                    OFFSET.map(Predicates.executionEvent.id.gtEql).getOrElse(True),
+                    Predicates.executionEvent.observation.program.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.ExecutionEvent.Id](ExecutionEventType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
       }
   }
 
@@ -498,19 +509,20 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     case (QueryType, "group", List(
       GroupIdBinding("groupId", rGroup)
     )) =>
-      Elab.transformChild { child =>
-        rGroup.map { grp =>
-          Unique(
-            Filter(
-              And(
-                Predicates.group.id.eql(grp),
-                Predicates.group.program.isVisibleTo(user)
-              ),
-              child
+      withUser:
+        Elab.transformChild { child =>
+          rGroup.map { grp =>
+            Unique(
+              Filter(
+                And(
+                  Predicates.group.id.eql(grp),
+                  Predicates.group.program.isVisibleTo(user)
+                ),
+                child
+              )
             )
-          )
+          }
         }
-      }
 
   private def observationPredicate(
     rOid: Result[Option[model.Observation.Id]],
@@ -532,13 +544,14 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ObservationIdBinding.Option("observationId", rOid),
       ObservationReferenceBinding.Option("observationReference", rRef)
     )) =>
-      Elab.transformChild { child =>
-        observationPredicate(rOid, rRef, Predicates.observation).map { obs =>
-          Unique(
-            Filter(And(obs, Predicates.observation.program.isVisibleTo(user)), child)
-          )
+      withUser:
+        Elab.transformChild { child =>
+          observationPredicate(rOid, rRef, Predicates.observation).map { obs =>
+            Unique(
+              Filter(And(obs, Predicates.observation.program.isVisibleTo(user)), child)
+            )
+          }
         }
-      }
 
   private lazy val Observations: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     val WhereObservationBinding = WhereObservation.binding(Path.from(ObservationType), allowCone = true)
@@ -549,27 +562,28 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
-                  Predicates.observation.existence.includeDeleted(includeDeleted),
-                  Predicates.observation.program.isVisibleTo(user),
-                  WHERE.getOrElse(True)
-                ))),
-                oss = Some(List(
-                  OrderSelection[lucuma.core.model.Observation.Id](ObservationType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(and(List(
+                    OFFSET.map(Predicates.observation.id.gtEql).getOrElse(True),
+                    Predicates.observation.existence.includeDeleted(includeDeleted),
+                    Predicates.observation.program.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.Observation.Id](ObservationType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
       }
   }
 
@@ -581,24 +595,25 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         ConfigurationRequestIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT),
       )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, lim) =>
-            val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  OFFSET.fold[Predicate](True)(Predicates.configurationRequest.id.gtEql),
-                  WHERE.getOrElse(True),
-                  Predicates.configurationRequest.program.isVisibleTo(user),
-                ))),
-                oss = Some(List(OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id"))),
-                offset = None,
-                limit = Some(limit + 1),
-                q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap { (WHERE, OFFSET, lim) =>
+              val limit = lim.fold(ResultMapping.MaxLimit)(_.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(and(List(
+                    OFFSET.fold[Predicate](True)(Predicates.configurationRequest.id.gtEql),
+                    WHERE.getOrElse(True),
+                    Predicates.configurationRequest.program.isVisibleTo(user),
+                  ))),
+                  oss = Some(List(OrderSelection[ConfigurationRequest.Id](ConfigurationRequestType / "id"))),
+                  offset = None,
+                  limit = Some(limit + 1),
+                  q
+                )
+              }
             }
           }
-        }
     }
 
   private lazy val ObservingModeGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -612,23 +627,24 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild: child =>
-          (programPredicate(rPid, rProp, rProg, Predicates.observingModeGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap: (program, WHERE, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit): q =>
-              FilterOrderByOffsetLimit(
-                pred = and(List(
-                  WHERE.getOrElse(True),
-                  program,
-                  Predicates.observingModeGroup.observations.matches.existence.includeDeleted(includeDeleted),
-                  Predicates.observingModeGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
-                  Predicates.observingModeGroup.observations.matches.program.isVisibleTo(user),
-                )).some,
-                oss    = List(OrderSelection[String](ObservingModeGroupType / "key")).some,
-                offset = none,
-                limit  = (limit + 1).some, // Select one extra row here.
-                child  = q
-              )
+        withUser:
+          Elab.transformChild: child =>
+            (programPredicate(rPid, rProp, rProg, Predicates.observingModeGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap: (program, WHERE, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit): q =>
+                FilterOrderByOffsetLimit(
+                  pred = and(List(
+                    WHERE.getOrElse(True),
+                    program,
+                    Predicates.observingModeGroup.observations.matches.existence.includeDeleted(includeDeleted),
+                    Predicates.observingModeGroup.observations.matches.program.existence.includeDeleted(includeDeleted),
+                    Predicates.observingModeGroup.observations.matches.program.isVisibleTo(user),
+                  )).some,
+                  oss    = List(OrderSelection[String](ObservingModeGroupType / "key")).some,
+                  offset = none,
+                  limit  = (limit + 1).some, // Select one extra row here.
+                  child  = q
+                )
     }
 
   private def programPredicate(
@@ -654,13 +670,14 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       ProposalReferenceBinding.Option("proposalReference", rProp),
       ProgramReferenceBinding.Option("programReference", rProg)
     )) =>
-      Elab.transformChild { child =>
-        programPredicate(rPid, rProp, rProg, Predicates.program).map { program =>
-          Unique(
-            Filter(And(program, Predicates.program.isVisibleTo(user)), child)
-          )
+      withUser:
+        Elab.transformChild { child =>
+          programPredicate(rPid, rProp, rProg, Predicates.program).map { program =>
+            Unique(
+              Filter(And(program, Predicates.program.isVisibleTo(user)), child)
+            )
+          }
         }
-      }
 
   private lazy val Programs: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     val WhereProgramBinding = WhereProgram.binding(Path.from(ProgramType))
@@ -671,29 +688,30 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    OFFSET.map(Predicates.program.id.gtEql).getOrElse(True),
-                    Predicates.program.existence.includeDeleted(includeDeleted),
-                    Predicates.program.isVisibleTo(user),
-                    WHERE.getOrElse(True)
-                  ))
-                ),
-                oss = Some(List(
-                  OrderSelection[lucuma.core.model.Program.Id](ProgramType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      OFFSET.map(Predicates.program.id.gtEql).getOrElse(True),
+                      Predicates.program.existence.includeDeleted(includeDeleted),
+                      Predicates.program.isVisibleTo(user),
+                      WHERE.getOrElse(True)
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.Program.Id](ProgramType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
     }
   }
 
@@ -701,11 +719,12 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     case (QueryType, "programNote", List(
       ProgramNoteIdBinding("programNoteId", rNid)
     )) =>
-      Elab.transformChild: child =>
-        rNid.map: nid =>
-          Unique(
-            Filter(And(Predicates.programNote.id.eql(nid), Predicates.programNote.isVisibleTo(user)), child)
-          )
+      withUser:
+        Elab.transformChild: child =>
+          rNid.map: nid =>
+            Unique(
+              Filter(And(Predicates.programNote.id.eql(nid), Predicates.programNote.isVisibleTo(user)), child)
+            )
   }
 
   private lazy val ProgramNotes: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -717,26 +736,27 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild: child =>
-          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap: (WHERE, OFFSET, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit): q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    OFFSET.map(Predicates.programNote.id.gtEql).getOrElse(True),
-                    Predicates.programNote.existence.includeDeleted(includeDeleted),
-                    Predicates.programNote.isVisibleTo(user),
-                    WHERE.getOrElse(True)
-                  ))
-                ),
-                oss = Some(List(
-                  OrderSelection[lucuma.core.model.ProgramNote.Id](ProgramNoteType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild: child =>
+            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap: (WHERE, OFFSET, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit): q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      OFFSET.map(Predicates.programNote.id.gtEql).getOrElse(True),
+                      Predicates.programNote.existence.includeDeleted(includeDeleted),
+                      Predicates.programNote.isVisibleTo(user),
+                      WHERE.getOrElse(True)
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.ProgramNote.Id](ProgramNoteType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
     }
 
   private lazy val TooTrigger_ : PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -745,12 +765,13 @@ trait QueryMapping[F[_]] extends Predicates[F] {
       case (QueryType, "tooTrigger", List(
         TooTriggerIdBinding("tooTriggerId", rId)
       )) =>
-        Elab.transformChild: child =>
-          rId.map: tid =>
-            Unique(Filter(And(
-              Predicates.tooTrigger.id.eql(tid),
-              Predicates.tooTrigger.observation.program.isVisibleTo(user)
-            ), child))
+        withUser:
+          Elab.transformChild: child =>
+            rId.map: tid =>
+              Unique(Filter(And(
+                Predicates.tooTrigger.id.eql(tid),
+                Predicates.tooTrigger.observation.program.isVisibleTo(user)
+              ), child))
     }
 
   private lazy val TooTriggers: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -762,25 +783,26 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         TooTriggerIdBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
-        Elab.transformChild: child =>
-          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit): q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    OFFSET.map(Predicates.tooTrigger.id.gtEql).getOrElse(True),
-                    Predicates.tooTrigger.observation.program.isVisibleTo(user),
-                    WHERE.getOrElse(True)
-                  ))
-                ),
-                oss = Some(List(
-                  OrderSelection[TooTrigger.Id](TooTriggerType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1),
-                child = q
-              )
+        withUser:
+          Elab.transformChild: child =>
+            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit): q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      OFFSET.map(Predicates.tooTrigger.id.gtEql).getOrElse(True),
+                      Predicates.tooTrigger.observation.program.isVisibleTo(user),
+                      WHERE.getOrElse(True)
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[TooTrigger.Id](TooTriggerType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1),
+                  child = q
+                )
     }
 
   private lazy val TooTriggerChronicleEntries: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
@@ -791,23 +813,24 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         LongBinding.Option("OFFSET", rOFFSET),
         NonNegIntBinding.Option("LIMIT", rLIMIT)
       )) =>
-        Elab.transformChild: child =>
-          (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit): q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(and(List(
-                  OFFSET.map(Predicates.tooTriggerChronicleEntry.id.gtEql).getOrElse(True),
-                  Predicates.tooTriggerChronicleEntry.tooTrigger.observation.program.isVisibleTo(user),
-                  WHERE.getOrElse(True)
-                ))),
-                oss = Some(List(
-                  OrderSelection[Long](TooTriggerChronicleEntryType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1),
-                child = q
-              )
+        withUser:
+          Elab.transformChild: child =>
+            (rWHERE, rOFFSET, rLIMIT).parTupled.flatMap: (WHERE, OFFSET, LIMIT) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit): q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(and(List(
+                    OFFSET.map(Predicates.tooTriggerChronicleEntry.id.gtEql).getOrElse(True),
+                    Predicates.tooTriggerChronicleEntry.tooTrigger.observation.program.isVisibleTo(user),
+                    WHERE.getOrElse(True)
+                  ))),
+                  oss = Some(List(
+                    OrderSelection[Long](TooTriggerChronicleEntryType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1),
+                  child = q
+                )
     }
 
   private lazy val ProgramUsers: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
@@ -819,30 +842,31 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    OFFSET.map(Predicates.programUser.userId.gtEql).getOrElse(True),
-                    Predicates.programUser.program.existence.includeDeleted(includeDeleted),
-                    Predicates.programUser.program.isVisibleTo(user),
-                    WHERE.getOrElse(True)
-                  ))
-                ),
-                oss = Some(List(
-                  OrderSelection[Option[lucuma.core.model.User.Id]](ProgramUserType / "userId"),
-                  OrderSelection[lucuma.core.model.Program.Id](ProgramUserType / "programId")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      OFFSET.map(Predicates.programUser.userId.gtEql).getOrElse(True),
+                      Predicates.programUser.program.existence.includeDeleted(includeDeleted),
+                      Predicates.programUser.program.isVisibleTo(user),
+                      WHERE.getOrElse(True)
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[Option[lucuma.core.model.User.Id]](ProgramUserType / "userId"),
+                    OrderSelection[lucuma.core.model.Program.Id](ProgramUserType / "programId")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
     }
   }
 
@@ -889,19 +913,20 @@ trait QueryMapping[F[_]] extends Predicates[F] {
     case (QueryType, "target", List(
       TargetIdBinding("targetId", rTid),
     )) =>
-      Elab.transformChild { child =>
-        rTid.map { tid =>
-          Unique(
-            Filter(
-              and(List(
-                Predicates.target.id.eql(tid),
-                Predicates.target.program.isVisibleTo(user),
-              )),
-              child
+      withUser:
+        Elab.transformChild { child =>
+          rTid.map { tid =>
+            Unique(
+              Filter(
+                and(List(
+                  Predicates.target.id.eql(tid),
+                  Predicates.target.program.isVisibleTo(user),
+                )),
+                child
+              )
             )
-          )
+          }
         }
-      }
 
   private lazy val TargetGroup: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] = {
     val WhereObservationBinding = WhereObservation.binding(TargetGroupType / "observations" / "matches", allowCone = false)
@@ -914,29 +939,30 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild { child =>
-          (programPredicate(rPid, rProp, rProg, Predicates.targetGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    WHERE.getOrElse(True),
-                    program,
-                    Predicates.targetGroup.target.existence.includeDeleted(includeDeleted),
-                    Predicates.targetGroup.program.isVisibleTo(user),
-                  ))
-                ),
-                oss = Some(List(
-                  OrderSelection[lucuma.core.model.Target.Id](TargetGroupType / "key")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (programPredicate(rPid, rProp, rProg, Predicates.targetGroup.program), rWHERE, rLIMIT, rIncludeDeleted).parTupled.flatMap { (program, WHERE, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      WHERE.getOrElse(True),
+                      program,
+                      Predicates.targetGroup.target.existence.includeDeleted(includeDeleted),
+                      Predicates.targetGroup.program.isVisibleTo(user),
+                    ))
+                  ),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.Target.Id](TargetGroupType / "key")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
     }
   }
 
@@ -949,29 +975,30 @@ trait QueryMapping[F[_]] extends Predicates[F] {
         NonNegIntBinding.Option("LIMIT", rLIMIT),
         BooleanBinding("includeDeleted", rIncludeDeleted)
       )) =>
-        Elab.transformChild { child =>
-          (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
-            val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-            ResultMapping.selectResult(child, limit) { q =>
-              FilterOrderByOffsetLimit(
-                pred = Some(
-                  and(List(
-                    OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
-                    Predicates.target.existence.includeDeleted(includeDeleted),
-                    Predicates.target.program.isVisibleTo(user),
-                    WHERE.getOrElse(True)
-                  )
-                )),
-                oss = Some(List(
-                  OrderSelection[lucuma.core.model.Target.Id](TargetType / "id")
-                )),
-                offset = None,
-                limit = Some(limit + 1), // Select one extra row here.
-                child = q
-              )
+        withUser:
+          Elab.transformChild { child =>
+            (rWHERE, rOFFSET, rLIMIT, rIncludeDeleted).parTupled.flatMap { (WHERE, OFFSET, LIMIT, includeDeleted) =>
+              val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+              ResultMapping.selectResult(child, limit) { q =>
+                FilterOrderByOffsetLimit(
+                  pred = Some(
+                    and(List(
+                      OFFSET.map(Predicates.target.id.gtEql).getOrElse(True),
+                      Predicates.target.existence.includeDeleted(includeDeleted),
+                      Predicates.target.program.isVisibleTo(user),
+                      WHERE.getOrElse(True)
+                    )
+                  )),
+                  oss = Some(List(
+                    OrderSelection[lucuma.core.model.Target.Id](TargetType / "id")
+                  )),
+                  offset = None,
+                  limit = Some(limit + 1), // Select one extra row here.
+                  child = q
+                )
+              }
             }
           }
-        }
     }
   }
 

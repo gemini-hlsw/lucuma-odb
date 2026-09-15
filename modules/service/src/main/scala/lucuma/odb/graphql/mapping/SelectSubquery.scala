@@ -14,13 +14,10 @@ import grackle.Query.OrderSelection
 import grackle.QueryCompiler.Elab
 import grackle.Result
 import grackle.TypeRef
-import lucuma.core.model.User
 import lucuma.odb.graphql.predicate.LeafPredicates
 import lucuma.odb.graphql.predicate.ProgramPredicates
 
 trait SelectSubquery {
-
-  def user: User
 
   def selectWithOffsetAndLimit[A: Order](
     rOFFSET:         Result[Option[A]],
@@ -30,22 +27,23 @@ trait SelectSubquery {
     offsetPredicate: LeafPredicates[A],
     progPredicates:  ProgramPredicates
   ): Elab[Unit] =
-    Elab.transformChild { child =>
-      (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
-        val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
-        ResultMapping.selectResult(child, limit) { q =>
-          FilterOrderByOffsetLimit(
-            pred = and(List(
-              OFFSET.map(offsetPredicate.gtEql).getOrElse(True),
-              progPredicates.isVisibleTo(user)
-            )).some,
-            oss    = List(OrderSelection[A](typeRef / offsetField)).some,
-            offset = None,
-            limit  = (limit + 1).some,
-            child  = q
-          )
+    UserEnv.elab: user =>
+      Elab.transformChild { child =>
+        (rOFFSET, rLIMIT).parTupled.flatMap { (OFFSET, LIMIT) =>
+          val limit = LIMIT.foldLeft(ResultMapping.MaxLimit)(_ min _.value)
+          ResultMapping.selectResult(child, limit) { q =>
+            FilterOrderByOffsetLimit(
+              pred = and(List(
+                OFFSET.map(offsetPredicate.gtEql).getOrElse(True),
+                progPredicates.isVisibleTo(user)
+              )).some,
+              oss    = List(OrderSelection[A](typeRef / offsetField)).some,
+              offset = None,
+              limit  = (limit + 1).some,
+              child  = q
+            )
+          }
         }
       }
-    }
 
 }

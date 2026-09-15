@@ -4,7 +4,6 @@
 package lucuma.itc.tests
 
 import cats.effect.IO
-import cats.syntax.option.*
 import fs2.io.file.Files
 import fs2.io.file.Path
 import lucuma.core.model.Attachment
@@ -68,7 +67,7 @@ def routesForWsb(
     cache  <- RedisEffectfulCache[IO](new NoOpRedis[IO, Array[Byte], Array[Byte]]())
     itcMap <- ItcMapping[IO](cache, itc, testConfig)
   yield (wsb: WebSocketBuilder2[IO]) =>
-    Routes.forService(_ => IO.pure(GraphQLService(itcMap).some), wsb)
+    Routes.forOpenService(GraphQLService.unvalidated(itcMap), wsb)
 
 def routes(itc: Itc[IO])(using Logger[IO], Tracer[IO]): IO[HttpRoutes[IO]] =
   for

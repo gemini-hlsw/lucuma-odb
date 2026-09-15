@@ -10,14 +10,12 @@ import cats.effect.*
 import cats.effect.std.Console
 import cats.effect.std.SecureRandom
 import cats.effect.std.UUIDGen
-import cats.effect.syntax.all.*
 import cats.implicits.*
 import com.comcast.ip4s.Host
 import com.comcast.ip4s.Port
 import com.monovore.decline.*
 import com.monovore.decline.effect.CommandIOApp
 import fs2.io.net.Network
-import grackle.skunk.SkunkMonitor
 import lucuma.common.middleware.LoggingMiddleware
 import lucuma.core.model.StandardRole
 import lucuma.core.model.StandardUser
@@ -25,7 +23,6 @@ import lucuma.core.util.Gid
 import lucuma.sso.service.config.*
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
-import lucuma.sso.service.graphql.mapping.SsoMapping
 import lucuma.sso.service.orcid.OrcidService
 import natchez.EntryPoint
 import natchez.Trace
@@ -211,12 +208,11 @@ object FMain extends AnsiColor {
   def routesResource[F[_]: Async: Trace: Tracer: Logger: Network: Console](config: Config): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     for {
       pool        <- databasePoolResource[F](config.database)
-      schema      <- SsoMapping.loadSchema[F].toResource
-      channels    <- SsoMapping.Channels(pool)
-      orcid       <- orcidServiceResource(config.orcid, config.environment)
+      orcid      <- orcidServiceResource(config.orcid, config.environment)
       httpClient  <- EmberClientBuilder.default[F].build
       dbPool       = pool.map(Database.fromSession(_))
       serviceUser <- Resource.eval(dbPool.use(_.getSsoServiceUser))
+      service     <- GraphQLRoutes.service(pool)
     } yield wsb => ServerMiddleware[F](config).apply {
       val localClient = LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su }
       val odb = OdbClient[F](httpClient, config.ssoJwtWriter, config.odbRootUri, serviceUser)
@@ -230,7 +226,7 @@ object FMain extends AnsiColor {
         cookies   = CookieService[F](config.cookieDomain, config.scheme === Scheme.https),
         cookieDomain = config.cookieDomain,
       ) <+>
-      GraphQLRoutes(localClient, pool, channels, SkunkMonitor.noopMonitor[F], wsb, schema)
+      GraphQLRoutes(localClient, service, wsb)
     }
 
   /** A startup action that prints a banner. */

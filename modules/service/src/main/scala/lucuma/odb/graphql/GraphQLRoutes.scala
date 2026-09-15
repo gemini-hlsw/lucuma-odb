@@ -4,11 +4,9 @@
 package lucuma.odb.graphql
 
 import cats.Parallel
-import cats.data.OptionT
 import cats.effect.*
 import cats.effect.std.SecureRandom
 import cats.implicits.*
-import cats.kernel.Order
 import fs2.Stream
 import grackle.Mapping
 import grackle.Operation
@@ -18,35 +16,32 @@ import grackle.skunk.SkunkMonitor
 import io.circe.Json
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.goa.GoaClient
-import lucuma.core.model.ServiceUser
+import lucuma.common.middleware.UserContext
 import lucuma.core.model.User
-import lucuma.core.util.Gid
 import lucuma.graphql.routes.GraphQLService
+import lucuma.graphql.routes.RequestContext
 import lucuma.graphql.routes.Routes as LucumaGraphQLRoutes
+import lucuma.graphql.routes.RoutesConfig
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
 import lucuma.odb.graphql.mapping.ConeCandidatesMapping
+import lucuma.odb.graphql.mapping.UserEnv
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
-import lucuma.odb.otel.given
 import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.service.Services
 import lucuma.odb.service.UserService
-import lucuma.odb.util.Cache
 import lucuma.sso.client.SsoClient
-import org.http4s.Header
 import org.http4s.HttpRoutes
 import org.http4s.MediaType
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
-import org.http4s.headers.Authorization
 import org.http4s.headers.`Content-Type`
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.syntax.*
 import org.typelevel.otel4s.Attribute
-import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.SpanFinalizer
 import org.typelevel.otel4s.trace.SpanKind
 import org.typelevel.otel4s.trace.StatusCode
@@ -60,9 +55,6 @@ import scala.concurrent.duration.*
 
 object GraphQLRoutes {
 
-  given Order[Authorization] =
-    Order.by(Header[Authorization].value)
-
   /** Finalization strategy for GraphQL *subscription* spans: a client disconnect (cancellation) is
     * a normal lifecycle event, not an error.
     */
@@ -72,8 +64,9 @@ object GraphQLRoutes {
   }
 
   /**
-   * Construct a source of `HttpRoutes` tailored to the requesting user. Routes will be cached
-   * based on the `Authorization` header and discarded when `ttl` expires.
+   * Construct a source of `HttpRoutes`. One `GraphQLService` serves every request; the user of a
+   * request reaches the mapping through the `Env` that the authenticator supplies, and the
+   * authenticator caches its results for `ttl`.
    */
   def apply[F[_]: {Async as F, Parallel, Tracer as T, Logger as L, LoggerFactory, SecureRandom}](
     gaiaClient:           GaiaClient[F],
@@ -90,20 +83,21 @@ object GraphQLRoutes {
     horizonsClient:       HorizonsClient[F],
     goaClient:            GoaClient[F],
     emailConfig:          Config.Email,
-    introspectionService: GraphQLService[F],
     schema:               Schema,
     validateMapping:      Boolean
   ): Resource[F, WebSocketBuilder2[F] => HttpRoutes[F]] =
     OdbMapping.Topics(pool).flatMap { topics =>
 
-      def mapping(user: User): Mapping[F] & ConeCandidatesMapping[F] =
-        OdbMapping(pool, monitor, user, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema, shouldValidate = false)
+      // One mapping for the whole server. Each request supplies its user through the env.
+      val odbMapping: Mapping[F] & ConeCandidatesMapping[F] =
+        OdbMapping(pool, monitor, topics, gaiaClient, itcClient, commitHash, goaUsers, ptc, httpClient, horizonsClient, goaClient, emailConfig, schema, shouldValidate = false)
 
-      // The type mappings do not depend on the user, so validate them once here rather than on
-      // every user's first query.
+      // Validate here, not in `GraphQLService.apply`: that validates on the calling thread, and the
+      // ODB mapping can overflow the default thread stack. `OdbMapping.validate` uses a thread with
+      // an 8 MB stack. When a Grackle release fixes the stack overflow, use `GraphQLService.apply`.
       val validateOnce: Resource[F, Unit] =
         Resource.eval:
-          OdbMapping.validate(mapping(ServiceUser(Gid[User.Id].minBound, "mapping-validation"))).whenA(validateMapping)
+          OdbMapping.validate(odbMapping).whenA(validateMapping)
 
       // Sometimes we get invalid cursors on startup; this works around the error by doing the thing again.
       extension [A](fa: F[A]) def retryOnInvalidCursorName: F[A] =
@@ -112,112 +106,104 @@ object GraphQLRoutes {
             warn"Invalid cursor; retrying (once)." >> fa
         }
 
-      // Log a message with the user
-      def info(user: User, message: String): F[Unit] =
-        info"${user.id}/${user.displayName}: $message"
+      // Log a message with the user of the request.
+      def label(u: User): String =
+        s"${u.id}/${u.displayName}"
 
-      def error(user: User, message: String, t: Throwable): F[Unit] =
-        L.error(t)(s"${user.id}/${user.displayName}: $message")
+      def describe(ctx: RequestContext): String =
+        UserEnv.fromEnv(ctx.env).toOption.fold("<anonymous>")(label)
 
-      def debug(user: User, message: String): F[Unit] =
-        Logger[F].debug(s"${user.id}/${user.displayName}: $message")
+      def error(ctx: RequestContext, message: String, t: Throwable): F[Unit] =
+        L.error(t)(s"${describe(ctx)}: $message")
 
-      validateOnce *> Cache.timed[F, Authorization, Option[GraphQLService[F]]](ttl).map { cache => wsb =>
-        LucumaGraphQLRoutes.forService[F](
-          {
-            case None    => introspectionService.some.pure[F] // only allow introspection
-            case Some(a) =>
-              cache.get(a).flatMap {
-                case Some(opt) =>
-                  debug"Cache hit for $a".as(opt) // it was in the cache
-                case None    =>           // It was not in the cache
-                  debug"Cache miss for $a" *>
-                  T.span("newServiceInstance").surround:
-                    {
-                      for {
-                        user <- OptionT(ssoClient.get(a))
-                        props = Attributes.from(user)
+      def debug(ctx: RequestContext, message: String): F[Unit] =
+        L.debug(s"${describe(ctx)}: $message")
 
-                        // If the user has never hit the ODB using http then there will be no user
-                        // entry in the database. So go ahead and [re]canonicalize here to be sure.
-                        _    <- OptionT.liftF(Services.asSuperUser(userSvc.canonicalizeUser(user).retryOnInvalidCursorName))
+      // Unvalidated, because `validateOnce` validates the mapping with a larger thread stack.
+      val service: GraphQLService[F] =
+        new GraphQLService[F](odbMapping) {
 
-                        _    <- OptionT.liftF(info(user, s"New service instance."))
-                        map   = mapping(user)
-                        svc   = new GraphQLService(map, props.toList*) {
-                                  override def query(
-                                    request:       Operation,
-                                    document:      String,
-                                    operationName: Option[String]
-                                  ): F[Result[Json]] =
+          override def query(
+            ctx:           RequestContext,
+            request:       Operation,
+            document:      String,
+            operationName: Option[String]
+          ): F[Result[Json]] =
 
-                                    def runQuery(req: Operation): F[Result[Json]] =
-                                      super.query(req, document, operationName).retryOnInvalidCursorName
+            def runQuery(req: Operation): F[Result[Json]] =
+              super.query(ctx, req, document, operationName).retryOnInvalidCursorName
 
-                                    // SC-9240: elaboration turns a `targetCoordinates` cone into a
-                                    // placeholder predicate, because the candidate lookup it needs
-                                    // is an F effect. Resolve those to `id IN (...)` here, where we
-                                    // are in F, so the whole WHERE pushes down to one SQL statement.
-                                    // Queries without a cone are returned untouched. The lookup
-                                    // streams through the same pooled sessions as the query itself,
-                                    // so it gets the same invalid-cursor retry.
-                                    def resolveAndRun: F[Result[Json]] =
-                                      ConeFilter.resolve(request.query)(map.configurationRequestConeCandidates, map.observationConeCandidates).retryOnInvalidCursorName.flatMap:
-                                        case Result.Success(q)       => runQuery(request.copy(query = q))
-                                        case Result.Warning(ps, q)   => runQuery(request.copy(query = q)).map(r => Result.Warning(ps, ()).flatMap(_ => r))
-                                        case f: Result.Failure       => F.pure(f)
-                                        case e: Result.InternalError => F.pure(e)
+            // SC-9240: elaboration turns a `targetCoordinates` cone into a
+            // placeholder predicate, because the candidate lookup it needs
+            // is an F effect. Resolve those to `id IN (...)` here, where we
+            // are in F, so the whole WHERE pushes down to one SQL statement.
+            // Queries without a cone are returned untouched. The lookup
+            // streams through the same pooled sessions as the query itself,
+            // so it gets the same invalid-cursor retry.
+            def resolveAndRun: F[Result[Json]] =
+              UserEnv.traverse(UserEnv.fromEnv(ctx.env)):
+                ConeFilter.resolve(request.query)(odbMapping.configurationRequestConeCandidates(_), odbMapping.observationConeCandidates(_)).retryOnInvalidCursorName.flatMap:
+                  case Result.Success(q)       => runQuery(request.copy(query = q))
+                  case Result.Warning(ps, q)   => runQuery(request.copy(query = q)).map(r => Result.Warning(ps, ()).flatMap(_ => r))
+                  case f: Result.Failure       => F.pure(f)
+                  case e: Result.InternalError => F.pure(e)
 
-                                    T.spanBuilder("graphql-query")
-                                      .withSpanKind(SpanKind.Server)
-                                      .build
-                                      .use: span =>
-                                        F.timed(
-                                          resolveAndRun
-                                            .handleError(Result.InternalError.apply)
-                                            .flatTap {
-                                              case Result.InternalError(t) => error(user, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
-                                              case _                       => debug(user, s"Query (success).")
-                                            }
-                                        ).flatMap: (elapsed, result) =>
-                                          val slow = elapsed > OdbMapping.slowQueryThreshold
-                                          val markSlow =
-                                            span.addAttribute(Attribute("graphql.slow_query", true)).whenA(slow)
-                                          val dumpGql: F[Unit] =
-                                            OdbMapping.dumpDir.filter(_ => slow).map: dir =>
-                                              F.blocking:
-                                                val hash = Integer.toHexString(document.hashCode)
-                                                val path = NIOPath.of(dir, s"odb-query-$hash.gql")
-                                                if !Files.exists(path) then {Files.writeString(path, document);()}
-                                            .getOrElse(F.unit)
-                                          markSlow *> dumpGql.as(result)
+            T.spanBuilder("graphql-query")
+              .withSpanKind(SpanKind.Server)
+              .build
+              .use: span =>
+                F.timed(
+                  resolveAndRun
+                    .handleError(Result.InternalError.apply)
+                    .flatTap {
+                      case Result.InternalError(t) => error(ctx, s"Internal error: ${t.getClass.getSimpleName}: ${t.getMessage}", t)
+                      case _                       => debug(ctx, s"Query (success).")
+                    }
+                ).flatMap: (elapsed, result) =>
+                  val slow = elapsed > OdbMapping.slowQueryThreshold
+                  val markSlow =
+                    span.addAttribute(Attribute("graphql.slow_query", true)).whenA(slow)
+                  val dumpGql: F[Unit] =
+                    OdbMapping.dumpDir.filter(_ => slow).map: dir =>
+                      F.blocking:
+                        val hash = Integer.toHexString(document.hashCode)
+                        val path = NIOPath.of(dir, s"odb-query-$hash.gql")
+                        if !Files.exists(path) then {Files.writeString(path, document);()}
+                    .getOrElse(F.unit)
+                  markSlow *> dumpGql.as(result)
 
-                                  override def subscribe(
-                                    request:       Operation,
-                                    document:      String,
-                                    operationName: Option[String]
-                                  ): Stream[F, Result[Json]] =
-                                    val spanResource =
-                                      T.spanBuilder("graphql-subscription")
-                                        .withSpanKind(SpanKind.Server)
-                                        .modifyState(_.withFinalizationStrategy(subscriptionFinalizer))
-                                        .build
-                                        .resource
-                                    Stream.resource(spanResource).flatMap: res =>
-                                      super.subscribe(request, document, operationName)
-                                        // use `res.trace` to make it the current context for each inner effect
-                                        .translate(res.trace)
-                                }
-                      } yield svc
-                    } .widen[GraphQLService[F]]
-                      .value
-                      .flatTap(os => cache.put(a, os))
-              }
-          },
-          wsb,
-          "odb"
+          override def subscribe(
+            ctx:           RequestContext,
+            request:       Operation,
+            document:      String,
+            operationName: Option[String]
+          ): Stream[F, Result[Json]] =
+            val spanResource =
+              T.spanBuilder("graphql-subscription")
+                .withSpanKind(SpanKind.Server)
+                .modifyState(_.withFinalizationStrategy(subscriptionFinalizer))
+                .build
+                .resource
+            Stream.resource(spanResource).flatMap: res =>
+              super.subscribe(ctx, request, document, operationName)
+                // use `res.trace` to make it the current context for each inner effect
+                .translate(res.trace)
+        }
+
+      // Resolves the user of a request. If the user has never hit the ODB using http then there
+      // will be no user entry in the database, so go ahead and [re]canonicalize here to be sure.
+      val authenticator =
+        UserContext.authenticator(
+          ssoClient,
+          u => Services.asSuperUser(userSvc.canonicalizeUser(u).retryOnInvalidCursorName) *> info"${label(u)}: Authenticated."
         )
-      }
+
+      for {
+        _    <- validateOnce
+        auth <- Resource.eval(authenticator.cached(ttl))
+      } yield wsb =>
+        LucumaGraphQLRoutes.forService[F](service, auth, wsb, RoutesConfig(graphQLPath = "odb"))
+
     }
 
   // The metadata service is gone and new versions of explore don't need it, however

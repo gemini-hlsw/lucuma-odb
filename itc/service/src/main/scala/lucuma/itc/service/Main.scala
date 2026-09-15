@@ -19,6 +19,7 @@ import fs2.compression.Compression
 import fs2.io.net.Network
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes
+import lucuma.graphql.routes.RoutesConfig
 import lucuma.itc.cache.BinaryEffectfulCache
 import lucuma.itc.cache.NoOpBinaryCache
 import lucuma.itc.cache.RedisEffectfulCache
@@ -172,6 +173,7 @@ object Main extends IOApp with ItcCacheOrRemote {
       customSedResolver          <- CustomSedOdbAttachmentResolver[F](cfg.odbBaseUrl, cfg.odbServiceToken)
       given CustomSed.Resolver[F] = CustomSedCachedResolver(customSedResolver, cache, CustomSedTTL)
       mapping                    <- Resource.eval(ItcMapping[F](cache, itc, cfg))
+      service                    <- Resource.eval(GraphQLService[F](mapping))
       otelMiddleware             <- Resource.eval(OtelServerMiddleware.builder[F](spanDataProvider).build)
       metricsOps                 <- Resource.eval(OtelMetrics.serverMetricsOps[F]())
     yield wsb =>
@@ -180,7 +182,7 @@ object Main extends IOApp with ItcCacheOrRemote {
           corsPolicy:
             cacheMiddleware:
               Metrics[F](metricsOps):
-                Routes.forService(_ => GraphQLService[F](mapping).some.pure[F], wsb, "itc")
+                Routes.forOpenService(service, wsb, RoutesConfig(graphQLPath = "itc"))
 
   // Custom class loader to give priority to the jars in the urls over the parent classloader
   class ReverseClassLoader(urls: Array[URL], parent: ClassLoader)

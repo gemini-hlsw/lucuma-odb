@@ -30,7 +30,6 @@ import eu.timepit.refined.types.numeric.PosInt
 import fs2.Stream
 import fs2.io.net.tls.TLSContext
 import fs2.text.utf8
-import grackle.Env
 import grackle.Mapping
 import grackle.Result
 import grackle.Result.Failure
@@ -51,6 +50,7 @@ import lucuma.catalog.goa.GoaClientMock
 import lucuma.catalog.simbad.SEDDataLoader
 import lucuma.catalog.telluric.TelluricTargetsClient
 import lucuma.catalog.votable.CatalogAdapter
+import lucuma.common.middleware.UserContext
 import lucuma.core.data.EmailAddress
 import lucuma.core.data.Zipper
 import lucuma.core.enums.Band
@@ -500,14 +500,13 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     for {
       db  <- FMain.databasePoolResource[IO](databaseConfig)
       mon  = SkunkMonitor.noopMonitor[IO]
-      usr  = TestUsers.Standard.pi(11, 110)
       top <- OdbMapping.Topics(db)
       itc  = itcClient
       enm <- db.evalMap(Enums.load)
       ptc <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
       goa <- Resource.eval(goaClient)
       schema <- Resource.eval(OdbMapping.loadSchema[IO])
-      map  = OdbMapping(db, mon, usr, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = false)
+      map  = OdbMapping(db, mon, top, gaiaClient, itc, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = false)
     } yield map
 
   /**
@@ -521,6 +520,11 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
     import Tracer.Implicits.noop
     given TracerProvider[IO] = TracerProvider.noop
     given MeterProvider[IO]  = MeterProvider.noop
+    given User               = user
+
+    // The mapping reads the user of the request from the env, as the routes supply it.
+    val env = UserContext.env(user)
+
     val res =
       for {
         db     <- FMain.databasePoolResource[IO](databaseConfig)
@@ -530,7 +534,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
         ptc    <- db.evalMap(TimeEstimateCalculatorImplementation.fromSession(_, enm))
         goa    <- Resource.eval(goaClient)
         schema <- Resource.eval(OdbMapping.loadSchema[IO])
-        map     = OdbMapping(db, mon, user, top, gaiaClient, itcClient, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = false)
+        map     = OdbMapping(db, mon, top, gaiaClient, itcClient, CommitHash.Zero, goaUsers, ptc, httpClient, horizonsClient, goa, emailConfig, schema, shouldValidate = false)
       } yield (map, mon)
 
     def orRaise[A](r: Result[A]): IO[A] =
@@ -542,10 +546,10 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
 
     res.use: (map, mon) =>
       for {
-        op   <- orRaise(map.compiler.compile(document, none, variables.map(_.toJson), reportUnused = false))
-        qry  <- ConeFilter.resolve(op.query)(map.configurationRequestConeCandidates, map.observationConeCandidates).flatMap(orRaise)
+        op   <- orRaise(map.compiler.compile(document, none, variables.map(_.toJson), reportUnused = false, env = env))
+        qry  <- ConeFilter.resolve(op.query)(map.configurationRequestConeCandidates(_), map.observationConeCandidates(_)).flatMap(orRaise)
         _    <- mon.take
-        json <- map.interpreter.run(qry, op.rootTpe, Env.empty).evalMap(map.mkResponse).compile.lastOrError
+        json <- map.interpreter.run(qry, op.rootTpe, env).evalMap(map.mkResponse).compile.lastOrError
         sts  <- mon.take
       } yield (json, sts)
 
@@ -938,7 +942,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
-        u,
         goaUsers,
         gaiaClient,
         itcClient,
@@ -975,7 +978,6 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       val mapping = (s: Session[IO]) => OdbMapping.forObscalc(
         Resource.pure(s),
         SkunkMonitor.noopMonitor[IO],
-        u,
         goaUsers,
         gaiaClient,
         itcClient,

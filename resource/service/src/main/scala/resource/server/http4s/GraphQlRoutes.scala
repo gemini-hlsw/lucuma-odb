@@ -3,14 +3,10 @@
 
 package resource.server.http4s
 
-import _root_.skunk.Session
 import cats.ApplicativeThrow
 import cats.effect.*
-import cats.syntax.all.*
 import grackle.*
-import grackle.skunk.SkunkMonitor
-import lucuma.common.middleware.IntrospectionMapping
-import lucuma.common.middleware.UserAttributes.given
+import lucuma.common.middleware.UserContext
 import lucuma.core.model.User
 import lucuma.graphql.routes.GraphQLService
 import lucuma.graphql.routes.Routes
@@ -21,9 +17,7 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.server.websocket.WebSocketBuilder2
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.typelevel.otel4s.Attributes
 import org.typelevel.otel4s.trace.Tracer
-import resource.server.graphql.ResourceMapping
 
 class GraphQlRoutes[F[_]: {Async, Tracer}](
 ) extends Http4sDsl[F] {
@@ -31,29 +25,14 @@ class GraphQlRoutes[F[_]: {Async, Tracer}](
   private given Logger[F] = Slf4jLogger.getLogger[F]
 
   def service(
-    wsb:       WebSocketBuilder2[F],
-    pool:      Resource[F, Session[F]],
-    monitor:   SkunkMonitor[F],
-    schema:    Schema,
-    ssoClient: SsoClient[F, User]
+    wsb:            WebSocketBuilder2[F],
+    graphQLService: GraphQLService[F],
+    ssoClient:      SsoClient[F, User]
   ): HttpRoutes[F] =
-    val introspectionService = GraphQLService[F](IntrospectionMapping(schema)).some
-    Routes.forService(
-      authorization =>
-        authorization
-          .flatTraverse(ssoClient.get)
-          .map:
-            case None =>
-              introspectionService // no auth: only schema introspection is allowed
-            case Some(user) =>
-              GraphQLService[F](
-                ResourceMapping(pool, monitor)(schema),
-                Attributes.from(user).toList*
-              ).some,
-      wsb
-    )
+    Routes.forService(graphQLService, UserContext.authenticator(ssoClient), wsb)
 }
 
 object GraphQlRoutes:
+
   def loadSchema[F[_]: ApplicativeThrow: Logger]: F[Schema] =
     SchemaStitcher.load("graphql/resource.graphql")

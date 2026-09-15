@@ -13,9 +13,9 @@ import fs2.*
 import fs2.compression.Compression
 import fs2.io.file.Files
 import fs2.io.net.*
-import grackle.Schema
 import grackle.skunk.SkunkMonitor
 import lucuma.core.model.User
+import lucuma.graphql.routes.GraphQLService
 import lucuma.otel.OtelSetup
 import lucuma.sso.client.SsoClient
 import natchez.Trace
@@ -33,6 +33,7 @@ import org.typelevel.otel4s.metrics.MeterProvider
 import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import resource.model.config.*
+import resource.server.graphql.ResourceMapping
 import skunk.*
 
 object ResourceMain extends IOApp.Simple {
@@ -82,13 +83,11 @@ object ResourceMain extends IOApp.Simple {
       .map(_.map(_.user))
 
   def routes[F[_]: {Async, Files, Tracer}](
-    pool:              Resource[F, Session[F]],
-    monitor:           SkunkMonitor[F],
-    schema:            Schema,
-    ssoClient:         SsoClient[F, User]
+    graphQLService:         GraphQLService[F],
+    ssoClient:              SsoClient[F, User]
   )(wsb: WebSocketBuilder2[F]): HttpRoutes[F] = Router[F](
     "/"         -> new StaticRoutes().service,
-    "/resource" -> new GraphQlRoutes().service(wsb, pool, monitor, schema, ssoClient)
+    "/resource" -> new GraphQlRoutes().service(wsb, graphQLService, ssoClient)
   )
 
   def routesResource[
@@ -103,7 +102,9 @@ object ResourceMain extends IOApp.Simple {
     for
       pool       <- databasePool(databaseConfig)
       schema     <- GraphQlRoutes.loadSchema[F].toResource
-      r           = routes(pool, SkunkMonitor.noopMonitor[F], schema, ssoClient)
+      service    <-
+        GraphQLService[F](ResourceMapping(pool, SkunkMonitor.noopMonitor[F])(schema)).toResource
+      r           = routes(service, ssoClient)
       middleware <- ServerMiddleware(corsOverHttps, domain, ssoClient).toResource
     yield wsb => middleware(r(wsb))
 

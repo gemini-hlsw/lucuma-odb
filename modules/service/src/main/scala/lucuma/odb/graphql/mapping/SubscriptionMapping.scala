@@ -41,10 +41,9 @@ import org.tpolecat.typename.TypeName
 
 import scala.reflect.ClassTag
 
-trait SubscriptionMapping[F[_]] extends Predicates[F] {
+trait SubscriptionMapping[F[_]] extends Predicates[F] with UserEnv {
 
   def topics: Topics[F]
-  def user: User
 
   lazy val SubscriptionType = schema.ref("Subscription")
 
@@ -73,13 +72,17 @@ trait SubscriptionMapping[F[_]] extends Predicates[F] {
     def FieldMapping: RootStream
   }
   private object SubscriptionField {
-    def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: (I, Query) => Stream[F, Result[Query]]) =
+    def apply[I: ClassTag: TypeName](fieldName: String, inputBinding: Matcher[I])(f: User ?=> (I, Query) => Stream[F, Result[Query]]) =
       new SubscriptionField {
         val FieldMapping =
-          RootStream.computeChild(fieldName) { (child, _, _) =>
+          RootStream.computeChild(fieldName) { (child, _, rootEnv) =>
             child match
               case Environment(env, child2) =>
-                Nested(env.getR[I]("input").flatTraverse(f(_, child2)))
+                Nested(
+                  (UserEnv.fromEnv(rootEnv), env.getR[I]("input"))
+                    .parTupled
+                    .flatTraverse { case (usr, i) => f(using usr)(i, child2) }
+                )
                   .map(child3 => Environment(env, child3))
                   .value
               case _ =>

@@ -12,7 +12,6 @@ import com.dimafeng.testcontainers.GenericContainer
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.dimafeng.testcontainers.munit.TestContainerForAll
 import fs2.io.net.Network
-import grackle.skunk.SkunkMonitor
 import lucuma.core.model.GuestUser
 import lucuma.core.model.ServiceUser
 import lucuma.core.model.StandardUser
@@ -24,7 +23,6 @@ import lucuma.sso.service.config.Environment
 import lucuma.sso.service.config.OrcidConfig
 import lucuma.sso.service.database.Database
 import lucuma.sso.service.graphql.GraphQLRoutes
-import lucuma.sso.service.graphql.mapping.SsoMapping
 import lucuma.sso.service.orcid.OrcidService
 import munit.Suite
 import munit.diff.console.AnsiColors
@@ -139,10 +137,9 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
       for {
         sim     <- Resource.eval(OrcidSimulator[F])
         pool    <- FMain.databasePoolResource[F](config.database)
-        chans   <- SsoMapping.Channels(pool)
         dbPool   = pool.map(Database.fromSession(_))
         svcUser <- dbPool.evalMap(_.getSsoServiceUser)
-        schema  <- Resource.eval(SsoMapping.loadSchema[F])
+        service <- GraphQLRoutes.service(pool)
       } yield (dbPool, sim, Routes[F](
           dbPool    = dbPool,
           orcid     = OrcidService(OrcidConfig.orcidHost(Environment.Production), "unused", "unused", sim.client),
@@ -154,11 +151,8 @@ trait SsoSimulator extends TestContainerForAll { self: Suite =>
           cookieDomain = "lucuma.xyz",
         ) <+> GraphQLRoutes(
           LocalSsoClient(config.ssoJwtReader, dbPool).collect { case su: StandardUser => su },
-          pool,
-          chans,
-          SkunkMonitor.noopMonitor[F],
-          null, // !!!
-          schema
+          service,
+          null // !!!
         ), config.ssoJwtReader, config.ssoJwtWriter)
 
     /** An Http client that hits an SSO server backed by a simulated ORCID server. */

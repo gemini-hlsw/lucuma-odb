@@ -51,19 +51,19 @@ class AuthenticationSuite extends ResourceGraphQLSuite:
       authorization = anonymous
     )
 
-  test("A data query with a malformed bearer token is rejected"):
+  test("A data query with a malformed bearer token is denied"):
     expect(
       timelineQuery,
-      Left(requiresAuth("telescopeNightTimeline")),
+      Left(List("Access denied.")),
       variables,
       authorization =
         rawAuthorization(Authorization(Credentials.Token(AuthScheme.Bearer, "not-a-real-jwt")))
     )
 
-  test("A data query with an unsupported Authorization scheme is rejected"):
+  test("A data query with an unsupported Authorization scheme is denied"):
     expect(
       timelineQuery,
-      Left(requiresAuth("telescopeNightTimeline")),
+      Left(List("Access denied.")),
       variables,
       authorization = rawAuthorization(Authorization(BasicCredentials("user", "password")))
     )

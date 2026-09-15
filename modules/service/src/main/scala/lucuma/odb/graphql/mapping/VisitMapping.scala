@@ -42,8 +42,7 @@ trait VisitMapping[F[_]] extends VisitTable[F]
                             with Predicates[F]
                             with SelectSubquery {
 
-  def user: User
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   lazy val VisitMapping: ObjectMapping =
     ObjectMapping(VisitType)(

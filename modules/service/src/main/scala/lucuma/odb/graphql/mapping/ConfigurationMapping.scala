@@ -17,6 +17,7 @@ import lucuma.catalog.clients.GaiaClient
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Region
 import lucuma.core.model.Observation
+import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ItcClient
 import lucuma.odb.graphql.table.ConfigurationRequestView
@@ -31,7 +32,7 @@ import org.http4s.client.Client
 trait ConfigurationMapping[F[_]]
   extends ObservationView[F] with ConfigurationRequestView[F] {
 
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
   def itcClient: ItcClient[F]
   def httpClient: Client[F]
   def gaiaClient: GaiaClient[F]
@@ -88,7 +89,7 @@ trait ConfigurationMapping[F[_]]
       // Returns a map keyed by observation id.
       private def calculateAll(
         ctx: List[(Observation.Id, Option[Timestamp])]
-      ): F[Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]]] =
+      )(using User): F[Map[Observation.Id, Result[Option[Either[Coordinates, Region]]]]] =
         val byTime: Map[Timestamp, List[Observation.Id]] =
           ctx.collect:
             case (oid, Some(t)) => t -> oid
@@ -116,8 +117,9 @@ trait ConfigurationMapping[F[_]]
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
          (for {
+          usr     <- ResultT.fromResult(UserEnv.fromQueries(queries))
           ctx     <- ResultT(queryContext(queries).pure[F])
-          results <- ResultT.liftF(calculateAll(ctx))
+          results <- ResultT.liftF(calculateAll(ctx)(using usr))
           res     <- ResultT.fromResult:
                        ctx.map(_._1).zip(queries).traverse { case (oid, (query, parentCursor)) =>
                          for {

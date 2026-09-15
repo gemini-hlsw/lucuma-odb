@@ -16,6 +16,7 @@ import grackle.ResultT
 import grackle.skunk.SkunkMapping
 import io.circe.syntax.*
 import lucuma.core.model.ConfigurationRequest
+import lucuma.core.model.User
 import lucuma.odb.graphql.table.ConfigurationRequestView
 import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.service.Services
@@ -24,7 +25,7 @@ import Services.Syntax.*
 
 trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with ProgramView[F] {
 
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   lazy val ConfigurationRequestMapping =
     ObjectMapping(ConfigurationRequestType)(
@@ -55,7 +56,8 @@ trait ConfigurationRequestMapping[F[_]] extends ConfigurationRequestView[F] with
           tuples.map: (key, cursor, childContext) =>
             CirceCursor(childContext, reqs.get(key).orEmpty.asJson, Some(cursor), cursor.fullEnv)
 
-    services.use: s =>
-      query(using(s)).value
+    UserEnv.traverse(UserEnv.fromQueries(pairs)):
+      services.use: s =>
+        query(using(s)).value
 
 }

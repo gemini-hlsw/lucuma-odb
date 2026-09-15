@@ -20,11 +20,13 @@ import io.circe.JsonObject
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.goa.GoaClient
 import lucuma.catalog.telluric.TelluricTargetsClient
+import lucuma.common.middleware.UserContext
 import lucuma.core.data.Metadata
 import lucuma.core.model.Access
 import lucuma.core.model.User
 import lucuma.core.util.Gid
 import lucuma.graphql.routes.GraphQLService
+import lucuma.graphql.routes.RequestContext
 import lucuma.horizons.HorizonsClient
 import lucuma.itc.client.ItcClient
 import lucuma.odb.Config
@@ -334,13 +336,18 @@ object Services:
       private val graphQlService: Result[GraphQLService[F]] =
         mapping0 match
           case None => Result.internalError("No GraphQL Mapping available for this Services instance.")
-          case Some(f) => Result(GraphQLService(f(session)))
+          case Some(f) => Result(GraphQLService.unvalidated(f(session)))
+
+      // The query runs on behalf of an already-known user, so the context carries that user under
+      // the same env key the mappings read.
+      private val graphQlContext: RequestContext =
+        RequestContext(UserContext.env(user0))
 
       def runGraphQLQueryImpl(query: String, op: Option[String], vars: Option[JsonObject]): ResultT[F, Json] =
         for
           svc    <- ResultT(graphQlService.pure[F])
-          parsed <- ResultT(svc.parse(query, op, vars).pure[F])
-          json   <- ResultT(svc.query(parsed, query, op))
+          parsed <- ResultT(svc.parse(graphQlContext, query, op, vars).pure[F])
+          json   <- ResultT(svc.query(graphQlContext, parsed, query, op))
         yield json
 
       def runGraphQLQuery(query: String, op: Option[String], vars: Option[JsonObject]): F[Result[Json]] =

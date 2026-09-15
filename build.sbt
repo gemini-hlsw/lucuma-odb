@@ -35,7 +35,7 @@ val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.3"
 val log4catsVersion              = "2.8.0"
 val lucumaCoreVersion            = "0.248.0"
-val lucumaGraphQLRoutesVersion   = "0.15.2"
+val lucumaGraphQLRoutesVersion   = "0.16.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
 val munitVersion                 = "1.3.6"
@@ -871,6 +871,7 @@ lazy val common = project
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
       "edu.gemini"    %% "lucuma-core"                           % lucumaCoreVersion,
+      "edu.gemini"    %% "lucuma-graphql-routes"                 % lucumaGraphQLRoutesVersion,
       "org.http4s"    %% "http4s-client"                         % http4sVersion,
       "org.http4s"    %% "http4s-core"                           % http4sVersion,
       "org.http4s"    %% "http4s-otel4s-middleware-trace-client" % http4sOtel4sVersion,

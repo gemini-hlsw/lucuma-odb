@@ -18,6 +18,7 @@ import io.circe.Encoder as CirceEncoder
 import io.circe.syntax.*
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.User
 
 import table.ObservationView
 
@@ -25,7 +26,7 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
 
   protected def effectHandler[E, R](
     readEnv:   Env => Result[E],
-    calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
+    calculate: User ?=> (Program.Id, Observation.Id, E) => F[Result[R]]
   )(using Eq[E], CirceEncoder[R]): EffectHandler[F] =
     readQueryAndCursorEffectHander((_, c) => readEnv(c.fullEnv), calculate)
 
@@ -36,7 +37,7 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
    * It replaces the one transaction per observation N+1 of `effectHandler`.
    */
   protected def batchedEffectHandler[R](
-    calculateAll: List[Observation.Id] => F[Map[Observation.Id, Result[R]]]
+    calculateAll: User ?=> List[Observation.Id] => F[Map[Observation.Id, Result[R]]]
   )(using CirceEncoder[R]): EffectHandler[F] =
     new EffectHandler[F] {
 
@@ -49,8 +50,9 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
+          usr <- ResultT.fromResult(UserEnv.fromQueries(queries))
           os  <- ResultT(oids(queries).pure[F])
-          map <- ResultT.liftF(calculateAll(os))
+          map <- ResultT.liftF(calculateAll(using usr)(os))
           res <- ResultT(os.zip(queries).traverse { case (oid, (query, parentCursor)) =>
                    for {
                      r            <- map.getOrElse(oid, missing(oid))
@@ -62,7 +64,7 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
 
   protected def readQueryAndCursorEffectHander[E, R](
     readQueryAndCursor:   (Query, Cursor) => Result[E],
-    calculate: (Program.Id, Observation.Id, E) => F[Result[R]]
+    calculate: User ?=> (Program.Id, Observation.Id, E) => F[Result[R]]
   )(using Eq[E], CirceEncoder[R]): EffectHandler[F] =
 
     new EffectHandler[F] {
@@ -78,9 +80,10 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
 
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
+          usr <- ResultT.fromResult(UserEnv.fromQueries(queries))
           ctx <- ResultT(queryContext(queries).pure[F])
           obs <- ctx.distinct.traverse { case (pid, oid, env) =>
-                   ResultT(calculate(pid, oid, env)).map((oid, env, _))
+                   ResultT(calculate(using usr)(pid, oid, env)).map((oid, env, _))
                  }
           res <- ResultT(ctx
                    .flatMap { case (_, oid, env) => obs.find(r => r._1 === oid && r._2 === env).map(_._3).toList }

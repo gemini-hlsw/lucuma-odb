@@ -25,6 +25,7 @@ import lucuma.core.enums.Instrument
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
+import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
@@ -47,7 +48,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def itcClient: ItcClient[F]
   def httpClient: Client[F]
   def gaiaClient: GaiaClient[F]
-  def services: Resource[F, Services[F]]
+  def services(using User): Resource[F, Services[F]]
 
   private val AvailabilityStartParam = "start"
   private val AvailabilityEndParam   = "end"
@@ -168,7 +169,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def guideEnvironmentQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[GuideService.GuideEnvironment]] =
+    val calculate: User ?=> (Program.Id, Observation.Id, Unit) => F[Result[GuideService.GuideEnvironment]] =
       (_, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:
@@ -188,7 +189,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
                   else Matcher.validationFailure("Start time must be prior to end time for guide star availability")
       } yield period
 
-    val calculate: (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
+    val calculate: User ?=> (Program.Id, Observation.Id, TimestampInterval) => F[Result[List[GuideService.AvailabilityPeriod]]] =
       (pid, oid, period) =>
         services.use { implicit s =>
           Services.asSuperUser:
@@ -216,7 +217,7 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
   def guideTargetNameQueryHandler: EffectHandler[F] = {
     val readEnv: Env => Result[Unit] = _ => ().success
 
-    val calculate: (Program.Id, Observation.Id, Unit) => F[Result[Option[NonEmptyString]]] =
+    val calculate: User ?=> (Program.Id, Observation.Id, Unit) => F[Result[Option[NonEmptyString]]] =
       (pid, oid, _) =>
         services.use { implicit s =>
           Services.asSuperUser:

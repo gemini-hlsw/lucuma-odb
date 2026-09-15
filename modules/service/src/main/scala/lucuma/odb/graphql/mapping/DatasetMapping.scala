@@ -10,7 +10,6 @@ import grackle.QueryCompiler.Elab
 import grackle.TypeRef
 import io.circe.syntax.*
 import lucuma.core.model.ExecutionEvent
-import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.odb.graphql.binding.ExecutionEventIdBinding
@@ -33,7 +32,6 @@ trait DatasetMapping[F[_]] extends DatasetTable[F]
                               with SelectSubquery
                               with StepRecordView[F]
                               with VisitTable[F] {
-  def user: User
 
   lazy val DatasetMapping: ObjectMapping =
     ObjectMapping(DatasetType)(
