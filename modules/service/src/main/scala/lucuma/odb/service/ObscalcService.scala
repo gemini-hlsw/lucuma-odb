@@ -419,6 +419,7 @@ object ObscalcService:
         "c_reacq_setup_time",
 
         "c_setup_count",
+        "c_calibration_count",
 
         "c_acq_obs_class",
         "c_acq_non_charged_time",
@@ -520,6 +521,7 @@ object ObscalcService:
         "c_reacq_setup_time",
 
         "c_setup_count",
+        "c_calibration_count",
 
         "c_acq_obs_class",
         "c_acq_non_charged_time",
@@ -626,6 +628,7 @@ object ObscalcService:
         sql"c_full_setup_time      = ${time_span.opt}"(r.digest.map(_.setup.full)),
         sql"c_reacq_setup_time     = ${time_span.opt}"(r.digest.map(_.setup.reacquisition)),
         sql"c_setup_count          = ${int4_nonneg.opt}"(r.digest.map(_.setupCount)),
+        sql"c_calibration_count    = ${int4_nonneg.opt}"(r.digest.map(_.calibrationCount)),
 
         // Acquisition Digest
         sql"c_acq_obs_class           = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),

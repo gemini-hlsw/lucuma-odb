@@ -1511,7 +1511,7 @@ class perScienceObservationCalibrations
                           services.obscalcService.selectOne(oid).map:
                             _.flatMap(_.result)
                               .flatMap(_.digest)
-                              .map(d => d.science.timeEstimate.programTime |+| d.science.timeEstimate.nonCharged)
+                              .map(_.science.timeEstimate.sum)
       storedDur    <- selectMeta(telluricOid).map(_.map(_.scienceDuration))
     } yield {
       assert(obs.targetName.isDefined)
@@ -1573,7 +1573,7 @@ class perScienceObservationCalibrations
       services.transactionally:
         services.obscalcService.selectExecutionDigest(oid).map:
           _.flatMap(_.value.toOption)
-            .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
+            .map(_.science.timeEstimate.sum)
 
   test("create two tellurics for long science"):
     for {

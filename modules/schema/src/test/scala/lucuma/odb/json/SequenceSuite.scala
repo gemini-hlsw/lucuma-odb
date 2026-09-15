@@ -36,6 +36,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import lucuma.core.util.arb.ArbGid
+import lucuma.refined.*
 import munit.DisciplineSuite
 import org.scalacheck.Cogen
 
@@ -102,7 +103,8 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   private val sampleExecutionDigest: ExecutionDigest =
     ExecutionDigest(
       SetupTime.Zero,
-      NonNegInt.unsafeFrom(2),
+      2.refined,
+      1.refined,
       SequenceDigest(ObserveClass.Acquisition, CategorizedTime.Zero, SortedSet.empty, NonNegInt.unsafeFrom(1), ExecutionState.Ongoing),
       SequenceDigest(ObserveClass.Science,     CategorizedTime.Zero, SortedSet.empty, NonNegInt.unsafeFrom(3), ExecutionState.Ongoing)
     )
@@ -115,4 +117,5 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   test("ExecutionDigest decodes from the deprecated top-level fields when `estimate` is absent"):
     val stripped =
       sampleExecutionDigest.asJson.mapObject(_.remove("estimate"))
-    assertEquals(Decoder[ExecutionDigest].decodeJson(stripped), Right(sampleExecutionDigest))
+    // `calibrationCount` lives only under `estimate`, so an old payload reads as 0.
+    assertEquals(Decoder[ExecutionDigest].decodeJson(stripped), Right(sampleExecutionDigest.copy(calibrationCount = NonNegInt.MinValue)))
