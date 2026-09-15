@@ -69,13 +69,17 @@ class altairInputSuite extends GraphQLSuite:
 
   test("NGS without the field lens is rejected"):
     queryErrors(
-      spectroscopyQuery("""{ mode: NGS, guideStarSeparation: { arcseconds: 3.5 }, guideStarBrightness: 12.5 }"""),
+      spectroscopyQuery(
+        """{ mode: NGS, guideStarSeparation: { arcseconds: 3.5 }, guideStarBrightness: 12.5 }"""
+      ),
       List(Rejected + "Altair NGS requires guideStarSeparation, guideStarBrightness and fieldLens.")
     )
 
   test("LGS with the guide star is accepted, with or without an explicit field lens in"):
     queryErrors(
-      spectroscopyQuery("""{ mode: LGS, guideStarSeparation: { arcseconds: 3.5 }, guideStarBrightness: 15.5 }"""),
+      spectroscopyQuery(
+        """{ mode: LGS, guideStarSeparation: { arcseconds: 3.5 }, guideStarBrightness: 15.5 }"""
+      ),
       Nil
     ) *>
       queryErrors(

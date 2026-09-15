@@ -62,7 +62,9 @@ class AltairCodecSuite extends FunSuite:
   test("exact image quality goes out as exactiq"):
     val fields: Set[String] = conditions.asJson.asObject.get.keys.toSet
     assertEquals(fields, Set("exactiq", "exactcc", "wv", "sb", "airmass"))
-    assertEquals(conditions.asJson.hcursor.downField("exactiq").downField("arcsec").as[BigDecimal], Right(BigDecimal("0.6")))
+    assertEquals(conditions.asJson.hcursor.downField("exactiq").downField("arcsec").as[BigDecimal],
+                 Right(BigDecimal("0.6"))
+    )
 
   test("the 20% bin goes out as the legacy iq percentile"):
     val json: Json = conditions.copy(iq = ItcImageQuality.Percentile20).asJson
@@ -70,8 +72,9 @@ class AltairCodecSuite extends FunSuite:
     assert(json.hcursor.downField("exactiq").failed)
 
   test("LGS+P1 is computed without Altair at the 20% bin, other modes keep their conditions"):
-    val p1: ObservingMode = gnirsImaging.copy(altair = AltairParameters.LgsP1.some)
+    val p1: ObservingMode  = gnirsImaging.copy(altair = AltairParameters.LgsP1.some)
     assertEquals(conditionsFor(p1, conditions).iq, ItcImageQuality.Percentile20)
-    val lgs: ObservingMode = gnirsImaging.copy(altair = AltairParameters.Lgs(separation, brightness).some)
+    val lgs: ObservingMode =
+      gnirsImaging.copy(altair = AltairParameters.Lgs(separation, brightness).some)
     assertEquals(conditionsFor(lgs, conditions), conditions)
     assertEquals(conditionsFor(gnirsImaging, conditions), conditions)
