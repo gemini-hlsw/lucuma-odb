@@ -139,7 +139,7 @@ object ItcImpl {
               case s @ (SpectroscopyMode.GmosNorth(centralWavelength = _) | SpectroscopyMode
                     .GmosSouth(centralWavelength = _) | SpectroscopyMode.Flamingos2(_, _, _, _, _) |
                   SpectroscopyMode.Igrins2(_) | SpectroscopyMode.Ghost(_, _, _, _, _) |
-                  SpectroscopyMode.GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _)) =>
+                  SpectroscopyMode.GnirsSpectroscopy(centralWavelength = _)) =>
                 spectroscopyTimeAndGraphs(
                   target,
                   observingMode,
@@ -147,7 +147,7 @@ object ItcImpl {
                   exposureTimeMode
                 )
               case ImagingMode.GmosNorth(_, _, _) | ImagingMode.GmosSouth(_, _, _) |
-                  ImagingMode.Flamingos2(_, _, _) | ImagingMode.Gnirs(_, _, _, _, _, _) =>
+                  ImagingMode.Flamingos2(_, _, _) | ImagingMode.Gnirs(filter = _) =>
                 F.raiseError:
                   new IllegalArgumentException("Imaging mode not supported for graph calculation")
 

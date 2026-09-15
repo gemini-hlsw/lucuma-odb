@@ -1024,7 +1024,8 @@ object WiringSuite:
           GnirsReadMode.Bright,
           GnirsWellDepth.Shallow,
           PosInt.unsafeFrom(1),
-          PortDisposition.Side
+          PortDisposition.Side,
+          none
         )
       ),
       NonEmptyList.of(

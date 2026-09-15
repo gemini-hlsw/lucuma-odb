@@ -15,6 +15,7 @@ import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.itc.AltairParameters
 import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
@@ -30,7 +31,8 @@ final case class GnirsSpectroscopyInput(
   readMode:          GnirsReadMode,
   wellDepth:         GnirsWellDepth,
   coadds:            PosInt,
-  port:              PortDisposition
+  port:              PortDisposition,
+  altair:            Option[AltairParameters]
 ) extends InstrumentModesInput
 
 object GnirsSpectroscopyInput:
@@ -48,7 +50,8 @@ object GnirsSpectroscopyInput:
             GnirsReadModeBinding("readMode", readMode),
             GnirsWellDepthBinding("wellDepth", wellDepth),
             PosIntBinding("coadds", coadds),
-            PortDispositionBinding("port", portDisposition)
+            PortDispositionBinding("port", portDisposition),
+            AltairInput.Binding.Option("altair", altair)
           ) =>
         (exposureTimeMode,
          centralWavelength,
@@ -60,5 +63,6 @@ object GnirsSpectroscopyInput:
          readMode,
          wellDepth,
          coadds,
-         portDisposition
+         portDisposition,
+         altair
         ).parMapN(apply)

@@ -5,6 +5,7 @@ package lucuma.itc.legacy
 
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
+import lucuma.core.enums.FieldLens
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuIfu
@@ -15,9 +16,11 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Wavelength
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
+import lucuma.itc.AltairParameters
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
@@ -54,7 +57,8 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
     fpu = GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
     wellDepth = GnirsWellDepth.Shallow,
     coadds = PosInt.unsafeFrom(1),
-    portDisposition = PortDisposition.Bottom
+    portDisposition = PortDisposition.Bottom,
+    altair = None
   )
 
   override def instrument = ItcInstrumentDetails(gnirs)
@@ -89,6 +93,57 @@ class LegacyITCGnirsSpecSignalToNoiseSuite extends CommonITCLegacySuite:
       )
       localItc.calculate:
         bodyConf(sourceDefinition, obs, ifuMode, gnirsIfuAnalysisMethod).asJson.noSpaces
+
+  // Altair through the real OCS jars: the GnirsRecipe AO branch swaps the seeing FWHM for the
+  // AO-corrected one, so the request must decode and yield a result.
+  private val altairGuideStar: (Angle, BrightnessValue) =
+    (Angle.fromDoubleArcseconds(3.5), BrightnessValue.unsafeFrom(12.0))
+
+  test("gnirs altair NGS".tag(LegacyITCTest)):
+    val (separation, brightness) = altairGuideStar
+    val result                   = localItc.calculate:
+      bodyConf(
+        sourceDefinition,
+        obs,
+        gnirs.copy(camera = GnirsCamera.LongBlue,
+                   altair = Some(AltairParameters.Ngs(separation, brightness, FieldLens.In))
+        )
+      ).asJson.noSpaces
+    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+
+  test("gnirs altair LGS".tag(LegacyITCTest)):
+    val (separation, _) = altairGuideStar
+    val result          = localItc.calculate:
+      bodyConf(
+        sourceDefinition,
+        obs,
+        gnirs.copy(camera = GnirsCamera.LongBlue,
+                   altair = Some(AltairParameters.Lgs(separation, BrightnessValue.unsafeFrom(16.0)))
+        )
+      ).asJson.noSpaces
+    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+
+  // The legacy Altair model refuses natural guide stars fainter than R = 15.1
+  test("gnirs altair NGS too faint is a legacy error".tag(LegacyITCTest)):
+    val (separation, _) = altairGuideStar
+    val result          = localItc.calculate:
+      bodyConf(
+        sourceDefinition,
+        obs,
+        gnirs.copy(altair =
+          Some(AltairParameters.Ngs(separation, BrightnessValue.unsafeFrom(17.0), FieldLens.In))
+        )
+      ).asJson.noSpaces
+    assertIOBoolean(result.map(_.fold(_.exists(_.contains("guide star")), _ => false)))
+
+  // LGS+P1 goes out without Altair at the 20% image quality bin
+  test("gnirs altair LGS+P1".tag(LegacyITCTest)):
+    val result = localItc.calculate:
+      bodyConf(sourceDefinition,
+               obs,
+               gnirs.copy(altair = Some(AltairParameters.LgsP1))
+      ).asJson.noSpaces
+    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
   test("gnirs grating".tag(LegacyITCTest)):
     assertAllValid(Enumerated[GnirsGrating].all): g =>

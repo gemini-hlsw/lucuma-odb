@@ -11,6 +11,7 @@ import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.model.ExposureTimeMode
+import lucuma.itc.AltairParameters
 import lucuma.itc.binding.*
 import lucuma.odb.graphql.binding.*
 import lucuma.odb.graphql.input.*
@@ -22,7 +23,8 @@ final case class GnirsImagingInput(
   readMode:         GnirsReadMode,
   wellDepth:        GnirsWellDepth,
   coadds:           PosInt,
-  port:             PortDisposition
+  port:             PortDisposition,
+  altair:           Option[AltairParameters]
 ) extends InstrumentModesInput
 
 object GnirsImagingInput:
@@ -36,8 +38,8 @@ object GnirsImagingInput:
             GnirsReadModeBinding("readMode", readMode),
             GnirsWellDepthBinding("wellDepth", wellDepth),
             PosIntBinding("coadds", coadds),
-            PortDispositionBinding("port", portDisposition)
+            PortDispositionBinding("port", portDisposition),
+            AltairInput.Binding.Option("altair", altair)
           ) =>
-        (exposureTimeMode, filter, camera, readMode, wellDepth, coadds, portDisposition).parMapN(
-          apply
-        )
+        (exposureTimeMode, filter, camera, readMode, wellDepth, coadds, portDisposition, altair)
+          .parMapN(apply)

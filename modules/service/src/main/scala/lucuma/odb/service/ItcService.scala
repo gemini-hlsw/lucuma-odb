@@ -513,7 +513,7 @@ object ItcService {
             noType(go(input, gmos.MinAcquisitionExposureTime, gmos.MaxAcquisitionExposureTime))
           case InstrumentMode.Flamingos2Imaging(_, _, _, _) =>
             noType(go(input, flamingos2.MinAcquisitionExposureTime, flamingos2.MaxAcquisitionExposureTime))
-          case InstrumentMode.GnirsImaging(etm, filter, camera, readMode, wellDepth, coadds, port) =>
+          case InstrumentMode.GnirsImaging(etm, filter, camera, readMode, wellDepth, coadds, port, altair) =>
             val min: TimeSpan = gnirs.MinAcquisitionExposureTime
             val max: TimeSpan = gnirs.MaxAcquisitionExposureTime
             etm match
@@ -531,7 +531,7 @@ object ItcService {
                 def gnirsInput(f: GnirsFilter, e: ExposureTimeMode): ImagingInput =
                   ImagingInput.parameters
                     .andThen(ImagingParameters.mode)
-                    .replace(InstrumentMode.GnirsImaging(e, f, camera, readMode, wellDepth, coadds, port))(input)
+                    .replace(InstrumentMode.GnirsImaging(e, f, camera, readMode, wellDepth, coadds, port, altair))(input)
 
                 val classifySN:  SignalToNoise    = gnirs.AcquisitionClassificationSignalToNoise
                 val classifyEtm: ExposureTimeMode = ExposureTimeMode.SignalToNoiseMode(classifySN, etm.at)
@@ -778,7 +778,7 @@ object ItcService {
               case InstrumentMode.GmosSouthImaging(_, _, _, _) =>
                 imagingScience(oid, im, Keyed.GmosSouthImaging)
 
-              case InstrumentMode.GnirsImaging(_, _, _, _, _, _, _) =>
+              case InstrumentMode.GnirsImaging(filter = _) =>
                 imagingScience(oid, im, Keyed.GnirsImaging)
 
               case m                                     =>

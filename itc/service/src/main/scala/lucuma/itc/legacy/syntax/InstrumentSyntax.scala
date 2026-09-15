@@ -351,3 +351,12 @@ trait GmosCustomSlitWidthSyntax:
         case CustomWidth_2_00 => "CUSTOM_WIDTH_2_00"
         case CustomWidth_5_00 => "CUSTOM_WIDTH_5_00"
 object gmoscustomslitwidth extends GmosCustomSlitWidthSyntax
+
+trait FieldLensSyntax:
+  import lucuma.core.enums.FieldLens
+  extension (self: FieldLens)
+    def ocs2Tag: String =
+      self match
+        case FieldLens.In  => "IN"
+        case FieldLens.Out => "OUT"
+object fieldlens extends FieldLensSyntax

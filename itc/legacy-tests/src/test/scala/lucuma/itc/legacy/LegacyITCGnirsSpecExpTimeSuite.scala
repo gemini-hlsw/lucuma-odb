@@ -55,7 +55,8 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
     fpu = GnirsFpu.Spectroscopy.Slit(GnirsFpuSlit.LongSlit_0_30),
     wellDepth = GnirsWellDepth.Shallow,
     coadds = PosInt.unsafeFrom(1),
-    portDisposition = PortDisposition.Bottom
+    portDisposition = PortDisposition.Bottom,
+    altair = None
   )
 
   override def instrument = ItcInstrumentDetails(gnirs)
