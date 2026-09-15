@@ -9820,6 +9820,12 @@ type ObservationTimeEstimate {
   "Expected number of setups."
   setupCount: NonNegInt!
 
+  """
+  Expected number of night-time calibration observations generated for this observation.  
+  Calibration observations report 0.
+  """
+  calibrationCount: NonNegInt!
+
   "Science sequence time estimate."
   science: CategorizedTime!
 
