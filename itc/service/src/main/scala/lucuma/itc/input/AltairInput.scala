@@ -37,12 +37,16 @@ object AltairInput:
         (separation, brightness, fieldLens) match
           case (Some(s), Some(b), Some(f)) => Result(AltairParameters.Ngs(s, b, f))
           case _                           =>
-            Result.failure("Altair NGS requires guideStarSeparation, guideStarBrightness and fieldLens.")
+            Result.failure(
+              "Altair NGS requires guideStarSeparation, guideStarBrightness and fieldLens."
+            )
       case AltairMode.Lgs   =>
         (separation, brightness, fieldLens) match
           case (Some(s), Some(b), None | Some(FieldLens.In)) => Result(AltairParameters.Lgs(s, b))
           case (Some(_), Some(_), Some(FieldLens.Out))       =>
-            Result.failure("Altair LGS always uses the field lens; fieldLens must be IN or omitted.")
+            Result.failure(
+              "Altair LGS always uses the field lens; fieldLens must be IN or omitted."
+            )
           case _                                             =>
             Result.failure("Altair LGS requires guideStarSeparation and guideStarBrightness.")
       case AltairMode.LgsP1 =>
