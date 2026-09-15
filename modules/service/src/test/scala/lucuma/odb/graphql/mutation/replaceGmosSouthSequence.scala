@@ -92,6 +92,41 @@ class replaceGmosSouthSequence extends query.ExecutionTestSupportForGmos with Re
           }
     """
 
+  def ifuStepInput(filter: GmosSouthFilter): String =
+    s"""
+          {
+            instrumentConfig: {
+              exposure: {
+                seconds: 20
+              }
+              readout: {
+                xBin: ONE
+                yBin: ONE
+                ampCount: TWELVE
+                ampGain: LOW
+                ampReadMode: SLOW
+              }
+              dtax: ZERO
+              roi: FULL_FRAME
+              gratingConfig: {
+                grating: R600_G5324
+                order: ZERO
+                wavelength: {
+                  nanometers: 500.0
+                }
+              }
+              filter: ${filter.tag.toScreamingSnakeCase}
+              fpu: {
+                builtin: IFU2_SLITS
+              }
+            }
+            stepConfig: {
+              science: true
+            }
+            observeClass: SCIENCE
+          }
+    """
+
   def imagingStepInput(filter: GmosSouthFilter): String =
     s"""
           {
@@ -257,6 +292,61 @@ class replaceGmosSouthSequence extends query.ExecutionTestSupportForGmos with Re
                   ]
                 }
               ]
+            }
+          }
+        """.asRight
+      )
+
+  private def replaceSequenceQuery(inputString: String): String =
+    s"""
+      mutation {
+        replaceGmosSouthSequence(input: $inputString) {
+          sequence {
+            description
+          }
+        }
+      }
+    """
+
+  test("no recorded static config - MOS"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosSouthMosObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Mos", mosStepInput(GmosSouthFilter.GPrime)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = json"""
+          {
+            "replaceGmosSouthSequence": {
+              "sequence": [ { "description": "Mos" } ]
+            }
+          }
+        """.asRight
+      )
+
+  test("no recorded static config - IFU"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosSouthIfuObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Ifu", ifuStepInput(GmosSouthFilter.GPrime)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = json"""
+          {
+            "replaceGmosSouthSequence": {
+              "sequence": [ { "description": "Ifu" } ]
             }
           }
         """.asRight
