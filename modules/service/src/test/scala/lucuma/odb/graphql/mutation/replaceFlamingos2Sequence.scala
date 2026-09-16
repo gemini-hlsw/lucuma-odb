@@ -261,3 +261,19 @@ class replaceFlamingos2Sequence extends query.ExecutionTestSupportForFlamingos2 
           }
         """.asRight
       )
+
+  test("rejects a non-Flamingos 2 observation"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(Flamingos2Filter.J)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = List(s"Observation $oid not found or is not a Flamingos 2 observation.").asLeft
+      )
