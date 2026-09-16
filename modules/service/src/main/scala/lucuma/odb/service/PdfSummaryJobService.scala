@@ -14,6 +14,7 @@ import io.circe.Json
 import io.circe.JsonObject
 import lucuma.core.enums.AttachmentType
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
 import lucuma.core.util.Enumerated
@@ -149,12 +150,13 @@ object PdfSummaryJobService:
 
       override def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit] =
         for
-          _ <- session.execute(Statements.PruneJobs)((pid, pid))
-          _ <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
-          _ <- session.execute(Statements.DeleteFailedJobs)(pid)
-          _ <- partners(pid).flatMap(_.traverse_(partner =>
-                 session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))
-               ))
+          _       <- session.execute(Statements.PruneJobs)((pid, pid))
+          _       <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
+          _       <- session.execute(Statements.DeleteFailedJobs)(pid)
+          subtype <- session.option(Statements.SelectScienceSubtype)(pid).map(_.flatten)
+          _       <- partners(pid).flatMap(_.traverse_(partner =>
+                       session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forProposal(subtype, partner)))
+                     ))
         yield ()
 
       override def regenerate(pid: Program.Id)(using NoTransaction[F], Services.PiAccess): F[Result[Unit]] =
@@ -242,6 +244,11 @@ object PdfSummaryJobService:
       sql"""
         SELECT EXISTS (SELECT 1 FROM t_proposal WHERE c_program_id = $program_id)
       """.query(bool)
+
+    val SelectScienceSubtype: Query[Program.Id, Option[ScienceSubtype]] =
+      sql"""
+        SELECT c_science_subtype FROM t_proposal WHERE c_program_id = $program_id
+      """.query(science_subtype.opt)
 
     val SelectPartners: Query[Program.Id, Partner] =
       sql"""

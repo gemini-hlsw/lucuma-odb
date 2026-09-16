@@ -281,6 +281,14 @@ class regenerateProposalSummaries extends OdbSuite
       jobs <- jobsFor(pid)
     yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiStandard)))
 
+  test("a Fast Turnaround proposal renders without investigators"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      _    <- createFastTurnaroundProposal(pi, pid)
+      _    <- regenerate(pi, pid)
+      jobs <- jobsFor(pid)
+    yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiNoInvestigators)))
+
   test("regenerating while a job is waiting is a no-op"):
     for
       pid    <- setupProposal()

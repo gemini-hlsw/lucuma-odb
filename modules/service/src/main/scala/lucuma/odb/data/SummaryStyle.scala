@@ -4,6 +4,7 @@
 package lucuma.odb.data
 
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.util.Enumerated
 
 /**
@@ -21,9 +22,11 @@ object SummaryStyle:
 
   val Default: SummaryStyle = GeminiStandard
 
-  // The OCS Phase 1 template map (P1PDF.templatesList).
-  def forPartner(partner: Option[Partner]): SummaryStyle =
-    partner.fold(Default):
+  // The OCS Phase 1 template map (P1PDF.templatesList), except that Fast
+  // Turnaround proposals get the no investigatorse template.
+  def forProposal(subtype: Option[ScienceSubtype], partner: Option[Partner]): SummaryStyle =
+    if subtype.contains(ScienceSubtype.FastTurnaround) then GeminiNoInvestigators
+    else partner.fold(Default):
       case Partner.CA => GeminiInvestigatorsAtEnd
       case Partner.CL => Chile
       case Partner.KR => GeminiDarp
