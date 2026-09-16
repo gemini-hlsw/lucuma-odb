@@ -6,6 +6,7 @@ package query
 
 import cats.effect.IO
 import cats.syntax.option.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -14,6 +15,8 @@ import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 import lucuma.refined.*
+
+import java.time.Instant
 
 class executionDigest_calibrationCount
   extends OdbSuite
@@ -67,4 +70,30 @@ class executionDigest_calibrationCount
         c0 <- calibrationCount(p, o)
       yield (c1, c2, c0),
       (1, 2, 0)
+    )
+
+  test("a mode that takes no telluric reports 0"):
+    assertIO(
+      for
+        p <- createProgramAs(pi)
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createFlamingos2ImagingObservationAs(pi, p, t)
+        c <- calibrationCount(p, o)
+      yield c,
+      0
+    )
+
+  test("a telluric's own digest reports 0"):
+    assertIO(
+      for
+        p   <- createProgramAs(pi)
+        t   <- createTargetWithProfileAs(pi, p)
+        o   <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
+        _   <- runObscalcUpdate(p, o)
+        _   <- recalculateCalibrations(p, Instant.parse("2024-01-01T12:00:00Z"), o)
+        obs <- queryObservation(o)
+        tel <- queryObservationsInGroup(obs.groupId.get).map(_.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id)
+        c   <- calibrationCount(p, tel)
+      yield c,
+      0
     )

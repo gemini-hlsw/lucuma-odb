@@ -32,6 +32,8 @@ UPDATE t_observation
    SET c_orig_est_calibration_count = 0
  WHERE c_orig_est_setup_count IS NOT NULL;
 
+SET CONSTRAINTS ALL IMMEDIATE;
+
 ALTER TABLE t_observation
   DROP CONSTRAINT original_estimate_all_or_none,
   ADD CONSTRAINT original_estimate_all_or_none CHECK (
