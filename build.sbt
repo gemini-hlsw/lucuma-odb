@@ -116,6 +116,9 @@ val munitFlakyOk = "MUNIT_FLAKY_OK" -> "${{ vars.MUNIT_FLAKY_OK }}"
 // notify of errors on the nightly cron
 ThisBuild / lucumaSlackNotifyWorkflows += "Legacy ITC Tests"
 
+// Required jobs for branch protection: Tests, plus static checks + schema validation.
+ThisBuild / lucumaRequiredCheckJobs := Seq("build", "checks")
+
 ThisBuild / githubWorkflowEnv += herokuToken
 ThisBuild / githubWorkflowEnv += munitFlakyOk
 // pyexplore is private; the pdfSummary image clones it with this token.

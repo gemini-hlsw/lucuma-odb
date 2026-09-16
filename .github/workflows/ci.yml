@@ -581,7 +581,7 @@ jobs:
 
   required-checks:
     name: REQUIRED CHECKS FOR BRANCH PROTECTION - AGGREGATED
-    needs: [build]
+    needs: [build, checks]
     if: always()
     strategy:
       matrix:
@@ -595,4 +595,4 @@ jobs:
           exit 1
 
       - name: Report success
-        run: echo "all of build passed or were skipped"
+        run: echo "all of build, checks passed or were skipped"
