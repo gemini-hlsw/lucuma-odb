@@ -15731,6 +15731,19 @@ type Altair {
   explicitFieldLens: FieldLens
 
   """
+  The AUTO field lens resolution: IN for the LGS modes; for NGS, IN when the
+  selected guide star is more than 1 arcsecond from the base, OUT otherwise.
+  Null when no guide star is selected yet.
+  """
+  defaultFieldLens: FieldLens
+
+  """
+  The field lens that will be used: explicitFieldLens when set, otherwise
+  defaultFieldLens.
+  """
+  fieldLens: FieldLens
+
+  """
   The cassegrain rotator tracking mode used while observing behind Altair.
   """
   cassRotator: CassRotator!
