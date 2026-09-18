@@ -613,6 +613,12 @@ object GuideService {
           .use(_.option(af.argument))
           .map(_.fold(OdbError.InvalidObservation(oid, Some(s"Failed to update guide target name for $oid.")).asFailure)(_.success))
 
+      def deleteItcResults(oid: Observation.Id): F[Unit] =
+        val af = Statements.deleteItcResults(oid)
+        session
+          .prepareR(af.fragment.command)
+          .use(_.execute(af.argument).void)
+
       def getFromCacheOrEmpty(pid: Program.Id, oid: Observation.Id, newHash: Md5Hash)(
         using NoTransaction[F]
       ): F[ContiguousTimestampMap[List[Angle]]] =
@@ -1179,12 +1185,22 @@ object GuideService {
             availability   = fullAvail.slice(period).intervals.toList.map(AvailabilityPeriod.fromTuple)
           } yield availability).value
 
+      /**
+       * The order matters. The generator hash folds in the ITC result, and the ITC now models
+       * Altair from the guide star stored for the observation. So the cached ITC result is
+       * discarded first, the name is stored before the generator runs -- so that run resolves the
+       * new star -- and only the hash that came out of that run is recorded.
+       */
       def setGuideTargetNameImpl(obsInfo: ObservationInfo, targetName: Option[NonEmptyString]): F[Result[Observation.Id]] =
-        targetName.fold(updateGuideTargetName(obsInfo.programId, obsInfo.id, none, none)){ name =>
+        targetName.fold(
+          deleteItcResults(obsInfo.id) *> updateGuideTargetName(obsInfo.programId, obsInfo.id, none, none)
+        ){ name =>
           (for {
-            gsn    <- ResultT.fromResult(
-                        GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
-                      )
+            gsn      <- ResultT.fromResult(
+                          GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
+                        )
+            _        <- ResultT.liftF(deleteItcResults(obsInfo.id))
+            _        <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, none))
             genInfo  <- ResultT(getGeneratorInfo(obsInfo.id))
             hash      = obsInfo.newGuideStarHash(genInfo.hash)
             result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
@@ -1340,6 +1356,15 @@ object GuideService {
         where c_program_id     = $program_id
           and c_observation_id = $observation_id
       """.apply(pid, oid) |+| andWhereUserWriteAccess(user, pid)
+
+    // A frozen result belongs to an executing observation and stays authoritative; every other
+    // row is a cache entry that a change of guide star invalidates.
+    def deleteItcResults(oid: Observation.Id): AppliedFragment =
+      sql"""
+        delete from t_itc_result
+        where c_observation_id = $observation_id
+          and not c_is_frozen
+      """.apply(oid)
 
     // both guideStarName and guideStarHash should either have values or be empty.
     def updateGuideTargetName(
