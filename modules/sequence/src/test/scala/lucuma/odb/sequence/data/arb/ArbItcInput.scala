@@ -7,6 +7,7 @@ package arb
 
 import cats.data.NonEmptyList
 import cats.syntax.traverse.*
+import lucuma.ags.GuideStarName
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.core.util.arb.ArbTimestamp.given
@@ -15,12 +16,21 @@ import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.itc.client.arb.ArbIntegrationTimeInput.given
 import lucuma.itc.client.arb.ArbTargetInput.given
+import lucuma.odb.data.AltairConfiguration
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalacheck.cats.implicits.*
 
 trait ArbItcInput:
+  import ArbAltairConfiguration.given
+
+  given Arbitrary[AltairRequest] =
+    Arbitrary:
+      for
+        configuration <- arbitrary[AltairConfiguration]
+        sourceId      <- Gen.option(Gen.posNum[Long])
+      yield AltairRequest(configuration, sourceId.map(GuideStarName.gaiaSourceId.reverseGet))
 
   private def genTargetDefinition(id: Long): Gen[ItcInput.TargetDefinition] =
     for
@@ -36,12 +46,14 @@ trait ArbItcInput:
         ct <- Gen.choose(1, 10)
         ts <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
         sn <- Gen.option(Gen.oneOf(ts.map(_.targetId)))
+        al <- arbitrary[Option[AltairRequest]]
         aq <- arbitrary[Option[ImagingParameters]]
         ac <- arbitrary[Boolean]
       yield ItcInput.Imaging(
         NonEmptyList.fromListUnsafe(ss),
         NonEmptyList.fromListUnsafe(ts),
         sn,
+        al,
         aq,
         ac
       )
@@ -73,12 +85,14 @@ trait ArbItcInput:
         ts  <- List.range(1L, ct + 1L).traverse(genTargetDefinition)
         bo  <- Gen.option(genTargetDefinition(ct + 1L))
         sn  <- Gen.option(Gen.oneOf(ts.map(_.targetId)))
+        al  <- arbitrary[Option[AltairRequest]]
       yield ItcInput.GnirsSpectroscopy(
         acq,
         NonEmptyList.fromListUnsafe(sci),
         NonEmptyList.fromListUnsafe(ts),
         bo,
-        sn
+        sn,
+        al
       )
 
   given Arbitrary[ItcInput.ScienceOnlySpectroscopy] =
