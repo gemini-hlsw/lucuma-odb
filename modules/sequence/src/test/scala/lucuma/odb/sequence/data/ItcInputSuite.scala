@@ -6,7 +6,13 @@ package data
 
 import cats.syntax.eq.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
+import lucuma.ags.GuideStarName
+import lucuma.core.enums.AltairMode
+import lucuma.core.enums.AltairNdFilter
+import lucuma.core.enums.CassRotator
 import lucuma.itc.client.TargetInput
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.sequence.data.arb.ArbItcInput.given
 import lucuma.odb.sequence.util.HashBytes
 import munit.ScalaCheckSuite
@@ -42,4 +48,31 @@ class ItcInputSuite extends ScalaCheckSuite:
           !java.util.Arrays.equals(HashBytes[ItcInput].hashBytes(itcInput), HashBytes[ItcInput].hashBytes(t)),
           "Removing a central wavelength did not change the hash"
         )
+    }
+
+  private val ngs: AltairConfiguration =
+    AltairConfiguration(AltairMode.Ngs, none, CassRotator.Following, AltairNdFilter.Out)
+
+  private val star: GuideStarName =
+    GuideStarName.gaiaSourceId.reverseGet(1L)
+
+  private def hash(input: ItcInput): List[Byte] =
+    HashBytes[ItcInput].hashBytes(input).toList
+
+  // The ITC models Altair from the configuration and from the guide star stored for the
+  // observation, so a change to either must miss the cached result.
+  private def assertAltairHashed(withAltair: Option[AltairRequest] => ItcInput): Unit =
+    val base = hash(withAltair(AltairRequest(ngs, star.some).some))
+
+    assertNotEquals(base, hash(withAltair(none)))
+    assertNotEquals(base, hash(withAltair(AltairRequest(ngs, none).some)))
+    assertNotEquals(base, hash(withAltair(AltairRequest(ngs.copy(mode = AltairMode.Lgs), star.some).some)))
+    assertNotEquals(base, hash(withAltair(AltairRequest(ngs.copy(cassRotator = CassRotator.Fixed), star.some).some)))
+    assertNotEquals(base, hash(withAltair(AltairRequest(ngs.copy(ndFilter = AltairNdFilter.In), star.some).some)))
+    assertNotEquals(base, hash(withAltair(AltairRequest(ngs, GuideStarName.gaiaSourceId.reverseGet(2L).some).some)))
+
+  property("the Altair configuration and guide star are part of the GNIRS hashes"):
+    forAll { (sp: ItcInput.GnirsSpectroscopy, im: ItcInput.Imaging) =>
+      assertAltairHashed(a => sp.copy(altair = a))
+      assertAltairHashed(a => im.copy(altair = a))
     }

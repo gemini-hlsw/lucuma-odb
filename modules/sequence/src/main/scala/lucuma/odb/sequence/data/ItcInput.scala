@@ -10,6 +10,7 @@ import cats.Order.given
 import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.eq.*
+import lucuma.ags.GuideStarName
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
 import lucuma.itc.client.ImagingInput
@@ -17,6 +18,7 @@ import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.util.HashBytes.given
@@ -24,6 +26,33 @@ import monocle.Prism
 import monocle.macros.GenPrism
 
 import scala.collection.mutable.ArrayBuilder
+
+/**
+ * Everything the database knows about Altair for an ITC calculation: how Altair is configured and
+ * which guide star, if any, was stored for the observation.
+ *
+ * The star itself is resolved against Gaia only when the remote ITC is actually called (see
+ * `ItcService`), so that no catalog query happens while the generator parameters are being read.
+ */
+case class AltairRequest(
+  configuration:  AltairConfiguration,
+  guideStarName:  Option[GuideStarName]
+)
+
+object AltairRequest:
+
+  given Eq[AltairRequest] =
+    Eq.by(a => (a.configuration, a.guideStarName.map(_.value.value)))
+
+  given HashBytes[AltairRequest] with
+    def hashBytes(a: AltairRequest): Array[Byte] =
+      Array.concat(
+        a.configuration.mode.hashBytes,
+        a.configuration.explicitFieldLens.hashBytes,
+        a.configuration.cassRotator.hashBytes,
+        a.configuration.ndFilter.hashBytes,
+        a.guideStarName.map(_.value.value).hashBytes
+      )
 
 /**
  * A simple ITC input creation ADT, separating imaging vs spectroscopy.
@@ -70,11 +99,15 @@ object ItcInput:
    * `gnirsAcqAutoSignalToNoise` is set when the acquisition signal-to-noise is
    * itself derived from that classification, in which case the second pass runs at
    * the derived S/N rather than at the one carried here.
+   *
+   * `altair` is the unresolved Altair request for GNIRS imaging; the other imaging
+   * modes never have one.
    */
   case class Imaging(
     science: NonEmptyList[ImagingParameters],
     targets: NonEmptyList[TargetDefinition],
     signalToNoiseTargetId: Option[Target.Id],
+    altair:               Option[AltairRequest],
     acquisition:          Option[ImagingParameters] = None,
     gnirsAcqAutoClassify: Boolean                   = false,
     gnirsAcqAutoSignalToNoise: Boolean              = false
@@ -98,6 +131,7 @@ object ItcInput:
           bld.addAll(params.hashBytes)
         bld.addAll(hashTargets(a.targets))
         bld.addAll(a.signalToNoiseTargetId.hashBytes)
+        bld.addAll(a.altair.hashBytes)
         bld.addAll(a.acquisition.hashBytes)
         bld.addAll(a.gnirsAcqAutoClassify.hashBytes)
         bld.addAll(a.gnirsAcqAutoSignalToNoise.hashBytes)
@@ -162,6 +196,7 @@ object ItcInput:
     targets:               NonEmptyList[TargetDefinition],
     blindOffset:           Option[TargetDefinition],
     signalToNoiseTargetId: Option[Target.Id],
+    altair:                Option[AltairRequest],
     gnirsAcqAutoClassify:  Boolean = false,
     gnirsAcqAutoSignalToNoise: Boolean = false
   ) extends ItcInput derives Eq:
@@ -186,6 +221,7 @@ object ItcInput:
           bld.addAll(params.hashBytes)
         bld.addAll(hashTargets(a.blindOffset.fold(a.targets)(_ :: a.targets)))
         bld.addAll(a.signalToNoiseTargetId.hashBytes)
+        bld.addAll(a.altair.hashBytes)
         bld.addAll(a.gnirsAcqAutoClassify.hashBytes)
         bld.addAll(a.gnirsAcqAutoSignalToNoise.hashBytes)
         bld.result()
@@ -232,7 +268,7 @@ object ItcInput:
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _, _, _, _, _)              => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _, _, _, _)      => in.hashBytes
-        case in @ GnirsSpectroscopy(_, _, _, _, _, _, _) => in.hashBytes
-        case in @ ScienceOnlySpectroscopy(_, _, _)    => in.hashBytes
+        case in @ Imaging(science = _)                 => in.hashBytes
+        case in @ Spectroscopy(science = _)            => in.hashBytes
+        case in @ GnirsSpectroscopy(science = _)       => in.hashBytes
+        case in @ ScienceOnlySpectroscopy(science = _) => in.hashBytes
