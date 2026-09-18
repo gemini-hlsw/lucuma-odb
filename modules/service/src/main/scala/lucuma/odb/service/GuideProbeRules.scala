@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.AltairMode
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.probes
@@ -18,6 +19,6 @@ object GuideProbeRules:
   def notAllowedMessage(mode: ObservingModeType, probe: GuideProbe): String =
     s"Guide probe ${probe.tag.toScreamingSnakeCase} cannot be used with observing mode ${mode.tag.toScreamingSnakeCase}."
 
-  def check(mode: ObservingModeType, probe: GuideProbe, prefix: String = ""): Result[Unit] =
-    if probes.isProbeAllowed(mode, probe) then Result.unit
+  def check(mode: ObservingModeType, altair: Option[AltairMode], probe: GuideProbe, prefix: String = ""): Result[Unit] =
+    if probes.isProbeAllowed(mode, altair, probe) then Result.unit
     else OdbError.InvalidArgument(s"$prefix${notAllowedMessage(mode, probe)}".some).asFailure

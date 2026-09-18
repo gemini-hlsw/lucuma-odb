@@ -301,6 +301,18 @@ trait Codecs {
   val email_address: Codec[EmailAddress] =
     codecFromPrism(EmailAddress.From, Type("citext"))
 
+  val altair_mode: Codec[AltairMode] =
+    enumerated[AltairMode](Type("e_altair_mode"))
+
+  val altair_nd_filter: Codec[AltairNdFilter] =
+    enumerated[AltairNdFilter](Type("e_altair_nd_filter"))
+
+  val cass_rotator: Codec[CassRotator] =
+    enumerated[CassRotator](Type("e_cass_rotator"))
+
+  val field_lens: Codec[FieldLens] =
+    enumerated[FieldLens](Type("e_field_lens"))
+
   val guide_probe: Codec[GuideProbe] =
     enumerated[GuideProbe](Type.varchar)
 

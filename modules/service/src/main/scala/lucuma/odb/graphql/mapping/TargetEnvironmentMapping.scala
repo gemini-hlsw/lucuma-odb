@@ -86,19 +86,34 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       SqlField("explicitGuideProbe", ObservationView.ExplicitGuideProbe),
       EffectField("defaultGuideProbe", defaultGuideProbeHandler, List("id")),
       EffectField("guideProbe", guideProbeHandler, List("id")),
+      SqlObject("altair"),
       SqlField("instrument", ObservationView.Instrument, hidden = true),
+      SqlField("storedCassRotator", ObservationView.CassRotator, hidden = true),
       CursorField[CassRotator](
         "cassRotator",
-        _.fieldAs[Option[Instrument]]("instrument").map:
-          case Some(Instrument.MaroonX) => CassRotator.Fixed
-          case _                        => CassRotator.Following
+        c =>
+          (c.fieldAs[Option[CassRotator]]("storedCassRotator"), c.fieldAs[Option[Instrument]]("instrument")).mapN: (stored, instrument) =>
+            stored.getOrElse:
+              instrument match
+                case Some(Instrument.MaroonX) => CassRotator.Fixed
+                case _                        => CassRotator.Following
         ,
-        List("instrument")
+        List("storedCassRotator", "instrument")
       ),
       EffectField("basePosition", basePositionQueryHandler, List("id")),
       EffectField("guideEnvironment", guideEnvironmentQueryHandler, List("id", "programId")),
       EffectField("guideAvailability", guideAvailabilityQueryHandler, List("id", "programId")),
       EffectField("guideTargetName", guideTargetNameQueryHandler, List("id", "programId"))
+    )
+
+  lazy val AltairMapping: ObjectMapping =
+    ObjectMapping(TargetEnvironmentType / "altair")(
+      SqlField("synthetic-id", ObservationView.TargetEnvironment.Altair.SyntheticId, key = true, hidden = true),
+      SqlField("id", ObservationView.Id, hidden = true),
+      SqlField("mode", ObservationView.TargetEnvironment.Altair.Mode),
+      SqlField("explicitFieldLens", ObservationView.TargetEnvironment.Altair.ExplicitFieldLens),
+      SqlField("cassRotator", ObservationView.TargetEnvironment.Altair.CassRotator),
+      SqlField("ndFilter", ObservationView.TargetEnvironment.Altair.NdFilter)
     )
 
   private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =
