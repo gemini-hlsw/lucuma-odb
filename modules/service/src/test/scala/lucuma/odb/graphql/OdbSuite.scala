@@ -79,7 +79,7 @@ import lucuma.odb.Config
 import lucuma.odb.FMain
 import lucuma.odb.data.ItcPeakPixel
 import lucuma.odb.data.OdbError
-import lucuma.odb.data.OdbErrorExtensions.*
+import lucuma.odb.data.OdbErrorClueExtensions.*
 import lucuma.odb.graphql.enums.Enums
 import lucuma.odb.logic.TimeEstimateCalculatorImplementation
 import lucuma.odb.sequence.util.CommitHash

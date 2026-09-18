@@ -10,7 +10,6 @@ import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegLong
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosBigDecimal
-import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
 import eu.timepit.refined.types.numeric.PosShort
 import eu.timepit.refined.types.string.NonEmptyString
@@ -62,7 +61,6 @@ import lucuma.odb.data.CalibrationWorkType
 import lucuma.odb.data.DatabaseOperation
 import lucuma.odb.data.EmailId
 import lucuma.odb.data.ExecutionEventType
-import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.ExposureTimeModeType
@@ -99,11 +97,8 @@ import scala.util.control.Exception
 import scala.util.matching.Regex
 
 
-// Codecs for some atomic types.
-trait Codecs {
-
-  def enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[A] =
-    `enum`(ev.tag, ev.fromTag, tpe)
+// Codecs for some atomic types. The ones the Resource service also needs live in `CoreCodecs`.
+trait Codecs extends CoreCodecs {
 
   /** Codec for an array of an enumerated type. */
   def _enumerated[A](tpe: Type)(implicit ev: Enumerated[A]): Codec[List[A]] =
@@ -348,9 +343,6 @@ trait Codecs {
         a => a
       }
 
-  val existence: Codec[Existence] =
-    enumerated(Type("e_existence"))
-
   val exposure_time_mode_id: Codec[ExposureTimeModeId] =
     int4.imap(ExposureTimeModeId.apply)(_.value)
 
@@ -544,9 +536,6 @@ trait Codecs {
   val int4_nonneg: Codec[NonNegInt] =
     int4.eimap(NonNegInt.from)(_.value)
 
-  val int4_pos: Codec[PosInt] =
-    int4.eimap(PosInt.from)(_.value)
-
   val int8_nonneg: Codec[NonNegLong] =
     int8.eimap(NonNegLong.from)(_.value)
 
@@ -637,12 +626,6 @@ trait Codecs {
   val seeing_trend: Codec[SeeingTrend] =
     enumerated[SeeingTrend](Type.varchar)
 
-  val semester: Codec[Semester] =
-    varchar.eimap(
-      s => Semester.fromString.getOption(s).toRight(s"Invalid semester: $s"))(
-      _.format
-    )
-
   val sequence_command: Codec[SequenceCommand] =
     enumerated[SequenceCommand](Type("e_sequence_command"))
 
@@ -651,9 +634,6 @@ trait Codecs {
 
   val _site: Codec[Arr[Site]] =
     Codec.array(_.tag.toLowerCase, s => Enumerated[Site].fromTag(s.toUpperCase).toRight(s"Invalid tag: $s"), Type("_e_site", List(Type("e_site"))))
-
-  val site: Codec[Site] =
-    `enum`(_.tag.toLowerCase, s => Enumerated[Site].fromTag(s.toUpperCase), Type("e_site"))
 
   val sky_background: Codec[SkyBackground] =
     enumerated[SkyBackground](Type.varchar)
@@ -797,9 +777,6 @@ trait Codecs {
 
   val target_disposition: Codec[TargetDisposition] =
     enumerated(Type("e_target_disposition"))
-
-  val text_nonempty: Codec[NonEmptyString] =
-    text.eimap(NonEmptyString.from)(_.value)
 
   /** A `text[]` column read as `List[String]`, for array-valued provenance such as GOA query URLs. */
   val text_list: Codec[List[String]] =

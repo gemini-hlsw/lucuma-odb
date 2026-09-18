@@ -6,7 +6,6 @@ package lucuma.odb.data
 import cats.Applicative
 import cats.data.NonEmptyChain
 import cats.syntax.all.*
-import clue.model.GraphQLError
 import grackle.Problem
 import grackle.Result
 import io.circe.JsonObject
@@ -35,13 +34,3 @@ object OdbErrorExtensions:
 
     def asWarningF[F[_]: Applicative, A](a: A): F[Result[A]] =
       asWarning(a).pure[F]
-
-  /** A client-side extension to recover an OdbError from a Clue GraphQLError. */
-  extension (self: OdbError.type)
-
-    def fromGraphQLError(gqe: GraphQLError): Option[OdbError] =
-      for
-        ext <- gqe.extensions
-        obj <- ext(Key)
-        err <- obj.as[OdbError].toOption
-      yield err

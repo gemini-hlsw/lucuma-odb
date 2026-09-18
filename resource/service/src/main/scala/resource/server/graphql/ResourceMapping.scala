@@ -19,9 +19,16 @@ class ResourceMapping[F[_]: Async](
     with BaseMapping[F]
     with QueryMapping[F]
     with LeafMappings[F]
-    with TelescopeNightTimelineMapping[F]:
+    with TelescopeAvailabilityBlockMapping[F]
+    with TelescopeModeBlockMapping[F]
+    with TooSupportBlockMapping[F]
+    with InstrumentAvailabilityBlockMapping[F]
+    with TelescopeSubsystemBlockMapping[F]
+    with InstrumentComponentBlockMapping[F]:
   // with SubscriptionMapping[F]
   // with MutationMapping[F]:
+
+  override val nightPool: Resource[F, Session[F]] = pool
 
   override val typeMappings: TypeMappings = TypeMappings(
     List(
@@ -29,7 +36,7 @@ class ResourceMapping[F[_]: Async](
       QueryMapping
       // SubscriptionMapping,
 
-    ) ++ TelescopeNightTimelineMappings ++ LeafMappings
+    ) ++ PublishedSemesterMappings ++ TelescopeAvailabilityBlockMappings ++ TelescopeModeBlockMappings ++ TooSupportBlockMappings ++ InstrumentAvailabilityBlockMappings ++ TelescopeSubsystemBlockMappings ++ InstrumentComponentBlockMappings ++ ComponentCatalogMappings ++ LeafMappings
   )
 
   override val selectElaborator: SelectElaborator =
