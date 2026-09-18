@@ -278,6 +278,9 @@ trait Services[F[_]]:
   /** The `GuideService`. */
   def guideService: GuideService[F]
 
+  /** The `GuideStarResolver`. */
+  def guideStarResolver: GuideStarResolver[F]
+
   /** The `UserInvitationService` */
   def userInvitationService: UserInvitationService[F]
 
@@ -433,6 +436,7 @@ object Services:
       lazy val generator = Generator.instantiate(commitHash, tc)
       lazy val archiveDuplicationSearchService = ArchiveDuplicationSearchService.instantiate(goaClient0)
       lazy val guideService = GuideService.instantiate(gaiaClient)
+      lazy val guideStarResolver = GuideStarResolver.instantiate(gaiaClient)
       lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val sequenceService = SequenceService.instantiate(tc)
@@ -511,6 +515,7 @@ object Services:
     def obscalcService[F[_]](using Services[F]): ObscalcService[F] = summon[Services[F]].obscalcService
     def timeEstimateService[F[_]](using Services[F]): TimeEstimateService[F] = summon[Services[F]].timeEstimateService
     def guideService[F[_]](using Services[F]): GuideService[F] = summon[Services[F]].guideService
+    def guideStarResolver[F[_]](using Services[F]): GuideStarResolver[F] = summon[Services[F]].guideStarResolver
     def userInvitationService[F[_]](using Services[F]): UserInvitationService[F] = summon[Services[F]].userInvitationService
     def emailService[F[_]](using Services[F]) = summon[Services[F]].emailService
     def telluricTargetsService[F[_]](using Services[F]): TelluricTargetsService[F] = summon[Services[F]].telluricTargetsService
