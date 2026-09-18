@@ -13,7 +13,6 @@ import lucuma.resource.ResourceBaseSuite
 import munit.catseffect.IOFixture
 import natchez.Trace
 import org.http4s.*
-import org.http4s.Uri.Host
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Server
 import org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT
@@ -25,6 +24,8 @@ import org.typelevel.otel4s.trace.Tracer
 import org.typelevel.otel4s.trace.TracerProvider
 import resource.model.config.DatabaseConfiguration
 import resource.server.http4s.ResourceMain
+import skunk.Session
+import skunk.TypingStrategy
 
 import java.nio.file.Paths
 import scala.concurrent.duration.*
@@ -92,12 +93,23 @@ trait ServerFixtures extends munit.CatsEffectSuite with ResourceBaseSuite with T
 
   lazy val serverFixture: IOFixture[Server] = ResourceSuiteLocalFixture("server", server)
 
-  def session = ResourceMain.singleSession[IO](databaseConfig)
+  def session: Resource[IO, Session[IO]] =
+    given TracerProvider[IO] = TracerProvider.noop
+    given MeterProvider[IO]  = MeterProvider.noop
+    val config               = databaseConfig
+    Session
+      .Builder[IO]
+      .withHost(config.host)
+      .withPort(config.port)
+      .withUserAndPassword(config.user, config.password)
+      .withDatabase(config.database)
+      .withTypingStrategy(TypingStrategy.SearchPath)
+      .single
 
   protected def databaseConfig: DatabaseConfiguration =
     DatabaseConfiguration(
       maxConnections = 10,
-      host = Host.unsafeFromString(container.host),
+      host = Host.fromString(container.host).get,
       port = Port.fromInt(container.mappedPort(POSTGRESQL_PORT)).get,
       user = PostgreSQLContainer.defaultUsername,
       password = PostgreSQLContainer.defaultPassword,

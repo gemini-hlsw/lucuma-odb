@@ -885,7 +885,7 @@ lazy val itcLegacyTests = project
 
 lazy val common = project
   .in(file("modules/common-middleware"))
-  .dependsOn(ssoBackendClient)
+  .dependsOn(ssoBackendClient, schema.jvm)
   .settings(
     name := "lucuma-common-middleware",
     libraryDependencies ++= Seq(
@@ -1044,6 +1044,7 @@ lazy val binding = project
       "co.fs2"        %% "fs2-core"           % fs2Version,
       "co.fs2"        %% "fs2-io"             % fs2Version,
       "edu.gemini"    %% "lucuma-core"        % lucumaCoreVersion,
+      "org.tpolecat"  %% "skunk-core"         % skunkVersion,
       "org.typelevel" %% "grackle-core"       % grackleVersion,
       "org.typelevel" %% "grackle-sql-core"   % grackleVersion,
       "org.typelevel" %% "log4cats-core"      % log4catsVersion,

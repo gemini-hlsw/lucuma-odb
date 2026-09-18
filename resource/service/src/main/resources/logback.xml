@@ -6,7 +6,7 @@
 
  It supports auto reloading scanning every 60s.
 -->
-<configuration scan="true" scanPeriod="60 seconds">
+<configuration>
     <logger name="resource" level="INFO" />
     <logger name="org.http4s.server.middleware.Logger" level="WARN" />
 

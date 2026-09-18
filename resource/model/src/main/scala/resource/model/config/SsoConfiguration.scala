@@ -26,7 +26,7 @@ final case class SsoConfiguration(
 object SsoConfiguration:
 
   given Eq[SsoConfiguration] =
-    Eq.by(c => (c.root.renderString, c.serviceJwt))
+    Eq.by(c => (c.root, c.serviceJwt))
 
   private given ConfigDecoder[String, PublicKey] =
     ConfigDecoder[String].mapEither: (_, s) =>

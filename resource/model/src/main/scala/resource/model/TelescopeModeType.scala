@@ -11,3 +11,5 @@ enum TelescopeModeType(val tag: String) derives Enumerated:
   case PriorityVisitor extends TelescopeModeType("PriorityVisitor")
   case Engineering     extends TelescopeModeType("Engineering")
   case Commissioning   extends TelescopeModeType("Commissioning")
+  case Shutdown        extends TelescopeModeType("Shutdown")
+  case BlockScheduling extends TelescopeModeType("BlockScheduling")
