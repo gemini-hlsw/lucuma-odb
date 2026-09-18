@@ -11,6 +11,7 @@ import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.ObservingMode.Instances.given
 import lucuma.odb.sequence.syntax.all.*
@@ -26,7 +27,8 @@ case class GeneratorParams(
   declaredState:    Option[DeclaredExecutionState],
   executionState:   ExecutionState,
   stepCount:        Long,
-  isSplittable:     Boolean
+  isSplittable:     Boolean,
+  altair:           Option[AltairConfiguration]
 ):
 
   // The standard star is chosen to suit the observation time, so a real
@@ -54,7 +56,8 @@ object GeneratorParams:
         a.declaredState,
         a.executionState,
         a.stepCount,
-        a.isSplittable
+        a.isSplittable,
+        a.altair
       )
 
   given HashBytes[GeneratorParams] with
@@ -69,5 +72,9 @@ object GeneratorParams:
         a.declaredState.hashBytes,
         a.executionState.hashBytes,
         a.stepCount.hashBytes,
-        a.isSplittable.hashBytes
+        a.isSplittable.hashBytes,
+        a.altair.map(_.mode).hashBytes,
+        a.altair.flatMap(_.explicitFieldLens).hashBytes,
+        a.altair.map(_.cassRotator).hashBytes,
+        a.altair.map(_.ndFilter).hashBytes
       )
