@@ -356,6 +356,7 @@ object ConfigurationService {
                   id
                 }
                 configuration {
+                  altairMode
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -449,6 +450,7 @@ object ConfigurationService {
                     id
                     status
                     configuration {
+                      altairMode
                       conditions {
                         imageQuality
                         cloudExtinction
@@ -575,6 +577,7 @@ object ConfigurationService {
             matches {
               id
               configuration {
+                altairMode
                 conditions {
                   imageQuality
                   cloudExtinction
@@ -670,6 +673,7 @@ object ConfigurationService {
                   id
                   status
                   configuration {
+                    altairMode
                     conditions {
                       imageQuality
                       cloudExtinction
@@ -787,6 +791,7 @@ object ConfigurationService {
                 id
                 status
                 configuration {
+                  altairMode
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -917,6 +922,7 @@ object ConfigurationService {
                   matches {
                     id
                     configuration {
+                      altairMode
                       conditions {
                         imageQuality
                         cloudExtinction
@@ -1001,6 +1007,7 @@ object ConfigurationService {
                 id
                 status
                 configuration {
+                  altairMode
                   conditions {
                     imageQuality
                     cloudExtinction
@@ -1127,7 +1134,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_altair_mode
         FROM v_configuration_request
         WHERE (
           c_program_id = (select c_program_id from t_observation where c_observation_id = $observation_id) AND
@@ -1156,7 +1164,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating is not distinct from ${gmos_north_grating.opt} AND
           c_gmos_north_ifu_fpu is not distinct from ${gmos_north_ifu_fpu.opt} AND
           c_gmos_south_ifu_grating is not distinct from ${gmos_south_grating.opt} AND
-          c_gmos_south_ifu_fpu is not distinct from ${gmos_south_ifu_fpu.opt}
+          c_gmos_south_ifu_fpu is not distinct from ${gmos_south_ifu_fpu.opt} AND
+          c_altair_mode IS NOT DISTINCT FROM ${altair_mode.opt}
         )
       """.query(
         (
@@ -1190,7 +1199,8 @@ object ConfigurationService {
           gmos_north_grating.opt       *:
           gmos_north_ifu_fpu.opt       *:
           gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt
+          gmos_south_ifu_fpu.opt       *:
+          altair_mode.opt
         ).emap:
           { case
             id                       *:
@@ -1224,6 +1234,7 @@ object ConfigurationService {
             gmosNorthIfuFpu          *:
             gmosSouthIfuGrating      *:
             gmosSouthIfuFpu          *:
+            altairMode               *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
@@ -1331,7 +1342,7 @@ object ConfigurationService {
                       ),
                       t,
                       m,
-                      None
+                      altairMode
                     )
                   )
 
@@ -1367,6 +1378,7 @@ object ConfigurationService {
         cfg.observingMode.gmosNorthIfu.map(_.fpu)                               *:
         cfg.observingMode.gmosSouthIfu.map(_.grating)                           *:
         cfg.observingMode.gmosSouthIfu.map(_.fpu)                               *:
+        cfg.altair                                                              *:
         EmptyTuple
       }
 
@@ -1403,7 +1415,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_altair_mode
         ) VALUES (
           (select c_program_id from t_observation where c_observation_id = $observation_id),
           ${text_nonempty.opt},
@@ -1434,7 +1447,8 @@ object ConfigurationService {
           ${gmos_north_grating.opt},
           ${gmos_north_ifu_fpu.opt},
           ${gmos_south_grating.opt},
-          ${gmos_south_ifu_fpu.opt}
+          ${gmos_south_ifu_fpu.opt},
+          ${altair_mode.opt}
         )
         ON CONFLICT DO NOTHING
         RETURNING
@@ -1468,7 +1482,8 @@ object ConfigurationService {
           c_gmos_north_ifu_grating,
           c_gmos_north_ifu_fpu,
           c_gmos_south_ifu_grating,
-          c_gmos_south_ifu_fpu
+          c_gmos_south_ifu_fpu,
+          c_altair_mode
       """.query(
         (
           configuration_request_id     *:
@@ -1501,7 +1516,8 @@ object ConfigurationService {
           gmos_north_grating.opt       *:
           gmos_north_ifu_fpu.opt       *:
           gmos_south_grating.opt       *:
-          gmos_south_ifu_fpu.opt
+          gmos_south_ifu_fpu.opt       *:
+          altair_mode.opt
         ).emap:
           { case
             id                       *:
@@ -1535,6 +1551,7 @@ object ConfigurationService {
             gmosNorthIfuFpu          *:
             gmosSouthIfuGrating      *:
             gmosSouthIfuFpu          *:
+            altairMode               *:
             EmptyTuple =>
 
               val mode: Either[String, Configuration.ObservingMode] =
@@ -1644,7 +1661,7 @@ object ConfigurationService {
                       ),
                       t,
                       m,
-                      None
+                      altairMode
                     )
                   )
 
@@ -1685,6 +1702,7 @@ object ConfigurationService {
         cfg.observingMode.gmosNorthIfu.map(_.fpu)                               *:
         cfg.observingMode.gmosSouthIfu.map(_.grating)                           *:
         cfg.observingMode.gmosSouthIfu.map(_.fpu)                               *:
+        cfg.altair                                                              *:
         EmptyTuple
       }
 
