@@ -76,6 +76,21 @@ object AltairConfiguration:
       case AltairMode.Ngs                    =>
         explicitFieldLens.orElse(defaultFieldLens(mode, guideStarSeparation))
 
+  /**
+   * The Altair configuration of a telluric standard taken for a science
+   * observation configured this way. A standard is observed on a natural guide
+   * star even when the science observation uses the laser, with the field lens
+   * in. The ND filter position depends on the standard's own guide star rather
+   * than the science one, so it starts out of the beam.
+   */
+  def forTelluric(science: AltairConfiguration): AltairConfiguration =
+    AltairConfiguration(
+      AltairMode.Ngs,
+      if science.mode.usesLaser then FieldLens.In.some else science.explicitFieldLens,
+      science.cassRotator,
+      AltairNdFilter.Out
+    )
+
   val mode: Lens[AltairConfiguration, AltairMode] =
     Focus[AltairConfiguration](_.mode)
 
