@@ -6,6 +6,7 @@ package lucuma.itc.client
 import cats.Eq
 import cats.derived.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Encoder
@@ -34,6 +35,7 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.GmosIfuAnalysis
 import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
+import lucuma.itc.AltairParameters
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.json.encoders.given
 import lucuma.itc.client.json.syntax.*
@@ -196,7 +198,8 @@ object InstrumentMode {
     readMode:          GnirsReadMode,
     wellDepth:         GnirsWellDepth,
     coadds:            PosInt,
-    port:              PortDisposition = PortDisposition.Bottom
+    port:              PortDisposition = PortDisposition.Bottom,
+    altair:            Option[AltairParameters] = none
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GNIRS Spectroscopy"
@@ -204,22 +207,24 @@ object InstrumentMode {
   object GnirsSpectroscopy:
     given Encoder[GnirsSpectroscopy] = a =>
       // `fpu` is a @oneOf input: exactly one of `slitWidth` / `ifu`.
-      val fpuJson: Json  =
+      val fpuJson: Json =
         a.fpu match
           case GnirsFpu.Spectroscopy.Slit(s) => Json.obj("slitWidth" -> s.asScreamingJson)
           case GnirsFpu.Spectroscopy.Ifu(i)  => Json.obj("ifu" -> i.asScreamingJson)
-      Json.obj(
-        "exposureTimeMode"  -> a.exposureTimeMode.asJson,
-        "centralWavelength" -> a.centralWavelength.asJson,
-        "filter"            -> a.filter.asScreamingJson,
-        "fpu"               -> fpuJson,
-        "prism"             -> a.prism.asScreamingJson,
-        "grating"           -> a.grating.asScreamingJson,
-        "camera"            -> a.camera.asScreamingJson,
-        "readMode"          -> a.readMode.asScreamingJson,
-        "wellDepth"         -> a.wellDepth.asScreamingJson,
-        "coadds"            -> a.coadds.asJson,
-        "port"              -> a.port.asScreamingJson
+      Json.fromFields(
+        List(
+          "exposureTimeMode"  -> a.exposureTimeMode.asJson,
+          "centralWavelength" -> a.centralWavelength.asJson,
+          "filter"            -> a.filter.asScreamingJson,
+          "fpu"               -> fpuJson,
+          "prism"             -> a.prism.asScreamingJson,
+          "grating"           -> a.grating.asScreamingJson,
+          "camera"            -> a.camera.asScreamingJson,
+          "readMode"          -> a.readMode.asScreamingJson,
+          "wellDepth"         -> a.wellDepth.asScreamingJson,
+          "coadds"            -> a.coadds.asJson,
+          "port"              -> a.port.asScreamingJson
+        ) ++ a.altair.map(_.asJson).tupleLeft("altair").toList
       )
 
   case class GmosNorthImaging(
@@ -288,7 +293,8 @@ object InstrumentMode {
     readMode:         GnirsReadMode,
     wellDepth:        GnirsWellDepth,
     coadds:           PosInt,
-    port:             PortDisposition = PortDisposition.Side
+    port:             PortDisposition = PortDisposition.Side,
+    altair:           Option[AltairParameters] = none
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GNIRS Imaging"
@@ -296,14 +302,16 @@ object InstrumentMode {
   object GnirsImaging:
 
     given Encoder[GnirsImaging] = a =>
-      Json.obj(
-        "exposureTimeMode" -> a.exposureTimeMode.asJson,
-        "filter"           -> a.filter.asScreamingJson,
-        "camera"           -> a.camera.asScreamingJson,
-        "readMode"         -> a.readMode.asScreamingJson,
-        "wellDepth"        -> a.wellDepth.asScreamingJson,
-        "coadds"           -> a.coadds.asJson,
-        "port"             -> a.port.asScreamingJson
+      Json.fromFields(
+        List(
+          "exposureTimeMode" -> a.exposureTimeMode.asJson,
+          "filter"           -> a.filter.asScreamingJson,
+          "camera"           -> a.camera.asScreamingJson,
+          "readMode"         -> a.readMode.asScreamingJson,
+          "wellDepth"        -> a.wellDepth.asScreamingJson,
+          "coadds"           -> a.coadds.asJson,
+          "port"             -> a.port.asScreamingJson
+        ) ++ a.altair.map(_.asJson).tupleLeft("altair").toList
       )
 
   val gmosNorthSpectroscopy: Prism[InstrumentMode, GmosNorthSpectroscopy] =
@@ -338,25 +346,25 @@ object InstrumentMode {
 
   given Encoder[InstrumentMode] = a =>
     a match
-      case a @ GmosNorthSpectroscopy(centralWavelength = _)       =>
+      case a @ GmosNorthSpectroscopy(centralWavelength = _) =>
         Json.obj("gmosNSpectroscopy" -> a.asJson)
-      case a @ GmosSouthSpectroscopy(centralWavelength = _)       =>
+      case a @ GmosSouthSpectroscopy(centralWavelength = _) =>
         Json.obj("gmosSSpectroscopy" -> a.asJson)
-      case a @ GmosNorthImaging(_, _, _, _)                       =>
+      case a @ GmosNorthImaging(_, _, _, _)                 =>
         Json.obj("gmosNImaging" -> a.asJson)
-      case a @ GmosSouthImaging(_, _, _, _)                       =>
+      case a @ GmosSouthImaging(_, _, _, _)                 =>
         Json.obj("gmosSImaging" -> a.asJson)
-      case a @ Flamingos2Spectroscopy(_, _, _, _, _, _)           =>
+      case a @ Flamingos2Spectroscopy(_, _, _, _, _, _)     =>
         Json.obj("flamingos2Spectroscopy" -> a.asJson)
-      case a @ Flamingos2Imaging(_, _, _, _)                      =>
+      case a @ Flamingos2Imaging(_, _, _, _)                =>
         Json.obj("flamingos2Imaging" -> a.asJson)
-      case a @ Igrins2Spectroscopy(_, _)                          =>
+      case a @ Igrins2Spectroscopy(_, _)                    =>
         Json.obj("igrins2Spectroscopy" -> a.asJson)
-      case a @ GhostSpectroscopy(_, _, _, _)                      =>
+      case a @ GhostSpectroscopy(_, _, _, _)                =>
         Json.obj("ghostSpectroscopy" -> a.asJson)
-      case a @ GnirsSpectroscopy(_, _, _, _, _, _, _, _, _, _, _) =>
+      case a @ GnirsSpectroscopy(centralWavelength = _)     =>
         Json.obj("gnirsSpectroscopy" -> a.asJson)
-      case a @ GnirsImaging(_, _, _, _, _, _, _)                  =>
+      case a @ GnirsImaging(filter = _)                     =>
         Json.obj("gnirsImaging" -> a.asJson)
 
   // `ifuAnalysis` is a @oneOf input: exactly one of `sumRadius` / `singleOffset`, each an

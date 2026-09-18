@@ -31,11 +31,11 @@ class executionAcqGnirsTwoPassTimeAndCount extends ExecutionTestSupportForGnirs:
   // the mode was pinned to Very Bright from the classification pass.
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
-      case InstrumentMode.GnirsImaging(ExposureTimeMode.SignalToNoiseMode(sn, _), _, _, _, _, _, _) =>
+      case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.SignalToNoiseMode(sn, _)) =>
         // Only the classification pass runs in S/N mode here; it uses the classification S/N.
         if sn === AcquisitionClassificationSignalToNoise then IntegrationTime(300.msTimeSpan, PosInt.unsafeFrom(1)).some
         else                                                  none
-      case InstrumentMode.GnirsImaging(ExposureTimeMode.TimeAndCountMode(time, count, _), _, _, _, _, _, _) =>
+      case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.TimeAndCountMode(time, count, _)) =>
         IntegrationTime(time, count).some
       case _                                                                                        =>
         none

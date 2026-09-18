@@ -9,12 +9,12 @@ import cats.syntax.all.*
 import eu.timepit.refined.numeric.NonNegative
 import eu.timepit.refined.refineV
 import io.circe.*
-import io.circe.generic.semiauto.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.*
 import lucuma.core.math.Angle
 import lucuma.core.math.BrightnessUnits.*
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Redshift
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.SingleSN
@@ -28,6 +28,7 @@ import lucuma.core.model.sequence.flamingos2.Flamingos2FpuMask
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.syntax.display.*
 import lucuma.core.syntax.string.*
+import lucuma.itc.AltairParameters
 import lucuma.itc.GraphType
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.ItcGraph
@@ -53,20 +54,32 @@ private[legacy] object codecs:
   private def toItcAirmass(m: Double): Double =
     if (m <= 1.35) 1.2 else if (m <= 1.75) 1.5 else 2.0
 
-  given Encoder[ItcObservingConditions] =
+  private def conditionsJson(a: ItcObservingConditions, iq: (String, Json)): Json =
     import lucuma.itc.legacy.syntax.conditions.*
-    Encoder.forProduct5("exactiq", "exactcc", "wv", "sb", "airmass") { a =>
-      (Json.obj(
-         "arcsec"            -> Json.fromBigDecimal(
-           a.iq.round(MathContext.DECIMAL32)
-         )
-       ),
-       Json.obj("extinction" -> Json.fromBigDecimal(a.cc)),
-       a.wv.ocs2Tag,
-       a.sb.ocs2Tag,
-       toItcAirmass(a.airmass)
-      )
-    }
+    Json.obj(
+      iq,
+      "exactcc" -> Json.obj("extinction" -> Json.fromBigDecimal(a.cc)),
+      "wv"      -> a.wv.ocs2Tag.asJson,
+      "sb"      -> a.sb.ocs2Tag.asJson,
+      "airmass" -> toItcAirmass(a.airmass).asJson
+    )
+
+  given Encoder[ItcObservingConditions] = (a: ItcObservingConditions) =>
+    conditionsJson(
+      a,
+      "exactiq" -> Json.obj("arcsec" -> Json.fromBigDecimal(a.iq.round(MathContext.DECIMAL32)))
+    )
+
+  // Altair LGS+P1 has no legacy model: the correction is modest and independent of the guide star,
+  // so the request goes out without Altair at the OCS 20% image quality bin, which the OCS scales
+  // with wavelength and airmass itself, in place of the exact FWHM the conditions carry.
+  private[legacy] def encodeConditions(
+    a:      ItcObservingConditions,
+    altair: Option[AltairParameters]
+  ): Json =
+    altair match
+      case Some(AltairParameters.LgsP1) => conditionsJson(a, "iq" -> Json.fromString("PERCENT_20"))
+      case _                            => a.asJson
 
   given Encoder[Wavelength] = w =>
     Json.fromString:
@@ -80,8 +93,9 @@ private[legacy] object codecs:
         Wavelength.decimalNanometers
           .getOption(w)
           .toRight(
-            DecodingFailure(s"Invalid wavelength value no enum value matched for $w",
-                            List(CursorOp.Field(key))
+            DecodingFailure(
+              s"Invalid wavelength value no enum value matched for $w",
+              List(CursorOp.Field(key))
             )
           )
       )
@@ -299,8 +313,31 @@ private[legacy] object codecs:
         "pixelScale"        -> Json.fromString(a.camera.pixelScale.ocs2Tag),
         "readMode"          -> Json.fromString(a.readMode.ocs2Tag),
         "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
-        "altair"            -> Json.Null
+        "altair"            -> encodeAltair(a.altair)
       )
+
+  // The legacy AltairParameters block. LGS+P1 has no legacy model and is computed without Altair,
+  // see `encodeConditions`.
+  private[legacy] def encodeAltair(altair: Option[AltairParameters]): Json =
+    def block(
+      separation: Angle,
+      brightness: BrightnessValue,
+      fieldLens:  FieldLens,
+      wfsMode:    String
+    ): Json =
+      Json.obj(
+        "guideStarSeparation" -> Angle.signedDecimalArcseconds.get(separation).asJson,
+        "guideStarMagnitude"  -> brightness.value.value.asJson,
+        "fieldLens"           -> Json.fromString(fieldLens.ocs2Tag),
+        "wfsMode"             -> Json.fromString(wfsMode)
+      )
+    altair match
+      case Some(AltairParameters.Ngs(separation, brightness, fieldLens)) =>
+        block(separation, brightness, fieldLens, "NGS")
+      case Some(AltairParameters.Lgs(separation, brightness))            =>
+        block(separation, brightness, FieldLens.In, "LGS")
+      case Some(AltairParameters.LgsP1) | None                           =>
+        Json.Null
 
   private val encodeGnirsImaging: Encoder[ObservingMode.ImagingMode.Gnirs] = a =>
     Json.obj(
@@ -313,7 +350,7 @@ private[legacy] object codecs:
       "slitWidth"         -> Json.fromString("ACQUISITION"),
       "camera"            -> Json.fromString(a.camera.ocs2Tag),
       "wellDepth"         -> Json.fromString(a.wellDepth.ocs2Tag),
-      "altair"            -> Json.Null
+      "altair"            -> encodeAltair(a.altair)
     )
 
   private given Encoder[ItcInstrumentDetails] = (a: ItcInstrumentDetails) =>
@@ -549,8 +586,14 @@ private[legacy] object codecs:
       "distribution" -> distribution
     )
 
-  given Encoder[ItcParameters] =
-    deriveEncoder[ItcParameters]
+  given Encoder[ItcParameters] = (p: ItcParameters) =>
+    Json.obj(
+      "source"      -> p.source.asJson,
+      "observation" -> p.observation.asJson,
+      "conditions"  -> encodeConditions(p.conditions, p.instrument.mode.altair),
+      "telescope"   -> p.telescope.asJson,
+      "instrument"  -> p.instrument.asJson
+    )
 
   private given Decoder[SeriesDataType] = (c: HCursor) =>
     Decoder.decodeJsonObject(c).flatMap { str =>

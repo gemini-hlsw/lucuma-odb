@@ -11,6 +11,7 @@ import lucuma.core.enums.GmosAmpCount
 import lucuma.core.enums.GmosAmpGain
 import lucuma.core.enums.GmosAmpReadMode
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Redshift
 import lucuma.core.math.SignalToNoise
 import lucuma.core.math.Wavelength
@@ -23,6 +24,7 @@ import lucuma.core.model.sequence.gmos.GmosCcdMode
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
+import lucuma.itc.AltairParameters
 
 import java.time.Duration
 
@@ -57,3 +59,13 @@ given Hash[GnirsFpu.Spectroscopy] = Hash.by:
 given Hash[GmosIfuAnalysis] = Hash.by:
   case GmosIfuAnalysis.Sum(radius)    => (0, radius.toMicroarcseconds)
   case GmosIfuAnalysis.Single(offset) => (1, offset.toMicroarcseconds)
+
+given Hash[BrightnessValue] = Hash.by(_.value.value)
+
+given Hash[AltairParameters] = Hash.by:
+  case AltairParameters.Ngs(separation, brightness, fieldLens) =>
+    (0, separation.toMicroarcseconds, brightness.value.value, fieldLens.tag)
+  case AltairParameters.Lgs(separation, brightness)            =>
+    (1, separation.toMicroarcseconds, brightness.value.value, "")
+  case AltairParameters.LgsP1                                  =>
+    (2, 0L, BigDecimal(0), "")

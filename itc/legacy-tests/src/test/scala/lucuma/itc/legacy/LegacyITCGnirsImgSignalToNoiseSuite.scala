@@ -5,13 +5,16 @@ package lucuma.itc.legacy
 
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
+import lucuma.core.enums.FieldLens
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
 import lucuma.core.util.Enumerated
+import lucuma.itc.AltairParameters
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails
 import lucuma.itc.service.ObservingMode
@@ -70,6 +73,42 @@ class LegacyITCGnirsImgSignalToNoiseSuite extends CommonITCLegacySuite:
     assertAllValid(Enumerated[GnirsWellDepth].all): w =>
       localItc.calculate:
         bodyConf(sourceDefinition, obs, gnirs.copy(wellDepth = w)).asJson.noSpaces
+
+  // Altair through the real OCS jars on the imaging recipe; the AO section runs before the
+  // imaging/spectroscopy split, but only this path exercises it with imaging apertures.
+  private val altairGuideStar: (Angle, BrightnessValue) =
+    (Angle.fromDoubleArcseconds(3.5), BrightnessValue.unsafeFrom(12.0))
+
+  test("gnirs imaging altair NGS".tag(LegacyITCTest)):
+    val (separation, brightness) = altairGuideStar
+    val result                   = localItc.calculate:
+      bodyConf(
+        sourceDefinition,
+        obs,
+        gnirs.copy(altair = Some(AltairParameters.Ngs(separation, brightness, FieldLens.In)))
+      ).asJson.noSpaces
+    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+
+  test("gnirs imaging altair LGS".tag(LegacyITCTest)):
+    val (separation, _) = altairGuideStar
+    val result          = localItc.calculate:
+      bodyConf(
+        sourceDefinition,
+        obs,
+        gnirs.copy(altair =
+          Some(AltairParameters.Lgs(separation, BrightnessValue.unsafeFrom(16.0)))
+        )
+      ).asJson.noSpaces
+    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
+
+  // LGS+P1 goes out without Altair at the 20% image quality bin
+  test("gnirs imaging altair LGS+P1".tag(LegacyITCTest)):
+    val result = localItc.calculate:
+      bodyConf(sourceDefinition,
+               obs,
+               gnirs.copy(altair = Some(AltairParameters.LgsP1))
+      ).asJson.noSpaces
+    assertIOBoolean(result.map(_.fold(_ => false, containsValidResults)))
 
   testConditions("GNIRS imaging integration time", baseParams)
 

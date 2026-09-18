@@ -5,6 +5,7 @@
 #import Flamingos2Disperser, Flamingos2FpuMaskInput, Flamingos2Filter, Flamingos2ReadMode from "lucuma/odb/graphql/OdbSchema.graphql"
 #import GhostReadMode, GhostBinning, GhostResolutionMode from "lucuma/odb/graphql/OdbSchema.graphql"
 #import GnirsFilter, GnirsFpuSlit, GnirsFpuIfu, GnirsPrism, GnirsGrating, GnirsCamera, GnirsReadMode, GnirsWellDepth from "lucuma/odb/graphql/OdbSchema.graphql"
+#import AltairMode, FieldLens from "lucuma/odb/graphql/OdbSchema.graphql"
 
 """
 ##########
@@ -336,6 +337,34 @@ input GnirsFpuSpectroscopyInput @oneOf {
   ifu: GnirsFpuIfu
 }
 
+"""
+Altair adaptive optics configuration. NGS and LGS need the natural guide star's separation
+and R-band brightness; LGS_P1 takes no other field and is computed without Altair at the
+20% image quality bin.
+"""
+input AltairInput {
+  """
+  Altair mode.
+  """
+  mode: AltairMode!
+
+  """
+  Angular separation between the science target and the natural guide star. Required for NGS
+  and LGS.
+  """
+  guideStarSeparation: AngleInput
+
+  """
+  R-band Vega magnitude of the natural guide star. Required for NGS and LGS.
+  """
+  guideStarBrightness: BigDecimal
+
+  """
+  Field lens position. NGS only; LGS always uses the field lens.
+  """
+  fieldLens: FieldLens
+}
+
 input GnirsSpectroscopyInput {
   """
   Exposure time mode.
@@ -391,6 +420,11 @@ input GnirsSpectroscopyInput {
   Instrument port disposition
   """
   port: PortDisposition = SIDE
+
+  """
+  Altair configuration, when observing behind Altair.
+  """
+  altair: AltairInput
 }
 
 input GnirsImagingInput {
@@ -428,6 +462,11 @@ input GnirsImagingInput {
   Instrument port disposition
   """
   port: PortDisposition = SIDE
+
+  """
+  Altair configuration, when observing behind Altair.
+  """
+  altair: AltairInput
 }
 
 """

@@ -32,7 +32,7 @@ class executionAcqGnirsDerivedSignalToNoise extends ExecutionTestSupportForGnirs
   //   K → 30s  × 1  = 30s  → Faint
   override def fakeItcImagingResultFor(input: ImagingInput): Option[IntegrationTime] =
     input.mode match
-      case InstrumentMode.GnirsImaging(ExposureTimeMode.SignalToNoiseMode(_, _), filter, _, _, _, _, _) =>
+      case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.SignalToNoiseMode(_, _), filter = filter) =>
         filter match
           case GnirsFilter.Y      => IntegrationTime(300.msTimeSpan, 1.refined).some
           case GnirsFilter.J      => IntegrationTime(2.secTimeSpan,  3.refined).some
@@ -40,7 +40,7 @@ class executionAcqGnirsDerivedSignalToNoise extends ExecutionTestSupportForGnirs
           case GnirsFilter.H2     => IntegrationTime(2.secTimeSpan,  3.refined).some
           case GnirsFilter.Order4 => IntegrationTime(5.secTimeSpan,  1.refined).some
           case _                  => none
-      case InstrumentMode.GnirsImaging(ExposureTimeMode.TimeAndCountMode(time, count, _), _, _, _, _, _, _) =>
+      case InstrumentMode.GnirsImaging(exposureTimeMode = ExposureTimeMode.TimeAndCountMode(time, count, _)) =>
         IntegrationTime(time, count).some
       case _ => none
 
