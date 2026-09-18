@@ -63,7 +63,8 @@ trait ServiceOperations { this: OdbSuite =>
       useBlindOffset = none,
       blindOffsetTarget = Nullable.NonNull(defaultCreateTargetInput(name)),
       blindOffsetType = blindOffsetType,
-      explicitGuideProbe = Nullable.Absent
+      explicitGuideProbe = Nullable.Absent,
+      altair = Nullable.Absent
     )
 
   def createTargetViaServiceAs(

@@ -7295,6 +7295,13 @@ input TargetEnvironmentInput {
   override and fall back to the default probe for the mode and target type.
   """
   explicitGuideProbe: GuideProbe
+
+  """
+  Altair adaptive optics configuration, only for GNIRS observations. On create,
+  absence means no Altair. On edit, absence leaves the configuration alone,
+  null clears it, and a value replaces it entirely.
+  """
+  altair: AltairInput
 }
 
 """
@@ -15696,6 +15703,73 @@ enum FieldLens {
 }
 
 """
+Altair neutral density filter position. The filter attenuates only the Altair
+wavefront sensor path, never the science beam, and is used for very bright
+natural guide stars.
+"""
+enum AltairNdFilter {
+  IN
+
+  OUT
+}
+
+"""
+Altair (Gemini North adaptive optics) configuration. Only GNIRS observations
+may be configured to observe behind Altair.
+"""
+type Altair {
+  """
+  The Altair guiding mode.
+  """
+  mode: AltairMode!
+
+  """
+  The user's field lens override, or null for AUTO. When AUTO the field lens
+  follows the guide star separation. The LGS modes always use the field lens,
+  so an explicit value of OUT is rejected for them.
+  """
+  explicitFieldLens: FieldLens
+
+  """
+  The cassegrain rotator tracking mode used while observing behind Altair.
+  """
+  cassRotator: CassRotator!
+
+  """
+  The Altair neutral density filter position.
+  """
+  ndFilter: AltairNdFilter!
+}
+
+"""
+Altair configuration creation and editing parameters. The value replaces the
+observation's entire Altair configuration.
+"""
+input AltairInput {
+  """
+  The Altair guiding mode.
+  """
+  mode: AltairMode!
+
+  """
+  Overrides the automatic field lens choice. Omit (or assign null) for AUTO, in
+  which case the field lens follows the guide star separation. The LGS modes
+  always use the field lens, so OUT is rejected for them.
+  """
+  fieldLens: FieldLens
+
+  """
+  The cassegrain rotator tracking mode used while observing behind Altair.
+  """
+  cassRotator: CassRotator = FOLLOWING
+
+  """
+  The Altair neutral density filter position.
+  """
+  ndFilter: AltairNdFilter = OUT
+}
+
+"""
 Enumeration for Guide Probes
 """
 enum GuideProbe {
@@ -15706,6 +15780,8 @@ enum GuideProbe {
   GMOS_OIWFS
 
   FLAMINGOS2_OIWFS
+
+  ALTAIR_AOWFS
 }
 
 """
@@ -21261,9 +21337,17 @@ type TargetEnvironment {
   explicitGuideProbe: GuideProbe
 
   """
-  The cassegrain rotator tracking mode.
+  The cassegrain rotator tracking mode: the value stored with the Altair
+  configuration when the observation has one, otherwise derived from the
+  instrument.
   """
   cassRotator: CassRotator!
+
+  """
+  Altair adaptive optics configuration, only for GNIRS observations. Null when
+  the observation does not observe behind Altair.
+  """
+  altair: Altair
 }
 
 type TargetGroup {
