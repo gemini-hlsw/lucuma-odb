@@ -26,8 +26,10 @@ import cats.syntax.reducible.*
 import cats.syntax.traverse.*
 import clue.ResponseException
 import fs2.Stream
+import grackle.Problem
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
+import lucuma.core.enums.AltairMode
 import lucuma.core.enums.Band
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
@@ -42,6 +44,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.util.TimeSpan
+import lucuma.itc.AltairParameters
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcGhostDetector
@@ -61,6 +64,7 @@ import lucuma.odb.data.ItcResult
 import lucuma.odb.data.ItcScience
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
+import lucuma.odb.sequence.data.AltairRequest
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ItcInputDerivation
@@ -330,12 +334,88 @@ object ItcService {
 
         params.itcInput match
           case ItcInputDerivation.Ready(p)      =>
-            callRemoteItc(oid, p).flatTap: r =>
-              services.transactionally(storeItc(pid, oid, p, r))
+            resolveAltair(oid, p).flatMap:
+              case Left(e)  => e.asLeft[Itc].pure[F]
+              case Right(r) =>
+                callRemoteItc(oid, r).flatTap: res =>
+                  services.transactionally(storeItc(pid, oid, p, res))
           case ItcInputDerivation.Incomplete(m) => missing(m)
           // No ITC applies to this mode; callers gate on Ready, so this is defensive.
           case ItcInputDerivation.NotApplicable =>
             OdbError.InvalidObservation(oid, "ITC is not applicable for this observing mode".some).asLeft[Itc].pure[F]
+
+      /**
+       * The Altair configuration and stored guide star an ITC input carries, if any. Only the
+       * GNIRS inputs can have one.
+       */
+      private def altairRequest(input: ItcInput): Option[AltairRequest] =
+        input match
+          case i @ ItcInput.Imaging(science = _)           => i.altair
+          case i @ ItcInput.GnirsSpectroscopy(science = _) => i.altair
+          case _                                           => none
+
+      // A Gaia or tracking failure is transient, so this is deliberately not an ItcError:
+      // storeItc caches only deterministic (ItcError) failures.
+      private def guideStarError(
+        oid:     Observation.Id,
+        failure: Either[Throwable, NonEmptyChain[Problem]]
+      ): OdbError =
+        val msg = failure.fold(_.getMessage, _.toChain.toList.map(_.message).mkString("; "))
+        OdbError.GuideEnvironmentError(s"Could not resolve the guide star selected for observation '$oid': $msg.".some)
+
+      // What the ITC needs of Altair, resolving the stored guide star against Gaia. LGS+P1 needs
+      // no star, and an observation with none stored yet is calculated without Altair.
+      private def resolveAltairParameters(
+        oid:     Observation.Id,
+        request: AltairRequest
+      ): F[Either[OdbError, Option[AltairParameters]]] =
+        request.configuration.mode match
+          case AltairMode.LgsP1                =>
+            AltairParameters.LgsP1.some.asRight[OdbError].pure[F]
+          case AltairMode.Lgs | AltairMode.Ngs =>
+            request.guideStarName.fold(none[AltairParameters].asRight[OdbError].pure[F]): _ =>
+              guideStarResolver.resolve(oid).map: result =>
+                result.toEither.bimap(
+                  guideStarError(oid, _),
+                  _.flatMap(star => request.configuration.itcParameters(star.separation, star.rBrightness))
+                )
+
+      // Writes the Altair parameters into every GNIRS mode of the input.
+      private def withAltairParameters(
+        input:  ItcInput,
+        params: Option[AltairParameters]
+      ): ItcInput =
+        def setMode(mode: InstrumentMode): InstrumentMode =
+          mode match
+            case m @ InstrumentMode.GnirsImaging(filter = _)                 => m.copy(altair = params)
+            case m @ InstrumentMode.GnirsSpectroscopy(centralWavelength = _) => m.copy(altair = params)
+            case m                                                           => m
+
+        input match
+          case i @ ItcInput.Imaging(science = _)           =>
+            i.copy(
+              science     = i.science.map(ImagingParameters.mode.modify(setMode)),
+              acquisition = i.acquisition.map(ImagingParameters.mode.modify(setMode))
+            )
+          case i @ ItcInput.GnirsSpectroscopy(science = _) =>
+            i.copy(
+              acquisition = ImagingParameters.mode.modify(setMode)(i.acquisition),
+              science     = i.science.map(SpectroscopyParameters.mode.modify(setMode))
+            )
+          case i                                           =>
+            i
+
+      /**
+       * Fills in the Altair parameters the remote ITC needs. This queries Gaia, so every caller
+       * must be outside a transaction. The result feeds the remote call only: the cache key stays
+       * the hash of `input`, which is derived from the database alone.
+       */
+      private def resolveAltair(
+        oid:   Observation.Id,
+        input: ItcInput
+      )(using NoTransaction[F]): F[Either[OdbError, ItcInput]] =
+        altairRequest(input).fold(input.asRight[OdbError].pure[F]): request =>
+          resolveAltairParameters(oid, request).map(_.map(withAltairParameters(input, _)))
 
       // Selects the parameters then checks the cache
       // Returns None if not cached (call remote), Some(Right) for cached success,
@@ -443,12 +523,19 @@ object ItcService {
         // deleted out from under it, and a failed statement would otherwise
         // abort a shared transaction and discard every other result too.
         for
-          inputs  <- services.transactionally(selectWarmInputs(programId))
-          results <- inputs.parTraverseN(WarmConcurrency): (oid, input) =>
-                       callRemoteItc(oid, input).map((oid, input, _))
-          _       <- results.traverse_ { case (oid, input, result) =>
-                       services.transactionally(storeItc(programId, oid, input, result))
-                     }
+          inputs   <- services.transactionally(selectWarmInputs(programId))
+          // Altair resolution queries Gaia, so it happens here: after the selection transaction
+          // has closed, and sequentially, since it shares this Services' one session.
+          resolved <- inputs.traverse: (oid, input) =>
+                        resolveAltair(oid, input).map((oid, input, _))
+          results  <- resolved.parTraverseN(WarmConcurrency): (oid, input, ready) =>
+                        ready.fold(
+                          e => (oid, input, e.asLeft[Itc]).pure[F],
+                          r => callRemoteItc(oid, r).map((oid, input, _))
+                        )
+          _        <- results.traverse_ { case (oid, input, result) =>
+                        services.transactionally(storeItc(programId, oid, input, result))
+                      }
         yield ()
 
       // The observations warmAll must actually call the remote service for,
@@ -841,11 +928,11 @@ object ItcService {
           yield Itc(ItcAcquisition.NotApplicable, ItcScience.Spectroscopy(sci))
 
         (input match
-          case im @ ItcInput.Imaging(_, _, _, _, _, _) =>
+          case im @ ItcInput.Imaging(science = _) =>
             imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _, _, _, _) =>
+          case sp @ ItcInput.Spectroscopy(science = _) =>
             spectroscopy(sp)
-          case sp @ ItcInput.GnirsSpectroscopy(_, _, _, _, _, _, _) =>
+          case sp @ ItcInput.GnirsSpectroscopy(science = _) =>
             gnirsSpectroscopy(sp)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets, _) =>
             ghost(gh, targets)
@@ -948,37 +1035,41 @@ object ItcService {
         params
           .flatMap: params =>
             params.itcInput match
-              case ItcInputDerivation.Ready(sp: ItcInput.Spectroscopy)           =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
-                  .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
-
-              // GNIRS spectroscopy has a single acquisition pass regardless of how
-              // many central wavelengths the science side has.
-              case ItcInputDerivation.Ready(sp: ItcInput.GnirsSpectroscopy)      =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
-                  .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
-
-              // GNIRS imaging has an acquisition sequence; other imaging modes don't
-              // (`acquisitionInput` is empty for them).
-              case ItcInputDerivation.Ready(im: ItcInput.Imaging)                =>
-                im.acquisitionInput match
-                  case None        => NotApplicable
-                  case Some(input) =>
-                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
+              case ItcInputDerivation.Ready(input)  =>
+                // Resolving the Altair guide star queries Gaia, so it happens here, after the
+                // transaction that selected the parameters has closed.
+                EitherT(resolveAltair(oid, input)).flatMap:
+                  case sp @ ItcInput.Spectroscopy(science = _)       =>
+                    safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
                       .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
-              // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
-              case ItcInputDerivation.Ready(_: ItcInput.ScienceOnlySpectroscopy) =>
-                NotApplicable
+                  // GNIRS spectroscopy has a single acquisition pass regardless of how
+                  // many central wavelengths the science side has.
+                  case sp @ ItcInput.GnirsSpectroscopy(science = _)  =>
+                    safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+                      .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
+
+                  // GNIRS imaging has an acquisition sequence; other imaging modes don't
+                  // (`acquisitionInput` is empty for them).
+                  case im @ ItcInput.Imaging(science = _)            =>
+                    im.acquisitionInput match
+                      case None        => NotApplicable
+                      case Some(input) =>
+                        safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
+                          .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
+
+                  // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
+                  case ItcInput.ScienceOnlySpectroscopy(science = _) =>
+                    NotApplicable
 
               // Incomplete parameters mean the acquisition ITC cannot be derived at
               // all: report that here rather than leaving it for a caller to notice.
-              case ItcInputDerivation.Incomplete(m)                              =>
+              case ItcInputDerivation.Incomplete(m) =>
                 EitherT.leftT:
                   Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))
 
               // No ITC at all (exchange / visitor): there is no acquisition sequence.
-              case ItcInputDerivation.NotApplicable                              =>
+              case ItcInputDerivation.NotApplicable =>
                 NotApplicable
           .value
 

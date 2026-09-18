@@ -1042,6 +1042,7 @@ lazy val sequence = project
   .settings(
     name := "lucuma-odb-sequence",
     libraryDependencies ++= Seq(
+      "edu.gemini"    %% "lucuma-ags"         % lucumaCoreVersion,
       "edu.gemini"    %% "lucuma-refined"     % lucumaRefinedVersion,
       "org.scalameta" %% "munit"              % munitVersion           % Test,
       "org.scalameta" %% "munit-scalacheck"   % munitScalacheckVersion % Test,
