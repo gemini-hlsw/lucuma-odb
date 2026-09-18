@@ -495,12 +495,12 @@ object GuideService {
         NonEmptyList.fromList(oids).fold(Map.empty.pure[F]): nel =>
           val af = Statements.getGuideProbeInfo(nel)
           session
-            .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt *: guide_probe.opt *: bool *: bool))
+            .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt *: guide_probe.opt *: altair_mode.opt *: bool *: bool))
             .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
             .map: rows =>
-              rows.map: (oid, mode, explicit, hasTargets, hasNonsidereal) =>
-                val trackType = if hasNonsidereal then TrackType.Nonsidereal else TrackType.Sidereal
-                val default   = mode.filter(_ => hasTargets).flatMap(probes.defaultGuideProbe(_, trackType))
+              rows.map: (oid, mode, explicit, altair, hasTargets, hasNonsidereal) =>
+                val trackType: TrackType        = if hasNonsidereal then TrackType.Nonsidereal else TrackType.Sidereal
+                val default: Option[GuideProbe] = mode.filter(_ => hasTargets).flatMap(probes.defaultGuideProbe(_, trackType, altair))
                 oid -> GuideService.GuideProbeSelection(default, explicit)
               .toMap
 
@@ -1181,6 +1181,7 @@ object GuideService {
           o.c_observation_id,
           o.c_observing_mode_type,
           o.c_explicit_guide_probe,
+          o.c_altair_mode,
           count(t.c_target_id) > 0,
           coalesce(bool_or(t.c_type = 'nonsidereal'), false)
         FROM t_observation o
@@ -1188,7 +1189,7 @@ object GuideService {
         LEFT JOIN t_target t ON t.c_target_id = a.c_target_id AND t.c_existence = 'present'
         WHERE o.c_observation_id IN (
       """ |+| oids.map(sql"$observation_id").intercalate(void", ") |+| void""")
-        GROUP BY o.c_observation_id, o.c_observing_mode_type, o.c_explicit_guide_probe
+        GROUP BY o.c_observation_id, o.c_observing_mode_type, o.c_explicit_guide_probe, o.c_altair_mode
       """
 
     def getBlindOffsetTracking(oid: Observation.Id): AppliedFragment =

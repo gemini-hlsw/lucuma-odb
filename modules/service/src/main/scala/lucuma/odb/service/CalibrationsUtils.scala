@@ -388,6 +388,7 @@ trait CalibrationObservations {
                 none,
                 none,
                 BlindOffsetType.Manual,
+                none,
                 none
               ).some,
               constraintSet = roleConstraints(CalibrationRole.SpectroPhotometric).some,
@@ -435,6 +436,7 @@ trait CalibrationObservations {
                 none,
                 none,
                 BlindOffsetType.Manual,
+                none,
                 none
               ).some,
               constraintSet = roleConstraints(CalibrationRole.Twilight).some,
