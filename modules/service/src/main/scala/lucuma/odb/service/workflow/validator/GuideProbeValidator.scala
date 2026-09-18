@@ -15,5 +15,5 @@ object GuideProbeValidator extends ObservationValidator:
 
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
     (info.observingMode, info.explicitGuideProbe).tupled.foldMap: (mode, probe) =>
-      if probes.isProbeAllowed(mode, probe) then ObservationValidationMap.empty
+      if probes.isProbeAllowed(mode, info.altair.map(_.mode), probe) then ObservationValidationMap.empty
       else ObservationValidationMap.singleton(ObservationValidation.configuration(GuideProbeRules.notAllowedMessage(mode, probe)))
