@@ -270,6 +270,10 @@ object Generator:
                  else NonNegInt.unsafeFrom(1)
           yield ExecutionDigest(estimator.estimateSetupTime, c, a, s)
 
+        // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
+        def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
+          if ctx.params.altair.exists(_.mode.usesLaser) then calculator.gnirsLgsSetup else nominal
+
         val done =
           EitherT.pure[F, OdbError]:
             ExecutionDigest(
@@ -307,11 +311,11 @@ object Generator:
             case ObservingModeType.GmosSouthIfu       =>
               EitherT(streaming.selectOrGenerateGmosSouthIfu(ctx)).flatMap(digest(_, calculator.gmosSouthIfuSetup))
             case ObservingModeType.GnirsImaging       =>
-              EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, calculator.gnirsImagingSetup))
+              EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsImagingSetup)))
             case ObservingModeType.GmosSouthMos       =>
               EitherT(streaming.selectOrGenerateGmosSouthMos(ctx)).flatMap(digest(_, calculator.gmosSouthMosSetup))
             case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
-              EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, calculator.gnirsLongSlitSetup))
+              EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsLongSlitSetup)))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
             case vis: VisitorObservingModeType        =>
