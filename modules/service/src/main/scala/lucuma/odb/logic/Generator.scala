@@ -325,8 +325,10 @@ object Generator:
               EitherT(streaming.selectOrGenerateGnirsImaging(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsImagingSetup)))
             case ObservingModeType.GmosSouthMos       =>
               EitherT(streaming.selectOrGenerateGmosSouthMos(ctx)).flatMap(digest(_, calculator.gmosSouthMosSetup))
-            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
+            case ObservingModeType.GnirsLongSlit      =>
               EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsLongSlitSetup)))
+            case ObservingModeType.GnirsIfu           =>
+              EitherT(streaming.selectOrGenerateGnirsSpectroscopy(ctx)).flatMap(digest(_, gnirsSetup(calculator.gnirsIfuSetup)))
             case ObservingModeType.Igrins2LongSlit    =>
               EitherT(streaming.selectOrGenerateIgrins2LongSlit(ctx)).flatMap(digest(_, calculator.igrins2LongSlitSetup))
             case vis: VisitorObservingModeType        =>
