@@ -16,16 +16,21 @@ import lucuma.itc.client.ImagingParameters
 import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.arb.ArbInstrumentMode
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.sequence.gmos.longslit.Config
 import lucuma.odb.sequence.gmos.longslit.arb.ArbGmosLongSlitConfig
 import org.scalacheck.*
 import org.scalacheck.Arbitrary.arbitrary
 
 trait ArbGeneratorParams:
+  import ArbAltairConfiguration.given
   import ArbEnumerated.given
   import ArbGmosLongSlitConfig.given
   import ArbInstrumentMode.given
   import ArbItcInput.given
+
+  private val genAltair: Gen[Option[AltairConfiguration]] =
+    Gen.option(arbitrary[AltairConfiguration])
 
   private def genItcInput(mo: InstrumentMode): Gen[ItcInput] =
     arbitrary[ItcInput.Spectroscopy]
@@ -47,7 +52,8 @@ trait ArbGeneratorParams:
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp)
+      alt <- genAltair
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
@@ -62,7 +68,8 @@ trait ArbGeneratorParams:
       es  <- arbitrary[ExecutionState]
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp)
+      alt <- genAltair
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:
