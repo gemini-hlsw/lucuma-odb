@@ -455,8 +455,7 @@ object GeneratorParamsService {
                   camera           = gnm.camera,
                   readMode         = readMode,
                   wellDepth        = gnm.wellDepth,
-                  coadds           = f.coadds,
-                  altair           = none
+                  coadds           = f.coadds
                 )
               )
 
@@ -480,8 +479,7 @@ object GeneratorParamsService {
                   camera           = gnm.camera,
                   readMode         = GnirsReadMode.Bright,
                   wellDepth        = gnm.wellDepth,
-                  coadds           = gnm.acquisition.coadds,
-                  altair           = none
+                  coadds           = gnm.acquisition.coadds
                 )
               )
 
@@ -697,8 +695,7 @@ object GeneratorParamsService {
                 camera            = gn.camera,
                 readMode          = sciReadMode,
                 wellDepth         = gn.wellDepth,
-                coadds            = w.coadds,
-                altair            = none
+                coadds            = w.coadds
               )
 
             // Two-pass acquisition ITC whenever the acquisition mode and filter are
@@ -723,8 +720,7 @@ object GeneratorParamsService {
                 camera           = gn.acquisitionCamera,
                 readMode         = GnirsReadMode.Bright,
                 wellDepth        = gn.wellDepth,
-                coadds           = gn.acquisition.coadds,
-                altair           = none
+                coadds           = gn.acquisition.coadds
               ),
               sciModes = sciModes,
               gnirsAcqAutoClassify = acqAutoClassify,

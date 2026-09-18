@@ -42,8 +42,7 @@ class LegacyITCGnirsImgExpTimeSuite extends CommonITCLegacySuite:
     readMode = GnirsReadMode.Bright,
     wellDepth = GnirsWellDepth.Shallow,
     coadds = PosInt.unsafeFrom(1),
-    portDisposition = PortDisposition.Bottom,
-    altair = None
+    portDisposition = PortDisposition.Bottom
   )
 
   override def instrument = ItcInstrumentDetails(gnirs)

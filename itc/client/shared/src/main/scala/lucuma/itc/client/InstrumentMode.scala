@@ -6,6 +6,7 @@ package lucuma.itc.client
 import cats.Eq
 import cats.derived.*
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.Encoder
@@ -198,7 +199,7 @@ object InstrumentMode {
     wellDepth:         GnirsWellDepth,
     coadds:            PosInt,
     port:              PortDisposition = PortDisposition.Bottom,
-    altair:            Option[AltairParameters]
+    altair:            Option[AltairParameters] = none
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GNIRS Spectroscopy"
@@ -293,7 +294,7 @@ object InstrumentMode {
     wellDepth:        GnirsWellDepth,
     coadds:           PosInt,
     port:             PortDisposition = PortDisposition.Side,
-    altair:           Option[AltairParameters]
+    altair:           Option[AltairParameters] = none
   ) extends InstrumentMode derives Eq:
     override def displayName: String =
       "GNIRS Imaging"

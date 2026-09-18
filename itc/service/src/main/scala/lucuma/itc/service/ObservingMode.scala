@@ -209,7 +209,7 @@ object ObservingMode {
       wellDepth:           GnirsWellDepth,
       coadds:              PosInt,
       portDisposition:     PortDisposition,
-      override val altair: Option[AltairParameters]
+      override val altair: Option[AltairParameters] = none
     ) extends SpectroscopyMode derives Hash {
       val instrument: Instrument =
         Instrument.Gnirs
@@ -300,7 +300,7 @@ object ObservingMode {
       wellDepth:           GnirsWellDepth,
       coadds:              PosInt,
       portDisposition:     PortDisposition,
-      override val altair: Option[AltairParameters]
+      override val altair: Option[AltairParameters] = none
     ) extends ImagingMode derives Hash {
       val instrument: Instrument = Instrument.Gnirs
 

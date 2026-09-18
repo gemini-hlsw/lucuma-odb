@@ -26,7 +26,26 @@ object AltairInput:
           ) =>
         (rMode, rSeparation, rBrightness, rFieldLens).parTupled.flatMap(create)
 
+  private def signedArcsec(a: Angle): BigDecimal =
+    Angle.signedDecimalArcseconds.get(a)
+
+  private def isNegative(a: Angle): Boolean =
+    signedArcsec(a) < 0
+
   private def create(
+    mode:       AltairMode,
+    separation: Option[Angle],
+    brightness: Option[BrightnessValue],
+    fieldLens:  Option[FieldLens]
+  ): Result[AltairParameters] =
+    separation.filter(isNegative) match
+      case Some(s) =>
+        Result.failure:
+          s"Altair guideStarSeparation must not be negative, got ${signedArcsec(s)} arcsec."
+      case None    =>
+        byMode(mode, separation, brightness, fieldLens)
+
+  private def byMode(
     mode:       AltairMode,
     separation: Option[Angle],
     brightness: Option[BrightnessValue],

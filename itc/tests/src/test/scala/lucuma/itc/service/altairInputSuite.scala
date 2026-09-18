@@ -103,6 +103,14 @@ class altairInputSuite extends GraphQLSuite:
       List(Rejected + "Altair LGS requires guideStarSeparation and guideStarBrightness.")
     )
 
+  test("a negative guide star separation is rejected"):
+    queryErrors(
+      spectroscopyQuery(
+        """{ mode: NGS, guideStarSeparation: { arcseconds: -3.5 }, guideStarBrightness: 12.5, fieldLens: OUT }"""
+      ),
+      List(Rejected + "Altair guideStarSeparation must not be negative, got -3.500000 arcsec.")
+    )
+
   test("LGS_P1 alone is accepted"):
     queryErrors(spectroscopyQuery("""{ mode: LGS_P1 }"""), Nil)
 
