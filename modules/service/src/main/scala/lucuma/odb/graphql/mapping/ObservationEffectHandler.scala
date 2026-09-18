@@ -6,6 +6,7 @@ package mapping
 
 import cats.Eq
 import cats.syntax.applicative.*
+import cats.syntax.apply.*
 import cats.syntax.eq.*
 import cats.syntax.traverse.*
 import grackle.Cursor
@@ -14,6 +15,7 @@ import grackle.Query
 import grackle.Query.EffectHandler
 import grackle.Result
 import grackle.ResultT
+import grackle.syntax.*
 import io.circe.Encoder as CirceEncoder
 import io.circe.syntax.*
 import lucuma.core.model.Observation
@@ -39,11 +41,21 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
   protected def batchedEffectHandler[R](
     calculateAll: User ?=> List[Observation.Id] => F[Map[Observation.Id, Result[R]]]
   )(using CirceEncoder[R]): EffectHandler[F] =
+    batchedEffectHandler[Unit, R](_ => ().success, rows => calculateAll(rows.map(_._1)))
+
+  /**
+   * Batched effect handler keyed by observation id, where the calculation also needs values read
+   * from each observation's own cursor.
+   */
+  protected def batchedEffectHandler[E, R](
+    readCursor:   Cursor => Result[E],
+    calculateAll: User ?=> List[(Observation.Id, E)] => F[Map[Observation.Id, Result[R]]]
+  )(using CirceEncoder[R]): EffectHandler[F] =
     new EffectHandler[F] {
 
-      private def oids(queries: List[(Query, Cursor)]): Result[List[Observation.Id]] =
+      private def rows(queries: List[(Query, Cursor)]): Result[List[(Observation.Id, E)]] =
         queries.traverse:
-          case (_, cursor) => cursor.fieldAs[Observation.Id]("id")
+          case (_, cursor) => (cursor.fieldAs[Observation.Id]("id"), readCursor(cursor)).tupled
 
       private def missing(oid: Observation.Id): Result[R] =
         Result.failure(s"No result computed for observation $oid")
@@ -51,9 +63,9 @@ trait ObservationEffectHandler[F[_]] extends ObservationView[F] {
       def runEffects(queries: List[(Query, Cursor)]): F[Result[List[Cursor]]] =
         (for {
           usr <- ResultT.fromResult(UserEnv.fromQueries(queries))
-          os  <- ResultT(oids(queries).pure[F])
+          os  <- ResultT(rows(queries).pure[F])
           map <- ResultT.liftF(calculateAll(using usr)(os))
-          res <- ResultT(os.zip(queries).traverse { case (oid, (query, parentCursor)) =>
+          res <- ResultT(os.map(_._1).zip(queries).traverse { case (oid, (query, parentCursor)) =>
                    for {
                      r            <- map.getOrElse(oid, missing(oid))
                      childContext <- Query.childContext(parentCursor.context, query)
