@@ -36,6 +36,11 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val CassRotator: ColumnRef           = col("c_cass_rotator",              cass_rotator.opt)
       val TooActivation: ColumnRef         = col("c_too_activation",            too_activation)
 
+      // View alias of c_altair_mode; the configuration reads it as a plain
+      // nullable column, while TargetEnvironment.Altair.Mode reads the column
+      // itself as the non-null mode of an embedded object.
+      val ConfigurationAltairMode: ColumnRef = col("c_configuration_altair_mode", altair_mode.opt)
+
       val SchedulingMode: ColumnRef        = col("c_scheduling_mode",           scheduling_mode)
       val IsSplittable: ColumnRef          = col("c_is_splittable",             bool)
 

@@ -11,6 +11,7 @@ import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
+import lucuma.core.enums.AltairMode
 import lucuma.core.enums.ConfigurationRequestStatus
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.GmosNorthFilter
@@ -194,17 +195,19 @@ object configurationrequest:
       (
         hc.downField("conditions").as[Conditions],
         hc.downField("target").as[Option[Either[Coordinates, Region]]], // may be missing
-        hc.downField("observingMode").as[Option[ObservingMode]]
+        hc.downField("observingMode").as[Option[ObservingMode]],
+        hc.downField("altairMode").as[Option[AltairMode]] // may be missing
       ).tupled.flatMap:
-        case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode))
-        case (conds, None, _)                  => Left(DecodingFailures.NoReferenceCoordinates)
-        case (conds, _, None)                  => Left(DecodingFailures.NoObservingMode)
+        case (conds, Some(coords), Some(mode), altair) => Right(Configuration(conds, coords, mode, altair))
+        case (conds, None, _, _)                       => Left(DecodingFailures.NoReferenceCoordinates)
+        case (conds, _, None, _)                       => Left(DecodingFailures.NoObservingMode)
 
     given Encoder[Configuration] = c =>
       Json.obj(
         "conditions" -> c.conditions.asJson,
         "target" -> c.target.asJson,
-        "observingMode" -> c.observingMode.asJson
+        "observingMode" -> c.observingMode.asJson,
+        "altairMode" -> c.altair.asJson
       )
 
     given Decoder[ConfigurationRequest] = hc =>
