@@ -112,6 +112,9 @@ object GmosSequenceService:
               InitialConfigs.GmosNorthStatic.some
             case ObservingModeType.GmosNorthImaging  =>
               InitialConfigs.GmosNorthStatic.copy(mosPreImaging = mosPreImaging(variant)).some
+            case ObservingModeType.GmosNorthMos      |
+                 ObservingModeType.GmosNorthIfu      =>
+              InitialConfigs.GmosNorthStatic.some
             case _                                   =>
               none
 
@@ -158,6 +161,9 @@ object GmosSequenceService:
               InitialConfigs.GmosSouthStatic.some
             case ObservingModeType.GmosSouthImaging  =>
               InitialConfigs.GmosSouthStatic.copy(mosPreImaging = mosPreImaging(variant)).some
+            case ObservingModeType.GmosSouthMos      |
+                 ObservingModeType.GmosSouthIfu      =>
+              InitialConfigs.GmosSouthStatic.some
             case _                                   =>
               none
 
@@ -269,6 +275,7 @@ object GmosSequenceService:
           FROM t_observation o
           LEFT JOIN t_gmos_#${site}_imaging i ON i.c_observation_id = o.c_observation_id
          WHERE o.c_observation_id = $observation_id
+           AND o.c_observing_mode_type IS NOT NULL
       """.query(observing_mode_type *: imaging_variant.opt)
 
     def insertStatic[A](site: String, encoderA: Encoder[A]): Query[(Observation.Id, A), Long] =

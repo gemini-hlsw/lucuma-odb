@@ -5,18 +5,20 @@ package lucuma.odb.service
 
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import lucuma.core.enums.ImagingVariantType
+import lucuma.core.enums.MosPreImaging
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
+import lucuma.odb.util.Codecs.imaging_variant
 import lucuma.odb.util.Codecs.observation_id
 import lucuma.odb.util.Codecs.observing_mode_type
 import lucuma.odb.util.Codecs.step_id
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_dynamic
 import lucuma.odb.util.Flamingos2Codecs.flamingos_2_static
 import skunk.*
-import skunk.codec.boolean.bool
 import skunk.codec.numeric.int8
 import skunk.implicits.*
 
@@ -48,6 +50,12 @@ trait Flamingos2SequenceService[F[_]]:
 
 object Flamingos2SequenceService:
 
+  // Extract the mos-preimaging setting from the imaging variant
+  private def mosPreImaging(v: Option[ImagingVariantType]): MosPreImaging =
+    v.filter(_ === ImagingVariantType.PreImaging)
+     .as(MosPreImaging.IsMosPreImaging)
+     .getOrElse(MosPreImaging.IsNotMosPreImaging)
+
   def instantiate[F[_]: Concurrent](using Services[F]): Flamingos2SequenceService[F] =
 
     new Flamingos2SequenceService[F]:
@@ -61,11 +69,19 @@ object Flamingos2SequenceService:
       private def defaultStatic(
         observationId: Observation.Id
       ): F[Option[Flamingos2StaticConfig]] =
-        // We'll need something like the GmosSequenceService version when
-        // F2 imaging is supported.
+        def toStatic(mode: ObservingModeType, variant: Option[ImagingVariantType]): Option[Flamingos2StaticConfig] =
+          mode match
+            case ObservingModeType.Flamingos2LongSlit |
+                 ObservingModeType.Flamingos2Mos      =>
+              lucuma.odb.sequence.flamingos2.Static.some
+            case ObservingModeType.Flamingos2Imaging  =>
+              lucuma.odb.sequence.flamingos2.Static.copy(mosPreImaging = mosPreImaging(variant)).some
+            case _                                    =>
+              none
+
         session
-          .option(Statements.SelectIsLongSlit)(observationId)
-          .map(_.as(lucuma.odb.sequence.flamingos2.Static))
+          .option(Statements.SelectStaticParams)(observationId)
+          .map(_.flatMap(toStatic(_, _)))
 
       override def selectStatic(
         observationId: Observation.Id
@@ -149,15 +165,15 @@ object Flamingos2SequenceService:
         WHERE c_observation_id = $observation_id
       """.query(flamingos_2_static)
 
-    val SelectIsLongSlit: Query[Observation.Id, Boolean] =
+    val SelectStaticParams: Query[Observation.Id, (ObservingModeType, Option[ImagingVariantType])] =
       sql"""
-        SELECT EXISTS (
-          SELECT 1
-          FROM t_observation
-          WHERE c_observation_id      = $observation_id
-            AND c_observing_mode_type = $observing_mode_type
-        )
-      """.query(bool).contramap(o => (o, ObservingModeType.Flamingos2LongSlit))
+        SELECT o.c_observing_mode_type,
+               i.c_variant
+          FROM t_observation o
+          LEFT JOIN t_flamingos_2_imaging i ON i.c_observation_id = o.c_observation_id
+         WHERE o.c_observation_id = $observation_id
+           AND o.c_observing_mode_type IS NOT NULL
+      """.query(observing_mode_type *: imaging_variant.opt)
 
     val SelectDynamicForStep: Query[Step.Id, Flamingos2DynamicConfig] =
       sql"""

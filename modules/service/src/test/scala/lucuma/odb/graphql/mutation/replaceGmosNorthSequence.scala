@@ -176,6 +176,50 @@ class replaceGmosNorthSequence extends query.ExecutionTestSupportForGmos with Re
       }
     """
 
+  test("no recorded static config - MOS"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthMosObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Mos", mosStepInput(GmosNorthFilter.GPrime)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = json"""
+          {
+            "replaceGmosNorthSequence": {
+              "sequence": [ { "description": "Mos" } ]
+            }
+          }
+        """.asRight
+      )
+
+  test("no recorded static config - IFU"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthIfuObservationAs(pi, p, List(t))
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Ifu", ifuStepInput(GmosNorthFilter.GPrime)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = json"""
+          {
+            "replaceGmosNorthSequence": {
+              "sequence": [ { "description": "Ifu" } ]
+            }
+          }
+        """.asRight
+      )
+
   test("manual sequence for unsplittable observation with multiple atoms"):
     val setup: IO[Observation.Id] =
       for

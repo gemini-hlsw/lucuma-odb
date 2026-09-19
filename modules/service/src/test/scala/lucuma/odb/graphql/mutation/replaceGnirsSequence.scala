@@ -211,3 +211,36 @@ class replaceGnirsSequence extends query.ExecutionTestSupportForGnirs with Repla
         "Execution sequences containing over 1000 atoms are not supported."
       ).asLeft)
     yield ()
+
+  private def replaceSequenceQuery(inputString: String): String =
+    s"""
+      mutation {
+        replaceGnirsSequence(input: $inputString) {
+          sequence {
+            description
+          }
+        }
+      }
+    """
+
+  test("no recorded static config - imaging"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsImagingObservationAs(pi, p, t)
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Img", stepInput(20)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = json"""
+          {
+            "replaceGnirsSequence": {
+              "sequence": [ { "description": "Img" } ]
+            }
+          }
+        """.asRight
+      )
