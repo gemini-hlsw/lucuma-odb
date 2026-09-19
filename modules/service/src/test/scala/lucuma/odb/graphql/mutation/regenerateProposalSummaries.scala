@@ -11,6 +11,8 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.parser.decode
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExchangePartner
+import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramUserRole
@@ -200,7 +202,7 @@ class regenerateProposalSummaries extends OdbSuite
       jobs <- jobsFor(pid)
     yield
       assertEquals(jobs.map(j => (j.partner, j.style, j.state)), List(
-        (Partner.CA.some, SummaryStyle.GeminiInvestigatorsAtEnd, "pending"),
+        (Partner.CA.some, SummaryStyle.GeminiDarp, "pending"),
         (Partner.US.some, SummaryStyle.NoirlabDarp,    "pending")
       ))
 
@@ -281,6 +283,63 @@ class regenerateProposalSummaries extends OdbSuite
       jobs <- jobsFor(pid)
     yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiStandard)))
 
+  test("a Fast Turnaround proposal renders without investigators"):
+    for
+      pid  <- createProgramWithNonPartnerPi(pi)
+      _    <- createFastTurnaroundProposal(pi, pid)
+      _    <- regenerate(pi, pid)
+      jobs <- jobsFor(pid)
+    yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiNoInvestigators)))
+
+  // Only queue and classical proposals go by the partner; the rest are typed.
+  // A Large Program has no splits at all, so its single job is darp.
+  test("a Large Program proposal renders darp"):
+    for
+      cid  <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.LargeProgram)
+      pid  <- createProgramWithNonPartnerPi(pi)
+      _    <- addProposal(pi, pid, cid.some, "largeProgram: { minPercentTime: 50 }".some)
+      _    <- regenerate(pi, pid)
+      jobs <- jobsFor(pid)
+    yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiDarp)))
+
+  // The exchange partner takes the whole time request, so there are no splits
+  // to follow; Subaru renders darp where a partnerless Gemini proposal would
+  // render standard.
+  test("a Subaru exchange proposal renders darp"):
+    for
+      cid  <- createGeminiCallForProposalsAs(staff, otherGemini = "exchangePartners: [{ exchangePartner: SUBARU }]".some)
+      pid  <- createProgramWithPiAffiliation(pi, PartnerLink.HasExchangePartner(ExchangePartner.Subaru))
+      _    <- addProposal(pi, pid, cid.some, "queue: { exchangePartner: SUBARU }".some)
+      _    <- regenerate(pi, pid)
+      jobs <- jobsFor(pid)
+    yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiDarp)))
+
+  // The style no longer follows from the partner the row is keyed on, so a job
+  // still waiting has to take the new one when the proposal type changes.
+  test("a waiting job picks up a changed proposal type"):
+    val toDemoScience = (pid: Program.Id) => query(pi, s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: { gemini: { demoScience: { minPercentTime: 50 } } }
+          }
+        ) { proposal { gemini { scienceSubtype } } }
+      }
+    """).void
+    for
+      pid    <- createProgramWithNonPartnerPi(pi)
+      _      <- createFastTurnaroundProposal(pi, pid)
+      _      <- regenerate(pi, pid)
+      before <- jobsFor(pid)
+      _      <- toDemoScience(pid)
+      _      <- regenerate(pi, pid)
+      after  <- jobsFor(pid)
+    yield
+      assertEquals(before.map(_.style), List(SummaryStyle.GeminiNoInvestigators))
+      assertEquals(after.map(_.id), before.map(_.id))
+      assertEquals(after.map(_.style), List(SummaryStyle.GeminiInvestigatorsAtEnd))
+
   test("regenerating while a job is waiting is a no-op"):
     for
       pid    <- setupProposal()
@@ -291,7 +350,7 @@ class regenerateProposalSummaries extends OdbSuite
     yield
       assertEquals(after.map(_.id), before.map(_.id))
       assertEquals(after.map(_.state).toSet, Set("pending"))
-      assertEquals(after.map(_.style), List(SummaryStyle.GeminiInvestigatorsAtEnd, SummaryStyle.NoirlabDarp))
+      assertEquals(after.map(_.style), List(SummaryStyle.GeminiDarp, SummaryStyle.NoirlabDarp))
 
   test("regenerating while a job is rendering enqueues a new one"):
     for
@@ -344,7 +403,7 @@ class regenerateProposalSummaries extends OdbSuite
       second <- summaries(pi, pid)
     yield
       assertEquals(left, Nil)
-      assertEquals(first.map(s => (s.partner, s.fileName.endsWith(".pdf"), s.style)), List((Some("CA"), true, "GEMINI_INVESTIGATORS_AT_END"), (Some("US"), true, "NOIRLAB_DARP")))
+      assertEquals(first.map(s => (s.partner, s.fileName.endsWith(".pdf"), s.style)), List((Some("CA"), true, "GEMINI_DARP"), (Some("US"), true, "NOIRLAB_DARP")))
       assertEquals(second.map(_.partner), List(Some("CA"), Some("US")))
 
   test("a partner dropped from the splits loses its job and its summary"):

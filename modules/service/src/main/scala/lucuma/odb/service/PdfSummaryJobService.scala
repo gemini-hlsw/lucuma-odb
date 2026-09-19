@@ -13,7 +13,10 @@ import grackle.ResultT
 import io.circe.Json
 import io.circe.JsonObject
 import lucuma.core.enums.AttachmentType
+import lucuma.core.enums.ExchangePartner
+import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
+import lucuma.core.enums.ScienceSubtype
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole
 import lucuma.core.util.Enumerated
@@ -149,12 +152,13 @@ object PdfSummaryJobService:
 
       override def enqueue(pid: Program.Id)(using Transaction[F], SuperUserAccess): F[Unit] =
         for
-          _ <- session.execute(Statements.PruneJobs)((pid, pid))
-          _ <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
-          _ <- session.execute(Statements.DeleteFailedJobs)(pid)
-          _ <- partners(pid).flatMap(_.traverse_(partner =>
-                 session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forPartner(partner)))
-               ))
+          _              <- session.execute(Statements.PruneJobs)((pid, pid))
+          _              <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
+          _              <- session.execute(Statements.DeleteFailedJobs)(pid)
+          (sub, obs, ex) <- session.unique(Statements.SelectProposalKind)(pid)
+          _              <- partners(pid).flatMap(_.traverse_(partner =>
+                              session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forProposal(sub, obs, ex, partner)))
+                            ))
         yield ()
 
       override def regenerate(pid: Program.Id)(using NoTransaction[F], Services.PiAccess): F[Result[Unit]] =
@@ -243,6 +247,13 @@ object PdfSummaryJobService:
         SELECT EXISTS (SELECT 1 FROM t_proposal WHERE c_program_id = $program_id)
       """.query(bool)
 
+    val SelectProposalKind: Query[Program.Id, (Option[ScienceSubtype], Observatory, Option[ExchangePartner])] =
+      sql"""
+        SELECT c_science_subtype, c_observatory, c_exchange_partner
+        FROM t_proposal
+        WHERE c_program_id = $program_id
+      """.query(science_subtype.opt *: observatory *: exchange_partner.opt)
+
     val SelectPartners: Query[Program.Id, Partner] =
       sql"""
         SELECT DISTINCT c_partner
@@ -290,12 +301,14 @@ object PdfSummaryJobService:
               END
       """.command
 
-    // A no-op when a job for this partner is already waiting.
+    // A job already waiting for this partner is kept rather than duplicated,
+    // but its style is refreshed: the proposal type may have changed since.
     val InsertJob: Command[(Program.Id, Option[Partner], SummaryStyle)] =
       sql"""
         INSERT INTO t_summary_job (c_program_id, c_partner, c_style)
         VALUES ($program_id, ${partner.opt}, $summary_style)
-        ON CONFLICT (c_program_id, c_partner) WHERE c_state = 'pending' DO NOTHING
+        ON CONFLICT (c_program_id, c_partner) WHERE c_state = 'pending'
+        DO UPDATE SET c_style = EXCLUDED.c_style
       """.command
 
     val Claim: Query[Void, Claimed] =
