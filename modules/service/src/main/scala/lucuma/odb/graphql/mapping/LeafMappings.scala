@@ -13,7 +13,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
-import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosMosAcquisitionType
@@ -79,9 +78,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
   private given io.circe.Encoder[Epoch] =
     e => Json.fromString(Epoch.fromString.reverseGet(e))
 
-  // TODO: move
   private given io.circe.Encoder[Semester] =
-    _.format.asJson
+    lucuma.odb.json.semester.given_Codec_Semester
 
   lazy val LeafMappings: List[TypeMapping] =
     List(

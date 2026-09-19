@@ -26,6 +26,8 @@ import org.http4s.jdkhttpclient.JdkWSClient
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import skunk.Command
+import skunk.Void
 
 trait ResourceGraphQLSuite extends ServerFixtures:
 
@@ -46,6 +48,14 @@ trait ResourceGraphQLSuite extends ServerFixtures:
     IO.pure(auth.some)
 
   private def defaultAuthorization: IO[Option[Authorization]] = asUser(defaultUser)
+
+  /** Runs one command against the test database. */
+  protected def exec(command: Command[Void]): IO[Unit] =
+    session.use(_.execute(command).void)
+
+  /** Asserts that the database rejects the operation, for example on a constraint violation. */
+  protected def expectDbRejection(io: IO[?])(using Location): IO[Unit] =
+    io.attempt.map(result => assert(result.isLeft))
 
   def expect(
     query:         String,

@@ -3,96 +3,42 @@
 
 package resource.server.graphql
 
-import grackle.Path
+import cats.syntax.all.*
+import grackle.Cursor
+import grackle.Result
 import grackle.skunk.SkunkMapping
-import lucuma.core.util.TimeSpan
+import io.circe.syntax.*
 import lucuma.core.util.Timestamp
-import resource.server.graphql.table.*
+import lucuma.core.util.TimestampInterval
+import lucuma.odb.json.time.query.given
 
 /**
- * Provides ObjectMappings for TimestampInterval and TimeSpan at arbitrary paths.
+ * Provides the `interval` field of a block.
  *
- * A TimestampInterval has no single stored column for duration; it is derived from the two
- * timestamp columns (start, end) that already appear in the row.
+ * A TimestampInterval has no single stored column; it is derived from the two timestamp columns
+ * (_start, _end) that already appear in the row. The JSON comes from the shared
+ * `Encoder[TimestampInterval]`, so the block queries and the night projection produce one shape.
  */
-trait TimestampIntervalMapping[F[_]] extends TelescopeNightTimelineTable[F]:
+trait TimestampIntervalMapping[F[_]] extends BaseMapping[F]:
   this: SkunkMapping[F] =>
 
+  protected val ClipStartKey = "clipStart"
+  protected val ClipEndKey   = "clipEnd"
+
   /**
-   * Build ObjectMappings for a TimestampInterval field at `path`, plus the nested TimeSpan at
-   * `path / "duration"`. `startCol` and `endCol` are both columns in the same table row; `keyCol`
-   * is used as the Grackle key.
+   * The row's [start, end) trimmed to the requested window when the elaborator put
+   * ClipStartKey/ClipEndKey in the Env; the stored interval otherwise. Overlap filtering guarantees
+   * clipped start < clipped end.
    */
-  protected def timestampIntervalMappings(
-    path:     Path,
-    startCol: ColumnRef,
-    endCol:   ColumnRef,
-    keyCol:   ColumnRef
-  ): List[TypeMapping] =
-    List(
-      ObjectMapping(path)(
-        SqlField("_key", keyCol, key = true, hidden = true),
-        SqlField("start", startCol),
-        SqlField("end", endCol),
-        SqlObject("duration")
-      ),
-      ObjectMapping(path / "duration")(
-        SqlField("_key", keyCol, key = true, hidden = true),
-        SqlField("_start", startCol, hidden = true),
-        SqlField("_end", endCol, hidden = true),
-        CursorField[Long](
-          "microseconds",
-          c =>
-            for {
-              s <- c.fieldAs[Timestamp]("_start")
-              e <- c.fieldAs[Timestamp]("_end")
-            } yield TimeSpan.between(s, e).toMicroseconds,
-          List("_start", "_end")
-        ),
-        CursorField[BigDecimal](
-          "milliseconds",
-          c =>
-            for {
-              s <- c.fieldAs[Timestamp]("_start")
-              e <- c.fieldAs[Timestamp]("_end")
-            } yield TimeSpan.FromMilliseconds.reverseGet(TimeSpan.between(s, e)),
-          List("_start", "_end")
-        ),
-        CursorField[BigDecimal](
-          "seconds",
-          c =>
-            for {
-              s <- c.fieldAs[Timestamp]("_start")
-              e <- c.fieldAs[Timestamp]("_end")
-            } yield TimeSpan.FromSeconds.reverseGet(TimeSpan.between(s, e)),
-          List("_start", "_end")
-        ),
-        CursorField[BigDecimal](
-          "minutes",
-          c =>
-            for {
-              s <- c.fieldAs[Timestamp]("_start")
-              e <- c.fieldAs[Timestamp]("_end")
-            } yield TimeSpan.FromMinutes.reverseGet(TimeSpan.between(s, e)),
-          List("_start", "_end")
-        ),
-        CursorField[BigDecimal](
-          "hours",
-          c =>
-            for {
-              s <- c.fieldAs[Timestamp]("_start")
-              e <- c.fieldAs[Timestamp]("_end")
-            } yield TimeSpan.FromHours.reverseGet(TimeSpan.between(s, e)),
-          List("_start", "_end")
-        ),
-        CursorField[String](
-          "iso",
-          c =>
-            for {
-              s <- c.fieldAs[Timestamp]("_start")
-              e <- c.fieldAs[Timestamp]("_end")
-            } yield TimeSpan.FromString.reverseGet(TimeSpan.between(s, e)),
-          List("_start", "_end")
-        )
-      )
+  private def clipped(c: Cursor): Result[TimestampInterval] =
+    for
+      s <- c.fieldAs[Timestamp]("_start")
+      e <- c.fieldAs[Timestamp]("_end")
+    yield TimestampInterval.between(
+      c.env[Timestamp](ClipStartKey).filter(_ > s).getOrElse(s),
+      c.env[Timestamp](ClipEndKey).filter(_ < e).getOrElse(e)
     )
+
+  /** The `interval` field of a block, built from its hidden `_start` and `_end` fields. */
+  protected val intervalField: CursorFieldJson =
+    CursorFieldJson("interval", c => clipped(c).map(_.asJson), List("_start", "_end"))

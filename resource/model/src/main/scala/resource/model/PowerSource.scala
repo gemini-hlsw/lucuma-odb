@@ -3,7 +3,8 @@
 
 package resource.model
 
-import io.circe.Encoder
+import lucuma.core.util.Enumerated
 
-final case class TelescopeMode(`type`: TelescopeModeType, programReference: Option[String])
-    derives Encoder.AsObject
+enum PowerSource(val tag: String) derives Enumerated:
+  case Commercial extends PowerSource("COMMERCIAL")
+  case Generator  extends PowerSource("GENERATOR")
