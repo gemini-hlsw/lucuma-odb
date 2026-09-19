@@ -172,6 +172,7 @@ object Flamingos2SequenceService:
           FROM t_observation o
           LEFT JOIN t_flamingos_2_imaging i ON i.c_observation_id = o.c_observation_id
          WHERE o.c_observation_id = $observation_id
+           AND o.c_observing_mode_type IS NOT NULL
       """.query(observing_mode_type *: imaging_variant.opt)
 
     val SelectDynamicForStep: Query[Step.Id, Flamingos2DynamicConfig] =

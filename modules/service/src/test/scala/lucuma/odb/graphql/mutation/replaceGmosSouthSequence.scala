@@ -351,3 +351,19 @@ class replaceGmosSouthSequence extends query.ExecutionTestSupportForGmos with Re
           }
         """.asRight
       )
+
+  test("rejects an observation with no observing mode"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createObservationAs(pi, p, t)
+      yield o
+
+    setup.flatMap: oid =>
+      val inputString = input(oid, SequenceType.Science, atomInput("Foo", stepInput(GmosSouthFilter.GPrime)))
+      expect(
+        user     = pi,
+        query    = replaceSequenceQuery(inputString),
+        expected = List(s"Observation $oid not found or is not a GMOS South observation.").asLeft
+      )
