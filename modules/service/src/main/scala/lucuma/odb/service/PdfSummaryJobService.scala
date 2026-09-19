@@ -155,7 +155,7 @@ object PdfSummaryJobService:
           _              <- session.execute(Statements.PruneJobs)((pid, pid))
           _              <- session.execute(Statements.PruneSummaryAttachments)((pid, pid))
           _              <- session.execute(Statements.DeleteFailedJobs)(pid)
-          (sub, obs, ex) <- session.option(Statements.SelectProposalKind)(pid).map(_.getOrElse((none, Observatory.Gemini, none)))
+          (sub, obs, ex) <- session.unique(Statements.SelectProposalKind)(pid)
           _              <- partners(pid).flatMap(_.traverse_(partner =>
                               session.execute(Statements.InsertJob)((pid, partner, SummaryStyle.forProposal(sub, obs, ex, partner)))
                             ))
