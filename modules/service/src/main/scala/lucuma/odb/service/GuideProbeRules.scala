@@ -20,5 +20,5 @@ object GuideProbeRules:
     s"Guide probe ${probe.tag.toScreamingSnakeCase} cannot be used with observing mode ${mode.tag.toScreamingSnakeCase}."
 
   def check(mode: ObservingModeType, altair: Option[AltairMode], probe: GuideProbe, prefix: String = ""): Result[Unit] =
-    if probes.isProbeAllowed(mode, altair, probe) then Result.unit
+    if probes.isProbeAllowed(mode, probe, altair) then Result.unit
     else OdbError.InvalidArgument(s"$prefix${notAllowedMessage(mode, probe)}".some).asFailure
