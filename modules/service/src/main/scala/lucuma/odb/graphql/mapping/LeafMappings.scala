@@ -85,6 +85,8 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
 
   lazy val LeafMappings: List[TypeMapping] =
     List(
+      LeafMapping[AltairMode](AltairModeType),
+      LeafMapping[AltairNdFilter](AltairNdFilterType),
       LeafMapping[ArcType](ArcTypeType),
       LeafMapping[Atom.Id](AtomIdType),
       LeafMapping[AtomExecutionState](AtomExecutionStateType),
@@ -97,6 +99,7 @@ trait LeafMappings[F[_]] extends BaseMapping[F]:
       LeafMapping[CallForProposals.Id](CallForProposalsIdType),
       LeafMapping[GeminiCallForProposalsType](GeminiCallForProposalsTypeType),
       LeafMapping[CassRotator](CassRotatorType),
+      LeafMapping[FieldLens](FieldLensType),
       LeafMapping[CatalogName](CatalogNameType),
       LeafMapping[ChargeClass](ChargeClassType),
       LeafMapping[Long](ChronicleIdType),

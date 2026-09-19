@@ -33,6 +33,7 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val BlindOffsetType: ColumnRef       = col("c_blind_offset_type",         blind_offset_type)
       val ExplicitGuideProbe: ColumnRef    = col("c_explicit_guide_probe",      guide_probe.opt)
       val SignalToNoiseTargetId: ColumnRef = col("c_signal_to_noise_target_id", target_id.opt)
+      val CassRotator: ColumnRef           = col("c_cass_rotator",              cass_rotator.opt)
       val TooActivation: ColumnRef         = col("c_too_activation",            too_activation)
 
       val SchedulingMode: ColumnRef        = col("c_scheduling_mode",           scheduling_mode)
@@ -54,6 +55,14 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
           val SyntheticId: ColumnRef = col("c_explicit_base_id",  observation_id.embedded)
           val Ra: ColumnRef          = col("c_explicit_ra",       right_ascension.embedded)
           val Dec: ColumnRef         = col("c_explicit_dec",      declination.embedded)
+        }
+
+        object Altair {
+          val SyntheticId: ColumnRef       = col("c_altair_id",            observation_id.embedded)
+          val Mode: ColumnRef              = col("c_altair_mode",          altair_mode.embedded)
+          val ExplicitFieldLens: ColumnRef = col("c_altair_field_lens",    field_lens.opt)
+          val CassRotator: ColumnRef       = col("c_altair_cass_rotator",  cass_rotator.embedded)
+          val NdFilter: ColumnRef          = col("c_altair_nd_filter",     altair_nd_filter.embedded)
         }
       }
 
