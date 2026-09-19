@@ -11,6 +11,7 @@ import io.circe.Json
 import io.circe.literal.*
 import io.circe.parser.decode
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
@@ -297,6 +298,18 @@ class regenerateProposalSummaries extends OdbSuite
       cid  <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.LargeProgram)
       pid  <- createProgramWithNonPartnerPi(pi)
       _    <- addProposal(pi, pid, cid.some, "largeProgram: { minPercentTime: 50 }".some)
+      _    <- regenerate(pi, pid)
+      jobs <- jobsFor(pid)
+    yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiDarp)))
+
+  // The exchange partner takes the whole time request, so there are no splits
+  // to follow; Subaru renders darp where a partnerless Gemini proposal would
+  // render standard.
+  test("a Subaru exchange proposal renders darp"):
+    for
+      cid  <- createGeminiCallForProposalsAs(staff, otherGemini = "exchangePartners: [{ exchangePartner: SUBARU }]".some)
+      pid  <- createProgramWithPiAffiliation(pi, PartnerLink.HasExchangePartner(ExchangePartner.Subaru))
+      _    <- addProposal(pi, pid, cid.some, "queue: { exchangePartner: SUBARU }".some)
       _    <- regenerate(pi, pid)
       jobs <- jobsFor(pid)
     yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiDarp)))

@@ -80,7 +80,8 @@ than `StaleRender` (30 minutes), so a crashed dyno never strands a job.
 `SummaryStyle.forProposal` mirrors the OCS Phase 1 template map
 (`P1PDF.templatesList`). The proposal type decides on its own; only queue and
 classical proposals, the ones apportioned across partners, fall through to the
-partner.
+partner. An exchange partner takes the whole time request, so where there is one
+it stands in for the splits.
 
 ```mermaid
 flowchart LR
@@ -92,8 +93,11 @@ flowchart LR
     subtype -->|Demo Science, System Verification| atend[gemini-investigators-at-end]
     subtype -->|Fast Turnaround| noinv[gemini-no-investigators]
     subtype -->|Director's Time, Poor Weather| standard
-    subtype -->|Queue, Classical| partner{partner}
+    subtype -->|Queue, Classical| exchange{exchange partner}
     subtype -->|none| standard
+    exchange -->|Subaru| darp
+    exchange -->|Keck| standard
+    exchange -->|none| partner{partner}
     partner -->|AR, BR, CA, KR| darp
     partner -->|CL| chile[chile]
     partner -->|US| noirlab[noirlab-darp]

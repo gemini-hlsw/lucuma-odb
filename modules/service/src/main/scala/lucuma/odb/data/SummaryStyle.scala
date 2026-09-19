@@ -3,6 +3,7 @@
 
 package lucuma.odb.data
 
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
@@ -26,12 +27,14 @@ object SummaryStyle:
   /**
    * The OCS Phase 1 template map (P1PDF.templatesList).  The proposal type
    * decides on its own; only queue and classical proposals, which are the ones
-   * apportioned across partners, follow the partner.
+   * apportioned across partners, follow the partner.  An exchange partner takes
+   * the whole time request, so it stands in for the splits when there is one.
    */
   def forProposal(
-    subtype:     Option[ScienceSubtype],
-    observatory: Observatory,
-    partner:     Option[Partner]
+    subtype:         Option[ScienceSubtype],
+    observatory:     Observatory,
+    exchangePartner: Option[ExchangePartner],
+    partner:         Option[Partner]
   ): SummaryStyle =
     observatory match
       // Normal and intensive Subaru proposals alike.
@@ -42,7 +45,10 @@ object SummaryStyle:
         case ScienceSubtype.DemoScience | ScienceSubtype.SystemVerification  => GeminiInvestigatorsAtEnd
         case ScienceSubtype.FastTurnaround                                   => GeminiNoInvestigators
         case ScienceSubtype.DirectorsTime | ScienceSubtype.PoorWeather       => GeminiStandard
-        case ScienceSubtype.Classical | ScienceSubtype.Queue                 => forPartner(partner)
+        case ScienceSubtype.Classical | ScienceSubtype.Queue                 =>
+          exchangePartner.fold(forPartner(partner)):
+            case ExchangePartner.Subaru => GeminiDarp
+            case ExchangePartner.Keck   => Default
 
   private def forPartner(partner: Option[Partner]): SummaryStyle =
     partner.fold(Default):

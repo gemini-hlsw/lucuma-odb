@@ -4,6 +4,7 @@
 package lucuma.odb.data
 
 import cats.syntax.all.*
+import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.Observatory
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ScienceSubtype
@@ -15,7 +16,10 @@ class SummaryStyleSuite extends FunSuite:
   import SummaryStyle.*
 
   private def gemini(subtype: ScienceSubtype, partner: Option[Partner]): SummaryStyle =
-    SummaryStyle.forProposal(subtype.some, Observatory.Gemini, partner)
+    SummaryStyle.forProposal(subtype.some, Observatory.Gemini, none, partner)
+
+  private def exchange(subtype: ScienceSubtype, ep: ExchangePartner): SummaryStyle =
+    SummaryStyle.forProposal(subtype.some, Observatory.Gemini, ep.some, none)
 
   test("the proposal type decides on its own, whatever the partner"):
     Partner.values.map(_.some).toList.appended(None).foreach: p =>
@@ -42,8 +46,16 @@ class SummaryStyleSuite extends FunSuite:
       assertEquals(gemini(Classical, p), style, clue = p)
 
   test("exchange proposals go by the observatory"):
-    assertEquals(SummaryStyle.forProposal(none, Observatory.Subaru, none), GeminiDarp)
-    assertEquals(SummaryStyle.forProposal(none, Observatory.Keck, none),   GeminiStandard)
+    assertEquals(SummaryStyle.forProposal(none, Observatory.Subaru, none, none), GeminiDarp)
+    assertEquals(SummaryStyle.forProposal(none, Observatory.Keck, none, none),   GeminiStandard)
+
+  // An exchange partner takes the whole time request, so there are no splits to
+  // follow and the partner is always None here.
+  test("an exchange partner stands in for the partner splits"):
+    assertEquals(exchange(Queue, ExchangePartner.Subaru),     GeminiDarp)
+    assertEquals(exchange(Classical, ExchangePartner.Subaru), GeminiDarp)
+    assertEquals(exchange(Queue, ExchangePartner.Keck),       GeminiStandard)
+    assertEquals(exchange(Classical, ExchangePartner.Keck),   GeminiStandard)
 
   test("a program without a proposal type gets the default"):
-    assertEquals(SummaryStyle.forProposal(none, Observatory.Gemini, none), SummaryStyle.Default)
+    assertEquals(SummaryStyle.forProposal(none, Observatory.Gemini, none, none), SummaryStyle.Default)
