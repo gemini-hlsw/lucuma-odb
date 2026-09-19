@@ -63,3 +63,14 @@ class ItcSeriesSuite extends FunSuite:
   test("ItcSeries.fromLegacy trims the title of a truncated series too"):
     val s = ItcSeries.fromLegacy("Blue Slit Signal ", SeriesDataType.SignalData, dataY, axis)
     assertEquals(s.map(_.title), "Blue Slit Signal".some)
+
+  // dataY is a primitive array, so the synthesized equals would compare it by reference
+  test("ItcSeries compares its samples by value"):
+    val x  = ItcXAxis(1.0, 5.0, 5)
+    val s1 = series(x, IArray(1.0, 2.0, 3.0, 4.0, 5.0)).get
+    val s2 = series(x, IArray(1.0, 2.0, 3.0, 4.0, 5.0)).get
+    val s3 = series(x, IArray(1.0, 2.0, 3.0, 4.0, 6.0)).get
+    assertEquals(s1, s2)
+    assertEquals(s1.hashCode, s2.hashCode)
+    assertNotEquals(s1, s3)
+    assertEquals(List(s1, s2).distinct, List(s1))

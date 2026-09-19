@@ -19,6 +19,7 @@ import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.core.util.Enumerated
 
+import java.util.Arrays
 import scala.collection.immutable.ArraySeq
 
 enum SeriesDataType(val tag: String) derives Enumerated:
@@ -70,19 +71,24 @@ case class ItcXAxis(start: Double, end: Double, count: Int) derives Decoder, Enc
  * Kept in an object so importers can target them: they are instances for a very general type.
  */
 object iarray:
+  // IArray is an Array at runtime, so unwrapping it is a cast. Package-private and read-only:
+  // the caller gets a mutable alias of data the rest of the code assumes never changes.
+  extension (a: IArray[Double])
+    private[itc] def mutable: Array[Double] = a.asInstanceOf[Array[Double]]
+
   given decodeIArrayDouble: Decoder[IArray[Double]] =
     Decoder.decodeArray[Double].map(IArray.unsafeFromArray)
 
   given encodeIArrayDouble: Encoder[IArray[Double]] =
     Encoder
       .encodeSeq[Double]
-      .contramap(a => ArraySeq.unsafeWrapArray(a.asInstanceOf[Array[Double]]))
+      .contramap(a => ArraySeq.unsafeWrapArray(a.mutable))
 
   // Only ItcGraph's derived Eq needs this, which is test-only; a while loop would avoid the
   // wrapped-array boxing if it ever reaches a hot path.
   given eqIArrayDouble: Eq[IArray[Double]] = Eq.instance(_.sameElements(_))
 
-import iarray.given
+import iarray.{*, given}
 
 case class ItcYAxis(min: Double, indexOfMin: Int, max: Double, indexOfMax: Int)
     derives Decoder,
@@ -114,6 +120,18 @@ case class ItcSeries(
   xAxis:      ItcXAxis,
   yAxis:      ItcYAxis
 ) derives Encoder.AsObject:
+  // dataY is a primitive array at runtime, so the synthesized equals/hashCode would compare it by
+  // reference and two series with identical samples would not be equal. That silently breaks
+  // assertEquals, distinct, toSet and Map keys, here and in everything holding an ItcSeries.
+  override def equals(that: Any): Boolean = that match
+    case s: ItcSeries =>
+      (this eq s) || (title == s.title && seriesType == s.seriesType && xAxis == s.xAxis &&
+        yAxis == s.yAxis && Arrays.equals(dataY.mutable, s.dataY.mutable))
+    case _            => false
+
+  override def hashCode: Int =
+    (title, seriesType, xAxis, yAxis, Arrays.hashCode(dataY.mutable)).hashCode
+
   def wavelengthAtMaxAndMax: Option[(Wavelength, Double)] =
     xAxis.wavelengthAt(yAxis.indexOfMax).tupleRight(yAxis.max)
 
