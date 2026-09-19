@@ -12,6 +12,8 @@ import lucuma.core.enums.CassRotator
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.GuideProbe
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
+import lucuma.itc.AltairParameters
 import monocle.Focus
 import monocle.Lens
 
@@ -42,6 +44,26 @@ case class AltairConfiguration(
    */
   def fieldLens(guideStarSeparation: Option[Angle]): Option[FieldLens] =
     AltairConfiguration.fieldLens(mode, explicitFieldLens, guideStarSeparation)
+
+  /**
+   * What the ITC needs of Altair, given the guide star Altair will use. LGS+P1 has no
+   * parameters at all and needs no star; the other modes are modelled from the star, so they
+   * yield nothing until its R magnitude is known and the calculation proceeds without Altair.
+   */
+  def itcParameters(
+    guideStarSeparation: Angle,
+    rBrightness:         Option[BrightnessValue]
+  ): Option[AltairParameters] =
+    mode match
+      case AltairMode.LgsP1 =>
+        AltairParameters.LgsP1.some
+      case AltairMode.Lgs   =>
+        rBrightness.map(AltairParameters.Lgs(guideStarSeparation, _))
+      case AltairMode.Ngs   =>
+        for
+          r <- rBrightness
+          f <- fieldLens(guideStarSeparation.some)
+        yield AltairParameters.Ngs(guideStarSeparation, r, f)
 
 object AltairConfiguration:
 
