@@ -41,3 +41,8 @@ class GraphCodecSuite extends FunSuite:
     val s    = decode[ItcGraph](json).fold(e => fail(s"did not decode: $e"), _.series.head)
     assertEquals(s.xAxis.start, 1.0)
     assertEquals(s.dataY.length, 5)
+
+  test("an empty series says so, rather than blaming the axis"):
+    val json = chart(1.0, 5.0, Nil)
+    val msg  = decode[ItcGraph](json).fold(_.getMessage, _ => fail("expected a decoding failure"))
+    assert(msg.contains("Empty dataY in series 'Final S/N BB(B)'"), msg)

@@ -18,6 +18,7 @@ import lucuma.core.math.Wavelength
 import lucuma.core.util.Enumerated
 import lucuma.core.util.TimeSpan
 import lucuma.itc.*
+import lucuma.itc.iarray.mutable
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.*
@@ -57,6 +58,10 @@ given [K: Pickler: Ordering, V: Pickler]: Pickler[NonEmptyMap[K, V]] =
 
 given Pickler[ItcXAxis]       = generatePickler
 given Pickler[ItcYAxis]       = generatePickler
+// ItcSeries holds its samples unboxed, so they pickle as a plain Array[Double].
+// IArray is an Array at runtime, and pickling only reads it, so neither direction needs a copy.
+given Pickler[IArray[Double]] =
+  transformPickler(IArray.unsafeFromArray[Double])(_.mutable)
 given Pickler[ItcSeries]      = generatePickler
 given Pickler[FiniteDuration] =
   transformPickler(n => new FiniteDuration(n, NANOSECONDS))(_.toNanos)
