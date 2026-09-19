@@ -51,7 +51,7 @@ its own upload instead of attaching it.
 | Column | Meaning |
 |---|---|
 | `c_program_id`, `c_partner` | The pair being rendered. `c_partner` is null for a proposal with no partner splits. |
-| `c_style` | Renderer style, derived from the partner (see below). |
+| `c_style` | Renderer style, derived from the proposal type (see below). |
 | `c_state` | `pending`, `rendering`, `failed`. A finished job is deleted, not kept. |
 | `c_attempts` | Incremented on each claim. Capped at `PdfSummaryJobService.MaxAttempts` (3). |
 | `c_retry_at` | A `pending` job is not claimed before this. Backoff is 1, 4, 16 minutes by attempt. |
@@ -75,11 +75,33 @@ flowchart LR
 sweep: every call to `next` first fails or re-pends any `rendering` row older
 than `StaleRender` (30 minutes), so a crashed dyno never strands a job.
 
-### Partner to style
+### Proposal to style
 
-`SummaryStyle.forPartner`: CA renders `gemini-investigators-at-end`, CL
-`chile`, KR `gemini-darp`, US `noirlab-darp`, everything else
-`gemini-standard`.
+`SummaryStyle.forProposal` mirrors the OCS Phase 1 template map
+(`P1PDF.templatesList`). The proposal type decides on its own; only queue and
+classical proposals, the ones apportioned across partners, fall through to the
+partner.
+
+```mermaid
+flowchart LR
+    proposal([proposal]) --> obs{observatory}
+    obs -->|Subaru| darp[gemini-darp]
+    obs -->|Keck| standard[gemini-standard]
+    obs -->|Gemini| subtype{science subtype}
+    subtype -->|Large Program| darp
+    subtype -->|Demo Science, System Verification| atend[gemini-investigators-at-end]
+    subtype -->|Fast Turnaround| noinv[gemini-no-investigators]
+    subtype -->|Director's Time, Poor Weather| standard
+    subtype -->|Queue, Classical| partner{partner}
+    subtype -->|none| standard
+    partner -->|AR, BR, CA, KR| darp
+    partner -->|CL| chile[chile]
+    partner -->|US| noirlab[noirlab-darp]
+    partner -->|UH, none| standard
+```
+
+Subaru is `gemini-darp` for normal and intensive proposals alike. A program
+with no proposal row at all falls back to `gemini-standard`.
 
 ## The Daemon
 
