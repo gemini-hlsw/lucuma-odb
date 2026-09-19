@@ -43,6 +43,7 @@ object SummaryStyle:
     observatory match
       // Normal and intensive Subaru proposals alike.
       case Observatory.Subaru => GeminiDarp
+      // Keck is not in use; Default until someone picks a template for it.
       case Observatory.Keck   => Default
       case Observatory.Gemini => subtype.fold(Default):
         case ScienceSubtype.LargeProgram                                     => GeminiDarp
