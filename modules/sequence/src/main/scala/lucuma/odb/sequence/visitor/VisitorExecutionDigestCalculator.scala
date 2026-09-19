@@ -54,6 +54,7 @@ object VisitorExecutionDigestCalculator:
     ExecutionDigest(
       SetupTime(overheads.setup, TimeSpan.Zero),
       NonNegInt.unsafeFrom(if count > 0 then 1 else 0),
+      NonNegInt.MinValue,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )
@@ -79,6 +80,7 @@ object VisitorExecutionDigestCalculator:
     ExecutionDigest(
       SetupTime.Zero, // no info about setup time
       NonNegInt.unsafeFrom(0),
+      NonNegInt.MinValue,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )

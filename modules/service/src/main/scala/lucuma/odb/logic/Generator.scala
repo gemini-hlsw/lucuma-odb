@@ -50,6 +50,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
 import lucuma.odb.service.NoTransaction
+import lucuma.odb.service.ObsExtract
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import skunk.*
@@ -223,6 +224,7 @@ object Generator:
         ExecutionDigest(
           SetupTime.Zero,
           NonNegInt.MinValue,
+          NonNegInt.MinValue,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
             observeClass   = ctx.params.calibrationRole.sciClass,
@@ -234,6 +236,7 @@ object Generator:
       private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
         ExecutionDigest(
           SetupTime.Zero,
+          NonNegInt.MinValue,
           NonNegInt.MinValue,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
@@ -268,12 +271,14 @@ object Generator:
             s <- EitherT(sequenceDigest(stream.science))
             c  = if ctx.params.isSplittable then estimator.estimateSetupCount(s.timeEstimate.sum)
                  else NonNegInt.unsafeFrom(1)
-          yield ExecutionDigest(estimator.estimateSetupTime, c, a, s)
+            n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
+          yield ExecutionDigest(estimator.estimateSetupTime, c, n, a, s)
 
         val done =
           EitherT.pure[F, OdbError]:
             ExecutionDigest(
               SetupTime.Zero,
+              NonNegInt.MinValue,
               NonNegInt.MinValue,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)

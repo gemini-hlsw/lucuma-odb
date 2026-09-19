@@ -134,6 +134,10 @@ _Avoid_: telluric standard (names the target star, not the observation).
 A telluric a PI has explicitly declined, held inactive so it will not be observed even when its science observation is active. Reversible — reinstating the telluric resumes its science observation's lifecycle. Distinct from a Telluric Type of NoTelluric, which is declarative and prevents generation up front: the type governs whether tellurics exist, the decline governs whether an existing one is observed. The two are uncoupled — setting NoTelluric deletes tellurics (unless they have visits or execution), taking any decline state with them; restoring a real type never reinstates a declined telluric.
 _Avoid_: disabled telluric, skipped telluric, deleted telluric, opted-out telluric.
 
+**Calibration Count**:
+The number of night-time calibration observations (today: tellurics) an observation is expected to generate, carried in its time estimate. Zero for calibration observations themselves and for modes that take no telluric; otherwise one, or two when the science time exceeds the multi-telluric threshold. It does not yet feed the time estimate.
+_Avoid_: telluric count (the concept is broader than tellurics), number of calibrations.
+
 **Telluric Type**:
 *What kind* of standard star a telluric should observe (`Hot`, `A0V`, `Solar`, `Manual`), or `NoTelluric` for no telluric at all. A property of the observing-mode config. Setting `NoTelluric` overwrites the previous choice (a `Manual` star list is not remembered across it), and changing the observing mode resets the type to its default (`Hot`) — a "no tellurics" decision for one mode must not be assumed to carry to another.
 _Avoid_: telluric (names the observation, not the classification), requires-telluric flag (superseded design).

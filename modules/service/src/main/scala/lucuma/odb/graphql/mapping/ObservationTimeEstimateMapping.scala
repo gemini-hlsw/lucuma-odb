@@ -16,6 +16,7 @@ trait ObservationTimeEstimateMapping[F[_]] extends ObservationView[F]:
         SqlField("id", OriginalEstimate.SyntheticId, key = true, hidden = true),
         SqlObject("setup"),
         SqlField("setupCount", OriginalEstimate.SetupCount),
+        SqlField("calibrationCount", OriginalEstimate.CalibrationCount),
         SqlObject("science"),
         SqlObject("total")
       ),
