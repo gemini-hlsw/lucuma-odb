@@ -641,7 +641,8 @@ object ObservationService {
                 _ <- if setsMode then validateTooActivationCeiling else ResultT.unit
 
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
-                setsGuiding = SET.targetEnvironment.exists(te => te.explicitGuideProbe.toOption.isDefined || te.altair.toOption.isDefined)
+                // Clearing Altair (null) also changes which probes are allowed, so it counts.
+                setsGuiding = SET.targetEnvironment.exists(te => te.explicitGuideProbe.toOption.isDefined || !te.altair.isAbsent)
                 _ <- if setsGuiding then validateExplicitGuideProbe else ResultT.unit
                 _ <- if setsGuiding || SET.observingMode.isDefined then validateAltairInstrument else ResultT.unit
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.scheduling.flatMap(_.timingWindows).foldPresent(_.orEmpty))))

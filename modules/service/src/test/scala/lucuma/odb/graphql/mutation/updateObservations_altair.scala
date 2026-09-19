@@ -260,6 +260,19 @@ class updateObservations_altair extends OdbSuite with UpdateObservationsOps:
              )
     yield ()
 
+  test("clearing Altair is rejected while the explicit probe is the Altair sensor"):
+    for
+      oid <- gnirsObservationAs("{ mode: NGS }".some)
+      _   <- updateObservation(
+               pi, oid, "targetEnvironment: { explicitGuideProbe: ALTAIR_AOWFS }", AltairGraph,
+               updated(altairJson("NGS", none, "FOLLOWING", "OUT"), GuideProbe.AltairAOWFS.some, GuideProbe.AltairAOWFS.some, "FOLLOWING").asRight
+             )
+      _   <- updateObservation(
+               pi, oid, "targetEnvironment: { altair: null }", AltairGraph,
+               s"Observation $oid: ${GuideProbeRules.notAllowedMessage(ObservingModeType.GnirsLongSlit, GuideProbe.AltairAOWFS)}".asLeft
+             )
+    yield ()
+
   test("moving an Altair observation off GNIRS is rejected"):
     for
       oid <- gnirsObservationAs("{ mode: NGS }".some)
