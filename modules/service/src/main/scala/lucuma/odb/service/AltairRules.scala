@@ -7,7 +7,6 @@ import cats.syntax.all.*
 import grackle.Result
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.Instrument
-import lucuma.core.enums.ObservingModeType
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -15,15 +14,15 @@ import lucuma.odb.data.OdbErrorExtensions.*
 // Rules governing where an Altair configuration may be attached and what it may say.
 object AltairRules:
 
-  val NotGnirsMessage: String =
-    "Altair can only be used with GNIRS observing modes."
-
   val LgsFieldLensMessage: String =
     "Altair LGS modes always use the field lens; fieldLens must be IN or omitted."
 
-  def checkInstrument(mode: ObservingModeType, prefix: String = ""): Result[Unit] =
-    if ObservingModeType.toFacility.getOption(mode).exists(_.instrument === Instrument.Gnirs) then Result.unit
-    else OdbError.InvalidArgument(s"$prefix$NotGnirsMessage".some).asFailure
+  def notAvailableMessage(instrument: Instrument): String =
+    s"Altair is not available for ${instrument.longName}."
+
+  def checkInstrument(instrument: Instrument, altairInstruments: Set[Instrument], prefix: String = ""): Result[Unit] =
+    if altairInstruments.contains(instrument) then Result.unit
+    else OdbError.InvalidArgument(s"$prefix${notAvailableMessage(instrument)}".some).asFailure
 
   def checkFieldLens(altair: AltairConfiguration, prefix: String = ""): Result[Unit] =
     if altair.mode.usesLaser && altair.explicitFieldLens.contains(FieldLens.Out)

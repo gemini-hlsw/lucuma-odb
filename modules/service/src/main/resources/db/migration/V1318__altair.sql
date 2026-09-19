@@ -75,3 +75,40 @@ CREATE VIEW v_observation AS
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
+
+-- Which instruments can observe behind Altair. IGRINS-2 is expected to join
+-- GNIRS here.
+ALTER TABLE t_instrument
+  ADD COLUMN c_altair boolean NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN t_instrument.c_altair IS
+  'Whether the instrument can observe behind the Altair adaptive optics system.';
+
+UPDATE t_instrument SET c_altair = true WHERE c_tag = 'Gnirs';
+
+-- The instrument flag lives in another table, so this invariant is a deferrable
+-- constraint trigger rather than a CHECK (see the contributor guide).
+CREATE FUNCTION check_altair_instrument()
+RETURNS TRIGGER AS $$
+BEGIN
+
+  -- A null instrument means the observation has no observing mode yet, which is
+  -- allowed; the check runs again when the mode arrives.
+  IF NEW.c_altair_mode IS NOT NULL AND NEW.c_instrument IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+      FROM t_instrument
+     WHERE c_tag = NEW.c_instrument
+       AND c_altair
+  ) THEN
+    RAISE EXCEPTION 'Altair is not available for instrument %', NEW.c_instrument;
+  END IF;
+
+  RETURN NEW;
+
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER trigger_t_observation_altair_instrument
+  AFTER INSERT OR UPDATE OF c_altair_mode, c_instrument ON t_observation
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION check_altair_instrument();

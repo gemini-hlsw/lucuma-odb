@@ -9,6 +9,7 @@ import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.GuideProbe
+import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
@@ -16,6 +17,8 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.odb.service.AltairRules
 import lucuma.odb.service.GuideProbeRules
+import lucuma.odb.util.Codecs.*
+import skunk.syntax.all.*
 
 class updateObservations_altair extends OdbSuite with UpdateObservationsOps:
 
@@ -219,7 +222,7 @@ class updateObservations_altair extends OdbSuite with UpdateObservationsOps:
       _   <- expect(
                user     = pi,
                query    = createWithAltair(pid, tid, GmosMode, "{ mode: NGS }"),
-               expected = List(AltairRules.NotGnirsMessage).asLeft
+               expected = List(AltairRules.notAvailableMessage(Instrument.GmosNorth)).asLeft
              )
     yield ()
 
@@ -278,7 +281,7 @@ class updateObservations_altair extends OdbSuite with UpdateObservationsOps:
       oid <- gnirsObservationAs("{ mode: NGS }".some)
       _   <- updateObservation(
                pi, oid, GmosMode, AltairGraph,
-               s"Observation $oid: ${AltairRules.NotGnirsMessage}".asLeft
+               s"Observation $oid: ${AltairRules.notAvailableMessage(Instrument.GmosNorth)}".asLeft
              )
     yield ()
 
@@ -290,3 +293,27 @@ class updateObservations_altair extends OdbSuite with UpdateObservationsOps:
                s"Observation $oid: ${GuideProbeRules.notAllowedMessage(ObservingModeType.GnirsLongSlit, GuideProbe.PWFS2)}".asLeft
              )
     yield ()
+
+  // The service rejects this long before it reaches the database, so the
+  // trigger has to be exercised with a direct update.
+  test("the database rejects Altair on an instrument that does not support it"):
+    val rejected: IO[Boolean] =
+      for
+        pid <- createProgramAs(pi)
+        tid <- createTargetAs(pi, pid)
+        oid <- createObservationAs(pi, pid, ObservingModeType.GmosNorthLongSlit.some, tid)
+        r   <- withFreshSession(
+                 _.execute(sql"""
+                   UPDATE t_observation
+                   SET c_altair_mode         = 'ngs',
+                       c_altair_cass_rotator = 'following',
+                       c_altair_nd_filter    = 'out'
+                   WHERE c_observation_id = $observation_id
+                 """.command)(oid).void
+               )
+               .as(false)
+               .recover:
+                 case e if e.getMessage.contains("Altair is not available for instrument") => true
+                 case _                                                                    => false
+      yield r
+    assertIOBoolean(rejected, "Expected the database to reject Altair on GMOS North")

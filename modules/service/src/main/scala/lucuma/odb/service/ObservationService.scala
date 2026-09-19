@@ -371,16 +371,27 @@ object ObservationService {
           val altair: Option[AltairConfiguration] =
             SET.targetEnvironment.flatMap(_.altair)
 
-          val guidingCheck: Result[Unit] =
-            (
-              (observingModeType, altair).tupled.fold(Result.unit)((m, _) => AltairRules.checkInstrument(m)),
-              altair.fold(Result.unit)(AltairRules.checkFieldLens(_)),
-              (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
-                .tupled
-                .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
-            ).parTupled.void
+          // A visitor mode has no facility instrument and leaves c_instrument
+          // null, so there is nothing for Altair to be checked against.
+          val modeInstrument: Option[Instrument] =
+            observingModeType.flatMap(ObservingModeType.toFacility.getOption).map(_.instrument)
 
-          ResultT.fromResult(guidingCheck)
+          val instrumentCheck: F[Result[Unit]] =
+            (altair, modeInstrument).tupled.fold(Result.unit.pure[F]): (_, facilityInstrument) =>
+              session.execute(Statements.SelectAltairInstruments).map: altairInstruments =>
+                AltairRules.checkInstrument(facilityInstrument, altairInstruments.toSet)
+
+          val guidingCheck: F[Result[Unit]] =
+            instrumentCheck.map: instrumentResult =>
+              (
+                instrumentResult,
+                altair.fold(Result.unit)(AltairRules.checkFieldLens(_)),
+                (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
+                  .tupled
+                  .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
+              ).parTupled.void
+
+          ResultT(guidingCheck)
             .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
             .flatMap: oid =>
               SET
@@ -593,17 +604,19 @@ object ObservationService {
                       mode.traverse_(GuideProbeRules.check(_, altair, probe, s"Observation $oid: "))
                     }
 
-            // Altair only works on GNIRS, and the observing mode may be changing in this same update.
+            // Altair works only behind some instruments, and the observing mode
+            // (hence the instrument) may be changing in this same update.
             val validateAltairInstrument: ResultT[F, Unit] =
               ResultT:
                 val af = Statements.selectAltairObservations(which)
-                session
-                  .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt))
-                  .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
-                  .map: rows =>
-                    rows.parTraverse_ { case (oid, mode) =>
-                      mode.traverse_(AltairRules.checkInstrument(_, s"Observation $oid: "))
-                    }
+                for
+                  altairInstruments <- session.execute(Statements.SelectAltairInstruments).map(_.toSet)
+                  rows              <- session
+                                         .prepareR(af.fragment.query(observation_id *: instrument.opt))
+                                         .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+                yield rows.parTraverse_ { case (oid, obsInstrument) =>
+                  obsInstrument.traverse_(AltairRules.checkInstrument(_, altairInstruments, s"Observation $oid: "))
+                }
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
@@ -1547,10 +1560,17 @@ object ObservationService {
         void"WHERE c_explicit_guide_probe IS NOT NULL "                                            |+|
         void"AND c_observation_id IN (" |+| which |+| void")"
 
+    val SelectAltairInstruments: Query[Void, Instrument] =
+      sql"""
+        SELECT c_tag
+          FROM t_instrument
+         WHERE c_altair
+      """.query(instrument)
+
     def selectAltairObservations(which: AppliedFragment): AppliedFragment =
-      void"SELECT c_observation_id, c_observing_mode_type " |+|
-        void"FROM t_observation "                           |+|
-        void"WHERE c_altair_mode IS NOT NULL "              |+|
+      void"SELECT c_observation_id, c_instrument " |+|
+        void"FROM t_observation "                  |+|
+        void"WHERE c_altair_mode IS NOT NULL "     |+|
         void"AND c_observation_id IN (" |+| which |+| void")"
 
     def validateUnsplittableSequence(
