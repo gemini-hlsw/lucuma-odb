@@ -622,7 +622,9 @@ private[legacy] object codecs:
     for
       title  <- c.downField("title").as[String]
       dt     <- c.downField("dataType").as[SeriesDataType]
-      dataY  <- c.downField("dataY").as[IArray[Double]]
+      dataY  <- c.downField("dataY")
+                  .as[IArray[Double]]
+                  .ensure(DecodingFailure(s"Empty dataY in series '$title'", c.history))(_.nonEmpty)
       xaxis  <- c.downField("xAxis").as[ItcXAxis]
       series <- ItcSeries
                   .fromLegacy(title, dt, dataY, xaxis)
