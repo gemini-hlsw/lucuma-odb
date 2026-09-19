@@ -25,10 +25,14 @@ object SummaryStyle:
   val Default: SummaryStyle = GeminiStandard
 
   /**
-   * The OCS Phase 1 template map (P1PDF.templatesList).  The proposal type
-   * decides on its own; only queue and classical proposals, which are the ones
-   * apportioned across partners, follow the partner.  An exchange partner takes
-   * the whole time request, so it stands in for the splits when there is one.
+   * What the legacy OCS renders today: P1MonitorConfig.toTemplate over
+   * conf.production-2026B.xml.  Fast Turnaround departs deliberately, sc-10424
+   * renders it without investigators where OCS uses darp.
+   *
+   * The proposal type decides on its own; only queue and classical proposals,
+   * which are the ones apportioned across partners, follow the partner.  An
+   * exchange partner takes the whole time request, so it stands in for the
+   * splits when there is one.
    */
   def forProposal(
     subtype:         Option[ScienceSubtype],

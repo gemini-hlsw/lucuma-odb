@@ -79,8 +79,10 @@ than `StaleRender` (30 minutes), so a crashed dyno never strands a job.
 
 ### Proposal to style
 
-`SummaryStyle.forProposal` mirrors the OCS Phase 1 template map
-(`P1PDF.templatesList`). The proposal type decides on its own; only queue and
+`SummaryStyle.forProposal` follows what the legacy OCS renders today
+(`P1MonitorConfig.toTemplate` over `conf.production-2026B.xml`), with one
+deliberate departure: OCS renders Fast Turnaround as darp, sc-10424 renders it
+without investigators. The proposal type decides on its own; only queue and
 classical proposals, the ones apportioned across partners, fall through to the
 partner. An exchange partner takes the whole time request, so where there is one
 it stands in for the splits.
