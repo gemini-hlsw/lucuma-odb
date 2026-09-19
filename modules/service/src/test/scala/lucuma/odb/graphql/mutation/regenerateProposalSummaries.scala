@@ -314,6 +314,32 @@ class regenerateProposalSummaries extends OdbSuite
       jobs <- jobsFor(pid)
     yield assertEquals(jobs.map(j => (j.partner, j.style)), List((none, SummaryStyle.GeminiDarp)))
 
+  // The style no longer follows from the partner the row is keyed on, so a job
+  // still waiting has to take the new one when the proposal type changes.
+  test("a waiting job picks up a changed proposal type"):
+    val toDemoScience = (pid: Program.Id) => query(pi, s"""
+      mutation {
+        updateProposal(
+          input: {
+            programId: "$pid"
+            SET: { gemini: { demoScience: { minPercentTime: 50 } } }
+          }
+        ) { proposal { gemini { scienceSubtype } } }
+      }
+    """).void
+    for
+      pid    <- createProgramWithNonPartnerPi(pi)
+      _      <- createFastTurnaroundProposal(pi, pid)
+      _      <- regenerate(pi, pid)
+      before <- jobsFor(pid)
+      _      <- toDemoScience(pid)
+      _      <- regenerate(pi, pid)
+      after  <- jobsFor(pid)
+    yield
+      assertEquals(before.map(_.style), List(SummaryStyle.GeminiNoInvestigators))
+      assertEquals(after.map(_.id), before.map(_.id))
+      assertEquals(after.map(_.style), List(SummaryStyle.GeminiInvestigatorsAtEnd))
+
   test("regenerating while a job is waiting is a no-op"):
     for
       pid    <- setupProposal()

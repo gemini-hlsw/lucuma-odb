@@ -32,8 +32,10 @@ flowchart TD
 ```
 
 A second request while a job for the same (program, partner) is already
-`pending` is a no-op (unique index). A request while it is `rendering` is
-allowed, so edits made during a render are picked up by the next one.
+`pending` adds no row (unique index); it only refreshes that row's `c_style`,
+since the proposal type may have changed since it was queued. A request while it
+is `rendering` is allowed, so edits made during a render are picked up by the
+next one.
 
 `enqueue` first prunes: jobs and `SUMMARY` attachments whose partner is no
 longer on the proposal are deleted. With splits the partnerless row is the

@@ -301,12 +301,14 @@ object PdfSummaryJobService:
               END
       """.command
 
-    // A no-op when a job for this partner is already waiting.
+    // A job already waiting for this partner is kept rather than duplicated,
+    // but its style is refreshed: the proposal type may have changed since.
     val InsertJob: Command[(Program.Id, Option[Partner], SummaryStyle)] =
       sql"""
         INSERT INTO t_summary_job (c_program_id, c_partner, c_style)
         VALUES ($program_id, ${partner.opt}, $summary_style)
-        ON CONFLICT (c_program_id, c_partner) WHERE c_state = 'pending' DO NOTHING
+        ON CONFLICT (c_program_id, c_partner) WHERE c_state = 'pending'
+        DO UPDATE SET c_style = EXCLUDED.c_style
       """.command
 
     val Claim: Query[Void, Claimed] =
