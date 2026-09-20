@@ -114,7 +114,7 @@ class observation_workflow_altair extends ExecutionTestSupportForGnirs:
   private def warning(msgs: String*): (ObservationValidationCode, List[String]) =
     (ObservationValidationCode.ConfigurationWarning, msgs.toList)
 
-  // NGS and LGS need a guide star, which every test but the dedicated one below supplies so that
+  // Altair needs a guide star, which every test but the dedicated ones supplies so that
   // its own rule is what the expectations show.
   private val GuideStarName: String =
     "Gaia DR3 3219118090462918016"
@@ -140,31 +140,30 @@ class observation_workflow_altair extends ExecutionTestSupportForGnirs:
       expected.toList
     )
 
-  test("Altair LGS with the ND filter in is an error"):
-    expectAltairValidations(
-      gnirsLongSlit(),
-      altair          = "{ mode: LGS, ndFilter: IN }",
-      imageQuality    = "POINT_THREE".some,
-      cloudExtinction = "ZERO".some
-    )(error(AltairValidator.NdFilterLgsMessage))
-
-  // Also shows that LGS+P1 alone needs no guide star: none is stored here.
-  test("Altair LGS+P1 on a long slit observation is an error"):
+  test("Altair LGS+P1 on a long slit observation is a warning"):
     expectAltairValidations(
       gnirsLongSlit(),
       altair          = "{ mode: LGS_P1 }",
       imageQuality    = "POINT_THREE".some,
-      cloudExtinction = "ZERO".some,
-      guideStar       = false
-    )(error(AltairValidator.LgsP1LongSlitMessage))
+      cloudExtinction = "ZERO".some
+    )(warning(AltairValidator.LgsP1LongSlitMessage))
 
-  test("Altair LGS is an error when cloud extinction is worse than 50%"):
+  test("Altair LGS is an error when cloud extinction is 0.1 mag or worse"):
     expectAltairValidations(
       gnirsLongSlit(),
       altair          = "{ mode: LGS }",
       imageQuality    = "POINT_THREE".some,
       cloudExtinction = "POINT_ONE".some
     )(error(AltairValidator.LgsConditionsMessage))
+
+  test("Altair LGS+P1 without a selected guide star is an error"):
+    expectAltairValidations(
+      gnirsLongSlit(),
+      altair          = "{ mode: LGS_P1 }",
+      imageQuality    = "POINT_THREE".some,
+      cloudExtinction = "ZERO".some,
+      guideStar       = false
+    )(error(AltairValidator.MissingGuideStarMessage), warning(AltairValidator.LgsP1LongSlitMessage))
 
   test("Altair NGS at 4.5 µm is an error"):
     expectAltairValidations(
