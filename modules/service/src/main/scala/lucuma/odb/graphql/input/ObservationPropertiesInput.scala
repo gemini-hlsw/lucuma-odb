@@ -108,7 +108,7 @@ object ObservationPropertiesInput {
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
-          ObservationPriorityBinding.Option("priority", rPriority),
+          ObservationPriorityBinding.NonNullable("priority", rPriority),
         ) =>
           (rSubtitle,
             rScienceBand,
