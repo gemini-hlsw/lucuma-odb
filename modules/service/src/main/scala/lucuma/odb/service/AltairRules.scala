@@ -5,6 +5,7 @@ package lucuma.odb.service
 
 import cats.syntax.all.*
 import grackle.Result
+import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.Instrument
 import lucuma.odb.data.AltairConfiguration
@@ -17,6 +18,9 @@ object AltairRules:
   val LgsFieldLensMessage: String =
     "Altair LGS modes always use the field lens; fieldLens must be IN or omitted."
 
+  val LgsNdFilterMessage: String =
+    "The Altair ND filter is not commissioned for the LGS modes; ndFilter must be OUT."
+
   def notAvailableMessage(instrument: Instrument): String =
     s"Altair is not available for ${instrument.longName}."
 
@@ -28,3 +32,12 @@ object AltairRules:
     if altair.mode.usesLaser && altair.explicitFieldLens.contains(FieldLens.Out)
     then OdbError.InvalidArgument(s"$prefix$LgsFieldLensMessage".some).asFailure
     else Result.unit
+
+  def checkNdFilter(altair: AltairConfiguration, prefix: String = ""): Result[Unit] =
+    if altair.mode.usesLaser && altair.ndFilter === AltairNdFilter.In
+    then OdbError.InvalidArgument(s"$prefix$LgsNdFilterMessage".some).asFailure
+    else Result.unit
+
+  /** The input checks that need nothing but the Altair configuration itself. */
+  def checkConfiguration(altair: AltairConfiguration, prefix: String = ""): Result[Unit] =
+    (checkFieldLens(altair, prefix), checkNdFilter(altair, prefix)).parTupled.void

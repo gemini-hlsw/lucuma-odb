@@ -27,6 +27,10 @@ ALTER TABLE t_observation
   -- LGS modes always use the field lens.
   ADD CONSTRAINT altair_lgs_field_lens CHECK (
     c_altair_mode = 'ngs' OR c_altair_field_lens IS NULL OR c_altair_field_lens = 'in'
+  ),
+  -- The ND filter is not commissioned for the LGS modes.
+  ADD CONSTRAINT altair_lgs_nd_filter CHECK (
+    c_altair_mode = 'ngs' OR c_altair_nd_filter IS NULL OR c_altair_nd_filter = 'out'
   );
 
 -- v_observation selects o.*, so it must be recreated to pick up the new columns.

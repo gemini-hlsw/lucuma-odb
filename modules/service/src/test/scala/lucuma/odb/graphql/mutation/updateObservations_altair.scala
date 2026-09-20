@@ -204,6 +204,17 @@ class updateObservations_altair extends OdbSuite with UpdateObservationsOps:
              )
     yield ()
 
+  test("an LGS mode cannot put the ND filter in"):
+    for
+      pid <- createProgramAs(pi)
+      tid <- createTargetAs(pi, pid)
+      _   <- expect(
+               user     = pi,
+               query    = createWithAltair(pid, tid, GnirsMode, "{ mode: LGS_P1, ndFilter: IN }"),
+               expected = List(AltairRules.LgsNdFilterMessage).asLeft
+             )
+    yield ()
+
   test("an LGS mode cannot take the field lens out"):
     for
       pid <- createProgramAs(pi)

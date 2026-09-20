@@ -385,7 +385,7 @@ object ObservationService {
             instrumentCheck.map: instrumentResult =>
               (
                 instrumentResult,
-                altair.fold(Result.unit)(AltairRules.checkFieldLens(_)),
+                altair.fold(Result.unit)(AltairRules.checkConfiguration(_)),
                 (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
                   .tupled
                   .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
@@ -668,12 +668,12 @@ object ObservationService {
             } yield g
 
             // Purely a check of the input, so it runs before anything is written.
-            val validateAltairFieldLens: ResultT[F, Unit] =
+            val validateAltairConfiguration: ResultT[F, Unit] =
               ResultT.fromResult:
-                SET.targetEnvironment.flatMap(_.altair.toOption).fold(Result.unit)(AltairRules.checkFieldLens(_))
+                SET.targetEnvironment.flatMap(_.altair.toOption).fold(Result.unit)(AltairRules.checkConfiguration(_))
 
             (for {
-              _ <- validateAltairFieldLens
+              _ <- validateAltairConfiguration
               _ <- forbidSystemGroupMove
               _ <- ResultT.liftF(session.execute(sql"set constraints all deferred".command))
               // The group move is inside the recover: a trigger may reject it
