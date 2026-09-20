@@ -15,7 +15,11 @@ import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
+import lucuma.core.enums.AltairMode
+import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.CassRotator
+import lucuma.core.enums.FieldLens
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
@@ -45,6 +49,7 @@ import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Cone
 import lucuma.odb.data.Existence
@@ -360,12 +365,33 @@ object ObservationService {
         input.foldWithId(
           OdbError.InvalidArgument().asFailureF // typically handled by caller
         ): (SET, pid) =>
-          val probeCheck: Result[Unit] =
-            (SET.observingMode.flatMap(_.observingModeType), SET.targetEnvironment.flatMap(_.explicitGuideProbe))
-              .tupled
-              .fold(Result.unit)(GuideProbeRules.check(_, _))
+          val observingModeType: Option[ObservingModeType] =
+            SET.observingMode.flatMap(_.observingModeType)
 
-          ResultT.fromResult(probeCheck)
+          val altair: Option[AltairConfiguration] =
+            SET.targetEnvironment.flatMap(_.altair)
+
+          // A visitor mode has no facility instrument and leaves c_instrument
+          // null, so there is nothing for Altair to be checked against.
+          val modeInstrument: Option[Instrument] =
+            observingModeType.flatMap(ObservingModeType.toFacility.getOption).map(_.instrument)
+
+          val instrumentCheck: F[Result[Unit]] =
+            (altair, modeInstrument).tupled.fold(Result.unit.pure[F]): (_, facilityInstrument) =>
+              session.execute(Statements.SelectAltairInstruments).map: altairInstruments =>
+                AltairRules.checkInstrument(facilityInstrument, altairInstruments.toSet)
+
+          val guidingCheck: F[Result[Unit]] =
+            instrumentCheck.map: instrumentResult =>
+              (
+                instrumentResult,
+                altair.fold(Result.unit)(AltairRules.checkConfiguration(_)),
+                (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
+                  .tupled
+                  .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
+              ).parTupled.void
+
+          ResultT(guidingCheck)
             .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
             .flatMap: oid =>
               SET
@@ -570,13 +596,27 @@ object ObservationService {
               ResultT:
                 val af = Statements.selectExplicitGuideProbes(which)
                 session
-                  .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt *: guide_probe))
+                  .prepareR(af.fragment.query(observation_id *: observing_mode_type.opt *: guide_probe *: altair_mode.opt))
                   .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
                   .map: rows =>
                     // parTraverse_ accumulates failures; Result's semigroup would downgrade them to warnings
-                    rows.parTraverse_ { case (oid, mode, probe) =>
-                      mode.traverse_(GuideProbeRules.check(_, probe, s"Observation $oid: "))
+                    rows.parTraverse_ { case (oid, mode, probe, altair) =>
+                      mode.traverse_(GuideProbeRules.check(_, altair, probe, s"Observation $oid: "))
                     }
+
+            // Altair works only behind some instruments, and the observing mode
+            // (hence the instrument) may be changing in this same update.
+            val validateAltairInstrument: ResultT[F, Unit] =
+              ResultT:
+                val af = Statements.selectAltairObservations(which)
+                for
+                  altairInstruments <- session.execute(Statements.SelectAltairInstruments).map(_.toSet)
+                  rows              <- session
+                                         .prepareR(af.fragment.query(observation_id *: instrument.opt))
+                                         .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+                yield rows.parTraverse_ { case (oid, obsInstrument) =>
+                  obsInstrument.traverse_(AltairRules.checkInstrument(_, altairInstruments, s"Observation $oid: "))
+                }
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
@@ -614,7 +654,10 @@ object ObservationService {
                 _ <- if setsMode then validateTooActivationCeiling else ResultT.unit
 
                 _ <- ResultT(u.map(u => Services.asSuperUser(updateObservingModes(SET.observingMode, u, e.toOption))).getOrElse(Result.unit.pure[F]))
-                _ <- if SET.targetEnvironment.exists(_.explicitGuideProbe.toOption.isDefined) then validateExplicitGuideProbe else ResultT.unit
+                // Clearing Altair (null) also changes which probes are allowed, so it counts.
+                setsGuiding = SET.targetEnvironment.exists(te => te.explicitGuideProbe.toOption.isDefined || !te.altair.isAbsent)
+                _ <- if setsGuiding then validateExplicitGuideProbe else ResultT.unit
+                _ <- if setsGuiding || SET.observingMode.isDefined then validateAltairInstrument else ResultT.unit
                 _ <- ResultT(Services.asSuperUser(setTimingWindows(u.foldMap(_.toList), SET.scheduling.flatMap(_.timingWindows).foldPresent(_.orEmpty))))
                 _ <- ResultT(g.toList.traverse { case (pid, oids) =>
                       obsAttachmentAssignmentService.setAssignments(pid, oids, SET.attachments)
@@ -624,7 +667,13 @@ object ObservationService {
                     }.map(_.sequence)))
             } yield g
 
+            // Purely a check of the input, so it runs before anything is written.
+            val validateAltairConfiguration: ResultT[F, Unit] =
+              ResultT.fromResult:
+                SET.targetEnvironment.flatMap(_.altair.toOption).fold(Result.unit)(AltairRules.checkConfiguration(_))
+
             (for {
+              _ <- validateAltairConfiguration
               _ <- forbidSystemGroupMove
               _ <- ResultT.liftF(session.execute(sql"set constraints all deferred".command))
               // The group move is inside the recover: a trigger may reject it
@@ -847,6 +896,7 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.useBlindOffset).getOrElse(false),
           SET.targetEnvironment.map(_.blindOffsetType).getOrElse(BlindOffsetType.Manual),
           SET.targetEnvironment.flatMap(_.explicitGuideProbe),
+          SET.targetEnvironment.flatMap(_.altair),
           calibrationRole,
           SET.scheduling.flatMap(_.schedulingMode).getOrElse(SchedulingMode.Unconstrained)
         )
@@ -870,6 +920,7 @@ object ObservationService {
       useBlindOffset:      Boolean,
       blindOffsetType:     BlindOffsetType,
       explicitGuideProbe:  Option[GuideProbe],
+      altair:              Option[AltairConfiguration],
       calibrationRole:     Option[CalibrationRole],
       schedulingMode:      SchedulingMode
     ): AppliedFragment = {
@@ -916,6 +967,10 @@ object ObservationService {
            useBlindOffset                                                                                                         ,
            blindOffsetType                                                                                                        ,
            explicitGuideProbe                                                                                                     ,
+           altair.map(_.mode)                                                                                                     ,
+           altair.flatMap(_.explicitFieldLens)                                                                                    ,
+           altair.map(_.cassRotator)                                                                                              ,
+           altair.map(_.ndFilter)                                                                                                 ,
            calibrationRole                                                                                                        ,
            schedulingMode
         )
@@ -964,6 +1019,10 @@ object ObservationService {
       Boolean                          ,
       BlindOffsetType                  ,
       Option[GuideProbe]               ,
+      Option[AltairMode]               ,
+      Option[FieldLens]                ,
+      Option[CassRotator]              ,
+      Option[AltairNdFilter]           ,
       Option[CalibrationRole]          ,
       SchedulingMode
     )] =
@@ -1003,6 +1062,10 @@ object ObservationService {
           c_use_blind_offset,
           c_blind_offset_type,
           c_explicit_guide_probe,
+          c_altair_mode,
+          c_altair_field_lens,
+          c_altair_cass_rotator,
+          c_altair_nd_filter,
           c_calibration_role,
           c_scheduling_mode
         )
@@ -1041,6 +1104,10 @@ object ObservationService {
           $bool,
           $blind_offset_type,
           ${guide_probe.opt},
+          ${altair_mode.opt},
+          ${field_lens.opt},
+          ${cass_rotator.opt},
+          ${altair_nd_filter.opt},
           ${calibration_role.opt},
           $scheduling_mode
       """
@@ -1224,13 +1291,29 @@ object ObservationService {
            .toList
            .flatMap(te => te.explicitGuideProbe.foldPresent(p => sql"c_explicit_guide_probe = ${guide_probe.opt}"(p)))
 
+      // The whole Altair configuration is replaced or cleared as a unit.
+      val altair: List[AppliedFragment] =
+        SET.targetEnvironment
+           .toList
+           .flatMap: te =>
+             te.altair
+               .foldPresent: a =>
+                 List(
+                   sql"c_altair_mode         = ${altair_mode.opt}"(a.map(_.mode)),
+                   sql"c_altair_field_lens   = ${field_lens.opt}"(a.flatMap(_.explicitFieldLens)),
+                   sql"c_altair_cass_rotator = ${cass_rotator.opt}"(a.map(_.cassRotator)),
+                   sql"c_altair_nd_filter    = ${altair_nd_filter.opt}"(a.map(_.ndFilter))
+                 )
+               .toList
+               .flatten
+
       val constraintSet: Result[List[AppliedFragment]] =
         SET.constraintSet
            .toList
            .flatTraverse(constraintSetUpdates)
 
       (explicitBase, constraintSet).mapN { (eb, cs) =>
-        NonEmptyList.fromList(eb ++ explicitGuideProbe ++ cs ++ ups ++ posAngleConstraint ++ scienceRequirements)
+        NonEmptyList.fromList(eb ++ explicitGuideProbe ++ altair ++ cs ++ ups ++ posAngleConstraint ++ scienceRequirements)
       }
     }
 
@@ -1329,6 +1412,10 @@ object ObservationService {
           c_use_blind_offset,
           c_blind_offset_type,
           c_explicit_guide_probe,
+          c_altair_mode,
+          c_altair_field_lens,
+          c_altair_cass_rotator,
+          c_altair_nd_filter,
           c_scheduling_mode
         )
         SELECT
@@ -1367,6 +1454,10 @@ object ObservationService {
           c_use_blind_offset,
           c_blind_offset_type,
           c_explicit_guide_probe,
+          c_altair_mode,
+          c_altair_field_lens,
+          c_altair_cass_rotator,
+          c_altair_nd_filter,
           c_scheduling_mode
       FROM t_observation
       WHERE c_observation_id = $observation_id
@@ -1464,9 +1555,22 @@ object ObservationService {
       """
 
     def selectExplicitGuideProbes(which: AppliedFragment): AppliedFragment =
-      void"SELECT c_observation_id, c_observing_mode_type, c_explicit_guide_probe " |+|
-        void"FROM t_observation "                                                   |+|
-        void"WHERE c_explicit_guide_probe IS NOT NULL "                             |+|
+      void"SELECT c_observation_id, c_observing_mode_type, c_explicit_guide_probe, c_altair_mode " |+|
+        void"FROM t_observation "                                                                  |+|
+        void"WHERE c_explicit_guide_probe IS NOT NULL "                                            |+|
+        void"AND c_observation_id IN (" |+| which |+| void")"
+
+    val SelectAltairInstruments: Query[Void, Instrument] =
+      sql"""
+        SELECT c_tag
+          FROM t_instrument
+         WHERE c_altair
+      """.query(instrument)
+
+    def selectAltairObservations(which: AppliedFragment): AppliedFragment =
+      void"SELECT c_observation_id, c_instrument " |+|
+        void"FROM t_observation "                  |+|
+        void"WHERE c_altair_mode IS NOT NULL "     |+|
         void"AND c_observation_id IN (" |+| which |+| void")"
 
     def validateUnsplittableSequence(

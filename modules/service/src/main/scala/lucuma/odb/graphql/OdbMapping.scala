@@ -414,6 +414,7 @@ object OdbMapping {
                 AddStepEventResultMapping,
                 AddTimeChargeCorrectionResultMapping,
                 AirMassRangeMapping,
+                AltairMapping,
                 AllocationMapping,
                 AsterismGroupMapping,
                 AsterismGroupSelectResultMapping,
