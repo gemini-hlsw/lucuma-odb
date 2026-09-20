@@ -94,6 +94,7 @@ object StartupDiagnostics:
           checkPostgresEnum(keck_instrument),
           checkPostgresEnum(multiple_filters_mode),
           checkPostgresEnum(obs_class),
+          checkPostgresEnum(observation_priority),
           checkPostgresEnum(observation_workflow_state),
           checkPostgresEnum(observatory),
           checkPostgresEnum(observing_mode_row_version),
