@@ -4603,6 +4603,12 @@ input ObservationPropertiesInput {
   Set the notes for  thhe observer
   """
   observerNotes: NonEmptyString
+
+  """
+  The PI's declared priority for this observation. Defaults to MEDIUM on
+  creation. Cannot be set to null.
+  """
+  priority: ObservationPriority
 }
 
 """
@@ -16950,6 +16956,12 @@ type Observation {
   observerNotes: NonEmptyString
 
   """
+  The PI's declared priority for this observation, relative to the other
+  observations of the same program. Defaults to MEDIUM.
+  """
+  priority: ObservationPriority!
+
+  """
   Parameters relevant to approved configurations.
   """
   configuration: Configuration!
@@ -17831,6 +17843,19 @@ type ObservationValidation {
   Particular errors for this validation type
   """
   messages: [String!]!
+}
+
+"""
+The PI's statement of which of their observations matter more. Advisory: the
+scheduler may weigh it when choosing among a program's observations. Meaningful
+only relative to the other observations of the same program.
+"""
+enum ObservationPriority {
+  LOW
+
+  MEDIUM
+
+  HIGH
 }
 
 """
@@ -19257,7 +19282,7 @@ enum ScienceMode {
 }
 
 """
-Science observation priorities.
+Science bands, ranking a program's time allocation.
 """
 enum ScienceBand {
   BAND1

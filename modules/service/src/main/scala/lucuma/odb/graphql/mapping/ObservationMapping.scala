@@ -89,6 +89,7 @@ trait ObservationMapping[F[_]]
       SqlField("groupIndex", ObservationView.GroupIndex),
       SqlField("calibrationRole", ObservationView.CalibrationRole),
       SqlField("observerNotes", ObservationView.ObserverNotes),
+      SqlField("priority", ObservationView.Priority),
       SqlObject("configuration"),
       EffectField("configurationRequests", configurationRequestsQueryHandler, List("id", "programId")),
       SqlObject("workflow", Join(ObservationView.Id, ObscalcTable.ObservationId)),

@@ -167,7 +167,8 @@ object PerScienceObservationCalibrationsService:
           existence = Existence.Present.some,
           group = groupId.some,
           groupIndex = telluricIndex.some,
-          observerNotes = none
+          observerNotes = none,
+          priority = none
         )
         observationService
           .createObservation(
@@ -308,7 +309,8 @@ object PerScienceObservationCalibrationsService:
           existence           = Existence.Present.some,
           group               = gid.some,
           groupIndex          = none,
-          observerNotes       = none
+          observerNotes       = none,
+          priority            = none
         )
         observationService
           .createObservation(

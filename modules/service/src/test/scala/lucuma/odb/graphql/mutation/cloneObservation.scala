@@ -2946,4 +2946,38 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
       _    <- readMaskColumns("t_flamingos_2_mos", coid).assertEquals((Option.empty[Attachment.Id], Option.empty[AttachmentType]))
     yield ()
 
+  test("clone copies the priority") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        for
+          // HIGH differs from the MEDIUM default, so a clone that reset the
+          // field rather than copying it could not produce this result.
+          _ <- query(
+                 user  = pi,
+                 query = s"""
+                   mutation {
+                     updateObservations(input: {
+                       SET: { priority: HIGH }
+                       WHERE: { id: { EQ: "$oid" } }
+                     }) {
+                       observations { id }
+                     }
+                   }
+                 """
+               )
+          c <- query(
+                 user  = pi,
+                 query = s"""
+                   mutation {
+                     cloneObservation(input: { observationId: "$oid" }) {
+                       newObservation { priority }
+                     }
+                   }
+                 """
+               ).map(_.hcursor.downFields("cloneObservation", "newObservation", "priority").require[Json])
+        yield assertEquals(c, json""" "HIGH" """)
+      }
+    }
+  }
+
 }

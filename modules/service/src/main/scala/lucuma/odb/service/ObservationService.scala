@@ -23,6 +23,7 @@ import lucuma.core.enums.FieldLens
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationPriority
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
@@ -898,7 +899,8 @@ object ObservationService {
           SET.targetEnvironment.flatMap(_.explicitGuideProbe),
           SET.targetEnvironment.flatMap(_.altair),
           calibrationRole,
-          SET.scheduling.flatMap(_.schedulingMode).getOrElse(SchedulingMode.Unconstrained)
+          SET.scheduling.flatMap(_.schedulingMode).getOrElse(SchedulingMode.Unconstrained),
+          SET.priority.getOrElse(ObservationPriority.Medium)
         )
       }
 
@@ -922,7 +924,8 @@ object ObservationService {
       explicitGuideProbe:  Option[GuideProbe],
       altair:              Option[AltairConfiguration],
       calibrationRole:     Option[CalibrationRole],
-      schedulingMode:      SchedulingMode
+      schedulingMode:      SchedulingMode,
+      priority:            ObservationPriority
     ): AppliedFragment = {
 
       val insert: AppliedFragment = {
@@ -972,7 +975,8 @@ object ObservationService {
            altair.map(_.cassRotator)                                                                                              ,
            altair.map(_.ndFilter)                                                                                                 ,
            calibrationRole                                                                                                        ,
-           schedulingMode
+           schedulingMode                                                                                                         ,
+           priority
         )
       }
 
@@ -1024,7 +1028,8 @@ object ObservationService {
       Option[CassRotator]              ,
       Option[AltairNdFilter]           ,
       Option[CalibrationRole]          ,
-      SchedulingMode
+      SchedulingMode                   ,
+      ObservationPriority
     )] =
       sql"""
         INSERT INTO t_observation (
@@ -1067,7 +1072,8 @@ object ObservationService {
           c_altair_cass_rotator,
           c_altair_nd_filter,
           c_calibration_role,
-          c_scheduling_mode
+          c_scheduling_mode,
+          c_priority
         )
         SELECT
           $program_id,
@@ -1109,7 +1115,8 @@ object ObservationService {
           ${cass_rotator.opt},
           ${altair_nd_filter.opt},
           ${calibration_role.opt},
-          $scheduling_mode
+          $scheduling_mode,
+          $observation_priority
       """
 
     def selectObservingModes(
@@ -1260,6 +1267,7 @@ object ObservationService {
       val upObserverNotes     = sql"c_observer_notes = ${text_nonempty.opt}"
       val upUseBlindOffset    = sql"c_use_blind_offset = $bool"
       val upSchedulingMode    = sql"c_scheduling_mode = $scheduling_mode"
+      val upPriority          = sql"c_priority = $observation_priority"
 
       val ups: List[AppliedFragment] =
         List(
@@ -1268,7 +1276,8 @@ object ObservationService {
           SET.scienceBand.foldPresent(upScienceBand),
           SET.observerNotes.foldPresent(upObserverNotes),
           SET.targetEnvironment.flatMap(_.useBlindOffset).map(upUseBlindOffset),
-          SET.scheduling.fold(SchedulingMode.Unconstrained.some, none, _.schedulingMode).map(upSchedulingMode)
+          SET.scheduling.fold(SchedulingMode.Unconstrained.some, none, _.schedulingMode).map(upSchedulingMode),
+          SET.priority.map(upPriority)
         ).flatten
 
       val posAngleConstraint: List[AppliedFragment] =
@@ -1416,7 +1425,8 @@ object ObservationService {
           c_altair_field_lens,
           c_altair_cass_rotator,
           c_altair_nd_filter,
-          c_scheduling_mode
+          c_scheduling_mode,
+          c_priority
         )
         SELECT
           c_program_id,
@@ -1458,7 +1468,8 @@ object ObservationService {
           c_altair_field_lens,
           c_altair_cass_rotator,
           c_altair_nd_filter,
-          c_scheduling_mode
+          c_scheduling_mode,
+          c_priority
       FROM t_observation
       WHERE c_observation_id = $observation_id
       RETURNING c_observation_id

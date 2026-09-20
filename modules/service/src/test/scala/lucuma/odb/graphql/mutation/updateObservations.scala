@@ -5324,3 +5324,64 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """,
       expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `schedulingMode` and the deprecated `isSplittable` may be specified.".asLeft
     )
+
+  test("update priority"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        priority: HIGH
+      """,
+      query = """
+        observations {
+          priority
+        }
+      """,
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "priority": "HIGH"
+              }
+            ]
+          }
+        }
+      """.asRight
+    )
+
+  test("staff can update the priority of a PI's observation"):
+    for
+      pid <- createProgramAs(pi)
+      oid <- createObservationAs(pi, pid)
+      _   <- updateObservation(
+               user     = staff,
+               oid      = oid,
+               update   = "priority: LOW",
+               query    = "observations { priority }",
+               expected = json"""
+                 {
+                   "updateObservations": {
+                     "observations": [
+                       {
+                         "priority": "LOW"
+                       }
+                     ]
+                   }
+                 }
+               """.asRight
+             )
+    yield ()
+
+  test("priority cannot be set to null"):
+    oneUpdateTest(
+      user   = pi,
+      update = """
+        priority: null
+      """,
+      query = """
+        observations {
+          priority
+        }
+      """,
+      expected = "Argument 'input.SET.priority' is invalid: cannot be null".asLeft
+    )
