@@ -22939,6 +22939,11 @@ input WhereObservation {
   scienceBand: WhereOptionOrderScienceBand
 
   """
+  Matches the PI's declared observation priority.
+  """
+  priority: WhereOrderObservationPriority
+
+  """
   Matches on the instrument in use, if any.
   """
   instrument: WhereOptionEqInstrument
@@ -24422,6 +24427,52 @@ input WhereProposalReference {
 
   "Matches the index in the proposal reference."
   semesterIndex: WhereOrderPosInt
+}
+
+"""
+Filters on equality or order comparisons of observation priorities.  All
+supplied criteria must match, but usually only one is selected.
+"""
+input WhereOrderObservationPriority {
+  """
+  Matches if the priority is exactly the supplied value.
+  """
+  EQ: ObservationPriority
+
+  """
+  Matches if the priority is not the supplied value.
+  """
+  NEQ: ObservationPriority
+
+  """
+  Matches if the priority is any of the supplied options.
+  """
+  IN: [ObservationPriority!]
+
+  """
+  Matches if the priority is none of the supplied values.
+  """
+  NIN: [ObservationPriority!]
+
+  """
+  Matches if the priority is ordered after (>) the supplied value.
+  """
+  GT: ObservationPriority
+
+  """
+  Matches if the priority is ordered before (<) the supplied value.
+  """
+  LT: ObservationPriority
+
+  """
+  Matches if the priority is ordered after or equal (>=) the supplied value.
+  """
+  GTE: ObservationPriority
+
+  """
+  Matches if the priority is ordered before or equal (<=) the supplied value.
+  """
+  LTE: ObservationPriority
 }
 
 """

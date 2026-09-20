@@ -5385,3 +5385,36 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """,
       expected = "Argument 'input.SET.priority' is invalid: cannot be null".asLeft
     )
+
+  test("filter observations by priority"):
+    for
+      pid <- createProgramAs(pi)
+      lo  <- createObservationAs(pi, pid)
+      me  <- createObservationAs(pi, pid)
+      hi  <- createObservationAs(pi, pid)
+      _   <- setPriority(lo, "LOW")
+      _   <- setPriority(hi, "HIGH")
+      // Scoped to this program: other tests in the suite set priorities too.
+      eq  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, priority: { EQ: HIGH }""")
+      gte <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, priority: { GTE: MEDIUM }""")
+      in  <- observationsWhere(pi, s"""program: { id: { EQ: "$pid" } }, priority: { IN: [LOW, HIGH] }""")
+    yield
+      assertEquals(eq, List(hi))
+      // Ordered comparisons follow the enum's Low < Medium < High ordering.
+      assertEquals(gte.toSet, Set(me, hi))
+      assertEquals(in.toSet, Set(lo, hi))
+
+  private def setPriority(oid: Observation.Id, priority: String): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateObservations(input: {
+            SET: { priority: $priority }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
