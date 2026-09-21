@@ -18,15 +18,13 @@ import lucuma.odb.service.workflow.ObservationValidator
  * revised by the GNIRS team (September 2026). Only runs when the observation
  * carries an Altair configuration. What the API and the database already refuse
  * (Altair on an unsupported instrument, the field lens out or the ND filter in
- * with the laser) is not repeated here.
+ * with the laser) is not repeated here, and whether a guide star exists is only
+ * known once AGS has run, so the sequence calculation reports that instead.
  */
 object AltairValidator extends ObservationValidator:
 
   val LgsP1LongSlitMessage: String =
     "Altair LGS+P1 on a long slit is subject to flexure; we recommend that a continuum source be visible in the slit."
-
-  val MissingGuideStarMessage: String =
-    "Altair needs a selected guide star."
 
   val LgsConditionsMessage: String =
     "Altair LGS requires clear skies: cloud extinction below 0.1 mag."
@@ -79,11 +77,6 @@ object AltairValidator extends ObservationValidator:
       val lgsConditions: ObservationValidationMap =
         Option.when(altair.mode.usesLaser && conditionsTooPoorForLaser(info))(error(LgsConditionsMessage)).orEmpty
 
-      // The guide star sets the Strehl the ITC models and the NGS field lens position, so both
-      // the exposure times and the sequence depend on it.
-      val missingGuideStar: ObservationValidationMap =
-        Option.when(!info.hasGuideTargetName)(error(MissingGuideStarMessage)).orEmpty
-
       val wavelengths: List[Wavelength] =
         scienceWavelengths(info)
 
@@ -93,4 +86,4 @@ object AltairValidator extends ObservationValidator:
       val wavelengthTooShort: ObservationValidationMap =
         Option.when(wavelengths.exists(_ < WavelengthFloor))(warning(WavelengthTooShortMessage)).orEmpty
 
-      lgsP1LongSlit |+| lgsConditions |+| missingGuideStar |+| wavelengthTooLong |+| wavelengthTooShort
+      lgsP1LongSlit |+| lgsConditions |+| wavelengthTooLong |+| wavelengthTooShort
