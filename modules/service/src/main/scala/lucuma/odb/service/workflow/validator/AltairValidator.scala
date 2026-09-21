@@ -49,9 +49,6 @@ object AltairValidator extends ObservationValidator:
   private def warning(msg: String): ObservationValidationMap =
     ObservationValidationMap.singleton(ObservationValidation.Warning.configuration(msg))
 
-  private def when(cond: Boolean)(v: => ObservationValidationMap): ObservationValidationMap =
-    if cond then v else ObservationValidationMap.empty
-
   // The laser needs clear skies; the presets step from 0 to 0.1 mag, so only the clearest passes.
   private val LaserCloudExtinctionLimit: BigDecimal =
     BigDecimal("0.1")
@@ -77,23 +74,23 @@ object AltairValidator extends ObservationValidator:
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
     info.altair.foldMap: altair =>
       val lgsP1LongSlit: ObservationValidationMap =
-        when(altair.mode === AltairMode.LgsP1 && info.observingMode.contains(ObservingModeType.GnirsLongSlit))(warning(LgsP1LongSlitMessage))
+        Option.when(altair.mode === AltairMode.LgsP1 && info.observingMode.contains(ObservingModeType.GnirsLongSlit))(warning(LgsP1LongSlitMessage)).orEmpty
 
       val lgsConditions: ObservationValidationMap =
-        when(altair.mode.usesLaser && conditionsTooPoorForLaser(info))(error(LgsConditionsMessage))
+        Option.when(altair.mode.usesLaser && conditionsTooPoorForLaser(info))(error(LgsConditionsMessage)).orEmpty
 
       // The guide star sets the Strehl the ITC models and the NGS field lens position, so both
       // the exposure times and the sequence depend on it.
       val missingGuideStar: ObservationValidationMap =
-        when(!info.hasGuideTargetName)(error(MissingGuideStarMessage))
+        Option.when(!info.hasGuideTargetName)(error(MissingGuideStarMessage)).orEmpty
 
       val wavelengths: List[Wavelength] =
         scienceWavelengths(info)
 
       val wavelengthTooLong: ObservationValidationMap =
-        when(wavelengths.exists(_ > WavelengthCeiling))(error(WavelengthTooLongMessage))
+        Option.when(wavelengths.exists(_ > WavelengthCeiling))(error(WavelengthTooLongMessage)).orEmpty
 
       val wavelengthTooShort: ObservationValidationMap =
-        when(wavelengths.exists(_ < WavelengthFloor))(warning(WavelengthTooShortMessage))
+        Option.when(wavelengths.exists(_ < WavelengthFloor))(warning(WavelengthTooShortMessage)).orEmpty
 
       lgsP1LongSlit |+| lgsConditions |+| missingGuideStar |+| wavelengthTooLong |+| wavelengthTooShort
