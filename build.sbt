@@ -198,12 +198,6 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
   case step if step.name.contains("Test") =>
     step.withEnv(
       Map(
-        // The sbt 2 server does not inherit the step's environment, so sbt-test-shards never
-        // saw TEST_SHARD and every shard ran the whole suite. It reads sys.props first, and
-        // system properties do reach the server through SBT_OPTS. This overrides the
-        // workflow-level SBT_OPTS, so the heap settings have to be repeated here.
-        "SBT_OPTS"          ->
-          s"-Xmx6g -Xss4M -Dtest.shard=$${{ matrix.shard }} -Dtest.shard.count=$nTestJobShards",
         "TEST_SHARD_COUNT"  -> nTestJobShards.toString(),
         "TEST_SHARD"        -> "${{ matrix.shard }}",
         // Prebuilt test database images, see githubWorkflowBuildPreamble
@@ -222,6 +216,15 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
       job
+        // The shard has to be a system property, since the sbt 2 server does not inherit the
+        // step's environment, and it has to be set on the *job*: whichever sbt invocation
+        // starts the server fixes its properties for the rest of the job, and `sbt update`
+        // runs several steps before the tests. A job-level value replaces the workflow-level
+        // SBT_OPTS, so the heap settings are repeated here.
+        .withEnv(
+          job.env + ("SBT_OPTS" ->
+            s"-Xmx6g -Xss4M -Dtest.shard=$${{ matrix.shard }} -Dtest.shard.count=$nTestJobShards")
+        )
         .withSteps(job.steps.flatMap {
           case s if s.name.contains("Checkout current branch")            => List(CheckoutShallow)
           case s if s.name.contains("Check that workflows are up to date") => Nil

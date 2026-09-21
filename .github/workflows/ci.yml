@@ -38,6 +38,8 @@ jobs:
         java: [temurin@25]
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
+    env:
+      SBT_OPTS: '-Xmx6g -Xss4M -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8'
     timeout-minutes: 60
     steps:
       - name: Checkout current branch
@@ -118,7 +120,6 @@ jobs:
           ODB_TEST_DB_IMAGE: 'lucuma-odb-test-db:ci'
           TEST_SHARD_COUNT: 8
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
-          SBT_OPTS: '-Xmx6g -Xss4M -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8'
           RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
         run: sbt -v '++ ${{ matrix.scala }}; lucumaTestAffected'
 
