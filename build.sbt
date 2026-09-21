@@ -90,12 +90,6 @@ ThisBuild / Test / parallelExecution := true
 
 ThisBuild / Test / testOptions += Tests.Argument(TestFrameworks.MUnit, "--log=debug")
 
-// Temporary: seven of the eight shards still run the whole suite even though each server gets
-// its own -Dtest.shard. This logs the filter's decision per suite. Remove once diagnosed.
-// A bare setting reaches every subproject; `ThisBuild /` would lose to the plugin's own
-// project-scoped default of false.
-testShardDebug := true
-
 // Disable plugin-injected CI steps, they will be run in a the dedicated `checks` job
 // instead of being repeated for each shard
 ThisBuild / tlCiHeaderCheck          := false
