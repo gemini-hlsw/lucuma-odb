@@ -74,6 +74,18 @@ trait ItcServiceSuiteSupport extends ExecutionTestSupportForGmos:
         """.query(skunk.codec.numeric.int8)
       )(pid, oid).map(_ > 0)
 
+  // The Altair parameters the cached result was calculated with: the outer option is the row, the
+  // inner the column, which is null for an observation that does not observe behind Altair.
+  def itcAltairHash(pid: Program.Id, oid: Observation.Id): IO[Option[Option[Md5Hash]]] =
+    withSession: s =>
+      s.option(
+        sql"""
+          SELECT c_altair_hash FROM t_itc_result
+          WHERE c_program_id     = $program_id AND
+                c_observation_id = $observation_id
+        """.query(md5_hash.opt)
+      )(pid, oid)
+
   def itcRowFrozen(pid: Program.Id, oid: Observation.Id): IO[Boolean] =
     withSession: s =>
       s.option(
@@ -153,6 +165,26 @@ class ItcServiceDeterministicFailureSuite extends ItcServiceSuiteSupport:
                        assertEquals(calls, 1)
       exists    <- itcFailureRowExists(pid, oid)
     yield assert(exists) // a row added to the db
+
+// Only Altair puts an Altair hash on a cached result; everything else caches as it always has.
+class ItcServiceAltairHashSuite extends ItcServiceSuiteSupport:
+
+  test("a result with no Altair keys none, and is still served from the cache"):
+    for
+      callCount <- IO.ref(0)
+      pid       <- createProgramAs(pi)
+      tid       <- createTargetWithProfileAs(pi, pid)
+      oid       <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      seed      <- withItcService(itcClient)(_.lookup(pid, oid))
+      altair    <- itcAltairHash(pid, oid)
+      // Any remote call would fail (and increment the counter).
+      got       <- withItcService(erroringClient(new IOException("Connection refused"), callCount))(_.lookup(pid, oid))
+      calls     <- callCount.get
+    yield
+      assert(seed.isRight, "seed lookup should succeed")
+      assertEquals(altair, Some(None)) // a row, with no Altair parameters
+      assertEquals(got, seed)
+      assertEquals(calls, 0)           // served from the cache
 
 // Transient ITC failure: e.g. IOException
 class ItcServiceTransientFailureSuite extends ItcServiceSuiteSupport:
