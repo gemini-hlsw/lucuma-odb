@@ -192,6 +192,12 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
   case step if step.name.contains("Test") =>
     step.withEnv(
       Map(
+        // The sbt 2 server does not inherit the step's environment, so sbt-test-shards never
+        // saw TEST_SHARD and every shard ran the whole suite. It reads sys.props first, and
+        // system properties do reach the server through SBT_OPTS. This overrides the
+        // workflow-level SBT_OPTS, so the heap settings have to be repeated here.
+        "SBT_OPTS"          ->
+          s"-Xmx6g -Xss4M -Dtest.shard=$${{ matrix.shard }} -Dtest.shard.count=$nTestJobShards",
         "TEST_SHARD_COUNT"  -> nTestJobShards.toString(),
         "TEST_SHARD"        -> "${{ matrix.shard }}",
         // Prebuilt test database images, see githubWorkflowBuildPreamble

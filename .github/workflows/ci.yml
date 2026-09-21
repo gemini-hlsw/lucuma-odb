@@ -118,6 +118,7 @@ jobs:
           ODB_TEST_DB_IMAGE: 'lucuma-odb-test-db:ci'
           TEST_SHARD_COUNT: 8
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
+          SBT_OPTS: '-Xmx6g -Xss4M -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8'
           RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
         run: sbt -v '++ ${{ matrix.scala }}; lucumaTestAffected'
 
