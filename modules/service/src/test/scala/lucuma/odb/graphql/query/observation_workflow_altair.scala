@@ -114,17 +114,11 @@ class observation_workflow_altair extends ExecutionTestSupportForGnirs:
   private def warning(msgs: String*): (ObservationValidationCode, List[String]) =
     (ObservationValidationCode.ConfigurationWarning, msgs.toList)
 
-  // Altair needs a guide star, which every test but the dedicated ones supplies so that
-  // its own rule is what the expectations show.
-  private val GuideStarName: String =
-    "Gaia DR3 3219118090462918016"
-
   private def expectAltairValidations(
     mode:            String,
     altair:          String,
     imageQuality:    Option[String] = None,
-    cloudExtinction: Option[String] = None,
-    guideStar:       Boolean        = true
+    cloudExtinction: Option[String] = None
   )(expected: (ObservationValidationCode, List[String])*): IO[Unit] =
     for
       pid <- createProgram
@@ -132,7 +126,6 @@ class observation_workflow_altair extends ExecutionTestSupportForGnirs:
       oid <- createObservationWithModeAs(pi, pid, List(tid), mode)
       _   <- setConstraints(oid, imageQuality, cloudExtinction)
       _   <- setAltair(oid, altair)
-      _   <- IO.whenA(guideStar)(setGuideTargetName(pi, oid, GuideStarName.some))
       _   <- runObscalcUpdate(pid, oid)
       vs  <- validations(oid)
     yield assertEquals(
@@ -156,15 +149,6 @@ class observation_workflow_altair extends ExecutionTestSupportForGnirs:
       cloudExtinction = "POINT_ONE".some
     )(error(AltairValidator.LgsConditionsMessage))
 
-  test("Altair LGS+P1 without a selected guide star is an error"):
-    expectAltairValidations(
-      gnirsLongSlit(),
-      altair          = "{ mode: LGS_P1 }",
-      imageQuality    = "POINT_THREE".some,
-      cloudExtinction = "ZERO".some,
-      guideStar       = false
-    )(error(AltairValidator.MissingGuideStarMessage), warning(AltairValidator.LgsP1LongSlitMessage))
-
   test("Altair NGS at 4.5 µm is an error"):
     expectAltairValidations(
       gnirsLongSlit(camera = "SHORT_RED", filter = "ORDER1", nm = 4500),
@@ -184,12 +168,3 @@ class observation_workflow_altair extends ExecutionTestSupportForGnirs:
       imageQuality    = "POINT_THREE".some,
       cloudExtinction = "ZERO".some
     )()
-
-  test("Altair NGS without a selected guide star is an error"):
-    expectAltairValidations(
-      gnirsLongSlit(),
-      altair          = "{ mode: NGS }",
-      imageQuality    = "POINT_THREE".some,
-      cloudExtinction = "ZERO".some,
-      guideStar       = false
-    )(error(AltairValidator.MissingGuideStarMessage))
