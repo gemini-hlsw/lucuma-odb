@@ -25,7 +25,9 @@ private val gaiaBands: Set[Band] =
   Set(Band.Gaia, Band.GaiaBP, Band.GaiaRP)
 
 extension (self: SourceProfile)
-  // Remove GAIA bands until the ITC supports them.
+  // Remove GAIA bands until the ITC supports them. The ITC service filters these out itself too
+  // (lucuma.itc.legacy.LegacyBands), but stripping them here keeps them out of the ITC input hash,
+  // so removing this would invalidate every cached ITC result for a target with GAIA photometry.
   def gaiaFree: SourceProfile =
     SourceProfile
       .integratedBrightnesses
