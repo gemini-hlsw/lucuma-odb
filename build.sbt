@@ -436,8 +436,7 @@ lazy val sbtStaticChecks =
       "lucumaScalafmtCheck",
       "lucumaScalafixCheck",
       "lucumaSlackNotifyCheck",
-      "scalafix --check",
-      "Test/scalafix --check",
+      "scalafixAll --check",
       "mimaReportBinaryIssues",
       "doc"
     ),
