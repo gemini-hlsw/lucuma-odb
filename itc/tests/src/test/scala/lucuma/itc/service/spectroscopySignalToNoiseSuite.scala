@@ -2056,3 +2056,72 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
       """
     )
   }
+
+  // The legacy ITC has no Gaia bands, so they are stripped before band selection. A target left
+  // with nothing to normalize against has to say so specifically; see legacyBandsSuite.
+  test("a GAIA-only target is rejected") {
+    queryErrors(
+      """
+        query {
+          spectroscopy(input: {
+            asterism: [
+              {
+                sourceProfile: {
+                  point: {
+                    bandNormalized: {
+                      sed: {
+                        stellarLibrary: B5_7_V
+                      }
+                      brightnesses: [ {
+                        band: GAIA
+                        value: 8.776856
+                        units: VEGA_MAGNITUDE
+                      }]
+                    }
+                  }
+                },
+                radialVelocity: {
+                  kilometersPerSecond: 0
+                }
+              }
+            ],
+            constraints: {
+              imageQuality: {
+                preset: ONE_POINT_ZERO
+              },
+              cloudExtinction: {
+                preset: POINT_THREE
+              },
+              skyBackground: BRIGHT,
+              waterVapor: WET,
+              elevationRange: {
+                airMass: {
+                  min: 1,
+                  max: 2
+                }
+              }
+            },
+            mode: {
+              gmosNSpectroscopy: {
+                exposureTimeMode: { signalToNoise: { value: 100, at: { nanometers: 600 } } },
+                centralWavelength: {
+                  nanometers: 540
+                },
+                fpu: {
+                  builtin: LONG_SLIT_0_50
+                },
+                grating: B480_G5309
+              }
+            }
+          }) {
+            brightest {
+              band
+            }
+          }
+        }
+        """,
+      List(
+        "The ITC does not support GAIA bands. At least one non-GAIA brightness measure is required."
+      )
+    )
+  }
