@@ -3177,4 +3177,59 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
         """.asRight
       )
 
+  test("[general] created observation should default to MEDIUM priority"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+            }) {
+              observation {
+                priority
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "priority": "MEDIUM"
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("[general] created observation should accept an explicit priority"):
+    createProgramAs(pi).flatMap: pid =>
+      expect(
+        user  = pi,
+        query = s"""
+          mutation {
+            createObservation(input: {
+              programId: ${pid.asJson}
+              SET: {
+                priority: HIGH
+              }
+            }) {
+              observation {
+                priority
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "createObservation": {
+              "observation": {
+                "priority": "HIGH"
+              }
+            }
+          }
+        """.asRight
+      )
+
 }

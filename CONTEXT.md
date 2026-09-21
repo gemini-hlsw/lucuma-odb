@@ -168,3 +168,8 @@ _Avoid_: status override, manual status.
 **Active Period**:
 The `[activeStart, activeEnd]` date interval during which a program's observations may be scheduled, defaulted from the Call for Proposals when there is one. Staff-editable. The source of the Default Status.
 _Avoid_: observing window (that is an observation-level concept), semester dates.
+
+### Observation Priority
+
+**Observation Priority**:
+The PI's declared statement of which of their observations matter more, one of Low, Medium or High, carried by `lucuma.core.enums.ObservationPriority`. Always present — every observation has one, defaulting to Medium, so there is no "unset" to distinguish from a deliberate Medium. Advisory: the scheduler may weigh it when choosing among a program's observations, and nothing in the ODB reads it. A single shared value, not one per role: staff edit the same field the PI does, and a staff edit replaces the PI's statement outright.

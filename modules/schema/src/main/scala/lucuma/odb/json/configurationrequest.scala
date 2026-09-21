@@ -196,7 +196,7 @@ object configurationrequest:
         hc.downField("target").as[Option[Either[Coordinates, Region]]], // may be missing
         hc.downField("observingMode").as[Option[ObservingMode]]
       ).tupled.flatMap:
-        case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode))
+        case (conds, Some(coords), Some(mode)) => Right(Configuration(conds, coords, mode, None))
         case (conds, None, _)                  => Left(DecodingFailures.NoReferenceCoordinates)
         case (conds, _, None)                  => Left(DecodingFailures.NoObservingMode)
 

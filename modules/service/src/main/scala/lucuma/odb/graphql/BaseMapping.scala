@@ -338,6 +338,7 @@ trait BaseMapping[F[_]]
   lazy val ObservationEditType                     = schema.ref("ObservationEdit")
   lazy val ObservationIdType                       = schema.ref("ObservationId")
   lazy val ObservationType                         = schema.ref("Observation")
+  lazy val ObservationPriorityType                 = schema.ref("ObservationPriority")
   lazy val ObservationReferenceType                = schema.ref("ObservationReference")
   lazy val ObservationReferenceLabelType           = schema.ref("ObservationReferenceLabel")
   lazy val ObservationSelectResultType             = schema.ref("ObservationSelectResult")

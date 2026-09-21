@@ -492,6 +492,9 @@ trait Codecs {
   val observation_id: Codec[Observation.Id] =
     gid[Observation.Id]
 
+  val observation_priority: Codec[ObservationPriority] =
+    enumerated(Type("e_observation_priority"))
+
   val offset_generator_role: Codec[TelescopeConfigGeneratorRole] =
     enumerated(Type("e_offset_generator_role"))
 

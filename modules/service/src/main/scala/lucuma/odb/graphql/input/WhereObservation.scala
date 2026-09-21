@@ -11,6 +11,7 @@ import grackle.Predicate
 import grackle.Predicate.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationPriority
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.Site
@@ -71,6 +72,7 @@ object WhereObservation {
     val WhereReferenceBinding = WhereObservationReference.binding(path / "reference")
     val WhereProgramBinding = WhereProgram.binding(path / "program")
     val ScienceBandBinding = WhereOptionOrder.binding(path / "scienceBand", enumeratedBinding[ScienceBand])
+    val PriorityBinding = WhereOrder.binding(path / "priority", enumeratedBinding[ObservationPriority])
     val InstrumentBinding = WhereOptionEq.binding(path / "instrument", enumeratedBinding[Instrument])
     val ObservingModeTypeBinding = WhereOptionEq.unwrappedBinding(path / "observingMode" / "mode", enumeratedBinding[ObservingModeType])
     val SiteBinding = siteBinding(enumeratedBinding[Site])
@@ -89,6 +91,7 @@ object WhereObservation {
         WhereProgramBinding.Option("program", rProgram),
         SubtitleBinding.Option("subtitle", rSubtitle),
         ScienceBandBinding.Option("scienceBand", rScienceBand),
+        PriorityBinding.Option("priority", rPriority),
         InstrumentBinding.Option("instrument", rInstrument),
         ObservingModeTypeBinding.Option("observingModeType", rObservingModeType),
         SiteBinding.Option("site", rSite),
@@ -96,8 +99,8 @@ object WhereObservation {
         CalibrationRoleBinding.Option("calibrationRole", rCalibrationRole),
         TargetCoordinatesBinding.Option("targetCoordinates", rTargetCoordinates)
       ) =>
-        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rInstrument, rObservingModeType, rSite, rWorkflow, rCalibrationRole, rTargetCoordinates).parMapN {
-          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, instrument, observingModeType, site, workflow, calibrationRole, targetCoordinates) =>
+        (rAND, rOR, rNOT, rId, rRef, rProgram, rSubtitle, rScienceBand, rPriority, rInstrument, rObservingModeType, rSite, rWorkflow, rCalibrationRole, rTargetCoordinates).parMapN {
+          (AND, OR, NOT, id, ref, program, subtitle, scienceBand, priority, instrument, observingModeType, site, workflow, calibrationRole, targetCoordinates) =>
             and(List(
               AND.map(and),
               OR.map(or),
@@ -107,6 +110,7 @@ object WhereObservation {
               program,
               subtitle,
               scienceBand,
+              priority,
               instrument,
               observingModeType,
               site,

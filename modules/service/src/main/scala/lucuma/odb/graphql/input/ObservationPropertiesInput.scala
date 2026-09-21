@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.string.NonEmptyString
 import grackle.Result
 import grackle.syntax.*
+import lucuma.core.enums.ObservationPriority
 import lucuma.core.enums.ScienceBand
 import lucuma.core.model.Attachment
 import lucuma.core.model.Group
@@ -61,7 +62,8 @@ object ObservationPropertiesInput {
     existence:           Option[Existence],
     group:               Option[Group.Id],
     groupIndex:          Option[NonNegShort],
-    observerNotes:       Option[NonEmptyString]
+    observerNotes:       Option[NonEmptyString],
+    priority:            Option[ObservationPriority]
   ) extends AsterismInput:
     def needsStaffAccess: Boolean =
       observingMode.exists(_.needsStaffAccess)
@@ -85,7 +87,8 @@ object ObservationPropertiesInput {
         existence           = Existence.Present.some,
         group               = None,
         groupIndex          = None,
-        observerNotes       = None
+        observerNotes       = None,
+        priority            = None
       )
 
     val Binding: Matcher[Create] =
@@ -105,6 +108,7 @@ object ObservationPropertiesInput {
           GroupIdBinding.Option("groupId", rGroupId),
           NonNegShortBinding.Option("groupIndex", rGroupIndex),
           NonEmptyStringBinding.Option("observerNotes", rObserverNotes),
+          ObservationPriorityBinding.NonNullable("priority", rPriority),
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -123,6 +127,7 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rPriority,
           ).parMapN(Create.apply)
       }
 
@@ -142,6 +147,7 @@ object ObservationPropertiesInput {
     group:               Nullable[Group.Id],
     groupIndex:          Option[NonNegShort],
     observerNotes:       Nullable[NonEmptyString],
+    priority:            Option[ObservationPriority],
   ) extends AsterismInput:
     def updatesAcquisition: Boolean =
       observingMode.toOption.exists(_.updatesAcquisition)
@@ -165,7 +171,8 @@ object ObservationPropertiesInput {
         existence =           None,
         group =               Nullable.Absent,
         groupIndex =          None,
-        observerNotes =       Nullable.Absent
+        observerNotes =       Nullable.Absent,
+        priority =            None
       )
 
     val Binding: Matcher[Edit] =
@@ -184,7 +191,8 @@ object ObservationPropertiesInput {
           ExistenceBinding.Option("existence", rExistence),
           GroupIdBinding.Nullable("groupId", rGroupId),
           NonNegShortBinding.NonNullable("groupIndex", rGroupIndex),
-          NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes)
+          NonEmptyStringBinding.Nullable("observerNotes", rObserverNotes),
+          ObservationPriorityBinding.NonNullable("priority", rPriority)
         ) =>
           (rSubtitle,
             rScienceBand,
@@ -205,6 +213,7 @@ object ObservationPropertiesInput {
             rGroupId,
             rGroupIndex,
             rObserverNotes,
+            rPriority,
           ).parMapN(apply)
       }
   }
