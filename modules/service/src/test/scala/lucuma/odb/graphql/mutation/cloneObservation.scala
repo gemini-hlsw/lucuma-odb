@@ -2950,8 +2950,6 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
     createProgramAs(pi).flatMap { pid =>
       createObservationAs(pi, pid).flatMap { oid =>
         for
-          // HIGH differs from the MEDIUM default, so a clone that reset the
-          // field rather than copying it could not produce this result.
           _ <- query(
                  user  = pi,
                  query = s"""
