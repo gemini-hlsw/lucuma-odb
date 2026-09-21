@@ -135,17 +135,21 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
         // Only NGS looks at the guide star; the laser modes always use the field lens.
         val needsStar: List[Observation.Id] =
           rows.collect { case (oid, (AltairMode.Ngs, _)) => oid }
-        services.use: s =>
-          s.guideStarResolver
-            .resolveAll(needsStar)
-            .map: stars =>
-              rows.map:
-                case (oid, (mode, explicitFieldLens)) =>
-                  // A star that cannot be resolved is as good as no star here: the field lens is
-                  // simply not yet determined.
-                  val separation: Option[Angle] = stars.get(oid).flatMap(_.toOption.flatten).map(_.separation)
-                  oid -> Result(select(mode, explicitFieldLens, separation))
-              .toMap
+        services.use { implicit s =>
+          Services.asSuperUser:
+            // Resolving a star runs AGS, so the observations are done one at a time.
+            needsStar
+              .traverse(oid => s.guideService.resolveGuideStar(oid).tupleLeft(oid))
+              .map: resolved =>
+                val stars: Map[Observation.Id, Result[GuideService.GuideStarResolution]] = resolved.toMap
+                rows.map:
+                  case (oid, (mode, explicitFieldLens)) =>
+                    // A star that cannot be resolved is as good as no star here: the field lens is
+                    // simply not yet determined.
+                    val separation: Option[Angle] = stars.get(oid).flatMap(_.toOption).flatMap(_.star).map(_.separation)
+                    oid -> Result(select(mode, explicitFieldLens, separation))
+                .toMap
+        }
     )
 
   private lazy val defaultFieldLensHandler: EffectHandler[F] =

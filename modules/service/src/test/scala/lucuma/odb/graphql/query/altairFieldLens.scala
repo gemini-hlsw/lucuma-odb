@@ -27,6 +27,9 @@ class altairFieldLens extends ExecutionTestSupportForGnirs
   override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
     createGnirsLongSlitObservationAs(user, pid, tids*)
 
+  // The only candidate inside the AOWFS patrol field, 12 arcseconds off axis.
+  private val aowfsStarName: String = "Gaia DR3 3219118090462917888"
+
   private def setAltair(oid: Observation.Id, altair: String): IO[Unit] =
     query(
       user  = pi,
@@ -49,7 +52,7 @@ class altairFieldLens extends ExecutionTestSupportForGnirs
       o <- createObservationAs(pi, p, List(t))
       _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
       _ <- setAltair(o, altair)
-      _ <- IO.whenA(guideStar)(setGuideTargetName(pi, o, defaultTargetName.some))
+      _ <- IO.whenA(guideStar)(setGuideTargetName(pi, o, aowfsStarName.some))
     yield o
 
   private def fieldLensQuery(oid: Observation.Id): String =
@@ -95,5 +98,68 @@ class altairFieldLens extends ExecutionTestSupportForGnirs
   test("an explicit NGS field lens overrides the automatic choice"):
     expectFieldLenses("{ mode: NGS, fieldLens: OUT }", guideStar = true, json""""IN"""", json""""OUT"""")
 
-  test("NGS has no field lens until a guide star is selected"):
-    expectFieldLenses("{ mode: NGS }", guideStar = false, Json.Null, Json.Null)
+  test("NGS without a stored guide star follows the AGS pick"):
+    expectFieldLenses("{ mode: NGS }", guideStar = false, json""""IN"""", json""""IN"""")
+
+// With a star inside the 1 arcsecond radius available, AGS prefers it and NGS drops the field lens.
+class altairFieldLensNearStar extends ExecutionTestSupportForGnirs
+                                    with GuideEnvironmentSuite:
+
+  override val gaiaResponseString: String = GaiaVoTables.altairCandidatesWithNearStar
+
+  override def createObservationAs(user: User, pid: Program.Id, tids: List[Target.Id]): IO[Observation.Id] =
+    createGnirsLongSlitObservationAs(user, pid, tids*)
+
+  private def observationWithAltair(altair: String): IO[Observation.Id] =
+    for
+      p <- createProgramAs(pi)
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createObservationAs(pi, p, List(t))
+      _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      _ <- query(
+             user  = pi,
+             query = s"""
+               mutation {
+                 updateObservations(input: {
+                   WHERE: { id: { EQ: "$o" } }
+                   SET: { targetEnvironment: { altair: $altair } }
+                 }) {
+                   observations { id }
+                 }
+               }
+             """
+           )
+    yield o
+
+  private def expectFieldLenses(altair: String, defaultFieldLens: Json, fieldLens: Json): IO[Unit] =
+    observationWithAltair(altair).flatMap: oid =>
+      expect(
+        pi,
+        query = s"""
+          query {
+            observation(observationId: "$oid") {
+              targetEnvironment {
+                altair { defaultFieldLens fieldLens }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "targetEnvironment": {
+                "altair": {
+                  "defaultFieldLens": $defaultFieldLens,
+                  "fieldLens":        $fieldLens
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
+  test("NGS within 1 arcsecond of the AGS pick drops the field lens"):
+    expectFieldLenses("{ mode: NGS }", json""""OUT"""", json""""OUT"""")
+
+  test("an explicit NGS field lens overrides the automatic choice"):
+    expectFieldLenses("{ mode: NGS, fieldLens: IN }", json""""OUT"""", json""""IN"""")
