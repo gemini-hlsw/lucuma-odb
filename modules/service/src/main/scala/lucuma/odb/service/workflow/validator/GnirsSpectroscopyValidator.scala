@@ -105,9 +105,6 @@ object GnirsSpectroscopyValidator:
   private def warning(msg: String): ObservationValidationMap =
     ObservationValidationMap.singleton(ObservationValidation.Warning.configuration(msg))
 
-  private def when(cond: Boolean)(v: => ObservationValidationMap): ObservationValidationMap =
-    if cond then v else ObservationValidationMap.empty
-
   private def isThermal(wavelength: Wavelength): Boolean =
     wavelength >= GnirsFilter.ThermalAcquisitionCutoff
 
@@ -123,14 +120,14 @@ object GnirsSpectroscopyValidator:
         c.wavelengths.toList.map(_.centralWavelength)
 
       val crossDispersedThermal: ObservationValidationMap =
-        when(c.prism =!= GnirsPrism.Mirror && wavelengths.exists(isThermal))(error(CrossDispersedThermal))
+        Option.when(c.prism =!= GnirsPrism.Mirror && wavelengths.exists(isThermal))(error(CrossDispersedThermal)).orEmpty
 
       val shortBlueLxd: ObservationValidationMap =
-        when(c.camera === GnirsCamera.ShortBlue && c.prism === GnirsPrism.Lxd)(error(ShortBlueLxd))
+        Option.when(c.camera === GnirsCamera.ShortBlue && c.prism === GnirsPrism.Lxd)(error(ShortBlueLxd)).orEmpty
 
       // Not offered by the configuration options, but the camera can be set directly.
       val redCameraCrossDispersed: ObservationValidationMap =
-        when(RedCameras(c.camera) && c.prism =!= GnirsPrism.Mirror)(error(RedCameraCrossDispersed))
+        Option.when(RedCameras(c.camera) && c.prism =!= GnirsPrism.Mirror)(error(RedCameraCrossDispersed)).orEmpty
 
       // The XD filter has no range of its own, so it is never checked.
       val filterCoverage: ObservationValidationMap =
@@ -145,13 +142,13 @@ object GnirsSpectroscopyValidator:
       // decker can only be a mistake.
       val decker: ObservationValidationMap =
         if c.decker === GnirsDecker.Acquisition then warning(DeckerAcquisitionMirror)
-        else when(c.decker =!= defaultDecker(c))(warning(deckerMismatch(c.decker, defaultDecker(c))))
+        else Option.when(c.decker =!= defaultDecker(c))(warning(deckerMismatch(c.decker, defaultDecker(c)))).orEmpty
 
       // Automatic selection is always valid; only an explicit choice can be wrong.
       val acquisitionFilter: ObservationValidationMap =
         c.acquisition.explicitFilter.foldMap: f =>
-          if isThermal(c.primaryCentralWavelength) then when(!RedCameraAcquisitionFilters(f))(error(RedCameraAcquisitionFilter))
-          else when(!BlueCameraAcquisitionFilters(f))(error(BlueCameraAcquisitionFilter))
+          if isThermal(c.primaryCentralWavelength) then Option.when(!RedCameraAcquisitionFilters(f))(error(RedCameraAcquisitionFilter)).orEmpty
+          else Option.when(!BlueCameraAcquisitionFilters(f))(error(BlueCameraAcquisitionFilter)).orEmpty
 
       crossDispersedThermal |+| shortBlueLxd |+| redCameraCrossDispersed |+| filterCoverage |+| decker |+| acquisitionFilter
 
