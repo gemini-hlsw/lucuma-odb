@@ -119,7 +119,9 @@ object GaiaVoTables:
   /**
    * The same stars with a BP magnitude, so that R can be estimated for the Altair limits, plus a
    * bright star close enough to the base to sit in the AOWFS patrol field and one far enough out
-   * that the PWFS1 probe arm clears the science field.
+   * that the PWFS1 probe arm clears the science field. The AOWFS star comes first because the
+   * stub answers a lookup by source id with the whole table, whose first row then stands in for
+   * the star that was asked for.
    */
   val altairCandidates: String =
   """<?xml version="1.0" encoding="UTF-8"?>
@@ -191,6 +193,18 @@ object GaiaVoTables:
   |            <DATA>
   |                <TABLEDATA>
   |                    <TR>
+  |                        <TD>3219118090462917888</TD>
+  |                        <TD>86.55474</TD>
+  |                        <TD>0.0</TD>
+  |                        <TD>-0.0980367</TD>
+  |                        <TD>0.0</TD>
+  |                        <TD>1.0</TD>
+  |                        <TD></TD>
+  |                        <TD>12.000000</TD>
+  |                        <TD>12.500000</TD>
+  |                        <TD>11.000000</TD>
+  |                    </TR>
+  |                    <TR>
   |                        <TD>3219118090462918016</TD>
   |                        <TD>86.5934741222927</TD>
   |                        <TD>0.43862335651876644</TD>
@@ -238,20 +252,29 @@ object GaiaVoTables:
   |                        <TD>13.500000</TD>
   |                        <TD>12.000000</TD>
   |                    </TR>
-  |                    <TR>
-  |                        <TD>3219118090462917888</TD>
-  |                        <TD>86.55474</TD>
-  |                        <TD>0.0</TD>
-  |                        <TD>-0.0980367</TD>
-  |                        <TD>0.0</TD>
-  |                        <TD>1.0</TD>
-  |                        <TD></TD>
-  |                        <TD>12.000000</TD>
-  |                        <TD>12.500000</TD>
-  |                        <TD>11.000000</TD>
-  |                    </TR>
   |                </TABLEDATA>
   |            </DATA>
   |        </TABLE>
   |    </RESOURCE>
   |</VOTABLE>""".stripMargin
+
+  /**
+   * `altairCandidates` plus a brighter star 0.36 arcseconds from the base, within the 1 arcsecond
+   * radius inside which NGS takes the field lens out.
+   */
+  val altairCandidatesWithNearStar: String =
+    val nearStar: String =
+      """|                    <TR>
+         |                        <TD>3219118090462999999</TD>
+         |                        <TD>86.55474</TD>
+         |                        <TD>0.0</TD>
+         |                        <TD>-0.10127</TD>
+         |                        <TD>0.0</TD>
+         |                        <TD>1.0</TD>
+         |                        <TD></TD>
+         |                        <TD>10.000000</TD>
+         |                        <TD>10.500000</TD>
+         |                        <TD>9.000000</TD>
+         |                    </TR>
+         |""".stripMargin
+    altairCandidates.replace("                </TABLEDATA>", s"$nearStar                </TABLEDATA>")

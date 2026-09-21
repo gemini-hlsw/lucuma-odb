@@ -8,6 +8,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import io.circe.Json
 import io.circe.literal.*
+import lucuma.ags.GuideStarName
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.math.Angle
 import lucuma.core.model.Observation
@@ -207,11 +208,11 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
   // The only candidate far enough out for the PWFS1 probe arm to clear the science field.
   private val pwfs1StarName: String = "Gaia DR3 3219118090462900000"
 
-  // Where the default star sits relative to the science target, and the R estimated from its
+  // Where the AOWFS star sits relative to the science target, and the R estimated from its
   // Gaia G, BP and RP.
-  private val defaultStarSeparation: Angle = Angle.fromDoubleArcseconds(218.122)
+  private val aowfsStarSeparation: Angle = Angle.fromDoubleArcseconds(12.0)
 
-  private val defaultStarRBrightness: BigDecimal = BigDecimal("13.941")
+  private val aowfsStarRBrightness: BigDecimal = BigDecimal("11.736")
 
   private def setAltair(oid: Observation.Id, altair: String): IO[Unit] =
     query(
@@ -277,9 +278,25 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
     }
     """.asRight
 
-  private def resolveStoredGuideStar(oid: Observation.Id): IO[Option[GuideService.ResolvedGuideStar]] =
+  private def resolveGuideStar(oid: Observation.Id): IO[GuideService.GuideStarResolution] =
     withServices(pi): services =>
-      Services.asSuperUser(services.guideService.resolveStoredGuideStar(oid)).flatMap(_.get)
+      Services.asSuperUser(services.guideService.resolveGuideStar(oid)).flatMap(_.get)
+
+  private def assertResolvedStar(
+    resolution:  GuideService.GuideStarResolution,
+    name:        String,
+    separation:  Angle,
+    rBrightness: BigDecimal
+  ): Unit =
+    val resolved: Option[GuideService.ResolvedGuideStar] = resolution.star
+    assertEquals(resolved.map(_.name.value.value), name.some)
+    val actualSeparation: Angle = resolved.map(_.separation).get
+    assert(
+      (Angle.signedDecimalArcseconds.get(actualSeparation) - Angle.signedDecimalArcseconds.get(separation)).abs < BigDecimal("0.1"),
+      s"unexpected separation $actualSeparation"
+    )
+    val actualRBrightness: BigDecimal = resolved.flatMap(_.rBrightness).map(_.value.value).get
+    assert((actualRBrightness - rBrightness).abs < BigDecimal("0.01"), s"unexpected R magnitude $actualRBrightness")
 
   test("NGS guides with the Altair AOWFS"):
     observationWithAltair("{ mode: NGS }").flatMap: oid =>
@@ -309,21 +326,45 @@ class guideEnvironmentGnirsAltair extends ExecutionTestSupportForGnirs
   // first row stands in for the star that was asked for.
   test("the stored guide star resolves to its separation and R magnitude"):
     for
-      oid      <- observationWithAltair("{ mode: NGS }")
-      _        <- setGuideTargetName(pi, oid, defaultTargetName.some)
-      resolved <- resolveStoredGuideStar(oid)
-    yield
-      assertEquals(resolved.map(_.name.value.value), defaultTargetName.some)
-      val separation: Angle = resolved.map(_.separation).get
-      assert(
-        (Angle.signedDecimalArcseconds.get(separation) - Angle.signedDecimalArcseconds.get(defaultStarSeparation)).abs < BigDecimal("0.1"),
-        s"unexpected separation $separation"
-      )
-      val rBrightness: BigDecimal = resolved.flatMap(_.rBrightness).map(_.value.value).get
-      assert((rBrightness - defaultStarRBrightness).abs < BigDecimal("0.01"), s"unexpected R magnitude $rBrightness")
+      oid        <- observationWithAltair("{ mode: NGS }")
+      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
+      resolution <- resolveGuideStar(oid)
+    yield assertResolvedStar(resolution, aowfsStarName, aowfsStarSeparation, aowfsStarRBrightness)
 
-  test("no stored guide star resolves to nothing"):
+  test("without a stored guide star the AGS pick resolves"):
     for
-      oid      <- observationWithAltair("{ mode: NGS }")
-      resolved <- resolveStoredGuideStar(oid)
-    yield assertEquals(resolved, none)
+      oid        <- observationWithAltair("{ mode: NGS }")
+      resolution <- resolveGuideStar(oid)
+    yield assertResolvedStar(resolution, aowfsStarName, aowfsStarSeparation, aowfsStarRBrightness)
+
+  // The fixture stars have no proper motion, so the pick at "now" matches the one at the fixed time.
+  test("without an observation time the AGS pick resolves at the current time"):
+    for
+      p          <- createProgramAs(pi)
+      t          <- createTargetWithProfileAs(pi, p)
+      o          <- createObservationAs(pi, p, List(t))
+      _          <- setAltair(o, "{ mode: NGS }")
+      resolution <- resolveGuideStar(o)
+    yield assertResolvedStar(resolution, aowfsStarName, aowfsStarSeparation, aowfsStarRBrightness)
+
+  // LGS+P1 guides with PWFS1, whose probe arm would vignette a star as close in as the AOWFS one,
+  // so the stored star is current but no longer usable.
+  test("a stored star the current parameters rule out resolves as unusable"):
+    for
+      oid        <- observationWithAltair("{ mode: LGS_P1 }")
+      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
+      resolution <- resolveGuideStar(oid)
+    yield assertEquals(
+      resolution,
+      GuideService.GuideStarResolution.SelectedStarUnusable(GuideStarName.unsafeFrom(aowfsStarName))
+    )
+
+  test("a calibration that does not guide resolves to NotGuided"):
+    for
+      p          <- createProgramAs(pi)
+      t          <- createTargetWithProfileAs(pi, p)
+      o          <- createObservationAs(pi, p, List(t))
+      _          <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      _          <- setObservationCalibrationRole(List(o), CalibrationRole.DaytimePinhole)
+      resolution <- resolveGuideStar(o)
+    yield assertEquals(resolution, GuideService.GuideStarResolution.NotGuided)
