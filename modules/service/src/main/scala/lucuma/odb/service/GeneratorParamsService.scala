@@ -20,7 +20,6 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import lucuma.ags.GuideStarName
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
@@ -56,7 +55,6 @@ import lucuma.itc.client.TargetInput
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
-import lucuma.odb.sequence.data.AltairRequest
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
 import lucuma.odb.sequence.data.ItcInputDerivation
@@ -271,17 +269,12 @@ object GeneratorParamsService {
         configCheck.leftMap(nel => Error.MissingData(MissingParamSet.fromParams(nel)))
 
       private def toObsGeneratorParams(
-        obsParams:  ObsParams,
-        config:     Option[ObservingMode]
+        obsParams: ObsParams,
+        config:    Option[ObservingMode]
       ): Either[Error, GeneratorParams] =
 
         // A target-less observation still has one (empty) asterism row.
         val hasTarget = obsParams.targets.exists(_.targetId.isDefined)
-
-        // Altair as the database has it. The guide star is resolved against Gaia only when the
-        // remote ITC is called (see ItcService), so nothing here leaves the database.
-        val altairRequest: Option[AltairRequest] =
-          obsParams.altair.map(AltairRequest(_, obsParams.guideStarName))
 
         def spectroscopyGeneratorParams(
           obsMode:              ObservingMode,
@@ -360,7 +353,6 @@ object GeneratorParamsService {
                 regularTargetInputs,
                 blindOffsetTargetInput,
                 obsParams.signalToNoiseTargetId,
-                altairRequest,
                 gnirsAcqAutoClassify,
                 gnirsAcqAutoSignalToNoise
               )
@@ -446,7 +438,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, altair = none))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -511,7 +503,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, altairRequest, acquisition.some, gnirsAcqAutoClassify = acqAutoClassify, gnirsAcqAutoSignalToNoise = acqAutoSignalToNoise))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, acquisition.some, gnirsAcqAutoClassify = acqAutoClassify, gnirsAcqAutoSignalToNoise = acqAutoSignalToNoise))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -654,7 +646,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, altair = none))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -672,7 +664,7 @@ object GeneratorParamsService {
               obsParams
                 .targets
                 .traverse(itcTargetParams)
-                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId, altair = none))
+                .map(ItcInput.Imaging(inputs, _, obsParams.signalToNoiseTargetId))
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
@@ -816,7 +808,6 @@ object GeneratorParamsService {
     stepCount:             Long,
     schedulingMode:        SchedulingMode,
     altair:                Option[AltairConfiguration],
-    guideStarName:         Option[GuideStarName],
     customSedTimestamp:    Option[Timestamp] = none
   )
 
@@ -842,8 +833,7 @@ object GeneratorParamsService {
     executionState:        ExecutionState,
     stepCount:             Long,
     schedulingMode:        SchedulingMode,
-    altair:                Option[AltairConfiguration],
-    guideStarName:         Option[GuideStarName]
+    altair:                Option[AltairConfiguration]
   )
 
   object ObsParams {
@@ -865,8 +855,7 @@ object GeneratorParamsService {
           oParams.head.executionState,
           oParams.head.stepCount,
           oParams.head.schedulingMode,
-          oParams.head.altair,
-          oParams.head.guideStarName
+          oParams.head.altair
         )
       .toMap
   }
@@ -914,14 +903,13 @@ object GeneratorParamsService {
        altair_mode.opt         *:
        field_lens.opt          *:
        cass_rotator.opt        *:
-       altair_nd_filter.opt    *:
-       guide_target_name.opt
-      ).map( (oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, am, fl, cr, nd, gsn) =>
+       altair_nd_filter.opt
+      ).map( (oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, am, fl, cr, nd) =>
         // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here are unreachable in
         // practice, not a second source of truth for them.
         val altair: Option[AltairConfiguration] =
           am.map(AltairConfiguration(_, fl, cr.getOrElse(CassRotator.Following), nd.getOrElse(AltairNdFilter.Out)))
-        ParamsRow(oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, altair, gsn, None))
+        ParamsRow(oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, altair, None))
 
     // v_generator_params knows nothing about proposals.
     private def ProposalJoin(tab: String): String =
@@ -964,8 +952,7 @@ object GeneratorParamsService {
         $tab.c_altair_mode,
         $tab.c_altair_field_lens,
         $tab.c_altair_cass_rotator,
-        $tab.c_altair_nd_filter,
-        $tab.c_guide_target_name
+        $tab.c_altair_nd_filter
       """
 
     def selectManyParams(
