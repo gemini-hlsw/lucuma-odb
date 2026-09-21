@@ -3,10 +3,12 @@
 
 package lucuma.odb.service
 
+import cats.Eq
 import cats.Order
 import cats.Order.*
 import cats.data.NonEmptyList
 import cats.data.NonEmptySet
+import cats.derived.*
 import cats.effect.Async
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
@@ -36,6 +38,7 @@ import lucuma.core.enums.Site
 import lucuma.core.enums.TrackType
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.Wavelength
@@ -129,13 +132,20 @@ trait GuideService[F[_]] {
   ): F[Map[Observation.Id, GuideService.GuideProbeSelection]]
 
   /**
-   * The guide star the PI selected, resolved against Gaia, or None when none is stored. The
-   * stored hash is deliberately ignored: the ITC uses the star that was picked even when the
-   * sequence has since changed.
+   * The guide star the observation will actually guide on: the one the user stored while it
+   * remains valid, otherwise the one AGS selects. Or why there is none.
    */
-  def resolveStoredGuideStar(oid: Observation.Id)(using
+  def resolveGuideStar(oid: Observation.Id)(using
     NoTransaction[F], SuperUserAccess
-  ): F[Result[Option[GuideService.ResolvedGuideStar]]]
+  ): F[Result[GuideService.GuideStarResolution]]
+
+  /**
+   * As `resolveGuideStar`, but against a sequence the caller has already generated, so that the
+   * generator does not run a second time.
+   */
+  def resolveGuideStar(oid: Observation.Id, generatorInfo: GuideService.GeneratorInfo)(using
+    NoTransaction[F], SuperUserAccess
+  ): F[Result[GuideService.GuideStarResolution]]
 }
 
 object GuideService {
@@ -148,6 +158,10 @@ object GuideService {
   val maxAvailabilityPeriod = TimeSpan.unsafeFromDuration(Duration.ofDays(maxAvailabilityPeriodDays))
 
   given Order[Angle] = Angle.AngleOrder
+
+  // Both are refined new types, which offer an OrderHash but no Eq of their own.
+  private given Eq[GuideStarName]   = Eq.by(_.value.value)
+  private given Eq[BrightnessValue] = Eq.by(_.value.value)
 
   case class GuideTarget(probe: GuideProbe, target: Target)
 
@@ -210,9 +224,46 @@ object GuideService {
   ):
     def effective: Option[GuideProbe] = explicit.orElse(default)
 
-  /** A stored guide star, with what Altair needs from it: how far off axis it is and how bright. */
-  type ResolvedGuideStar = GuideStarResolver.ResolvedGuideStar
-  val ResolvedGuideStar: GuideStarResolver.ResolvedGuideStar.type = GuideStarResolver.ResolvedGuideStar
+  /**
+   * The guide star an observation will guide on, AGS-selected or user-selected, with what Altair
+   * needs from it: how far off axis it is and how bright.
+   */
+  case class ResolvedGuideStar(
+    name:        GuideStarName,
+    separation:  Angle,
+    rBrightness: Option[BrightnessValue]
+  ) derives Eq
+
+  /** The outcome of resolving an observation's guide star. */
+  enum GuideStarResolution derives Eq:
+    /** The star the observation will guide on. */
+    case Resolved(guideStar: ResolvedGuideStar)
+    /** The observation does not guide (a calibration role without guiding). */
+    case NotGuided
+    /** AGS found no usable candidate. */
+    case NoUsableStar
+    /** The user-selected star is stored and current, but no longer usable with the present parameters. */
+    case SelectedStarUnusable(name: GuideStarName)
+
+    def star: Option[ResolvedGuideStar] =
+      this match
+        case Resolved(guideStar = s)        => s.some
+        case NotGuided                      => none
+        case NoUsableStar                   => none
+        case SelectedStarUnusable(name = _) => none
+
+  /** The outcome of a guide star lookup: the environment plus the star it was built from. */
+  private case class GuideStarSelection(
+    environment:     GuideEnvironment,
+    candidate:       GuideStarCandidate,
+    baseCoordinates: Coordinates
+  ):
+    def resolved: ResolvedGuideStar =
+      ResolvedGuideStar(
+        GuideStarName.gaiaSourceId.reverseGet(candidate.id),
+        baseCoordinates.angularDistance(candidate.tracking.baseCoordinates),
+        candidate.rBrightness
+      )
 
   private def generalError(error: String): OdbError =
     OdbError.GuideEnvironmentError(error.some)
@@ -326,7 +377,7 @@ object GuideService {
     }
   }
 
-  private case class GeneratorInfo(
+  case class GeneratorInfo(
     digest: ExecutionDigest,
     params: GeneratorParams,
     hash:   Md5Hash
@@ -1045,10 +1096,10 @@ object GuideService {
         obsDuration:            TimeSpan,
         scienceTime:            Timestamp,
         scienceDuration:        TimeSpan
-      )(using SuperUserAccess): F[Result[GuideEnvironment]] =
+      )(using SuperUserAccess): F[Result[Option[GuideStarSelection]]] =
         // If we got here, we either have the name but need to get all the details (they queried for more
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
-        // select the best.
+        // select the best. None means AGS found nothing usable.
         (for {
 
           visitEnd      <- ResultT.fromResult(
@@ -1099,17 +1150,11 @@ object GuideService {
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
           optUsable      <- ResultT.liftF(chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType))
           tgts           = original.map(x => (x._2.id, x._1)).toList.toMap
-          env            <- ResultT.fromResult(
-                             optUsable
-                              .flatMap(_.toGuideEnvironment(tgts))
-                              .toResult (
-                                generalError(
-                                  oGuideStarName.fold("No usable guidestars are available.")(name =>
-                                    s"Guidestar $name is not usable.")
-                                ).asProblem
-                             )
-                           )
-        } yield env).value
+          selection      = optUsable.flatMap: usable =>
+                             usable
+                               .toGuideEnvironment(tgts)
+                               .map(GuideStarSelection(_, usable.target, baseCoords))
+        } yield selection).value
 
       override def getGuideEnvironment(oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess
@@ -1130,6 +1175,14 @@ object GuideService {
                                   ResultT.pure(GuideEnvironment(obsInfo.availabilityAngles.head, Nil))
                                 else
                                   ResultT(lookupGuideStar(oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+                                    .flatMap: selection =>
+                                      ResultT.fromResult:
+                                        selection.map(_.environment).toResult(
+                                          generalError(
+                                            oGSName.fold("No usable guidestars are available.")(name =>
+                                              s"Guidestar $name is not usable.")
+                                          ).asProblem
+                                        )
           } yield result).value
 
       override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
@@ -1145,11 +1198,39 @@ object GuideService {
                         )
         } yield oGSName.map(_.toNonEmptyString)).value
 
-      override def resolveStoredGuideStar(oid: Observation.Id)(
+      override def resolveGuideStar(oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess
-      ): F[Result[Option[ResolvedGuideStar]]] =
-        T.span("resolveStoredGuideStar").surround:
-          guideStarResolver.resolve(oid)
+      ): F[Result[GuideStarResolution]] =
+        ResultT(getGeneratorInfo(oid))
+          .flatMap(genInfo => ResultT(resolveGuideStar(oid, genInfo)))
+          .value
+
+      override def resolveGuideStar(oid: Observation.Id, generatorInfo: GeneratorInfo)(
+        using NoTransaction[F], SuperUserAccess
+      ): F[Result[GuideStarResolution]] =
+        T.span("resolveGuideStar").surround:
+          (for {
+            obsInfo         <- ResultT(getObservationInfo(oid))
+            // Like Explore's own AGS, an unset observation time defaults to now and an unset
+            // duration to the observation's full time estimate.
+            now             <- ResultT.liftF(Async[F].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated))
+            obsTime          = obsInfo.optObsTime.getOrElse(now)
+            obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.timeEstimate)
+            scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
+            scienceStart     = generatorInfo.getScienceStartTime(obsTime)
+            oGSName          = obsInfo.validGuideStarName(generatorInfo.hash)
+            // A calibration that does not guide never has a star; that is not an error.
+            resolution      <- if (generatorInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
+                                 ResultT.pure(GuideStarResolution.NotGuided)
+                               else
+                                 ResultT(lookupGuideStar(oid, oGSName, obsInfo, generatorInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+                                   .map: selection =>
+                                     // A stored star is looked up by id, so no selection means that
+                                     // star itself is no longer usable.
+                                     selection.fold(
+                                       oGSName.fold(GuideStarResolution.NoUsableStar)(GuideStarResolution.SelectedStarUnusable.apply)
+                                     )(sel => GuideStarResolution.Resolved(sel.resolved))
+          } yield resolution).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
         using NoTransaction[F], SuperUserAccess
