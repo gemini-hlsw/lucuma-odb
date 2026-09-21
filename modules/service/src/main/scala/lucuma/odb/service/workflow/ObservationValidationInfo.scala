@@ -51,7 +51,6 @@ import lucuma.odb.util.Codecs.*
 import skunk.Encoder
 import skunk.Query
 import skunk.Transaction
-import skunk.codec.boolean.bool
 import skunk.syntax.all.*
 
 import java.time.Instant
@@ -87,8 +86,7 @@ case class ObservationValidationInfo(
   keckInstrument:         Option[KeckInstrument] = None,   // set for exchange_keck observations
   subaruInstrument:       Option[SubaruInstrument] = None, // set for exchange_subaru observations
   explicitGuideProbe:     Option[GuideProbe] = None,
-  altair:                 Option[AltairConfiguration],
-  hasGuideTargetName:     Boolean
+  altair:                 Option[AltairConfiguration]
 ) {
 
   def isDeclaredComplete: Boolean =
@@ -376,8 +374,7 @@ object ObservationValidationInfo {
           o.c_altair_mode,
           o.c_altair_field_lens,
           o.c_altair_cass_rotator,
-          o.c_altair_nd_filter,
-          o.c_guide_target_name IS NOT NULL
+          o.c_altair_nd_filter
         FROM t_observation o
         JOIN t_program p on p.c_program_id = o.c_program_id
         -- v_proposal rather than t_proposal: it adds the effective ToO ceiling
@@ -418,17 +415,16 @@ object ObservationValidationInfo {
         altair_mode.opt                 *:
         field_lens.opt                  *:
         cass_rotator.opt                *:
-        altair_nd_filter.opt            *:
-        bool
+        altair_nd_filter.opt
       )
       .map:
-        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter, hasGuideStar) =>
+        case (pid, tpe, oid, mode, ra, dec, cal, state, ds, ps, too, sched, ceil, cfp, sci, state2, ce, iq, sb, wv, er, wl, ovcs, egp, altairMode, fieldLens, cassRotator, ndFilter) =>
           val cs = ConstraintSet(iq, ce, sb, wv, er)
           // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here
           // are unreachable in practice, not a second source of truth for them.
           val altair = altairMode.map: m =>
             AltairConfiguration(m, fieldLens, cassRotator.getOrElse(CassRotator.Following), ndFilter.getOrElse(AltairNdFilter.Out))
-          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair, hasGuideTargetName = hasGuideStar)
+          ObservationValidationInfo(pid, tpe, oid, cs, wl, mode, None, (ra, dec).mapN(Coordinates.apply), cal, state, ds, ps, too, sched, ceil, cfp, sci, Nil, state2, ovcs, explicitGuideProbe = egp, altair = altair)
 
     def ProgramAllocations[A <: NonEmptyList[Program.Id]](enc: Encoder[A]): Query[A, (Program.Id, ScienceBand)] =
       sql"""
