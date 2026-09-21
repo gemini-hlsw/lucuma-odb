@@ -301,6 +301,15 @@ object GuideService {
         else none
        }
 
+    /**
+     * As `validGuideStarName`, but a name stored without a hash counts as valid. Only
+     * `setGuideTargetName` leaves one that way: it stores the name before running the generator,
+     * precisely so that run resolves the star just chosen, and records the hash the run produced
+     * afterwards. Until then the selection is pending, not stale.
+     */
+    def pendingOrValidGuideStarName(generatorHash: Md5Hash): Option[GuideStarName] =
+      guideStarHash.fold(guideStarName)(_ => validGuideStarName(generatorHash))
+
     private val AllAngles =
       NonEmptyList.fromListUnsafe(
         (0 until 360 by 10).map(a => Angle.fromDoubleDegrees(a.toDouble)).toList
@@ -377,6 +386,11 @@ object GuideService {
     }
   }
 
+  /**
+   * A generated sequence, as the guide star calculations need it. `hash` is what guide star
+   * validity and the availability cache key on; see `GeneratorContext.guideStarHash` for why it is
+   * not simply the hash of the generation this digest came out of.
+   */
   case class GeneratorInfo(
     digest: ExecutionDigest,
     params: GeneratorParams,
@@ -1224,7 +1238,7 @@ object GuideService {
             obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.timeEstimate)
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
-            oGSName          = obsInfo.validGuideStarName(generatorInfo.hash)
+            oGSName          = obsInfo.pendingOrValidGuideStarName(generatorInfo.hash)
             // A calibration that does not guide never has a star; that is not an error.
             resolution      <- if (generatorInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
                                  ResultT.pure(GuideStarResolution.NotGuided)

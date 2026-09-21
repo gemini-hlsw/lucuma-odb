@@ -52,6 +52,7 @@ import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import org.typelevel.log4cats.Logger
 import skunk.*
 
 import Generator.FutureLimit
@@ -69,10 +70,10 @@ sealed trait Generator[F[_]]:
   )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]]
 
   /**
-   * The same is `digest`, but it also returns the GeneratorParms and the hash used
-   * to determine if the digest needed to be recalculated. This is useful in things
-   * like the guide star availability calculations which depend on the digest and are
-   * also cached.
+   * The same is `digest`, but it also returns the GeneratorParms and a hash of the inputs the
+   * digest was calculated from. This is useful in things like the guide star availability
+   * calculations which depend on the digest and are also cached. Behind Altair that hash is the
+   * one of the Altair-free first pass; see `GeneratorContext.guideStarHash`.
    */
   def digestWithParamsAndHash(
     observationId: Observation.Id
@@ -160,7 +161,7 @@ object Generator:
         from(v).leftMap: _ =>
           s"Future limit must range from ${Min.value} to ${Max.value}, but was $v."
 
-  def instantiate[F[_]: Async: Services](
+  def instantiate[F[_]: Async: Logger: Services](
     commitHash: CommitHash,
     calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   ): Generator[F] =
@@ -193,10 +194,21 @@ object Generator:
           .flatMap(ctx => transactionallyEitherT(f(ctx)))
           .value
 
+      // An Altair sequence generated without the guide star the observation will actually use is
+      // not the sequence it will execute, so everything but `digestWithParamsAndHash` -- which the
+      // guide star calculations use to pick that star in the first place -- reports the problem.
+      private def altairChecked[A](ctx: GeneratorContext, a: A): Either[OdbError, A] =
+        ctx.altairProblem.toLeft(a)
+
       override def digest(
         oid: Observation.Id
       )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
-        digestWithParamsAndHash(oid).map(_.map(_._1))
+        transactionallyWithContext(oid, commitHash): ctx =>
+          for
+            d0 <- ExecutionDigestCache.lookupOne(ctx)
+            d1 <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
+            d  <- EitherT.fromEither[F](altairChecked(ctx, d1))
+          yield d
 
       override def digestWithParamsAndHash(
         oid: Observation.Id
@@ -205,7 +217,7 @@ object Generator:
           for
             d0  <- ExecutionDigestCache.lookupOne(ctx)
             d1  <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
-          yield (d1, ctx.params, ctx.hash)
+          yield (d1, ctx.params, ctx.guideStarHash)
 
       private def calcDigestThenCache(
         ctx: GeneratorContext
@@ -406,7 +418,8 @@ object Generator:
           for
             d <- calcDigestThenCache(ctx)
             a <- calculateScienceAtomDigests(ctx)
-          yield (d, a)
+            r <- EitherT.fromEither[F](altairChecked(ctx, (d, a)))
+          yield r
 
       override def generate(
         oid:  Observation.Id,
@@ -540,7 +553,7 @@ object Generator:
               EitherT.rightT(InstrumentExecutionConfig.Visitor(v.instrument))
 
         transactionallyWithContext(oid, commitHash): ctx =>
-          instrumentExecutionConfig(ctx)
+          instrumentExecutionConfig(ctx).flatMap(c => EitherT.fromEither[F](altairChecked(ctx, c)))
 
       override def resetAcquisition(
         observationId: Observation.Id

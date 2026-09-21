@@ -5,9 +5,12 @@ package lucuma.odb.graphql
 package feature
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.numeric.PosLong
+import fs2.Stream
+import fs2.text.utf8
 import io.circe.Json
 import io.circe.literal.*
 import io.circe.syntax.*
@@ -31,9 +34,12 @@ import lucuma.core.syntax.timespan.*
 import lucuma.itc.IntegrationTime
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.graphql.query.ExecutionTestSupportForGnirs
+import lucuma.odb.graphql.query.GaiaVoTables
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
 import lucuma.odb.service.Services
 import lucuma.odb.smartgcal.data.Gnirs
+import org.http4s.Request
+import org.http4s.Response
 import skunk.Session
 
 import java.time.Instant
@@ -47,6 +53,11 @@ class calibrations_gnirs_altair
   with TelluricCalibrationsTestSupport:
 
   val when: Instant = LocalDateTime.of(2024, 1, 1, 12, 0, 0).toInstant(ZoneOffset.UTC)
+
+  // Behind Altair the sequence is generated for the guide star the observation will actually use,
+  // so these observations need candidates inside the AOWFS patrol field to select one from.
+  override protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
+    _ => Resource.eval(IO.pure(Response(body = Stream(GaiaVoTables.altairCandidates).through(utf8.encode))))
 
   override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
     input.parameters.mode.exposureTimeMode match
