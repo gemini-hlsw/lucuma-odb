@@ -530,6 +530,41 @@ lazy val buildInfoSettings = Seq(
     )
 )
 
+lazy val root = project
+  .in(file("."))
+  .enablePlugins(NoPublishPlugin)
+  .aggregate(
+    binding,
+    calibrations,
+    common,
+    itcBenchmark,
+    itcClient.js,
+    itcClient.jvm,
+    itcLegacyTests,
+    itcModel.js,
+    itcModel.jvm,
+    itcService,
+    itcTestkit.js,
+    itcTestkit.jvm,
+    itcTests,
+    obscalc,
+    otel,
+    pdfSummary,
+    phase0,
+    resourceModel,
+    resourceService,
+    schema.js,
+    schema.jvm,
+    sequence,
+    service,
+    smartgcal,
+    ssoBackendClient,
+    ssoBackendExample,
+    ssoFrontendClient.js,
+    ssoFrontendClient.jvm,
+    ssoService
+  )
+
 // START SSO
 
 lazy val ssoFrontendClient =
