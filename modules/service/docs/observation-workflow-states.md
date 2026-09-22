@@ -124,12 +124,12 @@ backstop against swapping a placeholder back in after triggering.
 
 Two rules apply to **every** calibration role, whatever its kind:
 
-- A calibration never runs the validation pipeline. `validationStatus` is forced
-  to `Defined` as soon as `calibrationRole` is set, so a calibration is never
-  `Undefined` or `Unapproved` — and it never carries warnings, so its
-  `Defined -> Ready` edge never turns into `ForReview`. (A per-observation
-  calibration can still *show* `ForReview`, inherited from its science
-  observation's user state.)
+- A calibration runs exactly one validator, `BandValidator` — and nothing else.
+  Its only possible error is therefore a missing or unallocated science band,
+  which makes it `Undefined`; it is never `Unapproved`, and it never carries
+  warnings, so its `Defined -> Ready` edge never turns into `ForReview`. (A
+  per-observation calibration can still *show* `ForReview`, inherited from its
+  science observation's user state.)
 - Calibration programs have `ProgramType.hasProposal == false`, so the
   `Defined -> Ready` gate passes without an accepted proposal.
 
@@ -137,22 +137,22 @@ Beyond that the five roles split into two groups:
 
 | Role | Group | Lifecycle |
 |---|---|---|
-| `Photometric`, `SpectroPhotometric`, `Twilight` | program-level | the generic lifecycle above, entered at `Defined` |
+| `Photometric`, `SpectroPhotometric`, `Twilight` | program-level | the generic lifecycle above, entered at `Undefined` until a band is inherited |
 | `Telluric`, `DaytimePinhole` | per-observation | inherits its science observation's user state; see below |
 
 ### Program-level calibrations
 
 `Photometric`, `SpectroPhotometric`, and `Twilight` fall through to the generic
-`else` branch of `allowedTransitions`, so they run the full lifecycle — they are
-simply never gated on validation or on proposal acceptance. `Defined` is both the
-entry point and the floor: because `validationStatus` is pinned to `Defined`, the
-two edges that return "to the validation state" (`Ready -> validationStatus` and
-`Inactive -> validationStatus`) always land back on `Defined`.
+`else` branch of `allowedTransitions`, so they run the full lifecycle, gated only
+on the science band and never on proposal acceptance. The two edges that return
+"to the validation state" (`Ready -> validationStatus` and
+`Inactive -> validationStatus`) land on `Defined` or `Undefined` according to
+whether the calibration holds a band at the time.
 
-Compared with the main lifecycle, only the left-hand side changes: `Undefined`
-and `Unapproved` are unreachable, and `Defined -> Ready` carries no
-proposal-acceptance condition. Everything from `Ready` rightwards is identical,
-including the staff-and-visitor-mode restriction on `Ready <-> Ongoing`.
+Compared with the main lifecycle, only the left-hand side changes: `Unapproved` is
+unreachable, `Undefined` means the band and nothing else, and `Defined -> Ready`
+carries no proposal-acceptance condition. Everything from `Ready` rightwards is
+identical, including the staff-and-visitor-mode restriction on `Ready <-> Ongoing`.
 
 ### Per-observation calibrations
 

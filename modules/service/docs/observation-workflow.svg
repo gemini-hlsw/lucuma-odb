@@ -277,10 +277,20 @@
   <rect class="cont" x="20" y="1010" width="1480" height="230" rx="14"/>
   <text class="phase" x="40" y="1036">Program-level calibrations (Photometric, SpectroPhotometric, Twilight)</text>
 
-  <circle cx="380" cy="1150" r="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
-  <line class="blue" x1="392" y1="1150" x2="606" y2="1150" marker-end="url(#au-e)"/>
-  <text class="el" x="499" y="1130">calibration created —</text>
-  <text class="el" x="499" y="1143">validation is skipped</text>
+  <circle cx="70" cy="1150" r="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+  <line class="blue" x1="82" y1="1150" x2="242" y2="1150" marker-end="url(#au-e)"/>
+  <text class="el" x="162" y="1130">calibration created —</text>
+  <text class="el" x="162" y="1143">no band inherited yet</text>
+
+  <rect class="inact" x="256" y="1067" width="100" height="30"/>
+  <text class="si" x="306" y="1087">Inactive</text>
+  <line class="black" x1="306" y1="1101" x2="306" y2="1128" marker-end="url(#ab-e)" marker-start="url(#ab-s)"/>
+  <rect class="box" x="250" y="1132" width="112" height="36"/>
+  <text class="st" x="306" y="1155">Undefined</text>
+
+  <line class="blue" x1="366" y1="1150" x2="606" y2="1150" marker-end="url(#au-e)" marker-start="url(#au-s)"/>
+  <text class="el" x="486" y="1130">science band assigned /</text>
+  <text class="el" x="486" y="1143">removed</text>
 
   <rect class="inact" x="616" y="1067" width="100" height="30"/>
   <text class="si" x="666" y="1087">Inactive</text>
@@ -314,7 +324,7 @@
   <rect class="box" x="1350" y="1132" width="112" height="36"/>
   <text class="st" x="1406" y="1155">Completed</text>
 
-  <text class="foot" x="40" y="1218">Undefined and Unapproved are unreachable: validationStatus is pinned to Defined, which is both the entry point and the floor. Warnings never occur, so neither is ForReview.</text>
+  <text class="foot" x="40" y="1218">A calibration runs only BandValidator, so Undefined means a missing or unallocated science band and nothing else. Unapproved is unreachable, and warnings never occur, so neither is ForReview.</text>
 
   <!-- ============ Calibrations: per-observation ============ -->
   <rect class="cont" x="20" y="1265" width="1480" height="255" rx="14"/>
