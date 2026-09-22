@@ -131,7 +131,12 @@ ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TO
 // sbt 2 runs a background server, and JVM options only take effect when that server starts, so
 // `-J` flags on a later invocation are ignored. Setting them for the whole job means whichever
 // step boots the server gets them. Locally the same job is done by .jvmopts, which is gitignored.
-ThisBuild / githubWorkflowEnv += ("SBT_OPTS" -> "-Xmx6g -Xss4M")
+//
+// SBT_OPTS is a single string, so every place that sets it replaces the last: the coursier retry
+// sbt-lucuma contributes has to be carried explicitly, or flaky Central lookups fail the build.
+val baseSbtOpts = "-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10"
+
+ThisBuild / githubWorkflowEnv += ("SBT_OPTS" -> baseSbtOpts)
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
@@ -214,10 +219,10 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
         // step's environment, and it has to be set on the *job*: whichever sbt invocation
         // starts the server fixes its properties for the rest of the job, and `sbt update`
         // runs several steps before the tests. A job-level value replaces the workflow-level
-        // SBT_OPTS, so the heap settings are repeated here.
+        // SBT_OPTS, so baseSbtOpts has to be repeated here.
         .withEnv(
           job.env + ("SBT_OPTS" ->
-            s"-Xmx6g -Xss4M -Dtest.shard=$${{ matrix.shard }} -Dtest.shard.count=$nTestJobShards")
+            s"$baseSbtOpts -Dtest.shard=$${{ matrix.shard }} -Dtest.shard.count=$nTestJobShards")
         )
         .withSteps(job.steps.flatMap {
           case s if s.name.contains("Checkout current branch")            => List(CheckoutShallow)

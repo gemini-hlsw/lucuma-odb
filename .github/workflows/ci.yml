@@ -16,7 +16,7 @@ on:
 
 env:
   MUNIT_FLAKY_OK: ${{ vars.MUNIT_FLAKY_OK }}
-  SBT_OPTS: '-Xmx6g -Xss4M'
+  SBT_OPTS: '-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10'
   LUCUMA_AFFECTED_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -39,7 +39,7 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
     env:
-      SBT_OPTS: '-Xmx6g -Xss4M -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8'
+      SBT_OPTS: '-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10 -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8'
     timeout-minutes: 60
     steps:
       - name: Checkout current branch
