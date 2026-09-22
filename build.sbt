@@ -136,7 +136,9 @@ ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TO
 // sbt-lucuma contributes has to be carried explicitly, or flaky Central lookups fail the build.
 val baseSbtOpts =
   "-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10" +
-    " -Dbuildbuddy.host=${{ vars.BUILDBUDDY_HOST }}" +
+    // A secret, not a variable, so both halves live in the same place. GitHub masks it in the
+    // logs, so check the cache is on from BuildBuddy's side rather than from SBT_OPTS.
+    " -Dbuildbuddy.host=${{ secrets.BUILDBUDDY_HOST }}" +
     " -Dbuildbuddy.key=${{ secrets.BUILDBUDDY_API_KEY }}"
 
 ThisBuild / githubWorkflowEnv += ("SBT_OPTS" -> baseSbtOpts)
