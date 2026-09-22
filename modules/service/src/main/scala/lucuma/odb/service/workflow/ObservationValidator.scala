@@ -58,8 +58,11 @@ object ObservationValidator:
 
     // Here are our composed validators
 
-    val calibrationValidator, engValidator: ObservationValidator = _ =>
+    val engValidator: ObservationValidator = _ =>
       ObservationValidationMap.empty
+
+    val calibrationValidator: ObservationValidator =
+      BandValidator
 
     val scienceValidator1: ObservationValidator =
       GeneratorValidator                       |+|

@@ -35,6 +35,7 @@ import lucuma.odb.graphql.input.AllocationInput
 import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.service.GuideProbeRules
 import lucuma.odb.service.ObservationService
+import lucuma.odb.service.workflow.validator.BandValidator
 import lucuma.odb.service.workflow.validator.CfpRaDecValidator
 
 class observation_workflow
@@ -648,6 +649,109 @@ class observation_workflow
         ).asRight
       )
 
+  testWithTargetTypes("missing band"): (_, mkTarget) =>
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 4.hourTimeSpan)
+    )
+
+    val setup: IO[Observation.Id] =
+      for
+        pid <- createProgramAs(pi)
+        _   <- setAllocationsAs(staff, pid, allocations)
+        tid <- mkTarget(pi, pid)
+        oid <- createGmosSouthLongSlitObservationAs(pi, pid, List(tid))
+        _   <- computeItcResultAs(pi, oid)
+        _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Undefined,
+              List(ObservationWorkflowState.Inactive),
+              List(ObservationValidation.configuration(BandValidator.missingScienceBand))
+            )
+          )
+        ).asRight
+      )
+
+  test("missing band blocks the Ready transition"):
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 4.hourTimeSpan)
+    )
+
+    def setReady(oid: Observation.Id, expected: Either[List[String], Json]): IO[Unit] =
+      expect(
+        pi,
+        s"""
+          mutation {
+            setObservationWorkflowState(input: {
+              observationId: "$oid"
+              state: READY
+            }) { state }
+          }
+        """,
+        expected
+      )
+
+    for
+      cfp <- createGeminiCallForProposalsAs(staff)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, Some(cfp), None)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      oid <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _   <- createConfigurationRequestAs(pi, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      _   <- computeItcResultAs(pi, oid)
+      _   <- setProposalStatus(staff, pid, "ACCEPTED")
+      _   <- setAllocationsAs(staff, pid, allocations)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- setReady(oid, List("Workflow state cannot be changed from Undefined to Ready.").asLeft)
+      _   <- setScienceBandAs(pi, oid, ScienceBand.Band2.some)
+      _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      _   <- setReady(oid, json"""{ "setObservationWorkflowState": { "state": "READY" } }""".asRight)
+    yield ()
+
+  test("calibration with no band is Undefined"):
+    val allocations = List(
+      AllocationInput(TimeAccountingCategory.US, ScienceBand.Band1, 1.hourTimeSpan),
+      AllocationInput(TimeAccountingCategory.CA, ScienceBand.Band2, 4.hourTimeSpan)
+    )
+
+    val setup: IO[Observation.Id] =
+      for
+        pid <- createProgramAs(pi)
+        _   <- setAllocationsAs(staff, pid, allocations)
+        tid <- createTargetWithProfileAs(pi, pid)
+        oid <- createObservationAs(pi, pid, tid)
+        _   <- setObservationCalibrationRole(List(oid), CalibrationRole.SpectroPhotometric)
+        _   <- runObscalcUpdateAs(serviceUser, pid, oid)
+      yield oid
+
+    setup.flatMap: oid =>
+      expect(
+        pi,
+        workflowQuery(oid),
+        expected = workflowQueryResult(
+          CalculatedValue(
+            CalculationState.Ready,
+            ObservationWorkflow(
+              ObservationWorkflowState.Undefined,
+              List(ObservationWorkflowState.Inactive),
+              List(ObservationValidation.configuration(BandValidator.missingScienceBand))
+            )
+          )
+        ).asRight
+      )
+
   testWithTargetTypes("no configuration request checks if proposal is not approved"): (_, mkTarget) =>
     val setup: IO[Observation.Id] =
       for
@@ -771,7 +875,7 @@ class observation_workflow
         ).asRight
       )
 
-  test("calibrations are not validated and are immediately Defined"):
+  test("calibrations are only validated for band and are otherwise Defined"):
     val setup: IO[Observation.Id] =
       for
         cfp <- createGeminiCallForProposalsAs(staff)

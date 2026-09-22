@@ -15,7 +15,13 @@ object BandValidator extends ObservationValidator:
   def invalidScienceBand(b: ScienceBand): String =
     s"Science Band ${b.tag.toScreamingSnakeCase} has no time allocation."
 
+  val missingScienceBand: String =
+    "Please select a science band."
+
+  // Only programs with allocations can carry a band.
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
-    (info.scienceBand, info.programAllocations).tupled.foldMap: (b, bs) =>
-      if bs.toList.contains(b) then ObservationValidationMap.empty
-      else ObservationValidationMap.singleton(ObservationValidation.configuration(invalidScienceBand(b)))
+    info.programAllocations.foldMap: bs =>
+      info.scienceBand match
+        case None                             => ObservationValidationMap.singleton(ObservationValidation.configuration(missingScienceBand))
+        case Some(b) if bs.toList.contains(b) => ObservationValidationMap.empty
+        case Some(b)                          => ObservationValidationMap.singleton(ObservationValidation.configuration(invalidScienceBand(b)))

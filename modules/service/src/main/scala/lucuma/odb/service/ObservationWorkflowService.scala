@@ -173,8 +173,7 @@ object ObservationWorkflowService {
             case _: ObservationValidationCode.Warning => 9 // warnings sort after the errors
 
         val validationStatus: ValidationState =
-          if info.calibrationRole.isDefined then Defined // Calibrations are immediately Defined
-          else codes.minOption.fold(Defined):
+          codes.minOption.fold(Defined):
             case ObservationValidationCode.CallForProposalsError             |
                   ObservationValidationCode.ConfigurationError               |
                   ObservationValidationCode.ItcError                         => Undefined

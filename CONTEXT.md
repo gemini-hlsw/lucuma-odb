@@ -173,3 +173,16 @@ _Avoid_: observing window (that is an observation-level concept), semester dates
 
 **Observation Priority**:
 The PI's declared statement of which of their observations matter more, one of Low, Medium or High, carried by `lucuma.core.enums.ObservationPriority`. Always present — every observation has one, defaulting to Medium, so there is no "unset" to distinguish from a deliberate Medium. Advisory: the scheduler may weigh it when choosing among a program's observations, and nothing in the ODB reads it. A single shared value, not one per role: staff edit the same field the PI does, and a staff edit replaces the PI's statement outright.
+
+### Science Band
+
+**Science Band**:
+The ranking band (Band 1 through Band 4) an observation is scheduled under, drawn from the bands its program was allocated time in. Optional on an observation, but the scheduler cannot place an observation without one. A program with no allocations cannot carry a band at all.
+_Avoid_: band (alone, ambiguous with photometric bands), ranking, priority (that is Observation Priority).
+
+**Band Requirement**:
+The rule that an observation in an allocated program is not Defined, and so cannot be Ready, until it has a Science Band. It applies to calibration observations too, as the one validation they are subject to, so a calibration that inherits no band from its science observations is Undefined. Programs with no allocations are exempt.
+_Avoid_: band check, band gate.
+
+**Inherited Band**:
+The Science Band a calibration observation takes from the science observations it serves: the best band among matching observations for a per-program calibration, a copy of the parent's for a per-science one. Best-effort, which is why the Band Requirement still checks the calibration itself.
