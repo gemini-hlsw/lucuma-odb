@@ -16,6 +16,7 @@ on:
 
 env:
   MUNIT_FLAKY_OK: ${{ vars.MUNIT_FLAKY_OK }}
+  SBT_OPTS: '-Dlmcoursier.internal.shaded.coursier.exception-retry=10'
   LUCUMA_AFFECTED_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
