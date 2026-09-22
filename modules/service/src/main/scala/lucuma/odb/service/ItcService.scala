@@ -387,15 +387,16 @@ object ItcService {
         oid:    Observation.Id,
         params: GeneratorParams
       ): F[Option[Either[OdbError, Itc]]] =
-        params.itcInput.toOption.flatTraverse: ps =>
-          session
-            .option(Statements.SelectOneCachedResult)(pid, oid)
-            .map: rowOpt =>
-              for
-                (h, altair, sciOpt, sciErr, acqOpt, acqErr, frozen) <- rowOpt
-                // A frozen result is returned regardless of the input hash.
-                if frozen || isCurrent(ps, h, altair)
-              yield assembleItc(sciOpt, sciErr, acqOpt, acqErr)
+        session
+          .option(Statements.SelectOneCachedResult)(pid, oid)
+          .map: rowOpt =>
+            for
+              (h, altair, sciOpt, sciErr, acqOpt, acqErr, frozen) <- rowOpt
+              // A frozen result is returned regardless of the input hash, and even when the
+              // parameters no longer yield an ITC input at all: once execution has begun it is
+              // authoritative, so an observation whose inputs were edited afterwards still has one.
+              if frozen || params.itcInput.toOption.exists(isCurrent(_, h, altair))
+            yield assembleItc(sciOpt, sciErr, acqOpt, acqErr)
 
       // Selects the frozen (durable, authoritative) result for an observation,
       // if one exists.  Ignores the input hash.  A frozen row always carries

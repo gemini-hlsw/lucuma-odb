@@ -3,7 +3,6 @@
 
 package lucuma.odb.service
 
-import cats.data.EitherT
 import cats.data.Nested
 import cats.data.NonEmptyList
 import cats.effect.Clock
@@ -264,19 +263,19 @@ object ObscalcService:
 
         val gen = generator
 
-        def digest(itcResult: Either[OdbError, Itc]): F[Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])]] =
+        // The generator resolves the ITC itself: behind Altair its input depends on the guide
+        // star, which only the generation knows, so there is nothing sensible to look up first.
+        def digest: F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])] =
           Logger[F].info(s"${pending.observationId}: calculating digest") *>
-          EitherT(gen.obscalc(pending.observationId, itcResult))
-            .flatTap: da =>
-              EitherT.liftF(Logger[F].info(s"${pending.observationId}: finished calculting digest: $da"))
-            .value
+          gen.obscalc(pending.observationId)
+            .flatTap: (_, da) =>
+              Logger[F].info(s"${pending.observationId}: finished calculting digest: $da")
 
         val result: F[(Obscalc.Result, Stream[F, AtomDigest])] =
           for
-            r <- itcService.lookup(pending.programId, pending.observationId)
-            _ <- Logger[F].info(s"${pending.observationId}: itc lookup: $r")
-            d <- digest(r)
-            w <- workflow(r.toOption, d.toOption.map(_._1))
+            (r, d) <- digest
+            _      <- Logger[F].info(s"${pending.observationId}: itc: $r")
+            w      <- workflow(r.toOption, d.toOption.map(_._1))
           yield d.fold(
             err => (Obscalc.Result.Error(err, w), Stream.empty),
             dig => (Obscalc.Result.Success(r.fold(_ => false, _ => true), dig._1, w), dig._2)

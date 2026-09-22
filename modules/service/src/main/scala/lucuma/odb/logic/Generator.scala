@@ -72,23 +72,23 @@ sealed trait Generator[F[_]]:
   /**
    * The same is `digest`, but it also returns the GeneratorParms and a hash of the inputs the
    * digest was calculated from. This is useful in things like the guide star availability
-   * calculations which depend on the digest and are also cached. Behind Altair that hash is the
-   * one of the Altair-free first pass; see `GeneratorContext.guideStarHash`.
+   * calculations which depend on the digest and are also cached. The hash is the guide star one,
+   * which leaves the ITC result out; see `GeneratorContext.guideStarHash`.
    */
   def digestWithParamsAndHash(
     observationId: Observation.Id
   )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]]
 
   /**
-   * Calculates the ExecutionDigest and AtomDigests (for the obscalc service).
-   * This method always performs the calculation and does not attempt to use
-   * cached results nor call the ITC.  It will cache the calculation once
-   * performed.
+   * Calculates the ExecutionDigest and AtomDigests (for the obscalc service),
+   * along with the ITC result they were calculated from. Behind Altair the ITC
+   * is modelled from the guide star the generator resolves, so obscalc takes the
+   * result from here rather than looking one up of its own. The digest is always
+   * calculated afresh and cached once performed.
    */
   def obscalc(
-    observationId: Observation.Id,
-    itcResult:     Either[OdbError, Itc]
-  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])]]
+    observationId: Observation.Id
+  )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])]
 
   /**
    * Generates the execution config if the observation is found and defined
@@ -185,12 +185,11 @@ object Generator:
 
       private def transactionallyWithContext[A](
         oid:        Observation.Id,
-        commitHash: CommitHash,
-        itcResult:  Option[Either[OdbError, Itc]] = None
+        commitHash: CommitHash
       )(
         f: GeneratorContext => Transaction[F] ?=> EitherT[F, OdbError, A]
       )(using NoTransaction[F], Services[F]): F[Either[OdbError, A]] =
-        EitherT(GeneratorContext.lookup(oid, commitHash, itcResult))
+        EitherT(GeneratorContext.lookup(oid, commitHash))
           .flatMap(ctx => transactionallyEitherT(f(ctx)))
           .value
 
@@ -411,15 +410,19 @@ object Generator:
                .map(_._2)
 
       override def obscalc(
-        observationId: Observation.Id,
-        itcResult:     Either[OdbError, Itc]
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])]] =
-        transactionallyWithContext(observationId, commitHash, itcResult.some): ctx =>
-          for
-            d <- calcDigestThenCache(ctx)
-            a <- calculateScienceAtomDigests(ctx)
-            r <- EitherT.fromEither[F](altairChecked(ctx, (d, a)))
-          yield r
+        observationId: Observation.Id
+      )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])] =
+        GeneratorContext.lookup(observationId, commitHash).flatMap:
+          case Left(error) =>
+            (error.asLeft[Itc], error.asLeft[(ExecutionDigest, Stream[F, AtomDigest])]).pure[F]
+          case Right(ctx)  =>
+            transactionallyEitherT:
+              for
+                d <- calcDigestThenCache(ctx)
+                a <- calculateScienceAtomDigests(ctx)
+                r <- EitherT.fromEither[F](altairChecked(ctx, (d, a)))
+              yield r
+            .value.map((ctx.itcRes, _))
 
       override def generate(
         oid:  Observation.Id,

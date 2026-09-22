@@ -11,6 +11,7 @@ import clue.model.GraphQLError
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.util.CalculationState
 import lucuma.itc.ItcVersions
 import lucuma.itc.client.ClientCalculationResult
@@ -131,6 +132,23 @@ trait ItcServiceSuiteSupport extends ExecutionTestSupportForGmos:
         """.query(observation_workflow_state)
       )(oid)
 
+  // Leaves the target without an SED, so the observation's generator parameters no longer yield
+  // an ITC input at all.
+  def removeSED(tid: Target.Id): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: { sourceProfile: { point: { bandNormalized: { sed: null } } } }
+            WHERE: { id: { EQ: "$tid" } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
+
   // Simulates an ITC version bump, which fires the itc_version_update trigger.
   def bumpItcVersion(version: String): IO[Unit] =
     withSession: s =>
@@ -246,6 +264,20 @@ class ItcServiceFreezeSuite extends ItcServiceSuiteSupport:
       assert(seed.isRight, "seed lookup should succeed")
       assertEquals(got, seed) // frozen value served despite the hash mismatch
       assertEquals(calls, 0)  // remote ITC never consulted
+
+  // A frozen result outlives the inputs it was calculated from, so an observation whose target
+  // was edited after execution began still generates against the result it is executing with.
+  test("a frozen ITC result still generates a digest once its inputs go missing"):
+    for
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _      <- withItcService(itcClient)(_.lookup(pid, oid).void)
+      _      <- setFrozen(pid, oid)
+      _      <- removeSED(tid)
+      digest <- withServices(serviceUser): services =>
+                  Services.asSuperUser(services.generator.digest(oid))
+    yield assert(digest.isRight, s"expected a digest from the frozen result, found $digest")
 
   test("recording an observe visit freezes the observation's ITC result"):
     for

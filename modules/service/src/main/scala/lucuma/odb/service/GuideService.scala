@@ -76,6 +76,7 @@ import lucuma.odb.graphql.input.SetGuideTargetNameInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.json.all.query.given
 import lucuma.odb.json.target
+import lucuma.odb.logic.GeneratorContext
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.exchange
 import lucuma.odb.sequence.flamingos2
@@ -84,6 +85,7 @@ import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.igrins2
 import lucuma.odb.sequence.syntax.hash.*
+import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.visitor
 import lucuma.odb.service.Services.SuperUserAccess
@@ -147,6 +149,15 @@ trait GuideService[F[_]] {
   def resolveGuideStar(oid: Observation.Id, generatorInfo: GuideService.GeneratorInfo)(using
     NoTransaction[F], SuperUserAccess
   ): F[Result[GuideService.GuideStarResolution]]
+
+  /**
+   * As `resolveGuideStar`, but from the observation's parameters alone, before any sequence has
+   * been generated. Behind Altair the sequence is sized from the star, so this is the only
+   * resolution available until one has been picked.
+   */
+  def resolveGuideStar(oid: Observation.Id, params: GeneratorParams)(using
+    NoTransaction[F], SuperUserAccess
+  ): F[Result[GuideService.GuideStarResolution]]
 }
 
 object GuideService {
@@ -157,6 +168,13 @@ object GuideService {
   // The longest availability period we will calculate.
   val maxAvailabilityPeriodDays = 200L
   val maxAvailabilityPeriod = TimeSpan.unsafeFromDuration(Duration.ofDays(maxAvailabilityPeriodDays))
+
+  /**
+   * The visit length the Altair guide star pick assumes for an observation that has none of its
+   * own. The pick barely depends on the duration -- only through the average parallactic angle --
+   * and the verification against the generated sequence corrects it.
+   */
+  val NominalAltairVisitDuration: TimeSpan = TimeSpan.unsafeFromDuration(Duration.ofHours(1))
 
   given Order[Angle] = Angle.AngleOrder
 
@@ -385,20 +403,20 @@ object GuideService {
   }
 
   /**
-   * A generated sequence, as the guide star calculations need it. `hash` is what guide star
-   * validity and the availability cache key on; see `GeneratorContext.guideStarHash` for why it is
-   * not simply the hash of the generation this digest came out of.
+   * What the guide star calculations need of an observation: its parameters, the hash guide star
+   * validity and the availability cache key on (see `GeneratorContext.guideStarHash`), and
+   * whatever a generated sequence adds. Behind Altair the star is picked before any sequence
+   * exists, so the sequence-derived parts have neutral values there; see `fromParams`.
    */
   case class GeneratorInfo(
-    digest: ExecutionDigest,
-    params: GeneratorParams,
-    hash:   Md5Hash
+    params:                GeneratorParams,
+    hash:                  Md5Hash,
+    setupTime:             TimeSpan,
+    defaultObsDuration:    TimeSpan,
+    acqOffsets:            Option[AcquisitionOffsets],
+    sciOffsets:            Option[ScienceOffsets],
+    extraSciencePositions: List[Coordinates]
   ) {
-    val timeEstimate = digest.fullTimeEstimate.sum
-    val setupTime    = digest.setup.full
-    val acqOffsets   = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets)
-    val sciOffsets   = NonEmptySet.fromSet(digest.science.telescopeConfigs).flatMap(_.asSciOffsets)
-
     val (site: Site, observingModeType: ObservingModeType, agsWavelength: Wavelength) =
       params.observingMode match
         case c: exchange.Config                               =>
@@ -442,12 +460,6 @@ object GuideService {
         case visitor.Config(mode, wavelength, _, _, _, _)        =>
           (mode.instrument.site, mode, wavelength)
 
-    // Extra static coordinates AGS should treat like science positions.
-    // only GHOST supplies an optional one for the sky fiber position
-    val extraSciencePositions: List[Coordinates] =
-      params.observingMode match
-        case g: ghost.ifu.Config => g.skyPosition.toList
-        case _                   => Nil
 
     def agsParamsFor(
       trackType:     TrackType,
@@ -569,8 +581,46 @@ object GuideService {
           .toResult(generalError(s"Observation duration of ${obsDuration.format} is less than the setup time of ${setupTime.format} for observation $obsId.").asProblem)
   }
 
+  object GeneratorInfo {
+
+    // Extra static coordinates AGS should treat like science positions.
+    // only GHOST supplies an optional one for the sky fiber position
+    private def extraSciencePositions(params: GeneratorParams): List[Coordinates] =
+      params.observingMode match
+        case g: ghost.ifu.Config => g.skyPosition.toList
+        case _                   => Nil
+
+    /** Of an observation whose sequence the caller has generated. */
+    def fromDigest(digest: ExecutionDigest, params: GeneratorParams, hash: Md5Hash): GeneratorInfo =
+      GeneratorInfo(
+        params                = params,
+        hash                  = hash,
+        setupTime             = digest.setup.full,
+        defaultObsDuration    = digest.fullTimeEstimate.sum,
+        acqOffsets            = NonEmptySet.fromSet(digest.acquisition.telescopeConfigs).flatMap(_.asAcqOffsets),
+        sciOffsets            = NonEmptySet.fromSet(digest.science.telescopeConfigs).flatMap(_.asSciOffsets),
+        extraSciencePositions = extraSciencePositions(params)
+      )
+
+    /**
+     * Of an observation with no sequence yet, which is how the Altair guide star is picked: the
+     * sequence it feeds cannot be generated until the star is known.
+     */
+    def fromParams(params: GeneratorParams, hash: Md5Hash): GeneratorInfo =
+      GeneratorInfo(
+        params                = params,
+        hash                  = hash,
+        setupTime             = TimeSpan.Zero,
+        defaultObsDuration    = NominalAltairVisitDuration,
+        acqOffsets            = none,
+        sciOffsets            = none,
+        extraSciencePositions = Nil
+      )
+  }
+
   def instantiate[F[_]: {Async, Services, Tracer as T}](
     gaiaClient:             GaiaClient[F],
+    commitHash:             CommitHash
   ): GuideService[F] =
     new GuideService[F] {
 
@@ -867,7 +917,7 @@ object GuideService {
           generator
             .digestWithParamsAndHash(oid)
             .map:
-              case Right((d, p, h)) => GeneratorInfo(d, p, h).success
+              case Right((d, p, h)) => GeneratorInfo.fromDigest(d, p, h).success
               case Left(ge)         => generatorError(ge).asFailure
 
       def chooseBestGuideStar(
@@ -1221,10 +1271,11 @@ object GuideService {
           (for {
             obsInfo         <- ResultT(getObservationInfo(oid))
             // Like Explore's own AGS, an unset observation time defaults to now and an unset
-            // duration to the observation's full time estimate.
+            // duration to the sequence's full time estimate, or to a nominal visit when there is
+            // no sequence yet.
             now             <- ResultT.liftF(Timestamp.timestampNow[F])
             obsTime          = obsInfo.optObsTime.getOrElse(now)
-            obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.timeEstimate)
+            obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.defaultObsDuration)
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
             oGSName          = obsInfo.pendingOrValidGuideStarName(generatorInfo.hash)
@@ -1240,6 +1291,11 @@ object GuideService {
                                        oGSName.fold(GuideStarResolution.NoUsableStar)(GuideStarResolution.SelectedStarUnusable.apply)
                                      )(sel => GuideStarResolution.Resolved(sel.resolved))
           } yield resolution).value
+
+      override def resolveGuideStar(oid: Observation.Id, params: GeneratorParams)(
+        using NoTransaction[F], SuperUserAccess
+      ): F[Result[GuideStarResolution]] =
+        resolveGuideStar(oid, GeneratorInfo.fromParams(params, GeneratorContext.guideStarHash(params, commitHash)))
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
         using NoTransaction[F], SuperUserAccess
@@ -1270,11 +1326,10 @@ object GuideService {
           } yield availability).value
 
       /**
-       * The order matters. The generator hash folds in the ITC result, and the ITC models Altair
-       * from the guide star stored for the observation. So the name is stored before the generator
-       * runs, so that run resolves the new star, and only the hash that came out of that run is
-       * recorded. The cached ITC result needs no eviction: the Altair parameters are keyed apart,
-       * so a result computed for another star is simply not reused.
+       * The order matters. Behind Altair the sequence is sized from the guide star, so the name is
+       * stored before the generator runs -- that run then resolves the star just chosen -- and the
+       * hash is recorded only afterwards. The cached ITC result needs no eviction: the Altair
+       * parameters are keyed apart, so a result computed for another star is simply not reused.
        */
       def setGuideTargetNameImpl(obsInfo: ObservationInfo, targetName: Option[NonEmptyString]): F[Result[Observation.Id]] =
         targetName.fold(

@@ -14,6 +14,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.util.TimeSpan
 import lucuma.itc.AltairParameters
 import lucuma.itc.ItcVersions
 import lucuma.itc.client.ClientCalculationResult
@@ -92,14 +93,23 @@ trait AltairItcRecording extends ExecutionTestSupportForGnirs with GuideEnvironm
     ).void
 
   protected def observationWithAltair(altair: String, guideStar: Option[String]): IO[(Program.Id, Observation.Id)] =
+    observationWithAltair(altair, guideStar, fullTimeEstimate.some)
+
+  protected def observationWithAltair(
+    altair:      String,
+    guideStar:   Option[String],
+    obsDuration: Option[TimeSpan]
+  ): IO[(Program.Id, Observation.Id)] =
     for
       p <- createProgramAs(pi)
       t <- createTargetWithProfileAs(pi, p)
       o <- createObservationAs(pi, p, List(t))
-      _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, fullTimeEstimate.some)
+      _ <- setObservationTimeAndDuration(pi, o, gaiaSuccess.some, obsDuration)
       _ <- setAltair(o, altair)
-      _ <- guideStar.traverse_(n => setGuideTargetName(pi, o, n.some))
+      // Setting the guide star generates the sequence, and that generation is what the tests of a
+      // stored star look at, so the recording starts before it.
       _ <- clearItcCalls
+      _ <- guideStar.traverse_(n => setGuideTargetName(pi, o, n.some))
     yield (p, o)
 
   /** Generates the sequence, which is where the Altair guide star loop lives. */
@@ -107,17 +117,14 @@ trait AltairItcRecording extends ExecutionTestSupportForGnirs with GuideEnvironm
     withServices(serviceUser): services =>
       Services.asSuperUser(services.generator.digest(oid))
 
-class executionGnirsAltair extends AltairItcRecording:
+  // The only candidate inside the AOWFS patrol field of the default table, where it sits relative
+  // to the science target and the R estimated from its Gaia G, BP and RP.  See
+  // guideEnvironmentGnirsAltair.
+  protected val aowfsStarName: String       = "Gaia DR3 3219118090462917888"
+  protected val StarSeparation: Angle       = Angle.fromDoubleArcseconds(12.0)
+  protected val StarRBrightness: BigDecimal = BigDecimal("11.736")
 
-  override val gaiaResponseString: String = GaiaVoTables.altairCandidates
-
-  // The only candidate inside the AOWFS patrol field, where it sits relative to the science target
-  // and the R estimated from its Gaia G, BP and RP.  See guideEnvironmentGnirsAltair.
-  private val aowfsStarName: String       = "Gaia DR3 3219118090462917888"
-  private val StarSeparation: Angle       = Angle.fromDoubleArcseconds(12.0)
-  private val StarRBrightness: BigDecimal = BigDecimal("11.736")
-
-  private def assertNgs(altair: Option[AltairParameters], expectedFieldLens: FieldLens): Unit =
+  protected def assertNgs(altair: Option[AltairParameters], expectedFieldLens: FieldLens): Unit =
     altair match
       case Some(AltairParameters.Ngs(separation, brightness, fieldLens)) =>
         assert(
@@ -129,6 +136,10 @@ class executionGnirsAltair extends AltairItcRecording:
       case other                                                        =>
         fail(s"expected Altair NGS parameters, found $other")
 
+class executionGnirsAltair extends AltairItcRecording:
+
+  override val gaiaResponseString: String = GaiaVoTables.altairCandidates
+
   test("LGS+P1 needs no guide star and reaches the ITC"):
     for
       (_, oid)   <- observationWithAltair("{ mode: LGS_P1 }", none)
@@ -138,16 +149,28 @@ class executionGnirsAltair extends AltairItcRecording:
       assert(acq.nonEmpty && sci.nonEmpty, "expected acquisition and science ITC calls")
       (acq ++ sci).foreach(assertEquals(_, AltairParameters.LgsP1.some))
 
-  test("NGS runs Altair-free first, then again with the resolved guide star"):
+  // The star is picked from the database before anything is generated, so the ITC never sees an
+  // Altair-free configuration: the requested signal to noise may well be out of reach without
+  // Altair, which would make such a call meaningless.
+  test("NGS sends the resolved guide star on the first ITC call"):
     for
       (_, oid)   <- observationWithAltair("{ mode: NGS }", none)
       _          <- digestFor(oid)
       (acq, sci) <- itcAltairCalls
     yield
-      assertEquals(acq.headOption, none.some, "the first acquisition call should be Altair-free")
-      assertEquals(sci.headOption, none.some, "the first science call should be Altair-free")
-      assertNgs(acq.last, FieldLens.In)
-      assertNgs(sci.last, FieldLens.In)
+      assertEquals(sci.length, 1, s"expected a single science call, found $sci")
+      assertNgs(sci.head, FieldLens.In)
+      assertNgs(acq.head, FieldLens.In)
+
+  test("an observation without a stored duration picks with the nominal visit duration"):
+    for
+      (_, oid)   <- observationWithAltair("{ mode: NGS }", none, none)
+      digest     <- digestFor(oid)
+      (acq, sci) <- itcAltairCalls
+    yield
+      assert(digest.isRight, s"expected a digest, found $digest")
+      assertNgs(sci.head, FieldLens.In)
+      assertNgs(acq.head, FieldLens.In)
 
   test("a stored guide star reaches the ITC with its separation, R and field lens"):
     for
@@ -219,32 +242,17 @@ class executionGnirsAltair extends AltairItcRecording:
       s"the workflow should see the cached ITC result, but reported $messages"
     )
 
-  test("obscalc calls the remote ITC once per generation pass"):
+  test("obscalc calls the remote ITC once for a settled observation"):
     for
-      (pid, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
+      (pid, oid) <- observationWithAltair("{ mode: NGS }", none)
       _          <- clearItcCalls
       _          <- runObscalcUpdate(pid, oid)
       (_, sci)   <- itcAltairCalls
     yield
-      // The Altair-free pass and the one with the resolved guide star, and nothing else: obscalc's
-      // own lookup is the first of the two, not a third call.
-      assertEquals(sci.length, 2, s"expected one science call per pass, found $sci")
-      assertEquals(sci.head, none, "the first pass should be Altair-free")
-      assert(sci.last.isDefined, "the second pass should carry the resolved guide star")
-
-  test("setting a guide star runs the ITC again for the new star"):
-    for
-      (pid, oid) <- observationWithAltair("{ mode: NGS }", none)
-      _          <- runObscalcUpdate(pid, oid)
-      before     <- itcResultHashes(oid)
-      _          <- clearItcCalls
-      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
-      (acq, sci) <- itcAltairCalls
-      after      <- itcResultHashes(oid)
-    yield
-      assert(before.isDefined, "the ITC result should be cached before the guide star is set")
-      assert(after.isDefined,  "setting the guide star should leave a fresh ITC result")
-      assert(acq.nonEmpty && sci.nonEmpty, "setting the guide star should call the ITC again")
+      // Obscalc has no lookup of its own any more: it takes the result the generation produced,
+      // which is the only one computed with the guide star the observation will use.
+      assertEquals(sci.length, 1, s"expected a single science call, found $sci")
+      assert(sci.head.isDefined, "the only call should carry the resolved guide star")
 
   // The Altair parameters are keyed apart on the cached result, so a change of guide star needs
   // no eviction: the next generation simply does not reuse a result computed for another star.
@@ -268,9 +276,8 @@ class executionGnirsAltair extends AltairItcRecording:
       }
     """
 
-  // The guide star hash folds in the generator hash, which behind Altair is the one of the
-  // Altair-free first pass precisely so that it does not depend on the star being checked; see
-  // GeneratorContext.guideStarHash.
+  // The guide star hash folds in the generator hash, which leaves the ITC result out precisely so
+  // that it does not depend on the star being checked; see GeneratorContext.guideStarHash.
   test("the stored guide star stays valid once set"):
     observationWithAltair("{ mode: NGS }", aowfsStarName.some).flatMap: (_, oid) =>
       expect(
@@ -290,17 +297,34 @@ class executionGnirsAltair extends AltairItcRecording:
   // LGS+P1 guides with PWFS1, whose probe arm would vignette a star as close in as the AOWFS one.
   test("a stored star the current parameters rule out fails the sequence"):
     for
-      (_, oid) <- observationWithAltair("{ mode: LGS_P1 }", aowfsStarName.some)
-      digest   <- digestFor(oid)
-    yield assert(
-      digest.left.exists(_.message.contains("no longer usable")),
-      s"expected an unusable guide star error, found $digest"
-    )
+      (_, oid)   <- observationWithAltair("{ mode: LGS_P1 }", aowfsStarName.some)
+      _          <- clearItcCalls
+      digest     <- digestFor(oid)
+      (acq, sci) <- itcAltairCalls
+    yield
+      assert(
+        digest.left.exists(_.message.contains("no longer usable")),
+        s"expected an unusable guide star error, found $digest"
+      )
+      assertEquals(acq ++ sci, Nil, "an unusable stored star should reach no ITC call")
 
 // With a star inside the 1 arcsecond radius available, AGS prefers it and NGS drops the field lens.
 class executionGnirsAltairNearStar extends AltairItcRecording:
 
   override val gaiaResponseString: String = GaiaVoTables.altairCandidatesWithNearStar
+
+  // AGS prefers the near star here, so storing the AOWFS one is a real change of ITC input; with
+  // the same star on both sides the cached result would simply be reused.
+  test("setting a guide star runs the ITC again for the new star"):
+    for
+      (pid, oid) <- observationWithAltair("{ mode: NGS }", none)
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- clearItcCalls
+      _          <- setGuideTargetName(pi, oid, aowfsStarName.some)
+      (acq, sci) <- itcAltairCalls
+    yield
+      assert(acq.nonEmpty && sci.nonEmpty, "setting the guide star should call the ITC again")
+      assertNgs(sci.last, FieldLens.In)
 
   test("the field lens follows the separation of the resolved guide star"):
     for
@@ -317,9 +341,12 @@ class executionGnirsAltairNoStar extends AltairItcRecording:
 
   test("an Altair observation with no usable guide star fails the sequence"):
     for
-      (_, oid) <- observationWithAltair("{ mode: NGS }", none)
-      digest   <- digestFor(oid)
-    yield assert(
-      digest.left.exists(_.message.contains("none is usable")),
-      s"expected a missing guide star error, found $digest"
-    )
+      (_, oid)   <- observationWithAltair("{ mode: NGS }", none)
+      digest     <- digestFor(oid)
+      (acq, sci) <- itcAltairCalls
+    yield
+      assert(
+        digest.left.exists(_.message.contains("none is usable")),
+        s"expected a missing guide star error, found $digest"
+      )
+      assertEquals(acq ++ sci, Nil, "a missing guide star should reach no ITC call")

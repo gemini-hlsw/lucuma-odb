@@ -432,7 +432,7 @@ object Services:
       lazy val emailService = EmailService.fromConfigAndClient(emailConfig, httpClient)
       lazy val generator = Generator.instantiate(commitHash, tc)
       lazy val archiveDuplicationSearchService = ArchiveDuplicationSearchService.instantiate(goaClient0)
-      lazy val guideService = GuideService.instantiate(gaiaClient)
+      lazy val guideService = GuideService.instantiate(gaiaClient, commitHash)
       lazy val itcService = ItcService.instantiate(itcClient)
       lazy val proposalService = ProposalService.instantiate(emailConfig)
       lazy val sequenceService = SequenceService.instantiate(tc)

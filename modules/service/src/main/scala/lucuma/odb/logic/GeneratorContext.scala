@@ -11,6 +11,7 @@ import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import grackle.Result
 import lucuma.ags.GuideStarName
 import lucuma.core.data.Zipper
 import lucuma.core.enums.AltairMode
@@ -40,18 +41,17 @@ import org.typelevel.log4cats.Logger
 import java.security.MessageDigest
 
 /**
- * `altairProblem` records why the Altair guide star could not be resolved, in which case `params`
- * are the Altair-free ones. It is deliberately not a failure of the lookup: the guide star
+ * `altairProblem` records why the Altair guide star could not be resolved against the sequence
+ * that was generated for it. It is deliberately not a failure of the lookup: the guide star
  * calculations themselves need a sequence to select a star against, so they read the context as it
  * is, while everything else reports the problem. See `Generator`.
  */
 case class GeneratorContext(
-  oid:            Observation.Id,
-  itcRes:         Either[OdbError, Itc],
-  params:         GeneratorParams,
-  commitHash:     CommitHash,
-  altairFreeHash: Option[Md5Hash],
-  altairProblem:  Option[OdbError]
+  oid:           Observation.Id,
+  itcRes:        Either[OdbError, Itc],
+  params:        GeneratorParams,
+  commitHash:    CommitHash,
+  altairProblem: Option[OdbError]
 ):
   val hash: Md5Hash =
     val md5 = MessageDigest.getInstance("MD5")
@@ -96,24 +96,32 @@ case class GeneratorContext(
 
     Md5Hash.unsafeFromByteArray(md5.digest())
 
-  /**
-   * The hash that guide star validity and availability caching key on: the hash of the Altair-free
-   * first pass, which for an observation without Altair is just `hash`. `hash` folds in the ITC
-   * result, which behind Altair is itself computed from the guide star whose validity is being
-   * checked, so keying on it would be circular and no stored star would survive a later
-   * generation.
-   */
+  /** The hash that guide star validity and availability caching key on. */
   def guideStarHash: Md5Hash =
-    altairFreeHash.getOrElse(hash)
+    GeneratorContext.guideStarHash(params, commitHash)
 
 object GeneratorContext:
 
   /**
    * How many times the sequence may be generated while the Altair guide star settles. A pass is
-   * one generation: the first without Altair, each one after it with the parameters of the star
-   * the previous pass resolved.
+   * one generation: the first with the star picked before anything was generated, each one after
+   * it with the star the previous pass resolved.
    */
   val MaxAltairGuideStarPasses: Int = 3
+
+  /**
+   * The hash guide star validity and the availability cache key on: the generator parameters,
+   * which hold every user-editable input, and the code version. The ITC result is deliberately
+   * left out. Behind Altair it is computed from the very guide star whose validity is being
+   * checked, so folding it in would be circular, and the parameters already move whenever an
+   * input the ITC reads moves. The price is that redeploying the ITC alone no longer invalidates
+   * a stored guide star.
+   */
+  def guideStarHash(params: GeneratorParams, commitHash: CommitHash): Md5Hash =
+    val md5 = MessageDigest.getInstance("MD5")
+    md5.update(params.hashBytes)
+    md5.update(commitHash.hashBytes)
+    Md5Hash.unsafeFromByteArray(md5.digest())
 
   private def noUsableStar(oid: Observation.Id): OdbError =
     GeneratorError.sequenceUnavailable(oid, "Altair needs a guide star but none is usable.")
@@ -172,22 +180,15 @@ object GeneratorContext:
    * parameters, otherwise a remote call, which happens outside any transaction.
    */
   private def contextFor[F[_]: Concurrent](
-    pid:            Program.Id,
-    oid:            Observation.Id,
-    params:         GeneratorParams,
-    commitHash:     CommitHash,
-    itcResults:     Option[Either[OdbError, Itc]],
-    altairFreeHash: Option[Md5Hash]
+    pid:        Program.Id,
+    oid:        Observation.Id,
+    params:     GeneratorParams,
+    commitHash: CommitHash
   )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
     val itc = itcService
 
-    val cached: F[Option[Either[OdbError, Itc]]] =
-      itcResults match
-        case Some(r) => r.some.pure[F]                                       // use provided results when given
-        case None    => services.transactionally(itc.selectOne(pid, oid, params))
-
     (for
-      c  <- EitherT.liftF(cached)
+      c  <- EitherT.liftF(services.transactionally(itc.selectOne(pid, oid, params)))
       // This will be confusing, but the idea here is that if the observation
       // definition is missing target information we just record that in the
       // Context.  On the other hand if there is an error calling the ITC then
@@ -199,28 +200,31 @@ object GeneratorContext:
               case ItcInputDerivation.Ready(_)      =>
                 c.fold(EitherT(itc.callRemote(pid, oid, params)).map(_.asRight))(EitherT.pure(_))
               case ItcInputDerivation.Incomplete(m) =>
-                EitherT.pure(GeneratorError.sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft[Itc])
+                // A frozen result outlives its inputs, so an observation edited after execution
+                // began still generates from the result it is executing against.
+                EitherT.pure(c.getOrElse(GeneratorError.sequenceUnavailable(oid, s"Missing parameters: ${m.format}").asLeft[Itc]))
               case ItcInputDerivation.NotApplicable =>
                 // Exchange / visitor modes have no ITC; this result is never consumed
                 // for them, but a Left keeps the payload type honest.
                 EitherT.pure(GeneratorError.sequenceUnavailable(oid, "ITC is not applicable for this observing mode").asLeft[Itc])
-    yield GeneratorContext(oid, as, params, commitHash, altairFreeHash, none)).value
+    yield GeneratorContext(oid, as, params, commitHash, none)).value
 
   /**
    * Behind Altair the ITC is modelled from the guide star, and the guide star is selected against
-   * the sequence the ITC sizes, so the two are generated in turn until they agree: a first pass
-   * without Altair, then one more pass for each star whose parameters differ from the ones just
-   * used, up to [[MaxAltairGuideStarPasses]]. LGS+P1 settles on the first pass, since its ITC
-   * parameters are the same whatever the star, but it is still resolved once so that an unusable
-   * selection is reported rather than ignored. The loop lives here so that every caller of the
-   * generator sees the same digest and hash.
+   * the sequence the ITC sizes. The star therefore comes first, picked from the database alone
+   * before anything is generated: a sequence sized without Altair answers a question nobody asked,
+   * since the requested signal to noise may well be out of reach without it. The star is then
+   * verified against the sequence it produced, and the sequence generated again for as long as the
+   * verification keeps returning a different star, up to [[MaxAltairGuideStarPasses]] generations.
+   * LGS+P1 needs no pick, its ITC parameters being the same whatever the star, but it is still
+   * verified once so that an unusable selection is reported rather than ignored. The loop lives
+   * here so that every caller of the generator sees the same digest and hash.
    */
   private def settleAltairGuideStar[F[_]: Concurrent: Logger](
     pid:        Program.Id,
     oid:        Observation.Id,
     commitHash: CommitHash,
-    params:     GeneratorParams,
-    itcResults: Option[Either[OdbError, Itc]]
+    params:     GeneratorParams
   )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
 
     // Each pass caches its own digest, so the one the caller asks for afterwards is a lookup.
@@ -231,51 +235,68 @@ object GeneratorContext:
             case Some(d) => d.asRight[OdbError].pure[F]
             case None    => generator.calculateDigest(ctx).flatTap(_.traverse(executionDigestService.insertOrUpdate(oid, ctx.hash, _)))
 
-    // A Gaia or geometry failure is reported the same way an unusable star is: the sequence is
-    // generated without Altair and the problem travels with it.
-    def resolve(
+    def resolution(
+      fr: Services.SuperUserAccess ?=> F[Result[GuideService.GuideStarResolution]]
+    ): F[Either[OdbError, GuideService.GuideStarResolution]] =
+      Services.asSuperUser(fr).map:
+        _.toEither.leftMap: failure =>
+          GeneratorError.sequenceUnavailable(oid, failure.fold(_.getMessage, _.toChain.toList.map(_.message).mkString("; ")))
+
+    // The pick, from the observation as the database holds it.
+    val pick: F[Either[OdbError, GuideService.GuideStarResolution]] =
+      resolution(guideService.resolveGuideStar(oid, params))
+
+    // A Gaia or geometry failure is reported the same way an unusable star is: the sequence that
+    // was generated stands and the problem travels with it.
+    def verify(
       ctx:    GeneratorContext,
       digest: ExecutionDigest
     ): F[Either[OdbError, GuideService.GuideStarResolution]] =
-      Services
-        .asSuperUser(guideService.resolveGuideStar(oid, GuideService.GeneratorInfo(digest, ctx.params, ctx.guideStarHash)))
-        .map:
-          _.toEither.leftMap: failure =>
-            GeneratorError.sequenceUnavailable(oid, failure.fold(_.getMessage, _.toChain.toList.map(_.message).mkString("; ")))
+      resolution:
+        guideService.resolveGuideStar(oid, GuideService.GeneratorInfo.fromDigest(digest, ctx.params, ctx.guideStarHash))
 
-    def pass(
-      passParams:     GeneratorParams,
-      provided:       Option[Either[OdbError, Itc]],
-      altairFreeHash: Option[Md5Hash]
-    ): EitherT[F, OdbError, GeneratorContext] =
-      EitherT(contextFor(pid, oid, passParams, commitHash, provided, altairFreeHash))
+    def generate(star: Option[GuideService.ResolvedGuideStar]): EitherT[F, OdbError, GeneratorContext] =
+      EitherT(contextFor(pid, oid, withAltairGuideStar(params, star), commitHash))
 
     def go(number: Int, ctx: GeneratorContext): EitherT[F, OdbError, GeneratorContext] =
       for
-        digest     <- digestOf(ctx)
-        resolution <- EitherT.liftF(resolve(ctx, digest))
-        settled    <- resolution match
-                        case Right(GuideService.GuideStarResolution.Resolved(guideStar = resolved)) =>
-                          val next: GeneratorParams = withAltairGuideStar(params, resolved.some)
-                          if next === ctx.params then EitherT.pure(ctx)
-                          else if number >= MaxAltairGuideStarPasses then EitherT.liftF(Logger[F].warn(unsettled(oid))).as(ctx)
-                          else pass(next, none, ctx.altairFreeHash.orElse(ctx.hash.some)).flatMap(go(number + 1, _))
-                        case Right(GuideService.GuideStarResolution.NotGuided)                      =>
-                          EitherT.pure(ctx)
-                        case Right(GuideService.GuideStarResolution.NoUsableStar)                   =>
-                          EitherT.pure(ctx.copy(altairProblem = noUsableStar(oid).some))
-                        case Right(GuideService.GuideStarResolution.SelectedStarUnusable(name = n)) =>
-                          EitherT.pure(ctx.copy(altairProblem = selectedStarUnusable(oid, n).some))
-                        case Left(problem)                                                          =>
-                          EitherT.pure(ctx.copy(altairProblem = problem.some))
+        digest   <- digestOf(ctx)
+        verified <- EitherT.liftF(verify(ctx, digest))
+        settled  <- verified match
+                      case Right(GuideService.GuideStarResolution.Resolved(guideStar = resolved)) =>
+                        val next: GeneratorParams = withAltairGuideStar(params, resolved.some)
+                        if next === ctx.params then EitherT.pure(ctx)
+                        else if number >= MaxAltairGuideStarPasses then EitherT.liftF(Logger[F].warn(unsettled(oid))).as(ctx)
+                        else generate(resolved.some).flatMap(go(number + 1, _))
+                      case Right(GuideService.GuideStarResolution.NotGuided)                      =>
+                        EitherT.pure(ctx)
+                      case Right(GuideService.GuideStarResolution.NoUsableStar)                   =>
+                        EitherT.pure(ctx.copy(altairProblem = noUsableStar(oid).some))
+                      case Right(GuideService.GuideStarResolution.SelectedStarUnusable(name = n)) =>
+                        EitherT.pure(ctx.copy(altairProblem = selectedStarUnusable(oid, n).some))
+                      case Left(problem)                                                          =>
+                        EitherT.pure(ctx.copy(altairProblem = problem.some))
       yield settled
 
-    pass(withAltairGuideStar(params, none), itcResults, none).flatMap(go(1, _)).value
+    val settled: EitherT[F, OdbError, GeneratorContext] =
+      if params.altair.exists(_.mode === AltairMode.LgsP1) then generate(none).flatMap(go(1, _))
+      else
+        EitherT(pick).flatMap:
+          case GuideService.GuideStarResolution.Resolved(guideStar = star)     =>
+            generate(star.some).flatMap(go(1, _))
+          // A calibration that does not guide is generated without Altair parameters.
+          case GuideService.GuideStarResolution.NotGuided                      =>
+            generate(none)
+          case GuideService.GuideStarResolution.NoUsableStar                   =>
+            EitherT.leftT(noUsableStar(oid))
+          case GuideService.GuideStarResolution.SelectedStarUnusable(name = n) =>
+            EitherT.leftT(selectedStarUnusable(oid, n))
+
+    settled.value
 
   def lookup[F[_]: Concurrent: Logger](
     oid:        Observation.Id,
-    commitHash: CommitHash,
-    itcResults: Option[Either[OdbError, Itc]] = None
+    commitHash: CommitHash
   )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
     (for
       pp           <- EitherT(selectParams(oid))
@@ -283,6 +304,6 @@ object GeneratorContext:
       ctx          <- EitherT:
                         // Only Altair feeds the guide star back into the sequence; everything else
                         // is generated once.
-                        if params.altair.isDefined then settleAltairGuideStar(pid, oid, commitHash, params, itcResults)
-                        else contextFor(pid, oid, params, commitHash, itcResults, none)
+                        if params.altair.isDefined then settleAltairGuideStar(pid, oid, commitHash, params)
+                        else contextFor(pid, oid, params, commitHash)
     yield ctx).value
