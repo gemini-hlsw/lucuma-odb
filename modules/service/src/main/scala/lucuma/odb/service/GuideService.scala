@@ -301,6 +301,15 @@ object GuideService {
         else none
        }
 
+    /**
+     * As `validGuideStarName`, but a name stored without a hash counts as valid. Only
+     * `setGuideTargetName` leaves one that way: it stores the name before running the generator,
+     * precisely so that run resolves the star just chosen, and records the hash the run produced
+     * afterwards. Until then the selection is pending, not stale.
+     */
+    def pendingOrValidGuideStarName(generatorHash: Md5Hash): Option[GuideStarName] =
+      guideStarHash.fold(guideStarName)(_ => validGuideStarName(generatorHash))
+
     private val AllAngles =
       NonEmptyList.fromListUnsafe(
         (0 until 360 by 10).map(a => Angle.fromDoubleDegrees(a.toDouble)).toList
@@ -377,6 +386,11 @@ object GuideService {
     }
   }
 
+  /**
+   * A generated sequence, as the guide star calculations need it. `hash` is what guide star
+   * validity and the availability cache key on; see `GeneratorContext.guideStarHash` for why it is
+   * not simply the hash of the generation this digest came out of.
+   */
   case class GeneratorInfo(
     digest: ExecutionDigest,
     params: GeneratorParams,
@@ -663,6 +677,12 @@ object GuideService {
           .prepareR(af.fragment.query(observation_id))
           .use(_.option(af.argument))
           .map(_.fold(OdbError.InvalidObservation(oid, Some(s"Failed to update guide target name for $oid.")).asFailure)(_.success))
+
+      def deleteItcResults(oid: Observation.Id): F[Unit] =
+        val af = Statements.deleteItcResults(oid)
+        session
+          .prepareR(af.fragment.command)
+          .use(_.execute(af.argument).void)
 
       def getFromCacheOrEmpty(pid: Program.Id, oid: Observation.Id, newHash: Md5Hash)(
         using NoTransaction[F]
@@ -1218,7 +1238,7 @@ object GuideService {
             obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.timeEstimate)
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
             scienceStart     = generatorInfo.getScienceStartTime(obsTime)
-            oGSName          = obsInfo.validGuideStarName(generatorInfo.hash)
+            oGSName          = obsInfo.pendingOrValidGuideStarName(generatorInfo.hash)
             // A calibration that does not guide never has a star; that is not an error.
             resolution      <- if (generatorInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
                                  ResultT.pure(GuideStarResolution.NotGuided)
@@ -1260,12 +1280,22 @@ object GuideService {
             availability   = fullAvail.slice(period).intervals.toList.map(AvailabilityPeriod.fromTuple)
           } yield availability).value
 
+      /**
+       * The order matters. The generator hash folds in the ITC result, and the ITC now models
+       * Altair from the guide star stored for the observation. So the cached ITC result is
+       * discarded first, the name is stored before the generator runs -- so that run resolves the
+       * new star -- and only the hash that came out of that run is recorded.
+       */
       def setGuideTargetNameImpl(obsInfo: ObservationInfo, targetName: Option[NonEmptyString]): F[Result[Observation.Id]] =
-        targetName.fold(updateGuideTargetName(obsInfo.programId, obsInfo.id, none, none)){ name =>
+        targetName.fold(
+          deleteItcResults(obsInfo.id) *> updateGuideTargetName(obsInfo.programId, obsInfo.id, none, none)
+        ){ name =>
           (for {
-            gsn    <- ResultT.fromResult(
-                        GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
-                      )
+            gsn      <- ResultT.fromResult(
+                          GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
+                        )
+            _        <- ResultT.liftF(deleteItcResults(obsInfo.id))
+            _        <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, none))
             genInfo  <- ResultT(getGeneratorInfo(obsInfo.id))
             hash      = obsInfo.newGuideStarHash(genInfo.hash)
             result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
@@ -1421,6 +1451,15 @@ object GuideService {
         where c_program_id     = $program_id
           and c_observation_id = $observation_id
       """.apply(pid, oid) |+| andWhereUserWriteAccess(user, pid)
+
+    // A frozen result belongs to an executing observation and stays authoritative; every other
+    // row is a cache entry that a change of guide star invalidates.
+    def deleteItcResults(oid: Observation.Id): AppliedFragment =
+      sql"""
+        delete from t_itc_result
+        where c_observation_id = $observation_id
+          and not c_is_frozen
+      """.apply(oid)
 
     // both guideStarName and guideStarHash should either have values or be empty.
     def updateGuideTargetName(

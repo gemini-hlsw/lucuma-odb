@@ -28,6 +28,7 @@ import clue.ResponseException
 import fs2.Stream
 import io.circe.syntax.*
 import lucuma.core.data.Zipper
+import lucuma.core.enums.AltairMode
 import lucuma.core.enums.Band
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.GmosNorthFilter
@@ -42,6 +43,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.sequence.gnirs.GnirsAcquisitionMode
 import lucuma.core.util.TimeSpan
+import lucuma.itc.AltairParameters
 import lucuma.itc.AsterismIntegrationTimes
 import lucuma.itc.IntegrationTime
 import lucuma.itc.ItcGhostDetector
@@ -69,6 +71,7 @@ import lucuma.odb.sequence.flamingos2
 import lucuma.odb.sequence.gmos
 import lucuma.odb.sequence.gnirs
 import lucuma.odb.sequence.syntax.hash.*
+import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.service.Services.Syntax.*
@@ -231,6 +234,25 @@ object ItcService {
     def toEither: Either[OdbError, Itc] =
       r
 
+  private given HashBytes[AltairParameters] =
+    case AltairParameters.Ngs(separation, brightness, fieldLens) =>
+      Array.concat("ngs".hashBytes, separation.hashBytes, brightness.value.value.hashBytes, fieldLens.hashBytes)
+    case AltairParameters.Lgs(separation, brightness)            =>
+      Array.concat("lgs".hashBytes, separation.hashBytes, brightness.value.value.hashBytes)
+    case AltairParameters.LgsP1                                  =>
+      "lgsP1".hashBytes
+
+  /**
+   * The Altair parameters an ITC input was calculated with, as t_itc_result.c_altair_hash records
+   * them. They are deliberately absent from the input hash: the generator resolves them from a
+   * guide star, so a reader with only the database would never match a hash that folded them in.
+   */
+  private def altairHash(input: ItcInput): Option[Md5Hash] =
+    input.altairParameters.map(p => Md5Hash.unsafeFromByteArray(p.md5))
+
+  private def inputHash(input: ItcInput): Md5Hash =
+    Md5Hash.unsafeFromByteArray(input.md5)
+
   // Recombines the two acquisition columns into the three-way ItcAcquisition:
   // a results blob is Available, a bare error is Failed, both absent is
   // NotApplicable (a mode with no acquisition sequence).
@@ -321,8 +343,8 @@ object ItcService {
 
         params.itcInput match
           case ItcInputDerivation.Ready(p)      =>
-            callRemoteItc(oid, p).flatTap: r =>
-              services.transactionally(storeItc(pid, oid, p, r))
+            callRemoteItc(oid, p).flatTap: res =>
+              services.transactionally(storeItc(pid, oid, p, res))
           case ItcInputDerivation.Incomplete(m) => missing(m)
           // No ITC applies to this mode; callers gate on Ready, so this is defensive.
           case ItcInputDerivation.NotApplicable =>
@@ -342,20 +364,28 @@ object ItcService {
           } yield (p, r)).value
         }
 
+      /**
+       * Whether a stored result was calculated from exactly these parameters, Altair included.
+       * Only a caller that resolved the guide star -- the sequence generator -- has Altair
+       * parameters to match; a reader that has the database alone cannot, and so matches on the
+       * input hash alone (see `selectAll`).
+       */
+      private def isCurrent(input: ItcInput, hash: Md5Hash, altair: Option[Md5Hash]): Boolean =
+        hash === inputHash(input) && altairHash(input) === altair
+
       private def selectOneCached(
         pid:    Program.Id,
         oid:    Observation.Id,
         params: GeneratorParams
       ): F[Option[Either[OdbError, Itc]]] =
         params.itcInput.toOption.flatTraverse: ps =>
-          val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
           session
             .option(Statements.SelectOneCachedResult)(pid, oid)
             .map: rowOpt =>
               for
-                (h, sciOpt, sciErr, acqOpt, acqErr, frozen) <- rowOpt
+                (h, altair, sciOpt, sciErr, acqOpt, acqErr, frozen) <- rowOpt
                 // A frozen result is returned regardless of the input hash.
-                if frozen || h === inputHash
+                if frozen || isCurrent(ps, h, altair)
               yield assembleItc(sciOpt, sciErr, acqOpt, acqErr)
 
       // Selects the frozen (durable, authoritative) result for an observation,
@@ -377,6 +407,9 @@ object ItcService {
       )(using Transaction[F]): F[Option[Either[OdbError, Itc]]] =
         selectOneCached(pid, oid, params)
 
+      // These bulk readers have only the parameters the database yields, so they never carry the
+      // Altair parameters a stored result may have been calculated with and match on the input
+      // hash alone. Anything else would report every Altair observation's result as missing.
       override def selectAll(
         pid:    Program.Id,
         params: Map[Observation.Id, GeneratorParams]
@@ -389,8 +422,7 @@ object ItcService {
               // A frozen result is returned regardless of the input hash.
               if frozen then (oid -> results).some
               else params.get(oid).flatMap(_.itcInput.toOption).flatMap: ps =>
-                val inputHash = Md5Hash.unsafeFromByteArray(ps.md5)
-                Option.when(hash === inputHash)(oid -> results)
+                Option.when(hash === inputHash(ps))(oid -> results)
             .toMap
 
       override def selectAll(
@@ -410,8 +442,7 @@ object ItcService {
                     for
                       params <- params.get(oid)
                       input  <- params.itcInput.toOption
-                      inhash  = Md5Hash.unsafeFromByteArray(input.md5)
-                      pair   <- Option.when(hash === inhash)(oid -> results)
+                      pair   <- Option.when(hash === inputHash(input))(oid -> results)
                     yield pair
                 .toMap
 
@@ -446,7 +477,20 @@ object ItcService {
           oids   <- session.execute(Statements.SelectUncachedObservations)(programId)
           params <- generatorParamsService.selectMany(programId, oids)
         yield oids.flatMap: oid =>
-          params.get(oid).flatMap(_.toOption).flatMap(_.itcInput.toOption).tupleLeft(oid)
+          params.get(oid).flatMap(_.toOption).flatMap(warmInput).tupleLeft(oid)
+
+      /**
+       * The input to warm an observation with, if any. Behind Altair the ITC is modelled from the
+       * guide star the observation will use, which only sequence generation resolves: warming can
+       * only guess at it, and would store a result the next generation discards. LGS+P1 is the
+       * exception, its ITC parameters being the same whatever the star.
+       */
+      private def warmInput(params: GeneratorParams): Option[ItcInput] =
+        params.itcInput.toOption.flatMap: input =>
+          params.altair.map(_.mode) match
+            case None                   => input.some
+            case Some(AltairMode.LgsP1) => ItcInput.withAltairParameters(input, AltairParameters.LgsP1.some).some
+            case Some(_)                => none
 
       // Records the outcome of a remote call. A deterministic ITC failure is
       // cached like a success; a transient one (a timeout, a dead service) is
@@ -826,11 +870,11 @@ object ItcService {
           yield Itc(ItcAcquisition.NotApplicable, ItcScience.Spectroscopy(sci))
 
         (input match
-          case im @ ItcInput.Imaging(_, _, _, _, _, _) =>
+          case im @ ItcInput.Imaging(science = _) =>
             imaging(im)
-          case sp @ ItcInput.Spectroscopy(_, _, _, _, _, _, _) =>
+          case sp @ ItcInput.Spectroscopy(science = _) =>
             spectroscopy(sp)
-          case sp @ ItcInput.GnirsSpectroscopy(_, _, _, _, _, _, _) =>
+          case sp @ ItcInput.GnirsSpectroscopy(science = _) =>
             gnirsSpectroscopy(sp)
           case sp @ ItcInput.ScienceOnlySpectroscopy(SpectroscopyParameters(_, gh @ InstrumentMode.GhostSpectroscopy(_, _, _, _)), targets, _) =>
             ghost(gh, targets)
@@ -852,8 +896,7 @@ object ItcService {
         input:   ItcInput,
         results: Itc
       )(using Transaction[F]): F[Unit] =
-        val h = Md5Hash.unsafeFromByteArray(input.md5)
-        session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, h, results)
+        session.execute(Statements.InsertOrUpdateItcResult)(pid, oid, inputHash(input), altairHash(input), results)
           .void
           .recoverWith {
             case SqlState.ForeignKeyViolation(_) =>
@@ -906,8 +949,7 @@ object ItcService {
         input:  ItcInput,
         result: Itc
       )(using Transaction[F]): F[Unit] =
-        val h = Md5Hash.unsafeFromByteArray(input.md5)
-        session.execute(Statements.FreezeItcResult)(oid, h, result)
+        session.execute(Statements.FreezeItcResult)(oid, inputHash(input), altairHash(input), result)
           .void
           .recoverWith:
             case SqlState.ForeignKeyViolation(_) =>
@@ -933,37 +975,39 @@ object ItcService {
         params
           .flatMap: params =>
             params.itcInput match
-              case ItcInputDerivation.Ready(sp: ItcInput.Spectroscopy)           =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
-                  .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
-
-              // GNIRS spectroscopy has a single acquisition pass regardless of how
-              // many central wavelengths the science side has.
-              case ItcInputDerivation.Ready(sp: ItcInput.GnirsSpectroscopy)      =>
-                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
-                  .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
-
-              // GNIRS imaging has an acquisition sequence; other imaging modes don't
-              // (`acquisitionInput` is empty for them).
-              case ItcInputDerivation.Ready(im: ItcInput.Imaging)                =>
-                im.acquisitionInput match
-                  case None        => NotApplicable
-                  case Some(input) =>
-                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
+              case ItcInputDerivation.Ready(input)  =>
+                input match
+                  case sp @ ItcInput.Spectroscopy(science = _)       =>
+                    safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
                       .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
-              // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
-              case ItcInputDerivation.Ready(_: ItcInput.ScienceOnlySpectroscopy) =>
-                NotApplicable
+                  // GNIRS spectroscopy has a single acquisition pass regardless of how
+                  // many central wavelengths the science side has.
+                  case sp @ ItcInput.GnirsSpectroscopy(science = _)  =>
+                    safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+                      .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
+
+                  // GNIRS imaging has an acquisition sequence; other imaging modes don't
+                  // (`acquisitionInput` is empty for them).
+                  case im @ ItcInput.Imaging(science = _)            =>
+                    im.acquisitionInput match
+                      case None        => NotApplicable
+                      case Some(input) =>
+                        safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
+                          .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
+
+                  // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
+                  case ItcInput.ScienceOnlySpectroscopy(science = _) =>
+                    NotApplicable
 
               // Incomplete parameters mean the acquisition ITC cannot be derived at
               // all: report that here rather than leaving it for a caller to notice.
-              case ItcInputDerivation.Incomplete(m)                              =>
+              case ItcInputDerivation.Incomplete(m) =>
                 EitherT.leftT:
                   Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))
 
               // No ITC at all (exchange / visitor): there is no acquisition sequence.
-              case ItcInputDerivation.NotApplicable                              =>
+              case ItcInputDerivation.NotApplicable =>
                 NotApplicable
           .value
 
@@ -985,9 +1029,8 @@ object ItcService {
         input: ItcInput,
         error: OdbError.ItcError
       ): F[Unit] =
-        val h   = Md5Hash.unsafeFromByteArray(input.md5)
         val msg = error.detail.getOrElse("")
-        session.execute(Statements.InsertOrUpdateItcFailure)(pid, oid, h, msg)
+        session.execute(Statements.InsertOrUpdateItcFailure)(pid, oid, inputHash(input), altairHash(input), msg)
           .void
           .recoverWith:
             case SqlState.ForeignKeyViolation(_) =>
@@ -1022,10 +1065,11 @@ object ItcService {
     val SelectOneCachedResult: Query[(
       Program.Id,
       Observation.Id,
-    ), (Md5Hash, Option[ItcScience], Option[String], Option[ItcAcquisition.Available], Option[String], Boolean)] =
+    ), (Md5Hash, Option[Md5Hash], Option[ItcScience], Option[String], Option[ItcAcquisition.Available], Option[String], Boolean)] =
       sql"""
         SELECT
           c_hash,
+          c_altair_hash,
           c_science_results,
           c_science_error,
           c_acquisition_results,
@@ -1034,7 +1078,7 @@ object ItcService {
         FROM t_itc_result
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id
-      """.query(md5_hash *: science.opt *: text.opt *: acquisition.opt *: text.opt *: bool)
+      """.query(md5_hash *: md5_hash.opt *: science.opt *: text.opt *: acquisition.opt *: text.opt *: bool)
 
     val SelectFrozenResult: Query[(
       Program.Id,
@@ -1102,6 +1146,7 @@ object ItcService {
       Program.Id,
       Observation.Id,
       Md5Hash,
+      Option[Md5Hash],
       Itc
     )] =
       sql"""
@@ -1109,6 +1154,7 @@ object ItcService {
           c_program_id,
           c_observation_id,
           c_hash,
+          c_altair_hash,
           c_science_results,
           c_acquisition_results,
           c_acquisition_error
@@ -1116,21 +1162,23 @@ object ItcService {
           $program_id,
           $observation_id,
           $md5_hash,
+          ${md5_hash.opt},
           $science,
           ${acquisition.opt},
           ${text.opt}
         )
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash                = EXCLUDED.c_hash,
+              c_altair_hash         = EXCLUDED.c_altair_hash,
               c_science_results     = EXCLUDED.c_science_results,
               c_science_error       = NULL,
               c_acquisition_results = EXCLUDED.c_acquisition_results,
               c_acquisition_error   = EXCLUDED.c_acquisition_error
           WHERE NOT t_itc_result.c_is_frozen
       """.command
-        .contramap { case (pid, oid, h, itc) =>
+        .contramap { case (pid, oid, h, altairHash, itc) =>
           val (acqResults, acqError) = splitAcquisition(itc.acquisition)
-          (pid, oid, h, itc.science, acqResults, acqError)
+          (pid, oid, h, altairHash, itc.science, acqResults, acqError)
         }
 
     // Promotes an observation's ITC result to frozen/authoritative.  Derives the
@@ -1140,6 +1188,7 @@ object ItcService {
     val FreezeItcResult: Command[(
       Observation.Id,
       Md5Hash,
+      Option[Md5Hash],
       Itc
     )] =
       sql"""
@@ -1147,6 +1196,7 @@ object ItcService {
           c_program_id,
           c_observation_id,
           c_hash,
+          c_altair_hash,
           c_science_results,
           c_acquisition_results,
           c_acquisition_error,
@@ -1156,6 +1206,7 @@ object ItcService {
           o.c_program_id,
           $observation_id,
           $md5_hash,
+          ${md5_hash.opt},
           $science,
           ${acquisition.opt},
           ${text.opt},
@@ -1164,6 +1215,7 @@ object ItcService {
         WHERE o.c_observation_id = $observation_id
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash                = EXCLUDED.c_hash,
+              c_altair_hash         = EXCLUDED.c_altair_hash,
               c_science_results     = EXCLUDED.c_science_results,
               c_science_error       = NULL,
               c_acquisition_results = EXCLUDED.c_acquisition_results,
@@ -1171,15 +1223,16 @@ object ItcService {
               c_is_frozen           = true
           WHERE NOT t_itc_result.c_is_frozen
       """.command
-        .contramap { case (oid, h, itc) =>
+        .contramap { case (oid, h, altairHash, itc) =>
           val (acqResults, acqError) = splitAcquisition(itc.acquisition)
-          (oid, h, itc.science, acqResults, acqError, oid)
+          (oid, h, altairHash, itc.science, acqResults, acqError, oid)
         }
 
     val InsertOrUpdateItcFailure: Command[(
       Program.Id,
       Observation.Id,
       Md5Hash,
+      Option[Md5Hash],
       String
     )] =
       sql"""
@@ -1187,15 +1240,18 @@ object ItcService {
           c_program_id,
           c_observation_id,
           c_hash,
+          c_altair_hash,
           c_science_error
         ) VALUES (
           $program_id,
           $observation_id,
           $md5_hash,
+          ${md5_hash.opt},
           $text
         )
         ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
           SET c_hash                = EXCLUDED.c_hash,
+              c_altair_hash         = EXCLUDED.c_altair_hash,
               c_science_results     = NULL,
               c_science_error       = EXCLUDED.c_science_error,
               c_acquisition_results = NULL,
