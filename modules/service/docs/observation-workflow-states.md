@@ -4,10 +4,8 @@ Source of truth: `ObservationWorkflowService.workflowStateAndTransitions`
 (`modules/service/src/main/scala/lucuma/odb/service/ObservationWorkflowService.scala`).
 
 Black edges are the ones reachable through the `setObservationWorkflowState`
-mutation — they are exactly the contents of `allowedTransitions`, with one
-exception: the dashed black edge is a transition the mutation accepts for staff
-and better but that never appears in `allowedTransitions` (see "Warnings and
-ForReview"). Every other colour is a re-derivation that happens on its own,
+mutation — they are exactly the contents of `allowedTransitions`. Every other
+colour is a re-derivation that happens on its own,
 distinguished by who triggers it: blue for the PI editing the observation,
 green for a staff approval, red for a staff denial.
 
@@ -43,36 +41,32 @@ a request that was merely *pending* changes the validation code but not the
 state — the observation stays `Unapproved` — so the red edge specifically means
 revoking an approval, not the everyday act of rejecting a request.
 
-### Warnings and ForReview
+### Warnings
 
 A warning is a validation code whose severity is `Nonfatal` — today that is only
 `GenericWarning`, emitted by `ConditionsProbabilityValidator` (conditions
 likelihood below 10%) and `TotalSignalToNoiseValidator` (total S/N below 3).
-Warnings leave `validationStatus` at `Defined`; what they change is the exit:
-from `Defined` with warnings, `allowedTransitions` offers `ForReview` in place
-of `Ready`, under exactly the same gate conditions.
 
-`ForReview` is a third stored user state (`for_review`, V1285) and otherwise
-behaves like `Ready`: its transitions are `Inactive` and the validation state
-(plus `Ongoing` under the usual visitor-mode-and-staff gate), and a validation
-error suppresses it just as it suppresses a stored `Ready`.
+Warnings leave `validationStatus` at `Defined`; what they change is the exit.
+`allowedTransitions` withholds `Ready` until every warning the observation
+carries has been dismissed, so a warned observation sits at `Defined` with
+`Inactive` as its only way out.
 
-Staff and better may set `Ready` anyway, whenever `ForReview` is among the
-advertised transitions — that is, from `Defined` with warnings. This is the
-dashed edge in the diagram, and it is deliberately **not** in
-`allowedTransitions`: the cached workflow has no concept of who is asking, so
-the transition set must be user-independent. The UI has to special-case it —
-if `ForReview` is offered and the user is staff or better, also offer `Ready` —
-and should paint warnings as dismissed once an observation has passed through
-`ForReview`.
+Dismissal is a **program** property, not an observation one: `c_dismissed_warnings`
+on `t_program` (V1305), edited through `updatePrograms` and writable by staff and
+above only. Dismissing a code therefore clears it for every observation in the
+program at once, and a trigger (V1306) invalidates the program's whole obscalc
+cache so the transitions recompute.
 
-The override keys on `ForReview` being *offered*, so from `ForReview` itself
-even staff cannot jump straight to `Ready` — the allowed set there is
-`[Inactive, Defined]` — the route is back through `Defined`.
+Note that warnings do not skip the second validation stage: `ObservationValidator`
+filters stage 2 on `hasErrors` rather than on emptiness, precisely so a dismissed
+warning cannot let an observation reach `Ready` without the ITC and exposure
+checks having run.
 
-Note `for_review` sits between `defined` and `ready` in the enum order, so
-`state <= Ready` comparisons (the per-observation calibration carve-outs)
-include it.
+There was once a third user state, `ForReview`, sitting between `Defined` and
+`Ready`. It was removed in SC-10025 (`V1299__undo_for_review.sql`), which dropped
+it from `e_workflow_state` and `e_workflow_user_state` and mapped existing rows
+back to `defined` and `null`.
 
 ## Targets of Opportunity
 
@@ -94,10 +88,9 @@ already requires an accepted proposal and forbids an opportunity asterism, a
 trigger cannot be raised for an unapproved program or for an observation still
 holding a placeholder target.
 
-Warnings interact with this: a warned ToO observation offers only `ForReview`,
-and `for_review` does **not** fire the database trigger — only `ready` does. So
-a ToO with warnings cannot be triggered by its PI at all; staff must use the
-unadvertised override to force `Ready`.
+Warnings interact with this: an undismissed warning withholds `Ready`, and only
+`Ready` fires the database trigger, so a warned ToO cannot be triggered at all
+until staff dismiss the warning for its program.
 
 Note that `Inactive` and `Ready` share one column, so marking a triggered
 observation inactive **withdraws its trigger**; returning it to `Ready` requests
@@ -124,35 +117,38 @@ backstop against swapping a placeholder back in after triggering.
 
 Two rules apply to **every** calibration role, whatever its kind:
 
-- A calibration never runs the validation pipeline. `validationStatus` is forced
-  to `Defined` as soon as `calibrationRole` is set, so a calibration is never
-  `Undefined` or `Unapproved` — and it never carries warnings, so its
-  `Defined -> Ready` edge never turns into `ForReview`. (A per-observation
-  calibration can still *show* `ForReview`, inherited from its science
-  observation's user state.)
-- Calibration programs have `ProgramType.hasProposal == false`, so the
-  `Defined -> Ready` gate passes without an accepted proposal.
+- A calibration runs exactly one validator, `BandValidator` — and nothing else.
+  Its only possible error is therefore a missing or unallocated science band,
+  which makes it `Undefined`; it is never `Unapproved`, and it never carries
+  warnings, so nothing withholds its `Defined -> Ready` edge.
+- A calibration is only ever created inside a group of the science program it
+  serves — one group shared by the program's calibrations, or one group per
+  science observation. It therefore carries that program's type and its
+  allocations: `BandValidator` sees the science program's bands, and the
+  `Defined -> Ready` gate applies exactly as it does to a science observation,
+  accepted proposal included. There is no separate calibration program to
+  exempt it.
 
 Beyond that the five roles split into two groups:
 
 | Role | Group | Lifecycle |
 |---|---|---|
-| `Photometric`, `SpectroPhotometric`, `Twilight` | program-level | the generic lifecycle above, entered at `Defined` |
+| `Photometric`, `SpectroPhotometric`, `Twilight` | program-level | the generic lifecycle above, entered at `Undefined` until a band is inherited |
 | `Telluric`, `DaytimePinhole` | per-observation | inherits its science observation's user state; see below |
 
 ### Program-level calibrations
 
 `Photometric`, `SpectroPhotometric`, and `Twilight` fall through to the generic
-`else` branch of `allowedTransitions`, so they run the full lifecycle — they are
-simply never gated on validation or on proposal acceptance. `Defined` is both the
-entry point and the floor: because `validationStatus` is pinned to `Defined`, the
-two edges that return "to the validation state" (`Ready -> validationStatus` and
-`Inactive -> validationStatus`) always land back on `Defined`.
+`else` branch of `allowedTransitions`, so they run the full lifecycle under the
+same gate conditions as the science observations they sit beside. The two edges that return
+"to the validation state" (`Ready -> validationStatus` and
+`Inactive -> validationStatus`) land on `Defined` or `Undefined` according to
+whether the calibration holds a band at the time.
 
-Compared with the main lifecycle, only the left-hand side changes: `Undefined`
-and `Unapproved` are unreachable, and `Defined -> Ready` carries no
-proposal-acceptance condition. Everything from `Ready` rightwards is identical,
-including the staff-and-visitor-mode restriction on `Ready <-> Ongoing`.
+Compared with the main lifecycle, only the left-hand side changes: `Unapproved` is
+unreachable and `Undefined` means the band and nothing else. Everything from
+`Ready` rightwards is identical, including the staff-and-visitor-mode restriction
+on `Ready <-> Ongoing`.
 
 ### Per-observation calibrations
 
@@ -169,10 +165,8 @@ apply only while `state <= Ready`; once execution begins the generic rules resum
 
 | Transition | Requires |
 |---|---|
-| `Defined -> Ready` | no warnings, not an exchange observation, not a target of opportunity, and (proposal accepted or program has no proposal — `hasProposal` is true only for `Science`, `Keck`, `Subaru`) |
-| `Defined -> ForReview` | warnings present, otherwise the same conditions as `Defined -> Ready` |
-| `Defined -> Ready` (dashed, unadvertised) | `ForReview` is among the advertised transitions **and** staff access or above |
-| `Ready/ForReview -> Ongoing`, `Ongoing -> Ready` | visitor observing mode **and** staff access or above |
+| `Defined -> Ready` | no undismissed warnings, not an exchange observation, not a target of opportunity, and (proposal accepted or program has no proposal — `hasProposal` is true only for `Science`, `Keck`, `Subaru`) |
+| `Ready -> Ongoing`, `Ongoing -> Ready` | visitor observing mode **and** staff access or above |
 | `Completed -> Ongoing` | execution state was explicitly declared complete, not naturally complete |
 | `Telluric -> Inactive` | calibration role is `Telluric` and `state <= Ready` |
 | `Telluric Inactive -> inherited` | the telluric's own `c_workflow_user_state` is `Inactive` |
@@ -189,12 +183,11 @@ independent sources, in this precedence order:
 | Kind | Members | Where it comes from |
 |---|---|---|
 | `ExecutionState` | `Ongoing`, `Completed` | `c_declared_execution_state`, else the generator's execution state |
-| `UserState` | `Inactive`, `Ready`, `ForReview` | `c_workflow_user_state` — for a ToO observation, `Ready` also maintains a row in `t_too_trigger` |
+| `UserState` | `Inactive`, `Ready` | `c_workflow_user_state` — for a ToO observation, `Ready` also maintains a row in `t_too_trigger` |
 | `ValidationState` | `Undefined`, `Unapproved`, `Defined` | validation codes computed from the observation |
 
 Execution wins over user state, which wins over validation — except that a
-validation error suppresses a stored `Ready` or `ForReview` (but never a stored
-`Inactive`).
+validation error suppresses a stored `Ready` (but never a stored `Inactive`).
 
 ## Regenerating the diagram
 
