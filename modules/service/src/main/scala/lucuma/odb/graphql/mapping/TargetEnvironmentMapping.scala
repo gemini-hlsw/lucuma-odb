@@ -19,9 +19,12 @@ import grackle.skunk.SkunkMapping
 import grackle.syntax.*
 import io.circe.refined.given
 import lucuma.catalog.clients.GaiaClient
+import lucuma.core.enums.AltairMode
 import lucuma.core.enums.CassRotator
+import lucuma.core.enums.FieldLens
 import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.Instrument
+import lucuma.core.math.Angle
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
@@ -29,6 +32,7 @@ import lucuma.core.model.User
 import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcClient
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.graphql.predicate.Predicates
 import lucuma.odb.json.basePosition.given
 import lucuma.odb.service.GuideService
@@ -112,9 +116,47 @@ trait TargetEnvironmentMapping[F[_]: Temporal]
       SqlField("id", ObservationView.Id, hidden = true),
       SqlField("mode", ObservationView.TargetEnvironment.Altair.Mode),
       SqlField("explicitFieldLens", ObservationView.TargetEnvironment.Altair.ExplicitFieldLens),
+      EffectField("defaultFieldLens", defaultFieldLensHandler, AltairFieldLensDependencies),
+      EffectField("fieldLens", fieldLensHandler, AltairFieldLensDependencies),
       SqlField("cassRotator", ObservationView.TargetEnvironment.Altair.CassRotator),
       SqlField("ndFilter", ObservationView.TargetEnvironment.Altair.NdFilter)
     )
+
+  private val AltairFieldLensDependencies: List[String] =
+    List("id", "mode", "explicitFieldLens")
+
+  private def altairFieldLensHandler(
+    select: (AltairMode, Option[FieldLens], Option[Angle]) => Option[FieldLens]
+  ): EffectHandler[F] =
+    batchedEffectHandler[(AltairMode, Option[FieldLens]), Option[FieldLens]](
+      cursor =>
+        (cursor.fieldAs[AltairMode]("mode"), cursor.fieldAs[Option[FieldLens]]("explicitFieldLens")).tupled,
+      rows =>
+        // Only NGS looks at the guide star; the laser modes always use the field lens.
+        val needsStar: List[Observation.Id] =
+          rows.collect { case (oid, (AltairMode.Ngs, _)) => oid }
+        services.use { implicit s =>
+          Services.asSuperUser:
+            // Resolving a star runs AGS, so the observations are done one at a time.
+            needsStar
+              .traverse(oid => s.guideService.resolveGuideStar(oid).tupleLeft(oid))
+              .map: resolved =>
+                val stars: Map[Observation.Id, Result[GuideService.GuideStarResolution]] = resolved.toMap
+                rows.map:
+                  case (oid, (mode, explicitFieldLens)) =>
+                    // A star that cannot be resolved is as good as no star here: the field lens is
+                    // simply not yet determined.
+                    val separation: Option[Angle] = stars.get(oid).flatMap(_.toOption).flatMap(_.star).map(_.separation)
+                    oid -> Result(select(mode, explicitFieldLens, separation))
+                .toMap
+        }
+    )
+
+  private lazy val defaultFieldLensHandler: EffectHandler[F] =
+    altairFieldLensHandler((mode, _, separation) => AltairConfiguration.defaultFieldLens(mode, separation))
+
+  private lazy val fieldLensHandler: EffectHandler[F] =
+    altairFieldLensHandler(AltairConfiguration.fieldLens)
 
   private def asterismQuery(includeDeleted: Boolean, firstOnly: Boolean, child: Query): Query =
     FilterOrderByOffsetLimit(

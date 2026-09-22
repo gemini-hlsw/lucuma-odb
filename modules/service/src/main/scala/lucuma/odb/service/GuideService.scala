@@ -3,11 +3,13 @@
 
 package lucuma.odb.service
 
+import cats.Eq
 import cats.Order
 import cats.Order.*
 import cats.data.NonEmptyList
 import cats.data.NonEmptySet
-import cats.effect.Concurrent
+import cats.derived.*
+import cats.effect.Async
 import cats.syntax.all.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
@@ -25,6 +27,7 @@ import lucuma.ags.DefaultAreaBuffer
 import lucuma.ags.syntax.*
 import lucuma.catalog.clients.GaiaClient
 import lucuma.catalog.votable.*
+import lucuma.core.enums.AltairMode
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2LyotWheel
 import lucuma.core.enums.GuideProbe
@@ -35,6 +38,7 @@ import lucuma.core.enums.Site
 import lucuma.core.enums.TrackType
 import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.ProperMotion
 import lucuma.core.math.Wavelength
@@ -61,6 +65,7 @@ import lucuma.core.util.Timestamp
 import lucuma.core.util.TimestampInterval
 import lucuma.itc.client.ItcConstraintsInput
 import lucuma.itc.client.ItcConstraintsInput.*
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.ContiguousTimestampMap
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.data.OdbError
@@ -125,6 +130,22 @@ trait GuideService[F[_]] {
   def getGuideProbes(oids: List[Observation.Id])(using
     NoTransaction[F]
   ): F[Map[Observation.Id, GuideService.GuideProbeSelection]]
+
+  /**
+   * The guide star the observation will actually guide on: the one the user stored while it
+   * remains valid, otherwise the one AGS selects. Or why there is none.
+   */
+  def resolveGuideStar(oid: Observation.Id)(using
+    NoTransaction[F], SuperUserAccess
+  ): F[Result[GuideService.GuideStarResolution]]
+
+  /**
+   * As `resolveGuideStar`, but against a sequence the caller has already generated, so that the
+   * generator does not run a second time.
+   */
+  def resolveGuideStar(oid: Observation.Id, generatorInfo: GuideService.GeneratorInfo)(using
+    NoTransaction[F], SuperUserAccess
+  ): F[Result[GuideService.GuideStarResolution]]
 }
 
 object GuideService {
@@ -137,6 +158,10 @@ object GuideService {
   val maxAvailabilityPeriod = TimeSpan.unsafeFromDuration(Duration.ofDays(maxAvailabilityPeriodDays))
 
   given Order[Angle] = Angle.AngleOrder
+
+  // Both are refined new types, which offer an OrderHash but no Eq of their own.
+  private given Eq[GuideStarName]   = Eq.by(_.value.value)
+  private given Eq[BrightnessValue] = Eq.by(_.value.value)
 
   case class GuideTarget(probe: GuideProbe, target: Target)
 
@@ -199,6 +224,47 @@ object GuideService {
   ):
     def effective: Option[GuideProbe] = explicit.orElse(default)
 
+  /**
+   * The guide star an observation will guide on, AGS-selected or user-selected, with what Altair
+   * needs from it: how far off axis it is and how bright.
+   */
+  case class ResolvedGuideStar(
+    name:        GuideStarName,
+    separation:  Angle,
+    rBrightness: Option[BrightnessValue]
+  ) derives Eq
+
+  /** The outcome of resolving an observation's guide star. */
+  enum GuideStarResolution derives Eq:
+    /** The star the observation will guide on. */
+    case Resolved(guideStar: ResolvedGuideStar)
+    /** The observation does not guide (a calibration role without guiding). */
+    case NotGuided
+    /** AGS found no usable candidate. */
+    case NoUsableStar
+    /** The user-selected star is stored and current, but no longer usable with the present parameters. */
+    case SelectedStarUnusable(name: GuideStarName)
+
+    def star: Option[ResolvedGuideStar] =
+      this match
+        case Resolved(guideStar = s)        => s.some
+        case NotGuided                      => none
+        case NoUsableStar                   => none
+        case SelectedStarUnusable(name = _) => none
+
+  /** The outcome of a guide star lookup: the environment plus the star it was built from. */
+  private case class GuideStarSelection(
+    environment:     GuideEnvironment,
+    candidate:       GuideStarCandidate,
+    baseCoordinates: Coordinates
+  ):
+    def resolved: ResolvedGuideStar =
+      ResolvedGuideStar(
+        GuideStarName.gaiaSourceId.reverseGet(candidate.id),
+        baseCoordinates.angularDistance(candidate.tracking.baseCoordinates),
+        candidate.rBrightness
+      )
+
   private def generalError(error: String): OdbError =
     OdbError.GuideEnvironmentError(error.some)
   private def generatorError(error: OdbError): OdbError =
@@ -219,7 +285,8 @@ object GuideService {
     guideStarName:       Option[GuideStarName],
     guideStarHash:       Option[Md5Hash],
     blindOffsetTargetId: Option[Target.Id],
-    explicitGuideProbe:  Option[GuideProbe]
+    explicitGuideProbe:  Option[GuideProbe],
+    altair:              Option[AltairConfiguration]
   ) {
     def obsTime: Result[Timestamp] =
       optObsTime.toResult(generalError(s"Observation time not set for observation $id.").asProblem)
@@ -247,6 +314,15 @@ object GuideService {
         case PosAngleConstraint.AverageParallactic     => AllAngles
         case PosAngleConstraint.Unbounded              => AllAngles
 
+    // Altair fixes the guide probe and changes the brightness limits, so every part of the
+    // configuration can change which stars are usable.
+    private def updateWithAltair(md5: MessageDigest): Unit = {
+      md5.update(altair.map(_.mode.tag).hashBytes)
+      md5.update(altair.flatMap(_.explicitFieldLens).map(_.tag).hashBytes)
+      md5.update(altair.map(_.cassRotator.tag).hashBytes)
+      md5.update(altair.map(_.ndFilter.tag).hashBytes)
+    }
+
     def availabilityHash(generatorHash: Md5Hash): Md5Hash = {
       val md5 = MessageDigest.getInstance("MD5")
 
@@ -267,6 +343,8 @@ object GuideService {
       md5.update(HashBytes.forJsonEncoder[Option[Target.Id]].hashBytes(blindOffsetTargetId))
 
       md5.update(explicitGuideProbe.map(_.tag).hashBytes)
+
+      updateWithAltair(md5)
 
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
@@ -293,11 +371,13 @@ object GuideService {
 
       md5.update(explicitGuideProbe.map(_.tag).hashBytes)
 
+      updateWithAltair(md5)
+
       Md5Hash.unsafeFromByteArray(md5.digest())
     }
   }
 
-  private case class GeneratorInfo(
+  case class GeneratorInfo(
     digest: ExecutionDigest,
     params: GeneratorParams,
     hash:   Md5Hash
@@ -357,95 +437,117 @@ object GuideService {
         case g: ghost.ifu.Config => g.skyPosition.toList
         case _                   => Nil
 
-    def agsParamsFor(trackType: TrackType, explicitProbe: Option[GuideProbe]): Option[AgsParams] =
-      explicitProbe.orElse(probes.defaultGuideProbe(observingModeType, trackType)).flatMap: probe =>
-        (params.observingMode, probe) match
-          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
-            AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
-          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1)                                =>
-            AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS1.some
-          case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2)                                =>
-            AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS2.some
-          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
-            AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).some
-          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1)                                =>
-            AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS1.some
-          case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2)                                =>
-            AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS2.some
-          case (_: flamingos2.imaging.Config, GuideProbe.Flamingos2OIWFS)                                   =>
-            AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).some
-          case (_: flamingos2.imaging.Config, GuideProbe.PWFS1)                                             =>
-            AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS1.some
-          case (_: flamingos2.imaging.Config, GuideProbe.PWFS2)                                             =>
-            AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS2.some
-          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.Flamingos2OIWFS)                          =>
-            AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
-          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1)                                    =>
-            AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
-          case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2)                                    =>
-            AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
-          case (_: flamingos2.mos.Config, GuideProbe.Flamingos2OIWFS)                                       =>
-            AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).some
-          case (_: flamingos2.mos.Config, GuideProbe.PWFS1)                                                 =>
-            AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS1.some
-          case (_: flamingos2.mos.Config, GuideProbe.PWFS2)                                                 =>
-            AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS2.some
-          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.GmosOIWFS)  =>
-            AgsParams.GmosImaging(PortDisposition.Side).some
-          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS1)      =>
-            AgsParams.GmosImaging(PortDisposition.Side).withPWFS1.some
-          case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS2)      =>
-            AgsParams.GmosImaging(PortDisposition.Side).withPWFS2.some
-          case (_: gmos.mos.Config.GmosNorth, GuideProbe.GmosOIWFS)                                         =>
-            AgsParams.GmosMos(Site.GN, PortDisposition.Side).some
-          case (_: gmos.mos.Config.GmosNorth, GuideProbe.PWFS1)                                             =>
-            AgsParams.GmosMos(Site.GN, PortDisposition.Side).withPWFS1.some
-          case (_: gmos.mos.Config.GmosNorth, GuideProbe.PWFS2)                                             =>
-            AgsParams.GmosMos(Site.GN, PortDisposition.Side).withPWFS2.some
-          case (_: gmos.mos.Config.GmosSouth, GuideProbe.GmosOIWFS)                                         =>
-            AgsParams.GmosMos(Site.GS, PortDisposition.Side).some
-          case (_: gmos.mos.Config.GmosSouth, GuideProbe.PWFS1)                                             =>
-            AgsParams.GmosMos(Site.GS, PortDisposition.Side).withPWFS1.some
-          case (_: gmos.mos.Config.GmosSouth, GuideProbe.PWFS2)                                             =>
-            AgsParams.GmosMos(Site.GS, PortDisposition.Side).withPWFS2.some
-          case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                                 =>
-            AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).some
-          case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1)                                     =>
-            AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).withPWFS1.some
-          case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2)                                     =>
-            AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).withPWFS2.some
-          case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS)                                 =>
-            AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).some
-          case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1)                                     =>
-            AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).withPWFS1.some
-          case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2)                                     =>
-            AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).withPWFS2.some
-          case (_: igrins2.longslit.Config, GuideProbe.PWFS2)                                               =>
-            AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
-          case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
-            AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2) =>
-            AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
-          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) =>
-            AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
-          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS2)          =>
-            AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS2.some
-          case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1)          =>
-            AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS1.some
-          case (c: gnirs.imaging.Config, GuideProbe.PWFS2)                                                  =>
-            AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS2.some
-          case (c: gnirs.imaging.Config, GuideProbe.PWFS1)                                                  =>
-            AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
-          case (_: ghost.ifu.Config, GuideProbe.PWFS2)                                                      =>
-            AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
-          case (_: ghost.ifu.Config, GuideProbe.PWFS1)                                                      =>
-            AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS1.some
-          case (c: visitor.Config, GuideProbe.PWFS2)                                                        =>
-            AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS2.some
-          case (c: visitor.Config, GuideProbe.PWFS1)                                                        =>
-            AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS1.some
-          case _                                                                                            =>
-            none
+    /**
+     * Parameters for an observation behind Altair, where the mode both fixes the probe and brings
+     * its own brightness limits. Only GNIRS sits behind Altair.
+     */
+    private def altairAgsParamsFor(mode: AltairMode): Option[AgsParams] =
+      params.observingMode match
+        case gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera) =>
+          AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withAltair(mode).some
+        case gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu))                                  =>
+          AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withAltair(mode).some
+        case gnirs.imaging.Config(camera = camera, filters = filters)                                         =>
+          AgsParams.GnirsImaging(camera, AgsParams.GnirsImaging.representativeFilter(filters.map(_.filter)), PortDisposition.Bottom).withAltair(mode).some
+        case _                                                                                                =>
+          none
+
+    def agsParamsFor(
+      trackType:     TrackType,
+      explicitProbe: Option[GuideProbe],
+      altair:        Option[AltairConfiguration]
+    ): Option[AgsParams] =
+      explicitProbe.orElse(probes.defaultGuideProbe(observingModeType, trackType, altair.map(_.mode))).flatMap: probe =>
+        // The Altair parameters apply only when the probe is the one Altair guides with, which for
+        // LGS+P1 is PWFS1.
+        altair.filter(_.guideProbe === probe).map(_.mode).flatMap(altairAgsParamsFor).orElse:
+          (params.observingMode, probe) match
+            case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
+              AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
+            case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1)                                =>
+              AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS1.some
+            case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2)                                =>
+              AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).withPWFS2.some
+            case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
+              AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).some
+            case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1)                                =>
+              AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS1.some
+            case (gmos.longslit.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2)                                =>
+              AgsParams.GmosLongSlit(fpu.asRight, PortDisposition.Side).withPWFS2.some
+            case (_: flamingos2.imaging.Config, GuideProbe.Flamingos2OIWFS)                                   =>
+              AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).some
+            case (_: flamingos2.imaging.Config, GuideProbe.PWFS1)                                             =>
+              AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS1.some
+            case (_: flamingos2.imaging.Config, GuideProbe.PWFS2)                                             =>
+              AgsParams.Flamingos2Imaging(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS2.some
+            case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.Flamingos2OIWFS)                          =>
+              AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).some
+            case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS1)                                    =>
+              AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS1.some
+            case (flamingos2.longslit.Config(fpu = fpu), GuideProbe.PWFS2)                                    =>
+              AgsParams.Flamingos2LongSlit(Flamingos2LyotWheel.F16, Flamingos2FpuMask.Builtin(fpu), PortDisposition.Side).withPWFS2.some
+            case (_: flamingos2.mos.Config, GuideProbe.Flamingos2OIWFS)                                       =>
+              AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).some
+            case (_: flamingos2.mos.Config, GuideProbe.PWFS1)                                                 =>
+              AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS1.some
+            case (_: flamingos2.mos.Config, GuideProbe.PWFS2)                                                 =>
+              AgsParams.Flamingos2Mos(Flamingos2LyotWheel.F16, PortDisposition.Side).withPWFS2.some
+            case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.GmosOIWFS)  =>
+              AgsParams.GmosImaging(PortDisposition.Side).some
+            case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS1)      =>
+              AgsParams.GmosImaging(PortDisposition.Side).withPWFS1.some
+            case (_: gmos.imaging.Config.GmosNorth | _: gmos.imaging.Config.GmosSouth, GuideProbe.PWFS2)      =>
+              AgsParams.GmosImaging(PortDisposition.Side).withPWFS2.some
+            case (_: gmos.mos.Config.GmosNorth, GuideProbe.GmosOIWFS)                                         =>
+              AgsParams.GmosMos(Site.GN, PortDisposition.Side).some
+            case (_: gmos.mos.Config.GmosNorth, GuideProbe.PWFS1)                                             =>
+              AgsParams.GmosMos(Site.GN, PortDisposition.Side).withPWFS1.some
+            case (_: gmos.mos.Config.GmosNorth, GuideProbe.PWFS2)                                             =>
+              AgsParams.GmosMos(Site.GN, PortDisposition.Side).withPWFS2.some
+            case (_: gmos.mos.Config.GmosSouth, GuideProbe.GmosOIWFS)                                         =>
+              AgsParams.GmosMos(Site.GS, PortDisposition.Side).some
+            case (_: gmos.mos.Config.GmosSouth, GuideProbe.PWFS1)                                             =>
+              AgsParams.GmosMos(Site.GS, PortDisposition.Side).withPWFS1.some
+            case (_: gmos.mos.Config.GmosSouth, GuideProbe.PWFS2)                                             =>
+              AgsParams.GmosMos(Site.GS, PortDisposition.Side).withPWFS2.some
+            case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                                 =>
+              AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).some
+            case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1)                                     =>
+              AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).withPWFS1.some
+            case (gmos.ifu.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS2)                                     =>
+              AgsParams.GmosIfu(fpu.asLeft, PortDisposition.Side).withPWFS2.some
+            case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.GmosOIWFS)                                 =>
+              AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).some
+            case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS1)                                     =>
+              AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).withPWFS1.some
+            case (gmos.ifu.Config.GmosSouth(fpu = fpu), GuideProbe.PWFS2)                                     =>
+              AgsParams.GmosIfu(fpu.asRight, PortDisposition.Side).withPWFS2.some
+            case (_: igrins2.longslit.Config, GuideProbe.PWFS2)                                               =>
+              AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
+            case (_: igrins2.longslit.Config, GuideProbe.PWFS1)                                               =>
+              AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2) =>
+              AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) =>
+              AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS2)          =>
+              AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS2.some
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1)          =>
+              AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS1.some
+            case (c: gnirs.imaging.Config, GuideProbe.PWFS2)                                                  =>
+              AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS2.some
+            case (c: gnirs.imaging.Config, GuideProbe.PWFS1)                                                  =>
+              AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
+            case (_: ghost.ifu.Config, GuideProbe.PWFS2)                                                      =>
+              AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
+            case (_: ghost.ifu.Config, GuideProbe.PWFS1)                                                      =>
+              AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS1.some
+            case (c: visitor.Config, GuideProbe.PWFS2)                                                        =>
+              AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS2.some
+            case (c: visitor.Config, GuideProbe.PWFS1)                                                        =>
+              AgsParams.Visitor(c.agsDiameter, c.scienceFovDiameter, PortDisposition.Bottom).withPWFS1.some
+            case _                                                                                            =>
+              none
 
     def getScienceStartTime(obsTime: Timestamp): Timestamp = obsTime +| setupTime
     def getScienceDuration(obsDuration: TimeSpan, obsId: Observation.Id): Result[TimeSpan] =
@@ -458,7 +560,7 @@ object GuideService {
           .toResult(generalError(s"Observation duration of ${obsDuration.format} is less than the setup time of ${setupTime.format} for observation $obsId.").asProblem)
   }
 
-  def instantiate[F[_]: {Concurrent, Services, Tracer as T}](
+  def instantiate[F[_]: {Async, Services, Tracer as T}](
     gaiaClient:             GaiaClient[F],
   ): GuideService[F] =
     new GuideService[F] {
@@ -596,7 +698,8 @@ object GuideService {
         tracking:        Tracking,
         probe:           GuideProbe,
         wavelength:      Wavelength,
-        constraints:     ConstraintSet
+        constraints:     ConstraintSet,
+        altair:          Option[AltairConfiguration]
       ): Result[ADQLQuery] =
         val coordsAtStartO = explicitBase.orElse(tracking.at(start.toInstant))
         val coordsAtEndO   = explicitBase.orElse(tracking.at(end.toInstant))
@@ -604,7 +707,7 @@ object GuideService {
           .mapN { (a, b) =>
             // If caching is implemented for the guide star results, `ags.widestConstraints` should be
             // used for the brightness constraints.
-            val brightnessConstraints = gaiaBrightnessConstraints(constraints, probe, GuideSpeed.Slow, wavelength)
+            val brightnessConstraints = guideStarBrightnessConstraints(constraints, probe, altair.map(_.mode), GuideSpeed.Slow, wavelength)
             // Make a query based on two coordinates of the base of an asterism over a year
             CoordinatesRangeQueryByADQL(
               NonEmptyList.of(a, b),
@@ -642,11 +745,12 @@ object GuideService {
         tracking:     Tracking,
         wavelength:   Wavelength,
         probe:        GuideProbe,
-        constraints:  ConstraintSet
+        constraints:  ConstraintSet,
+        altair:       Option[AltairConfiguration]
       ): F[Result[List[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
           query      <- ResultT.fromResult(
-                          getGaiaQuery(oid, start, end, explicitBase, tracking, probe, wavelength, constraints)
+                          getGaiaQuery(oid, start, end, explicitBase, tracking, probe, wavelength, constraints, altair)
                         )
           candidates <- ResultT(callGaia(query))
         } yield candidates).value
@@ -659,10 +763,11 @@ object GuideService {
         tracking:     Tracking,
         wavelength:   Wavelength,
         probe:        GuideProbe,
-        constraints:  ConstraintSet
+        constraints:  ConstraintSet,
+        altair:       Option[AltairConfiguration]
       ): F[Result[NonEmptyList[(Target.Sidereal, GuideStarCandidate)]]] =
         (for {
-          candidates <- ResultT(getAllCandidates(oid, start, end, explicitBase, tracking, wavelength, probe, constraints))
+          candidates <- ResultT(getAllCandidates(oid, start, end, explicitBase, tracking, wavelength, probe, constraints, altair))
           nel        <- ResultT.fromResult(
                           NonEmptyList.fromList(candidates)
                             .toResult(generalError("No potential guidestars found on Gaia.").asProblem)
@@ -767,7 +872,7 @@ object GuideService {
         candidates:    NonEmptyList[GuideStarCandidate],
         trackType:     TrackType
       ): F[Option[AgsAnalysis.Usable]] =
-        genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe).flatTraverse: params =>
+        genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe, obsInfo.altair).flatTraverse: params =>
           val result =
             Ags.agsAnalysis(obsInfo.constraints,
                             wavelength,
@@ -804,14 +909,15 @@ object GuideService {
                               case None    => Result.success(Nil).pure[F]
                               case Some(t) =>
                                 val trackType = CompositeTracking(t.asterism.map(_._2)).trackType
-                                genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe).map: agsParams =>
+                                genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe, obsInfo.altair).map: agsParams =>
                                   getAllCandidates(
                                     obsInfo.id,
                                     candPeriod.start,
                                     candPeriod.end, obsInfo.explicitBase, t.base,
                                     genInfo.agsWavelength,
                                     agsParams.probe,
-                                    obsInfo.constraints
+                                    obsInfo.constraints,
+                                    obsInfo.altair
                                   )
                                 .getOrElse(Result.success(List.empty[(Target.Sidereal, GuideStarCandidate)]).pure[F])
           neededLists  <- ResultT.fromResult:
@@ -904,7 +1010,7 @@ object GuideService {
           endCutoff        = scienceCutoff.min(end)
           candidatesAt     = candidates.map(_.at(start.toInstant))
           trackType        = CompositeTracking(asterismTracking).trackType
-          agsParams       <- genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe).toRight(generalError(s"Unable to get AGS params for observation ${obsInfo.id}"))
+          agsParams       <- genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe, obsInfo.altair).toRight(generalError(s"Unable to get AGS params for observation ${obsInfo.id}"))
           angleMap         = getAvailabilityMap(
                                candidatesAt,
                                start,
@@ -990,10 +1096,10 @@ object GuideService {
         obsDuration:            TimeSpan,
         scienceTime:            Timestamp,
         scienceDuration:        TimeSpan
-      )(using SuperUserAccess): F[Result[GuideEnvironment]] =
+      )(using SuperUserAccess): F[Result[Option[GuideStarSelection]]] =
         // If we got here, we either have the name but need to get all the details (they queried for more
         // than name), or the name wasn't set or wasn't valid and we need to find all the candidates and
-        // select the best.
+        // select the best. None means AGS found nothing usable.
         (for {
 
           visitEnd      <- ResultT.fromResult(
@@ -1008,12 +1114,12 @@ object GuideService {
 
           trackType      = CompositeTracking(asterismTracking).trackType
           agsParams     <- ResultT.fromResult(
-                             genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe)
+                             genInfo.agsParamsFor(trackType, obsInfo.explicitGuideProbe, obsInfo.altair)
                                .toResult(generalError("No guide probe available for this observing mode.").asProblem)
                            )
           original      <- ResultT(
                              oGuideStarName.fold(
-                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, obsInfo.explicitBase, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints)
+                              getAllCandidatesNonEmpty(oid, obsTime, visitEnd, obsInfo.explicitBase, baseTracking, genInfo.agsWavelength, agsParams.probe, obsInfo.constraints, obsInfo.altair)
                              )(gsn => getGuideStarFromGaia(gsn).map(_.map(NonEmptyList.one)))
                            )
           candidates     = original.map(_._2.at(obsTime.toInstant)) // PM corrected
@@ -1044,17 +1150,11 @@ object GuideService {
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
           optUsable      <- ResultT.liftF(chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType))
           tgts           = original.map(x => (x._2.id, x._1)).toList.toMap
-          env            <- ResultT.fromResult(
-                             optUsable
-                              .flatMap(_.toGuideEnvironment(tgts))
-                              .toResult (
-                                generalError(
-                                  oGuideStarName.fold("No usable guidestars are available.")(name =>
-                                    s"Guidestar $name is not usable.")
-                                ).asProblem
-                             )
-                           )
-        } yield env).value
+          selection      = optUsable.flatMap: usable =>
+                             usable
+                               .toGuideEnvironment(tgts)
+                               .map(GuideStarSelection(_, usable.target, baseCoords))
+        } yield selection).value
 
       override def getGuideEnvironment(oid: Observation.Id)(
         using NoTransaction[F], SuperUserAccess
@@ -1075,6 +1175,14 @@ object GuideService {
                                   ResultT.pure(GuideEnvironment(obsInfo.availabilityAngles.head, Nil))
                                 else
                                   ResultT(lookupGuideStar(oid, oGSName, obsInfo, genInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+                                    .flatMap: selection =>
+                                      ResultT.fromResult:
+                                        selection.map(_.environment).toResult(
+                                          generalError(
+                                            oGSName.fold("No usable guidestars are available.")(name =>
+                                              s"Guidestar $name is not usable.")
+                                          ).asProblem
+                                        )
           } yield result).value
 
       override def getGuideTargetName(pid: Program.Id, oid: Observation.Id)(
@@ -1089,6 +1197,40 @@ object GuideService {
                           }
                         )
         } yield oGSName.map(_.toNonEmptyString)).value
+
+      override def resolveGuideStar(oid: Observation.Id)(
+        using NoTransaction[F], SuperUserAccess
+      ): F[Result[GuideStarResolution]] =
+        ResultT(getGeneratorInfo(oid))
+          .flatMap(genInfo => ResultT(resolveGuideStar(oid, genInfo)))
+          .value
+
+      override def resolveGuideStar(oid: Observation.Id, generatorInfo: GeneratorInfo)(
+        using NoTransaction[F], SuperUserAccess
+      ): F[Result[GuideStarResolution]] =
+        T.span("resolveGuideStar").surround:
+          (for {
+            obsInfo         <- ResultT(getObservationInfo(oid))
+            // Like Explore's own AGS, an unset observation time defaults to now and an unset
+            // duration to the observation's full time estimate.
+            now             <- ResultT.liftF(Async[F].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated))
+            obsTime          = obsInfo.optObsTime.getOrElse(now)
+            obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.timeEstimate)
+            scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
+            scienceStart     = generatorInfo.getScienceStartTime(obsTime)
+            oGSName          = obsInfo.validGuideStarName(generatorInfo.hash)
+            // A calibration that does not guide never has a star; that is not an error.
+            resolution      <- if (generatorInfo.params.calibrationRole.exists(GuideEnvironment.CalRolesWithoutGuiding.contains))
+                                 ResultT.pure(GuideStarResolution.NotGuided)
+                               else
+                                 ResultT(lookupGuideStar(oid, oGSName, obsInfo, generatorInfo, obsTime, obsDuration, scienceStart, scienceDuration))
+                                   .map: selection =>
+                                     // A stored star is looked up by id, so no selection means that
+                                     // star itself is no longer usable.
+                                     selection.fold(
+                                       oGSName.fold(GuideStarResolution.NoUsableStar)(GuideStarResolution.SelectedStarUnusable.apply)
+                                     )(sel => GuideStarResolution.Resolved(sel.resolved))
+          } yield resolution).value
 
       override def getGuideAvailability(pid: Program.Id, oid: Observation.Id, period: TimestampInterval)(
         using NoTransaction[F], SuperUserAccess
@@ -1170,7 +1312,11 @@ object GuideService {
           c_guide_target_name,
           c_guide_target_hash,
           c_blind_offset_target_id,
-          c_explicit_guide_probe
+          c_explicit_guide_probe,
+          c_altair_mode,
+          c_altair_field_lens,
+          c_altair_cass_rotator,
+          c_altair_nd_filter
         from t_observation
         where c_observation_id = $observation_id
       """.apply(oid)
@@ -1316,9 +1462,13 @@ object GuideService {
         time_span.opt              *:
         guide_target_name.opt      *:
         md5_hash.opt               *:
-        target_id.opt                *:
-        guide_probe.opt).emap {
-        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe) =>
+        target_id.opt              *:
+        guide_probe.opt            *:
+        altair_mode.opt            *:
+        field_lens.opt             *:
+        cass_rotator.opt           *:
+        altair_nd_filter.opt).emap {
+        case (id, pid, cloud, image, sky, water, amMin, amMax, haMin, haMax, mode, angle, ra, dec, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe, altairMode, altairFieldLens, altairCassRotator, altairNdFilter) =>
           val paConstraint: PosAngleConstraint = mode match
             case PosAngleConstraintMode.Unbounded           => PosAngleConstraint.Unbounded
             case PosAngleConstraintMode.Fixed               => PosAngleConstraint.Fixed(angle)
@@ -1349,8 +1499,13 @@ object GuideService {
           val explicitBase: Option[Coordinates] =
             (ra, dec).mapN(Coordinates(_, _))
 
+          // The columns are all-or-nothing apart from the field lens, which is null for AUTO.
+          val altair: Option[AltairConfiguration] =
+            (altairMode, altairCassRotator, altairNdFilter).mapN: (mode, cassRotator, ndFilter) =>
+              AltairConfiguration(mode, altairFieldLens, cassRotator, ndFilter)
+
           elevRange.map(elev =>
-            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe)
+            ObservationInfo(id, pid, ConstraintSet(image, cloud, sky, water, elev), paConstraint, explicitBase, time, duration, guidestarName, guidestarHash, blindOffsetTargetId, explicitGuideProbe, altair)
           )
       }
 
