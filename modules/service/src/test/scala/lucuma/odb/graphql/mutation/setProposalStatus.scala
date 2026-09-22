@@ -12,8 +12,10 @@ import io.circe.Json
 import io.circe.literal.*
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.EducationalStatus
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ExchangePartner
 import lucuma.core.enums.GeminiCallForProposalsType
+import lucuma.core.enums.KeckInstrument
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.Partner
 import lucuma.core.enums.ProgramType
@@ -24,6 +26,7 @@ import lucuma.core.model.CallForProposals
 import lucuma.core.model.PartnerLink
 import lucuma.core.model.Program
 import lucuma.core.model.Semester
+import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.model.UserProfile
 import lucuma.core.util.Enumerated
@@ -843,6 +846,98 @@ class setProposalStatus extends OdbSuite
         )
     yield ()
 
+  }
+
+  // GNIRS and Flamingos-2 imaging had no `Configuration.ObservingMode` variant, so
+  // canonicalization failed with "couldn't decode mode: GNIRS_IMAGING" on submit.  The failure
+  // was reported as an internal error and, because the per-observation results are combined
+  // monoidally, it took the whole program's requests down with it -- while the status change
+  // still committed, leaving a submitted proposal with no requests at all.
+  //
+  // `addSubmissionPrerequisites` contributes a GMOS North long slit observation of its own, so
+  // that mode is expected throughout.
+  private def assertSubmitRequests(
+    createObs: (Program.Id, Target.Id) => IO[Unit],
+    modes:     List[String]
+  ): IO[Unit] =
+    for
+      cid <- createGeminiCallForProposalsAs(staff, GeminiCallForProposalsType.RegularSemester)
+      pid <- createProgramWithNonPartnerPi(pi)
+      _   <- addProposal(pi, pid, cid.some)
+      _   <- addSubmissionPrerequisites(pid)
+      _   <- addPartnerSplits(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      _   <- createObs(pid, tid)
+      _   <- setProposalStatus(pi, pid, "SUBMITTED")
+      _   <- assertRequestModes(pid, modes)
+    yield ()
+
+  private def assertRequestModes(pid: Program.Id, modes: List[String]): IO[Unit] =
+    query(pi, s"""
+      query {
+        program(programId: "$pid") {
+          proposalStatus
+          configurationRequests {
+            matches { configuration { observingMode { mode } } }
+          }
+        }
+      }
+    """).map: json =>
+      val p = json.hcursor.downField("program")
+      assertEquals(p.downField("proposalStatus").require[String], "SUBMITTED")
+      val found =
+        p.downFields("configurationRequests", "matches")
+         .require[List[Json]]
+         .map(_.hcursor.downFields("configuration", "observingMode", "mode").require[String])
+      assertEquals(found.sorted, modes.sorted)
+
+  test("a GNIRS imaging observation gets a configuration request on submit") {
+    assertSubmitRequests(
+      (pid, tid) => createGnirsImagingObservationAs(pi, pid, tid).void,
+      List("GMOS_NORTH_LONG_SLIT", "GNIRS_IMAGING")
+    )
+  }
+
+  test("a Flamingos-2 imaging observation gets a configuration request on submit") {
+    assertSubmitRequests(
+      (pid, tid) => createFlamingos2ImagingObservationAs(pi, pid, tid).void,
+      List("FLAMINGOS_2_IMAGING", "GMOS_NORTH_LONG_SLIT")
+    )
+  }
+
+  // One observation the codec could not read used to take every other observation's request with
+  // it, so an imaging observation alongside others must leave theirs intact.
+  test("a GNIRS imaging observation does not suppress other observations' requests") {
+    assertSubmitRequests(
+      (pid, tid) =>
+        createGnirsImagingObservationAs(pi, pid, tid) *>
+        createGnirsLongSlitObservationAs(pi, pid, tid).void,
+      List("GMOS_NORTH_LONG_SLIT", "GNIRS_IMAGING", "GNIRS_LONG_SLIT")
+    )
+  }
+
+  // Exchange observations are excluded from configuration approval entirely (ObservationValidator
+  // skips them), so canonicalization must skip them too rather than failing to decode them.
+  test("an exchange observation is skipped, and does not block submission") {
+    for
+      cid <- createKeckCallForProposalsAs(staff, instruments = List(KeckInstrument.Hires))
+      pid <- createProgramWithUsPi(pi)
+      _   <- query(pi, s"""
+               mutation {
+                 createProposal(input: {
+                   programId: "$pid"
+                   SET: { category: GALACTIC_OTHER, callId: "$cid", keck: { partnerSplits: [{ partner: US, percent: 100 }] } }
+                 }) { proposal { category } }
+               }
+             """)
+      _   <- addProposalPrerequisitesAs(pi, pid)
+      _   <- addCoisAs(pi, pid)
+      tid <- createTargetWithProfileAs(pi, pid)
+      _   <- createExchangeModeObservationAs(pi, pid, ExchangeObservingModeType.ExchangeKeck, tid)
+      _   <- setProposalStatus(pi, pid, "SUBMITTED")
+      _   <- assertRequestModes(pid, Nil)
+    yield ()
   }
 
   test("ensure that configuration requests are deleted when the proposal is withdrawn") {

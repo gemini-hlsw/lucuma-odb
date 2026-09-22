@@ -132,14 +132,18 @@ object configurationrequest:
       hc.downField("gmosSouthIfu").as(using DecodeGmosSouthIfu) orElse
       hc.downField("gnirsLongSlit").as(using DecodeGnirsLongSlit) orElse
       hc.downField("gnirsIfu").as(using DecodeGnirsIfu) orElse
-      // GhostIfu and Igrins2LongSlit don't have parameters, so decode by name
+      // The imaging modes below, GhostIfu and Igrins2LongSlit don't have parameters, so
+      // decode by name.
       hc.downField("mode").as[String].flatMap:
-        case "GHOST_IFU"          => GhostIfu.asRight
-        case "IGRINS_2_LONG_SLIT" => Igrins2LongSlit.asRight
+        case "FLAMINGOS_2_IMAGING" => Flamingos2Imaging.asRight
+        case "GHOST_IFU"           => GhostIfu.asRight
+        case "GNIRS_IMAGING"       => GnirsImaging.asRight
+        case "IGRINS_2_LONG_SLIT"  => Igrins2LongSlit.asRight
         case other => Left(DecodingFailure(s"couldn't decode mode: $other", Nil))
 
     given Encoder[ObservingMode] = m =>
       Json.obj(
+        "flamingos2Imaging"  -> Json.Null, // one of these will be replaced below
         "flamingos2LongSlit" -> Json.Null, // one of these will be replaced below
         "flamingos2Mos"      -> Json.Null, // one of these will be replaced below
         "ghostIfu"           -> Json.Null, // one of these will be replaced below
@@ -153,9 +157,11 @@ object configurationrequest:
         "gmosSouthIfu"       -> Json.Null, // one of these will be replaced below
         "gnirsLongSlit"      -> Json.Null,
         "gnirsIfu"           -> Json.Null,
+        "gnirsImaging"       -> Json.Null,
         "igrins2LongSlit"    -> Json.Null, // one of these will be replaced below
         "visitor"            -> Json.Null,  // one of these will be replaced below
         m match
+          case Flamingos2Imaging                     => "flamingos2Imaging"  -> Json.obj("ignore" -> Json.Null)
           case Flamingos2LongSlit(disperser)         => "flamingos2LongSlit" -> Json.obj("disperser" -> disperser.asJson)
           case Flamingos2Mos(disperser)              => "flamingos2Mos"      -> Json.obj("disperser" -> disperser.asJson)
           case GhostIfu                              => "ghostIfu"           -> Json.obj("ignore" -> Json.Null)
@@ -169,6 +175,7 @@ object configurationrequest:
           case GmosSouthIfu(grating, fpu)            => "gmosSouthIfu"       -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
           case GnirsLongSlit(grating, camera, prism) => "gnirsLongSlit"      -> Json.obj("grating" -> grating.asJson, "camera" -> camera.asJson, "prism" -> prism.asJson)
           case GnirsIfu(grating, fpu)                => "gnirsIfu"           -> Json.obj("grating" -> grating.asJson, "fpu" -> fpu.asJson)
+          case GnirsImaging                          => "gnirsImaging"       -> Json.obj("ignore" -> Json.Null)
           case Igrins2LongSlit                       => "igrins2LongSlit"    -> Json.obj("ignore" -> Json.Null)
           case Visitor(mode, radius)                 => "visitor"            -> Json.obj("mode" -> mode.asJson, "radius" -> radius.asJson)
       )

@@ -199,6 +199,51 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
       yield assert(req1 === req2)    
   }
 
+  // The parameterless imaging modes are recognized by observing mode type alone, so their
+  // requests carry no mode-specific object -- only the mode itself.
+  test("create a configuration request for a GNIRS imaging observation") {
+    for
+      cfpid <- createGeminiCallForProposalsAs(admin)
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createGnirsImagingObservationAs(pi, pid, tid)
+      _     <- expect(
+                 user = pi,
+                 query = s"""
+                   mutation {
+                     createConfigurationRequest(input: { observationId: "$oid" }) {
+                       status
+                       configuration {
+                         observingMode {
+                           instrument
+                           mode
+                           gnirsLongSlit { grating }
+                           gnirsIfu { grating }
+                         }
+                       }
+                     }
+                   }
+                 """,
+                 expected = json"""
+                   {
+                     "createConfigurationRequest": {
+                       "status": "REQUESTED",
+                       "configuration": {
+                         "observingMode": {
+                           "instrument": "GNIRS",
+                           "mode": "GNIRS_IMAGING",
+                           "gnirsLongSlit": null,
+                           "gnirsIfu": null
+                         }
+                       }
+                     }
+                   }
+                 """.asRight
+               )
+    yield ()
+  }
+
   test("can't specify feedback on creation") {
     createGeminiCallForProposalsAs(admin).flatMap { cfpid =>
       createProgramAs(pi, "Foo").flatMap { pid =>
