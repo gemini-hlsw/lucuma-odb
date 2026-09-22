@@ -20,6 +20,7 @@ import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
@@ -137,7 +138,8 @@ object PerScienceObservationCalibrationsService:
       private def insertTelluricObservation(
         pid:             Program.Id,
         groupId: Group.Id,
-        telluricIndex:   NonNegShort
+        telluricIndex:   NonNegShort,
+        altair:          Option[AltairConfiguration]
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
         // Minimal input to create the telluric obs
         val targetEnvironment = TargetEnvironmentInput.Create(
@@ -148,7 +150,7 @@ object PerScienceObservationCalibrationsService:
           blindOffsetTarget = none,
           blindOffsetType = BlindOffsetType.Manual,
           explicitGuideProbe = none,
-          altair = none
+          altair = altair
         )
 
         val obsInput = ObservationPropertiesInput.Create(
@@ -185,9 +187,10 @@ object PerScienceObservationCalibrationsService:
         order:           TelluricCalibrationOrder
       )(using Transaction[F], SuperUserAccess): F[Observation.Id] =
         for {
-          telluricId <- insertTelluricObservation(pid, groupId, telluricIndex)
+          altair     <- selectAltair(scienceOid)
+          telluricId <- insertTelluricObservation(pid, groupId, telluricIndex, altair.map(AltairConfiguration.forTelluric))
           _          <- telluricTargetsService.requestTelluricTarget(pid, telluricId, scienceOid, duration, order)
-          _          <- syncConfiguration(scienceOid, telluricId)
+          _          <- syncConfiguration(scienceOid, telluricId, CalibrationRole.Telluric)
         } yield telluricId
 
       private def createTelluricCalibrations(
@@ -267,7 +270,7 @@ object PerScienceObservationCalibrationsService:
             // Only sync existing tellurics that are note deleted or recreated.
             toSync              = if (created.nonEmpty) List.empty
                                   else existing.filterNot(deleted.contains)
-            _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
+            _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid, CalibrationRole.Telluric))
           } yield (created, deleted)
 
       // ---- Daytime pinhole flats (GNIRS cross-dispersed) ----
@@ -329,10 +332,10 @@ object PerScienceObservationCalibrationsService:
               case (true, Nil) =>
                 for
                   oid <- insertDaytimePinholeObservation(pid, gid)
-                  _   <- syncConfiguration(obs.id, oid)
+                  _   <- syncConfiguration(obs.id, oid, CalibrationRole.DaytimePinhole)
                 yield (List(oid), List.empty[Observation.Id])
               case (true, es)  =>
-                es.traverse_(oid => syncConfiguration(obs.id, oid))
+                es.traverse_(oid => syncConfiguration(obs.id, oid, CalibrationRole.DaytimePinhole))
                   .as((List.empty[Observation.Id], List.empty[Observation.Id]))
               case (false, es) =>
                 excludeObsCalibrationsFromDeletion(es, identity).flatMap: deletable =>
@@ -434,9 +437,13 @@ object PerScienceObservationCalibrationsService:
                             acqEtm.traverse_(replaceEtm(ExposureTimeModeRole.Acquisition, _, allAcqEtm.get(telluricOid), isExplicit = false))
         } yield ()
 
+      private def selectAltair(oid: Observation.Id): F[Option[AltairConfiguration]] =
+        session.prepareR(Statements.selectAltair).use(_.unique(oid))
+
       private def syncConfiguration(
-        sourceOid: Observation.Id,
-        targetOid: Observation.Id
+        sourceOid:  Observation.Id,
+        targetOid:  Observation.Id,
+        targetRole: CalibrationRole
       )(using Transaction[F], SuperUserAccess): F[Unit] =
 
         def readObservingModes: F[List[(Observation.Id, Option[ObservingModeType])]] =
@@ -458,6 +465,16 @@ object PerScienceObservationCalibrationsService:
 
         def syncObservationProperties: F[Unit] =
           S.session.executeCommand(Statements.syncObservationConfiguration(sourceOid, targetOid)).void
+
+        // A daytime pinhole flat is taken with the dome closed, so it never
+        // observes behind Altair; a telluric standard does, on its own star.
+        def syncAltair: F[Unit] =
+          if targetRole === CalibrationRole.DaytimePinhole then F.unit
+          else
+            selectAltair(sourceOid).flatMap: science =>
+              S.session
+                .execute(Statements.updateAltair)(science.map(AltairConfiguration.forTelluric), targetOid)
+                .void
 
         // A Flamingos 2 MOS telluric is observed through the builtin long slit that
         // matches the mask's slitlets, never through the mask, so its calibration
@@ -518,6 +535,7 @@ object PerScienceObservationCalibrationsService:
           modes    <- readObservingModes
           (sm, tm) <- extractModes(modes)
           _        <- syncObservationProperties
+          _        <- syncAltair
           _        <- deleteOldTargetMode(tm)
           _        <- deleteAllExposureTimeModes(sm)
           _        <- updateTargetModeType(sm)
@@ -655,6 +673,29 @@ object PerScienceObservationCalibrationsService:
                    c_instrument          = ${instrument.opt}
             WHERE c_observation_id = $observation_id
           """.command
+
+        val selectAltair: Query[Observation.Id, Option[AltairConfiguration]] =
+          sql"""
+            SELECT c_altair_mode, c_altair_field_lens, c_altair_cass_rotator, c_altair_nd_filter
+            FROM   t_observation
+            WHERE  c_observation_id = $observation_id
+          """.query(altair_mode.opt *: field_lens.opt *: cass_rotator.opt *: altair_nd_filter.opt)
+             .map: (mode, fieldLens, cassRotator, ndFilter) =>
+               (mode, cassRotator, ndFilter).mapN(AltairConfiguration(_, fieldLens, _, _))
+
+        // All four columns are written together so that the "all null or mode,
+        // cass rotator and ND filter set" constraint holds within the statement.
+        val updateAltair: Command[(Option[AltairConfiguration], Observation.Id)] =
+          sql"""
+            UPDATE t_observation
+            SET    c_altair_mode         = ${altair_mode.opt},
+                   c_altair_field_lens   = ${field_lens.opt},
+                   c_altair_cass_rotator = ${cass_rotator.opt},
+                   c_altair_nd_filter    = ${altair_nd_filter.opt}
+            WHERE  c_observation_id = $observation_id
+          """.command
+             .contramap: (altair, oid) =>
+               (altair.map(_.mode), altair.flatMap(_.explicitFieldLens), altair.map(_.cassRotator), altair.map(_.ndFilter), oid)
 
         val selectScienceObservationIndex: Query[Observation.Id, NonNegShort] =
           sql"""
