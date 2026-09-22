@@ -246,7 +246,9 @@ class executionGnirsAltair extends AltairItcRecording:
       assert(after.isDefined,  "setting the guide star should leave a fresh ITC result")
       assert(acq.nonEmpty && sci.nonEmpty, "setting the guide star should call the ITC again")
 
-  test("clearing the guide star evicts the cached ITC result"):
+  // The Altair parameters are keyed apart on the cached result, so a change of guide star needs
+  // no eviction: the next generation simply does not reuse a result computed for another star.
+  test("clearing the guide star leaves the cached ITC result in place"):
     for
       (pid, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
       _          <- runObscalcUpdate(pid, oid)
@@ -255,7 +257,7 @@ class executionGnirsAltair extends AltairItcRecording:
       after      <- itcResultHashes(oid)
     yield
       assert(before.isDefined, "the ITC result should be cached before the guide star is cleared")
-      assertEquals(after, none)
+      assertEquals(after, before)
 
   private def guideTargetNameQuery(oid: Observation.Id): String =
     s"""
