@@ -134,9 +134,19 @@ ThisBuild / githubWorkflowEnv += ("PYEXPLORE_TOKEN" -> "${{ secrets.PYEXPLORE_TO
 //
 // SBT_OPTS is a single string, so every place that sets it replaces the last: the coursier retry
 // sbt-lucuma contributes has to be carried explicitly, or flaky Central lookups fail the build.
-val baseSbtOpts = "-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10"
+val baseSbtOpts =
+  "-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10" +
+    " -Dbuildbuddy.host=${{ vars.BUILDBUDDY_HOST }}" +
+    " -Dbuildbuddy.key=${{ secrets.BUILDBUDDY_API_KEY }}"
 
 ThisBuild / githubWorkflowEnv += ("SBT_OPTS" -> baseSbtOpts)
+
+// Buildbudy keys
+val buildBuddyHost   = sys.props.get("buildbuddy.host").filter(_.nonEmpty)
+val buildBuddyApiKey = sys.props.get("buildbuddy.key").filter(_.nonEmpty)
+
+Global / remoteCache        := buildBuddyHost.zip(buildBuddyApiKey).map((h, _) => uri(s"grpcs://$h"))
+Global / remoteCacheHeaders ++= buildBuddyApiKey.map("x-buildbuddy-api-key=" + _).toList
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
