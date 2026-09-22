@@ -72,6 +72,9 @@ jobs:
       - name: Docker compose up
         run: docker compose up -d
 
+      - name: Show remote cache
+        run: sbt -v '++ ${{ matrix.scala }}; show Global/remoteCache'
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 

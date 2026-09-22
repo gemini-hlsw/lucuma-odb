@@ -180,6 +180,12 @@ def prebuildTestDbImage(name: String, context: String): WorkflowStep =
     )
   )
 
+// Temporary: prints None or Some(grpcs://...), so the log says whether the remote cache is
+// actually configured. The host is a masked secret and the timings are ambiguous, so this is the
+// only direct evidence. Remove once BuildBuddy is confirmed.
+ThisBuild / githubWorkflowBuildPreamble +=
+  WorkflowStep.Sbt(List("show Global/remoteCache"), name = Some("Show remote cache"))
+
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Use(
     UseRef.Public("docker", "setup-buildx-action", "v4"),
