@@ -1,5 +1,7 @@
 import NativePackagerHelper.*
 import com.typesafe.tools.mima.core.*
+import sbt.internal.util.CacheEventSummary
+import sbt.util.{ ActionCacheStore, AggregateActionCacheStore }
 // `<task>.inputFiles` is no longer auto-imported in sbt 2.
 import sbt.internal.FileChangesMacro.inputFiles
 
@@ -166,6 +168,46 @@ ThisBuild / extraTestDigests ++= Def.uncached {
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
+// Temporary cache diagnostics for the test shards: sbt reports remote-cache failures at debug
+// level only, so hit/miss/error counts and the per-action exec log are the only evidence.
+val cacheStats = taskKey[Unit]("prints action cache hit/miss/error counts for the previous command")
+
+Global / cacheStats := Def.uncached {
+  val log    = streams.value.log
+  val config = Def.cacheConfiguration.value
+  config.cacheEventLog.previous match
+    case d: CacheEventSummary.Data =>
+      log.info(s"CACHE-STATS hit=${d.hitCount} miss=${d.missCount} remoteHit=${d.remoteHitCount} errors=${d.errorCount} hits=${d.hits}")
+    case other                     =>
+      log.info(s"CACHE-STATS empty event log ($other)")
+  def leaves(st: ActionCacheStore): Seq[ActionCacheStore] = st match
+    case AggregateActionCacheStore(ss) => ss.flatMap(leaves)
+    case other                         => Seq(other)
+  leaves(config.store).foreach(st => log.info(s"CACHE-STATS store=${st.storeName} ${st.getClass.getSimpleName}"))
+}
+
+val execLogPath = "/tmp/sbt-exec.log"
+
+val cacheDiagnosticSteps: List[WorkflowStep] = List(
+  // Plain `sbt`, not WorkflowStep.Sbt: that would prepend `++ <scala>`, and the stats describe
+  // the previous command, which must stay the test run.
+  WorkflowStep.Run(List("sbt -v Global/cacheStats"), name = Some("Cache stats")),
+  // The exec log is only flushed when the server exits.
+  WorkflowStep.Run(
+    List("sbt shutdown || true", "sleep 3", s"wc -l $execLogPath || true"),
+    name = Some("Flush exec log")
+  ),
+  WorkflowStep.Use(
+    UseRef.Public("actions", "upload-artifact", "v4"),
+    name = Some("Upload exec log"),
+    params = Map(
+      "name"              -> "sbt-exec-log-${{ matrix.shard }}",
+      "path"              -> execLogPath,
+      "if-no-files-found" -> "warn"
+    )
+  )
+)
+
 // The preamble below changes the key's mode, which git reports as a change; without this every
 // CI run sees a file that belongs to no project and tests everything.
 ThisBuild / lucumaAffectedIgnorePaths += "test-cert/**"
@@ -252,12 +294,13 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
         // SBT_OPTS, so baseSbtOpts has to be repeated here.
         .withEnv(
           job.env + ("SBT_OPTS" ->
-            s"$baseSbtOpts -Dtest.shard=$${{ matrix.shard }} -Dtest.shard.count=$nTestJobShards")
+            s"$baseSbtOpts -Dtest.shard=$${{ matrix.shard }} -Dtest.shard.count=$nTestJobShards -Dsbt.experimental_execution_log=$execLogPath")
         )
         // Keep the full checkout: lucumaTestAffected diffs against origin/main, and a depth-1
         // clone has no such ref, so the shard would silently test nothing.
         .withSteps(job.steps.flatMap {
           case s if s.name.contains("Check that workflows are up to date") => Nil
+          case s if s.name.contains("Test affected projects")              => s :: cacheDiagnosticSteps
           case s                                                          => List(s)
         })
         .withMatrixFailFast(Some(false))

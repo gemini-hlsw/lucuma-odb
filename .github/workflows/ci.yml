@@ -39,7 +39,7 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
     env:
-      SBT_OPTS: '-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10 -Dbuildbuddy.host=${{ secrets.BUILDBUDDY_HOST }} -Dbuildbuddy.key=${{ secrets.BUILDBUDDY_API_KEY }} -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8'
+      SBT_OPTS: '-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10 -Dbuildbuddy.host=${{ secrets.BUILDBUDDY_HOST }} -Dbuildbuddy.key=${{ secrets.BUILDBUDDY_API_KEY }} -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8 -Dsbt.experimental_execution_log=/tmp/sbt-exec.log'
     timeout-minutes: 60
     steps:
       - name: Checkout current branch
@@ -122,6 +122,22 @@ jobs:
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
           RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
         run: sbt -v '++ ${{ matrix.scala }}; lucumaTestAffected'
+
+      - name: Cache stats
+        run: sbt -v Global/cacheStats
+
+      - name: Flush exec log
+        run: |
+          sbt shutdown || true
+          sleep 3
+          wc -l /tmp/sbt-exec.log || true
+
+      - name: Upload exec log
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbt-exec-log-${{ matrix.shard }}
+          path: /tmp/sbt-exec.log
+          if-no-files-found: warn
 
       - name: Docker compose down
         run: docker compose down
