@@ -56,7 +56,7 @@ class executionDigest_calibrationCount
       }"""
     ).void
 
-  test("one telluric for short science, two for long, none for NO_TELLURIC"):
+  test("one epoch for short science, two for long, unchanged by NO_TELLURIC"):
     assertIO(
       for
         p  <- createProgramAs(pi)
@@ -69,7 +69,7 @@ class executionDigest_calibrationCount
         _  <- setTelluricType(o, "NO_TELLURIC")
         c0 <- calibrationCount(p, o)
       yield (c1, c2, c0),
-      (1, 2, 0)
+      (1, 2, 2)
     )
 
   test("a mode that takes no telluric reports 0"):

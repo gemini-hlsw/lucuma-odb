@@ -41,13 +41,24 @@ class CalibrationCountSuite extends FunSuite:
   private def count(role: Option[CalibrationRole], minutes: Long, telluricType: TelluricType = TelluricType.Hot): Int =
     ObsExtract.calibrationCount(f2(telluricType), role, TimeSpan.unsafeFromMicroseconds(minutes * 60_000_000L)).value
 
-  test("science observation: one telluric up to the threshold, two beyond"):
+  private def minutes(m: Long): TimeSpan =
+    TimeSpan.unsafeFromMicroseconds(m * 60_000_000L)
+
+  test("science observation: one epoch per 90 minutes, rounded up"):
+    assertEquals(count(none, 0), 0)
     assertEquals(count(none, 60), 1)
     assertEquals(count(none, 90), 1)
     assertEquals(count(none, 91), 2)
+    assertEquals(count(none, 300), 4)
 
-  test("NoTelluric requires none"):
-    assertEquals(count(none, 120, TelluricType.NoTelluric), 0)
+  test("NoTelluric still has epochs"):
+    assertEquals(count(none, 120, TelluricType.NoTelluric), 2)
+
+  test("tellurics per visit: one up to the threshold, two beyond"):
+    assertEquals(ObsExtract.telluricsForVisit(minutes(0)).value, 1)
+    assertEquals(ObsExtract.telluricsForVisit(minutes(90)).value, 1)
+    assertEquals(ObsExtract.telluricsForVisit(minutes(91)).value, 2)
+    assertEquals(ObsExtract.telluricsForVisit(minutes(300)).value, 2)
 
   test("a calibration observation requires none, whatever its mode says"):
     assertEquals(count(CalibrationRole.Telluric.some, 120), 0)

@@ -27,6 +27,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
@@ -83,24 +84,36 @@ object ObsExtract:
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
 
+  /** Modes whose science observations are accompanied by tellurics. */
+  def modeTakesTelluric(mode: ObservingMode): Boolean =
+    mode match
+      case _: Flamingos2Config | _: Flamingos2MosConfig | _: Igrins2Config | _: GnirsSpectroscopyConfig => true
+      case _                                                                                           => false
+
+  /** Roughly one calibration epoch per this much science time. */
+  val CalibrationEpochInterval: TimeSpan = 90.minTimeSpan
+
+  /** Calibration epochs over the lifetime of an observation: ceil(scienceTime / interval). */
+  def calibrationEpochs(scienceTime: TimeSpan): NonNegInt =
+    NonNegInt.unsafeFrom:
+      math.ceil(scienceTime.toMicroseconds.toDouble / CalibrationEpochInterval.toMicroseconds.toDouble).toInt
+
   /**
-   * Expected number of night-time calibrations for an observation.
+   * Calibration epochs carried in the time estimate.  Zero for calibration
+   * observations and for modes that take no telluric; independent of the
+   * telluric type, which only decides whether each epoch costs a telluric.
    */
   def calibrationCount(
     mode:        ObservingMode,
     role:        Option[CalibrationRole],
     scienceTime: TimeSpan
   ): NonNegInt =
-    val wantsTelluric = role.isEmpty && (mode match
-      case c: Flamingos2Config        => c.telluricType =!= TelluricType.NoTelluric
-      case c: Flamingos2MosConfig     => c.telluricType =!= TelluricType.NoTelluric
-      case c: Igrins2Config           => c.telluricType =!= TelluricType.NoTelluric
-      case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
-      case _                          => false
-    )
-    if !wantsTelluric then NonNegInt.MinValue
-    else if scienceTime > TelluricTargetsService.MultiTelluricThreshold then 2.refined
-    else 1.refined
+    if role.isDefined || !modeTakesTelluric(mode) then NonNegInt.MinValue
+    else calibrationEpochs(scienceTime)
+
+  /** Tellurics materialised for one visit: one after, or one before and one after for a long visit. */
+  def telluricsForVisit(visitTime: TimeSpan): NonNegInt =
+    if visitTime > TelluricTargetsService.MultiTelluricThreshold then 2.refined else 1.refined
 
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 

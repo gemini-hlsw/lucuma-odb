@@ -6,7 +6,6 @@ package lucuma.odb.service
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.numeric.NonNegShort
 import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
@@ -21,7 +20,6 @@ import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.BlindOffsetType
@@ -130,13 +128,11 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectTelluricObservations)
           .use(_.stream((gid, CalibrationRole.Telluric), 10).compile.toList)
 
-      // The digest carries the telluric count and the science time the standard
-      // star is chosen for.
-      private def obsDigest(
+      private def obsDuration(
         scienceOid: Observation.Id
-      )(using Transaction[F]): F[Option[ExecutionDigest]] =
+      )(using Transaction[F]): F[Option[TimeSpan]] =
         obscalcService.selectExecutionDigest(scienceOid).map:
-          _.flatMap(_.value.toOption)
+          _.flatMap(_.value.toOption).map(_.science.timeEstimate.sum)
 
       private def insertTelluricObservation(
         pid:             Program.Id,
@@ -200,7 +196,6 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
-        count:      NonNegInt,
         duration:   TimeSpan
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
@@ -208,10 +203,8 @@ object PerScienceObservationCalibrationsService:
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        if (count.value === 0)
-          List.empty[Observation.Id].pure[F]
-        else if (count.value > 1)
-          // Long science: 1 telluric before and 1 after
+        if (ObsExtract.telluricsForVisit(duration).value > 1)
+          // Long visit: 1 telluric before and 1 after
           for {
             sciIdx <- obsGroupIndex(scienceOid)
             bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
@@ -220,7 +213,7 @@ object PerScienceObservationCalibrationsService:
             c2     <- createTelluricObs(pid, scienceOid, groupId, aftIdx, duration, TelluricCalibrationOrder.After)
           } yield List(c1, c2)
         else
-          // Short science: one telluric after science
+          // Short visit: one telluric after science
           for {
             sciIdx <- obsGroupIndex(scienceOid)
             aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
@@ -255,18 +248,18 @@ object PerScienceObservationCalibrationsService:
           for {
             existing           <- findAllTelluricObservations(gid)
             deletable          <- excludeObsCalibrationsFromDeletion(existing, identity)
-            digest             <- if (requiresTelluric) obsDigest(obs.id)
-                                  else Option.empty[ExecutionDigest].pure[F]
-            _                  <- warn"No execution digest for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && digest.isEmpty)
+            duration           <- if (requiresTelluric) obsDuration(obs.id)
+                                  else Option.empty[TimeSpan].pure[F]
+            _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
             _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
-            requiredCount      = digest.fold(0)(_.calibrationCount.value)
+            requiredCount      = duration.fold(0)(ObsExtract.telluricsForVisit(_).value)
             // Delete/recreate if count changes
             (created, deleted) <- if (existing.size != requiredCount)
                                     for
                                       _ <- NonEmptyList.fromList(deletable)
                                             .traverse_(observationService.deleteCalibrationObservations)
-                                      c <- digest.fold(List.empty[Observation.Id].pure): d =>
-                                             createTelluricCalibrations(pid, obs.id, gid, d.calibrationCount, d.science.timeEstimate.sum)
+                                      c <- duration.fold(List.empty[Observation.Id].pure):
+                                             createTelluricCalibrations(pid, obs.id, gid, _)
                                     yield (c, deletable)
                                   else
                                     (List.empty, List.empty).pure[F]
