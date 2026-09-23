@@ -52,6 +52,7 @@ import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.GnirsCodecs.*
 import skunk.*
 import skunk.codec.all.*
+import skunk.data.Completion
 import skunk.implicits.*
 
 import Services.Syntax.*
@@ -88,6 +89,13 @@ trait GnirsSpectroscopyService[F[_]]:
    * compute the telluric pattern itself.
    */
   def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit]
+
+  /**
+   * Collapses `oid`'s central wavelength list to one row per distinct wavelength in each
+   * row version: the lowest-index row survives with the group's largest coadds, the rest
+   * go with their exposure time modes, and indices are renumbered contiguously.
+   */
+  def collapseTelluricWavelengths(oid: Observation.Id)(using Transaction[F]): F[Unit]
 
 object GnirsSpectroscopyService:
 
@@ -374,6 +382,15 @@ object GnirsSpectroscopyService:
 
       override def resetTelluricConfig(oid: Observation.Id)(using Transaction[F]): F[Unit] =
         session.exec(Statements.applyGnirsTelluricDefaults(oid))
+
+      override def collapseTelluricWavelengths(oid: Observation.Id)(using Transaction[F]): F[Unit] =
+        session.execute(Statements.RaiseWavelengthCoaddsToGroupMax)(oid) *>
+          session.execute(Statements.DeleteSurplusWavelengthEtms)(oid).flatMap:
+            case Completion.Delete(0) => F.unit
+            // Two steps: the primary key is checked per row, so a direct renumber can collide.
+            case _                    =>
+              session.execute(Statements.ShiftWavelengthIndices)(oid) *>
+                session.execute(Statements.RenumberWavelengthIndices)(oid).void
 
   object Statements:
 
@@ -683,6 +700,62 @@ object GnirsSpectroscopyService:
           c_telescope_configs = NULL
         WHERE c_observation_id = $observation_id
       """.apply(oid)
+
+    val RaiseWavelengthCoaddsToGroupMax: Command[Observation.Id] =
+      sql"""
+        UPDATE t_gnirs_central_wavelength_config w
+           SET c_coadds = m.c_coadds
+          FROM (
+            SELECT c_version, c_central_wavelength, MAX(c_coadds) AS c_coadds
+              FROM t_gnirs_central_wavelength_config
+             WHERE c_observation_id = $observation_id
+             GROUP BY c_version, c_central_wavelength
+          ) m
+         WHERE w.c_observation_id     = $observation_id
+           AND w.c_version            = m.c_version
+           AND w.c_central_wavelength = m.c_central_wavelength
+           AND w.c_coadds            <> m.c_coadds
+      """.command.contramap(oid => (oid, oid))
+
+    // Wavelength rows cascade from their exposure time modes.
+    val DeleteSurplusWavelengthEtms: Command[Observation.Id] =
+      sql"""
+        DELETE FROM t_exposure_time_mode e
+         USING t_gnirs_central_wavelength_config w
+         WHERE e.c_exposure_time_mode_id = w.c_exposure_time_mode_id
+           AND w.c_observation_id = $observation_id
+           AND EXISTS (
+             SELECT 1
+               FROM t_gnirs_central_wavelength_config k
+              WHERE k.c_observation_id     = w.c_observation_id
+                AND k.c_version            = w.c_version
+                AND k.c_central_wavelength = w.c_central_wavelength
+                AND k.c_index              < w.c_index
+           )
+      """.command
+
+    val ShiftWavelengthIndices: Command[Observation.Id] =
+      sql"""
+        UPDATE t_gnirs_central_wavelength_config
+           SET c_index = c_index + 16384
+         WHERE c_observation_id = $observation_id
+      """.command
+
+    val RenumberWavelengthIndices: Command[Observation.Id] =
+      sql"""
+        UPDATE t_gnirs_central_wavelength_config w
+           SET c_index = n.c_new_index
+          FROM (
+            SELECT c_version,
+                   c_index,
+                   (ROW_NUMBER() OVER (PARTITION BY c_version ORDER BY c_index) - 1)::smallint AS c_new_index
+              FROM t_gnirs_central_wavelength_config
+             WHERE c_observation_id = $observation_id
+          ) n
+         WHERE w.c_observation_id = $observation_id
+           AND w.c_version        = n.c_version
+           AND w.c_index          = n.c_index
+      """.command.contramap(oid => (oid, oid))
 
     def cloneGnirs(originalId: Observation.Id, newId: Observation.Id): AppliedFragment =
       sql"""

@@ -138,6 +138,10 @@ _Avoid_: disabled telluric, skipped telluric, deleted telluric, opted-out tellur
 *What kind* of standard star a telluric should observe (`Hot`, `A0V`, `Solar`, `Manual`), or `NoTelluric` for no telluric at all. A property of the observing-mode config. Setting `NoTelluric` overwrites the previous choice (a `Manual` star list is not remembered across it), and changing the observing mode resets the type to its default (`Hot`) — a "no tellurics" decision for one mode must not be assumed to carry to another.
 _Avoid_: telluric (names the observation, not the classification), requires-telluric flag (superseded design).
 
+**Derived Telluric S/N**:
+The signal-to-noise a Telluric's science exposure time mode is defaulted to: twice its science observation's, uncapped, so the standard is measured at least as deeply as the target. Where the science's own S/N comes from depends on how the PI expressed it — a requested signal-to-noise is taken at face value, while a Time & Count science has no requested S/N, so the ITC's achieved total signal-to-noise is used instead. Read from the science's live configurations only. Where a mode carries an exposure time mode per central wavelength, the Telluric has one configuration per *distinct* science wavelength, sized from the deepest science configuration at that wavelength, with the averaged reference wavelength and the largest coadds of the group; a daytime pinhole keeps the science list row for row. Always system-owned: it is written as derived, never as a PI's choice, and is recomputed whenever its science observation's ITC result changes.
+_Avoid_: telluric signal-to-noise (ambiguous — the ITC also computes one *for* the telluric), doubled S/N, telluric S/N target.
+
 ### AEON / Multi-Facility Proposals
 
 **AEON Multi-Facility Proposal**:
