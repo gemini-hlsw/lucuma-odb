@@ -201,8 +201,10 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
       job
+        // Keep the full checkout: lucumaTestAffected diffs against origin/main, and a depth-1
+        // clone has no such ref, so the shard would run nothing (or everything, depending on
+        // the sbt-lucuma version). Full history costs a few seconds.
         .withSteps(job.steps.flatMap {
-          case s if s.name.contains("Checkout current branch")            => List(CheckoutShallow)
           case s if s.name.contains("Check that workflows are up to date") => Nil
           case s                                                          => List(s)
         })
@@ -210,14 +212,6 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
     else job
   }
 }
-
-// Shollow checkout and no lfs, used for test shards
-lazy val CheckoutShallow: WorkflowStep =
-  WorkflowStep.Use(
-    UseRef.Public("actions", "checkout", "v5"),
-    name = Some("Checkout current branch"),
-    params = Map("fetch-depth" -> "1")
-  )
 
 // checkout without lfs but full history
 lazy val CheckoutFull: WorkflowStep =
