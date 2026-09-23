@@ -165,6 +165,10 @@ ThisBuild / extraTestDigests ++= Def.uncached {
 
 ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
+// The preamble below changes the key's mode, which git reports as a change; without this every
+// CI run sees a file that belongs to no project and tests everything.
+ThisBuild / lucumaAffectedIgnorePaths += "test-cert/**"
+
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
   Seq(
     WorkflowStep.Run(List("chmod 600 test-cert/server.key"), name = Some("Set up cert permissions (1)")),
@@ -192,12 +196,6 @@ def prebuildTestDbImage(name: String, context: String): WorkflowStep =
       "cache-to"   -> s"$${{ matrix.shard == '0' && 'type=gha,scope=$name,mode=max' || '' }}"
     )
   )
-
-// Temporary: prints None or Some(grpcs://...), so the log says whether the remote cache is
-// actually configured. The host is a masked secret and the timings are ambiguous, so this is the
-// only direct evidence. Remove once BuildBuddy is confirmed.
-ThisBuild / githubWorkflowBuildPreamble +=
-  WorkflowStep.Sbt(List("show Global/remoteCache"), name = Some("Show remote cache"))
 
 ThisBuild / githubWorkflowBuildPreamble ++= Seq(
   WorkflowStep.Use(
