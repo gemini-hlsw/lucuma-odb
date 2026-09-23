@@ -154,6 +154,15 @@ Global / remoteCacheHeaders ++= buildBuddyApiKey.map("x-buildbuddy-api-key=" + _
 // sbt.cacheversion when the Postgres image or test environment changes; the digest can't see it.
 ThisBuild / lucumaAffectedTestTask := "test"
 
+// Migrations are main resources, so no suite digest sees them. Hash them in so a new
+// migration reruns every suite instead of being skipped as already passed. Uncached: it reads
+// the filesystem, and a cached result would never notice a new file.
+ThisBuild / extraTestDigests ++= Def.uncached {
+  val migrations =
+    ((ThisBuild / baseDirectory).value / "modules" * "*" / "src" / "main" / "resources" / "db" / "migration" * "*.sql").get()
+  migrations.sortBy(_.getPath).map(f => sbt.util.Digest.sha256Hash(f.toPath))
+}
+
 ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>
