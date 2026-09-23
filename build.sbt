@@ -1351,7 +1351,7 @@ lazy val resourceService = project
   .in(file("resource/service"))
   .dependsOn(resourceModel, binding, otel, schema.jvm, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
-  .settings(resourceCommonSettings, buildInfoSettings)
+  .settings(resourceCommonSettings, buildInfoSettings, dockerGitCommit)
   .settings(
     name                        := "lucuma-resource-service",
     description                 := "Lucuma Resource Service",

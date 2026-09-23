@@ -3,7 +3,6 @@
 
 package resource.server.http4s
 
-import buildinfo.BuildInfo
 import cats.effect.*
 import cats.effect.std.Console
 import cats.effect.syntax.all.*
@@ -38,6 +37,9 @@ import skunk.*
 
 object ResourceMain extends IOApp.Simple {
 
+  // Set in the Docker image by the build; absent when running from sbt.
+  private val gitCommit: Option[String] = Option(System.getenv("GIT_COMMIT"))
+
   override def run: IO[Unit] = webServer[IO].useForever
 
   def webServer[F[_]: {Async, LiftIO, Compression, Console, Files, Network}]: Resource[F, Server] =
@@ -51,7 +53,7 @@ object ResourceMain extends IOApp.Simple {
 
       otel                   <- OtelSetup.resource(
                                   "lucuma-resource",
-                                  BuildInfo.gitHeadCommit.getOrElse("000000"),
+                                  gitCommit.getOrElse("000000"),
                                   conf.otel
                                 )
       given Trace[F]          = otel.trace
@@ -169,7 +171,7 @@ object ResourceMain extends IOApp.Simple {
       s"""Starting Resource Server
           | environment          : ${conf.environment}
           | port                 : ${conf.port}
-          | version (git commit) : ${BuildInfo.gitHeadCommit.getOrElse("----")}
+          | version (git commit) : ${gitCommit.getOrElse("----")}
           | tracing              : ${conf.otel.fold("No-op (silent)")(c =>
           s"OpenTelemetry (OTLP) endpoint=${c.endpoint} environment=${c.environment}"
         )}
