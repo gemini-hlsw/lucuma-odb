@@ -986,7 +986,11 @@ object ProposalService {
                       _         <- ResultT.liftF(freezeTooActivation(pid)).whenA(newStatus === ProposalStatus.Accepted)
                       _         <- ResultT(info.sendEmail(pid, newStatus))
                     yield pid
-                  go2.value
+                  // A failed `Result` is a value, not a raised error, so without this the status
+                  // change would commit even when canonicalization failed, leaving the proposal
+                  // submitted with no configuration requests. Warnings still commit.
+                  go2.value.flatTap: r =>
+                    transaction.rollback.unlessA(r.hasValue)
           .value
 
       }

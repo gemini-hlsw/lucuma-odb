@@ -15,6 +15,7 @@ import io.circe.Json
 import io.circe.syntax.*
 import lucuma.core.enums.ArcType
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.math.Angular
@@ -29,6 +30,7 @@ import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.User
+import lucuma.core.util.Enumerated
 import lucuma.odb.data.Cone
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.asFailure
@@ -175,7 +177,10 @@ object ConfigurationService {
                       case Right(cfg) => Result(Map(obsid -> cfg))
                       case Left(DecodingFailures.NoReferenceCoordinates) => OdbError.InvalidConfiguration(Some(s"Reference coordinates are not available for observation $obsid.")).asWarning(Map.empty)
                       case Left(DecodingFailures.NoObservingMode)        => OdbError.InvalidConfiguration(Some(s"Observing mode is undefined for observation $obsid.")).asWarning(Map.empty)
-                      case Left(other) => Result.internalError(other.getMessage)
+                      // A configuration this codec cannot read is a problem with that one
+                      // observation. Failing here would abort the whole program, since the
+                      // results are combined with the `Monoid` above.
+                      case Left(other) => OdbError.InvalidConfiguration(Some(s"Cannot read the configuration of observation $obsid: ${other.getMessage}")).asWarning(Map.empty)
 
     private def selectConfigurations(oids: List[Observation.Id])(using Transaction[F]): ResultT[F, Map[Observation.Id, Configuration]] =
       ResultT:
@@ -1254,6 +1259,14 @@ object ConfigurationService {
                   case (ObservingModeType.GhostIfu, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GhostIfu)
 
+                  // The imaging modes carry no parameters: their filter sets are not part of a
+                  // request's identity, so the mode type alone discriminates them.
+                  case (ObservingModeType.Flamingos2Imaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Imaging)
+
+                  case (ObservingModeType.GnirsImaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.GnirsImaging)
+
                   case (ObservingModeType.GnirsLongSlit, _, _, _, _, _, Some(grating), Some(cam), Some(prism), _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GnirsLongSlit(grating, cam, prism))
 
@@ -1556,6 +1569,14 @@ object ConfigurationService {
                   case (ObservingModeType.GhostIfu, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.GhostIfu)
 
+                  // The imaging modes carry no parameters: their filter sets are not part of a
+                  // request's identity, so the mode type alone discriminates them.
+                  case (ObservingModeType.Flamingos2Imaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.Flamingos2Imaging)
+
+                  case (ObservingModeType.GnirsImaging, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
+                    Right(Configuration.ObservingMode.GnirsImaging)
+
                   case (ObservingModeType.Igrins2LongSlit, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) =>
                     Right(Configuration.ObservingMode.Igrins2LongSlit)
 
@@ -1702,6 +1723,13 @@ object ConfigurationService {
         returning c_configuration_request_id
       """
 
+    private val ExchangeModeTags: String =
+      Enumerated[ExchangeObservingModeType].all.map(m => s"'${m.tag}'").mkString(", ")
+
+    // Exchange observations are deliberately left out: they are excluded from configuration
+    // approval altogether, which `ObservationValidator` expresses as `!info.isExchange`. A null
+    // observing mode is kept, because it decodes to `NoObservingMode` and is reported as a
+    // warning against that observation.
     val SelectActiveNonCalibrations: Query[Program.Id, Observation.Id] =
       sql"""
         select c_observation_id
@@ -1709,6 +1737,8 @@ object ConfigurationService {
         where c_program_id = $program_id
         and c_workflow_user_state is distinct from 'inactive'::e_workflow_user_state
         and c_calibration_role is null
+        and (c_observing_mode_type is null or
+             c_observing_mode_type not in (#$ExchangeModeTags))
       """.query(observation_id)
 
   }

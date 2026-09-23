@@ -291,6 +291,55 @@ class configurationRequests_UniquenessKey
   test("GMOS South imaging - a disjoint filter set reuses the request"):
     assertImagingCollapses(southImaging("R_PRIME"), southImaging("G_PRIME"))
 
+  // GNIRS and Flamingos-2 imaging configurations carry no parameters at all, so every request
+  // for one collapses onto a single row per (program, target, conditions).  Before these modes
+  // had a `Configuration.ObservingMode` variant, submitting a proposal containing one failed with
+  // "couldn't decode mode", and because the per-observation results are combined monoidally that
+  // took every other observation's request down with it.
+  private def gnirsImaging(filters: String*): String =
+    s"""
+      gnirsImaging: {
+        camera: SHORT_BLUE
+        filters: ${filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")}
+        variant: { interleaved: {} }
+      }
+    """
+
+  private def flamingos2Imaging(filters: String*): String =
+    s"""
+      flamingos2Imaging: {
+        filters: ${filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")}
+        variant: { interleaved: {} }
+      }
+    """
+
+  test("GNIRS imaging - a different filter set reuses the request"):
+    assertImagingCollapses(gnirsImaging("J"), gnirsImaging("J", "K"))
+
+  test("Flamingos-2 imaging - a different filter set reuses the request"):
+    assertImagingCollapses(flamingos2Imaging("Y"), flamingos2Imaging("Y", "J"))
+
+  // Parameterless variants are told apart by the observing mode type alone, so that had better
+  // actually distinguish them.
+  test("GNIRS imaging is distinct from GNIRS long slit"):
+    setup.flatMap: (pid, tid) =>
+      for
+        o1 <- createImagingObservation(pid, tid, gnirsImaging("J"))
+        r1 <- createConfigurationRequestAs(pi, o1)
+        r2 <- requestFor(pid, tid, gnirsLongSlit("D111", "SHORT_BLUE"))
+        _  <- IO(assertNotEquals(r1, r2))
+      yield ()
+
+  test("GNIRS imaging is distinct from Flamingos-2 imaging"):
+    setup.flatMap: (pid, tid) =>
+      for
+        o1 <- createImagingObservation(pid, tid, gnirsImaging("J"))
+        o2 <- createImagingObservation(pid, tid, flamingos2Imaging("Y"))
+        r1 <- createConfigurationRequestAs(pi, o1)
+        r2 <- createConfigurationRequestAs(pi, o2)
+        _  <- IO(assertNotEquals(r1, r2))
+      yield ()
+
   // Widening the key must not stop genuinely identical requests collapsing onto one.
   test("identical requests still collapse onto one"):
     setup.flatMap: (pid, tid) =>
