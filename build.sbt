@@ -1,4 +1,5 @@
 import NativePackagerHelper.*
+import com.typesafe.tools.mima.core.*
 // `<task>.inputFiles` is no longer auto-imported in sbt 2.
 import sbt.internal.FileChangesMacro.inputFiles
 
@@ -786,6 +787,8 @@ lazy val itcService = project
     name                  := "lucuma-itc-service",
     // Include internal (unpublished) project dependencies in the package
     projectDependencyArtifacts := (Compile / dependencyClasspathAsJars).value,
+    // Generated, not API: its keys change with the build setup.
+    mimaBinaryIssueFilters ++= Seq(ProblemFilters.exclude[Problem]("buildinfo.BuildInfo*")),
     description              := "ITC Server",
     scalacOptions -= "-Vtype-diffs",
     reStart / javaOptions := Seq(
