@@ -57,6 +57,7 @@ class HerokuConfigSuite extends CatsEffectSuite {
         _ <- putSystemProperty("HEROKU_RELEASE_VERSION", "...")
         _ <- putSystemProperty("DYNO", "...")
         _ <- putSystemProperty("HEROKU_SLUG_DESCRIPTION", "...")
+        _ <- putSystemProperty("GIT_COMMIT", "...")
         _ <- HerokuConfig.default.load[IO]
       } yield ()
     }
@@ -84,6 +85,7 @@ class HerokuConfigSuite extends CatsEffectSuite {
         _ <- putSystemProperty("HEROKU_RELEASE_VERSION", "...")
         _ <- putSystemProperty("DYNO", "...")
         _ <- putSystemProperty("HEROKU_SLUG_DESCRIPTION", "...")
+        _ <- putSystemProperty("GIT_COMMIT", "...")
         _ <- HerokuConfig.config.load[IO]
       } yield ()
     }

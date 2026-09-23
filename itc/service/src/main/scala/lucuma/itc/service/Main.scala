@@ -88,7 +88,7 @@ object Main extends IOApp with ItcCacheOrRemote {
             | redis                : $redis
             | port                 : ${cfg.port}
             | data checksum        : ${BuildInfo.ocslibHash}
-            | version (git commit) : ${BuildInfo.gitHeadCommit.getOrElse("----")}
+            | version (git commit) : ${Option(System.getenv("GIT_COMMIT")).getOrElse("----")}
             | ocs branch           : ${BuildInfo.ocsGitBranch}$localStatus
             | ocs git hash         : ${BuildInfo.ocsGitHash}
             | ocs local            : ${BuildInfo.ocsLocal}

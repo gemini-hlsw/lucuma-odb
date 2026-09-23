@@ -542,13 +542,15 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
   )
 )
 
+// Only content-stable keys go into BuildInfo: anything that changes per build (commit, time)
+// changes the generated source, so the project and every suite reaching it can never be cached.
 lazy val buildInfoSettings = Seq(
-  buildInfoKeys         := Seq[BuildInfoKey](
-      scalaVersion,
-      sbtVersion,
-      git.gitHeadCommit,
-      "buildDateTime"       -> System.currentTimeMillis()
-    )
+  buildInfoKeys := Seq[BuildInfoKey](scalaVersion, sbtVersion)
+)
+
+// The commit travels in the image instead, read at runtime as GIT_COMMIT.
+lazy val dockerGitCommit = Seq(
+  Docker / dockerEnvVars += "GIT_COMMIT" -> git.gitHeadCommit.value.getOrElse("")
 )
 
 lazy val root = project
@@ -628,6 +630,7 @@ lazy val ssoService = project
   .dependsOn(ssoBackendClient, binding, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
+  .settings(dockerGitCommit)
   .settings(
     name := "lucuma-sso-service",
     // Include internal (unpublished) project dependencies, like common, in the package
@@ -778,6 +781,7 @@ lazy val itcService = project
   .dependsOn(itcModel.jvm, binding, otel)
   .enablePlugins(BuildInfoPlugin, LucumaDockerPlugin, JavaServerAppPackaging)
   .settings(itcCommonSettings)
+  .settings(dockerGitCommit)
   .settings(
     name                  := "lucuma-itc-service",
     // Include internal (unpublished) project dependencies in the package
@@ -819,8 +823,6 @@ lazy val itcService = project
     buildInfoKeys         := Seq[BuildInfoKey](
       scalaVersion,
       sbtVersion,
-      git.gitHeadCommit,
-      "buildDateTime" -> System.currentTimeMillis(),
       itcSourceHash,
       ocslibHash,
       ocsGitHash,
@@ -1152,6 +1154,7 @@ lazy val service = project
   .dependsOn(binding, otel, phase0, sequence, smartgcal, ssoFrontendClient.jvm, ssoBackendClient, common)
   .enablePlugins(NoPublishPlugin, LucumaDockerPlugin, JavaAppPackaging, BuildInfoPlugin)
   .settings(buildInfoSettings)
+  .settings(dockerGitCommit)
   .settings(
     name                        := "lucuma-odb-service",
     projectDependencyArtifacts  := (Compile / dependencyClasspathAsJars).value,
