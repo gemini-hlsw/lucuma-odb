@@ -192,9 +192,17 @@ val execLogPath = "/tmp/sbt-exec.log"
 // every dependent compile's and suite's cache digest. With the dynver version that means a new
 // commit invalidates everything but the leaf projects. Tests don't need the real version, so the
 // shards pin it; deploy, publish and MiMa run in other jobs with the real one.
+// A command rather than `set every version`: that would also rewrite scoped versions such as
+// `Jmh / version`, which sbt-jmh uses to resolve its own libraries.
+commands += Command.command("pinCiVersion") { st =>
+  val extracted = Project.extract(st)
+  val pins      = extracted.structure.allProjectRefs.map(p => p / version := "0.0.0-ci")
+  extracted.appendWithSession(pins, st)
+}
+
 def pinnedVersionTestStep(s: WorkflowStep): WorkflowStep =
   WorkflowStep.Run(
-    List("sbt -v '++ ${{ matrix.scala }}; set every version := \"0.0.0-ci\"; lucumaTestAffected'"),
+    List("sbt -v '++ ${{ matrix.scala }}; pinCiVersion; lucumaTestAffected'"),
     id = s.id,
     name = s.name,
     cond = s.cond,
