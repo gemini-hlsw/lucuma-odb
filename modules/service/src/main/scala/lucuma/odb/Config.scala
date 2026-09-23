@@ -3,7 +3,6 @@
 
 package lucuma.odb
 
-import buildinfo.BuildInfo
 import cats.Show
 import cats.effect.*
 import cats.syntax.all.*
@@ -475,10 +474,6 @@ object Config:
   private def envOrProp(name: String): ConfigValue[Effect, String] =
     env(name).or(prop(name))
 
-  private def optValue[A](key: String, value: => Option[A]): ConfigValue[Effect, A] =
-    value.fold(ConfigValue.failed(ConfigError("Missing value"))): v =>
-      ConfigValue.loaded(ConfigKey(key), v)
-
   private val otelEnvironment: ConfigValue[Effect, String] =
     envOrProp("ODB_ENVIRONMENT").default("local")
 
@@ -518,7 +513,7 @@ object Config:
     Email.fromCiris,
     envOrProp("CORS_OVER_HTTPS").as[Boolean].default(true), // By default require https
     envOrProp("ODB_DOMAIN").as[List[String]],
-    optValue("CommitHash", BuildInfo.gitHeadCommit).as[CommitHash].default(CommitHash.Zero),
+    envOrProp("GIT_COMMIT").as[CommitHash].default(CommitHash.Zero),
     envOrProp("GOA_USER_IDS").as[List[User.Id]].map(_.toSet).default(Set.empty),
     envOrProp("OBSCALC_POLL_SECONDS").as[FiniteDuration].default(10.seconds),
     HttpClient.fromCiris,

@@ -16,7 +16,7 @@ on:
 
 env:
   MUNIT_FLAKY_OK: ${{ vars.MUNIT_FLAKY_OK }}
-  SBT_OPTS: '-Dlmcoursier.internal.shaded.coursier.exception-retry=10'
+  SBT_OPTS: '-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10 -Dbuildbuddy.host=${{ secrets.BUILDBUDDY_HOST }} -Dbuildbuddy.key=${{ secrets.BUILDBUDDY_API_KEY }}'
   LUCUMA_AFFECTED_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -38,12 +38,14 @@ jobs:
         java: [temurin@25]
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
+    env:
+      SBT_OPTS: '-Xmx6g -Xss4M -Dlmcoursier.internal.shaded.coursier.exception-retry=10 -Dbuildbuddy.host=${{ secrets.BUILDBUDDY_HOST }} -Dbuildbuddy.key=${{ secrets.BUILDBUDDY_API_KEY }} -Dtest.shard=${{ matrix.shard }} -Dtest.shard.count=8 -Dsbt.experimental_execution_log=/tmp/sbt-exec.log'
     timeout-minutes: 60
     steps:
       - name: Checkout current branch
         uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Setup sbt
         uses: sbt/setup-sbt@v1
@@ -59,7 +61,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: sbt -v +update
 
       - name: Set up cert permissions (1)
         run: chmod 600 test-cert/server.key
@@ -119,18 +121,46 @@ jobs:
           TEST_SHARD_COUNT: 8
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
           RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
-        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' lucumaTestAffected
+        run: sbt -v '++ ${{ matrix.scala }}; stabilizeCiInputs; lucumaTestAffected'
+
+      - name: Cache stats
+        run: sbt -v Global/cacheStats
+
+      - name: Flush exec log
+        run: |
+          sbt shutdown || true
+          sleep 3
+          wc -l /tmp/sbt-exec.log || true
+          python3 - <<'EOF'
+          import json, sys
+          dec = json.JSONDecoder()
+          s = open("/tmp/sbt-exec.log").read(); i = 0
+          while i < len(s):
+              while i < len(s) and s[i] in " \r\n\t": i += 1
+              if i >= len(s): break
+              o, i = dec.raw_decode(s, i)
+              if not o.get("cacheHit"):
+                  inp = o["input"]
+                  print("MISS", inp["digest"][:23], inp["codeContentHash"][:23], inp.get("str", "")[:160].replace("\n", " "))
+          EOF
+
+      - name: Upload exec log
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbt-exec-log-${{ matrix.shard }}
+          path: /tmp/sbt-exec.log
+          if-no-files-found: warn
 
       - name: Docker compose down
         run: docker compose down
 
       - name: Make target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
-        run: mkdir -p itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target modules/common-middleware/target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
+        run: mkdir -p project/target target/out/jvm/scala-3.9.0/lucuma-common-middleware target/out/jvm/scala-3.9.0/lucuma-itc target/out/jvm/scala-3.9.0/lucuma-itc-client target/out/jvm/scala-3.9.0/lucuma-itc-service target/out/jvm/scala-3.9.0/lucuma-itc-testkit target/out/jvm/scala-3.9.0/lucuma-odb-binding target/out/jvm/scala-3.9.0/lucuma-odb-otel target/out/jvm/scala-3.9.0/lucuma-odb-schema target/out/jvm/scala-3.9.0/lucuma-sso-backend-client target/out/jvm/scala-3.9.0/lucuma-sso-frontend-client target/out/sjs1/scala-3.9.0/lucuma-itc target/out/sjs1/scala-3.9.0/lucuma-itc-client target/out/sjs1/scala-3.9.0/lucuma-itc-testkit target/out/sjs1/scala-3.9.0/lucuma-odb-schema target/out/sjs1/scala-3.9.0/lucuma-sso-frontend-client
 
       - name: Compress target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
-        run: tar cf targets.tar itc/testkit/.jvm/target itc/service/target modules/binding/target itc/model/.jvm/target modules/otel/target modules/sso-frontend-client/.jvm/target itc/testkit/.js/target itc/model/.js/target itc/client/jvm/target modules/schema/.js/target target modules/common-middleware/target itc/client/js/target modules/schema/.jvm/target modules/sso-frontend-client/.js/target modules/sso-backend-client/target project/target
+        run: tar cf targets.tar project/target target/out/jvm/scala-3.9.0/lucuma-common-middleware target/out/jvm/scala-3.9.0/lucuma-itc target/out/jvm/scala-3.9.0/lucuma-itc-client target/out/jvm/scala-3.9.0/lucuma-itc-service target/out/jvm/scala-3.9.0/lucuma-itc-testkit target/out/jvm/scala-3.9.0/lucuma-odb-binding target/out/jvm/scala-3.9.0/lucuma-odb-otel target/out/jvm/scala-3.9.0/lucuma-odb-schema target/out/jvm/scala-3.9.0/lucuma-sso-backend-client target/out/jvm/scala-3.9.0/lucuma-sso-frontend-client target/out/sjs1/scala-3.9.0/lucuma-itc target/out/sjs1/scala-3.9.0/lucuma-itc-client target/out/sjs1/scala-3.9.0/lucuma-itc-testkit target/out/sjs1/scala-3.9.0/lucuma-odb-schema target/out/sjs1/scala-3.9.0/lucuma-sso-frontend-client
 
       - name: Upload target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
@@ -168,7 +198,7 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: sbt -v +update
 
       - name: Download target directories (3, 0)
         uses: actions/download-artifact@v6
@@ -202,7 +232,7 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_CREDENTIAL_HOST: ${{ secrets.SONATYPE_CREDENTIAL_HOST }}
-        run: sbt -v -J-Xmx6g -J-Xss4M tlCiRelease
+        run: sbt -v tlCiRelease
 
   validate-steward:
     name: Validate Steward Config
@@ -257,10 +287,10 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: sbt -v +update
 
       - name: Static checks
-        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
+        run: sbt -v '++ ${{ matrix.scala }}; githubWorkflowCheck; headerCheckAll; scalafmtCheckAll; project /; scalafmtSbtCheck; lucumaScalafmtCheck; lucumaScalafixCheck; lucumaSlackNotifyCheck; scalafixAll --check; mimaReportBinaryIssues; doc'
 
       - name: Install npm dependencies
         if: github.event_name == 'pull_request'
@@ -308,27 +338,27 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: sbt -v +update
 
       - name: Clean
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
-        run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' clean
+        run: sbt -v '++ ${{ matrix.scala }}; clean'
 
       - name: Build SSO Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' ssoService/docker:publishLocal'
+        run: sbt -v '++ ${{ matrix.scala }}; ssoService/Docker/publishLocal'
 
       - name: Build ITC Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'itcService'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' itcService/docker:publishLocal'
+        run: sbt -v '++ ${{ matrix.scala }}; itcService/Docker/publishLocal'
 
       - name: Build ODB Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' service/docker:publishLocal obscalc/docker:publishLocal calibrations/docker:publishLocal pdfSummary/docker:publishLocal'
+        run: sbt -v '++ ${{ matrix.scala }}; service/Docker/publishLocal; obscalc/Docker/publishLocal; calibrations/Docker/publishLocal; pdfSummary/Docker/publishLocal'
 
       - name: Build RESOURCE Docker images
         if: (contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
-        run: 'sbt -v -J-Xmx6g -J-Xss4M ''++ ${{ matrix.scala }}'' resourceService/docker:publishLocal'
+        run: sbt -v '++ ${{ matrix.scala }}; resourceService/Docker/publishLocal'
 
       - name: Log in to Heroku
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
@@ -572,13 +602,13 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: sbt -v +update
 
       - name: Compute affected projects
         id: report
         env:
           LUCUMA_AFFECTED_PUSH_BASE: ${{ github.event.before }}
-        run: sbt -v -J-Xmx6g -J-Xss4M lucumaAffectedReport
+        run: sbt -v lucumaAffectedReport
 
   required-checks:
     name: REQUIRED CHECKS FOR BRANCH PROTECTION - AGGREGATED

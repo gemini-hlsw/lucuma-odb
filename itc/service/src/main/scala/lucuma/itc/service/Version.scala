@@ -7,7 +7,8 @@ import buildinfo.BuildInfo
 import eu.timepit.refined.types.string.NonEmptyString
 
 trait Version:
-  val gitHash = BuildInfo.gitHeadCommit
+  // Set in the Docker image by the build; absent when running from sbt.
+  val gitHash: Option[String] = Option(System.getenv("GIT_COMMIT"))
 
   // The reported server version is a content hash of the ITC service and model
   // Scala sources (see the `itcSourceHash` task in build.sbt). This way it only

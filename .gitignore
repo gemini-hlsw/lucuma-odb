@@ -93,3 +93,4 @@ TASK_*.md
 .pi/
 .scratch/
 CONTEXT-MAP.md
+build.sbt.semanticdb

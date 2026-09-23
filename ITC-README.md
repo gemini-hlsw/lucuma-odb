@@ -7,10 +7,10 @@ This is a graphql server acting as a proxy for the old ocs2-based itc server
 It is possible to run locally using sbt
 
 ```
-   sbt ~itcService/reStart
+   sbt "~itcService/reStart"
 ```
 
-When using sbtn there is no output (see https://github.com/spray/sbt-revolver/issues/99).
+`itcService/reStop` stops it; `itcService/reStatus` says whether it is running.
 
 Note, it is important to have [`git lfs`](https://git-lfs.com) installed in
 order to obtain the necessary classes for running the ITC. See (`git lfs` and
