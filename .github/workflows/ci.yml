@@ -121,7 +121,7 @@ jobs:
           TEST_SHARD_COUNT: 8
           SSO_TEST_DB_IMAGE: 'lucuma-sso-test-db:ci'
           RESOURCE_TEST_DB_IMAGE: 'lucuma-resource-test-db:ci'
-        run: sbt -v '++ ${{ matrix.scala }}; lucumaTestAffected'
+        run: 'sbt -v ''++ ${{ matrix.scala }}; set every version := "0.0.0-ci"; lucumaTestAffected'''
 
       - name: Cache stats
         run: sbt -v Global/cacheStats

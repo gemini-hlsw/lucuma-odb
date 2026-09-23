@@ -188,6 +188,19 @@ Global / cacheStats := Def.uncached {
 
 val execLogPath = "/tmp/sbt-exec.log"
 
+// Internal project jars carry the version in their file name and manifest, and both are part of
+// every dependent compile's and suite's cache digest. With the dynver version that means a new
+// commit invalidates everything but the leaf projects. Tests don't need the real version, so the
+// shards pin it; deploy, publish and MiMa run in other jobs with the real one.
+def pinnedVersionTestStep(s: WorkflowStep): WorkflowStep =
+  WorkflowStep.Run(
+    List("sbt -v '++ ${{ matrix.scala }}; set every version := \"0.0.0-ci\"; lucumaTestAffected'"),
+    id = s.id,
+    name = s.name,
+    cond = s.cond,
+    env = s.env
+  )
+
 val cacheDiagnosticSteps: List[WorkflowStep] = List(
   // Plain `sbt`, not WorkflowStep.Sbt: that would prepend `++ <scala>`, and the stats describe
   // the previous command, which must stay the test run.
@@ -300,7 +313,7 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
         // clone has no such ref, so the shard would silently test nothing.
         .withSteps(job.steps.flatMap {
           case s if s.name.contains("Check that workflows are up to date") => Nil
-          case s if s.name.contains("Test affected projects")              => s :: cacheDiagnosticSteps
+          case s if s.name.contains("Test affected projects")              => pinnedVersionTestStep(s) :: cacheDiagnosticSteps
           case s                                                          => List(s)
         })
         .withMatrixFailFast(Some(false))
