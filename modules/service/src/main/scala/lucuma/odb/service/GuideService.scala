@@ -11,6 +11,7 @@ import cats.data.NonEmptySet
 import cats.derived.*
 import cats.effect.Async
 import cats.syntax.all.*
+import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.string.NonEmptyString
 import fs2.Stream
 import grackle.Result
@@ -159,9 +160,6 @@ object GuideService {
 
   given Order[Angle] = Angle.AngleOrder
 
-  // Both are refined new types, which offer an OrderHash but no Eq of their own.
-  private given Eq[GuideStarName]   = Eq.by(_.value.value)
-  private given Eq[BrightnessValue] = Eq.by(_.value.value)
 
   case class GuideTarget(probe: GuideProbe, target: Target)
 
@@ -437,31 +435,29 @@ object GuideService {
         case g: ghost.ifu.Config => g.skyPosition.toList
         case _                   => Nil
 
-    /**
-     * Parameters for an observation behind Altair, where the mode both fixes the probe and brings
-     * its own brightness limits. Only GNIRS sits behind Altair.
-     */
-    private def altairAgsParamsFor(mode: AltairMode): Option[AgsParams] =
-      params.observingMode match
-        case gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera) =>
-          AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withAltair(mode).some
-        case gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu))                                  =>
-          AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withAltair(mode).some
-        case gnirs.imaging.Config(camera = camera, filters = filters)                                         =>
-          AgsParams.GnirsImaging(camera, AgsParams.GnirsImaging.representativeFilter(filters.map(_.filter)), PortDisposition.Bottom).withAltair(mode).some
-        case _                                                                                                =>
-          none
-
     def agsParamsFor(
       trackType:     TrackType,
       explicitProbe: Option[GuideProbe],
       altair:        Option[AltairConfiguration]
     ): Option[AgsParams] =
-      explicitProbe.orElse(probes.defaultGuideProbe(observingModeType, trackType, altair.map(_.mode))).flatMap: probe =>
-        // The Altair parameters apply only when the probe is the one Altair guides with, which for
-        // LGS+P1 is PWFS1.
-        altair.filter(_.guideProbe === probe).map(_.mode).flatMap(altairAgsParamsFor).orElse:
+      val altairMode: Option[AltairMode] = altair.map(_.mode)
+      // Behind Altair the mode fixes the probe and brings its own brightness limits: the AOWFS for
+      // NGS and LGS, PWFS1 for LGS+P1. Only GNIRS sits behind Altair.
+      val lgsP1: Boolean = altairMode.contains(AltairMode.LgsP1)
+      explicitProbe.orElse(probes.defaultGuideProbe(observingModeType, trackType, altairMode)).flatMap: probe =>
           (params.observingMode, probe) match
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.AltairAOWFS) =>
+              altairMode.map(AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withAltair(_))
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1) if lgsP1 =>
+              AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withAltair(AltairMode.LgsP1).some
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.AltairAOWFS)    =>
+              altairMode.map(AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withAltair(_))
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1) if lgsP1 =>
+              AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withAltair(AltairMode.LgsP1).some
+            case (gnirs.imaging.Config(camera = camera, filters = filters), GuideProbe.AltairAOWFS)          =>
+              altairMode.map(AgsParams.GnirsImaging(camera, AgsParams.GnirsImaging.representativeFilter(filters.map(_.filter)), PortDisposition.Bottom).withAltair(_))
+            case (gnirs.imaging.Config(camera = camera, filters = filters), GuideProbe.PWFS1) if lgsP1       =>
+              AgsParams.GnirsImaging(camera, AgsParams.GnirsImaging.representativeFilter(filters.map(_.filter)), PortDisposition.Bottom).withAltair(AltairMode.LgsP1).some
             case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS)                            =>
               AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
             case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1)                                =>
@@ -1213,7 +1209,7 @@ object GuideService {
             obsInfo         <- ResultT(getObservationInfo(oid))
             // Like Explore's own AGS, an unset observation time defaults to now and an unset
             // duration to the observation's full time estimate.
-            now             <- ResultT.liftF(Async[F].realTimeInstant.map(Timestamp.unsafeFromInstantTruncated))
+            now             <- ResultT.liftF(Timestamp.timestampNow[F])
             obsTime          = obsInfo.optObsTime.getOrElse(now)
             obsDuration      = obsInfo.optObsDuration.getOrElse(generatorInfo.timeEstimate)
             scienceDuration <- ResultT.fromResult(generatorInfo.getScienceDuration(obsDuration, oid))
