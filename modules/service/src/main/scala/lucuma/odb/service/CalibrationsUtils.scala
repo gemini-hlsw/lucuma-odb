@@ -91,15 +91,17 @@ object ObsExtract:
       case _                                                                                           => false
 
   /** Roughly one calibration epoch per this much science time. */
+  // TODO: This is a temporary value. In the future this will depend on the obs wavelength.
   val CalibrationEpochInterval: TimeSpan = 90.minTimeSpan
 
   /** Calibration epochs over the lifetime of an observation: ceil(scienceTime / interval). */
+  // TODO: This is a temporary value. In the future this will depend on the obs wavelength and duration
   def calibrationEpochs(scienceTime: TimeSpan): NonNegInt =
     NonNegInt.unsafeFrom:
       math.ceil(scienceTime.toMicroseconds.toDouble / CalibrationEpochInterval.toMicroseconds.toDouble).toInt
 
   /**
-   * Calibration epochs carried in the time estimate.  Zero for calibration
+   * Calibration carried in the time estimate.  Zero for calibration
    * observations and for modes that take no telluric; independent of the
    * telluric type, which only decides whether each epoch costs a telluric.
    */
