@@ -150,6 +150,10 @@ val buildBuddyApiKey = sys.props.get("buildbuddy.key").filter(_.nonEmpty)
 Global / remoteCache        := buildBuddyHost.zip(buildBuddyApiKey).map((h, _) => uri(s"grpcs://$h"))
 Global / remoteCacheHeaders ++= buildBuddyApiKey.map("x-buildbuddy-api-key=" + _).toList
 
+// Skip suites already recorded as passed, on this machine or via BuildBuddy. Bump
+// sbt.cacheversion when the Postgres image or test environment changes; the digest can't see it.
+ThisBuild / lucumaAffectedTestTask := "test"
+
 ThisBuild / githubWorkflowSbtCommand := "sbt -v"
 
 ThisBuild / githubWorkflowBuildPreamble ~= { steps =>

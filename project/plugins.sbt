@@ -1,9 +1,13 @@
-val SbtLucumaVersion = "0.17-04f40af-SNAPSHOT"
+val SbtLucumaVersion = "0.17-4e28080-20260923T003126Z-SNAPSHOT"
 
 // Hosts the sbt 2 build of sbt-lucuma, and the sbt-typelevel snapshot it depends on.
 resolvers += "gemini-hlsw".at(
   "https://raw.githubusercontent.com/gemini-hlsw/maven-repo/master/releases"
 )
+
+// The remote cache (Global / remoteCache) is a separate plugin in sbt 2; without this the
+// setting is accepted but only the local disk store is ever used.
+addRemoteCachePlugin
 
 addSbtPlugin("com.timushev.sbt"    % "sbt-updates"       % "0.7.0")
 addSbtPlugin("edu.gemini"          % "sbt-lucuma-lib"    % SbtLucumaVersion)
