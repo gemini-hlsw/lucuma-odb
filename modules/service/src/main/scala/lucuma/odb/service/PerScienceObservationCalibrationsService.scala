@@ -7,6 +7,7 @@ import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
+import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
@@ -22,6 +23,7 @@ import lucuma.core.model.Program
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Existence
+import lucuma.odb.data.ExposureTimeModeId
 import lucuma.odb.data.ExposureTimeModeRole
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.Nullable
@@ -187,7 +189,7 @@ object PerScienceObservationCalibrationsService:
         for {
           telluricId <- insertTelluricObservation(pid, groupId, telluricIndex)
           _          <- telluricTargetsService.requestTelluricTarget(pid, telluricId, scienceOid, duration, order)
-          _          <- syncConfiguration(scienceOid, telluricId)
+          _          <- syncConfiguration(pid, scienceOid, telluricId, CalibrationRole.Telluric)
         } yield telluricId
 
       private def createTelluricCalibrations(
@@ -267,7 +269,7 @@ object PerScienceObservationCalibrationsService:
             // Only sync existing tellurics that are note deleted or recreated.
             toSync              = if (created.nonEmpty) List.empty
                                   else existing.filterNot(deleted.contains)
-            _                  <- toSync.traverse_(tid => syncConfiguration(obs.id, tid))
+            _                  <- toSync.traverse_(tid => syncConfiguration(pid, obs.id, tid, CalibrationRole.Telluric))
           } yield (created, deleted)
 
       // ---- Daytime pinhole flats (GNIRS cross-dispersed) ----
@@ -329,10 +331,10 @@ object PerScienceObservationCalibrationsService:
               case (true, Nil) =>
                 for
                   oid <- insertDaytimePinholeObservation(pid, gid)
-                  _   <- syncConfiguration(obs.id, oid)
+                  _   <- syncConfiguration(pid, obs.id, oid, CalibrationRole.DaytimePinhole)
                 yield (List(oid), List.empty[Observation.Id])
               case (true, es)  =>
-                es.traverse_(oid => syncConfiguration(obs.id, oid))
+                es.traverse_(oid => syncConfiguration(pid, obs.id, oid, CalibrationRole.DaytimePinhole))
                   .as((List.empty[Observation.Id], List.empty[Observation.Id]))
               case (false, es) =>
                 excludeObsCalibrationsFromDeletion(es, identity).flatMap: deletable =>
@@ -361,7 +363,11 @@ object PerScienceObservationCalibrationsService:
               pResult <- syncDaytimePinhole(pid, obs, gid)
             yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
 
-      private val MaxTelluricSN = SignalToNoise.fromInt(100).get
+      // Used when no science S/N can be derived.
+      private val FallbackTelluricSN = SignalToNoise.fromInt(100).get
+
+      // The largest value that still fits once doubled.
+      private val MaxUndoubledSN = SignalToNoise.Max.toBigDecimal / 2
 
       /**
        * The telluric's acquisition is reset rather than copied: the standard is
@@ -383,60 +389,117 @@ object PerScienceObservationCalibrationsService:
       // After cloning we have the same etm as science, but we need a different one for tellurics
       // https://app.shortcut.com/lucuma/story/6968/generate-telluric-standard-sequence
       private def createTelluricExposureTimeMode(
-        mode:        Option[ObservingModeType],
-        scienceOid:  Observation.Id,
-        telluricOid: Observation.Id
+        mode:            Option[ObservingModeType],
+        pid:             Program.Id,
+        scienceOid:      Observation.Id,
+        telluricOid:     Observation.Id,
+        calibrationRole: CalibrationRole
       )(using Transaction[F]): F[Unit] =
-        def telluricEtm(etm: ExposureTimeMode): ExposureTimeMode.SignalToNoiseMode =
-          val snValue = etm match
-            case ExposureTimeMode.SignalToNoiseMode(sn, _) =>
-              SignalToNoise.unsafeFromBigDecimalExact(
-                (sn.toBigDecimal * 2).min(MaxTelluricSN.toBigDecimal)
-              )
-            case _ =>
-              MaxTelluricSN
-          ExposureTimeMode.SignalToNoiseMode(snValue, etm.at)
+        def doubled(sn: SignalToNoise): SignalToNoise =
+          SignalToNoise.unsafeFromBigDecimalExact(sn.toBigDecimal.min(MaxUndoubledSN) * 2)
 
-        // Update in place rather than delete-and-insert: GNIRS spectroscopy's
-        // central wavelength rows reference their science ETM with ON DELETE
-        // CASCADE, so deleting the ETM would take the observing mode's
-        // wavelengths with it.  `updateMany` updates the rows that exist and
-        // inserts where none does, so the end state is the same for every other
-        // mode.
-        def replaceEtm(
-          role:       ExposureTimeModeRole,
-          newEtm:     ExposureTimeMode,
-          current:    Option[ExposureTimeMode],
-          isExplicit: Boolean = true
-        ): F[Unit] =
+        // A requested S/N as is; for time and count, the ITC's measured S/N.
+        def scienceSN(etm: ExposureTimeMode, measured: Option[SignalToNoise]): Option[SignalToNoise] =
+          etm match
+            case ExposureTimeMode.SignalToNoiseMode(sn, _) => sn.some
+            case _                                         => measured
+
+        // Twice the science's S/N, uncapped.
+        def telluricEtm(
+          etm:      ExposureTimeMode,
+          measured: Option[SignalToNoise]
+        ): ExposureTimeMode.SignalToNoiseMode =
+          ExposureTimeMode.SignalToNoiseMode(scienceSN(etm, measured).fold(FallbackTelluricSN)(doubled), etm.at)
+
+        // One telluric configuration per science wavelength: sized from the deepest of the
+        // group, at the average of their S/N wavelengths.
+        def groupedTelluricEtm(
+          group: NonEmptyList[(ExposureTimeMode, Option[SignalToNoise])]
+        ): ExposureTimeMode.SignalToNoiseMode =
+          val sn = group.toList
+            .flatMap((etm, m) => scienceSN(etm, m))
+            .maximumByOption(_.toBigDecimal)
+            .fold(FallbackTelluricSN)(doubled)
+          val at = group.map(_._1.at.toPicometers.value.value.toLong).sumAll
+          val pm = ((at + group.size / 2) / group.size).toInt
+          ExposureTimeMode.SignalToNoiseMode(sn, PosInt.from(pm).map(Wavelength(_)).getOrElse(group.head._1.at))
+
+        // Read whatever is stored, not only a hash-current result: GNIRS rewrites its
+        // derived acquisition S/N after caching, which moves the hash off the row.
+        def measuredScienceSNs: F[List[Option[SignalToNoise]]] =
+          itcService
+            .selectStoredScience(pid, scienceOid)
+            .map(_.foldMap(_.totalSignalToNoisePerConfig.toList.map(_.map(_.value))))
+
+        // The acquisition is the mode's default, not a PI choice, hence derived.
+        def replaceAcqEtm(newEtm: ExposureTimeMode, current: Option[ExposureTimeMode]): F[Unit] =
           exposureTimeModeService
-            .updateMany(List(telluricOid), role, newEtm, isExplicit)
+            .updateMany(List(telluricOid), ExposureTimeModeRole.Acquisition, newEtm, isExplicit = false)
             .unlessA(current.contains(newEtm))
             .void
 
+        def currentScienceEtms(oid: Observation.Id): F[List[(ExposureTimeModeId, ExposureTimeMode, Option[Wavelength])]] =
+          S.session
+            .prepareR(Statements.selectCurrentScienceExposureTimeModes)
+            .use(_.stream(oid, 8).compile.toList)
+
+        def scienceEtmsByIndex(oid: Observation.Id): F[List[(ExposureTimeModeId, ExposureTimeMode, Int, Option[Wavelength])]] =
+          S.session
+            .prepareR(Statements.selectScienceExposureTimeModesByIndex)
+            .use(_.stream(oid, 8).compile.toList)
+
+        // A pinhole pairs with the science configuration at the same index; a telluric,
+        // collapsed to one row per wavelength, with the science configurations sharing it.
+        // An unpaired row falls back to the deepest.
+        def telluricEtmFor(
+          science: List[(ExposureTimeMode, Option[SignalToNoise], Option[Wavelength])]
+        ): (Int, Option[Wavelength]) => Option[ExposureTimeMode.SignalToNoiseMode] =
+          val byIndex  = science.map((etm, m, _) => telluricEtm(etm, m))
+          val byLambda = science
+            .groupByNel(_._3)
+            .view
+            .mapValues(g => groupedTelluricEtm(g.map((etm, m, _) => (etm, m))))
+            .toMap
+          val deepest  = byIndex.maxByOption(_.value.toBigDecimal)
+          calibrationRole match
+            case CalibrationRole.Telluric => (_, w) => byLambda.get(w).orElse(deepest)
+            case _                        => (i, _) => byIndex.lift(i).orElse(deepest)
+
         for {
+          // Cloning copied the PI's c_is_explicit; the writes below skip unchanged values.
+          _          <- exposureTimeModeService
+                          .setDerived(List(telluricOid), ExposureTimeModeRole.Science, FallbackTelluricSN)
           allEtm     <- exposureTimeModeService
-                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Science, ExposureTimeModeRole.Acquisition)
-          allSciEtm   = allEtm.collect:
-                          case (oid, roles) if roles.contains(ExposureTimeModeRole.Science) =>
-                            oid -> roles(ExposureTimeModeRole.Science).head
+                           .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Acquisition)
           allAcqEtm   = allEtm.collect:
                           case (oid, roles) if roles.contains(ExposureTimeModeRole.Acquisition) =>
                             oid -> roles(ExposureTimeModeRole.Acquisition).head
-          scienceEtm  = allSciEtm.get(scienceOid)
-          _          <- scienceEtm.traverse_ : etm =>
-                          // Normally there is a single acq etm but is safe to go over all of them.
-                          // It is written as derived, not explicit: it is the mode's default,
-                          // not a user choice.
-                          val acqEtm = allAcqEtm.get(scienceOid).map(a => telluricAcquisitionEtm(mode, a.at))
-
-                          replaceEtm(ExposureTimeModeRole.Science, telluricEtm(etm), allSciEtm.get(telluricOid)) *>
-                            acqEtm.traverse_(replaceEtm(ExposureTimeModeRole.Acquisition, _, allAcqEtm.get(telluricOid), isExplicit = false))
+          scienceEtms <- currentScienceEtms(scienceOid)
+          telluricEtms<- scienceEtmsByIndex(telluricOid)
+          // Only a time-and-count configuration needs the ITC.
+          needsItc     = scienceEtms.exists:
+                           _._2 match
+                             case ExposureTimeMode.SignalToNoiseMode(_, _) => false
+                             case _                                        => true
+          measured    <- if needsItc then measuredScienceSNs else List.empty.pure[F]
+          candidate   = telluricEtmFor:
+                          scienceEtms.zipWithIndex.map: (row, i) =>
+                            (row._2, measured.lift(i).flatten, row._3)
+          _          <- telluricEtms.traverse_ : row =>
+                          candidate(row._3, row._4).traverse_ : sci =>
+                            exposureTimeModeService
+                              .updateOne(row._1, sci)
+                              .unlessA(row._2 === (sci: ExposureTimeMode))
+          _          <- allAcqEtm.get(scienceOid)
+                          .map(a => telluricAcquisitionEtm(mode, a.at))
+                          .traverse_(replaceAcqEtm(_, allAcqEtm.get(telluricOid)))
         } yield ()
 
       private def syncConfiguration(
-        sourceOid: Observation.Id,
-        targetOid: Observation.Id
+        pid:             Program.Id,
+        sourceOid:       Observation.Id,
+        targetOid:       Observation.Id,
+        calibrationRole: CalibrationRole
       )(using Transaction[F], SuperUserAccess): F[Unit] =
 
         def readObservingModes: F[List[(Observation.Id, Option[ObservingModeType])]] =
@@ -514,6 +577,14 @@ object PerScienceObservationCalibrationsService:
             case _ =>
               F.unit
 
+        // A telluric observes each science wavelength once; a pinhole keeps the list as is.
+        def collapseTelluricWavelengths(sm: Option[ObservingModeType]): F[Unit] =
+          (sm, calibrationRole) match
+            case (Some(ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu), CalibrationRole.Telluric) =>
+              gnirsSpectroscopyService.collapseTelluricWavelengths(targetOid)
+            case _ =>
+              F.unit
+
         for {
           modes    <- readObservingModes
           (sm, tm) <- extractModes(modes)
@@ -523,7 +594,8 @@ object PerScienceObservationCalibrationsService:
           _        <- updateTargetModeType(sm)
           _        <- cloneSourceMode(sm)
           _        <- resetTelluricConfig(sm)
-          _        <- createTelluricExposureTimeMode(telluricModeFor(sm), sourceOid, targetOid)
+          _        <- collapseTelluricWavelengths(sm)
+          _        <- createTelluricExposureTimeMode(telluricModeFor(sm), pid, sourceOid, targetOid, calibrationRole)
         } yield ()
 
       private def findObsCalibrationGroupForObservation(
@@ -629,6 +701,46 @@ object PerScienceObservationCalibrationsService:
               AND  g.c_system = true
               AND  g.c_calibration_roles && $_calibration_role
           """.query(group_id)
+
+        // The live ('current') science exposure time modes in configuration order, which is
+        // the order of the ITC results.  GNIRS keeps an 'initial' list beside it (V1248);
+        // other modes have a single row and no wavelength table.
+        val selectCurrentScienceExposureTimeModes: Query[Observation.Id, (ExposureTimeModeId, ExposureTimeMode, Option[Wavelength])] =
+          sql"""
+            SELECT e.c_exposure_time_mode_id,
+                   e.c_exposure_time_mode,
+                   e.c_signal_to_noise_at,
+                   e.c_signal_to_noise,
+                   e.c_exposure_time,
+                   e.c_exposure_count,
+                   g.c_central_wavelength
+            FROM   t_exposure_time_mode e
+            LEFT JOIN t_gnirs_central_wavelength_config g
+                   ON g.c_exposure_time_mode_id = e.c_exposure_time_mode_id
+            WHERE  e.c_observation_id = $observation_id
+              AND  e.c_role = 'science'::e_exposure_time_mode_role
+              AND  (g.c_version IS NULL OR g.c_version = 'current'::e_observing_mode_row_version)
+            ORDER BY COALESCE(g.c_index, 0), e.c_exposure_time_mode_id
+          """.query(exposure_time_mode_id *: exposure_time_mode *: wavelength_pm.opt)
+
+        // Every science exposure time mode row, both versions, with its configuration's
+        // index and wavelength.  The calibration's 'initial' rows are written too.
+        val selectScienceExposureTimeModesByIndex: Query[Observation.Id, (ExposureTimeModeId, ExposureTimeMode, Int, Option[Wavelength])] =
+          sql"""
+            SELECT e.c_exposure_time_mode_id,
+                   e.c_exposure_time_mode,
+                   e.c_signal_to_noise_at,
+                   e.c_signal_to_noise,
+                   e.c_exposure_time,
+                   e.c_exposure_count,
+                   COALESCE(g.c_index, 0),
+                   g.c_central_wavelength
+            FROM   t_exposure_time_mode e
+            LEFT JOIN t_gnirs_central_wavelength_config g
+                   ON g.c_exposure_time_mode_id = e.c_exposure_time_mode_id
+            WHERE  e.c_observation_id = $observation_id
+              AND  e.c_role = 'science'::e_exposure_time_mode_role
+          """.query(exposure_time_mode_id *: exposure_time_mode *: skunk.codec.numeric.int4 *: wavelength_pm.opt)
 
         val selectTelluricObservations: Query[(Group.Id, CalibrationRole), Observation.Id] =
           sql"""

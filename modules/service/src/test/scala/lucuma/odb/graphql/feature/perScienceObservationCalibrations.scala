@@ -36,6 +36,8 @@ import lucuma.core.math.BrightnessUnits.Integrated
 import lucuma.core.math.BrightnessValue
 import lucuma.core.math.Coordinates
 import lucuma.core.math.SignalToNoise
+import lucuma.core.math.SingleSN
+import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Group
@@ -53,6 +55,7 @@ import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan
 import lucuma.core.util.Timestamp
 import lucuma.itc.IntegrationTime
+import lucuma.itc.SignalToNoiseAt
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.OdbError
@@ -162,6 +165,17 @@ class perScienceObservationCalibrations
 
   override protected def telluricClient: IO[TelluricTargetsClient[IO]] =
     TelluricTargetsClientMock.fromJson(mockTelluricJson, SimbadClientMock.withSingleTarget(mockTarget))
+
+  // The fake ITC measures the ticket's S/N of 116, so a telluric sized from it lands at 232.
+  override def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
+    // 116 everywhere but 1650nm, which measures 50, so per-wavelength sizing is visible.
+    val total =
+      if w === Wavelength.fromIntNanometers(1650).get then 50 else 116
+    SignalToNoiseAt(
+      w,
+      SingleSN(SignalToNoise.unsafeFromBigDecimalExact(58)),
+      TotalSN(SignalToNoise.unsafeFromBigDecimalExact(total))
+    )
 
   // Override fake ITC to vary duration based on exposure time mode
   override def fakeItcSpectroscopyResultFor(input: SpectroscopyInput): Option[IntegrationTime] =
@@ -289,6 +303,54 @@ class perScienceObservationCalibrations
 
       AllEtmInfo(parseEtm(reqEtm), parseEtm(acqEtm), parseEtm(sciEtm))
     }
+
+  private def scienceEtmIsExplicit(oid: Observation.Id): IO[Boolean] =
+    import skunk.codec.boolean.bool
+    withSession: s =>
+      s.unique(
+        sql"""SELECT c_is_explicit
+                FROM t_exposure_time_mode
+               WHERE c_observation_id = $observation_id
+                 AND c_role = 'science'::e_exposure_time_mode_role""".query(bool)
+      )(oid)
+
+  private def scienceEtmSignalToNoise(oid: Observation.Id): IO[List[Option[SignalToNoise]]] =
+    withSession: s =>
+      s.execute(
+        sql"""SELECT c_signal_to_noise
+                FROM t_exposure_time_mode
+               WHERE c_observation_id = $observation_id
+                 AND c_role = 'science'::e_exposure_time_mode_role"""
+          .query(lucuma.odb.util.Codecs.signal_to_noise.opt)
+      )(oid)
+
+  // Keeps the stored ITC result but breaks its input hash, as GNIRS does after caching.
+  private def staleItcHash(oid: Observation.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"""UPDATE t_itc_result
+                 SET c_hash = decode(md5('stale'), 'hex')
+               WHERE c_observation_id = $observation_id""".command
+      )(oid).void
+
+  // Makes the superseded 'initial' science etm a deep S/N request.
+  private def deepenInitialScienceEtm(oid: Observation.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"""UPDATE t_exposure_time_mode e
+                 SET c_exposure_time_mode = 'signal_to_noise'::e_exp_time_mode,
+                     c_signal_to_noise    = 500,
+                     c_exposure_time      = NULL,
+                     c_exposure_count     = NULL
+               WHERE e.c_observation_id = $observation_id
+                 AND e.c_role = 'science'::e_exposure_time_mode_role
+                 AND EXISTS (
+                       SELECT 1
+                         FROM t_gnirs_central_wavelength_config g
+                        WHERE g.c_exposure_time_mode_id = e.c_exposure_time_mode_id
+                          AND g.c_version = 'initial'::e_observing_mode_row_version
+                     )""".command
+      )(oid).void
 
   private def selectTelluricObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
     queryObservation(oid).flatMap: obs =>
@@ -1799,7 +1861,7 @@ class perScienceObservationCalibrations
       assertEquals(removed2.size, 0)
     }
 
-  test("telluric etm is sn with a max of 100"):
+  test("telluric sv is 2x science"):
     for {
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
@@ -1816,37 +1878,12 @@ class perScienceObservationCalibrations
     } yield {
       assertEquals(scienceEtm.snValue, SignalToNoise.unsafeFromBigDecimalExact(75.0).some)
       assertEquals(scienceEtm.snWAt, Wavelength.fromIntNanometers(510))
-      // Science has S/N = 75, telluric would be max(100, 2 * 75 = 150)
-      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
-      assertEquals(telluricEtms.science.snWAt, scienceEtm.snWAt)
-      assertEquals(telluricEtms.acquisition.snValue, SignalToNoise.unsafeFromBigDecimalExact(10).some)
-      assertEquals(telluricEtms.acquisition.snWAt, Wavelength.fromIntNanometers(500))
-    }
-
-  test("telluric sv is 2x science"):
-    for {
-      pid          <- createProgramAs(pi)
-      tid          <- createTargetWithProfileAs(pi, pid)
-      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _            <- setScienceRequirements(oid, DefaultSnAt, 30.0)
-      _            <- runObscalcUpdate(pid, oid)
-      _            <- recalculateCalibrations(pid, when, oid)
-      scienceEtm   <- queryExposureTimeMode(oid)
-      obs          <- queryObservation(oid)
-      groupId      =  obs.groupId.get
-      obsInGroup   <- queryObservationsInGroup(groupId)
-      telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
-      telluricEtms <- queryAllEtms(telluricOid)
-    } yield {
-      // Science has sn = 30, telluric is 60
-      assertEquals(scienceEtm.snValue, SignalToNoise.unsafeFromBigDecimalExact(30.0).some)
-      assertEquals(scienceEtm.snWAt, Wavelength.fromIntNanometers(510))
-      // Science etm is synced for tellurics
-      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(60).some)
+      // Science has sn = 75, telluric is 150: twice the science, not capped at 100.
+      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(150).some)
       assertEquals(telluricEtms.science.snWAt, scienceEtm.snWAt)
     }
 
-  test("telluric gets sn 100 when science is txc"):
+  test("telluric sn is 2x the ITC's measured sn when science is txc"):
     for {
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
@@ -1860,14 +1897,87 @@ class perScienceObservationCalibrations
       obsInGroup   <- queryObservationsInGroup(groupId)
       telluricOid  =  obsInGroup.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricEtms <- queryAllEtms(telluricOid)
+      isExplicit   <- scienceEtmIsExplicit(telluricOid)
     } yield {
       assertEquals(scienceEtm.snValue, None)
       assert(scienceEtm.txcValue.isDefined)
       assertEquals(scienceEtm.txcWvAt, Wavelength.fromIntNanometers(1390))
-      // Science etm is synced for tellurics
-      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+      // No requested S/N, so the telluric doubles the measured one.
+      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(232).some)
       assertEquals(telluricEtms.science.snWAt, scienceEtm.txcWvAt)
+      // System-set, so the PI never sees it reported as their own choice.
+      assertEquals(isExplicit, false)
     }
+
+  // Regression: reading only a hash-current ITC result left GNIRS tellurics on the fallback.
+  test("telluric sn survives an ITC input hash that has moved on"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1600))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- staleItcHash(oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      sns    <- telOpt.traverse(scienceEtmSignalToNoise)
+    } yield
+      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(232).some).some)
+
+  // Each science wavelength sizes its own telluric configuration, requested or measured.
+  test("telluric configurations follow science configurations expressed differently"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsMixedEtmObservationAs(pi, pid, tid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      sns    <- telOpt.traverse(scienceEtmSignalToNoise)
+    } yield
+      // The requested leg asks for 200 (2 x 100), the measured leg for 232 (2 x 116).
+      assertEquals(
+        sns.map(_.flatten.map(_.toBigDecimal).distinct.sorted),
+        List(BigDecimal(200), BigDecimal(232)).some
+      )
+
+  // Regression: a superseded 'initial' GNIRS row must not size the telluric.
+  test("telluric sn ignores a superseded initial science etm"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsShallowSnObservationAs(pi, pid, tid)
+      _      <- deepenInitialScienceEtm(oid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      sns    <- telOpt.traverse(scienceEtmSignalToNoise)
+    } yield
+      // 2 x the live S/N 10, not the superseded 500.
+      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(20).some).some)
+
+  test("science configurations sharing a wavelength collapse to one telluric configuration"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsRepeatedWavelengthObservationAs(pi, pid, tid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      rows   <- telOpt.traverse(gnirsWavelengthRows)
+    } yield
+      // One 1650 row per version, renumbered: 2 x the deeper leg (measured 50 over
+      // requested 40), the average of 1640 and 1660, the larger coadds.
+      val expected = List(
+        ("current", 0, 1650, 4, 100, 1650),
+        ("current", 1, 1600, 1, 232, 1600),
+        ("initial", 0, 1650, 4, 100, 1650),
+        ("initial", 1, 1600, 1, 232, 1600)
+      )
+      assertEquals(rows.map(_.sortBy(_._1)), expected.some)
 
   test("telluric etm is updated when science etm changes"):
     val wavelength1 = Wavelength.fromIntNanometers(500).get
@@ -1893,7 +2003,7 @@ class perScienceObservationCalibrations
     } yield {
       assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
       assertEquals(telluricEtms1.science.snWAt, wavelength1.some)
-      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(120).some)
       assertEquals(telluricEtms2.science.snWAt, wavelength2.some)
     }
 
@@ -1918,8 +2028,8 @@ class perScienceObservationCalibrations
     } yield {
       assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
       assertEquals(telluricEtms1.science.snWAt, Wavelength.fromIntNanometers(510))
-      // Only Science ETM is synced for tellurics
-      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+      // Switching to time and count moves the telluric from the requested to the measured S/N.
+      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(232).some)
       assertEquals(telluricEtms2.science.snWAt, Wavelength.fromIntNanometers(1500))
     }
 
@@ -2425,6 +2535,135 @@ class perScienceObservationCalibrations
         }
       """
     ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  // One wavelength on a requested S/N, the other on time and count.
+  private def createGnirsMixedEtmObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tid:  Target.Id
+  ): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson},
+            SET: {
+              targetEnvironment: { asterism: ${List(tid).asJson} }
+              scienceRequirements: ${scienceRequirementsObject(ObservingModeType.GnirsLongSlit)}
+              observingMode: {
+                gnirsSpectroscopy: {
+                  grating: D32
+                  prism: SXD
+                  camera: SHORT_BLUE
+                  slit: { fpu: LONG_SLIT_0_30 }
+                  filter: ORDER3
+                  centralWavelengths: [
+                    { centralWavelength: { nanometers: 1600 }
+                      exposureTimeMode: { timeAndCount: { time: { seconds: 60.0 } count: 8 at: { nanometers: 1600 } } } }
+                    { centralWavelength: { nanometers: 1650 }
+                      exposureTimeMode: { signalToNoise: { value: 100 at: { nanometers: 1650 } } } }
+                  ]
+                }
+              }
+              constraintSet: { imageQuality: POINT_EIGHT }
+            }
+          }) { observation { id } }
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  private def createGnirsShallowSnObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tid:  Target.Id
+  ): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson},
+            SET: {
+              targetEnvironment: { asterism: ${List(tid).asJson} }
+              scienceRequirements: ${scienceRequirementsObject(ObservingModeType.GnirsLongSlit)}
+              observingMode: {
+                gnirsSpectroscopy: {
+                  grating: D32
+                  prism: SXD
+                  camera: SHORT_BLUE
+                  slit: { fpu: LONG_SLIT_0_30 }
+                  filter: ORDER3
+                  centralWavelengths: [
+                    { centralWavelength: { nanometers: 1650 }
+                      exposureTimeMode: { signalToNoise: { value: 10 at: { nanometers: 1650 } } } }
+                  ]
+                }
+              }
+              constraintSet: { imageQuality: POINT_EIGHT }
+            }
+          }) { observation { id } }
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  // 1650 twice, expressed differently, then 1600: collapsing leaves an index gap.
+  private def createGnirsRepeatedWavelengthObservationAs(
+    user: User,
+    pid:  Program.Id,
+    tid:  Target.Id
+  ): IO[Observation.Id] =
+    query(
+      user = user,
+      query = s"""
+        mutation {
+          createObservation(input: {
+            programId: ${pid.asJson},
+            SET: {
+              targetEnvironment: { asterism: ${List(tid).asJson} }
+              scienceRequirements: ${scienceRequirementsObject(ObservingModeType.GnirsLongSlit)}
+              observingMode: {
+                gnirsSpectroscopy: {
+                  grating: D32
+                  prism: SXD
+                  camera: SHORT_BLUE
+                  slit: { fpu: LONG_SLIT_0_30 }
+                  filter: ORDER3
+                  centralWavelengths: [
+                    { centralWavelength: { nanometers: 1650 }
+                      exposureTimeMode: { signalToNoise: { value: 40 at: { nanometers: 1640 } } } }
+                    { centralWavelength: { nanometers: 1650 }
+                      coadds: 4
+                      exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1660 } } } }
+                    { centralWavelength: { nanometers: 1600 }
+                      exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1600 } } } }
+                  ]
+                }
+              }
+              constraintSet: { imageQuality: POINT_EIGHT }
+            }
+          }) { observation { id } }
+        }
+      """
+    ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  // (version, index, central wavelength nm, coadds, science S/N, S/N at nm) per row.
+  private def gnirsWavelengthRows(oid: Observation.Id): IO[List[(String, Int, Int, Int, Int, Int)]] =
+    import skunk.codec.all.{int4, text}
+    withSession: s =>
+      s.execute(
+        sql"""SELECT g.c_version::text,
+                     g.c_index::int4,
+                     (g.c_central_wavelength / 1000)::int4,
+                     g.c_coadds,
+                     e.c_signal_to_noise,
+                     (e.c_signal_to_noise_at / 1000)::int4
+                FROM t_gnirs_central_wavelength_config g
+                JOIN t_exposure_time_mode e ON e.c_exposure_time_mode_id = g.c_exposure_time_mode_id
+               WHERE g.c_observation_id = $observation_id
+               ORDER BY g.c_version, g.c_index"""
+          .query(text *: int4 *: int4 *: int4 *: lucuma.odb.util.Codecs.signal_to_noise *: int4)
+      )(oid).map(_.map((v, i, w, c, sn, at) => (v, i, w, c, sn.toBigDecimal.toInt, at)))
 
   private def selectDaytimePinholeObservationFor(oid: Observation.Id): IO[Option[Observation.Id]] =
     queryObservation(oid).flatMap: obs =>

@@ -17,6 +17,7 @@ import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosSouthFilter
 import lucuma.core.enums.GnirsAcquisitionType
 import lucuma.core.enums.GnirsFilter
+import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
 import lucuma.core.model.Target
 import lucuma.core.util.Enumerated
@@ -108,6 +109,13 @@ sealed trait ItcScience:
    */
   def scienceExposureCount: PosInt
 
+  /** One science result per configuration (filter, channel or central wavelength). */
+  def scienceResults: NonEmptyList[Zipper[ItcResult]]
+
+  /** Achieved total S/N per configuration, in the observation's configuration order. */
+  def totalSignalToNoisePerConfig: NonEmptyList[Option[TotalSN]] =
+    scienceResults.map(_.focus.signalToNoise.map(_.total))
+
 object ItcScience:
 
   /**
@@ -143,6 +151,9 @@ object ItcScience:
     override def scienceExposureCount: PosInt =
       sumExposureCounts(science.toNel.map(_._2))
 
+    override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
+      science.toNel.map(_._2)
+
   val flamingos2Imaging: Prism[ItcScience, Flamingos2Imaging] =
     GenPrism[ItcScience, Flamingos2Imaging]
 
@@ -156,6 +167,9 @@ object ItcScience:
 
     override def scienceExposureCount: PosInt =
       red.focus.value.exposureCount max blue.focus.value.exposureCount
+
+    override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
+      NonEmptyList.of(red, blue)
 
   object GhostIfu:
     given Eq[GhostIfu] =
@@ -177,6 +191,9 @@ object ItcScience:
     override def scienceExposureCount: PosInt =
       sumExposureCounts(science.toNel.map(_._2))
 
+    override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
+      science.toNel.map(_._2)
+
   object GmosNorthImaging:
     given Eq[GmosNorthImaging] =
       Eq.by(_.science)
@@ -197,6 +214,9 @@ object ItcScience:
     override def scienceExposureCount: PosInt =
       sumExposureCounts(science.toNel.map(_._2))
 
+    override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
+      science.toNel.map(_._2)
+
   object GmosSouthImaging:
     given Eq[GmosSouthImaging] =
       Eq.by(_.science)
@@ -216,6 +236,9 @@ object ItcScience:
 
     override def scienceExposureCount: PosInt =
       sumExposureCounts(science.toNel.map(_._2))
+
+    override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
+      science.toNel.map(_._2)
 
   object GnirsImaging:
     given Eq[GnirsImaging] =
@@ -239,6 +262,9 @@ object ItcScience:
 
     override def scienceExposureCount: PosInt =
       sumExposureCounts(science.map(_._2))
+
+    override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
+      science.map(_._2)
 
   object GnirsSpectroscopy:
     given Eq[GnirsSpectroscopy] =
@@ -265,6 +291,9 @@ object ItcScience:
 
     override def scienceExposureCount: PosInt =
       science.focus.value.exposureCount
+
+    override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
+      NonEmptyList.one(science)
 
   object Spectroscopy:
     given Eq[Spectroscopy] =

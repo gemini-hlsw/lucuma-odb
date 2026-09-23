@@ -118,6 +118,15 @@ sealed trait ItcService[F[_]] {
   )(using Transaction[F]): F[Option[Either[OdbError, Itc]]]
 
   /**
+   * Selects the stored science results for an observation regardless of input hash, so a
+   * slightly stale result still counts.  Does not call the remote ITC.
+   */
+  def selectStoredScience(
+    programId:     Program.Id,
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[ItcScience]]
+
+  /**
    * Selects the cached ITC results for a program, for those observations where
    * it is available and still valid.  Does not perform a remote ITC service
    * call if not available.
@@ -376,6 +385,12 @@ object ItcService {
         params: GeneratorParams
       )(using Transaction[F]): F[Option[Either[OdbError, Itc]]] =
         selectOneCached(pid, oid, params)
+
+      override def selectStoredScience(
+        pid: Program.Id,
+        oid: Observation.Id
+      )(using Transaction[F]): F[Option[ItcScience]] =
+        session.option(Statements.SelectStoredScienceResult)(pid, oid).map(_.flatten)
 
       override def selectAll(
         pid:    Program.Id,
@@ -1035,6 +1050,18 @@ object ItcService {
         WHERE c_program_id     = $program_id     AND
               c_observation_id = $observation_id
       """.query(md5_hash *: science.opt *: text.opt *: acquisition.opt *: text.opt *: bool)
+
+    val SelectStoredScienceResult: Query[(
+      Program.Id,
+      Observation.Id,
+    ), Option[ItcScience]] =
+      sql"""
+        SELECT
+          c_science_results
+        FROM t_itc_result
+        WHERE c_program_id     = $program_id     AND
+              c_observation_id = $observation_id
+      """.query(science.opt)
 
     val SelectFrozenResult: Query[(
       Program.Id,
