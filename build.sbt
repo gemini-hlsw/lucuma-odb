@@ -193,16 +193,25 @@ val execLogPath = "/tmp/sbt-exec.log"
 // commit invalidates everything but the leaf projects. Tests don't need the real version, so the
 // shards pin it; deploy, publish and MiMa run in other jobs with the real one.
 // A command rather than `set every version`: that would also rewrite scoped versions such as
-// `Jmh / version`, which sbt-jmh uses to resolve its own libraries.
-commands += Command.command("pinCiVersion") { st =>
+// `Jmh / version`, which sbt-jmh uses to resolve its own libraries. The Scala.js source-map flag
+// from sbt-typelevel embeds the commit hash, which invalidates every JS compile the same way.
+commands += Command.command("stabilizeCiInputs") { st =>
   val extracted = Project.extract(st)
-  val pins      = extracted.structure.allProjectRefs.map(p => p / version := "0.0.0-ci")
+  val sourceMap = "-scalajs-mapSourceURI:"
+  val pins      = extracted.structure.allProjectRefs.flatMap { p =>
+    Seq(
+      p / version := "0.0.0-ci",
+      p / scalacOptions ~= (_.filterNot(_.startsWith(sourceMap))),
+      p / Compile / scalacOptions ~= (_.filterNot(_.startsWith(sourceMap))),
+      p / Test / scalacOptions ~= (_.filterNot(_.startsWith(sourceMap)))
+    )
+  }
   extracted.appendWithSession(pins, st)
 }
 
 def pinnedVersionTestStep(s: WorkflowStep): WorkflowStep =
   WorkflowStep.Run(
-    List("sbt -v '++ ${{ matrix.scala }}; pinCiVersion; lucumaTestAffected'"),
+    List("sbt -v '++ ${{ matrix.scala }}; stabilizeCiInputs; lucumaTestAffected'"),
     id = s.id,
     name = s.name,
     cond = s.cond,
