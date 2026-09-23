@@ -91,6 +91,12 @@ sealed trait ItcService[F[_]] {
   /**
    * Obtains the ITC results for a single target, first checking the cache and
    * then performing a query to the remote ITC service if necessary.
+   *
+   * This is the reader's entry point (the `observation.itc` field), so it has only the parameters
+   * the database yields and never the Altair parameters a stored result may have been calculated
+   * with. It therefore matches a cached result on the input hash alone; comparing a column it
+   * cannot compute would miss every Altair result, call the remote service Altair-free, and
+   * overwrite the generator's result with one the sequence does not use.
    */
   def lookup(
     programId:     Program.Id,
@@ -113,6 +119,9 @@ sealed trait ItcService[F[_]] {
    * Returns Some(Right) for a cached success, Some(Left) for a
    * cached deterministic failure, and None if not cached.
    * Does not perform a remote ITC service call.
+   *
+   * This is the sequence generator's entry point, and the only one whose `params` carry the Altair
+   * parameters resolved from a guide star, so it is also the only one that compares them.
    */
   def selectOne(
     programId:    Program.Id,
@@ -174,6 +183,16 @@ sealed trait ItcService[F[_]] {
   )(using Transaction[F]): F[Unit]
 
   /**
+   * Selects the frozen (durable, authoritative) result for an observation, if one exists, ignoring
+   * the input hash entirely. A caller that finds one knows the observation is executing against
+   * it and that nothing it might recompute can replace it.
+   */
+  def selectFrozen(
+    programId:     Program.Id,
+    observationId: Observation.Id
+  )(using Transaction[F]): F[Option[Itc]]
+
+  /**
    * Performs a fresh remote ITC call for the ACQUISITION portion of an
    * observation only, bypassing the cache and any frozen result.  This is the
    * one point at which acquisition is re-derived during execution (via
@@ -182,9 +201,14 @@ sealed trait ItcService[F[_]] {
    * transient — is fatal (a Left): resetAcquisition must not overwrite a working
    * acquisition with a failure.  Returns NotApplicable for modes that have no
    * acquisition sequence (in which case resetAcquisition is a no-op).
+   *
+   * `params` come from the caller rather than from the database so that the acquisition is
+   * re-derived with the same inputs the science side has, the Altair parameters resolved from the
+   * observation's guide star included.
    */
   def callRemoteAcquisition(
-    observationId: Observation.Id
+    observationId: Observation.Id,
+    params:        GeneratorParams
   )(using NoTransaction[F]): F[Either[OdbError, ItcAcquisition]]
 
   /**
@@ -369,7 +393,7 @@ object ItcService {
         services.transactionally {
           (for {
             p <- EitherT(generatorParamsService.selectOne(pid, oid).map(_.leftMap(Error.invalidObservation(oid, _))))
-            r <- EitherT.liftF(selectOneCached(pid, oid, p))
+            r <- EitherT.liftF(selectOneCached(pid, oid, p, altairSensitive = false))
           } yield (p, r)).value
         }
 
@@ -377,15 +401,16 @@ object ItcService {
        * Whether a stored result was calculated from exactly these parameters, Altair included.
        * Only a caller that resolved the guide star -- the sequence generator -- has Altair
        * parameters to match; a reader that has the database alone cannot, and so matches on the
-       * input hash alone (see `selectAll`).
+       * input hash alone (see `lookup` and `selectAll`).
        */
       private def isCurrent(input: ItcInput, hash: Md5Hash, altair: Option[Md5Hash]): Boolean =
         hash === inputHash(input) && altairHash(input) === altair
 
       private def selectOneCached(
-        pid:    Program.Id,
-        oid:    Observation.Id,
-        params: GeneratorParams
+        pid:             Program.Id,
+        oid:             Observation.Id,
+        params:          GeneratorParams,
+        altairSensitive: Boolean
       ): F[Option[Either[OdbError, Itc]]] =
         session
           .option(Statements.SelectOneCachedResult)(pid, oid)
@@ -395,17 +420,16 @@ object ItcService {
               // A frozen result is returned regardless of the input hash, and even when the
               // parameters no longer yield an ITC input at all: once execution has begun it is
               // authoritative, so an observation whose inputs were edited afterwards still has one.
-              if frozen || params.itcInput.toOption.exists(isCurrent(_, h, altair))
+              if frozen || params.itcInput.toOption.exists: input =>
+                   if altairSensitive then isCurrent(input, h, altair) else h === inputHash(input)
             yield assembleItc(sciOpt, sciErr, acqOpt, acqErr)
 
-      // Selects the frozen (durable, authoritative) result for an observation,
-      // if one exists.  Ignores the input hash.  A frozen row always carries
-      // science results (it is only ever frozen from a successful Itc), so this
-      // returns the Itc directly; the acquisition part may still be Failed.
-      private def selectFrozen(
+      // A frozen row always carries science results (it is only ever frozen from a successful
+      // Itc), so this returns the Itc directly; the acquisition part may still be Failed.
+      override def selectFrozen(
         pid: Program.Id,
         oid: Observation.Id
-      ): F[Option[Itc]] =
+      )(using Transaction[F]): F[Option[Itc]] =
         session.option(Statements.SelectFrozenResult)(pid, oid).map: rowOpt =>
           rowOpt.map: (sci, acqOpt, acqErr) =>
             Itc(assembleAcquisition(acqOpt, acqErr), sci)
@@ -415,7 +439,7 @@ object ItcService {
         oid:    Observation.Id,
         params: GeneratorParams
       )(using Transaction[F]): F[Option[Either[OdbError, Itc]]] =
-        selectOneCached(pid, oid, params)
+        selectOneCached(pid, oid, params, altairSensitive = true)
 
       override def selectStoredScience(
         pid: Program.Id,
@@ -975,57 +999,50 @@ object ItcService {
           *> updateDerivedAcquisitionSignalToNoise(oid, input, result.acquisition)
 
       override def callRemoteAcquisition(
-        oid: Observation.Id
+        oid:    Observation.Id,
+        params: GeneratorParams
       )(using NoTransaction[F]): F[Either[OdbError, ItcAcquisition]] =
-        val params: EitherT[F, OdbError, GeneratorParams] =
-          EitherT:
-            services.transactionally:
-              (for
-                pid <- EitherT(observationService.selectProgram(oid).map(_.toOption.toRight(OdbError.InvalidObservation(oid, s"Program for observation $oid not found.".some))))
-                prm <- EitherT(generatorParamsService.selectOne(pid, oid)).leftMap(e => Error.invalidObservation(oid, e))
-              yield prm).value
-
         val NotApplicable: EitherT[F, OdbError, ItcAcquisition] =
           EitherT.pure(ItcAcquisition.NotApplicable: ItcAcquisition)
 
-        params
-          .flatMap: params =>
-            params.itcInput match
-              case ItcInputDerivation.Ready(input)  =>
-                input match
-                  case sp @ ItcInput.Spectroscopy(science = _)       =>
-                    safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+        val acquisition: EitherT[F, OdbError, ItcAcquisition] =
+          params.itcInput match
+          case ItcInputDerivation.Ready(input)  =>
+            input match
+              case sp @ ItcInput.Spectroscopy(science = _)       =>
+                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+                  .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
+
+              // GNIRS spectroscopy has a single acquisition pass regardless of how
+              // many central wavelengths the science side has.
+              case sp @ ItcInput.GnirsSpectroscopy(science = _)  =>
+                safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
+                  .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
+
+              // GNIRS imaging has an acquisition sequence; other imaging modes don't
+              // (`acquisitionInput` is empty for them).
+              case im @ ItcInput.Imaging(science = _)            =>
+                im.acquisitionInput match
+                  case None        => NotApplicable
+                  case Some(input) =>
+                    safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
                       .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
 
-                  // GNIRS spectroscopy has a single acquisition pass regardless of how
-                  // many central wavelengths the science side has.
-                  case sp @ ItcInput.GnirsSpectroscopy(science = _)  =>
-                    safeAcquisitionCall(oid, sp.acquisitionInput, sp.acquisitionTargets, sp.gnirsAcqAutoClassify, sp.gnirsAcqAutoSignalToNoise)
-                      .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
-
-                  // GNIRS imaging has an acquisition sequence; other imaging modes don't
-                  // (`acquisitionInput` is empty for them).
-                  case im @ ItcInput.Imaging(science = _)            =>
-                    im.acquisitionInput match
-                      case None        => NotApplicable
-                      case Some(input) =>
-                        safeAcquisitionCall(oid, input, im.acquisitionTargets, im.gnirsAcqAutoClassify, im.gnirsAcqAutoSignalToNoise)
-                          .map((z, t) => ItcAcquisition.Available(z, t): ItcAcquisition)
-
-                  // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
-                  case ItcInput.ScienceOnlySpectroscopy(science = _) =>
-                    NotApplicable
-
-              // Incomplete parameters mean the acquisition ITC cannot be derived at
-              // all: report that here rather than leaving it for a caller to notice.
-              case ItcInputDerivation.Incomplete(m) =>
-                EitherT.leftT:
-                  Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))
-
-              // No ITC at all (exchange / visitor): there is no acquisition sequence.
-              case ItcInputDerivation.NotApplicable =>
+              // GHOST and IGRINS-2 spectroscopy have no acquisition sequence.
+              case ItcInput.ScienceOnlySpectroscopy(science = _) =>
                 NotApplicable
-          .value
+
+          // Incomplete parameters mean the acquisition ITC cannot be derived at
+          // all: report that here rather than leaving it for a caller to notice.
+          case ItcInputDerivation.Incomplete(m) =>
+            EitherT.leftT:
+              Error.invalidObservation(oid, GeneratorParamsService.Error.MissingData(m))
+
+          // No ITC at all (exchange / visitor): there is no acquisition sequence.
+          case ItcInputDerivation.NotApplicable =>
+            NotApplicable
+
+        acquisition.value
 
       override def updateAcquisition(
         oid:         Observation.Id,

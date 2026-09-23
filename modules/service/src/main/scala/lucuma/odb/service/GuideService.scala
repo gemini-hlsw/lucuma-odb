@@ -154,6 +154,10 @@ trait GuideService[F[_]] {
    * As `resolveGuideStar`, but from the observation's parameters alone, before any sequence has
    * been generated. Behind Altair the sequence is sized from the star, so this is the only
    * resolution available until one has been picked.
+   *
+   * Altair is also the only caller: the hash it can compute without a sequence is the one only
+   * Altair observations key on (see `GeneratorContext.guideStarHash`), so this must not be used
+   * for anything else.
    */
   def resolveGuideStar(oid: Observation.Id, params: GeneratorParams)(using
     NoTransaction[F], SuperUserAccess
@@ -1330,20 +1334,33 @@ object GuideService {
        * stored before the generator runs -- that run then resolves the star just chosen -- and the
        * hash is recorded only afterwards. The cached ITC result needs no eviction: the Altair
        * parameters are keyed apart, so a result computed for another star is simply not reused.
+       *
+       * The generator reaches Gaia and the ITC, so it cannot run inside the transaction that would
+       * otherwise make the two writes atomic; the previous name and hash are put back by hand
+       * instead. Left alone, a failed set would store the new name with no hash, which reads as a
+       * selection still waiting for its generation and so never goes stale.
        */
       def setGuideTargetNameImpl(obsInfo: ObservationInfo, targetName: Option[NonEmptyString]): F[Result[Observation.Id]] =
         targetName.fold(
           updateGuideTargetName(obsInfo.programId, obsInfo.id, none, none)
         ){ name =>
-          (for {
-            gsn      <- ResultT.fromResult(
-                          GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
-                        )
-            _        <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, none))
-            genInfo  <- ResultT(getGeneratorInfo(obsInfo.id))
-            hash      = obsInfo.newGuideStarHash(genInfo.hash)
-            result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
-          } yield result).value
+          val restore: F[Unit] =
+            updateGuideTargetName(obsInfo.programId, obsInfo.id, obsInfo.guideStarName, obsInfo.guideStarHash).void
+
+          val set: F[Result[Observation.Id]] =
+            (for {
+              gsn      <- ResultT.fromResult(
+                            GuideStarName.from(name.value).toOption.toResult(guideStarNameError(name.value).asProblem)
+                          )
+              _        <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, none))
+              genInfo  <- ResultT(getGeneratorInfo(obsInfo.id))
+              hash      = obsInfo.newGuideStarHash(genInfo.hash)
+              result   <- ResultT(updateGuideTargetName(obsInfo.programId, obsInfo.id, gsn.some, hash.some))
+            } yield result).value
+
+          set
+            .onError(_ => restore)
+            .flatMap(result => if result.hasValue then result.pure[F] else restore.as(result))
         }
 
       override def setGuideTargetName(checked: AccessControl.CheckedWithId[SetGuideTargetNameInput, Observation.Id])(

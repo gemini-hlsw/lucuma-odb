@@ -573,70 +573,76 @@ object Generator:
             .flatMap(s => EitherT.liftF(persist(observationId, s.acquisition)))
             .flatMap(_ => EitherT.liftF(input.traverse_(itcService.updateAcquisition(observationId, _, acq))))
 
+        def reset(ctx: GeneratorContext, freshAcq: ItcAcquisition)(using Transaction[F]): EitherT[F, OdbError, Unit] =
+          val ctxʹ = ctx.copy(itcRes = ctx.itcRes.map(_.copy(acquisition = freshAcq)))
+          ctxʹ.params.observingMode.modeType match
+            case _: ExchangeObservingModeType =>
+              EitherT.pure(())
+
+            // N.B. there is no imaging acquisition, but it should not blow up.
+            case ObservingModeType.Flamingos2Imaging  =>
+              EitherT.pure(())
+
+            case ObservingModeType.Flamingos2LongSlit =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
+
+            // N.B. there is no MOS acquisition yet, so there is nothing to reset.
+            // This becomes wrong once a MOS acquisition lands.
+            case ObservingModeType.Flamingos2Mos      =>
+              EitherT.pure(())
+
+            // N.B. there is no imaging acquisition, but it should not blow up.
+            case ObservingModeType.GhostIfu           =>
+              EitherT.pure(())
+
+
+            case ObservingModeType.GmosNorthImaging   =>
+              EitherT.pure(())
+
+            case ObservingModeType.GmosNorthLongSlit  =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthLongSlit(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
+
+            case ObservingModeType.GmosSouthImaging   =>
+              EitherT.pure(())
+
+            case ObservingModeType.GmosSouthLongSlit  =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
+
+            case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
+              EitherT.pure(())
+
+            case ObservingModeType.GmosNorthIfu       =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthIfu(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
+
+            case ObservingModeType.GmosSouthIfu       =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthIfu(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
+            case ObservingModeType.GnirsImaging       =>
+              EitherT.pure(())
+
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)
+
+            case ObservingModeType.Igrins2LongSlit    =>
+              EitherT.pure(())
+
+            case _: VisitorObservingModeType          =>
+              EitherT.pure(())
+
         // Re-derive the acquisition ITC, bypassing the frozen snapshot, so that
-        // an edited acquisition exposure-time mode takes effect.  The remote call
+        // an edited acquisition exposure-time mode takes effect. The remote call
         // happens outside the write transaction. Any acquisition ITC failure
         // aborts the reset with nothing written, preserving the existing sequence.
         // The freshly generated acquisition is written to both the sequence and
         // the ITC snapshot, keeping the two consistent.
-        EitherT(itcService.callRemoteAcquisition(observationId))
-          .flatMap: freshAcq =>
-            EitherT:
-              transactionallyWithContext(observationId, commitHash): ctx =>
-                val ctxʹ = ctx.copy(itcRes = ctx.itcRes.map(_.copy(acquisition = freshAcq)))
-                ctxʹ.params.observingMode.modeType match
-                  case _: ExchangeObservingModeType =>
-                    EitherT.pure(())
-
-                  // N.B. there is no imaging acquisition, but it should not blow up.
-                  case ObservingModeType.Flamingos2Imaging  =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.Flamingos2LongSlit =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
-
-                  // N.B. there is no MOS acquisition yet, so there is nothing to reset.
-                  // This becomes wrong once a MOS acquisition lands.
-                  case ObservingModeType.Flamingos2Mos      =>
-                    EitherT.pure(())
-
-                  // N.B. there is no imaging acquisition, but it should not blow up.
-                  case ObservingModeType.GhostIfu           =>
-                    EitherT.pure(())
-
-
-                  case ObservingModeType.GmosNorthImaging   =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GmosNorthLongSlit  =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthLongSlit(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
-
-                  case ObservingModeType.GmosSouthImaging   =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GmosSouthLongSlit  =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
-
-                  case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GmosNorthIfu       =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthIfu(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
-
-                  case ObservingModeType.GmosSouthIfu       =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthIfu(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
-                  case ObservingModeType.GnirsImaging       =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)
-
-                  case ObservingModeType.Igrins2LongSlit    =>
-                    EitherT.pure(())
-
-                  case _: VisitorObservingModeType          =>
-                    EitherT.pure(())
-          .value
+        //
+        // The context comes first so that the acquisition is re-derived from the parameters the
+        // science side generates with -- behind Altair those carry the resolved guide star, which
+        // the database alone does not yield.
+        (for
+          ctx      <- EitherT(GeneratorContext.lookup(observationId, commitHash))
+          freshAcq <- EitherT(itcService.callRemoteAcquisition(observationId, ctx.params))
+          _        <- transactionallyEitherT(reset(ctx, freshAcq))
+        yield ()).value
 
       override def calculateDigest(
         ctx: GeneratorContext
@@ -720,7 +726,9 @@ object Generator:
               EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>
-          materializeExecutionConfig(ctx) *> EitherT(f(ctx))
+          // Nothing executable is written for a sequence whose Altair guide star could not be
+          // resolved against it, so the check comes before the materialization, not after.
+          EitherT.fromEither[F](altairChecked(ctx, ())) *> materializeExecutionConfig(ctx) *> EitherT(f(ctx))
 
 
       override def materialize(

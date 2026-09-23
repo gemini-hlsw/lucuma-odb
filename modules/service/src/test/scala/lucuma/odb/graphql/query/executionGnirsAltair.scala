@@ -5,6 +5,7 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.effect.Resource
 import cats.syntax.all.*
 import io.circe.literal.*
 import lucuma.core.enums.FieldLens
@@ -29,8 +30,12 @@ import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.syntax.hash.*
 import lucuma.odb.service.Services
 import lucuma.odb.util.Codecs.*
+import org.http4s.Request
+import org.http4s.Response
 import skunk.implicits.*
 
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -256,6 +261,46 @@ class executionGnirsAltair extends AltairItcRecording:
 
   // The Altair parameters are keyed apart on the cached result, so a change of guide star needs
   // no eviction: the next generation simply does not reuse a result computed for another star.
+  // A reader has only the database, so it cannot compute the Altair half of the key. Were it to
+  // compare one anyway it would miss every Altair result, call the remote service Altair-free, and
+  // overwrite the result the sequence is generated from.
+  test("reading the ITC of an Altair observation leaves the cached result alone"):
+    for
+      (pid, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
+      _          <- runObscalcUpdate(pid, oid)
+      before     <- itcResultHashes(oid)
+      _          <- clearItcCalls
+      _          <- query(pi, s"""query { observation(observationId: "$oid") { itc { itcType } } }""")
+      after      <- itcResultHashes(oid)
+      (acq, sci) <- itcAltairCalls
+    yield
+      assert(before.exists(_._2.isDefined), "the cached result should carry Altair parameters")
+      assertEquals(after, before)
+      assertEquals(acq ++ sci, Nil, "reading the ITC should reach no remote call")
+
+  // The acquisition is re-derived from the parameters the science side generates with, guide star
+  // included; reading them back from the database would lose Altair.
+  test("resetting the acquisition re-derives it with the resolved guide star"):
+    for
+      (_, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
+      _        <- digestFor(oid)
+      _        <- clearItcCalls
+      _        <- resetAcquisitionAs(serviceUser, oid)
+      (acq, _) <- itcAltairCalls
+    yield
+      assert(acq.nonEmpty, "the reset should call the acquisition ITC")
+      assertNgs(acq.last, FieldLens.In)
+
+  // LGS+P1 guides with PWFS1, whose probe arm would vignette the AOWFS star.
+  test("an unusable stored star stops the sequence being materialized"):
+    for
+      (_, oid) <- observationWithAltair("{ mode: LGS_P1 }", aowfsStarName.some)
+      result   <- withServices(serviceUser)(_.generator.materialize(oid))
+    yield assert(
+      result.left.exists(_.message.contains("no longer usable")),
+      s"expected an unusable guide star error, found $result"
+    )
+
   test("clearing the guide star leaves the cached ITC result in place"):
     for
       (pid, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
@@ -334,6 +379,88 @@ class executionGnirsAltairNearStar extends AltairItcRecording:
     yield (acq.last :: sci.last :: Nil).foreach:
       case Some(AltairParameters.Ngs(fieldLens = f)) => assertEquals(f, FieldLens.Out)
       case other                                     => fail(s"expected Altair NGS parameters, found $other")
+
+/**
+ * Once execution has begun the digest comes from the frozen ITC result, without resolving the
+ * guide star again: the sequence is already materialized, so a fresh AGS pass could only make the
+ * two disagree, and Gaia being unreachable would leave an executing observation with no digest.
+ */
+class executionGnirsAltairFrozen extends AltairItcRecording:
+
+  override val gaiaResponseString: String = GaiaVoTables.altairCandidates
+
+  // When set, every Gaia query fails, as an outage would.
+  private val gaiaDown: AtomicBoolean = new AtomicBoolean(false)
+
+  override protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
+    request =>
+      if gaiaDown.get then Resource.eval(IO.raiseError(new IOException("Gaia unavailable")))
+      else super.httpRequestHandler(request)
+
+  // Marks the cached result frozen, as the freeze at execution start would.
+  private def freezeItcResult(oid: Observation.Id): IO[Unit] =
+    withSession: s =>
+      s.execute(
+        sql"""
+          UPDATE t_itc_result
+             SET c_is_frozen = true
+           WHERE c_observation_id = $observation_id
+        """.command
+      )(oid).void
+
+  test("a frozen Altair result generates without resolving the guide star again"):
+    for
+      (_, oid)   <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
+      before     <- digestFor(oid)
+      _          <- freezeItcResult(oid)
+      _          <- clearItcCalls
+      _          <- IO(gaiaDown.set(true))
+      after      <- digestFor(oid)
+      (acq, sci) <- itcAltairCalls
+    yield
+      assert(before.isRight, s"expected a digest before the freeze, found $before")
+      assertEquals(after, before)
+      assertEquals(acq ++ sci, Nil, "a frozen result should reach no remote ITC call")
+
+/**
+ * Setting a guide star stores the name before the generator runs and the hash only afterwards, so
+ * a generator failure in between must leave the observation exactly as it found it. A name stored
+ * without a hash reads as a selection still waiting for its generation, and so would never go
+ * stale.
+ */
+class executionGnirsAltairFailedSet extends AltairItcRecording:
+
+  override val gaiaResponseString: String = GaiaVoTables.altairCandidates
+
+  // When set, every Gaia query fails, as an outage would.
+  private val gaiaDown: AtomicBoolean = new AtomicBoolean(false)
+
+  override protected def httpRequestHandler: Request[IO] => Resource[IO, Response[IO]] =
+    request =>
+      if gaiaDown.get then Resource.eval(IO.raiseError(new IOException("Gaia unavailable")))
+      else super.httpRequestHandler(request)
+
+  private def storedGuideStar(oid: Observation.Id): IO[Option[(Option[String], Option[String])]] =
+    withSession: s =>
+      s.option(
+        sql"""
+          SELECT c_guide_target_name, c_guide_target_hash
+          FROM t_observation
+          WHERE c_observation_id = $observation_id
+        """.query(guide_target_name.opt *: md5_hash.opt)
+      )(oid).map(_.map((name, hash) => (name.map(_.value.value), hash.map(_.toHex))))
+
+  test("a guide star set the generator cannot complete leaves the stored selection alone"):
+    for
+      (_, oid) <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
+      before   <- storedGuideStar(oid)
+      _        <- IO(gaiaDown.set(true))
+      failed   <- setGuideTargetName(pi, oid, otherTargetName.some).attempt
+      after    <- storedGuideStar(oid)
+    yield
+      assert(before.exists((name, hash) => name.contains(aowfsStarName) && hash.isDefined), s"expected a stored selection, found $before")
+      assert(failed.isLeft, "the mutation should fail while Gaia is unreachable")
+      assertEquals(after, before)
 
 // The default candidate table is built for the PWFS patrol field; none of its stars lies inside
 // the much smaller AOWFS one, so AGS has nothing to offer Altair.

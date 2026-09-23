@@ -96,9 +96,17 @@ case class GeneratorContext(
 
     Md5Hash.unsafeFromByteArray(md5.digest())
 
-  /** The hash that guide star validity and availability caching key on. */
+  /**
+   * The hash that guide star validity and availability caching key on.
+   *
+   * Behind Altair the ITC result is computed from the very guide star whose validity is being
+   * checked, so folding it in would be circular; the parameters and the code version stand in for
+   * it (see [[GeneratorContext.guideStarHash]]). Every other observation keeps the full generator
+   * hash it has always used, so that guide stars already stored against it stay valid.
+   */
   def guideStarHash: Md5Hash =
-    GeneratorContext.guideStarHash(params, commitHash)
+    if params.altair.isDefined then GeneratorContext.guideStarHash(params, commitHash)
+    else hash
 
 object GeneratorContext:
 
@@ -110,12 +118,14 @@ object GeneratorContext:
   val MaxAltairGuideStarPasses: Int = 3
 
   /**
-   * The hash guide star validity and the availability cache key on: the generator parameters,
-   * which hold every user-editable input, and the code version. The ITC result is deliberately
-   * left out. Behind Altair it is computed from the very guide star whose validity is being
-   * checked, so folding it in would be circular, and the parameters already move whenever an
-   * input the ITC reads moves. The price is that redeploying the ITC alone no longer invalidates
-   * a stored guide star.
+   * The hash an Altair observation's guide star validity and availability cache key on: the
+   * generator parameters, which hold every user-editable input, and the code version. The ITC
+   * result is deliberately left out. Behind Altair it is computed from the very guide star whose
+   * validity is being checked, so folding it in would be circular, and the parameters already move
+   * whenever an input the ITC reads moves. The price is that redeploying the ITC alone no longer
+   * invalidates a stored guide star.
+   *
+   * Only Altair observations key on this, so no stored hash predates it.
    */
   def guideStarHash(params: GeneratorParams, commitHash: CommitHash): Md5Hash =
     val md5 = MessageDigest.getInstance("MD5")
@@ -238,9 +248,15 @@ object GeneratorContext:
     def resolution(
       fr: Services.SuperUserAccess ?=> F[Result[GuideService.GuideStarResolution]]
     ): F[Either[OdbError, GuideService.GuideStarResolution]] =
+      // The generator already runs on behalf of a caller whose access to the observation was
+      // checked, so the guide service is called with the superuser marker.
       Services.asSuperUser(fr).map:
         _.toEither.leftMap: failure =>
-          GeneratorError.sequenceUnavailable(oid, failure.fold(_.getMessage, _.toChain.toList.map(_.message).mkString("; ")))
+          GeneratorError.sequenceUnavailable(
+            oid,
+            // A Throwable need not carry a message.
+            failure.fold(t => Option(t.getMessage).getOrElse(t.toString), _.toChain.toList.map(_.message).mkString("; "))
+          )
 
     // The pick, from the observation as the database holds it.
     val pick: F[Either[OdbError, GuideService.GuideStarResolution]] =
@@ -304,6 +320,23 @@ object GeneratorContext:
       ctx          <- EitherT:
                         // Only Altair feeds the guide star back into the sequence; everything else
                         // is generated once.
-                        if params.altair.isDefined then settleAltairGuideStar(pid, oid, commitHash, params)
-                        else contextFor(pid, oid, params, commitHash)
+                        if params.altair.isEmpty then contextFor(pid, oid, params, commitHash)
+                        else frozenOrSettled(pid, oid, commitHash, params)
     yield ctx).value
+
+  /**
+   * An executing Altair observation generates from the result it was frozen with, without
+   * resolving the guide star again: the sequence is already materialized, so a fresh AGS or Gaia
+   * call could only make the digest disagree with what is being executed, or fail outright when
+   * Gaia is unreachable. The Altair parameters are absent from the input hash, so the context this
+   * builds hashes exactly as the settled one would.
+   */
+  private def frozenOrSettled[F[_]: Concurrent: Logger](
+    pid:        Program.Id,
+    oid:        Observation.Id,
+    commitHash: CommitHash,
+    params:     GeneratorParams
+  )(using NoTransaction[F], Services[F]): F[Either[OdbError, GeneratorContext]] =
+    services.transactionally(itcService.selectFrozen(pid, oid)).flatMap:
+      case Some(itc) => GeneratorContext(oid, itc.asRight[OdbError], params, commitHash, none).asRight[OdbError].pure[F]
+      case None      => settleAltairGuideStar(pid, oid, commitHash, params)
