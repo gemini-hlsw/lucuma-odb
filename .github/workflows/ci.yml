@@ -139,9 +139,9 @@ jobs:
               while i < len(s) and s[i] in " \r\n\t": i += 1
               if i >= len(s): break
               o, i = dec.raw_decode(s, i)
-              if not o.get("cacheHit"):
-                  inp = o["input"]
-                  print("MISS", inp["digest"][:23], inp["codeContentHash"][:23], inp.get("str", "")[:160].replace("\n", " "))
+              inp = o["input"]
+              tag = "HIT " if o.get("cacheHit") else "MISS"
+              print(tag, inp["digest"][:23], inp["codeContentHash"][:23], inp.get("str", "")[:160].replace("\n", " "))
           EOF
 
       - name: Upload exec log

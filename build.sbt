@@ -223,8 +223,8 @@ val cacheDiagnosticSteps: List[WorkflowStep] = List(
   // the previous command, which must stay the test run.
   WorkflowStep.Run(List("sbt -v Global/cacheStats"), name = Some("Cache stats")),
   // The exec log is only flushed when the server exits.
-  // Artifacts are deleted by the generated Clean workflow, so the misses also go to the job log:
-  // one line per missed action with its description and digest.
+  // Artifacts are deleted by the generated Clean workflow, so the actions also go to the job log:
+  // one line per cached action with hit/miss, digests and description, to diff across shards.
   WorkflowStep.Run(
     List(
       "sbt shutdown || true",
@@ -238,9 +238,9 @@ while i < len(s):
     while i < len(s) and s[i] in " \\r\\n\\t": i += 1
     if i >= len(s): break
     o, i = dec.raw_decode(s, i)
-    if not o.get("cacheHit"):
-        inp = o["input"]
-        print("MISS", inp["digest"][:23], inp["codeContentHash"][:23], inp.get("str", "")[:160].replace("\\n", " "))
+    inp = o["input"]
+    tag = "HIT " if o.get("cacheHit") else "MISS"
+    print(tag, inp["digest"][:23], inp["codeContentHash"][:23], inp.get("str", "")[:160].replace("\\n", " "))
 EOF"""
     ),
     name = Some("Flush exec log")
