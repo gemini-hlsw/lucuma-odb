@@ -13,7 +13,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
@@ -83,12 +82,11 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
       TelescopeConfig(offset1, StepGuideState.Disabled),
       TelescopeConfig(offset2, StepGuideState.Enabled)
     )
-    val digest = SequenceDigest(
-      ObserveClass.Science,
-      CategorizedTime.Zero,
-      configs,
-      NonNegInt.unsafeFrom(1),
-      ExecutionState.Ongoing
+    val digest = SequenceDigest.Zero.copy(
+      observeClass     = ObserveClass.Science,
+      telescopeConfigs = configs,
+      atomCount        = NonNegInt.unsafeFrom(1),
+      executionState   = ExecutionState.Ongoing
     )
     val json = digest.asJson
     // configs are serialized directly
@@ -105,8 +103,8 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
       SetupTime.Zero,
       2.refined,
       1.refined,
-      SequenceDigest(ObserveClass.Acquisition, CategorizedTime.Zero, SortedSet.empty, NonNegInt.unsafeFrom(1), ExecutionState.Ongoing),
-      SequenceDigest(ObserveClass.Science,     CategorizedTime.Zero, SortedSet.empty, NonNegInt.unsafeFrom(3), ExecutionState.Ongoing)
+      SequenceDigest.Zero.copy(observeClass = ObserveClass.Acquisition, atomCount = NonNegInt.unsafeFrom(1), executionState = ExecutionState.Ongoing),
+      SequenceDigest.Zero.copy(observeClass = ObserveClass.Science,     atomCount = NonNegInt.unsafeFrom(3), executionState = ExecutionState.Ongoing)
     )
 
   test("ExecutionDigest decodes from `estimate` when the deprecated top-level fields are absent"):

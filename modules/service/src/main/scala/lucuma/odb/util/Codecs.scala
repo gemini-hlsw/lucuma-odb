@@ -39,6 +39,7 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.model.sequence.GcalDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
@@ -735,11 +736,14 @@ trait Codecs {
         .get
     }
 
+  lazy val gcal_digest: Codec[GcalDigest] =
+    (int4_nonneg *: categorized_time).to[GcalDigest]
+
   lazy val sequence_digest: Codec[SequenceDigest] =
-    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: execution_state).imap {
-      case (oClass, pTime, offsets, guideStates, aCount, execState) =>
+    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: gcal_digest *: gcal_digest *: categorized_time *: execution_state).imap {
+      case (oClass, pTime, offsets, guideStates, aCount, arcs, flats, oTime, execState) =>
         val config = offsets.getOrElse(Nil).zip(guideStates.getOrElse(Nil)).map(TelescopeConfig.apply.tupled)
-        SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, execState)
+        SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, arcs, flats, oTime, execState)
     } { sd =>
       // Don't inline to get a consistent sort
       val telescopeConfigs = sd.telescopeConfigs.toList
@@ -749,6 +753,9 @@ trait Codecs {
         Some(telescopeConfigs.map(_.offset)),
         Some(telescopeConfigs.map(_.guiding)),
         sd.atomCount,
+        sd.arcs,
+        sd.flats,
+        sd.observingTime,
         sd.executionState
       )
     }

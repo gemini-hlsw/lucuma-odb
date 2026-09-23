@@ -9,16 +9,9 @@ import cats.syntax.applicative.*
 import cats.syntax.applicativeError.*
 import cats.syntax.eq.*
 import cats.syntax.functor.*
-import eu.timepit.refined.types.numeric.NonNegInt
-import lucuma.core.enums.ChargeClass
-import lucuma.core.enums.ExecutionState
-import lucuma.core.enums.ObserveClass
-import lucuma.core.enums.StepGuideState
-import lucuma.core.math.Offset
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Md5Hash
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
@@ -99,50 +92,7 @@ object ExecutionDigestService:
         hash:   Md5Hash,
         digest: ExecutionDigest
       )(using Transaction[F]): F[Unit] =
-        val acqConfigs = digest.acquisition.telescopeConfigs.toList
-        val sciConfigs = digest.science.telescopeConfigs.toList
-        session.execute(Statements.InsertOrUpdateExecutionDigest)(
-          oid,
-          hash,
-          digest.setup.full,
-          digest.setup.reacquisition,
-          digest.setupCount,
-          digest.calibrationCount,
-          digest.acquisition.observeClass,
-          digest.acquisition.timeEstimate(ChargeClass.NonCharged),
-          digest.acquisition.timeEstimate(ChargeClass.Program),
-          acqConfigs.map(_.offset),
-          acqConfigs.map(_.guiding),
-          digest.acquisition.atomCount,
-          digest.acquisition.executionState,
-          digest.science.observeClass,
-          digest.science.timeEstimate(ChargeClass.NonCharged),
-          digest.science.timeEstimate(ChargeClass.Program),
-          sciConfigs.map(_.offset),
-          sciConfigs.map(_.guiding),
-          digest.science.atomCount,
-          digest.science.executionState,
-          oid,
-          hash,
-          digest.setup.full,
-          digest.setup.reacquisition,
-          digest.setupCount,
-          digest.calibrationCount,
-          digest.acquisition.observeClass,
-          digest.acquisition.timeEstimate(ChargeClass.NonCharged),
-          digest.acquisition.timeEstimate(ChargeClass.Program),
-          acqConfigs.map(_.offset),
-          acqConfigs.map(_.guiding),
-          digest.acquisition.atomCount,
-          digest.acquisition.executionState,
-          digest.science.observeClass,
-          digest.science.timeEstimate(ChargeClass.NonCharged),
-          digest.science.timeEstimate(ChargeClass.Program),
-          sciConfigs.map(_.offset),
-          sciConfigs.map(_.guiding),
-          digest.science.atomCount,
-          digest.science.executionState
-        )
+        session.execute(Statements.InsertOrUpdateExecutionDigest)(oid, hash, digest, oid)
         .void
         .recoverWith:
           case SqlState.ForeignKeyViolation(ex) =>
@@ -162,6 +112,14 @@ object ExecutionDigestService:
         "c_acq_offsets",
         "c_acq_offset_guide_states",
         "c_acq_atom_count",
+        "c_acq_arc_count",
+        "c_acq_arc_non_charged_time",
+        "c_acq_arc_program_time",
+        "c_acq_flat_count",
+        "c_acq_flat_non_charged_time",
+        "c_acq_flat_program_time",
+        "c_acq_observing_non_charged_time",
+        "c_acq_observing_program_time",
         "c_acq_execution_state",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
@@ -169,6 +127,14 @@ object ExecutionDigestService:
         "c_sci_offsets",
         "c_sci_offset_guide_states",
         "c_sci_atom_count",
+        "c_sci_arc_count",
+        "c_sci_arc_non_charged_time",
+        "c_sci_arc_program_time",
+        "c_sci_flat_count",
+        "c_sci_flat_non_charged_time",
+        "c_sci_flat_program_time",
+        "c_sci_observing_non_charged_time",
+        "c_sci_observing_program_time",
         "c_sci_execution_state"
       )
 
@@ -204,113 +170,21 @@ object ExecutionDigestService:
           c_observation_id in ($enc)
       """.query(observation_id *: md5_hash *: execution_digest)
 
-    val InsertOrUpdateExecutionDigest: Command[(
-      Observation.Id,
-      Md5Hash,
-      TimeSpan,
-      TimeSpan,
-      NonNegInt,
-      NonNegInt,
-      ObserveClass,
-      TimeSpan,
-      TimeSpan,
-      List[Offset],
-      List[StepGuideState],
-      NonNegInt,
-      ExecutionState,
-      ObserveClass,
-      TimeSpan,
-      TimeSpan,
-      List[Offset],
-      List[StepGuideState],
-      NonNegInt,
-      ExecutionState,
-      Observation.Id,
-      Md5Hash,
-      TimeSpan,
-      TimeSpan,
-      NonNegInt,
-      NonNegInt,
-      ObserveClass,
-      TimeSpan,
-      TimeSpan,
-      List[Offset],
-      List[StepGuideState],
-      NonNegInt,
-      ExecutionState,
-      ObserveClass,
-      TimeSpan,
-      TimeSpan,
-      List[Offset],
-      List[StepGuideState],
-      NonNegInt,
-      ExecutionState
-    )] =
+    val InsertOrUpdateExecutionDigest: Command[(Observation.Id, Md5Hash, ExecutionDigest, Observation.Id)] =
       sql"""
         INSERT INTO t_execution_digest (
           c_program_id,
           c_observation_id,
           c_hash,
-          c_full_setup_time,
-          c_reacq_setup_time,
-          c_setup_count,
-          c_calibration_count,
-          c_acq_obs_class,
-          c_acq_non_charged_time,
-          c_acq_program_time,
-          c_acq_offsets,
-          c_acq_offset_guide_states,
-          c_acq_atom_count,
-          c_acq_execution_state,
-          c_sci_obs_class,
-          c_sci_non_charged_time,
-          c_sci_program_time,
-          c_sci_offsets,
-          c_sci_offset_guide_states,
-          c_sci_atom_count,
-          c_sci_execution_state
+          #${DigestColumns.mkString(",\n")}
         ) SELECT
           o.c_program_id,
           $observation_id,
           $md5_hash,
-          $time_span,
-          $time_span,
-          $int4_nonneg,
-          $int4_nonneg,
-          $obs_class,
-          $time_span,
-          $time_span,
-          $_offset_array,
-          $_guide_state,
-          $int4_nonneg,
-          $execution_state,
-          $obs_class,
-          $time_span,
-          $time_span,
-          $_offset_array,
-          $_guide_state,
-          $int4_nonneg,
-          $execution_state
+          $execution_digest
         FROM t_observation o
         WHERE o.c_observation_id = $observation_id
         ON CONFLICT ON CONSTRAINT t_execution_digest_pkey DO UPDATE
-          SET c_hash                    = $md5_hash,
-              c_full_setup_time         = $time_span,
-              c_reacq_setup_time        = $time_span,
-              c_setup_count             = $int4_nonneg,
-              c_calibration_count       = $int4_nonneg,
-              c_acq_obs_class           = $obs_class,
-              c_acq_non_charged_time    = $time_span,
-              c_acq_program_time        = $time_span,
-              c_acq_offsets             = $_offset_array,
-              c_acq_offset_guide_states = $_guide_state,
-              c_acq_atom_count          = $int4_nonneg,
-              c_acq_execution_state     = $execution_state,
-              c_sci_obs_class           = $obs_class,
-              c_sci_non_charged_time    = $time_span,
-              c_sci_program_time        = $time_span,
-              c_sci_offsets             = $_offset_array,
-              c_sci_offset_guide_states = $_guide_state,
-              c_sci_atom_count          = $int4_nonneg,
-              c_sci_execution_state     = $execution_state
+          SET c_hash = EXCLUDED.c_hash,
+              #${DigestColumns.map(c => s"$c = EXCLUDED.$c").mkString(",\n")}
       """.command

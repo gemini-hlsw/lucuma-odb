@@ -14,7 +14,6 @@ import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.util.TimeSpan
 
-import scala.collection.immutable.SortedSet
 
 object VisitorExecutionDigestCalculator:
 
@@ -43,12 +42,11 @@ object VisitorExecutionDigestCalculator:
           (TimeSpan.Zero, 0)
 
     val scienceDigest =
-      SequenceDigest(
-        ObserveClass.Science,
-        CategorizedTime(ChargeClass.Program -> exposureTotal),
-        SortedSet.empty,
-        NonNegInt.unsafeFrom(0),
-        state
+      SequenceDigest.Zero.copy(
+        observeClass   = ObserveClass.Science,
+        timeEstimate   = CategorizedTime(ChargeClass.Program -> exposureTotal),
+        observingTime  = CategorizedTime(ChargeClass.Program -> exposureTotal),
+        executionState = state
       )
 
     ExecutionDigest(
@@ -69,12 +67,11 @@ object VisitorExecutionDigestCalculator:
   ): ExecutionDigest =
     val total = totalRequestTime.getOrElse(TimeSpan.Zero)
     val scienceDigest =
-      SequenceDigest(
-        ObserveClass.Science,
-        CategorizedTime(ChargeClass.Program -> total),
-        SortedSet.empty,
-        NonNegInt.unsafeFrom(0),
-        state
+      SequenceDigest.Zero.copy(
+        observeClass   = ObserveClass.Science,
+        timeEstimate   = CategorizedTime(ChargeClass.Program -> total),
+        observingTime  = CategorizedTime(ChargeClass.Program -> total),
+        executionState = state
       )
 
     ExecutionDigest(

@@ -20,6 +20,7 @@ import lucuma.core.model.Program
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.model.sequence.GcalDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.TelescopeConfig
@@ -149,10 +150,10 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
       "41.1".sec + // readout
       "10.0".sec   // writeout
 
-  val CalTime =
-    "15.0".sec +  // science fold
-    "52.1".sec +  // arc
-    "57.1".sec    // flat
+  // The science fold move is charged to the arc that follows it.
+  val ArcTime  = "15.0".sec + "52.1".sec
+  val FlatTime = "57.1".sec
+  val CalTime  = ArcTime + FlatTime
 
   val Offset_15arcsec = "7.0".sec + "0.09375".sec
   val Offset_30arcsec = "7.0".sec + "0.18750".sec
@@ -214,6 +215,9 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
             )),
             NonNegInt.unsafeFrom(1 + RepeatingAtomCount),
+            GcalDigest.Zero,
+            GcalDigest.Zero,
+            CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
@@ -226,6 +230,9 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
             )),
             NonNegInt.unsafeFrom(4),
+            GcalDigest(NonNegInt.unsafeFrom(4), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ArcTime * 4).get)),
+            GcalDigest(NonNegInt.unsafeFrom(4), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(FlatTime * 4).get)),
+            CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence - CalTime * 4).get),
             ExecutionState.NotStarted
           )
       ),

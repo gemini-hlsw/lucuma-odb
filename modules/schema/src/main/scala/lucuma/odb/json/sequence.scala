@@ -24,6 +24,7 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
+import lucuma.core.model.sequence.GcalDigest
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
@@ -95,15 +96,34 @@ trait SequenceCodec {
       )
     }
 
+  given Decoder[GcalDigest] =
+    Decoder.instance: c =>
+      for
+        n <- c.downField("count").as[NonNegInt]
+        t <- c.downField("time").as[CategorizedTime]
+      yield GcalDigest(n, t)
+
+  given (using Encoder[TimeSpan]): Encoder[GcalDigest] =
+    Encoder.instance: (a: GcalDigest) =>
+      Json.obj(
+        "count" -> a.count.asJson,
+        "time"  -> a.time.asJson
+      )
+
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
+      // Payloads that predate the GCAL breakdown have no arcs, flats or
+      // observingTime; read them as all observing time so the sum invariant holds.
       for
         o  <- c.downField("observeClass").as[ObserveClass]
         t  <- c.downField("timeEstimate").as[CategorizedTime]
         tc <- c.downField("telescopeConfigs").as[SortedSet[TelescopeConfig]]
         n  <- c.downField("atomCount").as[NonNegInt]
+        r  <- c.downField("arcs").as[Option[GcalDigest]].map(_.getOrElse(GcalDigest.Zero))
+        f  <- c.downField("flats").as[Option[GcalDigest]].map(_.getOrElse(GcalDigest.Zero))
+        ot <- c.downField("observingTime").as[Option[CategorizedTime]].map(_.getOrElse(t))
         e  <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, tc, n, e)
+      yield SequenceDigest(o, t, tc, n, r, f, ot, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
@@ -112,6 +132,9 @@ trait SequenceCodec {
         "timeEstimate"     -> a.timeEstimate.asJson,
         "telescopeConfigs" -> a.telescopeConfigs.asJson,
         "atomCount"        -> a.atomCount.asJson,
+        "arcs"             -> a.arcs.asJson,
+        "flats"            -> a.flats.asJson,
+        "observingTime"    -> a.observingTime.asJson,
         "executionState"   -> a.executionState.asJson
       )
 
