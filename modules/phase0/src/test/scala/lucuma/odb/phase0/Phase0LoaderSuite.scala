@@ -17,7 +17,7 @@ class Phase0LoaderSuite extends CatsEffectSuite:
     val stream =
       fs2.io.readInputStream(
         IO(inputStream),
-        chunkSize = 4096,
+        chunkSize = 2048,
         closeAfterUse = true
       )
 
