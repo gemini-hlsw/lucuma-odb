@@ -60,6 +60,15 @@ object GeneratorParams:
         a.altair
       )
 
+  given HashBytes[AltairConfiguration] with
+    def hashBytes(a: AltairConfiguration): Array[Byte] =
+      Array.concat(
+        a.mode.hashBytes,
+        a.explicitFieldLens.hashBytes,
+        a.cassRotator.hashBytes,
+        a.ndFilter.hashBytes
+      )
+
   given HashBytes[GeneratorParams] with
     def hashBytes(a: GeneratorParams): Array[Byte] =
       Array.concat(
@@ -73,8 +82,5 @@ object GeneratorParams:
         a.executionState.hashBytes,
         a.stepCount.hashBytes,
         a.isSplittable.hashBytes,
-        a.altair.map(_.mode).hashBytes,
-        a.altair.flatMap(_.explicitFieldLens).hashBytes,
-        a.altair.map(_.cassRotator).hashBytes,
-        a.altair.map(_.ndFilter).hashBytes
+        a.altair.hashBytes
       )
