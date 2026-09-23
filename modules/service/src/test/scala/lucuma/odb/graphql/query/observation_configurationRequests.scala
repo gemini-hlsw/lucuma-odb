@@ -382,4 +382,52 @@ class observation_configurationRequests
     }
   }
 
+  // `Observation.configurationRequests` is the one route to `ConfigurationObservingMode` that is
+  // not SQL-mapped: `configurationRequestsQueryHandler` builds a `CirceCursor` from
+  // `Encoder[Configuration]`. Anything the schema declares but the encoder omits therefore fails
+  // only here, which is how `instrument` and `mode` went missing unnoticed. Select every field of
+  // the type so a third omission cannot hide the same way.
+  test("every field of the observing mode is selectable through an observation's requests"):
+    for
+      oid <- setup(too = false, ObservingModeType.GmosNorthLongSlit)
+      rid <- createConfigurationRequestAs(pi, oid)
+      _   <- expect(
+               user = pi,
+               query = s"""
+                 query {
+                   observation(observationId: "$oid") {
+                     configurationRequests {
+                       id
+                       configuration {
+                         observingMode {
+                           instrument
+                           mode
+                           gmosNorthLongSlit { grating }
+                         }
+                       }
+                     }
+                   }
+                 }
+               """,
+               expected = Right(json"""
+                 {
+                   "observation" : {
+                     "configurationRequests" : [
+                       {
+                         "id" : $rid,
+                         "configuration" : {
+                           "observingMode" : {
+                             "instrument" : "GMOS_NORTH",
+                             "mode" : "GMOS_NORTH_LONG_SLIT",
+                             "gmosNorthLongSlit" : { "grating" : "R831_G5302" }
+                           }
+                         }
+                       }
+                     ]
+                   }
+                 }
+               """)
+             )
+    yield ()
+
 }

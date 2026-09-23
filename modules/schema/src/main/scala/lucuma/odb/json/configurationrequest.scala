@@ -12,6 +12,7 @@ import io.circe.Json
 import io.circe.refined.*
 import io.circe.syntax.*
 import lucuma.core.enums.ConfigurationRequestStatus
+import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.GmosNorthFilter
 import lucuma.core.enums.GmosNorthGrating
@@ -23,6 +24,7 @@ import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
+import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.enums.WaterVapor
@@ -39,6 +41,7 @@ import lucuma.core.model.ImageQuality
 import lucuma.odb.json.angle.query.given
 import lucuma.odb.json.coordinates.query.given
 import lucuma.odb.json.region.query.given
+import lucuma.odb.syntax.observingModeType.*
 
 object configurationrequest:
 
@@ -118,31 +121,54 @@ object configurationrequest:
         r <- hc.downField("radius").as[Angle]
       yield Visitor(m, r)
 
+    /**
+     * Decodes what the `observingMode` selection returns, dispatching on `mode` -- which the
+     * schema declares non-null -- rather than trying each sub-object in turn. Matching the
+     * enum makes this exhaustive, so a mode added to `ObservingModeType` without a case here
+     * fails the build instead of surfacing at runtime as an unreadable configuration. It also
+     * keeps the reported error honest: a sub-object that fails to decode says so, rather than
+     * being swallowed and reported as an unrecognized mode.
+     */
     given Decoder[ObservingMode] = hc =>
-      hc.downField("flamingos2LongSlit").as(using DecodeFlamingos2LongSlit) orElse
-      hc.downField("flamingos2Mos").as(using DecodeFlamingos2Mos) orElse
-      hc.downField("visitor").as(using DecodeVisitor) orElse
-      hc.downField("gmosNorthImaging").as(using DecodeGmosNorthImaging) orElse
-      hc.downField("gmosNorthLongSlit").as(using DecodeGmosNorthLongSlit) orElse
-      hc.downField("gmosNorthMos").as(using DecodeGmosNorthMos) orElse
-      hc.downField("gmosSouthImaging").as(using DecodeGmosSouthImaging) orElse
-      hc.downField("gmosSouthLongSlit").as(using DecodeGmosSouthLongSlit) orElse
-      hc.downField("gmosSouthMos").as(using DecodeGmosSouthMos) orElse
-      hc.downField("gmosNorthIfu").as(using DecodeGmosNorthIfu) orElse
-      hc.downField("gmosSouthIfu").as(using DecodeGmosSouthIfu) orElse
-      hc.downField("gnirsLongSlit").as(using DecodeGnirsLongSlit) orElse
-      hc.downField("gnirsIfu").as(using DecodeGnirsIfu) orElse
-      // The imaging modes below, GhostIfu and Igrins2LongSlit don't have parameters, so
-      // decode by name.
-      hc.downField("mode").as[String].flatMap:
-        case "FLAMINGOS_2_IMAGING" => Flamingos2Imaging.asRight
-        case "GHOST_IFU"           => GhostIfu.asRight
-        case "GNIRS_IMAGING"       => GnirsImaging.asRight
-        case "IGRINS_2_LONG_SLIT"  => Igrins2LongSlit.asRight
-        case other => Left(DecodingFailure(s"couldn't decode mode: $other", Nil))
+      val modeField = hc.downField("mode")
+
+      def sub[A <: ObservingMode](field: String, d: Decoder[A]): Decoder.Result[ObservingMode] =
+        hc.downField(field).as(using d)
+
+      modeField.as[ObservingModeType].flatMap:
+        case ObservingModeType.Flamingos2LongSlit => sub("flamingos2LongSlit", DecodeFlamingos2LongSlit)
+        case ObservingModeType.Flamingos2Mos      => sub("flamingos2Mos",      DecodeFlamingos2Mos)
+        case ObservingModeType.GmosNorthImaging   => sub("gmosNorthImaging",   DecodeGmosNorthImaging)
+        case ObservingModeType.GmosNorthLongSlit  => sub("gmosNorthLongSlit",  DecodeGmosNorthLongSlit)
+        case ObservingModeType.GmosNorthMos       => sub("gmosNorthMos",       DecodeGmosNorthMos)
+        case ObservingModeType.GmosNorthIfu       => sub("gmosNorthIfu",       DecodeGmosNorthIfu)
+        case ObservingModeType.GmosSouthImaging   => sub("gmosSouthImaging",   DecodeGmosSouthImaging)
+        case ObservingModeType.GmosSouthLongSlit  => sub("gmosSouthLongSlit",  DecodeGmosSouthLongSlit)
+        case ObservingModeType.GmosSouthMos       => sub("gmosSouthMos",       DecodeGmosSouthMos)
+        case ObservingModeType.GmosSouthIfu       => sub("gmosSouthIfu",       DecodeGmosSouthIfu)
+        case ObservingModeType.GnirsLongSlit      => sub("gnirsLongSlit",      DecodeGnirsLongSlit)
+        case ObservingModeType.GnirsIfu           => sub("gnirsIfu",           DecodeGnirsIfu)
+        case _: VisitorObservingModeType          => sub("visitor",            DecodeVisitor)
+
+        // These modes have no parameters, so the mode alone identifies them.
+        case ObservingModeType.Flamingos2Imaging  => Flamingos2Imaging.asRight
+        case ObservingModeType.GhostIfu           => GhostIfu.asRight
+        case ObservingModeType.GnirsImaging       => GnirsImaging.asRight
+        case ObservingModeType.Igrins2LongSlit    => Igrins2LongSlit.asRight
+
+        // Exchange observations are not approved through configuration requests and have no
+        // `Configuration.ObservingMode`. `ConfigurationService` relies on this failing.
+        case _: ExchangeObservingModeType         =>
+          // Report the mode as it arrived, rather than the enum's name.
+          Left(DecodingFailure(s"couldn't decode mode: ${modeField.as[String].getOrElse("")}", Nil))
 
     given Encoder[ObservingMode] = m =>
       Json.obj(
+        // `instrument` and `mode` are the two scalar fields of `ConfigurationObservingMode`.
+        // They are derived from the mode rather than stored, exactly as the Grackle mappings
+        // derive them, so that this JSON and the SQL-mapped path agree field for field.
+        "instrument"         -> m.tpe.instrumentOption.asJson,
+        "mode"               -> m.tpe.asJson,
         "flamingos2Imaging"  -> Json.Null, // one of these will be replaced below
         "flamingos2LongSlit" -> Json.Null, // one of these will be replaced below
         "flamingos2Mos"      -> Json.Null, // one of these will be replaced below
