@@ -223,8 +223,26 @@ val cacheDiagnosticSteps: List[WorkflowStep] = List(
   // the previous command, which must stay the test run.
   WorkflowStep.Run(List("sbt -v Global/cacheStats"), name = Some("Cache stats")),
   // The exec log is only flushed when the server exits.
+  // Artifacts are deleted by the generated Clean workflow, so the misses also go to the job log:
+  // one line per missed action with its description and digest.
   WorkflowStep.Run(
-    List("sbt shutdown || true", "sleep 3", s"wc -l $execLogPath || true"),
+    List(
+      "sbt shutdown || true",
+      "sleep 3",
+      s"wc -l $execLogPath || true",
+      s"""python3 - <<'EOF'
+import json, sys
+dec = json.JSONDecoder()
+s = open("$execLogPath").read(); i = 0
+while i < len(s):
+    while i < len(s) and s[i] in " \\r\\n\\t": i += 1
+    if i >= len(s): break
+    o, i = dec.raw_decode(s, i)
+    if not o.get("cacheHit"):
+        inp = o["input"]
+        print("MISS", inp["digest"][:23], inp["codeContentHash"][:23], inp.get("str", "")[:160].replace("\\n", " "))
+EOF"""
+    ),
     name = Some("Flush exec log")
   ),
   WorkflowStep.Use(
