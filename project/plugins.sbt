@@ -1,4 +1,4 @@
-val SbtLucumaVersion = "0.17-3ae7d1b-20260923T003522Z-SNAPSHOT"
+val SbtLucumaVersion = "0.17-566daaf-SNAPSHOT"
 
 // Hosts the sbt 2 build of sbt-lucuma, and the sbt-typelevel snapshot it depends on.
 resolvers += "gemini-hlsw".at(
