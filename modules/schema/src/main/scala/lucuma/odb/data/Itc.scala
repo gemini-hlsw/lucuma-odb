@@ -112,7 +112,10 @@ sealed trait ItcScience:
   /** One science result per configuration (filter, channel or central wavelength). */
   def scienceResults: NonEmptyList[Zipper[ItcResult]]
 
-  /** Achieved total S/N per configuration, in the observation's configuration order. */
+  /**
+   * Achieved total S/N per configuration, in `scienceResults` order: the observation's
+   * configuration order for spectroscopy, filter order for imaging.
+   */
   def totalSignalToNoisePerConfig: NonEmptyList[Option[TotalSN]] =
     scienceResults.map(_.focus.signalToNoise.map(_.total))
 

@@ -1958,6 +1958,36 @@ class perScienceObservationCalibrations
       // 2 x the live S/N 10, not the superseded 500.
       assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(20).some).some)
 
+  // Regression: a telluric 'initial' row at a wavelength the science has since changed must
+  // follow its own 'current' row, not the deepest science leg.
+  test("telluric initial rows follow the current rows after a science wavelength changes"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1600, 1650))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      // The 1650 leg becomes a shallow 1700 request; the science 'initial' list keeps 1650.
+      _      <- setGnirsCentralWavelengths(oid,
+                  """{ centralWavelength: { nanometers: 1600 }
+                       exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1600 } } } }
+                     { centralWavelength: { nanometers: 1700 }
+                       exposureTimeMode: { signalToNoise: { value: 10 at: { nanometers: 1700 } } } }""")
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      rows   <- telOpt.traverse(gnirsWavelengthRows)
+    } yield
+      // The cloned initial 1650 row carries the current 1700 row's 20, not the deepest 232.
+      val expected = List(
+        ("current", 0, 1600, 1, 232, 1600),
+        ("current", 1, 1700, 1, 20, 1700),
+        ("initial", 0, 1600, 1, 232, 1600),
+        ("initial", 1, 1650, 1, 20, 1700)
+      )
+      assertEquals(rows.map(_.sortBy(_._1)), expected.some)
+
   test("science configurations sharing a wavelength collapse to one telluric configuration"):
     for {
       pid    <- createProgramAs(pi)
@@ -2646,6 +2676,25 @@ class perScienceObservationCalibrations
         }
       """
     ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
+
+  private def setGnirsCentralWavelengths(oid: Observation.Id, entries: String): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          SET: {
+            observingMode: {
+              gnirsSpectroscopy: {
+                centralWavelengths: [ $entries ]
+              }
+            }
+          }
+          WHERE: { id: { EQ: "$oid" } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
 
   // (version, index, central wavelength nm, coadds, science S/N, S/N at nm) per row.
   private def gnirsWavelengthRows(oid: Observation.Id): IO[List[(String, Int, Int, Int, Int, Int)]] =

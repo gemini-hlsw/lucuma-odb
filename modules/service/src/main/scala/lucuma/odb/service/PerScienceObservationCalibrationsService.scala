@@ -450,10 +450,10 @@ object PerScienceObservationCalibrationsService:
 
         // A pinhole pairs with the science configuration at the same index; a telluric,
         // collapsed to one row per wavelength, with the science configurations sharing it.
-        // An unpaired row falls back to the deepest.
+        // Also returns the deepest candidate, for a row that pairs with nothing.
         def telluricEtmFor(
           science: List[(ExposureTimeMode, Option[SignalToNoise], Option[Wavelength])]
-        ): (Int, Option[Wavelength]) => Option[ExposureTimeMode.SignalToNoiseMode] =
+        ): ((Int, Option[Wavelength]) => Option[ExposureTimeMode.SignalToNoiseMode], Option[ExposureTimeMode.SignalToNoiseMode]) =
           val byIndex  = science.map((etm, m, _) => telluricEtm(etm, m))
           val byLambda = science
             .groupByNel(_._3)
@@ -462,8 +462,8 @@ object PerScienceObservationCalibrationsService:
             .toMap
           val deepest  = byIndex.maxByOption(_.value.toBigDecimal)
           calibrationRole match
-            case CalibrationRole.Telluric => (_, w) => byLambda.get(w).orElse(deepest)
-            case _                        => (i, _) => byIndex.lift(i).orElse(deepest)
+            case CalibrationRole.Telluric => ((_, w) => byLambda.get(w), deepest)
+            case _                        => ((i, _) => byIndex.lift(i), deepest)
 
         for {
           // Cloning copied the PI's c_is_explicit; the writes below skip unchanged values.
@@ -476,17 +476,25 @@ object PerScienceObservationCalibrationsService:
                             oid -> roles(ExposureTimeModeRole.Acquisition).head
           scienceEtms <- currentScienceEtms(scienceOid)
           telluricEtms<- scienceEtmsByIndex(telluricOid)
-          // Only a time-and-count configuration needs the ITC.
+          // Only a time-and-count configuration needs the ITC.  A stored result computed
+          // for a different number of configurations pairs by position with the wrong
+          // ones, so it is discarded in favour of the fallback until the ITC catches up.
           needsItc     = scienceEtms.exists:
                            _._2 match
                              case ExposureTimeMode.SignalToNoiseMode(_, _) => false
                              case _                                        => true
           measured    <- if needsItc then measuredScienceSNs else List.empty.pure[F]
-          candidate   = telluricEtmFor:
+          aligned      = if measured.length === scienceEtms.length then measured else List.empty
+          (candidate,
+           deepest)   = telluricEtmFor:
                           scienceEtms.zipWithIndex.map: (row, i) =>
-                            (row._2, measured.lift(i).flatten, row._3)
-          _          <- telluricEtms.traverse_ : row =>
-                          candidate(row._3, row._4).traverse_ : sci =>
+                            (row._2, aligned.lift(i).flatten, row._3)
+          paired      = telluricEtms.map(row => (row, candidate(row._3, row._4)))
+          // A telluric 'initial' row at a wavelength the science has since changed follows
+          // the telluric's own 'current' row at that index, so the two versions agree.
+          byIndex     = paired.collect { case (row, Some(etm)) => row._3 -> etm }.toMap
+          _          <- paired.traverse_ : (row, c) =>
+                          c.orElse(byIndex.get(row._3)).orElse(deepest).traverse_ : sci =>
                             exposureTimeModeService
                               .updateOne(row._1, sci)
                               .unlessA(row._2 === (sci: ExposureTimeMode))
