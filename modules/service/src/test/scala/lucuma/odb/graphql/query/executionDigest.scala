@@ -242,6 +242,76 @@ class executionDigest extends ExecutionTestSupportForGmos {
         expected = successDigestResult.asRight
       )
 
+  test("digest - gcal breakdown"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    def gcal(count: Int, seconds: BigDecimal): Json =
+      json"""
+        {
+          "count": $count,
+          "time": {
+            "program": { "seconds": ${seconds.asJson} },
+            "nonCharged": { "seconds": 0.000000 }
+          }
+        }
+      """
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                digest {
+                  value {
+                    acquisition {
+                      arcs { count time { program { seconds } nonCharged { seconds } } }
+                      flats { count time { program { seconds } nonCharged { seconds } } }
+                    }
+                    science {
+                      arcs { count time { program { seconds } nonCharged { seconds } } }
+                      flats { count time { program { seconds } nonCharged { seconds } } }
+                      observingTime { program { seconds } nonCharged { seconds } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "digest": {
+                  "value": {
+                    "acquisition": {
+                      "arcs": ${gcal(0, BigDecimal(0).setScale(6))},
+                      "flats": ${gcal(0, BigDecimal(0).setScale(6))}
+                    },
+                    "science": {
+                      "arcs": ${gcal(4, "67.1".sec * 4)},
+                      "flats": ${gcal(4, "57.1".sec * 4)},
+                      "observingTime": {
+                        "program": { "seconds": ${ScienceTime.asJson} },
+                        "nonCharged": { "seconds": 0.000000 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
   test("digest - deprecated state field still works"):
     val setup: IO[Observation.Id] =
       for

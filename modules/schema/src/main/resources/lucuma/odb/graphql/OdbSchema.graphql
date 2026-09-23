@@ -19429,6 +19429,15 @@ enum SequenceCommand {
   STOP
 }
 
+"Summary of the GCAL steps of one kind (arcs or flats) in a sequence."
+type GcalDigest {
+  "Number of steps."
+  count: NonNegInt!
+
+  "Time estimate for these steps, including any configuration change that precedes them."
+  time: CategorizedTime!
+}
+
 type SequenceDigest {
   """
   ObserveClass of the whole sequence.
@@ -19450,6 +19459,18 @@ type SequenceDigest {
   and any remaining atoms not included in 'possibleFuture'.
   """
   atomCount: NonNegInt!
+
+  "Arc steps in the sequence and their time."
+  arcs: GcalDigest!
+
+  "Flat steps in the sequence and their time."
+  flats: GcalDigest!
+
+  """
+  Time for all steps other than arcs and flats, so that
+  observingTime + arcs.time + flats.time equals timeEstimate.
+  """
+  observingTime: CategorizedTime!
 
   """
   Execution state for the sequence. Note, acquisition sequences are never
