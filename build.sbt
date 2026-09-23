@@ -197,6 +197,10 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
 // Swap the test-shard checkout for a shallow no-LFS variant, and drop the
 // plugin-injected githubWorkflowCheck step from the shards. The check costs a
 // separate sbt start per shard; the `checks` job runs it once instead.
+// The CI preamble chmods the key, which git reports as a change; without this every run sees a
+// file that belongs to no project and tests everything.
+ThisBuild / lucumaAffectedIgnorePaths += "test-cert/**"
+
 ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
