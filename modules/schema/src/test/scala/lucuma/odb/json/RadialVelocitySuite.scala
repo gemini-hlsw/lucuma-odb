@@ -16,7 +16,6 @@ abstract class RadialVelocitySuite(using Encoder[RadialVelocity]) extends Discip
   import radialvelocity.decoder.given
 
   checkAll("RadialVelocityCodec", CodecTests[RadialVelocity].codec)
-  checkAll("RadialVelocityCodec1", CodecTests[RadialVelocity].codec)
 
   test("all radial velocity encoders produce the same radial velocity") {
     conversionTest[RadialVelocity]()
