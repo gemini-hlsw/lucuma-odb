@@ -150,7 +150,7 @@ ALTER TABLE t_observation
 -- v_observation selects o.*, so it must be recreated to pick up the new column.
 DROP VIEW v_observation;
 
--- Body copied verbatim from V1313.
+-- Body copied verbatim from V1323.
 CREATE VIEW v_observation AS
   SELECT o.*,
   (o.c_scheduling_mode = 'unconstrained'::e_scheduling_mode) AS c_is_splittable,
@@ -164,6 +164,11 @@ CREATE VIEW v_observation AS
   CASE WHEN o.c_img_minimum_fov          IS NOT NULL THEN o.c_observation_id END AS c_img_minimum_fov_id,
   CASE WHEN o.c_observation_duration     IS NOT NULL THEN o.c_observation_id END AS c_observation_duration_id,
   CASE WHEN o.c_orig_est_setup_count     IS NOT NULL THEN o.c_observation_id END AS c_original_estimate_id,
+  CASE WHEN o.c_altair_mode              IS NOT NULL THEN o.c_observation_id END AS c_altair_id,
+  -- Alias read as a plain nullable column; c_altair_cass_rotator itself is mapped
+  -- as a non-null field of the nested Altair object and a grackle ColumnRef is
+  -- identified by name alone, so the two uses need distinct names.
+  o.c_altair_cass_rotator AS c_cass_rotator,
   CASE WHEN o.c_science_mode = 'imaging'::d_tag      THEN o.c_observation_id END AS c_imaging_mode_id,
   CASE WHEN o.c_science_mode = 'spectroscopy'::d_tag THEN o.c_observation_id END AS c_spectroscopy_mode_id,
   c.c_active_start::timestamp + (c.c_active_end::timestamp - c.c_active_start::timestamp) * 0.5 AS c_reference_time,
@@ -184,7 +189,8 @@ CREATE VIEW v_observation AS
     FROM t_asterism_target a
     WHERE a.c_observation_id = o.c_observation_id
       AND a.c_is_signal_to_noise_target
-  ) AS c_signal_to_noise_target_id
+  ) AS c_signal_to_noise_target_id,
+  o.c_altair_mode AS c_configuration_altair_mode
   FROM t_observation o
   LEFT JOIN t_proposal p on p.c_program_id = o.c_program_id
   LEFT JOIN t_cfp c on p.c_cfp_id = c.c_cfp_id;
