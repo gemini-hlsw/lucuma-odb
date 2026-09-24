@@ -234,19 +234,25 @@ lazy val CheckoutFullWithLfs: WorkflowStep =
     params = Map("fetch-depth" -> "0")
   )
 
-ThisBuild / githubWorkflowJobSetup := {
-  List(CheckoutFull) :::
-    WorkflowStep.SetupSbt ::
-    WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
-    githubWorkflowGeneratedCacheSteps.value.toList
-}
+// Swap the checkout step but keep everything else the plugins put in the job setup. Rebuilding
+// the list from scratch would drop sbt-lucuma's setup-java tweaks (the sbt cache key).
+def withCheckout(checkout: WorkflowStep)(steps: Seq[WorkflowStep]): List[WorkflowStep] =
+  steps.toList.map {
+    case s: WorkflowStep.Use if isCheckout(s) => checkout
+    case s                                   => s
+  }
+
+def isCheckout(step: WorkflowStep.Use): Boolean =
+  step.ref match {
+    case UseRef.Public("actions", "checkout", _) => true
+    case _                                       => false
+  }
+
+ThisBuild / githubWorkflowJobSetup ~= withCheckout(CheckoutFull)
 
 // allow customizing the checkout style.
 def setupWith(checkout: WorkflowStep): Def.Initialize[List[WorkflowStep]] = Def.setting {
-  checkout ::
-    WorkflowStep.SetupSbt ::
-    WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
-    githubWorkflowGeneratedCacheSteps.value.toList
+  withCheckout(checkout)(githubWorkflowJobSetup.value)
 }
 
 lazy val sbtClean =
