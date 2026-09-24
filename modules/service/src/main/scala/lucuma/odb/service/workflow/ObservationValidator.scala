@@ -73,6 +73,7 @@ object ObservationValidator:
       GhostVMagnitudeValidator                 |+|
       GnirsSpectroscopyValidator.configuration |+|
       GuideProbeValidator                      |+|
+      AltairValidator                          |+|
       TooActivationValidator                   |+|
       OpportunityTargetValidator               |+|
       OtherConfigErrorValidator                |+|
