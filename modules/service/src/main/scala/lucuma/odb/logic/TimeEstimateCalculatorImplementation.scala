@@ -175,6 +175,17 @@ object TimeEstimateCalculatorImplementation:
         ctx.enums.TimeEstimate.GnirsLongslitMaxVisit.time
       )
 
+    // Altair's laser modes cost 25 minutes of setup rather than 15; the reacquisition and
+    // max-visit costs are unchanged.
+    lazy val gnirsLgsSetup: SetupTimeEstimateCalculator =
+      setupCalculatorfromEstimation(
+        SetupTime(
+          ctx.enums.TimeEstimate.GnirsLgsSetup.time,
+          ctx.enums.TimeEstimate.GnirsReacquisition.time
+        ),
+        ctx.enums.TimeEstimate.GnirsLongslitMaxVisit.time
+      )
+
     lazy val gnirsImagingSetup: SetupTimeEstimateCalculator =
       gnirsLongSlitSetup
 

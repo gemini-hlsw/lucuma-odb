@@ -20,7 +20,9 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.CassRotator
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.Flamingos2ReadMode
@@ -50,6 +52,7 @@ import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.ItcConstraintsInput.*
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
+import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
@@ -185,10 +188,10 @@ object GeneratorParamsService {
           paramsRows <- params
           oms         = paramsRows.collect { case ParamsRow(observationId = oid, observingMode = Some(om)) => (oid, om) }.distinct
           m          <- Services.asSuperUser(observingModeServices.selectObservingMode(oms))
+          obsParams   = NonEmptyList.fromList(paramsRows).fold(Map.empty[Observation.Id, ObsParams])(ObsParams.fromParamsRows)
         yield
-          NonEmptyList.fromList(paramsRows).fold(Map.empty): paramsRowsNel =>
-            ObsParams.fromParamsRows(paramsRowsNel).map: (obsId, obsParams) =>
-              obsId -> toObsGeneratorParams(obsParams, m.get(obsId))
+          obsParams.map: (obsId, obs) =>
+            obsId -> toObsGeneratorParams(obs, m.get(obsId))
 
       private def selectManyParams(
         pid:  Program.Id,
@@ -301,7 +304,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair)
 
         /**
          * Modes with no acquisition sequence are costed on science alone.
@@ -320,7 +323,7 @@ object GeneratorParamsService {
               .leftMap(MissingParamSet.fromParams)
               .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair)
 
         /**
          * GNIRS spectroscopy takes spectra at one or more central wavelengths,
@@ -357,7 +360,7 @@ object GeneratorParamsService {
             .leftMap(MissingParamSet.fromParams)
             .toEither
 
-          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable)
+          GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, obsMode, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair)
 
         // Shared by long slit and MOS.  Signal-to-noise is solved by the ITC, so
         // the read mode it is given is ignored; only Time & Count needs a real one.
@@ -382,7 +385,8 @@ object GeneratorParamsService {
               obsParams.declaredState,
               obsParams.executionState,
               obsParams.stepCount,
-              obsParams.schedulingMode.isSplittable
+              obsParams.schedulingMode.isSplittable,
+              obsParams.altair
             ).asRight
 
           case f2: flamingos2.longslit.Config =>
@@ -438,7 +442,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, f2, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair).asRight
 
           case gnm @ gnirs.imaging.Config(filters = fs) =>
             // An input per filter. In S/N mode the read mode is derived per step from
@@ -503,7 +507,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gnm, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair).asRight
 
           case gh @ ghost.ifu.Config(stepCnt, resolutionMode, red, blue, _, _, _, _) =>
             (
@@ -646,7 +650,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gn, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair).asRight
 
           case gs @ gmos.imaging.Config.GmosSouth(_, fs, _) =>
             // An input per filter.
@@ -664,7 +668,7 @@ object GeneratorParamsService {
                 .leftMap(MissingParamSet.fromParams)
                 .toEither
 
-            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable).asRight
+            GeneratorParams(ItcInputDerivation.fromEither(itcInput), obsParams.scienceBand, gs, obsParams.calibrationRole, obsParams.proposalStatus, hasTarget, obsParams.declaredState, obsParams.executionState, obsParams.stepCount, obsParams.schedulingMode.isSplittable, obsParams.altair).asRight
 
           case gn: gnirs.spectroscopy.Config =>
             // Acquisition (imaging) filter for the ITC: the explicit acquisition
@@ -744,7 +748,8 @@ object GeneratorParamsService {
               obsParams.declaredState,
               obsParams.executionState,
               obsParams.stepCount,
-              obsParams.schedulingMode.isSplittable
+              obsParams.schedulingMode.isSplittable,
+              obsParams.altair
             ).asRight
 
 
@@ -802,6 +807,7 @@ object GeneratorParamsService {
     executionState:        ExecutionState,
     stepCount:             Long,
     schedulingMode:        SchedulingMode,
+    altair:                Option[AltairConfiguration],
     customSedTimestamp:    Option[Timestamp] = none
   )
 
@@ -826,7 +832,8 @@ object GeneratorParamsService {
     declaredState:         Option[DeclaredExecutionState],
     executionState:        ExecutionState,
     stepCount:             Long,
-    schedulingMode:        SchedulingMode
+    schedulingMode:        SchedulingMode,
+    altair:                Option[AltairConfiguration]
   )
 
   object ObsParams {
@@ -847,7 +854,8 @@ object GeneratorParamsService {
           oParams.head.declaredState,
           oParams.head.executionState,
           oParams.head.stepCount,
-          oParams.head.schedulingMode
+          oParams.head.schedulingMode,
+          oParams.head.altair
         )
       .toMap
   }
@@ -891,9 +899,17 @@ object GeneratorParamsService {
        declared_execution_state.opt *:
        execution_state         *:
        int8                    *:
-       scheduling_mode
-      ).map( (oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req) =>
-        ParamsRow(oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, None))
+       scheduling_mode         *:
+       altair_mode.opt         *:
+       field_lens.opt          *:
+       cass_rotator.opt        *:
+       altair_nd_filter.opt
+      ).map( (oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, am, fl, cr, nd) =>
+        // All-or-nothing (field lens aside) is a DB CHECK; the fallbacks here are unreachable in
+        // practice, not a second source of truth for them.
+        val altair: Option[AltairConfiguration] =
+          am.map(AltairConfiguration(_, fl, cr.getOrElse(CassRotator.Following), nd.getOrElse(AltairNdFilter.Out)))
+        ParamsRow(oid, role, ps, cs, etm, om, sb, btid, brv, bsp, tid, rv, sp, snt, dc, es, sc, req, altair, None))
 
     // v_generator_params knows nothing about proposals.
     private def ProposalJoin(tab: String): String =
@@ -932,7 +948,11 @@ object GeneratorParamsService {
         $tab.c_declared_state,
         $tab.c_execution_state,
         $tab.c_step_count,
-        $tab.c_scheduling_mode
+        $tab.c_scheduling_mode,
+        $tab.c_altair_mode,
+        $tab.c_altair_field_lens,
+        $tab.c_altair_cass_rotator,
+        $tab.c_altair_nd_filter
       """
 
     def selectManyParams(
