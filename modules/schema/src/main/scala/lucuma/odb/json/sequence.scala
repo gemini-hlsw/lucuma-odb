@@ -140,9 +140,10 @@ trait SequenceCodec {
         t  <- c.downField("timeEstimate").as[CategorizedTime]
         tc <- c.downField("telescopeConfigs").as[SortedSet[TelescopeConfig]]
         n  <- c.downField("atomCount").as[NonNegInt]
+        g  <- c.downField("gcalSets").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         s  <- c.downField("steps").as[Option[StepDigests]].map(_.getOrElse(StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, t))))
         e  <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, tc, n, s, e)
+      yield SequenceDigest(o, t, tc, n, g, s, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
@@ -151,6 +152,7 @@ trait SequenceCodec {
         "timeEstimate"     -> a.timeEstimate.asJson,
         "telescopeConfigs" -> a.telescopeConfigs.asJson,
         "atomCount"        -> a.atomCount.asJson,
+        "gcalSets"         -> a.gcalSets.asJson,
         "steps"            -> a.steps.asJson,
         "executionState"   -> a.executionState.asJson
       )

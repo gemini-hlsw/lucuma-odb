@@ -19481,6 +19481,13 @@ type SequenceDigest {
   """
   atomCount: NonNegInt!
 
+  """
+  Number of GCAL sets: atoms that contain at least one GCAL step.  A set may
+  hold only a flat or only an arc, so this cannot be derived from the step
+  counts in 'steps'.
+  """
+  gcalSets: NonNegInt!
+
   "Steps in the sequence by kind, with their counts and times."
   steps: StepDigests!
 

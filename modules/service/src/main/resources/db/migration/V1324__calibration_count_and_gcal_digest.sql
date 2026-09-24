@@ -3,13 +3,14 @@
 -- * c_calibration_count: expected number of calibration epochs for an
 --   observation, carried beside the setup count; calibration observations
 --   report 0.
--- * Per sequence (acq, sci): bias, dark, arc, flat and observing (all other)
---   step counts and times, so the five sum to the sequence time estimate per
---   charge class.
+-- * Per sequence (acq, sci): the number of GCAL sets (atoms with a GCAL step),
+--   and bias, dark, arc, flat and observing (all other) step counts and times,
+--   so the five sum to the sequence time estimate per charge class.
 
 -- Obscalc: nullable like the other digest columns (null when there is no digest).
 ALTER TABLE t_obscalc
   ADD COLUMN c_calibration_count              int4     NULL CHECK (c_calibration_count              >= 0),
+  ADD COLUMN c_acq_gcal_set_count             int4     NULL CHECK (c_acq_gcal_set_count             >= 0),
   ADD COLUMN c_acq_bias_count                 int4     NULL CHECK (c_acq_bias_count                 >= 0),
   ADD COLUMN c_acq_bias_non_charged_time      interval NULL CHECK (c_acq_bias_non_charged_time      >= interval '0 seconds'),
   ADD COLUMN c_acq_bias_program_time          interval NULL CHECK (c_acq_bias_program_time          >= interval '0 seconds'),
@@ -25,6 +26,7 @@ ALTER TABLE t_obscalc
   ADD COLUMN c_acq_observing_count            int4     NULL CHECK (c_acq_observing_count            >= 0),
   ADD COLUMN c_acq_observing_non_charged_time interval NULL CHECK (c_acq_observing_non_charged_time >= interval '0 seconds'),
   ADD COLUMN c_acq_observing_program_time     interval NULL CHECK (c_acq_observing_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_gcal_set_count             int4     NULL CHECK (c_sci_gcal_set_count             >= 0),
   ADD COLUMN c_sci_bias_count                 int4     NULL CHECK (c_sci_bias_count                 >= 0),
   ADD COLUMN c_sci_bias_non_charged_time      interval NULL CHECK (c_sci_bias_non_charged_time      >= interval '0 seconds'),
   ADD COLUMN c_sci_bias_program_time          interval NULL CHECK (c_sci_bias_program_time          >= interval '0 seconds'),
@@ -46,6 +48,7 @@ ALTER TABLE t_obscalc
 -- the sum invariant) until they are recomputed.
 UPDATE t_obscalc
    SET c_calibration_count              = 0,
+       c_acq_gcal_set_count             = 0,
        c_acq_bias_count                 = 0,
        c_acq_bias_non_charged_time      = interval '0 seconds',
        c_acq_bias_program_time          = interval '0 seconds',
@@ -61,6 +64,7 @@ UPDATE t_obscalc
        c_acq_observing_count            = 0,
        c_acq_observing_non_charged_time = c_acq_non_charged_time,
        c_acq_observing_program_time     = c_acq_program_time,
+       c_sci_gcal_set_count             = 0,
        c_sci_bias_count                 = 0,
        c_sci_bias_non_charged_time      = interval '0 seconds',
        c_sci_bias_program_time          = interval '0 seconds',
@@ -90,6 +94,7 @@ TRUNCATE TABLE t_execution_digest;
 
 ALTER TABLE t_execution_digest
   ADD COLUMN c_calibration_count              int4     NOT NULL CHECK (c_calibration_count              >= 0),
+  ADD COLUMN c_acq_gcal_set_count             int4     NOT NULL CHECK (c_acq_gcal_set_count             >= 0),
   ADD COLUMN c_acq_bias_count                 int4     NOT NULL CHECK (c_acq_bias_count                 >= 0),
   ADD COLUMN c_acq_bias_non_charged_time      interval NOT NULL CHECK (c_acq_bias_non_charged_time      >= interval '0 seconds'),
   ADD COLUMN c_acq_bias_program_time          interval NOT NULL CHECK (c_acq_bias_program_time          >= interval '0 seconds'),
@@ -105,6 +110,7 @@ ALTER TABLE t_execution_digest
   ADD COLUMN c_acq_observing_count            int4     NOT NULL CHECK (c_acq_observing_count            >= 0),
   ADD COLUMN c_acq_observing_non_charged_time interval NOT NULL CHECK (c_acq_observing_non_charged_time >= interval '0 seconds'),
   ADD COLUMN c_acq_observing_program_time     interval NOT NULL CHECK (c_acq_observing_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_gcal_set_count             int4     NOT NULL CHECK (c_sci_gcal_set_count             >= 0),
   ADD COLUMN c_sci_bias_count                 int4     NOT NULL CHECK (c_sci_bias_count                 >= 0),
   ADD COLUMN c_sci_bias_non_charged_time      interval NOT NULL CHECK (c_sci_bias_non_charged_time      >= interval '0 seconds'),
   ADD COLUMN c_sci_bias_program_time          interval NOT NULL CHECK (c_sci_bias_program_time          >= interval '0 seconds'),

@@ -272,6 +272,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 digest {
                   value {
                     acquisition {
+                      gcalSets
                       steps {
                         biases { count time { program { seconds } nonCharged { seconds } } }
                         darks { count time { program { seconds } nonCharged { seconds } } }
@@ -280,6 +281,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       }
                     }
                     science {
+                      gcalSets
                       steps {
                         biases { count time { program { seconds } nonCharged { seconds } } }
                         darks { count time { program { seconds } nonCharged { seconds } } }
@@ -301,6 +303,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 "digest": {
                   "value": {
                     "acquisition": {
+                      "gcalSets": 0,
                       "steps": {
                         "biases": ${bucket(0, "0".sec)},
                         "darks": ${bucket(0, "0".sec)},
@@ -309,6 +312,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
                       }
                     },
                     "science": {
+                      "gcalSets": 4,
                       "steps": {
                         "biases": ${bucket(0, "0".sec)},
                         "darks": ${bucket(0, "0".sec)},

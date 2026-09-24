@@ -160,6 +160,10 @@ _Avoid_: telluric signal-to-noise (ambiguous — the ITC also computes one *for*
 For one kind of step within a sequence (bias, dark, arc, flat or observing): how many there are and how much time they take, split by charge class. Step time includes the configuration change that precedes the step, so the science-fold move into GCAL is charged to the arc that follows it. A sequence carries its five step digests together as `steps`, which partition it so their times always sum to its time estimate. Steps are bucketed by step type; a GCAL step whose lamp is not an arc counts as a flat. Stored per sequence as count, non-charged time and program time columns in `t_obscalc` and `t_execution_digest`; digests recorded before the breakdown are backfilled with everything as observing time and then recomputed. No generator emits biases or darks yet, so those buckets are zero.
 _Avoid_: GCAL digest (the buckets are not only GCAL steps), calibration digest (calibrations also means telluric observations), flat/arc time (loses the count).
 
+**GCAL Set**:
+An atom that contains at least one GCAL step, counted per sequence as `gcalSets`. GMOS puts an arc and a flat in every science atom, so it has one set per atom; Flamingos-2 and GNIRS put theirs in a single calibration atom, which may hold only a flat or only an arc. Not deducible from the arc and flat step counts, since a set need not contain one of each. It is what a Calibration Epoch is expected to bring, so the cost of one set and the sets left in a sequence both come from it.
+_Avoid_: calibration set (calibrations also means telluric observations), flat/arc pair (a set may hold only one).
+
 **Observing Time**:
 The step digest of everything that is not a bias, dark, arc or flat: science exposures, acquisition and offsets, including the science-fold move back to sky. Excludes setup time.
 _Avoid_: science time (the sequence's full time estimate, which includes GCAL steps), on-source time (observing time also contains offsets), exposure time.

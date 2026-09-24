@@ -216,6 +216,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
             )),
             NonNegInt.unsafeFrom(1 + RepeatingAtomCount),
+            NonNegInt.unsafeFrom(0),
             StepDigests.Zero.copy(
               observing = StepDigest(NonNegInt.unsafeFrom(3 + RepeatingAtomCount), CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)))
             ),
@@ -230,6 +231,7 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 15000000L), StepGuideState.Enabled),
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
             )),
+            NonNegInt.unsafeFrom(4),
             NonNegInt.unsafeFrom(4),
             StepDigests.Zero.copy(
               arcs      = StepDigest(NonNegInt.unsafeFrom(4), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ArcTime * 4).get)),

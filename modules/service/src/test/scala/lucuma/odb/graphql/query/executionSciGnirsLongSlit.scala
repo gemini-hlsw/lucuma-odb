@@ -175,8 +175,8 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
         assert(continua.forall(_.isNull), s"expected no flat steps, got continua=$continua")
         assert(arcs.exists(a => a.asArray.exists(_.nonEmpty)), s"expected an arc step, got arcs=$arcs")
 
-  // (arc count, arc seconds, flat count, flat seconds, observing seconds, total seconds)
-  private def gcalBreakdown(pid: Program.Id, oid: Observation.Id): IO[(Int, BigDecimal, Int, BigDecimal, BigDecimal, BigDecimal)] =
+  // (gcal sets, arc count, arc seconds, flat count, flat seconds, observing seconds, total seconds)
+  private def gcalBreakdown(pid: Program.Id, oid: Observation.Id): IO[(Int, Int, BigDecimal, Int, BigDecimal, BigDecimal, BigDecimal)] =
     runObscalcUpdate(pid, oid) *>
     query(
       pi,
@@ -187,6 +187,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
               digest {
                 value {
                   science {
+                    gcalSets
                     steps {
                       arcs  { count time { total { seconds } } }
                       flats { count time { total { seconds } } }
@@ -203,6 +204,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
     ).map: js =>
       val sci = js.hcursor.downFields("observation", "execution", "digest", "value", "science")
       (
+        sci.downField("gcalSets").require[Int],
         sci.downFields("steps", "arcs", "count").require[Int],
         sci.downFields("steps", "arcs", "time", "total", "seconds").require[BigDecimal],
         sci.downFields("steps", "flats", "count").require[Int],
@@ -221,7 +223,8 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       yield (p, o)
 
     setup.flatMap: (pid, oid) =>
-      gcalBreakdown(pid, oid).map: (arcN, arcT, flatN, flatT, obsT, total) =>
+      gcalBreakdown(pid, oid).map: (sets, arcN, arcT, flatN, flatT, obsT, total) =>
+        assertEquals(sets, 1)
         assertEquals(arcN, 0)
         assertEquals(arcT, BigDecimal(0))
         assertEquals(flatN, 1)
@@ -238,7 +241,8 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       yield (p, o)
 
     setup.flatMap: (pid, oid) =>
-      gcalBreakdown(pid, oid).map: (arcN, arcT, flatN, flatT, obsT, total) =>
+      gcalBreakdown(pid, oid).map: (sets, arcN, arcT, flatN, flatT, obsT, total) =>
+        assertEquals(sets, 1)
         assert(arcN > 0, s"expected arc steps, got $arcN")
         assert(arcT > 0, s"expected arc time, got $arcT")
         assertEquals(flatN, 0)
