@@ -9834,10 +9834,8 @@ type ObservationTimeEstimate {
   setupCount: NonNegInt!
 
   """
-  Expected number of calibration epochs over the remaining science time, roughly
-  one per 90 minutes.  Each epoch brings a set of flats and arcs and, unless the
-  telluric type is NO_TELLURIC, a telluric.  Zero for calibration observations
-  and for modes that take no telluric.
+  Expected number of calibration over the remaining science time.
+  Zero for calibration observations and for modes that take no callibrations per observation.
   """
   calibrationCount: NonNegInt!
 
