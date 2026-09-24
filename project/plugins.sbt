@@ -1,4 +1,4 @@
-val SbtLucumaVersion = "0.16.4"
+val SbtLucumaVersion = "0.16.5"
 
 addSbtPlugin("io.spray"            % "sbt-revolver"        % "0.10.0")
 addSbtPlugin("com.timushev.sbt"    % "sbt-updates"         % "0.7.0")
