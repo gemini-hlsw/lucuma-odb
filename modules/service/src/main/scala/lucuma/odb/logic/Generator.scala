@@ -233,8 +233,6 @@ object Generator:
       private def isUnresolvedTelluric(ctx: GeneratorContext): Boolean =
         ctx.params.calibrationRole.contains(CalibrationRole.Telluric) && !ctx.params.hasTarget
 
-      // No steps are generated, so the whole charge is observing time with no
-      // step count; this keeps the step digests summing to the time estimate.
       private def flatDigest(ctx: GeneratorContext, charge: TimeSpan): ExecutionDigest =
         val time = CategorizedTime.Zero.sumCharge(ChargeClass.Program, charge)
         ExecutionDigest(

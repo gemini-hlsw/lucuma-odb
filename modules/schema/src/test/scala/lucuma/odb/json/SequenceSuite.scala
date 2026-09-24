@@ -85,7 +85,7 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
     val digest = SequenceDigest.Zero.copy(
       observeClass     = ObserveClass.Science,
       telescopeConfigs = configs,
-      atomCount        = NonNegInt.unsafeFrom(1),
+      atomCount        = 1.refined,
       executionState   = ExecutionState.Ongoing
     )
     val json = digest.asJson
@@ -103,8 +103,8 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
       SetupTime.Zero,
       2.refined,
       1.refined,
-      SequenceDigest.Zero.copy(observeClass = ObserveClass.Acquisition, atomCount = NonNegInt.unsafeFrom(1), executionState = ExecutionState.Ongoing),
-      SequenceDigest.Zero.copy(observeClass = ObserveClass.Science,     atomCount = NonNegInt.unsafeFrom(3), executionState = ExecutionState.Ongoing)
+      SequenceDigest.Zero.copy(observeClass = ObserveClass.Acquisition, atomCount = 1.refined, executionState = ExecutionState.Ongoing),
+      SequenceDigest.Zero.copy(observeClass = ObserveClass.Science,     atomCount = 3.refined, executionState = ExecutionState.Ongoing)
     )
 
   test("ExecutionDigest decodes from `estimate` when the deprecated top-level fields are absent"):
