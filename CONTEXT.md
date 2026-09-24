@@ -156,13 +156,13 @@ _Avoid_: telluric signal-to-noise (ambiguous — the ITC also computes one *for*
 
 ### Time Estimates
 
-**GCAL Digest**:
-For one lamp type (arcs or flats) within a sequence: how many GCAL steps there are and how much time they take, split by charge class. Step time includes the configuration change that precedes the step, so the science-fold move into GCAL is charged to the arc that follows it. Stored per sequence as count, non-charged time and program time columns in `t_obscalc` and `t_execution_digest`; digests recorded before the breakdown existed are backfilled as zero and recomputed.
-_Avoid_: calibration digest (calibrations also means telluric observations), flat/arc time (loses the count).
+**Step Digest**:
+For one kind of step within a sequence (bias, dark, arc, flat or observing): how many there are and how much time they take, split by charge class. Step time includes the configuration change that precedes the step, so the science-fold move into GCAL is charged to the arc that follows it. The five step digests partition a sequence, so their times always sum to its time estimate. Steps are bucketed by step type; a GCAL step whose lamp is not an arc counts as a flat. Stored per sequence as count, non-charged time and program time columns in `t_obscalc` and `t_execution_digest`; digests recorded before the breakdown are backfilled with everything as observing time and then recomputed. No generator emits biases or darks yet, so those buckets are zero.
+_Avoid_: GCAL digest (the buckets are not only GCAL steps), calibration digest (calibrations also means telluric observations), flat/arc time (loses the count).
 
 **Observing Time**:
-Sequence time not spent on GCAL arcs or flats. Accumulated alongside the two GCAL Digests, so observing time + arcs + flats always equals the sequence's time estimate per charge class. Excludes setup time. Still contains biases, darks and the science-fold move back to sky. Rows that predate the breakdown report their whole time estimate as observing time until recomputed.
-_Avoid_: science time (the sequence's full time estimate, which includes GCAL steps), on-source time (observing time also contains darks and offsets), exposure time.
+The step digest of everything that is not a bias, dark, arc or flat: science exposures, acquisition and offsets, including the science-fold move back to sky. Excludes setup time.
+_Avoid_: science time (the sequence's full time estimate, which includes GCAL steps), on-source time (observing time also contains offsets), exposure time.
 
 ### AEON / Multi-Facility Proposals
 

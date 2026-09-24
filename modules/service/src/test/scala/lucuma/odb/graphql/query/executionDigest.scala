@@ -242,7 +242,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         expected = successDigestResult.asRight
       )
 
-  test("digest - gcal breakdown"):
+  test("digest - step breakdown"):
     val setup: IO[Observation.Id] =
       for
         p <- createProgram
@@ -251,7 +251,7 @@ class executionDigest extends ExecutionTestSupportForGmos {
         _ <- runObscalcUpdate(p, o)
       yield o
 
-    def gcal(count: Int, seconds: BigDecimal): Json =
+    def bucket(count: Int, seconds: BigDecimal): Json =
       json"""
         {
           "count": $count,
@@ -272,13 +272,17 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 digest {
                   value {
                     acquisition {
+                      biases { count time { program { seconds } nonCharged { seconds } } }
+                      darks { count time { program { seconds } nonCharged { seconds } } }
                       arcs { count time { program { seconds } nonCharged { seconds } } }
                       flats { count time { program { seconds } nonCharged { seconds } } }
                     }
                     science {
+                      biases { count time { program { seconds } nonCharged { seconds } } }
+                      darks { count time { program { seconds } nonCharged { seconds } } }
                       arcs { count time { program { seconds } nonCharged { seconds } } }
                       flats { count time { program { seconds } nonCharged { seconds } } }
-                      observingTime { program { seconds } nonCharged { seconds } }
+                      observing { count time { program { seconds } nonCharged { seconds } } }
                     }
                   }
                 }
@@ -293,16 +297,17 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 "digest": {
                   "value": {
                     "acquisition": {
-                      "arcs": ${gcal(0, BigDecimal(0).setScale(6))},
-                      "flats": ${gcal(0, BigDecimal(0).setScale(6))}
+                      "biases": ${bucket(0, "0".sec)},
+                      "darks": ${bucket(0, "0".sec)},
+                      "arcs": ${bucket(0, "0".sec)},
+                      "flats": ${bucket(0, "0".sec)}
                     },
                     "science": {
-                      "arcs": ${gcal(4, "67.1".sec * 4)},
-                      "flats": ${gcal(4, "57.1".sec * 4)},
-                      "observingTime": {
-                        "program": { "seconds": ${ScienceTime.asJson} },
-                        "nonCharged": { "seconds": 0.000000 }
-                      }
+                      "biases": ${bucket(0, "0".sec)},
+                      "darks": ${bucket(0, "0".sec)},
+                      "arcs": ${bucket(4, "67.1".sec * 4)},
+                      "flats": ${bucket(4, "57.1".sec * 4)},
+                      "observing": ${bucket(10, ScienceTime)}
                     }
                   }
                 }

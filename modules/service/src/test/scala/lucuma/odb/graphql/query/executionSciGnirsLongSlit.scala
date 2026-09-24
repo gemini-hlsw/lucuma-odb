@@ -189,7 +189,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
                   science {
                     arcs  { count time { total { seconds } } }
                     flats { count time { total { seconds } } }
-                    observingTime { total { seconds } }
+                    observing { time { total { seconds } } }
                     timeEstimate  { total { seconds } }
                   }
                 }
@@ -205,7 +205,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
         sci.downFields("arcs", "time", "total", "seconds").require[BigDecimal],
         sci.downFields("flats", "count").require[Int],
         sci.downFields("flats", "time", "total", "seconds").require[BigDecimal],
-        sci.downFields("observingTime", "total", "seconds").require[BigDecimal],
+        sci.downFields("observing", "time", "total", "seconds").require[BigDecimal],
         sci.downFields("timeEstimate", "total", "seconds").require[BigDecimal]
       )
 

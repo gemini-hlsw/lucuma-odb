@@ -3,49 +3,77 @@
 -- * c_calibration_count: expected number of calibration epochs for an
 --   observation, carried beside the setup count; calibration observations
 --   report 0.
--- * Per sequence (acq, sci): arc and flat step counts and times, plus the
---   observing time (all other steps), so that
---   observing + arcs + flats == the sequence time estimate per charge class.
+-- * Per sequence (acq, sci): bias, dark, arc, flat and observing (all other)
+--   step counts and times, so the five sum to the sequence time estimate per
+--   charge class.
 
 -- Obscalc: nullable like the other digest columns (null when there is no digest).
 ALTER TABLE t_obscalc
   ADD COLUMN c_calibration_count              int4     NULL CHECK (c_calibration_count >= 0),
-  ADD COLUMN c_acq_arc_count                  int4     NULL CHECK (c_acq_arc_count >= 0),
-  ADD COLUMN c_acq_arc_non_charged_time       interval NULL CHECK (c_acq_arc_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_arc_program_time           interval NULL CHECK (c_acq_arc_program_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_flat_count                 int4     NULL CHECK (c_acq_flat_count >= 0),
-  ADD COLUMN c_acq_flat_non_charged_time      interval NULL CHECK (c_acq_flat_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_flat_program_time          interval NULL CHECK (c_acq_flat_program_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_bias_count            int4     NULL CHECK (c_acq_bias_count >= 0),
+  ADD COLUMN c_acq_bias_non_charged_time interval NULL CHECK (c_acq_bias_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_bias_program_time     interval NULL CHECK (c_acq_bias_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_dark_count            int4     NULL CHECK (c_acq_dark_count >= 0),
+  ADD COLUMN c_acq_dark_non_charged_time interval NULL CHECK (c_acq_dark_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_dark_program_time     interval NULL CHECK (c_acq_dark_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_arc_count            int4     NULL CHECK (c_acq_arc_count >= 0),
+  ADD COLUMN c_acq_arc_non_charged_time interval NULL CHECK (c_acq_arc_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_arc_program_time     interval NULL CHECK (c_acq_arc_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_flat_count            int4     NULL CHECK (c_acq_flat_count >= 0),
+  ADD COLUMN c_acq_flat_non_charged_time interval NULL CHECK (c_acq_flat_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_flat_program_time     interval NULL CHECK (c_acq_flat_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_observing_count            int4     NULL CHECK (c_acq_observing_count >= 0),
   ADD COLUMN c_acq_observing_non_charged_time interval NULL CHECK (c_acq_observing_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_observing_program_time     interval NULL CHECK (c_acq_observing_program_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_arc_count                  int4     NULL CHECK (c_sci_arc_count >= 0),
-  ADD COLUMN c_sci_arc_non_charged_time       interval NULL CHECK (c_sci_arc_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_arc_program_time           interval NULL CHECK (c_sci_arc_program_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_flat_count                 int4     NULL CHECK (c_sci_flat_count >= 0),
-  ADD COLUMN c_sci_flat_non_charged_time      interval NULL CHECK (c_sci_flat_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_flat_program_time          interval NULL CHECK (c_sci_flat_program_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_observing_program_time     interval NULL CHECK (c_acq_observing_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_bias_count            int4     NULL CHECK (c_sci_bias_count >= 0),
+  ADD COLUMN c_sci_bias_non_charged_time interval NULL CHECK (c_sci_bias_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_bias_program_time     interval NULL CHECK (c_sci_bias_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_dark_count            int4     NULL CHECK (c_sci_dark_count >= 0),
+  ADD COLUMN c_sci_dark_non_charged_time interval NULL CHECK (c_sci_dark_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_dark_program_time     interval NULL CHECK (c_sci_dark_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_arc_count            int4     NULL CHECK (c_sci_arc_count >= 0),
+  ADD COLUMN c_sci_arc_non_charged_time interval NULL CHECK (c_sci_arc_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_arc_program_time     interval NULL CHECK (c_sci_arc_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_flat_count            int4     NULL CHECK (c_sci_flat_count >= 0),
+  ADD COLUMN c_sci_flat_non_charged_time interval NULL CHECK (c_sci_flat_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_flat_program_time     interval NULL CHECK (c_sci_flat_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_observing_count            int4     NULL CHECK (c_sci_observing_count >= 0),
   ADD COLUMN c_sci_observing_non_charged_time interval NULL CHECK (c_sci_observing_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_observing_program_time     interval NULL CHECK (c_sci_observing_program_time >= interval '0 seconds');
+  ADD COLUMN c_sci_observing_program_time     interval NULL CHECK (c_sci_observing_program_time     >= interval '0 seconds');
 
 -- Existing digests predate both additions: no epochs were counted and there
--- is no GCAL breakdown, so all of their time counts as observing time (keeping
+-- is no step breakdown, so all of their time counts as observing time (keeping
 -- the sum invariant) until they are recomputed.
 UPDATE t_obscalc
    SET c_calibration_count              = 0,
-       c_acq_arc_count                  = 0,
-       c_acq_arc_non_charged_time       = interval '0 seconds',
-       c_acq_arc_program_time           = interval '0 seconds',
-       c_acq_flat_count                 = 0,
-       c_acq_flat_non_charged_time      = interval '0 seconds',
-       c_acq_flat_program_time          = interval '0 seconds',
+       c_acq_bias_count            = 0,
+       c_acq_bias_non_charged_time = interval '0 seconds',
+       c_acq_bias_program_time     = interval '0 seconds',
+       c_acq_dark_count            = 0,
+       c_acq_dark_non_charged_time = interval '0 seconds',
+       c_acq_dark_program_time     = interval '0 seconds',
+       c_acq_arc_count            = 0,
+       c_acq_arc_non_charged_time = interval '0 seconds',
+       c_acq_arc_program_time     = interval '0 seconds',
+       c_acq_flat_count            = 0,
+       c_acq_flat_non_charged_time = interval '0 seconds',
+       c_acq_flat_program_time     = interval '0 seconds',
+       c_acq_observing_count            = 0,
        c_acq_observing_non_charged_time = c_acq_non_charged_time,
        c_acq_observing_program_time     = c_acq_program_time,
-       c_sci_arc_count                  = 0,
-       c_sci_arc_non_charged_time       = interval '0 seconds',
-       c_sci_arc_program_time           = interval '0 seconds',
-       c_sci_flat_count                 = 0,
-       c_sci_flat_non_charged_time      = interval '0 seconds',
-       c_sci_flat_program_time          = interval '0 seconds',
+       c_sci_bias_count            = 0,
+       c_sci_bias_non_charged_time = interval '0 seconds',
+       c_sci_bias_program_time     = interval '0 seconds',
+       c_sci_dark_count            = 0,
+       c_sci_dark_non_charged_time = interval '0 seconds',
+       c_sci_dark_program_time     = interval '0 seconds',
+       c_sci_arc_count            = 0,
+       c_sci_arc_non_charged_time = interval '0 seconds',
+       c_sci_arc_program_time     = interval '0 seconds',
+       c_sci_flat_count            = 0,
+       c_sci_flat_non_charged_time = interval '0 seconds',
+       c_sci_flat_program_time     = interval '0 seconds',
+       c_sci_observing_count            = 0,
        c_sci_observing_non_charged_time = c_sci_non_charged_time,
        c_sci_observing_program_time     = c_sci_program_time
  WHERE c_setup_count IS NOT NULL;
@@ -62,22 +90,36 @@ TRUNCATE TABLE t_execution_digest;
 
 ALTER TABLE t_execution_digest
   ADD COLUMN c_calibration_count              int4     NOT NULL CHECK (c_calibration_count >= 0),
-  ADD COLUMN c_acq_arc_count                  int4     NOT NULL CHECK (c_acq_arc_count >= 0),
-  ADD COLUMN c_acq_arc_non_charged_time       interval NOT NULL CHECK (c_acq_arc_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_arc_program_time           interval NOT NULL CHECK (c_acq_arc_program_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_flat_count                 int4     NOT NULL CHECK (c_acq_flat_count >= 0),
-  ADD COLUMN c_acq_flat_non_charged_time      interval NOT NULL CHECK (c_acq_flat_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_flat_program_time          interval NOT NULL CHECK (c_acq_flat_program_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_bias_count            int4     NOT NULL CHECK (c_acq_bias_count >= 0),
+  ADD COLUMN c_acq_bias_non_charged_time interval NOT NULL CHECK (c_acq_bias_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_bias_program_time     interval NOT NULL CHECK (c_acq_bias_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_dark_count            int4     NOT NULL CHECK (c_acq_dark_count >= 0),
+  ADD COLUMN c_acq_dark_non_charged_time interval NOT NULL CHECK (c_acq_dark_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_dark_program_time     interval NOT NULL CHECK (c_acq_dark_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_arc_count            int4     NOT NULL CHECK (c_acq_arc_count >= 0),
+  ADD COLUMN c_acq_arc_non_charged_time interval NOT NULL CHECK (c_acq_arc_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_arc_program_time     interval NOT NULL CHECK (c_acq_arc_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_flat_count            int4     NOT NULL CHECK (c_acq_flat_count >= 0),
+  ADD COLUMN c_acq_flat_non_charged_time interval NOT NULL CHECK (c_acq_flat_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_flat_program_time     interval NOT NULL CHECK (c_acq_flat_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_acq_observing_count            int4     NOT NULL CHECK (c_acq_observing_count >= 0),
   ADD COLUMN c_acq_observing_non_charged_time interval NOT NULL CHECK (c_acq_observing_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_acq_observing_program_time     interval NOT NULL CHECK (c_acq_observing_program_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_arc_count                  int4     NOT NULL CHECK (c_sci_arc_count >= 0),
-  ADD COLUMN c_sci_arc_non_charged_time       interval NOT NULL CHECK (c_sci_arc_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_arc_program_time           interval NOT NULL CHECK (c_sci_arc_program_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_flat_count                 int4     NOT NULL CHECK (c_sci_flat_count >= 0),
-  ADD COLUMN c_sci_flat_non_charged_time      interval NOT NULL CHECK (c_sci_flat_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_flat_program_time          interval NOT NULL CHECK (c_sci_flat_program_time >= interval '0 seconds'),
+  ADD COLUMN c_acq_observing_program_time     interval NOT NULL CHECK (c_acq_observing_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_bias_count            int4     NOT NULL CHECK (c_sci_bias_count >= 0),
+  ADD COLUMN c_sci_bias_non_charged_time interval NOT NULL CHECK (c_sci_bias_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_bias_program_time     interval NOT NULL CHECK (c_sci_bias_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_dark_count            int4     NOT NULL CHECK (c_sci_dark_count >= 0),
+  ADD COLUMN c_sci_dark_non_charged_time interval NOT NULL CHECK (c_sci_dark_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_dark_program_time     interval NOT NULL CHECK (c_sci_dark_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_arc_count            int4     NOT NULL CHECK (c_sci_arc_count >= 0),
+  ADD COLUMN c_sci_arc_non_charged_time interval NOT NULL CHECK (c_sci_arc_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_arc_program_time     interval NOT NULL CHECK (c_sci_arc_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_flat_count            int4     NOT NULL CHECK (c_sci_flat_count >= 0),
+  ADD COLUMN c_sci_flat_non_charged_time interval NOT NULL CHECK (c_sci_flat_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_sci_flat_program_time     interval NOT NULL CHECK (c_sci_flat_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_sci_observing_count            int4     NOT NULL CHECK (c_sci_observing_count >= 0),
   ADD COLUMN c_sci_observing_non_charged_time interval NOT NULL CHECK (c_sci_observing_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_sci_observing_program_time     interval NOT NULL CHECK (c_sci_observing_program_time >= interval '0 seconds');
+  ADD COLUMN c_sci_observing_program_time     interval NOT NULL CHECK (c_sci_observing_program_time     >= interval '0 seconds');
 
 -- Original estimate: joins the all-or-none set.  Estimates recorded before this
 -- column existed are backfilled with 0.

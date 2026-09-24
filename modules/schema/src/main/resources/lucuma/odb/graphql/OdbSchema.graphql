@@ -19431,8 +19431,8 @@ enum SequenceCommand {
   STOP
 }
 
-"Summary of the GCAL steps of one kind (arcs or flats) in a sequence."
-type GcalDigest {
+"Summary of the steps of one kind (biases, darks, arcs, flats or observing) in a sequence."
+type StepDigest {
   "Number of steps."
   count: NonNegInt!
 
@@ -19462,17 +19462,23 @@ type SequenceDigest {
   """
   atomCount: NonNegInt!
 
+  "Bias steps in the sequence and their time."
+  biases: StepDigest!
+
+  "Dark steps in the sequence and their time."
+  darks: StepDigest!
+
   "Arc steps in the sequence and their time."
-  arcs: GcalDigest!
+  arcs: StepDigest!
 
   "Flat steps in the sequence and their time."
-  flats: GcalDigest!
+  flats: StepDigest!
 
   """
-  Time for all steps other than arcs and flats, so that
-  observingTime + arcs.time + flats.time equals timeEstimate.
+  All other steps (science, acquisition, offsets) and their time.  The five
+  step digests partition the sequence, so their times sum to timeEstimate.
   """
-  observingTime: CategorizedTime!
+  observing: StepDigest!
 
   """
   Execution state for the sequence. Note, acquisition sequences are never
