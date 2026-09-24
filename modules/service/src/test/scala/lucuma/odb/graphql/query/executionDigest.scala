@@ -272,17 +272,21 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 digest {
                   value {
                     acquisition {
-                      biases { count time { program { seconds } nonCharged { seconds } } }
-                      darks { count time { program { seconds } nonCharged { seconds } } }
-                      arcs { count time { program { seconds } nonCharged { seconds } } }
-                      flats { count time { program { seconds } nonCharged { seconds } } }
+                      steps {
+                        biases { count time { program { seconds } nonCharged { seconds } } }
+                        darks { count time { program { seconds } nonCharged { seconds } } }
+                        arcs { count time { program { seconds } nonCharged { seconds } } }
+                        flats { count time { program { seconds } nonCharged { seconds } } }
+                      }
                     }
                     science {
-                      biases { count time { program { seconds } nonCharged { seconds } } }
-                      darks { count time { program { seconds } nonCharged { seconds } } }
-                      arcs { count time { program { seconds } nonCharged { seconds } } }
-                      flats { count time { program { seconds } nonCharged { seconds } } }
-                      observing { count time { program { seconds } nonCharged { seconds } } }
+                      steps {
+                        biases { count time { program { seconds } nonCharged { seconds } } }
+                        darks { count time { program { seconds } nonCharged { seconds } } }
+                        arcs { count time { program { seconds } nonCharged { seconds } } }
+                        flats { count time { program { seconds } nonCharged { seconds } } }
+                        observing { count time { program { seconds } nonCharged { seconds } } }
+                      }
                     }
                   }
                 }
@@ -297,17 +301,21 @@ class executionDigest extends ExecutionTestSupportForGmos {
                 "digest": {
                   "value": {
                     "acquisition": {
-                      "biases": ${bucket(0, "0".sec)},
-                      "darks": ${bucket(0, "0".sec)},
-                      "arcs": ${bucket(0, "0".sec)},
-                      "flats": ${bucket(0, "0".sec)}
+                      "steps": {
+                        "biases": ${bucket(0, "0".sec)},
+                        "darks": ${bucket(0, "0".sec)},
+                        "arcs": ${bucket(0, "0".sec)},
+                        "flats": ${bucket(0, "0".sec)}
+                      }
                     },
                     "science": {
-                      "biases": ${bucket(0, "0".sec)},
-                      "darks": ${bucket(0, "0".sec)},
-                      "arcs": ${bucket(4, "67.1".sec * 4)},
-                      "flats": ${bucket(4, "57.1".sec * 4)},
-                      "observing": ${bucket(10, ScienceTime)}
+                      "steps": {
+                        "biases": ${bucket(0, "0".sec)},
+                        "darks": ${bucket(0, "0".sec)},
+                        "arcs": ${bucket(4, "67.1".sec * 4)},
+                        "flats": ${bucket(4, "57.1".sec * 4)},
+                        "observing": ${bucket(10, ScienceTime)}
+                      }
                     }
                   }
                 }

@@ -21,6 +21,7 @@ import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.TelescopeConfig
@@ -215,11 +216,9 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               TelescopeConfig(Offset.microarcseconds.reverseGet(10000000L, 0L), StepGuideState.Enabled)
             )),
             NonNegInt.unsafeFrom(1 + RepeatingAtomCount),
-            StepDigest.Zero,
-            StepDigest.Zero,
-            StepDigest.Zero,
-            StepDigest.Zero,
-            StepDigest(NonNegInt.unsafeFrom(3 + RepeatingAtomCount), CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L))),
+            StepDigests.Zero.copy(
+              observing = StepDigest(NonNegInt.unsafeFrom(3 + RepeatingAtomCount), CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)))
+            ),
             ExecutionState.NotStarted
           ),
           SequenceDigest(
@@ -232,11 +231,11 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
               TelescopeConfig(Offset.microarcseconds.reverseGet(0L, 1295985000000L), StepGuideState.Enabled)
             )),
             NonNegInt.unsafeFrom(4),
-            StepDigest.Zero,
-            StepDigest.Zero,
-            StepDigest(NonNegInt.unsafeFrom(4), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ArcTime * 4).get)),
-            StepDigest(NonNegInt.unsafeFrom(4), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(FlatTime * 4).get)),
-            StepDigest(NonNegInt.unsafeFrom(10), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence - CalTime * 4).get)),
+            StepDigests.Zero.copy(
+              arcs      = StepDigest(NonNegInt.unsafeFrom(4), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ArcTime * 4).get)),
+              flats     = StepDigest(NonNegInt.unsafeFrom(4), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(FlatTime * 4).get)),
+              observing = StepDigest(NonNegInt.unsafeFrom(10), CategorizedTime(ChargeClass.Program -> TimeSpan.FromSeconds.getOption(ScienceSequence - CalTime * 4).get))
+            ),
             ExecutionState.NotStarted
           )
       ),

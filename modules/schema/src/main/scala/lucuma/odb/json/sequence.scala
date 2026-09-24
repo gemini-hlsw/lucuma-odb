@@ -25,6 +25,7 @@ import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
@@ -110,24 +111,38 @@ trait SequenceCodec {
         "time"  -> a.time.asJson
       )
 
+  given Decoder[StepDigests] =
+    Decoder.instance: c =>
+      for
+        b <- c.downField("biases").as[StepDigest]
+        d <- c.downField("darks").as[StepDigest]
+        r <- c.downField("arcs").as[StepDigest]
+        f <- c.downField("flats").as[StepDigest]
+        o <- c.downField("observing").as[StepDigest]
+      yield StepDigests(b, d, r, f, o)
+
+  given (using Encoder[TimeSpan]): Encoder[StepDigests] =
+    Encoder.instance: (a: StepDigests) =>
+      Json.obj(
+        "biases"    -> a.biases.asJson,
+        "darks"     -> a.darks.asJson,
+        "arcs"      -> a.arcs.asJson,
+        "flats"     -> a.flats.asJson,
+        "observing" -> a.observing.asJson
+      )
+
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
-      // Payloads that predate the step breakdown have no buckets; read them as
+      // Payloads that predate the step breakdown have no `steps`; read them as
       // all observing time so the sum invariant holds.
-      def bucket(name: String): Decoder.Result[StepDigest] =
-        c.downField(name).as[Option[StepDigest]].map(_.getOrElse(StepDigest.Zero))
       for
         o  <- c.downField("observeClass").as[ObserveClass]
         t  <- c.downField("timeEstimate").as[CategorizedTime]
         tc <- c.downField("telescopeConfigs").as[SortedSet[TelescopeConfig]]
         n  <- c.downField("atomCount").as[NonNegInt]
-        b  <- bucket("biases")
-        d  <- bucket("darks")
-        r  <- bucket("arcs")
-        f  <- bucket("flats")
-        v  <- c.downField("observing").as[Option[StepDigest]].map(_.getOrElse(StepDigest(NonNegInt.MinValue, t)))
+        s  <- c.downField("steps").as[Option[StepDigests]].map(_.getOrElse(StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, t))))
         e  <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, tc, n, b, d, r, f, v, e)
+      yield SequenceDigest(o, t, tc, n, s, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
@@ -136,11 +151,7 @@ trait SequenceCodec {
         "timeEstimate"     -> a.timeEstimate.asJson,
         "telescopeConfigs" -> a.telescopeConfigs.asJson,
         "atomCount"        -> a.atomCount.asJson,
-        "biases"           -> a.biases.asJson,
-        "darks"            -> a.darks.asJson,
-        "arcs"             -> a.arcs.asJson,
-        "flats"            -> a.flats.asJson,
-        "observing"        -> a.observing.asJson,
+        "steps"            -> a.steps.asJson,
         "executionState"   -> a.executionState.asJson
       )
 

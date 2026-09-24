@@ -13,6 +13,7 @@ import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.util.TimeSpan
 
 
@@ -46,7 +47,7 @@ object VisitorExecutionDigestCalculator:
       SequenceDigest.Zero.copy(
         observeClass   = ObserveClass.Science,
         timeEstimate   = CategorizedTime(ChargeClass.Program -> exposureTotal),
-        observing      = StepDigest(NonNegInt.unsafeFrom(count), CategorizedTime(ChargeClass.Program -> exposureTotal)),
+        steps          = StepDigests.Zero.copy(observing = StepDigest(NonNegInt.unsafeFrom(count), CategorizedTime(ChargeClass.Program -> exposureTotal))),
         executionState = state
       )
 
@@ -71,7 +72,7 @@ object VisitorExecutionDigestCalculator:
       SequenceDigest.Zero.copy(
         observeClass   = ObserveClass.Science,
         timeEstimate   = CategorizedTime(ChargeClass.Program -> total),
-        observing      = StepDigest(NonNegInt.MinValue, CategorizedTime(ChargeClass.Program -> total)),
+        steps          = StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, CategorizedTime(ChargeClass.Program -> total))),
         executionState = state
       )
 

@@ -19440,6 +19440,27 @@ type StepDigest {
   time: CategorizedTime!
 }
 
+"""
+The steps of a sequence by kind.  The five digests partition the sequence,
+so their times sum to the sequence timeEstimate.
+"""
+type StepDigests {
+  "Bias steps."
+  biases: StepDigest!
+
+  "Dark steps."
+  darks: StepDigest!
+
+  "GCAL arc steps."
+  arcs: StepDigest!
+
+  "GCAL flat steps."
+  flats: StepDigest!
+
+  "All other steps: science, acquisition and offsets."
+  observing: StepDigest!
+}
+
 type SequenceDigest {
   """
   ObserveClass of the whole sequence.
@@ -19462,23 +19483,8 @@ type SequenceDigest {
   """
   atomCount: NonNegInt!
 
-  "Bias steps in the sequence and their time."
-  biases: StepDigest!
-
-  "Dark steps in the sequence and their time."
-  darks: StepDigest!
-
-  "Arc steps in the sequence and their time."
-  arcs: StepDigest!
-
-  "Flat steps in the sequence and their time."
-  flats: StepDigest!
-
-  """
-  All other steps (science, acquisition, offsets) and their time.  The five
-  step digests partition the sequence, so their times sum to timeEstimate.
-  """
-  observing: StepDigest!
+  "Steps in the sequence by kind, with their counts and times."
+  steps: StepDigests!
 
   """
   Execution state for the sequence. Note, acquisition sequences are never
