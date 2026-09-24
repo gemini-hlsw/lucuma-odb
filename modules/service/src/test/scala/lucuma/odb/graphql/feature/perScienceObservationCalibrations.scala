@@ -1598,6 +1598,7 @@ class perScienceObservationCalibrations
     yield
       assertEquals(meta.flatMap(_.resolvedTargetId), None)
       assertEquals(dig.map(_.fullTimeEstimate.sum), Generator.UnresolvedTelluricTime.some)
+      assertEquals(dig.map(_.science.steps.time), dig.map(_.science.timeEstimate), "the step digests must sum to the estimate")
 
   test("coordinate change triggers re-resolution with new hash"):
     val obsTime = Timestamp.fromInstantTruncated(when).get

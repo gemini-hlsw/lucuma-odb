@@ -35,7 +35,7 @@ sbt service/Test/compile
 ### Test
 
 ```bash
-sbt "service/testOnly xxxx"
+sbt "service/testOnly lucuma.odb.graphql.mutation.createObservation_GnirsLongSlit"
 ```
 
 Never run the full `service/test` suite locally: it is far too heavy (hundreds of
