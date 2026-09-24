@@ -17251,6 +17251,7 @@ type Configuration {
   conditions: ConfigurationConditions!
   target: ConfigurationTarget # may not be available
   observingMode: ConfigurationObservingMode
+  altairMode: AltairMode
 }
 
 type ConfigurationConditions {
