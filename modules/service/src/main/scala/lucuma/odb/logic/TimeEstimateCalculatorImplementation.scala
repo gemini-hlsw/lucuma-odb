@@ -167,27 +167,24 @@ object TimeEstimateCalculatorImplementation:
       )
 
     lazy val gnirsLongSlitSetup: SetupTimeEstimateCalculator =
+      gnirsSetup(ctx.enums.TimeEstimate.GnirsLongslitSetup.time)
+
+    // The IFU and imaging differ from long slit only in the initial setup cost.
+    private def gnirsSetup(setup: TimeSpan): SetupTimeEstimateCalculator =
       setupCalculatorfromEstimation(
-        SetupTime(
-          ctx.enums.TimeEstimate.GnirsLongslitSetup.time,
-          ctx.enums.TimeEstimate.GnirsReacquisition.time
-        ),
+        SetupTime(setup, ctx.enums.TimeEstimate.GnirsReacquisition.time),
         ctx.enums.TimeEstimate.GnirsLongslitMaxVisit.time
       )
 
-    // Altair's laser modes cost 25 minutes of setup rather than 15; the reacquisition and
-    // max-visit costs are unchanged.
+    lazy val gnirsIfuSetup: SetupTimeEstimateCalculator =
+      gnirsSetup(ctx.enums.TimeEstimate.GnirsIfuSetup.time)
+
+    // Altair's laser modes cost 25 minutes of setup rather than 15.
     lazy val gnirsLgsSetup: SetupTimeEstimateCalculator =
-      setupCalculatorfromEstimation(
-        SetupTime(
-          ctx.enums.TimeEstimate.GnirsLgsSetup.time,
-          ctx.enums.TimeEstimate.GnirsReacquisition.time
-        ),
-        ctx.enums.TimeEstimate.GnirsLongslitMaxVisit.time
-      )
+      gnirsSetup(ctx.enums.TimeEstimate.GnirsLgsSetup.time)
 
     lazy val gnirsImagingSetup: SetupTimeEstimateCalculator =
-      gnirsLongSlitSetup
+      gnirsSetup(ctx.enums.TimeEstimate.GnirsImagingSetup.time)
 
 
     lazy val flamingos2Step: StepTimeEstimateCalculator[Flamingos2StaticConfig, Flamingos2DynamicConfig] =
