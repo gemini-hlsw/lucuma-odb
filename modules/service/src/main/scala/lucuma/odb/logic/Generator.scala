@@ -52,6 +52,7 @@ import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
 import lucuma.odb.service.NoTransaction
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
+import org.typelevel.log4cats.Logger
 import skunk.*
 
 import Generator.FutureLimit
@@ -69,25 +70,25 @@ sealed trait Generator[F[_]]:
   )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]]
 
   /**
-   * The same is `digest`, but it also returns the GeneratorParms and the hash used
-   * to determine if the digest needed to be recalculated. This is useful in things
-   * like the guide star availability calculations which depend on the digest and are
-   * also cached.
+   * The same is `digest`, but it also returns the GeneratorParms and a hash of the inputs the
+   * digest was calculated from. This is useful in things like the guide star availability
+   * calculations which depend on the digest and are also cached. The hash is the guide star one,
+   * which leaves the ITC result out; see `GeneratorContext.guideStarHash`.
    */
   def digestWithParamsAndHash(
     observationId: Observation.Id
   )(using NoTransaction[F]): F[Either[OdbError, (ExecutionDigest, GeneratorParams, Md5Hash)]]
 
   /**
-   * Calculates the ExecutionDigest and AtomDigests (for the obscalc service).
-   * This method always performs the calculation and does not attempt to use
-   * cached results nor call the ITC.  It will cache the calculation once
-   * performed.
+   * Calculates the ExecutionDigest and AtomDigests (for the obscalc service),
+   * along with the ITC result they were calculated from. Behind Altair the ITC
+   * is modelled from the guide star the generator resolves, so obscalc takes the
+   * result from here rather than looking one up of its own. The digest is always
+   * calculated afresh and cached once performed.
    */
   def obscalc(
-    observationId: Observation.Id,
-    itcResult:     Either[OdbError, Itc]
-  )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])]]
+    observationId: Observation.Id
+  )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])]
 
   /**
    * Generates the execution config if the observation is found and defined
@@ -160,7 +161,7 @@ object Generator:
         from(v).leftMap: _ =>
           s"Future limit must range from ${Min.value} to ${Max.value}, but was $v."
 
-  def instantiate[F[_]: Async: Services](
+  def instantiate[F[_]: Async: Logger: Services](
     commitHash: CommitHash,
     calculator: TimeEstimateCalculatorImplementation.ForInstrumentMode
   ): Generator[F] =
@@ -184,19 +185,29 @@ object Generator:
 
       private def transactionallyWithContext[A](
         oid:        Observation.Id,
-        commitHash: CommitHash,
-        itcResult:  Option[Either[OdbError, Itc]] = None
+        commitHash: CommitHash
       )(
         f: GeneratorContext => Transaction[F] ?=> EitherT[F, OdbError, A]
       )(using NoTransaction[F], Services[F]): F[Either[OdbError, A]] =
-        EitherT(GeneratorContext.lookup(oid, commitHash, itcResult))
+        EitherT(GeneratorContext.lookup(oid, commitHash))
           .flatMap(ctx => transactionallyEitherT(f(ctx)))
           .value
+
+      // An Altair sequence generated without the guide star the observation will actually use is
+      // not the sequence it will execute, so everything but `digestWithParamsAndHash` -- which the
+      // guide star calculations use to pick that star in the first place -- reports the problem.
+      private def altairChecked[A](ctx: GeneratorContext, a: A): Either[OdbError, A] =
+        ctx.altairProblem.toLeft(a)
 
       override def digest(
         oid: Observation.Id
       )(using NoTransaction[F]): F[Either[OdbError, ExecutionDigest]] =
-        digestWithParamsAndHash(oid).map(_.map(_._1))
+        transactionallyWithContext(oid, commitHash): ctx =>
+          for
+            d0 <- ExecutionDigestCache.lookupOne(ctx)
+            d1 <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
+            d  <- EitherT.fromEither[F](altairChecked(ctx, d1))
+          yield d
 
       override def digestWithParamsAndHash(
         oid: Observation.Id
@@ -205,7 +216,7 @@ object Generator:
           for
             d0  <- ExecutionDigestCache.lookupOne(ctx)
             d1  <- d0.fold(calcDigestThenCache(ctx))(d => EitherT.pure(d))
-          yield (d1, ctx.params, ctx.hash)
+          yield (d1, ctx.params, ctx.guideStarHash)
 
       private def calcDigestThenCache(
         ctx: GeneratorContext
@@ -399,14 +410,19 @@ object Generator:
                .map(_._2)
 
       override def obscalc(
-        observationId: Observation.Id,
-        itcResult:     Either[OdbError, Itc]
-      )(using NoTransaction[F], Services.ServiceAccess): F[Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])]] =
-        transactionallyWithContext(observationId, commitHash, itcResult.some): ctx =>
-          for
-            d <- calcDigestThenCache(ctx)
-            a <- calculateScienceAtomDigests(ctx)
-          yield (d, a)
+        observationId: Observation.Id
+      )(using NoTransaction[F], Services.ServiceAccess): F[(Either[OdbError, Itc], Either[OdbError, (ExecutionDigest, Stream[F, AtomDigest])])] =
+        GeneratorContext.lookup(observationId, commitHash).flatMap:
+          case Left(error) =>
+            (error.asLeft[Itc], error.asLeft[(ExecutionDigest, Stream[F, AtomDigest])]).pure[F]
+          case Right(ctx)  =>
+            transactionallyEitherT:
+              for
+                d <- calcDigestThenCache(ctx)
+                a <- calculateScienceAtomDigests(ctx)
+                r <- EitherT.fromEither[F](altairChecked(ctx, (d, a)))
+              yield r
+            .value.map((ctx.itcRes, _))
 
       override def generate(
         oid:  Observation.Id,
@@ -540,7 +556,7 @@ object Generator:
               EitherT.rightT(InstrumentExecutionConfig.Visitor(v.instrument))
 
         transactionallyWithContext(oid, commitHash): ctx =>
-          instrumentExecutionConfig(ctx)
+          instrumentExecutionConfig(ctx).flatMap(c => EitherT.fromEither[F](altairChecked(ctx, c)))
 
       override def resetAcquisition(
         observationId: Observation.Id
@@ -557,70 +573,76 @@ object Generator:
             .flatMap(s => EitherT.liftF(persist(observationId, s.acquisition)))
             .flatMap(_ => EitherT.liftF(input.traverse_(itcService.updateAcquisition(observationId, _, acq))))
 
+        def reset(ctx: GeneratorContext, freshAcq: ItcAcquisition)(using Transaction[F]): EitherT[F, OdbError, Unit] =
+          val ctxʹ = ctx.copy(itcRes = ctx.itcRes.map(_.copy(acquisition = freshAcq)))
+          ctxʹ.params.observingMode.modeType match
+            case _: ExchangeObservingModeType =>
+              EitherT.pure(())
+
+            // N.B. there is no imaging acquisition, but it should not blow up.
+            case ObservingModeType.Flamingos2Imaging  =>
+              EitherT.pure(())
+
+            case ObservingModeType.Flamingos2LongSlit =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
+
+            // N.B. there is no MOS acquisition yet, so there is nothing to reset.
+            // This becomes wrong once a MOS acquisition lands.
+            case ObservingModeType.Flamingos2Mos      =>
+              EitherT.pure(())
+
+            // N.B. there is no imaging acquisition, but it should not blow up.
+            case ObservingModeType.GhostIfu           =>
+              EitherT.pure(())
+
+
+            case ObservingModeType.GmosNorthImaging   =>
+              EitherT.pure(())
+
+            case ObservingModeType.GmosNorthLongSlit  =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthLongSlit(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
+
+            case ObservingModeType.GmosSouthImaging   =>
+              EitherT.pure(())
+
+            case ObservingModeType.GmosSouthLongSlit  =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
+
+            case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
+              EitherT.pure(())
+
+            case ObservingModeType.GmosNorthIfu       =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthIfu(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
+
+            case ObservingModeType.GmosSouthIfu       =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthIfu(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
+            case ObservingModeType.GnirsImaging       =>
+              EitherT.pure(())
+
+            case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
+              go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)
+
+            case ObservingModeType.Igrins2LongSlit    =>
+              EitherT.pure(())
+
+            case _: VisitorObservingModeType          =>
+              EitherT.pure(())
+
         // Re-derive the acquisition ITC, bypassing the frozen snapshot, so that
-        // an edited acquisition exposure-time mode takes effect.  The remote call
+        // an edited acquisition exposure-time mode takes effect. The remote call
         // happens outside the write transaction. Any acquisition ITC failure
         // aborts the reset with nothing written, preserving the existing sequence.
         // The freshly generated acquisition is written to both the sequence and
         // the ITC snapshot, keeping the two consistent.
-        EitherT(itcService.callRemoteAcquisition(observationId))
-          .flatMap: freshAcq =>
-            EitherT:
-              transactionallyWithContext(observationId, commitHash): ctx =>
-                val ctxʹ = ctx.copy(itcRes = ctx.itcRes.map(_.copy(acquisition = freshAcq)))
-                ctxʹ.params.observingMode.modeType match
-                  case _: ExchangeObservingModeType =>
-                    EitherT.pure(())
-
-                  // N.B. there is no imaging acquisition, but it should not blow up.
-                  case ObservingModeType.Flamingos2Imaging  =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.Flamingos2LongSlit =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateFlamingos2LongSlit(ctxʹ))(sequenceService.resetFlamingos2Acquisition)
-
-                  // N.B. there is no MOS acquisition yet, so there is nothing to reset.
-                  // This becomes wrong once a MOS acquisition lands.
-                  case ObservingModeType.Flamingos2Mos      =>
-                    EitherT.pure(())
-
-                  // N.B. there is no imaging acquisition, but it should not blow up.
-                  case ObservingModeType.GhostIfu           =>
-                    EitherT.pure(())
-
-
-                  case ObservingModeType.GmosNorthImaging   =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GmosNorthLongSlit  =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthLongSlit(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
-
-                  case ObservingModeType.GmosSouthImaging   =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GmosSouthLongSlit  =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthLongSlit(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
-
-                  case ObservingModeType.GmosNorthMos | ObservingModeType.GmosSouthMos  =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GmosNorthIfu       =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosNorthIfu(ctxʹ))(sequenceService.resetGmosNorthAcquisition)
-
-                  case ObservingModeType.GmosSouthIfu       =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGmosSouthIfu(ctxʹ))(sequenceService.resetGmosSouthAcquisition)
-                  case ObservingModeType.GnirsImaging       =>
-                    EitherT.pure(())
-
-                  case ObservingModeType.GnirsLongSlit | ObservingModeType.GnirsIfu =>
-                    go(freshAcq, ctxʹ.params.itcInput.toOption, streaming.generateGnirsSpectroscopy(ctxʹ))(sequenceService.resetGnirsAcquisition)
-
-                  case ObservingModeType.Igrins2LongSlit    =>
-                    EitherT.pure(())
-
-                  case _: VisitorObservingModeType          =>
-                    EitherT.pure(())
-          .value
+        //
+        // The context comes first so that the acquisition is re-derived from the parameters the
+        // science side generates with -- behind Altair those carry the resolved guide star, which
+        // the database alone does not yield.
+        (for
+          ctx      <- EitherT(GeneratorContext.lookup(observationId, commitHash))
+          freshAcq <- EitherT(itcService.callRemoteAcquisition(observationId, ctx.params))
+          _        <- transactionallyEitherT(reset(ctx, freshAcq))
+        yield ()).value
 
       override def calculateDigest(
         ctx: GeneratorContext
@@ -704,7 +726,9 @@ object Generator:
               EitherT.pure(())
 
         transactionallyWithContext(oid, commitHash): ctx =>
-          materializeExecutionConfig(ctx) *> EitherT(f(ctx))
+          // Nothing executable is written for a sequence whose Altair guide star could not be
+          // resolved against it, so the check comes before the materialization, not after.
+          EitherT.fromEither[F](altairChecked(ctx, ())) *> materializeExecutionConfig(ctx) *> EitherT(f(ctx))
 
 
       override def materialize(

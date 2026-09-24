@@ -11,6 +11,7 @@ import clue.model.GraphQLError
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.util.CalculationState
 import lucuma.itc.ItcVersions
 import lucuma.itc.client.ClientCalculationResult
@@ -74,6 +75,18 @@ trait ItcServiceSuiteSupport extends ExecutionTestSupportForGmos:
         """.query(skunk.codec.numeric.int8)
       )(pid, oid).map(_ > 0)
 
+  // The Altair parameters the cached result was calculated with: the outer option is the row, the
+  // inner the column, which is null for an observation that does not observe behind Altair.
+  def itcAltairHash(pid: Program.Id, oid: Observation.Id): IO[Option[Option[Md5Hash]]] =
+    withSession: s =>
+      s.option(
+        sql"""
+          SELECT c_altair_hash FROM t_itc_result
+          WHERE c_program_id     = $program_id AND
+                c_observation_id = $observation_id
+        """.query(md5_hash.opt)
+      )(pid, oid)
+
   def itcRowFrozen(pid: Program.Id, oid: Observation.Id): IO[Boolean] =
     withSession: s =>
       s.option(
@@ -119,6 +132,23 @@ trait ItcServiceSuiteSupport extends ExecutionTestSupportForGmos:
         """.query(observation_workflow_state)
       )(oid)
 
+  // Leaves the target without an SED, so the observation's generator parameters no longer yield
+  // an ITC input at all.
+  def removeSED(tid: Target.Id): IO[Unit] =
+    query(
+      user  = pi,
+      query = s"""
+        mutation {
+          updateTargets(input: {
+            SET: { sourceProfile: { point: { bandNormalized: { sed: null } } } }
+            WHERE: { id: { EQ: "$tid" } }
+          }) {
+            targets { id }
+          }
+        }
+      """
+    ).void
+
   // Simulates an ITC version bump, which fires the itc_version_update trigger.
   def bumpItcVersion(version: String): IO[Unit] =
     withSession: s =>
@@ -153,6 +183,26 @@ class ItcServiceDeterministicFailureSuite extends ItcServiceSuiteSupport:
                        assertEquals(calls, 1)
       exists    <- itcFailureRowExists(pid, oid)
     yield assert(exists) // a row added to the db
+
+// Only Altair puts an Altair hash on a cached result; everything else caches as it always has.
+class ItcServiceAltairHashSuite extends ItcServiceSuiteSupport:
+
+  test("a result with no Altair keys none, and is still served from the cache"):
+    for
+      callCount <- IO.ref(0)
+      pid       <- createProgramAs(pi)
+      tid       <- createTargetWithProfileAs(pi, pid)
+      oid       <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      seed      <- withItcService(itcClient)(_.lookup(pid, oid))
+      altair    <- itcAltairHash(pid, oid)
+      // Any remote call would fail (and increment the counter).
+      got       <- withItcService(erroringClient(new IOException("Connection refused"), callCount))(_.lookup(pid, oid))
+      calls     <- callCount.get
+    yield
+      assert(seed.isRight, "seed lookup should succeed")
+      assertEquals(altair, Some(None)) // a row, with no Altair parameters
+      assertEquals(got, seed)
+      assertEquals(calls, 0)           // served from the cache
 
 // Transient ITC failure: e.g. IOException
 class ItcServiceTransientFailureSuite extends ItcServiceSuiteSupport:
@@ -214,6 +264,20 @@ class ItcServiceFreezeSuite extends ItcServiceSuiteSupport:
       assert(seed.isRight, "seed lookup should succeed")
       assertEquals(got, seed) // frozen value served despite the hash mismatch
       assertEquals(calls, 0)  // remote ITC never consulted
+
+  // A frozen result outlives the inputs it was calculated from, so an observation whose target
+  // was edited after execution began still generates against the result it is executing with.
+  test("a frozen ITC result still generates a digest once its inputs go missing"):
+    for
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      oid    <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _      <- withItcService(itcClient)(_.lookup(pid, oid).void)
+      _      <- setFrozen(pid, oid)
+      _      <- removeSED(tid)
+      digest <- withServices(serviceUser): services =>
+                  Services.asSuperUser(services.generator.digest(oid))
+    yield assert(digest.isRight, s"expected a digest from the frozen result, found $digest")
 
   test("recording an observe visit freezes the observation's ITC result"):
     for

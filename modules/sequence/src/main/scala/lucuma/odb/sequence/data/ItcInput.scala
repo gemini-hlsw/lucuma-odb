@@ -10,16 +10,21 @@ import cats.Order.given
 import cats.data.NonEmptyList
 import cats.derived.*
 import cats.syntax.eq.*
+import cats.syntax.option.*
+import io.circe.Encoder
 import lucuma.core.model.Target
 import lucuma.core.util.Timestamp
+import lucuma.itc.AltairParameters
 import lucuma.itc.client.ImagingInput
 import lucuma.itc.client.ImagingParameters
+import lucuma.itc.client.InstrumentMode
 import lucuma.itc.client.SpectroscopyInput
 import lucuma.itc.client.SpectroscopyParameters
 import lucuma.itc.client.TargetInput
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 import lucuma.odb.sequence.util.HashBytes.given
+import monocle.Lens
 import monocle.Prism
 import monocle.macros.GenPrism
 
@@ -38,11 +43,64 @@ sealed trait ItcInput:
    */
   def signalToNoiseTargetId: Option[Target.Id]
 
+  /**
+   * The Altair parameters the GNIRS modes of this input carry, if any. They come from the guide
+   * star the sequence generator resolves, not from the database, and are keyed apart from the
+   * input hash for that reason; see [[ItcInput.withAltairParameters]].
+   */
+  def altairParameters: Option[AltairParameters] =
+    this match
+      case i @ ItcInput.Imaging(science = _)           => ItcInput.modeAltair(i.science.head.mode)
+      case i @ ItcInput.GnirsSpectroscopy(science = _) => ItcInput.modeAltair(i.science.head.mode)
+      case _                                           => none
+
 object ItcInput:
 
+  private def modeAltair(mode: InstrumentMode): Option[AltairParameters] =
+    mode match
+      case m @ InstrumentMode.GnirsImaging(filter = _)                 => m.altair
+      case m @ InstrumentMode.GnirsSpectroscopy(centralWavelength = _) => m.altair
+      case _                                                           => none
+
+  private def setModeAltair(altair: Option[AltairParameters])(mode: InstrumentMode): InstrumentMode =
+    mode match
+      case m @ InstrumentMode.GnirsImaging(filter = _)                 => m.copy(altair = altair)
+      case m @ InstrumentMode.GnirsSpectroscopy(centralWavelength = _) => m.copy(altair = altair)
+      case m                                                           => m
+
+  /**
+   * Rewrites the Altair parameters of every GNIRS mode of an input. Only GNIRS observes behind
+   * Altair, so every other mode is left alone.
+   */
+  def withAltairParameters(input: ItcInput, altair: Option[AltairParameters]): ItcInput =
+    val set: InstrumentMode => InstrumentMode = setModeAltair(altair)
+    input match
+      case i @ Imaging(science = _)           =>
+        i.copy(
+          science     = i.science.map(ImagingParameters.mode.modify(set)),
+          acquisition = i.acquisition.map(ImagingParameters.mode.modify(set))
+        )
+      case i @ GnirsSpectroscopy(science = _) =>
+        i.copy(
+          acquisition = ImagingParameters.mode.modify(set)(i.acquisition),
+          science     = i.science.map(SpectroscopyParameters.mode.modify(set))
+        )
+      case i                                  =>
+        i
+
+  /**
+   * Hashes the ITC parameters with the Altair parameters removed. Altair is modelled from a guide
+   * star that only sequence generation resolves, so hashing it here would give the generator and a
+   * reader that has the database alone different keys for the same observation. The ITC result
+   * cache keys the Altair parameters separately instead (t_itc_result.c_altair_hash).
+   */
+  private def hashBytesWithoutAltair[A: Encoder](mode: Lens[A, InstrumentMode]): HashBytes[A] =
+    val json: HashBytes[A] = HashBytes.forJsonEncoder
+    a => json.hashBytes(mode.modify(setModeAltair(none))(a))
+
   private given HashBytes[TargetInput]            = HashBytes.forJsonEncoder
-  private given HashBytes[ImagingParameters]      = HashBytes.forJsonEncoder
-  private given HashBytes[SpectroscopyParameters] = HashBytes.forJsonEncoder
+  private given HashBytes[ImagingParameters]      = hashBytesWithoutAltair(ImagingParameters.mode)
+  private given HashBytes[SpectroscopyParameters] = hashBytesWithoutAltair(SpectroscopyParameters.mode)
 
   case class TargetDefinition(
     targetId: Target.Id,
@@ -232,7 +290,7 @@ object ItcInput:
   given HashBytes[ItcInput] with
     def hashBytes(a: ItcInput): Array[Byte] =
       a match
-        case in @ Imaging(_, _, _, _, _, _)              => in.hashBytes
-        case in @ Spectroscopy(_, _, _, _, _, _, _)      => in.hashBytes
-        case in @ GnirsSpectroscopy(_, _, _, _, _, _, _) => in.hashBytes
-        case in @ ScienceOnlySpectroscopy(_, _, _)    => in.hashBytes
+        case in @ Imaging(science = _)                 => in.hashBytes
+        case in @ Spectroscopy(science = _)            => in.hashBytes
+        case in @ GnirsSpectroscopy(science = _)       => in.hashBytes
+        case in @ ScienceOnlySpectroscopy(science = _) => in.hashBytes
