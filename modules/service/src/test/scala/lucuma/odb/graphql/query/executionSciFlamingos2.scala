@@ -39,8 +39,8 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
-                  "possibleFuture" -> List(flamingos2ExpectedGcals((0, 15))).asJson,
+                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, 10, Enabled), (0, -10, Enabled), (0, -10, Enabled), (0, 10, Enabled)),
+                  "possibleFuture" -> List(flamingos2ExpectedGcals((0, 10))).asJson,
                   "hasMore" -> false.asJson
                 )
               )
@@ -68,8 +68,8 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
-                  "possibleFuture" -> List(flamingos2ExpectedGcals((0, 15))).asJson,
+                  "nextAtom" -> flamingos2ExpectedScienceAtom(ExposureTime, (0, -10, Enabled), (0, -10, Enabled), (0, 10, Enabled)),
+                  "possibleFuture" -> List(flamingos2ExpectedGcals((0, 10))).asJson,
                   "hasMore" -> false.asJson
                 )
               )
@@ -97,7 +97,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
             "executionConfig" -> Json.obj(
               "flamingos2" -> Json.obj(
                 "science" -> Json.obj(
-                  "nextAtom" -> flamingos2ExpectedGcals((0, 15)),
+                  "nextAtom" -> flamingos2ExpectedGcals((0, 10)),
                   "possibleFuture" -> List.empty[Json].asJson,
                   "hasMore" -> false.asJson
                 )
@@ -224,7 +224,7 @@ class executionSciFlamingos2 extends ExecutionTestSupportForFlamingos2:
         query    = flamingos2ScienceQuery(oid, 1.some),
         expected = expectedUnsplittableExecutionConfig(
           "flamingos2",
-          flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled)),
-          flamingos2ExpectedGcals((0, 15))
+          flamingos2ExpectedScienceAtom(ExposureTime, (0, 10, Enabled), (0, -10, Enabled), (0, -10, Enabled), (0, 10, Enabled)),
+          flamingos2ExpectedGcals((0, 10))
         ).asRight
       )

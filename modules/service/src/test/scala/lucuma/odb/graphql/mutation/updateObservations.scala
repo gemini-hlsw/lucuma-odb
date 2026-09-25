@@ -2157,10 +2157,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "defaultTelescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" }
                     ],
                     "toSky": null
                   }
@@ -2221,10 +2221,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "defaultTelescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" }
                     ],
                     "toSky": null
                   }
@@ -2258,10 +2258,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "telescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" }
                     ],
                     "toSky": null
                   },
@@ -2269,10 +2269,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                   "defaultTelescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" }
                     ],
                     "toSky": null
                   }
@@ -3859,10 +3859,10 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
                     "defaultTelescopeConfigs": {
                       "offsetMode": "NOD_ALONG_SLIT",
                       "alongSlit": [
-                        { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                        { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                        { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" }
                       ],
                       "toSky": null
                     }

@@ -2365,7 +2365,7 @@ class perScienceObservationCalibrations
         .flatMap(_.hcursor.downField("q").downField("arcseconds").as[Double].toOption)
       (hasExplicit, qs)
 
-  test("f2 telluric resolves to the Telluric offsets"):
+  test("f2 science resolves to NodAlongSlit and its telluric to the Telluric offsets"):
     for {
       pid     <- createProgramAs(pi)
       tid     <- createTargetWithProfileAs(pi, pid)
@@ -2377,9 +2377,10 @@ class perScienceObservationCalibrations
       toid    = toidOpt.get
       tel     <- queryF2TelescopeConfigs(toid)
     } yield {
-      val telluricQs = List(15.0, -15.0, -15.0, 15.0)
-      // Science has no explicit override, resolving to the default Telluric pattern.
-      assertEquals(sci, (false, telluricQs))
+      val nodAlongSlitQs = List(10.0, -10.0, -10.0, 10.0)
+      val telluricQs     = List(15.0, -15.0, -15.0, 15.0)
+      // Science has no explicit override, resolving to the default NodAlongSlit pattern.
+      assertEquals(sci, (false, nodAlongSlitQs))
       // The telluric calibration also resolves to the Telluric pattern (override cleared).
       assertEquals(tel, (false, telluricQs))
     }
