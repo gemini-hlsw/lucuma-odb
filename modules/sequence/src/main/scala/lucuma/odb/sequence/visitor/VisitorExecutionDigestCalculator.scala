@@ -12,9 +12,10 @@ import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.util.TimeSpan
 
-import scala.collection.immutable.SortedSet
 
 object VisitorExecutionDigestCalculator:
 
@@ -43,17 +44,17 @@ object VisitorExecutionDigestCalculator:
           (TimeSpan.Zero, 0)
 
     val scienceDigest =
-      SequenceDigest(
-        ObserveClass.Science,
-        CategorizedTime(ChargeClass.Program -> exposureTotal),
-        SortedSet.empty,
-        NonNegInt.unsafeFrom(0),
-        state
+      SequenceDigest.Zero.copy(
+        observeClass   = ObserveClass.Science,
+        timeEstimate   = CategorizedTime(ChargeClass.Program -> exposureTotal),
+        steps          = StepDigests.Zero.copy(observing = StepDigest(NonNegInt.unsafeFrom(count), CategorizedTime(ChargeClass.Program -> exposureTotal))),
+        executionState = state
       )
 
     ExecutionDigest(
       SetupTime(overheads.setup, TimeSpan.Zero),
       NonNegInt.unsafeFrom(if count > 0 then 1 else 0),
+      NonNegInt.MinValue,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )
@@ -68,17 +69,17 @@ object VisitorExecutionDigestCalculator:
   ): ExecutionDigest =
     val total = totalRequestTime.getOrElse(TimeSpan.Zero)
     val scienceDigest =
-      SequenceDigest(
-        ObserveClass.Science,
-        CategorizedTime(ChargeClass.Program -> total),
-        SortedSet.empty,
-        NonNegInt.unsafeFrom(0),
-        state
+      SequenceDigest.Zero.copy(
+        observeClass   = ObserveClass.Science,
+        timeEstimate   = CategorizedTime(ChargeClass.Program -> total),
+        steps          = StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, CategorizedTime(ChargeClass.Program -> total))),
+        executionState = state
       )
 
     ExecutionDigest(
       SetupTime.Zero, // no info about setup time
       NonNegInt.unsafeFrom(0),
+      NonNegInt.MinValue,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )

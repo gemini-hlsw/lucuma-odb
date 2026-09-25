@@ -18,7 +18,7 @@ val catsVersion                  = "2.13.0"
 val circeVersion                 = "0.14.16"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.1"
-val clueVersion                  = "0.59.0"
+val clueVersion                  = "0.60.0"
 val declineVersion               = "2.6.2"
 val flywayVersion                = "13.7.0"
 val fs2AwsVersion                = "6.2.0"
@@ -32,9 +32,9 @@ val jmhVersion                   = "1.37"
 val jwtVersion                   = "11.0.4"
 val keySemaphoreVersion          = "0.3.0-M2"
 val kittensVersion               = "3.5.0"
-val logbackVersion               = "1.6.3"
+val logbackVersion               = "1.6.4"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.253.0"
+val lucumaCoreVersion            = "0.254.0"
 val lucumaGraphQLRoutesVersion   = "0.16.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -75,6 +75,18 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.tpolecat" %% "skunk-core"  % VersionScheme.Always,
   "org.tpolecat" %% "skunk-circe" % VersionScheme.Always
 )
+
+// ---------------------------------------------------------------------------
+// TEMPORARY: clue 0.60 vs. lucuma-graphql-routes
+//
+// lucuma-core 0.254.0 brings clue 0.60.0, while lucuma-graphql-routes 0.16.0
+// still declares clue-model 0.59.0, which early-semver treats as breaking.
+// clue-model is unchanged between the two releases (only clue-core and
+// clue-http4s changed), so it is safe.  Remove once graphql-routes publishes
+// against clue 0.60.
+// ---------------------------------------------------------------------------
+ThisBuild / libraryDependencySchemes +=
+  "edu.gemini" %% "clue-model" % VersionScheme.Always
 
 ThisBuild / tlBaseVersion      := "0.97"
 ThisBuild / scalaVersion       := "3.9.0"
@@ -197,12 +209,18 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
 // Swap the test-shard checkout for a shallow no-LFS variant, and drop the
 // plugin-injected githubWorkflowCheck step from the shards. The check costs a
 // separate sbt start per shard; the `checks` job runs it once instead.
+// The CI preamble chmods the key, which git reports as a change; without this every run sees a
+// file that belongs to no project and tests everything.
+ThisBuild / lucumaAffectedIgnorePaths += "test-cert/**"
+
 ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
       job
+        // Keep the full checkout: lucumaTestAffected diffs against origin/main, and a depth-1
+        // clone has no such ref, so the shard would run nothing (or everything, depending on
+        // the sbt-lucuma version). Full history costs a few seconds.
         .withSteps(job.steps.flatMap {
-          case s if s.name.contains("Checkout current branch")            => List(CheckoutShallow)
           case s if s.name.contains("Check that workflows are up to date") => Nil
           case s                                                          => List(s)
         })
@@ -210,14 +228,6 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
     else job
   }
 }
-
-// Shollow checkout and no lfs, used for test shards
-lazy val CheckoutShallow: WorkflowStep =
-  WorkflowStep.Use(
-    UseRef.Public("actions", "checkout", "v5"),
-    name = Some("Checkout current branch"),
-    params = Map("fetch-depth" -> "1")
-  )
 
 // checkout without lfs but full history
 lazy val CheckoutFull: WorkflowStep =
@@ -234,19 +244,25 @@ lazy val CheckoutFullWithLfs: WorkflowStep =
     params = Map("fetch-depth" -> "0")
   )
 
-ThisBuild / githubWorkflowJobSetup := {
-  List(CheckoutFull) :::
-    WorkflowStep.SetupSbt ::
-    WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
-    githubWorkflowGeneratedCacheSteps.value.toList
-}
+// Swap the checkout step but keep everything else the plugins put in the job setup. Rebuilding
+// the list from scratch would drop sbt-lucuma's setup-java tweaks (the sbt cache key).
+def withCheckout(checkout: WorkflowStep)(steps: Seq[WorkflowStep]): List[WorkflowStep] =
+  steps.toList.map {
+    case s: WorkflowStep.Use if isCheckout(s) => checkout
+    case s                                   => s
+  }
+
+def isCheckout(step: WorkflowStep.Use): Boolean =
+  step.ref match {
+    case UseRef.Public("actions", "checkout", _) => true
+    case _                                       => false
+  }
+
+ThisBuild / githubWorkflowJobSetup ~= withCheckout(CheckoutFull)
 
 // allow customizing the checkout style.
 def setupWith(checkout: WorkflowStep): Def.Initialize[List[WorkflowStep]] = Def.setting {
-  checkout ::
-    WorkflowStep.SetupSbt ::
-    WorkflowStep.SetupJava(githubWorkflowJavaVersions.value.toList) :::
-    githubWorkflowGeneratedCacheSteps.value.toList
+  withCheckout(checkout)(githubWorkflowJobSetup.value)
 }
 
 lazy val sbtClean =
@@ -914,6 +930,7 @@ lazy val schema =
         "edu.gemini"    %%% "lucuma-core"                % lucumaCoreVersion,
         "io.circe"      %%% "circe-testing"              % circeVersion           % Test,
         "edu.gemini"    %%% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
+        "edu.gemini"    %%% "lucuma-refined"             % lucumaRefinedVersion   % Test,
         "org.scalameta" %%% "munit"                      % munitVersion           % Test,
         "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
         "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test

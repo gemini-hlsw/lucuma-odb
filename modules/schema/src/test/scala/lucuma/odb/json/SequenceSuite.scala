@@ -13,7 +13,6 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.Atom
-import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
@@ -36,6 +35,7 @@ import lucuma.core.model.sequence.gmos.StaticConfig
 import lucuma.core.model.sequence.gmos.arb.ArbDynamicConfig
 import lucuma.core.model.sequence.gmos.arb.ArbStaticConfig
 import lucuma.core.util.arb.ArbGid
+import lucuma.refined.*
 import munit.DisciplineSuite
 import org.scalacheck.Cogen
 
@@ -82,12 +82,11 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
       TelescopeConfig(offset1, StepGuideState.Disabled),
       TelescopeConfig(offset2, StepGuideState.Enabled)
     )
-    val digest = SequenceDigest(
-      ObserveClass.Science,
-      CategorizedTime.Zero,
-      configs,
-      NonNegInt.unsafeFrom(1),
-      ExecutionState.Ongoing
+    val digest = SequenceDigest.Zero.copy(
+      observeClass     = ObserveClass.Science,
+      telescopeConfigs = configs,
+      atomCount        = 1.refined,
+      executionState   = ExecutionState.Ongoing
     )
     val json = digest.asJson
     // configs are serialized directly
@@ -102,9 +101,10 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   private val sampleExecutionDigest: ExecutionDigest =
     ExecutionDigest(
       SetupTime.Zero,
-      NonNegInt.unsafeFrom(2),
-      SequenceDigest(ObserveClass.Acquisition, CategorizedTime.Zero, SortedSet.empty, NonNegInt.unsafeFrom(1), ExecutionState.Ongoing),
-      SequenceDigest(ObserveClass.Science,     CategorizedTime.Zero, SortedSet.empty, NonNegInt.unsafeFrom(3), ExecutionState.Ongoing)
+      2.refined,
+      1.refined,
+      SequenceDigest.Zero.copy(observeClass = ObserveClass.Acquisition, atomCount = 1.refined, executionState = ExecutionState.Ongoing),
+      SequenceDigest.Zero.copy(observeClass = ObserveClass.Science,     atomCount = 3.refined, executionState = ExecutionState.Ongoing)
     )
 
   test("ExecutionDigest decodes from `estimate` when the deprecated top-level fields are absent"):
@@ -115,4 +115,5 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   test("ExecutionDigest decodes from the deprecated top-level fields when `estimate` is absent"):
     val stripped =
       sampleExecutionDigest.asJson.mapObject(_.remove("estimate"))
-    assertEquals(Decoder[ExecutionDigest].decodeJson(stripped), Right(sampleExecutionDigest))
+    // `calibrationCount` lives only under `estimate`, so an old payload reads as 0.
+    assertEquals(Decoder[ExecutionDigest].decodeJson(stripped), Right(sampleExecutionDigest.copy(calibrationCount = NonNegInt.MinValue)))

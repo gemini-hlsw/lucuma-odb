@@ -49,6 +49,8 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
 
     val ObservingModeType = col("c_observing_mode_type", observing_mode_type)
 
+    val AltairMode: ColumnRef = col("c_altair_mode", altair_mode.opt)
+
     object Flamingos2LongSlit:
       val Id = col("c_flamingos_2_longslit_id", configuration_request_id.embedded)
       val Disperser = col("c_flamingos_2_longslit_disperser", flamingos_2_disperser.embedded)

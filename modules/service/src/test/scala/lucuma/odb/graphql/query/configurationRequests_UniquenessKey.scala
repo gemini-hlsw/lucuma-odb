@@ -5,12 +5,15 @@ package lucuma.odb.graphql
 package query
 
 import cats.effect.IO
+import cats.syntax.all.*
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.model.ConfigurationRequest
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.User
+import lucuma.odb.graphql.mutation.UpdateObservationsOps
 import lucuma.odb.graphql.query.ObservingModeSetupOperations.ConstraintSet
 
 /**
@@ -24,7 +27,8 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations.ConstraintSet
  */
 class configurationRequests_UniquenessKey
   extends OdbSuite
-     with ObservingModeSetupOperations:
+     with ObservingModeSetupOperations
+     with UpdateObservationsOps:
 
   val admin: User = TestUsers.Standard.admin(3, 32)
   val pi: User    = TestUsers.Standard.pi(1, 30)
@@ -339,6 +343,32 @@ class configurationRequests_UniquenessKey
         r2 <- createConfigurationRequestAs(pi, o2)
         _  <- IO(assertNotEquals(r1, r2))
       yield ()
+
+  // Altair is Gemini North AO, so only a GNIRS observation can carry it.
+  private def requestWithAltair(pid: Program.Id, tid: Target.Id, altair: Option[String]): IO[ConfigurationRequest.Id] =
+    for
+      oid <- createObservationWithModeAs(pi, pid, List(tid), gnirsLongSlit("D111", "SHORT_BLUE"))
+      _   <- altair.traverse_ : mode =>
+               updateObservation(
+                 pi, oid, s"targetEnvironment: { altair: { mode: $mode } }", "observations { id }",
+                 json"""{ "updateObservations": { "observations": [ { "id": $oid } ] } }""".asRight
+               )
+      rid <- createConfigurationRequestAs(pi, oid)
+    yield rid
+
+  private def assertDistinctAltair(a: Option[String], b: Option[String]): IO[Unit] =
+    setup.flatMap: (pid, tid) =>
+      for
+        r1 <- requestWithAltair(pid, tid, a)
+        r2 <- requestWithAltair(pid, tid, b)
+        _  <- IO(assertNotEquals(r1, r2, s"Expected distinct configuration requests, got $r1 twice."))
+      yield ()
+
+  test("Altair - differing only in mode"):
+    assertDistinctAltair("NGS".some, "LGS".some)
+
+  test("Altair - differing only in whether Altair is used at all"):
+    assertDistinctAltair("NGS".some, none)
 
   // Widening the key must not stop genuinely identical requests collapsing onto one.
   test("identical requests still collapse onto one"):

@@ -620,7 +620,7 @@ object ProposalService {
           Services.asSuperUser:
             emailService
               .send(pid, emailConfig.invitationFrom, recipient, subject, text, html)
-              .map(_ => Result.unit)
+              .map(_.void)
 
         def sendSubmissionEmail(pid: Program.Id, newReference: ProposalReference)(using Transaction[F]): F[Result[Unit]] =
           piEmailAddress // this has already been validated, so we should have one
@@ -681,17 +681,21 @@ object ProposalService {
           notificationRecipients match
             case Nil        => Result.unit.pure
             case recipients =>
-              (for {
-                timeRequested <- ResultT.liftF(timeRequest(pid))
-                _             <- recipients.traverse: a =>
-                                   ResultT(sendEmailHelper(
-                                     pid,
-                                     a,
-                                     notificationSubject(newReference),
-                                     notificationText(newReference, timeRequested),
-                                     notificationHtml(newReference, timeRequested).some
-                                   ))
-              } yield ()).value
+              // Every recipient is attempted: one address the provider rejects must not stop
+              // the others being notified.  `parSequence`, not `sequence`: `Result`'s monadic
+              // applicative short circuits, so it would report only the earliest failure even
+              // though every send had already been made.
+              timeRequest(pid).flatMap: timeRequested =>
+                recipients
+                  .traverse: a =>
+                    sendEmailHelper(
+                      pid,
+                      a,
+                      notificationSubject(newReference),
+                      notificationText(newReference, timeRequested),
+                      notificationHtml(newReference, timeRequested).some
+                    )
+                  .map(_.parSequence.void)
 
         def sendEmail(
           pid: Program.Id,
@@ -699,11 +703,17 @@ object ProposalService {
          )(using Transaction[F]): F[Result[Unit]] =
           // There might be emails for other status changes in the future
           if newStatus === ProposalStatus.Submitted then
-            (for {
-              newReference <- ResultT(getNewReference(pid))
-              _            <- ResultT(sendSubmissionEmail(pid, newReference))
-              _            <- ResultT(sendNotificationEmails(pid, newReference))
-            } yield ()).value
+            // The reference is needed to compose either message, so that failure is fatal.
+            // The two sends themselves are independent: a PI address the provider rejects must
+            // not stop Gemini being notified of the submission.
+            ResultT(getNewReference(pid))
+              .flatMap: newReference =>
+                ResultT:
+                  List(
+                    sendSubmissionEmail(pid, newReference),
+                    sendNotificationEmails(pid, newReference)
+                  ).sequence.map(_.parSequence.void)
+              .value
           else Result.unit.pure
 
       }
@@ -984,13 +994,27 @@ object ProposalService {
                       _         <- ResultT.liftF(Services.asSuperUser(pdfSummaryJobService.enqueue(pid)).void).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
                       _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === ProposalStatus.Submitted && newStatus === ProposalStatus.NotSubmitted)
                       _         <- ResultT.liftF(freezeTooActivation(pid)).whenA(newStatus === ProposalStatus.Accepted)
-                      _         <- ResultT(info.sendEmail(pid, newStatus))
-                    yield pid
+                    yield (info, newStatus)
                   // A failed `Result` is a value, not a raised error, so without this the status
                   // change would commit even when canonicalization failed, leaving the proposal
                   // submitted with no configuration requests. Warnings still commit.
                   go2.value.flatTap: r =>
                     transaction.rollback.unlessA(r.hasValue)
+              .flatMap: (info, newStatus) =>
+                // Mail is an external side effect that cannot be undone, so it must not be sent
+                // until the commit that justifies it has happened, and it runs in a transaction of
+                // its own that the submission is beyond the reach of. A rejected address comes back
+                // as a `Result`, so that transaction still commits and the audit rows for the sends
+                // that did succeed are kept; a transport failure `EmailService` does not recover
+                // raises instead, losing them and surfacing as an error.
+                ResultT:
+                  services.transactionally(info.sendEmail(pid, newStatus)).map:
+                    // The proposal is submitted either way, so a send that failed is a warning on
+                    // that success, never a failure implying the submission did not happen.
+                    case Result.Failure(ps) => Result.Warning(ps, pid)
+                    // Success and Warning already mean "submitted"; an InternalError is a bug and
+                    // stays loud.
+                    case other              => other.as(pid)
           .value
 
       }
