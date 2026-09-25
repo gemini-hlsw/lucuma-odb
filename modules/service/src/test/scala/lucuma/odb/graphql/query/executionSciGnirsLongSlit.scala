@@ -189,9 +189,9 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
                   science {
                     gcalSets
                     steps {
-                      arcs  { count time { total { seconds } } }
-                      flats { count time { total { seconds } } }
-                      observing { time { total { seconds } } }
+                      arc     { count time { total { seconds } } }
+                      flat    { count time { total { seconds } } }
+                      science { time { total { seconds } } }
                     }
                     timeEstimate { total { seconds } }
                   }
@@ -205,11 +205,11 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       val sci = js.hcursor.downFields("observation", "execution", "digest", "value", "science")
       (
         sci.downField("gcalSets").require[Int],
-        sci.downFields("steps", "arcs", "count").require[Int],
-        sci.downFields("steps", "arcs", "time", "total", "seconds").require[BigDecimal],
-        sci.downFields("steps", "flats", "count").require[Int],
-        sci.downFields("steps", "flats", "time", "total", "seconds").require[BigDecimal],
-        sci.downFields("steps", "observing", "time", "total", "seconds").require[BigDecimal],
+        sci.downFields("steps", "arc", "count").require[Int],
+        sci.downFields("steps", "arc", "time", "total", "seconds").require[BigDecimal],
+        sci.downFields("steps", "flat", "count").require[Int],
+        sci.downFields("steps", "flat", "time", "total", "seconds").require[BigDecimal],
+        sci.downFields("steps", "science", "time", "total", "seconds").require[BigDecimal],
         sci.downFields("timeEstimate", "total", "seconds").require[BigDecimal]
       )
 

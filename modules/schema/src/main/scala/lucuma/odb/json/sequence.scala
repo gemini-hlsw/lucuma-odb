@@ -114,21 +114,21 @@ trait SequenceCodec {
   given Decoder[StepDigests] =
     Decoder.instance: c =>
       for
-        b <- c.downField("biases").as[StepDigest]
-        d <- c.downField("darks").as[StepDigest]
-        r <- c.downField("arcs").as[StepDigest]
-        f <- c.downField("flats").as[StepDigest]
-        o <- c.downField("observing").as[StepDigest]
+        b <- c.downField("bias").as[StepDigest]
+        d <- c.downField("dark").as[StepDigest]
+        r <- c.downField("arc").as[StepDigest]
+        f <- c.downField("flat").as[StepDigest]
+        o <- c.downField("science").as[StepDigest]
       yield StepDigests(b, d, r, f, o)
 
   given (using Encoder[TimeSpan]): Encoder[StepDigests] =
     Encoder.instance: (a: StepDigests) =>
       Json.obj(
-        "biases"    -> a.biases.asJson,
-        "darks"     -> a.darks.asJson,
-        "arcs"      -> a.arcs.asJson,
-        "flats"     -> a.flats.asJson,
-        "observing" -> a.observing.asJson
+        "bias"    -> a.biases.asJson,
+        "dark"    -> a.darks.asJson,
+        "arc"     -> a.arcs.asJson,
+        "flat"    -> a.flats.asJson,
+        "science" -> a.observing.asJson
       )
 
   given Decoder[SequenceDigest] =

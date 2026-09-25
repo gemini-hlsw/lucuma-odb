@@ -439,9 +439,9 @@ object ObscalcService:
         "c_acq_flat_count",
         "c_acq_flat_non_charged_time",
         "c_acq_flat_program_time",
-        "c_acq_observing_count",
-        "c_acq_observing_non_charged_time",
-        "c_acq_observing_program_time",
+        "c_acq_science_count",
+        "c_acq_science_non_charged_time",
+        "c_acq_science_program_time",
         "c_acq_execution_state",
 
         "c_sci_obs_class",
@@ -463,9 +463,9 @@ object ObscalcService:
         "c_sci_flat_count",
         "c_sci_flat_non_charged_time",
         "c_sci_flat_program_time",
-        "c_sci_observing_count",
-        "c_sci_observing_non_charged_time",
-        "c_sci_observing_program_time",
+        "c_sci_science_count",
+        "c_sci_science_non_charged_time",
+        "c_sci_science_program_time",
         "c_sci_execution_state",
 
         "c_workflow_state",
@@ -573,9 +573,9 @@ object ObscalcService:
         "c_acq_flat_count",
         "c_acq_flat_non_charged_time",
         "c_acq_flat_program_time",
-        "c_acq_observing_count",
-        "c_acq_observing_non_charged_time",
-        "c_acq_observing_program_time",
+        "c_acq_science_count",
+        "c_acq_science_non_charged_time",
+        "c_acq_science_program_time",
         "c_acq_execution_state",
 
         "c_sci_obs_class",
@@ -597,9 +597,9 @@ object ObscalcService:
         "c_sci_flat_count",
         "c_sci_flat_non_charged_time",
         "c_sci_flat_program_time",
-        "c_sci_observing_count",
-        "c_sci_observing_non_charged_time",
-        "c_sci_observing_program_time",
+        "c_sci_science_count",
+        "c_sci_science_non_charged_time",
+        "c_sci_science_program_time",
         "c_sci_execution_state"
       )
 
@@ -713,9 +713,9 @@ object ObscalcService:
         sql"c_acq_flat_count                 = ${int4_nonneg.opt}"(r.digest.map(_.acquisition.steps.flats.count)),
         sql"c_acq_flat_non_charged_time      = ${time_span.opt}"(r.digest.map(_.acquisition.steps.flats.time(ChargeClass.NonCharged))),
         sql"c_acq_flat_program_time          = ${time_span.opt}"(r.digest.map(_.acquisition.steps.flats.time(ChargeClass.Program))),
-        sql"c_acq_observing_count            = ${int4_nonneg.opt}"(r.digest.map(_.acquisition.steps.observing.count)),
-        sql"c_acq_observing_non_charged_time = ${time_span.opt}"(r.digest.map(_.acquisition.steps.observing.time(ChargeClass.NonCharged))),
-        sql"c_acq_observing_program_time     = ${time_span.opt}"(r.digest.map(_.acquisition.steps.observing.time(ChargeClass.Program))),
+        sql"c_acq_science_count              = ${int4_nonneg.opt}"(r.digest.map(_.acquisition.steps.observing.count)),
+        sql"c_acq_science_non_charged_time   = ${time_span.opt}"(r.digest.map(_.acquisition.steps.observing.time(ChargeClass.NonCharged))),
+        sql"c_acq_science_program_time       = ${time_span.opt}"(r.digest.map(_.acquisition.steps.observing.time(ChargeClass.Program))),
         sql"c_acq_execution_state            = ${execution_state.opt}"(r.digest.map(_.acquisition.executionState)),
 
         // Science Digest
@@ -738,9 +738,9 @@ object ObscalcService:
         sql"c_sci_flat_count                 = ${int4_nonneg.opt}"(r.digest.map(_.science.steps.flats.count)),
         sql"c_sci_flat_non_charged_time      = ${time_span.opt}"(r.digest.map(_.science.steps.flats.time(ChargeClass.NonCharged))),
         sql"c_sci_flat_program_time          = ${time_span.opt}"(r.digest.map(_.science.steps.flats.time(ChargeClass.Program))),
-        sql"c_sci_observing_count            = ${int4_nonneg.opt}"(r.digest.map(_.science.steps.observing.count)),
-        sql"c_sci_observing_non_charged_time = ${time_span.opt}"(r.digest.map(_.science.steps.observing.time(ChargeClass.NonCharged))),
-        sql"c_sci_observing_program_time     = ${time_span.opt}"(r.digest.map(_.science.steps.observing.time(ChargeClass.Program))),
+        sql"c_sci_science_count              = ${int4_nonneg.opt}"(r.digest.map(_.science.steps.observing.count)),
+        sql"c_sci_science_non_charged_time   = ${time_span.opt}"(r.digest.map(_.science.steps.observing.time(ChargeClass.NonCharged))),
+        sql"c_sci_science_program_time       = ${time_span.opt}"(r.digest.map(_.science.steps.observing.time(ChargeClass.Program))),
         sql"c_sci_execution_state            = ${execution_state.opt}"(r.digest.map(_.science.executionState)),
 
         // Workflow
