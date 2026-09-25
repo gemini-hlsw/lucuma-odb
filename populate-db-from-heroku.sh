@@ -261,7 +261,7 @@ export EXPLORE_URL="http://localhost:3000"
 export ODB_DOMAIN="localhost"
 
 # Start the odb, it will attempt to migrate
-sbt -v -J-Xmx6g "service/run serve" > $SERVICE_LOG 2>&1 &
+sbt -v -J-Xmx6g -J-Xss4M "service/run serve" > $SERVICE_LOG 2>&1 &
 SERVICE_PID=$!
 
 echo "🍏 Service PID: $SERVICE_PID"
