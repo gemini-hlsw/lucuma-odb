@@ -52,6 +52,7 @@ trait ConfigurationMapping[F[_]]
       SqlObject("conditions"),
       SqlObject("observingMode"),
       SqlField("altairMode", ConfigurationRequestView.AltairMode),
+      SqlField("schedulingMode", ConfigurationRequestView.SchedulingMode),
     )
 
   private lazy val ObservationConfigurationMapping: ObjectMapping =
@@ -70,6 +71,7 @@ trait ConfigurationMapping[F[_]]
       SqlObject("conditions"),
       SqlObject("observingMode"),
       SqlField("altairMode", ObservationView.ConfigurationAltairMode),
+      SqlField("schedulingMode", ObservationView.SchedulingMode),
     )
 
   def targetQueryHandler: EffectHandler[F] =

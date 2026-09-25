@@ -28,6 +28,7 @@ import lucuma.core.model.CompositeTracking
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
+import lucuma.core.model.Target
 import lucuma.core.model.sequence.AtomDigest
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
@@ -308,10 +309,8 @@ object ObscalcService:
                 .flatMap: targets =>
                   targets
                     .traverse:
-                      // Asking for the sidereal projection rather than testing the subtype
-                      // picks up a Target of Opportunity that resolved siderally, which has
-                      // a real position while keeping its opportunity identity.
-                      case (_, t) => t.asSidereal.map(_.tracking)
+                      case (_, t: Target.Sidereal) => t.tracking.some
+                      case _                       => none
                     .flatMap(ts => CompositeTracking(ts).at(Epoch.J2000.toInstant))
 
       private def storeResult(

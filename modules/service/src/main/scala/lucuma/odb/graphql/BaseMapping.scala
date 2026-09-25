@@ -470,7 +470,6 @@ trait BaseMapping[F[_]]
   lazy val TargetGroupSelectResultType             = schema.ref("TargetGroupSelectResult")
   lazy val TargetGroupType                         = schema.ref("TargetGroup")
   lazy val TargetIdType                            = schema.ref("TargetId")
-  lazy val TargetResolutionType                    = schema.ref("TargetResolution")
   lazy val TargetSelectResultType                  = schema.ref("TargetSelectResult")
   lazy val TargetType                              = schema.ref("Target")
   lazy val TelescopeConfigGeneratorType            = schema.ref("TelescopeConfigGenerator")

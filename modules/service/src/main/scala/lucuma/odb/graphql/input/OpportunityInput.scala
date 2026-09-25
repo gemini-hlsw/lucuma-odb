@@ -4,49 +4,37 @@
 package lucuma.odb.graphql
 package input
 
-import cats.syntax.all.*
 import lucuma.core.math.Region
-import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
 case class OpportunityInput(region: Region)
 
 object OpportunityInput:
 
-  case class Create(region: RegionInput.Create, resolution: Option[TargetResolutionInput.Create])
+  case class Create(region: RegionInput.Create)
 
   /**
-   * The two fields differ in exactly the way their meanings differ.
-   *
-   * The resolution is `Nullable`: unresolved is a real, reachable state, so assigning null
-   * un-resolves the target and returns it to waiting, while omitting it leaves the resolution
-   * alone.
-   *
    * The region is optional but *not* nullable. Every opportunity target has one -- omitting it on
    * create approves the whole sky rather than leaving it unset -- so there is no state for null to
    * denote; ceasing to be a Target of Opportunity is a subtype change, made through the top-level
-   * sidereal / nonsidereal fields. Omitting it here leaves the approved region untouched, which is
-   * what makes resolving a target safe: a client that had to restate the region in order to
-   * resolve could silently redraw it.
+   * sidereal / nonsidereal fields. Omitting it here leaves the approved region untouched.
    *
    * GraphQL cannot express "optional but not nullable" in the type -- an input field is either
    * required or nullable -- so it is enforced here, by `NonNullable`.
    */
-  case class Edit(region: Option[RegionInput.Edit], resolution: Nullable[TargetResolutionInput.Edit])
+  case class Edit(region: Option[RegionInput.Edit])
 
   val CreateBinding: Matcher[Create] =
     ObjectFieldsBinding.rmap:
       case List(
-        RegionInput.CreateBinding.NonNullable("region", rRegion),
-        TargetResolutionInput.CreateBinding.Option("resolution", rResolution)
+        RegionInput.CreateBinding.NonNullable("region", rRegion)
       ) =>
-        (rRegion, rResolution).parMapN: (region, resolution) =>
-          Create(region.getOrElse(RegionInput.Default), resolution)
+        rRegion.map: region =>
+          Create(region.getOrElse(RegionInput.Default))
 
   val EditBinding: Matcher[Edit] =
     ObjectFieldsBinding.rmap:
       case List(
-        RegionInput.EditBinding.NonNullable("region", rRegion),
-        TargetResolutionInput.EditBinding.Nullable("resolution", rResolution)
+        RegionInput.EditBinding.NonNullable("region", rRegion)
       ) =>
-        (rRegion, rResolution).parMapN(Edit.apply)
+        rRegion.map(Edit.apply)

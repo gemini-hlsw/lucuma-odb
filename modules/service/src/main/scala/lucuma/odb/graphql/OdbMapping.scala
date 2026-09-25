@@ -262,7 +262,6 @@ object OdbMapping {
           with ObservingModeMapping[F]
           with OffsetMapping[F]
           with OpportunityMapping[F]
-          with TargetResolutionMapping[F]
           with ParallaxMapping[F]
           with PartnerSplitMapping[F]
           with PosAngleConstraintMapping[F]
@@ -687,7 +686,6 @@ object OdbMapping {
                 RegionMappings,
                 RightAscensionMappings,
                 SiteCoordinateLimitsMappings,
-                TargetResolutionMappings,
                 TelescopeConfigMappings,
                 TimeSpanMappings,
                 UserProfileMappings,

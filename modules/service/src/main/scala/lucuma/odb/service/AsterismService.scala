@@ -11,7 +11,6 @@ import grackle.Result
 import grackle.ResultT
 import grackle.syntax.*
 import lucuma.core.enums.ArcType
-import lucuma.core.enums.TrackType
 import lucuma.core.math.Arc
 import lucuma.core.math.Coordinates
 import lucuma.core.math.Declination
@@ -25,7 +24,6 @@ import lucuma.core.model.Program
 import lucuma.core.model.SiderealTracking
 import lucuma.core.model.SourceProfile
 import lucuma.core.model.Target
-import lucuma.core.model.TargetResolution
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
@@ -425,7 +423,6 @@ object AsterismService {
           t.c_target_id,
           c_name,
           c_type = 'opportunity',
-          c_resolved_type,
           c_sid_ra,
           c_sid_dec,
           c_sid_epoch,
@@ -459,7 +456,6 @@ object AsterismService {
           t.c_target_id,
           c_name,
           c_type = 'opportunity',
-          c_resolved_type,
           c_sid_ra,
           c_sid_dec,
           c_sid_epoch,
@@ -502,7 +498,6 @@ object AsterismService {
       (target_id *:
         text_nonempty *:           // name
         bool *:                    // c_type = 'opportunity'
-        target_tracking_type.opt *:// c_resolved_type (opportunity targets only)
         right_ascension.opt *:
         declination.opt *:
         epoch.opt *:
@@ -526,7 +521,6 @@ object AsterismService {
         case (id,
               name,
               isOpportunity,
-              oResolvedType,
               oRa,
               oDec,
               oEpoch,
@@ -564,11 +558,6 @@ object AsterismService {
           val oEphemerisKey: Option[Ephemeris.Key] =
             (oDes, oEphemKeyType).mapN((des, keyType) => Ephemeris.Key.fromTypeAndDes.getOption((keyType, des))).flatten
 
-          val oResolution: Option[TargetResolution] =
-            oResolvedType.flatMap:
-              case TrackType.Sidereal    => oSiderealTracking.map(TargetResolution.Sidereal(_, oCatalogInfo))
-              case TrackType.Nonsidereal => oEphemerisKey.map(TargetResolution.Nonsidereal(_))
-
           if isOpportunity then
             (oSourceProfile, oRaArcType, oDecArcType).tupled.flatMap: (sourceProfile, raArcType, decArcType) =>
 
@@ -587,7 +576,7 @@ object AsterismService {
                   case _ => None
 
               (oRaArc, oDecArc).mapN: (raArc, decArc) =>
-                (id, Target.Opportunity(name, Region(raArc, decArc), oResolution, sourceProfile))
+                (id, Target.Opportunity(name, Region(raArc, decArc), sourceProfile))
 
             .toRight(s"Invalid target $id.")
           else

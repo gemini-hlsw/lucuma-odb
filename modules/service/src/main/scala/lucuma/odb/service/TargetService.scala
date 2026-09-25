@@ -41,7 +41,6 @@ import lucuma.odb.graphql.input.OpportunityInput
 import lucuma.odb.graphql.input.RegionInput
 import lucuma.odb.graphql.input.SiderealInput
 import lucuma.odb.graphql.input.TargetPropertiesInput
-import lucuma.odb.graphql.input.TargetResolutionInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.graphql.mapping.AccessControl.CheckedWithId
 import lucuma.odb.json.angle.query.given
@@ -116,18 +115,8 @@ object TargetService {
         input.foldWithId(OdbError.NotAuthorized(user.id).asFailureF): (input, pid) =>
           val insertFragment: ResultT[F, AppliedFragment] = input.subtypeInfo match
             case s: SiderealInput.Create  => Statements.insertSiderealFragment(pid, input.name, s, input.sourceProfile.asJson, disposition, role).pure
-            case OpportunityInput.Create(r, res) =>
-              // A resolution given at creation follows the same path the top-level subtypes do,
-              // including creating a user-supplied ephemeris first when that is what was given.
-              val rResolution: ResultT[F, Option[SiderealInput.Create | Ephemeris.Key]] =
-                res match
-                  case None                                        => ResultT.pure(None)
-                  case Some(s: SiderealInput.Create)               => ResultT.pure(Some(s))
-                  case Some(NonsiderealInput.Create.Horizons(k))   => ResultT.pure(Some(k))
-                  case Some(NonsiderealInput.Create.UserSupplied(elems)) =>
-                    ResultT(Services.asSuperUser(trackingService.createUserSuppliedEphemeris(elems))).map(Some(_))
-              rResolution.map: res =>
-                Statements.insertOpportunityFragment(pid, input.name, r, res, input.sourceProfile.asJson, disposition, role)
+            case OpportunityInput.Create(r) =>
+              Statements.insertOpportunityFragment(pid, input.name, r, input.sourceProfile.asJson, disposition, role).pure
             case NonsiderealInput.Create.Horizons(k) => Statements.insertNonsiderealFragment(pid, input.name, k, input.sourceProfile.asJson, disposition, role).pure
             case NonsiderealInput.Create.UserSupplied(elems) =>
               ResultT(Services.asSuperUser(trackingService.createUserSuppliedEphemeris(elems))).map: k =>
@@ -148,16 +137,11 @@ object TargetService {
 
       private def updateTargetsImpl(input: TargetPropertiesInput.Edit, which: AppliedFragment)(using Transaction[F], SuperUserAccess): F[UpdateTargetsResponse] =
 
-        // Updates to the user-supplied ephemeris, if any.  It arrives either as the target's own
-        // tracking or as an opportunity target's resolution, and the two mean the same thing: the
-        // same key columns are written either way, so if the nested one is not unwrapped here the
-        // target ends up pointing at a key whose elements were never replaced.
+        // Updates to the user-supplied ephemeris, if any.  An opportunity target does not track,
+        // so this reaches only a target whose own tracking is nonsidereal.
         val userSuppliedEphemeris: Option[NonsiderealInput.Edit.UserSupplied] =
           input.subtypeInfo.flatMap:
             case u: NonsiderealInput.Edit.UserSupplied => u.some
-            case o: OpportunityInput.Edit              =>
-              o.resolution.toOption.collect:
-                case u: NonsiderealInput.Edit.UserSupplied => u
             case _                                     => none
 
         val replaceEphemeris: F[Unit] =
@@ -402,31 +386,18 @@ object TargetService {
         }
 
     /**
-     * A Target of Opportunity, optionally already resolved. The resolution is stored in the same
-     * columns the corresponding target subtype would use, so every one of them appears here and
-     * is null when the target is unresolved -- which is the ordinary case at proposal time.
+     * A Target of Opportunity: a placeholder carrying a region and no coordinates at all. Every
+     * tracking column is left null, which is what the field constraints require of a target that
+     * does not track -- and it does not track because there is nothing there yet to track.
      */
     def insertOpportunityFragment(
       pid:           Program.Id,
       name:          NonEmptyString,
       region:        RegionInput.Create,
-      resolution:    Option[SiderealInput.Create | Ephemeris.Key],
       sourceProfile: Json,
       disposition:   TargetDisposition,
       role:          Option[CalibrationRole]
-    ): AppliedFragment = {
-
-      val sidereal: Option[SiderealInput.Create] =
-        resolution.collect { case s: SiderealInput.Create => s }
-
-      val nonsidereal: Option[Ephemeris.Key] =
-        resolution.collect { case k: Ephemeris.Key => k }
-
-      val resolvedType: Option[String] =
-        resolution.map:
-          case _: SiderealInput.Create => "sidereal"
-          case _: Ephemeris.Key        => "nonsidereal"
-
+    ): AppliedFragment =
       sql"""
         insert into t_target (
           c_program_id,
@@ -438,20 +409,6 @@ object TargetService {
           c_opp_dec_arc_type,
           c_opp_dec_arc_start,
           c_opp_dec_arc_end,
-          c_resolved_type,
-          c_sid_ra,
-          c_sid_dec,
-          c_sid_epoch,
-          c_sid_pm_ra,
-          c_sid_pm_dec,
-          c_sid_rv,
-          c_sid_parallax,
-          c_sid_catalog_name,
-          c_sid_catalog_id,
-          c_sid_catalog_object_type,
-          c_nsid_des,
-          c_nsid_key_type,
-          c_nsid_key,
           c_source_profile,
           c_target_disposition,
           c_calibration_role
@@ -462,20 +419,6 @@ object TargetService {
           'opportunity',
           ${arc(right_ascension)},
           ${arc(declination)},
-          ${varchar.opt}::e_target_tracking_type,
-          ${right_ascension.opt},
-          ${declination.opt},
-          ${epoch.opt},
-          ${int8.opt},
-          ${int8.opt},
-          ${radial_velocity.opt},
-          ${parallax.opt},
-          ${catalog_name.opt},
-          ${text_nonempty.opt},
-          ${text_nonempty.opt},
-          ${text_nonempty.opt},
-          ${ephemeris_key_type.opt},
-          ${text_nonempty.opt},
           $json,
           $target_disposition,
           ${calibration_role.opt}
@@ -485,25 +428,10 @@ object TargetService {
         name,
         region.raArc,
         region.decArc,
-        resolvedType,
-        sidereal.map(_.ra),
-        sidereal.map(_.dec),
-        sidereal.map(_.epoch),
-        sidereal.map(_.properMotion.fold(0L)(_.ra.μasy.value)),
-        sidereal.map(_.properMotion.fold(0L)(_.dec.μasy.value)),
-        sidereal.map(_.radialVelocity.getOrElse(RadialVelocity.Zero)),
-        sidereal.map(_.parallax.getOrElse(Parallax.Zero)),
-        sidereal.flatMap(_.catalogInfo.flatMap(_.name)),
-        sidereal.flatMap(_.catalogInfo.flatMap(_.id)),
-        sidereal.flatMap(_.catalogInfo.flatMap(_.objectType)),
-        nonsidereal.flatMap(k => NonEmptyString.from(k.des).toOption),
-        nonsidereal.map(_.keyType),
-        nonsidereal.flatMap(k => NonEmptyString.from(Ephemeris.Key.fromString.reverseGet(k)).toOption),
         sourceProfile,
         disposition,
         role
       )
-    }
 
     extension [A](n: Nullable[A]) def asUpdate(column: String, e: Encoder[A]): Option[AppliedFragment] =
       n.foldPresent(_.fold(void"null")(sql"$e")).map(sql"#$column = "(Void) |+| _)
@@ -565,10 +493,7 @@ object TargetService {
       val NullOutSiderealFields    = nullOut(SiderealFields)
       val NullOutOpportunityFields = nullOut(OpportunityFields)
 
-      // The column updates for a tracking edit, without the discriminator.  A resolution is
-      // stored in exactly the same columns as the target subtype it resolves to, so this is
-      // shared by the subtype change (which sets c_type) and by resolving an opportunity
-      // target (which sets c_resolved_type instead).
+      // The column updates for a tracking edit, without the discriminator.
       def trackingUpdates(tracking: SiderealInput.Edit | NonsiderealInput.Edit): List[AppliedFragment] =
         tracking match
 
@@ -592,54 +517,27 @@ object TargetService {
             ) ++
             NullOutSiderealFields
 
-      // Clear the tracking columns of a target being *converted* into an opportunity target.
-      // This arm always sets c_type = 'opportunity', so it serves two different edits: touching
-      // an existing opportunity target's region, which must not silently un-resolve it, and
-      // converting a sidereal or nonsidereal target into one, which must not leave the old
-      // coordinates behind -- with no resolution they belong to no tracking type, and
-      // sidereal_or_all_columns_null rejects the row.
-      //
-      // Only the ELSE branch does anything; for a target that is already an opportunity target
-      // each assignment is a no-op.  It is written this way because a single UPDATE covers a set
-      // of ids that may hold both kinds, so the two cases can only be told apart per row.  The
-      // right-hand side of an UPDATE sees the OLD row, so c_type here is the type the target had
-      // before this statement set it to 'opportunity'.
-      val ClearTrackingUnlessAlreadyOpportunity =
-        (List("c_resolved_type") ++ SiderealFields ++ NonsiderealFields).map: col =>
-          sql"#$col = CASE WHEN c_type = 'opportunity' THEN #$col ELSE null END".apply(Void)
-
-      // Resolving an opportunity target, un-resolving it, or leaving it alone.  Un-resolving
-      // must clear the tracking columns as well as the discriminator, for the same constraint
-      // reason.  Each arm owns every tracking column it touches, so no column is assigned twice.
-      def resolutionUpdates(resolution: Nullable[TargetResolutionInput.Edit]): List[AppliedFragment] =
-        resolution match
-          case Nullable.Absent      =>
-            ClearTrackingUnlessAlreadyOpportunity
-          case Nullable.Null        =>
-            void"c_resolved_type = null" :: NullOutSiderealFields ++ NullOutNonsiderealFields
-          case Nullable.NonNull(t)  =>
-            val tag = t match
-              case _: SiderealInput.Edit    => void"c_resolved_type = 'sidereal'"
-              case _: NonsiderealInput.Edit => void"c_resolved_type = 'nonsidereal'"
-            tag :: trackingUpdates(t)
+      // An opportunity target is a placeholder and carries no coordinates, so every tracking
+      // column is cleared.  This arm always sets c_type = 'opportunity', and serves both edits
+      // that do so: touching an existing opportunity target's region, where the columns are
+      // already null and each assignment is a no-op, and converting a sidereal or nonsidereal
+      // target into one, which must not leave the old coordinates behind -- they belong to no
+      // tracking type now, and sidereal_or_all_columns_null rejects the row.
+      val ClearTracking =
+        NullOutSiderealFields ++ NullOutNonsiderealFields
 
       tracking match {
 
         case sid: SiderealInput.Edit   =>
           void"c_type = 'sidereal'" ::
-          void"c_resolved_type = null" ::
           trackingUpdates(sid) ++
           NullOutOpportunityFields
 
         case e: NonsiderealInput.Edit =>
           void"c_type = 'nonsidereal'" ::
-          void"c_resolved_type = null" ::
           trackingUpdates(e) ++
           NullOutOpportunityFields
 
-        // Note this does NOT null out the tracking columns.  A resolved Target of Opportunity
-        // keeps its coordinates, and editing its region must not silently un-resolve it; only
-        // an explicit `resolution: null` does that, via resolutionUpdates.
         case opp: OpportunityInput.Edit =>
           // Omitting the region leaves it exactly as it was, which is what lets a client
           // resolve a target without having to restate -- and risk redrawing -- the patch of
@@ -664,7 +562,7 @@ object TargetService {
             opp.region.toList.flatMap: region =>
               arcUpdates(region.raArc,  "c_opp_ra",  right_ascension) ++
               arcUpdates(region.decArc, "c_opp_dec", declination)
-          void"c_type = 'opportunity'" :: regionUpdates ++ resolutionUpdates(opp.resolution)
+          void"c_type = 'opportunity'" :: regionUpdates ++ ClearTracking
 
       }
 
@@ -717,7 +615,6 @@ object TargetService {
           c_source_profile,
           c_calibration_role,
           c_target_disposition,
-          c_resolved_type,
           c_opp_ra_arc_type,
           c_opp_ra_arc_start,
           c_opp_ra_arc_end,
@@ -745,7 +642,6 @@ object TargetService {
           c_source_profile,
           c_calibration_role,
           c_target_disposition,
-          c_resolved_type,
           c_opp_ra_arc_type,
           c_opp_ra_arc_start,
           c_opp_ra_arc_end,

@@ -241,6 +241,17 @@ object ProgramService {
               case _                                            => status.isEmpty
           )
 
+      // The ceiling is an approval, so it is for staff to grant.
+      def validateTooActivationCeiling(present: Boolean): Result[Unit] =
+        OdbError
+          .NotAuthorized(user.id, "Only staff may set the Target of Opportunity activation ceiling.".some)
+          .asFailure
+          .unlessA(
+            user.role.access match
+              case Access.Admin | Access.Service | Access.Staff => true
+              case _                                            => !present
+          )
+
       def validateProprietaryPeriod(period: Option[NonNegInt]): Result[Unit] =
         OdbError
           .NotAuthorized(user.id, "Only staff may set the proprietary months.".some)
@@ -289,6 +300,7 @@ object ProgramService {
               _ <- ResultT.fromResult(validateExplicitStatus(SETʹ.explicitStatus))
               _ <- ResultT.fromResult(validateProprietaryPeriod(proprietaryMonths))
               _ <- ResultT.fromResult(validatedismissedWarnings(SETʹ.dismissedWarnings))
+              _ <- ResultT.fromResult(validateTooActivationCeiling(SETʹ.tooActivationCeiling.isDefined))
               p <- ResultT(create)
               _ <- SETʹ.active.fold(ResultT.unit)(a => ResultT(setActivePeriod(p, a)))
             } yield p).value
@@ -329,6 +341,7 @@ object ProgramService {
             _   <- ResultT.fromResult(validateProprietaryPeriod(SET.goa.flatMap(_.proprietaryMonths)))
             _   <- ResultT.fromResult(validateExplicitStatus(SET.explicitStatus))
               _ <- ResultT.fromResult(validatedismissedWarnings(SET.dismissedWarnings))
+            _   <- ResultT.fromResult(validateTooActivationCeiling(!SET.tooActivationCeiling.isAbsent))
             ids <- ResultT(updatePrograms)
           yield ids).value
 
@@ -417,6 +430,7 @@ object ProgramService {
           SET.active.flatMap(_.left).map(sql"c_active_start = $date"),
           SET.active.flatMap(_.right).map(sql"c_active_end = $date"),
           SET.dismissedWarnings.map(sql"c_dismissed_warnings = $_observation_validation_warning"),
+          SET.tooActivationCeiling.foldPresent(sql"c_too_activation_ceiling = ${too_activation.opt}"),
         ).flatten
       )
 
@@ -442,7 +456,8 @@ object ProgramService {
           c_goa_private_header,
           c_existence,
           c_explicit_status,
-          c_dismissed_warnings
+          c_dismissed_warnings,
+          c_too_activation_ceiling
         )
         VALUES (
           ${text_nonempty.opt},
@@ -452,7 +467,8 @@ object ProgramService {
           $bool,
           $existence,
           ${program_status.opt},
-          $_observation_validation_warning
+          $_observation_validation_warning,
+          ${too_activation.opt}
         )
         RETURNING c_program_id
       """.query(program_id).contramap { c => (
@@ -464,6 +480,7 @@ object ProgramService {
         c.existence,
         c.explicitStatus.toOption,
         c.dismissedWarnings.orEmpty,
+        c.tooActivationCeiling,
       )}
 
     /** Insert a calibration program, without a user for a staff program */

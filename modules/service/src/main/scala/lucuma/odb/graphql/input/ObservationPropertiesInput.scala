@@ -117,7 +117,7 @@ object ObservationPropertiesInput {
             rConstraintSet,
             (rTimingWindows, rScheduling).parFlatMapN {
               case (Some(_), Some(_)) => PleaseUseSchedulingField
-              case (Some(t), None)    => SchedulingConstraintsInput(None, Nullable.NonNull(t)).some.success
+              case (Some(t), None)    => SchedulingConstraintsInput(None, None, Nullable.NonNull(t)).some.success
               case (None,    s)       => s.success
             },
             rAttachments,
@@ -200,10 +200,10 @@ object ObservationPropertiesInput {
             rTargetEnvironment,
             rConstraintSet,
             (rTimingWindows, rScheduling).parFlatMapN {
-              case (Nullable.Null,       Nullable.Absent)     => Nullable.NonNull(SchedulingConstraintsInput(None, Nullable.Null)).success
+              case (Nullable.Null,       Nullable.Absent)     => Nullable.NonNull(SchedulingConstraintsInput(None, None, Nullable.Null)).success
               case (Nullable.Null,       Nullable.Null)       => Nullable.Null.success
               case (Nullable.Absent,     s)                   => s.success
-              case (Nullable.NonNull(t), Nullable.Absent)     => Nullable.NonNull(SchedulingConstraintsInput(None, Nullable.NonNull(t))).success
+              case (Nullable.NonNull(t), Nullable.Absent)     => Nullable.NonNull(SchedulingConstraintsInput(None, None, Nullable.NonNull(t))).success
               case _                                          => PleaseUseSchedulingField
             },
             rAttachments,

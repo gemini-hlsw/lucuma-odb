@@ -26,6 +26,7 @@ import lucuma.core.enums.GnirsFpuIfu
 import lucuma.core.enums.GnirsGrating
 import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.ObservingModeType
+import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.VisitorObservingModeType
 import lucuma.core.enums.WaterVapor
@@ -229,18 +230,20 @@ object configurationrequest:
         hc.downField("conditions").as[Conditions],
         hc.downField("target").as[Option[Either[Coordinates, Region]]], // may be missing
         hc.downField("observingMode").as[Option[ObservingMode]],
-        hc.downField("altairMode").as[Option[AltairMode]] // may be missing
+        hc.downField("altairMode").as[Option[AltairMode]], // may be missing
+        hc.downField("schedulingMode").as[SchedulingMode]
       ).tupled.flatMap:
-        case (conds, Some(coords), Some(mode), altair) => Right(Configuration(conds, coords, mode, altair))
-        case (conds, None, _, _)                       => Left(DecodingFailures.NoReferenceCoordinates)
-        case (conds, _, None, _)                       => Left(DecodingFailures.NoObservingMode)
+        case (conds, Some(coords), Some(mode), altair, sm) => Right(Configuration(conds, coords, mode, altair, sm))
+        case (conds, None, _, _, _)                        => Left(DecodingFailures.NoReferenceCoordinates)
+        case (conds, _, None, _, _)                        => Left(DecodingFailures.NoObservingMode)
 
     given Encoder[Configuration] = c =>
       Json.obj(
         "conditions" -> c.conditions.asJson,
         "target" -> c.target.asJson,
         "observingMode" -> c.observingMode.asJson,
-        "altairMode" -> c.altair.asJson
+        "altairMode" -> c.altair.asJson,
+        "schedulingMode" -> c.schedulingMode.asJson
       )
 
     given Decoder[ConfigurationRequest] = hc =>

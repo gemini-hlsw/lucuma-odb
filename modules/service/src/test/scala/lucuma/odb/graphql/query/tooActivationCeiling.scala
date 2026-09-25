@@ -7,6 +7,7 @@ package query
 import cats.effect.IO
 import cats.syntax.either.*
 import cats.syntax.option.*
+import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ExchangeObservingModeType
 import lucuma.core.enums.GeminiCallForProposalsType.RegularSemester
@@ -14,17 +15,22 @@ import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.TooActivation
 import lucuma.core.enums.TooActivation.Interrupting
 import lucuma.core.enums.TooActivation.Rapid
-import lucuma.core.enums.TooActivation.Standard
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
-import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
+import lucuma.odb.data.OdbError
 
 /**
- * The Target-of-Opportunity ceiling: an unset proposal-level activation is
- * derived as the maximum among the program's observations, frozen on
- * acceptance, and thereafter enforced against each observation.
+ * The Target-of-Opportunity activation an observation may reach: its program's
+ * ceiling.
+ *
+ * A program with no ceiling has no restriction.  Acceptance gives a program one
+ * if it has none -- `NONE` for classical, poor weather and Keck proposals, and
+ * otherwise the highest activation among its observations -- and staff may set
+ * or clear it on any program as a program property.
+ * A set ceiling is enforced whatever kind of program it is on.  A proposal type
+ * that ordinarily has no ToOs is only warned about until a ceiling is set.
  */
 class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
 
@@ -33,57 +39,6 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
   val service      = TestUsers.service(4)
 
   override val validUsers: List[User] = List(pi, staff)
-
-  /**
-   * Makes an observation derive `activation`.  The activation is no longer set
-   * directly: an observation is a Target of Opportunity exactly when its asterism
-   * holds an opportunity target, and how disruptive it may be follows from its
-   * scheduling mode.  So this adds the target and picks the mode that produces
-   * the wanted value.
-   */
-  private def deriveTooActivation(pid: Program.Id, oid: Observation.Id, activation: TooActivation): IO[Unit] =
-    val mode = activation match
-      case Standard           => SchedulingMode.Unconstrained
-      case Rapid              => SchedulingMode.Uninterruptible
-      case Interrupting       => SchedulingMode.Interrupting
-      case TooActivation.None => fail("no scheduling mode derives NONE")
-    for
-      tid <- createOpportunityTargetAs(pi, pid)
-      _   <- resolveOpportunityTargetAs(pi, tid)
-      _   <- addOpportunityTargetToAsterism(oid, tid)
-      _   <- setSchedulingModeAs(pi, oid, mode)
-    yield ()
-
-  private def addOpportunityTargetToAsterism(oid: Observation.Id, tid: Target.Id): IO[Unit] =
-    query(
-      pi,
-      s"""
-        mutation {
-          updateAsterisms(input: {
-            SET: { ADD: [ ${tid.asJson} ] }
-            WHERE: { id: { EQ: ${oid.asJson} } }
-          }) {
-            observations { id }
-          }
-        }
-      """
-    ).void
-
-  /** Sets the explicit ceiling, which after acceptance is what enforcement uses. */
-  private def setExplicitCeiling(pid: Program.Id, ceiling: TooActivation): IO[Unit] =
-    query(
-      staff,
-      s"""
-        mutation {
-          updateProposal(input: {
-            programId: "$pid"
-            SET: { gemini: { queue: { explicitTooActivationCeiling: ${ceiling.tag.toScreamingSnakeCase} } } }
-          }) {
-            proposal { gemini { ... on Queue { explicitTooActivationCeiling } } }
-          }
-        }
-      """
-    ).void
 
   private def schedulingMode(oid: Observation.Id): IO[SchedulingMode] =
     query(
@@ -97,36 +52,27 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
       """
     ).map(_.hcursor.downFields("observation", "schedulingConstraints", "schedulingMode").require[SchedulingMode])
 
-  private def proposalCeiling(pid: Program.Id): IO[TooActivation] =
+  private def observationActivation(oid: Observation.Id): IO[TooActivation] =
     query(
       pi,
       s"""
         query {
-          program(programId: ${pid.asJson}) {
-            proposal { gemini { ... on Queue { tooActivationCeiling } } }
+          observation(observationId: ${oid.asJson}) {
+            schedulingConstraints { tooActivation }
           }
         }
       """
-    ).map:
-      _.hcursor
-       .downFields("program", "proposal", "gemini", "tooActivationCeiling")
-       .require[TooActivation]
+    ).map(_.hcursor.downFields("observation", "schedulingConstraints", "tooActivation").require[TooActivation])
 
-  /** The explicit ceiling, which is null until acceptance freezes it. */
-  private def proposalExplicitCeiling(pid: Program.Id): IO[Option[TooActivation]] =
-    query(
-      pi,
-      s"""
-        query {
-          program(programId: ${pid.asJson}) {
-            proposal { gemini { ... on Queue { explicitTooActivationCeiling } } }
-          }
-        }
-      """
-    ).map:
-      _.hcursor
-       .downFields("program", "proposal", "gemini", "explicitTooActivationCeiling")
-       .require[Option[TooActivation]]
+  private def ceiling(pid: Program.Id): IO[Option[TooActivation]] =
+    query(pi, s"""query { program(programId: ${pid.asJson}) { tooActivationCeiling } }""")
+      .map(_.hcursor.downFields("program", "tooActivationCeiling").require[Option[TooActivation]])
+
+  private def summaries(pid: Program.Id): IO[(TooActivation, SchedulingMode)] =
+    query(pi, s"""query { program(programId: ${pid.asJson}) { maxTooActivation maxSchedulingMode } }""")
+      .map: js =>
+        val c = js.hcursor.downField("program")
+        (c.downField("maxTooActivation").require[TooActivation], c.downField("maxSchedulingMode").require[SchedulingMode])
 
   private def validationCodes(oid: Observation.Id): IO[List[String]] =
     query(
@@ -158,181 +104,358 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
       """
     ).map(_.hcursor.downFields("observation", "workflow", "value", "state").require[String])
 
-  /** A program with a proposal that leaves tooActivation unset, and one observation. */
-  private def setup(activation: TooActivation): IO[(Program.Id, Observation.Id)] =
+  private def flagged(pid: Program.Id, oid: Observation.Id): IO[Boolean] =
+    runObscalcUpdateAs(service, pid, oid) *> validationCodes(oid).map(_.contains("TOO_ACTIVATION_UNAPPROVED"))
+
+  private def warned(pid: Program.Id, oid: Observation.Id): IO[Boolean] =
+    runObscalcUpdateAs(service, pid, oid) *> validationCodes(oid).map(_.contains("TOO_ACTIVATION_UNEXPECTED"))
+
+  private val Classical: String = "classical: { minPercentTime: 50 }"
+
+  /**
+   * A program with a proposal (queue unless `proposalType` says otherwise) and one
+   * observation declaring `activation`.
+   */
+  private def setup(activation: TooActivation, proposalType: Option[String] = None): IO[(Program.Id, Observation.Id)] =
     for
       _ <- createUsers(pi, staff)
       c <- createGeminiCallForProposalsAs(staff, RegularSemester)
       p <- createProgramWithNonPartnerPi(pi, "ToO ceiling")
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _ <- deriveTooActivation(p, o, activation)
+      _ <- setTooActivationAs(pi, o, activation)
       _ <- computeItcResultAs(pi, o)
-      _ <- addProposal(pi, p, c.some)
-      _ <- addPartnerSplits(pi, p)
+      _ <- addProposal(pi, p, c.some, proposalType)
+      _ <- addPartnerSplits(pi, p, proposalType.fold("queue")(_.takeWhile(_ != ':')))
       _ <- addCoisAs(pi, p)
     yield (p, o)
 
-  test("an unset ceiling is derived from the program's observations"):
+  /** A program with no proposal and one observation declaring `activation`. */
+  private def setupWithoutProposal(activation: TooActivation): IO[(Program.Id, Observation.Id)] =
     for
-      (p, o) <- setup(Rapid)
-      too    <- proposalCeiling(p)
-    yield assertEquals(too, Rapid)
+      _ <- createUsers(pi, staff)
+      p <- createProgramAs(pi, "No proposal")
+      t <- createTargetWithProfileAs(pi, p)
+      o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _ <- setTooActivationAs(pi, o, activation)
+    yield (p, o)
 
-  test("the derived ceiling tracks the maximum, not the first"):
+  private def updateProgramQuery(pid: Program.Id, set: String): String =
+    s"""
+      mutation {
+        updatePrograms(input: {
+          SET: { $set }
+          WHERE: { id: { EQ: ${pid.asJson} } }
+        }) {
+          programs { id }
+        }
+      }
+    """
+
+  private def setCeilingQuery(pid: Program.Id, ceiling: Option[TooActivation]): String =
+    updateProgramQuery(pid, s"tooActivationCeiling: ${ceiling.fold("null")(_.tag.toScreamingSnakeCase)}")
+
+  private def createProgramWithCeilingQuery(ceiling: TooActivation): String =
+    s"""
+      mutation {
+        createProgram(input: { SET: { tooActivationCeiling: ${ceiling.tag.toScreamingSnakeCase} } }) {
+          program { tooActivationCeiling }
+        }
+      }
+    """
+
+  private def setCeiling(pid: Program.Id, ceiling: Option[TooActivation]): IO[Unit] =
+    query(staff, setCeilingQuery(pid, ceiling)).void
+
+  // -- Summaries ----------------------------------------------------------------
+
+  test("the program summarizes the highest activation and mode among its observations"):
     for
-      (p, o) <- setup(Standard)
+      (p, _) <- setup(Rapid)
       t      <- createTargetWithProfileAs(pi, p)
       o2     <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _      <- deriveTooActivation(p, o2, Interrupting)
-      too    <- proposalCeiling(p)
-    yield assertEquals(too, Interrupting)
+      _      <- setSchedulingModeAs(pi, o2, SchedulingMode.NoSplitting)
+      sums   <- summaries(p)
+    yield assertEquals(sums, (Rapid, SchedulingMode.Uninterruptible))
 
-  test("the ceiling is derived, not explicit, until the proposal is accepted"):
+  test("a program with no observations summarizes to the lowest levels"):
     for
-      (p, o) <- setup(Rapid)
-      before <- proposalExplicitCeiling(p)
-      _      <- acceptProposal(staff, p)
-      after  <- proposalExplicitCeiling(p)
+      _    <- createUsers(pi)
+      p    <- createProgramAs(pi, "Empty")
+      sums <- summaries(p)
+    yield assertEquals(sums, (TooActivation.None, SchedulingMode.Unconstrained))
+
+  // A summary of what the observations ask for, whatever the proposal type allows.
+  test("the activation summary is not capped by the proposal type"):
+    for
+      (p, _) <- setup(Rapid, Classical.some)
+      sums   <- summaries(p)
+    yield assertEquals(sums._1, Rapid)
+
+  // -- The default at acceptance -------------------------------------------------
+
+  test("a program has no ceiling until acceptance"):
+    for
+      (p, o) <- setup(Interrupting)
+      _      <- setProposalStatus(staff, p, "SUBMITTED")
+      too    <- ceiling(p)
+      flag   <- flagged(p, o)
     yield
-      assertEquals(before, None)            // derived from the observations
-      assertEquals(after,  Rapid.some)      // frozen into the explicit field
+      assertEquals(too, none)
+      assert(!flag)
 
-  test("acceptance freezes the ceiling, so a later observation cannot raise it"):
+  test("acceptance sets the ceiling to the highest activation among the observations"):
     for
-      (p, o) <- setup(Rapid)
+      (p, _) <- setup(Rapid)
       _      <- acceptProposal(staff, p)
-      before <- proposalCeiling(p)
-      t      <- createTargetWithProfileAs(pi, p)
-      o2     <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      // The mode goes first, while the asterism is still ordinary: the activation
-      // derives NONE, so the ceiling guard has nothing to object to.  Setting the
-      // mode after the opportunity target were added would be refused outright --
-      // which is the point of the guard, and why this reaches INTERRUPTING through
-      // the asterism instead.
-      _      <- setSchedulingModeAs(pi, o2, SchedulingMode.Interrupting)
-      tid    <- createOpportunityTargetAs(pi, p)
-      _      <- resolveOpportunityTargetAs(pi, tid)
-      _      <- addOpportunityTargetToAsterism(o2, tid)
-      after  <- proposalCeiling(p)
+      too    <- ceiling(p)
+    yield assertEquals(too, Rapid.some)
+
+  test("acceptance sets a classical proposal's ceiling to NONE"):
+    for
+      (p, o) <- setup(Rapid, Classical.some)
+      _      <- acceptProposal(staff, p)
+      too    <- ceiling(p)
+      flag   <- flagged(p, o)
     yield
-      assertEquals(before, Rapid)
-      assertEquals(after,  Rapid) // frozen: the new observation does not raise its own ceiling
+      assertEquals(too, TooActivation.None.some)
+      assert(flag, "expected the unapproved activation to be flagged")
 
-  // Raising the mode over the ceiling is refused outright now, so the only way
-  // to reach this state is for the ceiling to move beneath a settled observation.
-  // The validator still matters: the ceiling is not the only thing that can move.
-  test("an observation exceeding the frozen ceiling is flagged and cannot become ready"):
+  // Only a missing ceiling is filled in; one staff chose, say during review, stays.
+  test("acceptance keeps a ceiling staff already set"):
+    for
+      (p, _) <- setup(Rapid)
+      _      <- setCeiling(p, Interrupting.some)
+      _      <- acceptProposal(staff, p)
+      too    <- ceiling(p)
+    yield assertEquals(too, Interrupting.some)
+
+  // -- Enforcement ----------------------------------------------------------------
+
+  test("an activation within the ceiling is not flagged"):
     for
       (p, o) <- setup(Rapid)
       _      <- acceptProposal(staff, p)
-      _      <- setExplicitCeiling(p, Standard)
-      _      <- runObscalcUpdateAs(service, p, o)
-      codes  <- validationCodes(o)
+      flag   <- flagged(p, o)
+    yield assert(!flag)
+
+  test("an activation above the ceiling is flagged and cannot become ready"):
+    for
+      (p, o) <- setup(TooActivation.None)
+      _      <- acceptProposal(staff, p)
+      _      <- setTooActivationAs(pi, o, Rapid)
+      flag   <- flagged(p, o)
       state  <- workflowState(o)
     yield
-      assert(codes.contains("TOO_ACTIVATION_UNAPPROVED"), s"expected ceiling violation, got $codes")
+      assert(flag, "expected the unapproved activation to be flagged")
       assertEquals(state, "UNAPPROVED")
 
-  test("an observation at or below the frozen ceiling is not flagged"):
+  test("raising the ceiling clears the flag"):
     for
-      (p, o) <- setup(Rapid)
+      (p, o) <- setup(TooActivation.None)
       _      <- acceptProposal(staff, p)
-      _      <- setSchedulingModeAs(pi, o, SchedulingMode.Unconstrained)
-      _      <- runObscalcUpdateAs(service, p, o)
-      codes  <- validationCodes(o)
-    yield assert(!codes.contains("TOO_ACTIVATION_UNAPPROVED"), s"unexpected ceiling violation: $codes")
-
-  test("a PI may lower the mode after the ceiling moves beneath them, recovering the observation"):
-    for
-      (p, o)  <- setup(Rapid)
-      _       <- acceptProposal(staff, p)
-      _       <- setExplicitCeiling(p, Standard)
-      _       <- runObscalcUpdateAs(service, p, o)
-      before  <- validationCodes(o)
-      state   <- workflowState(o)
-      // UNAPPROVED is a pre-execution state, so the observation is still editable
-      // and the PI is not stranded above a ceiling they cannot come back under.
-      // It has to come all the way down to a compliant mode: while the derived
-      // activation is over the ceiling, any mode leaving it over is refused.
-      _       <- setSchedulingModeAs(pi, o, SchedulingMode.Unconstrained)
-      _       <- runObscalcUpdateAs(service, p, o)
-      after   <- validationCodes(o)
+      _      <- setTooActivationAs(pi, o, Rapid)
+      before <- flagged(p, o)
+      _      <- setCeiling(p, Rapid.some)
+      after  <- flagged(p, o)
     yield
-      assertEquals(state, "UNAPPROVED")
-      assert(before.contains("TOO_ACTIVATION_UNAPPROVED"), s"expected ceiling violation, got $before")
-      // The ceiling violation clears.  This fixture has no approved configuration,
-      // so the observation stays UNAPPROVED for that unrelated reason -- what is
-      // being pinned is that the ceiling no longer contributes.
-      assert(!after.contains("TOO_ACTIVATION_UNAPPROVED"), s"expected recovery, got $after")
+      assert(before)
+      assert(!after)
 
-  // -- The guard on direct mode edits ---------------------------------------
-
-  private def ceilingRefusal(oid: Observation.Id, activation: TooActivation, ceiling: TooActivation) =
-    List(
-      s"Cannot set the scheduling mode for observation $oid: Target of Opportunity activation ${activation.tag.toScreamingSnakeCase} exceeds the maximum ${ceiling.tag.toScreamingSnakeCase} allowed by the proposal."
-    ).asLeft
-
-  test("raising the mode above the frozen ceiling is refused"):
+  test("lowering the ceiling flags the observation"):
     for
       (p, o) <- setup(Rapid)
       _      <- acceptProposal(staff, p)
-      _      <- expect(pi, schedulingModeQuery(o, SchedulingMode.Interrupting), ceilingRefusal(o, Interrupting, Rapid))
+      _      <- setCeiling(p, TooActivation.None.some)
+      flag   <- flagged(p, o)
+    yield assert(flag, "expected the unapproved activation to be flagged")
+
+  test("clearing the ceiling lifts the restriction"):
+    for
+      (p, o) <- setup(TooActivation.None)
+      _      <- acceptProposal(staff, p)
+      _      <- setTooActivationAs(pi, o, Interrupting)
+      before <- flagged(p, o)
+      _      <- setCeiling(p, none)
+      after  <- flagged(p, o)
+      too    <- ceiling(p)
+    yield
+      assert(before)
+      assert(!after)
+      assertEquals(too, none)
+
+  test("a PI may lower the activation to recover the observation"):
+    for
+      (p, o)  <- setup(TooActivation.None)
+      _       <- acceptProposal(staff, p)
+      _       <- setTooActivationAs(pi, o, Rapid)
+      before  <- flagged(p, o)
+      _       <- setTooActivationAs(pi, o, TooActivation.None)
+      after   <- flagged(p, o)
+    yield
+      assert(before)
+      assert(!after)
+
+  test("a program without a proposal has no ceiling and no restriction"):
+    for
+      (p, o) <- setupWithoutProposal(Interrupting)
+      too    <- ceiling(p)
+      flag   <- flagged(p, o)
+    yield
+      assertEquals(too, none)
+      assert(!flag)
+
+  test("a ceiling set on a program without a proposal is enforced"):
+    for
+      (p, o) <- setupWithoutProposal(Rapid)
+      _      <- setCeiling(p, TooActivation.None.some)
+      flag   <- flagged(p, o)
+    yield assert(flag, "expected the unapproved activation to be flagged")
+
+  // -- Setting the ceiling ----------------------------------------------------------
+
+  test("a PI may not set the ceiling"):
+    for
+      (p, _) <- setup(Rapid)
+      _      <- expectOdbError(
+                  user     = pi,
+                  query    = setCeilingQuery(p, Interrupting.some),
+                  expected = { case OdbError.NotAuthorized(_, _) => () }
+                )
     yield ()
 
-  test("the refusal leaves the observation untouched"):
+  test("editing other program properties leaves the ceiling alone"):
     for
-      (p, o) <- setup(Rapid)
-      _      <- acceptProposal(staff, p)
-      before <- schedulingMode(o)
-      _      <- expect(pi, schedulingModeQuery(o, SchedulingMode.Interrupting), ceilingRefusal(o, Interrupting, Rapid))
-      after  <- schedulingMode(o)
-    yield
-      // The check runs after the update inside the transaction, so a violation
-      // has to roll the whole thing back rather than leave it half applied.
-      assertEquals(before, SchedulingMode.Uninterruptible)
-      assertEquals(after, before)
+      (p, _) <- setup(Rapid)
+      _      <- setCeiling(p, Interrupting.some)
+      _      <- query(staff, updateProgramQuery(p, "name: \"Renamed\""))
+      too    <- ceiling(p)
+    yield assertEquals(too, Interrupting.some)
 
-  test("a mode at or below the frozen ceiling is accepted"):
+  test("staff may create a program with a ceiling"):
+    for
+      _ <- createUsers(staff)
+      _ <- expect(
+             staff,
+             createProgramWithCeilingQuery(Rapid),
+             json"""{ "createProgram": { "program": { "tooActivationCeiling": "RAPID" } } }""".asRight
+           )
+    yield ()
+
+  test("a PI may not create a program with a ceiling"):
+    for
+      _ <- createUsers(pi)
+      _ <- expectOdbError(
+             user     = pi,
+             query    = createProgramWithCeilingQuery(Rapid),
+             expected = { case OdbError.NotAuthorized(_, _) => () }
+           )
+    yield ()
+
+  test("staff may grant a ToO ceiling to a classical program"):
+    for
+      (p, o) <- setup(Rapid, Classical.some)
+      _      <- acceptProposal(staff, p)
+      _      <- setCeiling(p, Rapid.some)
+      flag   <- flagged(p, o)
+    yield assert(!flag)
+
+  // -- Raising the activation ------------------------------------------------------
+
+  // Only a Ready observation is refused a raise (see tooTriggerActivation); a
+  // Defined one simply goes Unapproved until staff raise the ceiling.
+  test("a Defined observation may be raised above the ceiling"):
     for
       (p, o) <- setup(Rapid)
       _      <- acceptProposal(staff, p)
+      _      <- setTooActivationAs(pi, o, Interrupting)
+      act    <- observationActivation(o)
+      flag   <- flagged(p, o)
+    yield
+      assertEquals(act, Interrupting)
+      assert(flag, "expected the unapproved activation to be flagged")
+
+  test("the mode is free again once the activation is lowered"):
+    for
+      (p, o) <- setup(Rapid)
+      _      <- acceptProposal(staff, p)
+      // Every ToO is UNINTERRUPTIBLE, so the mode is only free once the
+      // observation stops being one.
+      _      <- setTooActivationAs(pi, o, TooActivation.None)
       _      <- setSchedulingModeAs(pi, o, SchedulingMode.Unconstrained)
       mode   <- schedulingMode(o)
     yield assertEquals(mode, SchedulingMode.Unconstrained)
 
-  test("the ceiling does not constrain the mode before it is frozen"):
-    for
-      (p, o) <- setup(Rapid)
-      // No acceptance, so no explicit ceiling.  The derived one is the maximum
-      // over the program's own observations, which this edit is raising -- checking
-      // against it would refuse a PI for describing their own proposal.
-      _      <- setSchedulingModeAs(pi, o, SchedulingMode.Interrupting)
-      mode   <- schedulingMode(o)
-      too    <- proposalCeiling(p)
-    yield
-      assertEquals(mode, SchedulingMode.Interrupting)
-      assertEquals(too, Interrupting)
-
-  test("a non-ToO observation may take any mode, whatever the ceiling"):
+  test("a non-ToO observation may take any mode"):
     for
       (p, o) <- setup(Rapid)
       _      <- acceptProposal(staff, p)
       t      <- createTargetWithProfileAs(pi, p)
       o2     <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      // No opportunity target, so the activation derives NONE whatever the mode.
-      // INTERRUPTING is invalid for a different reason -- it needs a ToO target --
-      // but that is the workflow's business, not the ceiling's.
+      // Born NONE, like every new observation, which is what a monitoring or
+      // follow-up observation alongside a ToO wants.  The mode is the other axis:
+      // an ordinary observation that must not be disturbed is ordinary science.
       _      <- setSchedulingModeAs(pi, o2, SchedulingMode.Uninterruptible)
       mode   <- schedulingMode(o2)
-    yield assertEquals(mode, SchedulingMode.Uninterruptible)
+      act    <- observationActivation(o2)
+    yield
+      assertEquals(mode, SchedulingMode.Uninterruptible)
+      assertEquals(act, TooActivation.None)
 
-  // -- Exchange proposals ----------------------------------------------------
+
+  // -- Proposal types that ordinarily have no ToOs --------------------------------
+
+  // Staff may grant one, so the activation is not refused; the PI is warned
+  // instead, before acceptance limits it to NONE.
+  test("a ToO in a classical proposal is warned about, not refused"):
+    for
+      (p, o) <- setup(Rapid, Classical.some)
+      act    <- observationActivation(o)
+      warn   <- warned(p, o)
+      flag   <- flagged(p, o)
+    yield
+      assertEquals(act, Rapid)
+      assert(warn, "expected the unexpected activation to be warned about")
+      assert(!flag)
+
+  test("the warning gives way once a ceiling is set"):
+    for
+      (p, o) <- setup(Rapid, Classical.some)
+      _      <- setCeiling(p, Rapid.some)
+      warn   <- warned(p, o)
+    yield assert(!warn)
+
+  test("a ToO in an ordinary queue proposal draws no warning"):
+    for
+      (p, o) <- setup(Rapid)
+      warn   <- warned(p, o)
+    yield assert(!warn)
+
+  // Changing the proposal type does not touch the observations, so the warning is
+  // what catches a ToO left behind in a type that ordinarily has none.
+  test("a ToO left behind by a change to classical is warned about"):
+    for
+      (p, o) <- setup(Rapid)
+      _      <- query(
+                  pi,
+                  s"""
+                    mutation {
+                      updateProposal(input: {
+                        programId: "$p"
+                        SET: { gemini: { classical: { } } }
+                      }) { proposal { category } }
+                    }
+                  """
+                )
+      warn   <- warned(p, o)
+    yield assert(warn, "expected the unexpected activation to be warned about")
+
+  // -- Exchange proposals --------------------------------------------------------
   //
-  // A Subaru proposal derives and freezes its ceiling exactly like a Gemini one.
-  // It used to be capped at NONE instead, on the theory that a non-Gemini
-  // observatory may not have ToOs, so every exchange ToO sat at UNAPPROVED
-  // forever.  Keck is still capped: nobody has asked for ToOs there.  See V1286.
+  // Subaru adopted our nomenclature, so an rToO is RAPID.  What Subaru calls an
+  // sToO -- observed whenever convenient once its event arrives -- is NONE here,
+  // exactly as it is at Gemini.  A Subaru program's ceiling works like any other.
+  // Keck proposals ordinarily have no ToOs: nobody has asked for them there.
 
   private def validTransitions(oid: Observation.Id): IO[List[String]] =
     query(
@@ -349,7 +472,7 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
        .downFields("observation", "workflow", "value", "validTransitions")
        .require[List[String]]
 
-  /** An exchange program with one exchange observation deriving `activation`. */
+  /** An exchange program with one exchange observation declaring `activation`. */
   private def exchangeSetup(
     mode:       ExchangeObservingModeType,
     activation: TooActivation
@@ -375,64 +498,47 @@ class tooActivationCeiling extends OdbSuite with TooTriggerSetupOperations:
            """)
       t <- createTargetWithProfileAs(pi, p)
       o <- createExchangeModeObservationAs(pi, p, mode, t)
-      _ <- deriveTooActivation(p, o, activation)
+      _ <- setTooActivationAs(pi, o, activation)
       _ <- addCoisAs(pi, p)
     yield (p, o)
 
   private def subaruSetup(activation: TooActivation): IO[(Program.Id, Observation.Id)] =
     exchangeSetup(ExchangeObservingModeType.ExchangeSubaru, activation)
 
-  // Subaru adopted our nomenclature, so an sToO is a ToO target under an
-  // ordinary scheduling mode and an rToO is one under UNINTERRUPTIBLE.
-  List(Standard, Rapid).foreach: activation =>
-    test(s"a Subaru exchange ${activation.tag} ToO is not flagged"):
-      for
-        (p, o) <- subaruSetup(activation)
-        _      <- runObscalcUpdateAs(service, p, o)
-        codes  <- validationCodes(o)
-        state  <- workflowState(o)
-      yield
-        assert(!codes.contains("TOO_ACTIVATION_UNAPPROVED"), s"unexpected ceiling violation: $codes")
-        assertEquals(state, "DEFINED")
-
-  // Only Subaru asked for this.  A Keck proposal is still capped at NONE, so its
-  // ToO is flagged exactly as a Subaru one used to be -- the restriction is a
-  // one-line predicate change away if Keck ever asks.
-  test("a Keck exchange ToO is still flagged"):
+  test("a Subaru exchange rapid ToO is neither flagged nor warned about"):
     for
-      (p, o) <- exchangeSetup(ExchangeObservingModeType.ExchangeKeck, Standard)
-      _      <- runObscalcUpdateAs(service, p, o)
-      codes  <- validationCodes(o)
+      (p, o) <- subaruSetup(Rapid)
+      flag   <- flagged(p, o)
+      warn   <- warned(p, o)
       state  <- workflowState(o)
     yield
-      assert(codes.contains("TOO_ACTIVATION_UNAPPROVED"), s"expected ceiling violation, got $codes")
-      assertEquals(state, "UNAPPROVED")
+      assert(!flag)
+      assert(!warn)
+      assertEquals(state, "DEFINED")
 
-  // The other half of the requirement: defining one is supported, triggering it
-  // is not.  Requesting a trigger is what setting an observation READY means, and
-  // exchange observations have no such lifecycle -- they execute at Subaru.
+  test("a Subaru exchange ToO is held to the ceiling like any other"):
+    for
+      (p, o)  <- subaruSetup(Rapid)
+      _       <- acceptProposal(staff, p)
+      within  <- flagged(p, o)
+      _       <- setTooActivationAs(pi, o, Interrupting)
+      above   <- flagged(p, o)
+    yield
+      assert(!within)
+      assert(above, "expected the unapproved activation to be flagged")
+
+  test("a Keck exchange ToO is warned about, not refused"):
+    for
+      (p, o) <- exchangeSetup(ExchangeObservingModeType.ExchangeKeck, Rapid)
+      warn   <- warned(p, o)
+    yield assert(warn, "expected the unexpected activation to be warned about")
+
+  // Defining one is supported, triggering it is not.  Requesting a trigger is
+  // what setting an observation READY means, and exchange observations have no
+  // such lifecycle -- they execute at Subaru.
   test("a Subaru exchange ToO is still never offered READY"):
     for
       (p, o) <- subaruSetup(Rapid)
       _      <- runObscalcUpdateAs(service, p, o)
       ts     <- validTransitions(o)
     yield assertEquals(ts, List("INACTIVE"))
-
-  // The ceiling a Subaru proposal derives is the maximum over its own
-  // observations, so submitting an sToO and coming back for an rToO after
-  // acceptance is refused -- the same escalation, and the same refusal, a Gemini
-  // PI gets.  Under the old cap the refusal was there too, but against a ceiling
-  // of NONE, so it fired on the sToO itself.
-  test("a Subaru exchange proposal freezes the ceiling its observations derived"):
-    for
-      (p, o) <- subaruSetup(Standard)
-      _      <- acceptProposal(staff, p)
-      _      <- expect(pi, schedulingModeQuery(o, SchedulingMode.Uninterruptible), ceilingRefusal(o, Rapid, Standard))
-      // ... and everything at or below what was proposed still moves freely.
-      _      <- setSchedulingModeAs(pi, o, SchedulingMode.NoSplitting)
-      mode   <- schedulingMode(o)
-      _      <- runObscalcUpdateAs(service, p, o)
-      codes  <- validationCodes(o)
-    yield
-      assertEquals(mode, SchedulingMode.NoSplitting)
-      assert(!codes.contains("TOO_ACTIVATION_UNAPPROVED"), s"unexpected ceiling violation: $codes")

@@ -38,10 +38,26 @@ object PdfSummaryJobPayload:
   def build(program: Json, observations: List[Json], attachments: List[AttachmentUrl]): Json =
     Json.obj(
       "schemaVersion" -> SchemaVersion.asJson,
-      "program"       -> Json.obj("data" -> Json.obj("program" -> program)),
+      "program"       -> Json.obj("data" -> Json.obj("program" -> tooActivationForRenderer(program))),
       "observations"  -> observations.asJson,
       "attachments"   -> attachments.asJson
     )
+
+  /**
+   * The renderer reads the ToO activation from `proposal.gemini.tooActivationCeiling`,
+   * where it lived before moving to the program, as `maxTooActivation`.  It is moved
+   * back there so the renderer's input is unchanged until it reads the program's
+   * field itself.
+   */
+  private def tooActivationForRenderer(program: Json): Json =
+    val c   = program.hcursor
+    val max = c.downField("maxTooActivation").focus.getOrElse(Json.Null)
+    c.downField("proposal")
+     .downField("gemini")
+     .withFocus(_.mapObject(_.add("tooActivationCeiling", max)))
+     .top
+     .getOrElse(program)
+     .mapObject(_.remove("maxTooActivation"))
 
   /**
    * One operation with two root selections.  The `program` selection is the
@@ -63,6 +79,7 @@ query PdfSummaryJobPayload($$programId: ProgramId!) {
     id
     name
     description
+    maxTooActivation
     active {
       start
       end
@@ -161,22 +178,18 @@ fragment Proposal on Proposal {
     }
 
     ... on DemoScience {
-      tooActivationCeiling
       minPercentTime
     }
 
     ... on DirectorsTime {
-      tooActivationCeiling
       minPercentTime
     }
 
     ... on FastTurnaround {
-      tooActivationCeiling
       minPercentTime
     }
 
     ... on LargeProgram {
-      tooActivationCeiling
       minPercentTime
       totalTime { hours }
       aeonMultiFacility { requiredInstruments }
@@ -188,7 +201,6 @@ fragment Proposal on Proposal {
     }
 
     ... on Queue {
-      tooActivationCeiling
       minPercentTime
       partnerSplits {
         partner
@@ -202,7 +214,6 @@ fragment Proposal on Proposal {
     }
 
     ... on SystemVerification {
-      tooActivationCeiling
       minPercentTime
     }
   }

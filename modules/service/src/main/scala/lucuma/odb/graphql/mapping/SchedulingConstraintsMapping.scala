@@ -21,7 +21,6 @@ trait SchedulingConstraintsMapping[F[_]]
       SqlField("id", ObservationView.Id, key = true, hidden = true),
       SqlField("tooActivation", ObservationView.TooActivation),
       SqlField("schedulingMode", ObservationView.SchedulingMode),
-      SqlField("isSplittable", ObservationView.IsSplittable),
       SqlObject("timingWindows", Join(ObservationView.Id, TimingWindowView.ObservationId))
     )
 

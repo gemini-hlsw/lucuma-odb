@@ -43,7 +43,6 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
       val ConfigurationAltairMode: ColumnRef = col("c_configuration_altair_mode", altair_mode.opt)
 
       val SchedulingMode: ColumnRef        = col("c_scheduling_mode",           scheduling_mode)
-      val IsSplittable: ColumnRef          = col("c_is_splittable",             bool)
 
       val AcquisitionSequenceIsMaterialized: ColumnRef =
         col("c_acquisition_sequence_is_materialized", bool)
