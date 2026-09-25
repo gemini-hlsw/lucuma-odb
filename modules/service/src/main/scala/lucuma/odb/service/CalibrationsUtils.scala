@@ -7,6 +7,7 @@ import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.Concurrent
 import cats.syntax.all.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ExecutionState
@@ -26,6 +27,8 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.syntax.timespan.*
+import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
 import lucuma.odb.data.Nullable
 import lucuma.odb.data.PosAngleConstraintMode
@@ -51,6 +54,7 @@ import lucuma.odb.service.CalibrationConfigSubset.*
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs
 import lucuma.odb.util.Codecs.*
+import lucuma.refined.*
 import org.typelevel.otel4s.trace.Tracer
 import skunk.AppliedFragment
 import skunk.Transaction
@@ -79,6 +83,39 @@ object ObsExtract:
       case c: Igrins2Config           => c.telluricType =!= TelluricType.NoTelluric
       case c: GnirsSpectroscopyConfig => c.telluricType =!= TelluricType.NoTelluric
       case _                          => true
+
+  /** Modes whose science observations are accompanied by tellurics. */
+  def modeTakesTelluric(mode: ObservingMode): Boolean =
+    mode match
+      case _: Flamingos2Config | _: Flamingos2MosConfig | _: Igrins2Config | _: GnirsSpectroscopyConfig => true
+      case _                                                                                           => false
+
+  /** Roughly one calibration epoch per this much science time. */
+  // TODO: This is a temporary value. In the future this will depend on the obs wavelength.
+  val CalibrationEpochInterval: TimeSpan = 90.minTimeSpan
+
+  /** Calibration epochs over the lifetime of an observation: ceil(scienceTime / interval). */
+  // TODO: This is a temporary value. In the future this will depend on the obs wavelength and duration
+  def calibrationEpochs(scienceTime: TimeSpan): NonNegInt =
+    NonNegInt.unsafeFrom:
+      math.ceil(scienceTime.toMicroseconds.toDouble / CalibrationEpochInterval.toMicroseconds.toDouble).toInt
+
+  /**
+   * Calibration carried in the time estimate.  Zero for calibration
+   * observations and for modes that take no telluric; independent of the
+   * telluric type, which only decides whether each epoch costs a telluric.
+   */
+  def calibrationCount(
+    mode:        ObservingMode,
+    role:        Option[CalibrationRole],
+    scienceTime: TimeSpan
+  ): NonNegInt =
+    if role.isDefined || !modeTakesTelluric(mode) then NonNegInt.MinValue
+    else calibrationEpochs(scienceTime)
+
+  /** Tellurics materialised for one visit: one after, or one before and one after for a long visit. */
+  def telluricsForVisit(visitTime: TimeSpan): NonNegInt =
+    if visitTime > TelluricTargetsService.MultiTelluricThreshold then 2.refined else 1.refined
 
   val PerProgramPerConfigCalibrationTypes = List(CalibrationRole.SpectroPhotometric, CalibrationRole.Twilight)
 

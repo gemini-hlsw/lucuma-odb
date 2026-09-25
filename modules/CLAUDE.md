@@ -35,9 +35,13 @@ sbt service/Test/compile
 ### Test
 
 ```bash
-sbt service/test
 sbt "service/testOnly lucuma.odb.graphql.mutation.createObservation_GnirsLongSlit"
 ```
+
+Never run the full `service/test` suite locally: it is far too heavy (hundreds of
+Testcontainers-backed suites) and CI runs it on every PR. Run only the suites you
+touched plus the one or two that exercise the same path, one `testOnly` per sbt
+invocation. Running several long suites in one command tends to exceed the shell timeout.
 
 ### Run service (hot-reload, port 8082)
 

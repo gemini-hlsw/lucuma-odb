@@ -11,8 +11,10 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.StepGuideState.Disabled
 import lucuma.core.enums.StepGuideState.Enabled
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
+import lucuma.odb.graphql.ACursorOps
 
 /**
  * Tests GNIRS LongSlit science sequence generation.  The default GNIRS
@@ -172,6 +174,80 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
         assert(continua.nonEmpty, "expected at least one Gcal step, found none")
         assert(continua.forall(_.isNull), s"expected no flat steps, got continua=$continua")
         assert(arcs.exists(a => a.asArray.exists(_.nonEmpty)), s"expected an arc step, got arcs=$arcs")
+
+  // (gcal sets, arc count, arc seconds, flat count, flat seconds, observing seconds, total seconds)
+  private def gcalBreakdown(pid: Program.Id, oid: Observation.Id): IO[(Int, Int, BigDecimal, Int, BigDecimal, BigDecimal, BigDecimal)] =
+    runObscalcUpdate(pid, oid) *>
+    query(
+      pi,
+      s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              digest {
+                value {
+                  science {
+                    gcalSets
+                    steps {
+                      arc     { count time { total { seconds } } }
+                      flat    { count time { total { seconds } } }
+                      science { time { total { seconds } } }
+                    }
+                    timeEstimate { total { seconds } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      """
+    ).map: js =>
+      val sci = js.hcursor.downFields("observation", "execution", "digest", "value", "science")
+      (
+        sci.downField("gcalSets").require[Int],
+        sci.downFields("steps", "arc", "count").require[Int],
+        sci.downFields("steps", "arc", "time", "total", "seconds").require[BigDecimal],
+        sci.downFields("steps", "flat", "count").require[Int],
+        sci.downFields("steps", "flat", "time", "total", "seconds").require[BigDecimal],
+        sci.downFields("steps", "science", "time", "total", "seconds").require[BigDecimal],
+        sci.downFields("timeEstimate", "total", "seconds").require[BigDecimal]
+      )
+
+  test("[gnirs] flat-only config: digest has flats, no arcs, and the parts sum to the estimate"):
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- configureGnirsThermalIr(o)
+      yield (p, o)
+
+    setup.flatMap: (pid, oid) =>
+      gcalBreakdown(pid, oid).map: (sets, arcN, arcT, flatN, flatT, obsT, total) =>
+        assertEquals(sets, 1)
+        assertEquals(arcN, 0)
+        assertEquals(arcT, BigDecimal(0))
+        assertEquals(flatN, 1)
+        assert(flatT > 0, s"expected flat time, got $flatT")
+        assertEquals(obsT + arcT + flatT, total)
+
+  test("[gnirs] arc-only config: digest has arcs, no flats, and the parts sum to the estimate"):
+    val setup: IO[(Program.Id, Observation.Id)] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGnirsLongSlitObservationAs(pi, p, t)
+        _ <- configureGnirsCrossDispersed(o, "LONG_BLUE")
+      yield (p, o)
+
+    setup.flatMap: (pid, oid) =>
+      gcalBreakdown(pid, oid).map: (sets, arcN, arcT, flatN, flatT, obsT, total) =>
+        assertEquals(sets, 1)
+        assert(arcN > 0, s"expected arc steps, got $arcN")
+        assert(arcT > 0, s"expected arc time, got $arcT")
+        assertEquals(flatN, 0)
+        assertEquals(flatT, BigDecimal(0))
+        assertEquals(obsT + arcT + flatT, total)
 
   test("[gnirs] 111/LXD short camera has neither flat nor arc -> sequence error"):
     // The 111/LXD rows exist only for the long camera (0.05"/pix), so the same

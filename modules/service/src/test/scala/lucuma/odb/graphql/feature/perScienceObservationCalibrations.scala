@@ -1573,7 +1573,7 @@ class perScienceObservationCalibrations
                           services.obscalcService.selectOne(oid).map:
                             _.flatMap(_.result)
                               .flatMap(_.digest)
-                              .map(d => d.science.timeEstimate.programTime |+| d.science.timeEstimate.nonCharged)
+                              .map(_.science.timeEstimate.sum)
       storedDur    <- selectMeta(telluricOid).map(_.map(_.scienceDuration))
     } yield {
       assert(obs.targetName.isDefined)
@@ -1598,6 +1598,7 @@ class perScienceObservationCalibrations
     yield
       assertEquals(meta.flatMap(_.resolvedTargetId), None)
       assertEquals(dig.map(_.fullTimeEstimate.sum), Generator.UnresolvedTelluricTime.some)
+      assertEquals(dig.map(_.science.steps.time), dig.map(_.science.timeEstimate), "the step digests must sum to the estimate")
 
   test("coordinate change triggers re-resolution with new hash"):
     val obsTime = Timestamp.fromInstantTruncated(when).get
@@ -1635,7 +1636,7 @@ class perScienceObservationCalibrations
       services.transactionally:
         services.obscalcService.selectExecutionDigest(oid).map:
           _.flatMap(_.value.toOption)
-            .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
+            .map(_.science.timeEstimate.sum)
 
   test("create two tellurics for long science"):
     for {

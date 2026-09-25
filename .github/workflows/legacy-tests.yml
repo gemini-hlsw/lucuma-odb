@@ -38,7 +38,23 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
-          cache: sbt
+          # No `cache: sbt`: only ci.yml writes the sbt cache. This job would save a partial
+          # one under the same key and leave CI downloading mid-test.
+
+      - name: Restore sbt cache (read-only, written by ci.yml)
+        if: matrix.java == 'temurin@25'
+        uses: actions/cache/restore@v6
+        with:
+          # Must be byte-for-byte what setup-java passes for `cache: sbt` on Linux, in this
+          # order: the cache "version" is a hash of this list, and a different list never matches.
+          path: |
+            /home/runner/.ivy2/cache
+            /home/runner/.sbt
+            /home/runner/.cache/coursier
+            !/home/runner/.sbt/*.lock
+            !/home/runner/**/ivydata-*.properties
+          key: setup-java-${{ runner.os }}-x64-sbt-${{ hashFiles('**/*.sbt', '**/project/build.properties', '**/project/**.scala', '**/project/**.sbt', '.github/workflows/ci.yml') }}
+          restore-keys: setup-java-${{ runner.os }}-x64-sbt-
 
       # Sharding is handled by sbt-test-shards (auto-enabled on every project), which reads
       # these two variables and filters the suites by name hash. Keep TEST_SHARD_COUNT in step

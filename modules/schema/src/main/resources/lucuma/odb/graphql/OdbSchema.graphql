@@ -9833,6 +9833,12 @@ type ObservationTimeEstimate {
   "Expected number of setups."
   setupCount: NonNegInt!
 
+  """
+  Expected number of calibration over the remaining science time.
+  Zero for calibration observations and for modes that take no callibrations per observation.
+  """
+  calibrationCount: NonNegInt!
+
   "Science sequence time estimate."
   science: CategorizedTime!
 
@@ -19423,6 +19429,37 @@ enum SequenceCommand {
   STOP
 }
 
+"Summary of the steps of one kind (bias, dark, arc, flat or science) in a sequence."
+type StepDigest {
+  "Number of steps."
+  count: NonNegInt!
+
+  "Time estimate for these steps, including any configuration change that precedes them."
+  time: CategorizedTime!
+}
+
+"""
+The steps of a sequence by step type, with GCAL steps split into arcs and
+flats.  The five digests partition the sequence, so their times sum to the
+sequence timeEstimate.
+"""
+type StepDigests {
+  "Steps of type BIAS."
+  bias: StepDigest!
+
+  "Steps of type DARK."
+  dark: StepDigest!
+
+  "GCAL and SmartGCAL arc steps."
+  arc: StepDigest!
+
+  "GCAL and SmartGCAL flat steps, including any whose lamp is not an arc."
+  flat: StepDigest!
+
+  "Steps of type SCIENCE, which includes acquisition exposures."
+  science: StepDigest!
+}
+
 type SequenceDigest {
   """
   ObserveClass of the whole sequence.
@@ -19444,6 +19481,16 @@ type SequenceDigest {
   and any remaining atoms not included in 'possibleFuture'.
   """
   atomCount: NonNegInt!
+
+  """
+  Number of GCAL sets: atoms that contain at least one GCAL step.  A set may
+  hold only a flat or only an arc, so this cannot be derived from the step
+  counts in 'steps'.
+  """
+  gcalSets: NonNegInt!
+
+  "Steps in the sequence by kind, with their counts and times."
+  steps: StepDigests!
 
   """
   Execution state for the sequence. Note, acquisition sequences are never

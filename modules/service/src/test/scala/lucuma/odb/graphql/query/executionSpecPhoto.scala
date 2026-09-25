@@ -55,6 +55,25 @@ class executionSpecPhoto extends ExecutionTestSupportForGmos {
         .downFields("observation", "execution", "digest", "value", "science", "timeEstimate", "total", "seconds")
         .require[BigDecimal]
 
+  // Count and time of the science sequence's science steps.
+  private def scienceObserving(oid: Observation.Id): IO[(Int, BigDecimal)] =
+    query(
+      user  = pi,
+      query = s"""
+        query {
+          observation(observationId: "$oid") {
+            execution {
+              digest {
+                value { science { steps { science { count time { total { seconds } } } } } }
+              }
+            }
+          }
+        }
+      """
+    ).map: json =>
+      val o = json.hcursor.downFields("observation", "execution", "digest", "value", "science", "steps", "science")
+      (o.downField("count").require[Int], o.downFields("time", "total", "seconds").require[BigDecimal])
+
   // Total time for the observation, setup included.
   private def totalTimeEstimate(oid: Observation.Id): IO[BigDecimal] =
     query(
@@ -99,9 +118,11 @@ class executionSpecPhoto extends ExecutionTestSupportForGmos {
         _   <- runObscalcUpdate(pid, oid)
         tot <- totalTimeEstimate(oid)
         sci <- scienceTimeEstimate(oid)
+        obs <- scienceObserving(oid)
       } yield
         assertEquals(tot, BigDecimal("1200.000000"))
         assertEquals(sci, BigDecimal("1200.000000"), "the whole charge is science; there is no setup to add")
+        assertEquals(obs, (0, BigDecimal("1200.000000")), "no steps, but the charge still lands in the science bucket")
     }
   }
 

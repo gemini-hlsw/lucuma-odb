@@ -242,6 +242,93 @@ class executionDigest extends ExecutionTestSupportForGmos {
         expected = successDigestResult.asRight
       )
 
+  test("digest - step breakdown"):
+    val setup: IO[Observation.Id] =
+      for
+        p <- createProgram
+        t <- createTargetWithProfileAs(pi, p)
+        o <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+        _ <- runObscalcUpdate(p, o)
+      yield o
+
+    def bucket(count: Int, seconds: BigDecimal): Json =
+      json"""
+        {
+          "count": $count,
+          "time": {
+            "program": { "seconds": ${seconds.asJson} },
+            "nonCharged": { "seconds": 0.000000 }
+          }
+        }
+      """
+
+    setup.flatMap: oid =>
+      expect(
+        user     = pi,
+        query    = s"""
+          query {
+            observation(observationId: "$oid") {
+              execution {
+                digest {
+                  value {
+                    acquisition {
+                      gcalSets
+                      steps {
+                        bias { count time { program { seconds } nonCharged { seconds } } }
+                        dark { count time { program { seconds } nonCharged { seconds } } }
+                        arc { count time { program { seconds } nonCharged { seconds } } }
+                        flat { count time { program { seconds } nonCharged { seconds } } }
+                      }
+                    }
+                    science {
+                      gcalSets
+                      steps {
+                        bias { count time { program { seconds } nonCharged { seconds } } }
+                        dark { count time { program { seconds } nonCharged { seconds } } }
+                        arc { count time { program { seconds } nonCharged { seconds } } }
+                        flat { count time { program { seconds } nonCharged { seconds } } }
+                        science { count time { program { seconds } nonCharged { seconds } } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """,
+        expected = json"""
+          {
+            "observation": {
+              "execution": {
+                "digest": {
+                  "value": {
+                    "acquisition": {
+                      "gcalSets": 0,
+                      "steps": {
+                        "bias": ${bucket(0, "0".sec)},
+                        "dark": ${bucket(0, "0".sec)},
+                        "arc": ${bucket(0, "0".sec)},
+                        "flat": ${bucket(0, "0".sec)}
+                      }
+                    },
+                    "science": {
+                      "gcalSets": 4,
+                      "steps": {
+                        "bias": ${bucket(0, "0".sec)},
+                        "dark": ${bucket(0, "0".sec)},
+                        "arc": ${bucket(4, "67.1".sec * 4)},
+                        "flat": ${bucket(4, "57.1".sec * 4)},
+                        "science": ${bucket(10, ScienceTime)}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """.asRight
+      )
+
   test("digest - deprecated state field still works"):
     val setup: IO[Observation.Id] =
       for
