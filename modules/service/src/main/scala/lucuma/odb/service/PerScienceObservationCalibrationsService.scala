@@ -360,8 +360,8 @@ object PerScienceObservationCalibrationsService:
               pResult <- syncDaytimePinhole(pid, obs, gid)
             yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
 
-      // Used when no science S/N can be derived.
-      private val FallbackTelluricSN = SignalToNoise.fromInt(100).get
+      // A telluric's S/N floor, also used when no science S/N can be derived.
+      private val MinTelluricSN = SignalToNoise.fromInt(100).get
 
       // The largest value that still fits once doubled.
       private val MaxUndoubledSN = SignalToNoise.Max.toBigDecimal / 2
@@ -406,7 +406,7 @@ object PerScienceObservationCalibrationsService:
           etm:      ExposureTimeMode,
           measured: Option[SignalToNoise]
         ): ExposureTimeMode.SignalToNoiseMode =
-          ExposureTimeMode.SignalToNoiseMode(scienceSN(etm, measured).fold(FallbackTelluricSN)(doubled), etm.at)
+          ExposureTimeMode.SignalToNoiseMode(scienceSN(etm, measured).fold(MinTelluricSN)(doubled), etm.at)
 
         // One telluric configuration per science wavelength: sized from the deepest of the
         // group, at the average of their S/N wavelengths.
@@ -416,7 +416,7 @@ object PerScienceObservationCalibrationsService:
           val sn = group.toList
             .flatMap((etm, m) => scienceSN(etm, m))
             .maximumByOption(_.toBigDecimal)
-            .fold(FallbackTelluricSN)(doubled)
+            .fold(MinTelluricSN)(doubled)
           val at = group.map(_._1.at.toPicometers.value.value.toLong).sumAll
           val pm = ((at + group.size / 2) / group.size).toInt
           ExposureTimeMode.SignalToNoiseMode(sn, PosInt.from(pm).map(Wavelength(_)).getOrElse(group.head._1.at))
@@ -458,14 +458,22 @@ object PerScienceObservationCalibrationsService:
             .mapValues(g => groupedTelluricEtm(g.map((etm, m, _) => (etm, m))))
             .toMap
           val deepest  = byIndex.maxByOption(_.value.toBigDecimal)
+          
+          def telluricFloor(etm: ExposureTimeMode.SignalToNoiseMode): ExposureTimeMode.SignalToNoiseMode =
+            if etm.value < MinTelluricSN
+            then etm.copy(value = MinTelluricSN)
+            else etm
+
           calibrationRole match
-            case CalibrationRole.Telluric => ((_, w) => byLambda.get(w), deepest)
-            case _                        => ((i, _) => byIndex.lift(i), deepest)
+            case CalibrationRole.Telluric =>
+              ((_, w) => byLambda.get(w).map(telluricFloor), deepest.map(telluricFloor))
+            case _                        => 
+              ((i, _) => byIndex.lift(i), deepest)
 
         for {
           // Cloning copied the PI's c_is_explicit; the writes below skip unchanged values.
           _          <- exposureTimeModeService
-                          .setDerived(List(telluricOid), ExposureTimeModeRole.Science, FallbackTelluricSN)
+                          .setDerived(List(telluricOid), ExposureTimeModeRole.Science, MinTelluricSN)
           allEtm     <- exposureTimeModeService
                            .select(List(scienceOid, telluricOid), ExposureTimeModeRole.Acquisition)
           allAcqEtm   = allEtm.collect:

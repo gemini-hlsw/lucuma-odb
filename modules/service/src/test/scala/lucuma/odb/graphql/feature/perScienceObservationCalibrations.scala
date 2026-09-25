@@ -168,9 +168,12 @@ class perScienceObservationCalibrations
 
   // The fake ITC measures the ticket's S/N of 116, so a telluric sized from it lands at 232.
   override def fakeSignalToNoiseAt(w: Wavelength): SignalToNoiseAt =
-    // 116 everywhere but 1650nm, which measures 50, so per-wavelength sizing is visible.
+    // 116 everywhere but 1650nm, which measures 50, so per-wavelength sizing is visible,
+    // and 1550nm, which measures 30, so the telluric minimum is used.
     val total =
-      if w === Wavelength.fromIntNanometers(1650).get then 50 else 116
+      if w === Wavelength.fromIntNanometers(1650).get then 50
+      else if w === Wavelength.fromIntNanometers(1550).get then 30
+      else 116
     SignalToNoiseAt(
       w,
       SingleSN(SignalToNoise.unsafeFromBigDecimalExact(58)),
@@ -1956,8 +1959,8 @@ class perScienceObservationCalibrations
       telOpt <- selectTelluricObservationFor(oid)
       sns    <- telOpt.traverse(scienceEtmSignalToNoise)
     } yield
-      // 2 x the live S/N 10, not the superseded 500.
-      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(20).some).some)
+      // 2 x the live S/N 10 raised to the floor, not 2 x the superseded 500.
+      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(100).some).some)
 
   // Regression: a telluric 'initial' row at a wavelength the science has since changed must
   // follow its own 'current' row, not the deepest science leg.
@@ -1980,12 +1983,13 @@ class perScienceObservationCalibrations
       telOpt <- selectTelluricObservationFor(oid)
       rows   <- telOpt.traverse(gnirsWavelengthRows)
     } yield
-      // The cloned initial 1650 row carries the current 1700 row's 20, not the deepest 232.
+      // The cloned initial 1650 row carries the current 1700 row's floored 100, not the
+      // deepest 232.
       val expected = List(
         ("current", 0, 1600, 1, 232, 1600),
-        ("current", 1, 1700, 1, 20, 1700),
+        ("current", 1, 1700, 1, 100, 1700),
         ("initial", 0, 1600, 1, 232, 1600),
-        ("initial", 1, 1650, 1, 20, 1700)
+        ("initial", 1, 1650, 1, 100, 1700)
       )
       assertEquals(rows.map(_.sortBy(_._1)), expected.some)
 
@@ -2010,6 +2014,72 @@ class perScienceObservationCalibrations
       )
       assertEquals(rows.map(_.sortBy(_._1)), expected.some)
 
+  test("telluric sn is at least 100 when science requests less"):
+    for {
+      pid          <- createProgramAs(pi)
+      tid          <- createTargetWithProfileAs(pi, pid)
+      oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _            <- setScienceRequirements(oid, DefaultSnAt, 30.0)
+      _            <- runObscalcUpdate(pid, oid)
+      _            <- recalculateCalibrations(pid, when, oid)
+      telluricOid  <- selectTelluricObservationFor(oid).map(_.get)
+      telluricEtms <- queryAllEtms(telluricOid)
+    } yield
+      // 2 x 30 is 60, raised to the floor.
+      assertEquals(telluricEtms.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(100).some)
+
+  test("telluric sn is at least 100 when the ITC measures less for txc science"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsXdObservationAs(pi, pid, tid, wavelengthsNm = List(1550))
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      sns    <- telOpt.traverse(scienceEtmSignalToNoise)
+    } yield
+      // The ITC measures 30 at 1550nm; 2 x 30 is 60, raised to the floor.
+      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(100).some).some)
+
+  test("telluric sn floor applies to a collapsed wavelength group"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsShallowSnObservationAs(pi, pid, tid)
+      _      <- setGnirsCentralWavelengths(oid,
+                  """{ centralWavelength: { nanometers: 1650 }
+                       exposureTimeMode: { signalToNoise: { value: 10 at: { nanometers: 1650 } } } }
+                     { centralWavelength: { nanometers: 1650 }
+                       exposureTimeMode: { signalToNoise: { value: 20 at: { nanometers: 1650 } } } }
+                     { centralWavelength: { nanometers: 1600 }
+                       exposureTimeMode: { timeAndCount: { time: { seconds: 30.0 } count: 3 at: { nanometers: 1600 } } } }""")
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      telOpt <- selectTelluricObservationFor(oid)
+      rows   <- telOpt.traverse(gnirsWavelengthRows)
+    } yield
+      // The deepest 1650 leg asks for 20; 2 x 20 is 40, raised to the floor.
+      assertEquals(
+        rows.map(_.filter(_._1 === "current").map(r => (r._3, r._5))),
+        List((1650, 100), (1600, 232)).some
+      )
+
+  test("daytime pinhole sn has no floor"):
+    for {
+      pid    <- createProgramAs(pi)
+      tid    <- createTargetWithProfileAs(pi, pid)
+      _      <- seedGnirsXdSmartGcal
+      oid    <- createGnirsShallowSnObservationAs(pi, pid, tid)
+      _      <- runObscalcUpdate(pid, oid)
+      _      <- recalculateCalibrations(pid, when, oid)
+      pinOpt <- selectDaytimePinholeObservationFor(oid)
+      sns    <- pinOpt.traverse(scienceEtmSignalToNoise)
+    } yield
+      // 2 x the requested 10; the floor is for tellurics only.
+      assertEquals(sns.map(_.distinct), List(SignalToNoise.unsafeFromBigDecimalExact(20).some).some)
+
   test("telluric etm is updated when science etm changes"):
     val wavelength1 = Wavelength.fromIntNanometers(500).get
     val wavelength2 = Wavelength.fromIntNanometers(600).get
@@ -2018,7 +2088,7 @@ class perScienceObservationCalibrations
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
       oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _            <- setScienceRequirements(oid, wavelength1, 40.0)
+      _            <- setScienceRequirements(oid, wavelength1, 60.0)
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when, oid)
       obs          <- queryObservation(oid)
@@ -2027,14 +2097,14 @@ class perScienceObservationCalibrations
       telluricOid  =  obsInGroup1.find(_.calibrationRole.contains(CalibrationRole.Telluric)).get.id
       telluricEtms1 <- queryAllEtms(telluricOid)
       // Update science to higher sn
-      _            <- setScienceRequirements(oid, wavelength2, 60.0)
+      _            <- setScienceRequirements(oid, wavelength2, 80.0)
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when, oid)
       telluricEtms2 <- queryAllEtms(telluricOid)
     } yield {
-      assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
+      assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(120).some)
       assertEquals(telluricEtms1.science.snWAt, wavelength1.some)
-      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(120).some)
+      assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(160).some)
       assertEquals(telluricEtms2.science.snWAt, wavelength2.some)
     }
 
@@ -2043,7 +2113,7 @@ class perScienceObservationCalibrations
       pid          <- createProgramAs(pi)
       tid          <- createTargetWithProfileAs(pi, pid)
       oid          <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
-      _            <- setScienceRequirements(oid, DefaultSnAt, 40.0)
+      _            <- setScienceRequirements(oid, DefaultSnAt, 60.0)
       _            <- runObscalcUpdate(pid, oid)
       _            <- recalculateCalibrations(pid, when, oid)
       obs          <- queryObservation(oid)
@@ -2057,7 +2127,7 @@ class perScienceObservationCalibrations
       _            <- recalculateCalibrations(pid, when, oid)
       telluricEtms2 <- queryAllEtms(telluricOid)
     } yield {
-      assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(80).some)
+      assertEquals(telluricEtms1.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(120).some)
       assertEquals(telluricEtms1.science.snWAt, Wavelength.fromIntNanometers(510))
       // Switching to time and count moves the telluric from the requested to the measured S/N.
       assertEquals(telluricEtms2.science.snValue, SignalToNoise.unsafeFromBigDecimalExact(232).some)
