@@ -273,7 +273,8 @@ object Science:
   end Generator
 
   private def exposureTimeTooLong(oid: Observation.Id, estimate: TimeSpan, maxSciencePeriod: TimeSpan): OdbError =
-    definitionError(oid, s"Estimated ABBA cycle time (${estimate.toMinutes} minutes) for $oid must be less than ${maxSciencePeriod.toMinutes} minutes.")
+    def minutes(t: TimeSpan): BigDecimal = t.toMinutes.setScale(2, BigDecimal.RoundingMode.HALF_UP)
+    definitionError(oid, s"Estimated ABBA cycle time (${minutes(estimate)} minutes) for $oid must be less than ${minutes(maxSciencePeriod)} minutes.")
 
   /**
    * @param modeName         observing mode name, for error messages
