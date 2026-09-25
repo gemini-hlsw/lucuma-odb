@@ -5,11 +5,11 @@ package lucuma.odb.sequence.flamingos2.spectroscopy
 
 import cats.syntax.option.*
 import lucuma.core.enums.Flamingos2ReadMode
-import lucuma.core.enums.Flamingos2SlitOffsetPreset
+import lucuma.core.enums.Flamingos2TelluricOffsetPreset
 import lucuma.core.model.Observation
 import lucuma.core.model.SlitTelescopeConfigs
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig as F2
-import lucuma.core.model.sequence.flamingos2.defaultSlitTelescopeConfigs
+import lucuma.core.model.sequence.flamingos2.defaultTelluricTelescopeConfigs
 import lucuma.odb.data.OdbError
 import lucuma.odb.sequence.data.ProtoStep
 
@@ -33,4 +33,4 @@ def zeroExposureTime(oid: Observation.Id, modeName: String): OdbError =
  * Nod pattern for the telluric standard of a MOS observation.
  */
 val MosTelluricTelescopeConfigs: SlitTelescopeConfigs =
-  defaultSlitTelescopeConfigs(Flamingos2SlitOffsetPreset.MosTelluric)
+  defaultTelluricTelescopeConfigs(Flamingos2TelluricOffsetPreset.MosTelluric)

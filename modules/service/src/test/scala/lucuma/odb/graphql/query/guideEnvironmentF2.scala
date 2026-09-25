@@ -204,7 +204,7 @@ class guideEnvironmentF2 extends ExecutionTestSupportForFlamingos2
       yield o
 
     setup.flatMap: oid =>
-      expect(pi, guideEnvironmentQuery(oid), expected = pwfs2Result)
+      expect(pi, guideEnvironmentQuery(oid), expected = flamingos2ImagingResult("Nonsidereal Target", GuideProbe.PWFS2, 100.0))
 
   test("Flamingos2 Imaging with oiwfs"):
     val setup: IO[Observation.Id] =

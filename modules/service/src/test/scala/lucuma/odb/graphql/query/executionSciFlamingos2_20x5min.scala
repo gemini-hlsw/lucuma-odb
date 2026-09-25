@@ -22,7 +22,7 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
   override def fakeItcSpectroscopyResult: IntegrationTime =
     IntegrationTime(ExposureTime, PosInt.unsafeFrom(20))
 
-  val abba = flamingos2ExpectedScienceAtom(ExposureTime, (0, 15, Enabled), (0, -15, Enabled), (0, -15, Enabled), (0, 15, Enabled))
+  val abba = flamingos2ExpectedScienceAtom(ExposureTime, (0, 10, Enabled), (0, -10, Enabled), (0, -10, Enabled), (0, 10, Enabled))
 
   test("simple generation"):
     val setup: IO[Observation.Id] =
@@ -45,10 +45,10 @@ class executionSciFlamingos2_20x5min extends ExecutionTestSupportForFlamingos2:
                   "possibleFuture" -> List(
                     abba,
                     abba,
-                    flamingos2ExpectedGcals((0, 15)),
+                    flamingos2ExpectedGcals((0, 10)),
                     abba,
                     abba,
-                    flamingos2ExpectedGcals((0, 15))
+                    flamingos2ExpectedGcals((0, 10))
                   ).asJson,
                   "hasMore" -> false.asJson
                 )

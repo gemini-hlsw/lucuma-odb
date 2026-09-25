@@ -1632,14 +1632,14 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
           { "offset": { "p": { "microarcseconds": 0, "arcseconds": 0.0 }, "q": { "microarcseconds":  -2500000, "arcseconds":  -2.5 } }, "guiding": "DISABLED" }
         ]
       }"""
-    val telluricDefault =
+    val nodAlongSlitDefault =
       json"""{
         "offsetMode": "NOD_ALONG_SLIT",
         "alongSlit": [
-          { "q": { "microarcseconds":  15000000, "arcseconds":  15.0 }, "guiding": "ENABLED" },
-          { "q": { "microarcseconds": -15000000, "arcseconds": -15.0 }, "guiding": "ENABLED" },
-          { "q": { "microarcseconds": -15000000, "arcseconds": -15.0 }, "guiding": "ENABLED" },
-          { "q": { "microarcseconds":  15000000, "arcseconds":  15.0 }, "guiding": "ENABLED" }
+          { "q": { "microarcseconds":  10000000, "arcseconds":  10.0 }, "guiding": "ENABLED" },
+          { "q": { "microarcseconds": -10000000, "arcseconds": -10.0 }, "guiding": "ENABLED" },
+          { "q": { "microarcseconds": -10000000, "arcseconds": -10.0 }, "guiding": "ENABLED" },
+          { "q": { "microarcseconds":  10000000, "arcseconds":  10.0 }, "guiding": "ENABLED" }
         ],
         "toSky": null
       }"""
@@ -1660,7 +1660,7 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
            Flamingos2Fpu.LongSlit2,
            explicitToSky,
            explicitToSky,
-           telluricDefault
+           nodAlongSlitDefault
           )
         )
       }
@@ -2400,10 +2400,10 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
                   "telescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" }
                     ],
                     "toSky": null
                   },
@@ -2411,10 +2411,10 @@ class createObservation extends OdbSuite with TelluricTypeGraphQLFormat with que
                   "defaultTelescopeConfigs": {
                     "offsetMode": "NOD_ALONG_SLIT",
                     "alongSlit": [
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": -15.000000 }, "guiding": "ENABLED" },
-                      { "q": { "arcseconds": 15.000000 }, "guiding": "ENABLED" }
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": -10.000000 }, "guiding": "ENABLED" },
+                      { "q": { "arcseconds": 10.000000 }, "guiding": "ENABLED" }
                     ],
                     "toSky": null
                   }

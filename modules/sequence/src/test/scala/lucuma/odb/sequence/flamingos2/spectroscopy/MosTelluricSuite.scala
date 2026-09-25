@@ -12,7 +12,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Flamingos2Disperser
 import lucuma.core.enums.Flamingos2Filter
 import lucuma.core.enums.Flamingos2Fpu
-import lucuma.core.enums.Flamingos2SlitOffsetPreset
+import lucuma.core.enums.Flamingos2TelluricOffsetPreset
 import lucuma.core.enums.GcalContinuum
 import lucuma.core.enums.GcalDiffuser
 import lucuma.core.enums.GcalFilter
@@ -33,7 +33,7 @@ import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2DynamicConfig
 import lucuma.core.model.sequence.flamingos2.Flamingos2StaticConfig
-import lucuma.core.model.sequence.flamingos2.defaultSlitTelescopeConfigs
+import lucuma.core.model.sequence.flamingos2.defaultTelluricTelescopeConfigs
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
@@ -147,7 +147,7 @@ class MosTelluricSuite extends FunSuite:
     assertEquals(titles(atoms), List("Telluric", "Telluric", "Telluric", "Nighttime Calibrations"))
 
   test("a long slit observation's own telluric keeps the ABBA cadence"):
-    val atoms = generate(cfg = config(defaultSlitTelescopeConfigs(Flamingos2SlitOffsetPreset.Telluric).telescopeConfigs
+    val atoms = generate(cfg = config(defaultTelluricTelescopeConfigs(Flamingos2TelluricOffsetPreset.Telluric).telescopeConfigs
 , none)).science.toList
 
     assertEquals(titles(atoms).distinct, List("ABBA Cycle", "Nighttime Calibrations"))

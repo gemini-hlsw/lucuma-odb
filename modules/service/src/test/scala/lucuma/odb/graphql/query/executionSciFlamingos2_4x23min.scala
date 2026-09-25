@@ -32,6 +32,6 @@ class executionSciFlamingos2_4x23min extends ExecutionTestSupportForFlamingos2:
         user     = pi,
         query    = flamingos2ScienceQuery(oid),
         expected = List(
-          s"Could not generate a sequence for $oid: Estimated ABBA cycle time (94.3578125 minutes) for o-100 must be less than 90.000000 minutes."
+          s"Could not generate a sequence for $oid: Estimated ABBA cycle time (94.36 minutes) for o-100 must be less than 90.00 minutes."
         ).asLeft
       )
