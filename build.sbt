@@ -197,12 +197,18 @@ ThisBuild / githubWorkflowBuild ~= (_.map {
 // Swap the test-shard checkout for a shallow no-LFS variant, and drop the
 // plugin-injected githubWorkflowCheck step from the shards. The check costs a
 // separate sbt start per shard; the `checks` job runs it once instead.
+// The CI preamble chmods the key, which git reports as a change; without this every run sees a
+// file that belongs to no project and tests everything.
+ThisBuild / lucumaAffectedIgnorePaths += "test-cert/**"
+
 ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
   jobs.map { job =>
     if (job.id == "build")
       job
+        // Keep the full checkout: lucumaTestAffected diffs against origin/main, and a depth-1
+        // clone has no such ref, so the shard would run nothing (or everything, depending on
+        // the sbt-lucuma version). Full history costs a few seconds.
         .withSteps(job.steps.flatMap {
-          case s if s.name.contains("Checkout current branch")            => List(CheckoutShallow)
           case s if s.name.contains("Check that workflows are up to date") => Nil
           case s                                                          => List(s)
         })
@@ -210,14 +216,6 @@ ThisBuild / githubWorkflowGeneratedCI ~= { jobs =>
     else job
   }
 }
-
-// Shollow checkout and no lfs, used for test shards
-lazy val CheckoutShallow: WorkflowStep =
-  WorkflowStep.Use(
-    UseRef.Public("actions", "checkout", "v5"),
-    name = Some("Checkout current branch"),
-    params = Map("fetch-depth" -> "1")
-  )
 
 // checkout without lfs but full history
 lazy val CheckoutFull: WorkflowStep =
