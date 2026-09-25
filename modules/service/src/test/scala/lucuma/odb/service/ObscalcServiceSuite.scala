@@ -20,10 +20,10 @@ import lucuma.core.model.Program
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.ExecutionDigest
-import lucuma.core.model.sequence.StepDigest
-import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.CalculationState
 import lucuma.core.util.TimeSpan

@@ -41,10 +41,10 @@ import lucuma.core.model.sequence.DatasetReference
 import lucuma.core.model.sequence.ExecutionDigest
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
-import lucuma.core.model.sequence.StepDigest
-import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.optics.Format
