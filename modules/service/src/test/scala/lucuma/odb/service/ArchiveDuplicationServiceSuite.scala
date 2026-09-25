@@ -8,7 +8,6 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.catalog.goa.GoaObservationClass
-import lucuma.catalog.goa.GoaObservationType
 import lucuma.catalog.goa.GoaSummaryRecord
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
@@ -47,7 +46,6 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       ra               = searchPointing.ra.some,
       dec              = searchPointing.dec.some,
       instrument       = "GMOS-N",
-      observationType  = GoaObservationType.Object,
       observationClass = GoaObservationClass.Science.some,
       qaState          = "Pass".some,
       utDateTime       = Instant.parse("2019-01-01T09:08:07Z").some,
@@ -72,7 +70,6 @@ class ArchiveDuplicationServiceSuite extends OdbSuite:
       ra               = none,
       dec              = none,
       instrument       = "GMOS-S",
-      observationType  = GoaObservationType.Object,
       observationClass = none,
       qaState          = none,
       utDateTime       = none,
