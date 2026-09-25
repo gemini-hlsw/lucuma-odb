@@ -18,7 +18,7 @@ val catsVersion                  = "2.13.0"
 val circeVersion                 = "0.14.16"
 val circeRefinedVersion          = "0.15.1"
 val cirisVersion                 = "3.15.1"
-val clueVersion                  = "0.59.0"
+val clueVersion                  = "0.60.0"
 val declineVersion               = "2.6.2"
 val flywayVersion                = "13.7.0"
 val fs2AwsVersion                = "6.2.0"
@@ -34,7 +34,7 @@ val keySemaphoreVersion          = "0.3.0-M1"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.4"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.253.0"
+val lucumaCoreVersion            = "0.254.0"
 val lucumaGraphQLRoutesVersion   = "0.16.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -75,6 +75,18 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.tpolecat" %% "skunk-core"  % VersionScheme.Always,
   "org.tpolecat" %% "skunk-circe" % VersionScheme.Always
 )
+
+// ---------------------------------------------------------------------------
+// TEMPORARY: clue 0.60 vs. lucuma-graphql-routes
+//
+// lucuma-core 0.254.0 brings clue 0.60.0, while lucuma-graphql-routes 0.16.0
+// still declares clue-model 0.59.0, which early-semver treats as breaking.
+// clue-model is unchanged between the two releases (only clue-core and
+// clue-http4s changed), so it is safe.  Remove once graphql-routes publishes
+// against clue 0.60.
+// ---------------------------------------------------------------------------
+ThisBuild / libraryDependencySchemes +=
+  "edu.gemini" %% "clue-model" % VersionScheme.Always
 
 ThisBuild / tlBaseVersion      := "0.97"
 ThisBuild / scalaVersion       := "3.9.0"
@@ -918,6 +930,7 @@ lazy val schema =
         "edu.gemini"    %%% "lucuma-core"                % lucumaCoreVersion,
         "io.circe"      %%% "circe-testing"              % circeVersion           % Test,
         "edu.gemini"    %%% "lucuma-core-testkit"        % lucumaCoreVersion      % Test,
+        "edu.gemini"    %%% "lucuma-refined"             % lucumaRefinedVersion   % Test,
         "org.scalameta" %%% "munit"                      % munitVersion           % Test,
         "org.scalameta" %%% "munit-scalacheck"           % munitScalacheckVersion % Test,
         "org.typelevel" %%% "discipline-munit"           % munitDisciplineVersion % Test

@@ -30,6 +30,8 @@ import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.StepEstimate
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.util.TimeSpan
@@ -95,15 +97,53 @@ trait SequenceCodec {
       )
     }
 
+  given Decoder[StepDigest] =
+    Decoder.instance: c =>
+      for
+        n <- c.downField("count").as[NonNegInt]
+        t <- c.downField("time").as[CategorizedTime]
+      yield StepDigest(n, t)
+
+  given (using Encoder[TimeSpan]): Encoder[StepDigest] =
+    Encoder.instance: (a: StepDigest) =>
+      Json.obj(
+        "count" -> a.count.asJson,
+        "time"  -> a.time.asJson
+      )
+
+  given Decoder[StepDigests] =
+    Decoder.instance: c =>
+      for
+        b <- c.downField("bias").as[StepDigest]
+        d <- c.downField("dark").as[StepDigest]
+        r <- c.downField("arc").as[StepDigest]
+        f <- c.downField("flat").as[StepDigest]
+        o <- c.downField("science").as[StepDigest]
+      yield StepDigests(b, d, r, f, o)
+
+  given (using Encoder[TimeSpan]): Encoder[StepDigests] =
+    Encoder.instance: (a: StepDigests) =>
+      Json.obj(
+        "bias"    -> a.biases.asJson,
+        "dark"    -> a.darks.asJson,
+        "arc"     -> a.arcs.asJson,
+        "flat"    -> a.flats.asJson,
+        "science" -> a.observing.asJson
+      )
+
   given Decoder[SequenceDigest] =
     Decoder.instance: c =>
+      // Payloads that predate the step breakdown have no `steps`; read them as
+      // all observing time so the sum invariant holds.
       for
         o  <- c.downField("observeClass").as[ObserveClass]
         t  <- c.downField("timeEstimate").as[CategorizedTime]
         tc <- c.downField("telescopeConfigs").as[SortedSet[TelescopeConfig]]
         n  <- c.downField("atomCount").as[NonNegInt]
+        g  <- c.downField("gcalSets").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
+        s  <- c.downField("steps").as[Option[StepDigests]].map(_.getOrElse(StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, t))))
         e  <- c.downField("executionState").as[ExecutionState]
-      yield SequenceDigest(o, t, tc, n, e)
+      yield SequenceDigest(o, t, tc, n, g, s, e)
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[SequenceDigest] =
     Encoder.instance: (a: SequenceDigest) =>
@@ -112,17 +152,22 @@ trait SequenceCodec {
         "timeEstimate"     -> a.timeEstimate.asJson,
         "telescopeConfigs" -> a.telescopeConfigs.asJson,
         "atomCount"        -> a.atomCount.asJson,
+        "gcalSets"         -> a.gcalSets.asJson,
+        "steps"            -> a.steps.asJson,
         "executionState"   -> a.executionState.asJson
       )
 
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
-      // `ExecutionDigest` has four canonical fields: `setup`, `setupCount`,
-      // `acquisition` and `science`.  Everything else the encoder emits --
+      // `ExecutionDigest` has five canonical fields: `setup`, `setupCount`,
+      // `calibrationCount`, `acquisition` and `science`.  Everything else the encoder emits --
       // `fullTimeEstimate` and the entire `estimate` object (`estimate.science`,
       // `estimate.total`) -- is a derived, output-only projection with no place
       // to live in the model, so it is intentionally ignored here and recomputed
       // from the fields below.
+      //
+      // `calibrationCount` appears only under `estimate` and is absent from
+      // payloads that predate it, so a missing value reads as 0.
       //
       // `setup` and `setupCount` appear twice in the encoded form: under the
       // (current) `estimate` object and as deprecated top-level fields.  Read
@@ -137,9 +182,10 @@ trait SequenceCodec {
       for {
         t <- read[SetupTime]("setup")
         n <- read[NonNegInt]("setupCount")
+        k <- est.downField("calibrationCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(t, n, a, s)
+      } yield ExecutionDigest(t, n, k, a, s)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
@@ -148,6 +194,7 @@ trait SequenceCodec {
         "estimate"         -> Json.obj(
           "setup"            -> a.setup.asJson,
           "setupCount"       -> a.setupCount.asJson,
+          "calibrationCount" -> a.calibrationCount.asJson,
           "science"          -> a.science.timeEstimate.asJson,
           "total"            -> a.fullTimeEstimate.asJson
         ),

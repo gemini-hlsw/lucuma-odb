@@ -43,6 +43,8 @@ import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
 import lucuma.core.model.sequence.Step
 import lucuma.core.model.sequence.StepConfig
+import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.model.sequence.TelescopeConfig
 import lucuma.core.model.sequence.TimeChargeCorrection
 import lucuma.core.optics.Format
@@ -735,11 +737,17 @@ trait Codecs {
         .get
     }
 
+  lazy val step_digest: Codec[StepDigest] =
+    (int4_nonneg *: categorized_time).to[StepDigest]
+
+  lazy val step_digests: Codec[StepDigests] =
+    (step_digest *: step_digest *: step_digest *: step_digest *: step_digest).to[StepDigests]
+
   lazy val sequence_digest: Codec[SequenceDigest] =
-    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: execution_state).imap {
-      case (oClass, pTime, offsets, guideStates, aCount, execState) =>
+    (obs_class *: categorized_time *: _offset_array.opt *: _guide_state.opt *: int4_nonneg *: int4_nonneg *: step_digests *: execution_state).imap {
+      case (oClass, pTime, offsets, guideStates, aCount, gcalSets, steps, execState) =>
         val config = offsets.getOrElse(Nil).zip(guideStates.getOrElse(Nil)).map(TelescopeConfig.apply.tupled)
-        SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, execState)
+        SequenceDigest(oClass, pTime, SortedSet.from(config), aCount, gcalSets, steps, execState)
     } { sd =>
       // Don't inline to get a consistent sort
       val telescopeConfigs = sd.telescopeConfigs.toList
@@ -749,12 +757,14 @@ trait Codecs {
         Some(telescopeConfigs.map(_.offset)),
         Some(telescopeConfigs.map(_.guiding)),
         sd.atomCount,
+        sd.gcalSets,
+        sd.steps,
         sd.executionState
       )
     }
 
   lazy val execution_digest: Codec[ExecutionDigest] =
-    (setup_time *: int4_nonneg *: sequence_digest *: sequence_digest).to[ExecutionDigest]
+    (setup_time *: int4_nonneg *: int4_nonneg *: sequence_digest *: sequence_digest).to[ExecutionDigest]
 
   val step_type: Codec[StepType] =
     enumerated(Type("e_step_type"))

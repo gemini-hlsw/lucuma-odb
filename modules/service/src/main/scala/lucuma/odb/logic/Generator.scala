@@ -33,6 +33,8 @@ import lucuma.core.model.sequence.ExecutionSequence
 import lucuma.core.model.sequence.InstrumentExecutionConfig
 import lucuma.core.model.sequence.SequenceDigest
 import lucuma.core.model.sequence.SetupTime
+import lucuma.core.model.sequence.StepDigest
+import lucuma.core.model.sequence.StepDigests
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.Itc
@@ -50,6 +52,7 @@ import lucuma.odb.sequence.util.CommitHash
 import lucuma.odb.sequence.visitor.Config as VisitorConfig
 import lucuma.odb.sequence.visitor.VisitorExecutionDigestCalculator
 import lucuma.odb.service.NoTransaction
+import lucuma.odb.service.ObsExtract
 import lucuma.odb.service.Services
 import lucuma.odb.service.Services.Syntax.*
 import org.typelevel.log4cats.Logger
@@ -231,28 +234,22 @@ object Generator:
         ctx.params.calibrationRole.contains(CalibrationRole.Telluric) && !ctx.params.hasTarget
 
       private def flatDigest(ctx: GeneratorContext, charge: TimeSpan): ExecutionDigest =
+        val time = CategorizedTime.Zero.sumCharge(ChargeClass.Program, charge)
         ExecutionDigest(
           SetupTime.Zero,
+          NonNegInt.MinValue,
           NonNegInt.MinValue,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
             observeClass   = ctx.params.calibrationRole.sciClass,
-            timeEstimate   = CategorizedTime.Zero.sumCharge(ChargeClass.Program, charge),
+            timeEstimate   = time,
+            steps          = StepDigests.Zero.copy(observing = StepDigest(NonNegInt.MinValue, time)),
             executionState = ctx.params.executionState
           )
         )
 
       private def unresolvedTelluricDigest(ctx: GeneratorContext): ExecutionDigest =
-        ExecutionDigest(
-          SetupTime.Zero,
-          NonNegInt.MinValue,
-          SequenceDigest.Zero,
-          SequenceDigest.Zero.copy(
-            observeClass   = ctx.params.calibrationRole.sciClass,
-            timeEstimate   = CategorizedTime.Zero.sumCharge(ChargeClass.Program, UnresolvedTelluricTime),
-            executionState = ctx.params.executionState
-          )
-        )
+        flatDigest(ctx, UnresolvedTelluricTime)
 
       private def calcDigestFromContext(
         ctx: GeneratorContext
@@ -279,7 +276,8 @@ object Generator:
             s <- EitherT(sequenceDigest(stream.science))
             c  = if ctx.params.isSplittable then estimator.estimateSetupCount(s.timeEstimate.sum)
                  else NonNegInt.unsafeFrom(1)
-          yield ExecutionDigest(estimator.estimateSetupTime, c, a, s)
+            n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
+          yield ExecutionDigest(estimator.estimateSetupTime, c, n, a, s)
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
@@ -289,6 +287,7 @@ object Generator:
           EitherT.pure[F, OdbError]:
             ExecutionDigest(
               SetupTime.Zero,
+              NonNegInt.MinValue,
               NonNegInt.MinValue,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)

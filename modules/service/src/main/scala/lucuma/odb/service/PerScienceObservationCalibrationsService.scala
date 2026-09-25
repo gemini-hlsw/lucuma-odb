@@ -65,8 +65,6 @@ object PerScienceObservationCalibrationsService:
   def instantiate[F[_]: {Concurrent as F, Tracer as T, Logger, Services as S}]: PerScienceObservationCalibrationsService[F] =
     new PerScienceObservationCalibrationsService[F] with CalibrationObservations with WorkflowStateQueries[F]:
 
-      private val MultiTelluricThreshold: TimeSpan = TelluricTargetsService.MultiTelluricThreshold
-
       private def groupNameForObservation(
         config: CalibrationConfigSubset,
         oid:    Observation.Id
@@ -134,8 +132,7 @@ object PerScienceObservationCalibrationsService:
         scienceOid: Observation.Id
       )(using Transaction[F]): F[Option[TimeSpan]] =
         obscalcService.selectExecutionDigest(scienceOid).map:
-          _.flatMap(_.value.toOption)
-            .map(d => d.science.timeEstimate.sum |+| d.science.timeEstimate.nonCharged)
+          _.flatMap(_.value.toOption).map(_.science.timeEstimate.sum)
 
       private def insertTelluricObservation(
         pid:             Program.Id,
@@ -206,8 +203,8 @@ object PerScienceObservationCalibrationsService:
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        if (duration > MultiTelluricThreshold)
-          // Over 1.5h: 1 telluric before and 1 after
+        if (ObsExtract.telluricsForVisit(duration).value > 1)
+          // Long visit: 1 telluric before and 1 after
           for {
             sciIdx <- obsGroupIndex(scienceOid)
             bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
@@ -216,7 +213,7 @@ object PerScienceObservationCalibrationsService:
             c2     <- createTelluricObs(pid, scienceOid, groupId, aftIdx, duration, TelluricCalibrationOrder.After)
           } yield List(c1, c2)
         else
-          // Less than 1.5h: one telluric after science
+          // Short visit: one telluric after science
           for {
             sciIdx <- obsGroupIndex(scienceOid)
             aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
@@ -255,10 +252,7 @@ object PerScienceObservationCalibrationsService:
                                   else Option.empty[TimeSpan].pure[F]
             _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
             _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
-            requiredCount      = duration match
-                                  case Some(d) if d > MultiTelluricThreshold => 2
-                                  case Some(_)                               => 1
-                                  case None                                  => 0
+            requiredCount      = duration.fold(0)(ObsExtract.telluricsForVisit(_).value)
             // Delete/recreate if count changes
             (created, deleted) <- if (existing.size != requiredCount)
                                     for

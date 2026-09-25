@@ -134,6 +134,18 @@ _Avoid_: telluric standard (names the target star, not the observation).
 A telluric a PI has explicitly declined, held inactive so it will not be observed even when its science observation is active. Reversible — reinstating the telluric resumes its science observation's lifecycle. Distinct from a Telluric Type of NoTelluric, which is declarative and prevents generation up front: the type governs whether tellurics exist, the decline governs whether an existing one is observed. The two are uncoupled — setting NoTelluric deletes tellurics (unless they have visits or execution), taking any decline state with them; restoring a real type never reinstates a declined telluric.
 _Avoid_: disabled telluric, skipped telluric, deleted telluric, opted-out telluric.
 
+**Calibration Epoch**:
+A stretch of roughly 90 minutes of science time (the Calibration Epoch Interval) after which an observation's night-time calibrations are assumed to need repeating: a fresh SmartGCal flat and arc set and, unless the Telluric Type is `NoTelluric`, a telluric. An estimating unit, not a scheduling one — epochs do not line up with visits (a visit can hold more or less than an epoch), so the Calibration Count and the setup count disagree by design.
+_Avoid_: visit (a scheduling unit), calibration set, telluric interval.
+
+**Multi-Telluric Threshold**:
+The science time per visit (90 minutes today) above which a visit is given two tellurics, one before and one after the science, instead of one after. A scheduling rule applied by the calibrations service when tellurics are materialised; it shares its value with the Calibration Epoch Interval by coincidence, and the two are separate constants so they may diverge.
+_Avoid_: telluric threshold, 1.5 h rule, epoch interval (the estimating constant).
+
+**Calibration Count**:
+The number of calibration epochs an observation is expected to need over its remaining science time, roughly one per 90 minutes, carried in its time estimate. Each epoch is expected to bring a SmartGCal flat and arc set and, unless the Telluric Type is `NoTelluric`, a telluric. Zero for calibration observations themselves and for modes that take no telluric. Independent of the Telluric Type, which decides what an epoch costs, not how many there are. Distinct from the number of tellurics materialised per visit (one, or two above the multi-telluric threshold), which is a scheduling rule, not an estimate. It does not yet feed the time estimate.
+_Avoid_: telluric count (the concept is broader than tellurics), number of calibrations.
+
 **Telluric Type**:
 *What kind* of standard star a telluric should observe (`Hot`, `A0V`, `Solar`, `Manual`), or `NoTelluric` for no telluric at all. A property of the observing-mode config. Setting `NoTelluric` overwrites the previous choice (a `Manual` star list is not remembered across it), and changing the observing mode resets the type to its default (`Hot`) — a "no tellurics" decision for one mode must not be assumed to carry to another.
 _Avoid_: telluric (names the observation, not the classification), requires-telluric flag (superseded design).
@@ -141,6 +153,20 @@ _Avoid_: telluric (names the observation, not the classification), requires-tell
 **Derived Telluric S/N**:
 The signal-to-noise a Telluric's science exposure time mode is defaulted to: twice its science observation's, uncapped, so the standard is measured at least as deeply as the target. Where the science's own S/N comes from depends on how the PI expressed it — a requested signal-to-noise is taken at face value, while a Time & Count science has no requested S/N, so the ITC's achieved total signal-to-noise is used instead. Read from the science's live configurations only. Where a mode carries an exposure time mode per central wavelength, the Telluric has one configuration per *distinct* science wavelength, sized from the deepest science configuration at that wavelength, with the averaged reference wavelength and the largest coadds of the group; a daytime pinhole keeps the science list row for row. Always system-owned: it is written as derived, never as a PI's choice, and is recomputed whenever its science observation's ITC result changes.
 _Avoid_: telluric signal-to-noise (ambiguous — the ITC also computes one *for* the telluric), doubled S/N, telluric S/N target.
+
+### Time Estimates
+
+**Step Digest**:
+For one kind of step within a sequence (bias, dark, arc, flat or science): how many there are and how much time they take, split by charge class. Step time includes the configuration change that precedes the step, so the science-fold move into GCAL is charged to the arc that follows it. A sequence carries its five step digests together as `steps`, which partition it so their times always sum to its time estimate. Steps are bucketed by step type, and the buckets are named after it; GCAL and SmartGCAL steps are the one split, into arc and flat, and one whose lamp is not an arc counts as a flat. In Scala (lucuma-core) the fields are still `biases`, `darks`, `arcs`, `flats` and `observing`. Stored per sequence as count, non-charged time and program time columns in `t_obscalc` and `t_execution_digest`; digests recorded before the breakdown are backfilled with everything as science and then recomputed. No generator emits biases or darks yet, so those buckets are zero.
+_Avoid_: GCAL digest (the buckets are not only GCAL steps), calibration digest (calibrations also means telluric observations), flat/arc time (loses the count).
+
+**GCAL Set**:
+An atom that contains at least one GCAL step, counted per sequence as `gcalSets`. GMOS puts an arc and a flat in every science atom, so it has one set per atom; Flamingos-2 and GNIRS put theirs in a single calibration atom, which may hold only a flat or only an arc. Not deducible from the arc and flat step counts, since a set need not contain one of each. It is what a Calibration Epoch is expected to bring, so the cost of one set and the sets left in a sequence both come from it.
+_Avoid_: calibration set (calibrations also means telluric observations), flat/arc pair (a set may hold only one).
+
+**Science Steps**:
+The step digest of the steps whose step type is `Science`: science exposures and offsets, and in an acquisition sequence the acquisition exposures, including the science-fold move back to sky. Exposed as `steps.science`. Excludes setup time.
+_Avoid_: science time (the sequence's full time estimate, which includes GCAL steps), observing time (the earlier name for this bucket), on-source time (it also contains offsets).
 
 ### AEON / Multi-Facility Proposals
 
