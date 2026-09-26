@@ -65,7 +65,12 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: |
+          for attempt in 1 2 3; do
+            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
 
       - name: Set up cert permissions (1)
         run: chmod 600 test-cert/server.key
@@ -180,7 +185,12 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: |
+          for attempt in 1 2 3; do
+            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
 
       - name: Download target directories (3, 0)
         uses: actions/download-artifact@v6
@@ -275,7 +285,12 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: |
+          for attempt in 1 2 3; do
+            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
 
       - name: Static checks
         run: sbt -v -J-Xmx6g -J-Xss4M '++ ${{ matrix.scala }}' githubWorkflowCheck headerCheckAll scalafmtCheckAll 'project /' scalafmtSbtCheck lucumaScalafmtCheck lucumaScalafixCheck lucumaSlackNotifyCheck 'scalafixAll --check' mimaReportBinaryIssues doc
@@ -332,7 +347,12 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: |
+          for attempt in 1 2 3; do
+            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
 
       - name: Clean
         if: (contains(fromJSON(needs.affected.outputs.projects), 'ssoService') || contains(fromJSON(needs.affected.outputs.projects), 'itcService') || contains(fromJSON(needs.affected.outputs.projects), 'service') || contains(fromJSON(needs.affected.outputs.projects), 'obscalc') || contains(fromJSON(needs.affected.outputs.projects), 'calibrations') || contains(fromJSON(needs.affected.outputs.projects), 'pdfSummary') || contains(fromJSON(needs.affected.outputs.projects), 'resourceService'))
@@ -602,7 +622,12 @@ jobs:
 
       - name: sbt update
         if: matrix.java == 'temurin@25' && steps.setup-java-temurin-25.outputs.cache-hit == 'false'
-        run: sbt -v -J-Xmx6g -J-Xss4M +update
+        run: |
+          for attempt in 1 2 3; do
+            sbt -v -J-Xmx6g -J-Xss4M +update +scalaCompilerBridgeBinaryJar && exit 0
+            [ "$attempt" = 3 ] || sleep 30
+          done
+          exit 1
 
       - name: Compute affected projects
         id: report
