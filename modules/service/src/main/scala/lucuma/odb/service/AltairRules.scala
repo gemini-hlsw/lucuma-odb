@@ -24,8 +24,8 @@ object AltairRules:
   def notAvailableMessage(instrument: Instrument): String =
     s"Altair is not available for ${instrument.longName}."
 
-  def checkInstrument(instrument: Instrument, altairInstruments: Set[Instrument], prefix: String = ""): Result[Unit] =
-    if altairInstruments.contains(instrument) then Result.unit
+  def checkInstrument(instrument: Instrument, prefix: String = ""): Result[Unit] =
+    if instrument.supportsAltair then Result.unit
     else OdbError.InvalidArgument(s"$prefix${notAvailableMessage(instrument)}".some).asFailure
 
   def checkFieldLens(altair: AltairConfiguration, prefix: String = ""): Result[Unit] =

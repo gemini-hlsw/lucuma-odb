@@ -177,6 +177,35 @@ class executionGnirsAltair extends AltairItcRecording:
       assertNgs(sci.head, FieldLens.In)
       assertNgs(acq.head, FieldLens.In)
 
+  // The average parallactic angle is undefined while the target is below the horizon, which for
+  // a time defaulting to now would make this pass or fail depending on when it runs.
+  test("an observation without a time picks at the next transit"):
+    for
+      p          <- createProgramAs(pi)
+      t          <- createTargetWithProfileAs(pi, p)
+      o          <- createObservationAs(pi, p, List(t))
+      _          <- setAltair(o, "{ mode: NGS }")
+      _          <- query(
+                      user  = pi,
+                      query = s"""
+                        mutation {
+                          updateObservations(input: {
+                            WHERE: { id: { EQ: "$o" } }
+                            SET: { posAngleConstraint: { mode: AVERAGE_PARALLACTIC } }
+                          }) {
+                            observations { id }
+                          }
+                        }
+                      """
+                    )
+      _          <- clearItcCalls
+      digest     <- digestFor(o)
+      (acq, sci) <- itcAltairCalls
+    yield
+      assert(digest.isRight, s"expected a digest, found $digest")
+      assertNgs(sci.head, FieldLens.In)
+      assertNgs(acq.head, FieldLens.In)
+
   test("a stored guide star reaches the ITC with its separation, R and field lens"):
     for
       (_, oid)   <- observationWithAltair("{ mode: NGS }", aowfsStarName.some)
