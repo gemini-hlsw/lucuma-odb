@@ -86,32 +86,49 @@ object ObsExtract:
 
   /** Modes whose science observations are accompanied by tellurics. */
   def modeTakesTelluric(mode: ObservingMode): Boolean =
-    mode match
-      case _: Flamingos2Config | _: Flamingos2MosConfig | _: Igrins2Config | _: GnirsSpectroscopyConfig => true
-      case _                                                                                           => false
+    calibrationSetInterval(mode).isDefined
 
-  /** Roughly one calibration epoch per this much science time. */
-  // TODO: This is a temporary value. In the future this will depend on the obs wavelength.
-  val CalibrationEpochInterval: TimeSpan = 90.minTimeSpan
+  /** Wavelength from which infrared calibrations repeat hourly rather than every 90 minutes. 2.6 microns */
+  val LongWavelengthCutoff: Wavelength = Wavelength.unsafeFromIntPicometers(2_600_000)
 
-  /** Calibration epochs over the lifetime of an observation: ceil(scienceTime / interval). */
-  // TODO: This is a temporary value. In the future this will depend on the obs wavelength and duration
-  def calibrationEpochs(scienceTime: TimeSpan): NonNegInt =
-    NonNegInt.unsafeFrom:
-      math.ceil(scienceTime.toMicroseconds.toDouble / CalibrationEpochInterval.toMicroseconds.toDouble).toInt
+  val ShortWavelengthSetInterval: TimeSpan = 90.minTimeSpan
+
+  val LongWavelengthSetInterval: TimeSpan = 60.minTimeSpan
+
+  inline def calibrationSetInterval(wavelength: Wavelength): TimeSpan =
+    if wavelength < LongWavelengthCutoff then ShortWavelengthSetInterval else LongWavelengthSetInterval
 
   /**
-   * Calibration carried in the time estimate.  Zero for calibration
+   * Calibration set interval for a mode, if it takes night-time calibrations.
+   * GNIRS follows its longest central wavelength; the other infrared modes
+   * never reach the cutoff and keep the 90-minute interval.
+   */
+  def calibrationSetInterval(mode: ObservingMode): Option[TimeSpan] =
+    mode match
+      case c: GnirsSpectroscopyConfig =>
+        calibrationSetInterval(c.wavelengths.map(_.centralWavelength).maximum).some
+      case _: Flamingos2Config | _: Flamingos2MosConfig | _: Igrins2Config =>
+        ShortWavelengthSetInterval.some
+      case _ =>
+        none
+
+  /** Calibration sets over the lifetime of an observation: ceil(scienceTime / interval). */
+  def calibrationSets(interval: TimeSpan, scienceTime: TimeSpan): NonNegInt =
+    NonNegInt.unsafeFrom:
+      math.ceil(scienceTime.toMicroseconds.toDouble / interval.toMicroseconds.toDouble).toInt
+
+  /**
+   * Calibration sets carried in the time estimate.  Zero for calibration
    * observations and for modes that take no telluric; independent of the
-   * telluric type, which only decides whether each epoch costs a telluric.
+   * telluric type, which only decides whether each set costs a telluric.
    */
   def calibrationCount(
     mode:        ObservingMode,
     role:        Option[CalibrationRole],
     scienceTime: TimeSpan
   ): NonNegInt =
-    if role.isDefined || !modeTakesTelluric(mode) then NonNegInt.MinValue
-    else calibrationEpochs(scienceTime)
+    if role.isDefined then NonNegInt.MinValue
+    else calibrationSetInterval(mode).fold(NonNegInt.MinValue)(calibrationSets(_, scienceTime))
 
   /** Tellurics materialised for one visit: one after, or one before and one after for a long visit. */
   def telluricsForVisit(visitTime: TimeSpan): NonNegInt =
