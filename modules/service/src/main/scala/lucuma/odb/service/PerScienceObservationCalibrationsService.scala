@@ -264,14 +264,12 @@ object PerScienceObservationCalibrationsService:
             _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
             _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
             required           =  duration.toList.flatMap(requiredOrders)
-            // The star search depends on the duration, so a changed one also means a fresh set.
-            satisfied          =  unobserved.flatMap(_.order).map(_.tag).sorted ==
+            complete           =  unobserved.flatMap(_.order).map(_.tag).sorted ==
                                     required.map(_.tag).sorted &&
                                     unobserved.forall(_.duration === duration)
-            // Without a duration nothing replaces them, so keep the usual protection.
             toDelete           <- duration.fold(excludeObsCalibrationsFromDeletion(existing, identity)):
                                     _ => unobserved.map(_.oid).pure[F]
-            (created, deleted) <- if (!satisfied)
+            (created, deleted) <- if (!complete)
                                     for
                                       _ <- NonEmptyList.fromList(toDelete)
                                             .traverse_(observationService.deleteCalibrationObservations)
