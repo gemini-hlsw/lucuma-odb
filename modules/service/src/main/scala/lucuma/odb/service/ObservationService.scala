@@ -1491,6 +1491,7 @@ object ObservationService {
           c_altair_cass_rotator,
           c_altair_nd_filter,
           c_scheduling_mode,
+          c_too_activation,
           c_priority
         )
         SELECT
@@ -1534,6 +1535,7 @@ object ObservationService {
           c_altair_cass_rotator,
           c_altair_nd_filter,
           c_scheduling_mode,
+          c_too_activation,
           c_priority
       FROM t_observation
       WHERE c_observation_id = $observation_id

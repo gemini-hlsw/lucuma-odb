@@ -475,8 +475,7 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
       createObservationAs(pi, pid).flatMap { oid =>
         for
           // The mode differs from its default, so a clone that recomputed it
-          // rather than copying could not produce this result.  The activation
-          // is derived and so is recomputed by definition.
+          // rather than copying could not produce this result.
           _ <- setScheduling(oid, "schedulingMode: UNINTERRUPTIBLE")
           c <- cloneWith(oid)
         yield assertEquals(
@@ -504,6 +503,46 @@ class cloneObservation extends OdbSuite with ObservingModeSetupOperations with M
             {
               "tooActivation": "NONE",
               "schedulingMode": "UNCONSTRAINED"
+            }
+          """
+        )
+      }
+    }
+  }
+
+  test("clone copies the ToO activation") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        for
+          // Both differ from their defaults: a clone that fell back to the
+          // column default would lose the activation and stop being a ToO.
+          _ <- setScheduling(oid, "tooActivation: INTERRUPTING, schedulingMode: UNINTERRUPTIBLE")
+          c <- cloneWith(oid)
+        yield assertEquals(
+          c,
+          json"""
+            {
+              "tooActivation": "INTERRUPTING",
+              "schedulingMode": "UNINTERRUPTIBLE"
+            }
+          """
+        )
+      }
+    }
+  }
+
+  test("clone SET overrides the copied ToO activation") {
+    createProgramAs(pi).flatMap { pid =>
+      createObservationAs(pi, pid).flatMap { oid =>
+        for
+          _ <- setScheduling(oid, "tooActivation: INTERRUPTING, schedulingMode: UNINTERRUPTIBLE")
+          c <- cloneWith(oid, "tooActivation: RAPID".some)
+        yield assertEquals(
+          c,
+          json"""
+            {
+              "tooActivation": "RAPID",
+              "schedulingMode": "UNINTERRUPTIBLE"
             }
           """
         )
