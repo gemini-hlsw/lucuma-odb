@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.data.NonEmptyList
+import cats.data.OptionT
 import cats.effect.Concurrent
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegShort
@@ -131,15 +132,15 @@ object PerScienceObservationCalibrationsService:
           calibrationRoles = obsCalibrationGroupRoles(config)
         ).orError
 
-      // The obsDuration (typically the next visit) visit decides the telluric count.
+      // The obsDuration (typically the next visit) decides the telluric count.
       private def telluricDuration(
         scienceOid: Observation.Id
       )(using Transaction[F]): F[Option[TimeSpan]] =
-        session.prepareR(Statements.selectObservationDuration).use(_.unique(scienceOid)).flatMap:
-          case Some(d) => d.some.pure
-          case None    =>
+        OptionT(session.prepareR(Statements.selectObservationDuration).use(_.unique(scienceOid)))
+          .orElseF:
             obscalcService.selectExecutionDigest(scienceOid).map:
               _.flatMap(_.value.toOption).map(_.science.timeEstimate.sum)
+          .value
 
       private def findGroupTellurics(gid: Group.Id): F[List[GroupTelluric]] =
         session
@@ -214,15 +215,14 @@ object PerScienceObservationCalibrationsService:
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
-        duration:   TimeSpan,
-        orders:     List[TelluricCalibrationOrder]
+        duration:   TimeSpan
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        orders.foldLeftM(List.empty[Observation.Id]): (created, order) =>
+        requiredOrders(duration).foldLeftM(List.empty[Observation.Id]): (created, order) =>
           obsGroupIndex(scienceOid).flatMap: sciIdx =>
             val idx = order match
               case TelluricCalibrationOrder.Before => sciIdx
@@ -259,27 +259,29 @@ object PerScienceObservationCalibrationsService:
           for {
             tellurics          <- findGroupTellurics(gid)
             existing           =  tellurics.map(_.oid)
-            // Observed telluric always remain and we may need to add more for the next obs duration.
+            // Observed tellurics always remain and we may need to add more for the next obs duration.
             unobserved         =  tellurics.filterNot(_.visited)
             duration          <- if (requiresTelluric) telluricDuration(obs.id)
                                   else Option.empty[TimeSpan].pure[F]
             _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
             _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
             required           =  duration.toList.flatMap(requiredOrders)
-            complete           =  unobserved.flatMap(_.order).map(_.tag).sorted ==
-                                    required.map(_.tag).sorted
+            complete           =  unobserved.forall(_.order.isDefined) &&
+                                    unobserved.flatMap(_.order).map(_.tag).sorted ==
+                                      required.map(_.tag).sorted
+            // With a known duration the unobserved set is rebuilt even while the science is
+            // ongoing, so the parent execution-state protection does not apply here.
             toDelete           <- duration.fold(excludeObsCalibrationsFromDeletion(existing, identity)):
                                     _ => unobserved.map(_.oid).pure[F]
-            (created, deleted) <- if (!complete)
+            (created, deleted) <- if (complete)
+                                    (List.empty, List.empty).pure[F]
+                                  else
                                     for
                                       _ <- NonEmptyList.fromList(toDelete)
                                             .traverse_(observationService.deleteCalibrationObservations)
-                                      c <- duration.toList.flatTraverse: d =>
-                                             createTelluricCalibrations(pid, obs.id, gid, d, required)
-                                    yield (c, toDelete)
-                                  else
-                                    (List.empty, List.empty).pure[F]
-            // Only sync existing tellurics that are note deleted or recreated.
+                                      c <- duration.traverse(createTelluricCalibrations(pid, obs.id, gid, _))
+                                    yield (c.orEmpty, toDelete)
+            // Only sync existing tellurics that are not deleted or recreated.
             toSync              = if (created.nonEmpty || !syncExisting) List.empty
                                   else existing.filterNot(deleted.contains)
             _                  <- toSync.traverse_(tid => syncConfiguration(pid, obs.id, tid, CalibrationRole.Telluric))
