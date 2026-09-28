@@ -1749,7 +1749,26 @@ class perScienceObservationCalibrations
       assertEquals(n3, 2)
     }
 
-  test("an ongoing science keeps both tellurics when obsDuration drops"):
+  test("a new obsDuration above the threshold replaces the pair with the new duration"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- setExposureTime(oid, 120)
+      _                  <- runObscalcUpdate(pid, oid)
+      _                  <- setObservationTimeAndDuration(pi, oid, none, 100.minTimeSpan.some)
+      (added1, _)        <- recalculateCalibrations(pid, when, oid)
+      _                  <- setObservationTimeAndDuration(pi, oid, none, 150.minTimeSpan.some)
+      (added2, removed2) <- recalculateCalibrations(pid, when, oid)
+      metas              <- added2.traverse(selectMeta)
+    } yield {
+      assertEquals(added1.size, 2)
+      assertEquals(added2.size, 2)
+      assertEquals(removed2.toSet, added1.toSet)
+      assertEquals(metas.flatten.map(_.scienceDuration), List(150.minTimeSpan, 150.minTimeSpan))
+    }
+
+  test("an ongoing science replaces its unobserved tellurics when obsDuration drops"):
     for {
       pid                <- createProgramAs(pi)
       tid                <- createTargetWithProfileAs(pi, pid)
@@ -1763,11 +1782,15 @@ class perScienceObservationCalibrations
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       gid                <- queryObservation(oid).map(_.groupId.get)
       obsInGroup         <- queryObservationsInGroup(gid)
+      tellurics          =  obsInGroup.filter(_.calibrationRole.contains(CalibrationRole.Telluric))
+      metas              <- tellurics.traverse(t => selectMeta(t.id))
     } yield {
       assertEquals(added1.size, 2)
-      assertEquals(added2.size, 0)
-      assertEquals(removed2.size, 0)
-      assertEquals(obsInGroup.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 2)
+      assertEquals(added2.size, 1)
+      assertEquals(removed2.toSet, added1.toSet)
+      assertEquals(tellurics.map(_.id), added2)
+      assertEquals(metas.flatten.map(_.calibrationOrder), List(TelluricCalibrationOrder.After))
+      assertEquals(metas.flatten.map(_.scienceDuration), List(60.minTimeSpan))
     }
 
   test("observed tellurics are spent, the next visit gets a fresh pair"):
@@ -1778,6 +1801,7 @@ class perScienceObservationCalibrations
       _                  <- setExposureTime(oid, 120)
       _                  <- runObscalcUpdate(pid, oid)
       (added1, _)        <- recalculateCalibrations(pid, when, oid)
+      _                  <- sleep >> resolveTelluricTargets
       _                  <- added1.traverse_(recordVisitAs(serviceUser, _))
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
       gid                <- queryObservation(oid).map(_.groupId.get)

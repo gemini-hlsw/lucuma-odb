@@ -240,7 +240,7 @@ trait WorkflowStateQueries[F[_]: {Concurrent, Services, Tracer as T}] {
           .use(_.stream(af.argument, 1024).compile.toList)
           .map(_.map((oid, state) => oid -> state).toMap)
 
-  def haveVisits(
+  private def haveVisits(
     oids: List[Observation.Id]
   ): F[Set[Observation.Id]] =
     NonEmptyList.fromList(oids) match
