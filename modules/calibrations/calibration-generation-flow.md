@@ -147,46 +147,58 @@ flowchart TD
 
 `PerScienceObservationCalibrationsService.scala`
 
-Each Flamingos2 or IGRINS2 science observation gets its own telluric calibration observations. The number of tellurics depends on the science observation's execution duration. Matching between instruments is handled by `CalibrationConfigMatcher` (`Flamingos2LS`, `Igrins2LS`) and `ObsExtract.perObsFilter` accepts both `Flamingos2Config` and `Igrins2Config`.
+Each Flamingos2 or IGRINS2 science observation gets its own telluric calibration observations. The number of tellurics follows the observation's planned visit: `obsDuration` (`c_observation_duration`) when set, otherwise the science time estimate from the execution digest (`telluricDuration`). Matching between instruments is handled by `CalibrationConfigMatcher` (`Flamingos2LS`, `Igrins2LS`) and `ObsExtract.perObsFilter` accepts both `Flamingos2Config` and `Igrins2Config`.
+
+Editing `obsDuration` re-enqueues the calibration calculation for science observations (`cascade_calibration_duration_recalc_trigger`, V1326).
 
 ### Flow
 
 ```mermaid
 flowchart TD
     A[generateCalibrations pid, scienceObs, oid] --> B[Find the changed observation in scienceObs]
-    B --> C[Filter to Defined/Ready workflow states only]
-    C --> D[Set all constraints to deferred]
+    B --> D[Set all constraints to deferred]
     D --> E[Load program group tree]
 
-    E --> F{Is observation still active?}
-    F -->|Yes: Defined/Ready| G[generateTelluricForScience]
-    F -->|No: other state| H[cleanupOrphanedTelluricGroup]
+    E --> F{Workflow state?}
+    F -->|Defined/Ready| G[generateObsCalibrationsForScience]
+    F -->|other| F2{Has a calibration group?}
+    F2 -->|No| Z[Skip]
+    F2 -->|Yes| F3{Ongoing and requests tellurics?}
+    F3 -->|Yes| J2["syncTelluricObservation (count only: no config sync of existing tellurics)"]
+    F3 -->|No| H[cleanupOrphanedObsCalibrationGroup]
 
-    G --> I[Find or create telluric group for this science obs]
-    I --> J[syncTelluricObservation]
+    G --> I[Find or create the calibration group for this science obs]
+    I --> J["syncTelluricObservation (also syncs config of existing tellurics)"]
 
-    J --> K[Find existing telluric obs in group]
-    K --> L[Filter out non-deletable obs]
-    L --> M[Query science observation duration]
+    J --> K
+    J2 --> K
+    K["findGroupTellurics: id, order, recorded duration, has visit (one query)"] --> L[Split: spent = has a visit, unobserved = the rest]
+    L --> M[telluricDuration: obsDuration, else science time]
 
     M --> N{Duration?}
-    N -->|> 1.5 hours| O[Need 2 tellurics: Before + After]
-    N -->|<= 1.5 hours| P[Need 1 telluric: After]
-    N -->|No duration| Q[Need 0 tellurics]
+    N -->|> 1.5 hours| O[Required: Before + After]
+    N -->|<= 1.5 hours| P[Required: After]
+    N -->|None| Q[Required: nothing]
 
-    O --> R{Existing count matches needed count?}
+    O --> R{Unobserved orders match required orders?}
     P --> R
     Q --> R
 
-    R -->|No| S[Delete all deletable tellurics]
-    S --> T[Create new telluric observations]
-    R -->|Yes| U[Sync configuration on existing tellurics]
+    R -->|No, with a duration| S[Delete all unobserved tellurics]
+    R -->|No, without a duration| S2[Delete only unprotected tellurics]
+    S --> T[Create the required set with the current duration]
+    S2 --> T
+    R -->|Yes| U{Recorded duration differs?}
+    U -->|Yes| U2[updateScienceDuration: new duration, requeue star search]
+    U -->|No| U3[Keep]
 
-    T --> V[For each telluric:]
+    T --> V[For each new telluric:]
     V --> W[Clone observing mode from science obs]
     W --> X[Set telluric exposure time mode]
-    X --> Y["S/N = min(science_S/N x 2, 100)"]
+    X --> Y["S/N = max(science_S/N x 2, 100)"]
 ```
+
+Spent tellurics are never deleted or counted: the next visit gets its own set, so an observation can accumulate more tellurics than one visit needs. The unobserved ones are replaced as a set rather than reused one by one, so every telluric of a visit shares one recorded duration.
 
 ### Telluric Observation Details
 
@@ -205,7 +217,7 @@ The telluric's effective workflow state is **inherited from its parent science o
 
 ### Telluric Target Resolution
 
-After a telluric observation is created, `TelluricTargetsService` asynchronously resolves its target star from HIP catalog data. Brightness limits (`c_hmin_hot`, `c_hmin_solar`) are loaded at startup into an `HminBrightnessCache` keyed by `HminBrightnessKey.F2(disperser, filter, fpu)` or `HminBrightnessKey.Igrins2`. For F2 the key comes from the instrument config; IGRINS2 has a single entry because it has no per-config variation.
+After a telluric observation is created, `TelluricTargetsService` asynchronously resolves its target star from HIP catalog data. The search reads `c_science_duration` from `t_telluric_resolution`: it sizes the search window (capped at the max telluric duration) and picks the selection rule (over 1.5 hours match the telluric's order, otherwise the RA vs twilight LST rule). When the sync keeps a telluric whose recorded duration is outdated, `updateScienceDuration` writes the new one and requeues the search like `invalidate_telluric_resolution`; a row still `calculating` keeps its state and is requeued when its stale result fails to match `c_last_invalidation`. Brightness limits (`c_hmin_hot`, `c_hmin_solar`) are loaded at startup into an `HminBrightnessCache` keyed by `HminBrightnessKey.F2(disperser, filter, fpu)` or `HminBrightnessKey.Igrins2`. For F2 the key comes from the instrument config; IGRINS2 has a single entry because it has no per-config variation.
 
 ### Deletion Protection
 
@@ -213,7 +225,7 @@ All calibration deletion guards in `CalibrationsUtils.scala` read execution stat
 
 - `excludeOngoingAndCompleted` — base helper used by the GMOS deletion paths (`CalibrationsService.recalculateCalibrations`, `PerProgramPerConfigCalibrationsService.removeUnnecessaryCalibrations`).
 - `excludeFromDeletion` — composes the above with a `t_visit`-based check.
-- `excludeTelluricsFromDeletion` — also checks the **parent science observation** in the same group, for the sc-8614 case where the parent has started executing but obscalc hasn't refreshed.
+- `excludeObsCalibrationsFromDeletion` — also checks the **parent science observation** in the same group, for the sc-8614 case where the parent has started executing but obscalc hasn't refreshed.
 
 For tellurics specifically, even if the telluric's own mirrored state still says `Defined`/`Ready`, the telluric is protected when the parent science obs has started executing (`Ongoing`, `Completed`, or `DeclaredComplete`).
 
@@ -231,7 +243,7 @@ flowchart TD
     F -->|NotStarted / NotDefined| E[YES - safe to delete]
 ```
 
-The parent state is resolved by `selectTelluricScienceExecutionStates`, which joins `t_observation` to itself by `c_group_id` (picking the row with `c_calibration_role IS NULL`) and then to `v_generator_params` for the execution state. Both `syncTelluricObservation` and `cleanupOrphanedTelluricGroup` use this filter.
+The parent state is resolved by `selectTelluricScienceExecutionStates`, which joins `t_observation` to itself by `c_group_id` (picking the row with `c_calibration_role IS NULL`) and then to `v_generator_params` for the execution state. `cleanupOrphanedObsCalibrationGroup` uses this filter. `syncTelluricObservation` uses it only when there is no duration; with a duration it deletes every unobserved telluric when the required orders change, including those of an ongoing science, since the replacements carry the current duration. Spent tellurics are never deleted.
 
 ## Strategy 2: Per-Program-Per-Config Calibrations (GMOS SpectroPhotometric + Twilight)
 
@@ -384,7 +396,8 @@ sequenceDiagram
 |-----------|---------------|----------------|
 | Count science obs toward GMOS calibrations | Defined, Ready (obscalc settled), Ongoing, Completed | All others |
 | Process science observation (telluric path) | Defined, Ready | All others |
+| Sync telluric count only (no config sync of existing tellurics) | Ongoing, with a calibration group and tellurics requested | All others |
 | Modify calibration observation | execution state NotStarted/NotDefined | Ongoing, Completed, DeclaredComplete |
 | Delete calibration observation | execution state NotStarted/NotDefined (no visits) | Ongoing, Completed, DeclaredComplete, or has visits |
-| Delete telluric calibration | Above, **and** parent science obs execution state NotStarted/NotDefined | Same as above, plus parent science Ongoing/Completed/DeclaredComplete |
+| Delete telluric calibration | Above, **and** parent science obs execution state NotStarted/NotDefined; or, during a telluric sync with a duration, any telluric without visits | Has visits; otherwise as above |
 | Directly transition a telluric via `setWorkflowState` | None (while ≤ Ready) | All transitions rejected; state mirrors science obs |
