@@ -140,7 +140,7 @@ class archiveDuplication extends OdbSuite:
   test("an observation that has never been searched reads as not checked"):
     for
       oid <- siderealObservation
-      js  <- archiveDuplication(oid, "state matchCount saturated lastCheckedAt error queryUrls matches { name }")
+      js  <- archiveDuplication(oid, "state matchCount saturated lastCheckedAt error queryUrls queries { searchUrl } matches { name }")
     yield assertEquals(
       js,
       json"""
@@ -151,6 +151,7 @@ class archiveDuplication extends OdbSuite:
           "lastCheckedAt": null,
           "error": null,
           "queryUrls": [],
+          "queries": [],
           "matches": []
         }
       """
@@ -358,6 +359,21 @@ class archiveDuplication extends OdbSuite:
       assert(urls.forall(_.startsWith("https://archive.gemini.edu/jsonsummary/notengineering/NotFail/")))
       // An imaging observation is not duplicated by a spectrum of the same field.
       assert(urls.forall(_.contains("/OBJECT/IMAGING/ra=")))
+
+  test("queries name the instrument and a browsable search page for each query URL"):
+    for
+      oid <- siderealObservation
+      _   <- refresh(GoaClientMock.fromJson[IO](SparseRecord))(oid)
+      js  <- archiveDuplication(oid, "queryUrls queries { instrument searchUrl }")
+    yield
+      val urls = js.hcursor.downField("queryUrls").as[List[String]].toOption.get
+      val expected = urls.map: url =>
+        val instrument = if url.contains("/GMOS-N/") then "GMOS_NORTH" else "GMOS_SOUTH"
+        Json.obj(
+          "instrument" -> Json.fromString(instrument),
+          "searchUrl"  -> Json.fromString(url.replace("/jsonsummary/", "/searchform/"))
+        )
+      assertEquals(js.hcursor.downField("queries").focus, Json.arr(expected*).some)
 
   test("distance is the separation from the stored search center"):
     for

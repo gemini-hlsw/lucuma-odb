@@ -5,16 +5,23 @@ package lucuma.odb.graphql
 
 package mapping
 
+import cats.syntax.all.*
 import grackle.Query.Binding
 import grackle.Query.OrderBy
 import grackle.Query.OrderSelection
 import grackle.Query.OrderSelections
 import grackle.QueryCompiler.Elab
 import grackle.TypeRef
+import io.circe.Json
+import io.circe.syntax.*
+import lucuma.catalog.goa.GoaEndpoint
+import lucuma.catalog.goa.GoaParams
 import lucuma.core.enums.DatasetQaState
 import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObserveClass
+import lucuma.core.syntax.string.*
 import lucuma.odb.goa
+import org.http4s.Uri
 
 import table.ArchiveDuplicationView
 import table.ArchiveMatchView
@@ -39,8 +46,23 @@ trait ArchiveDuplicationMapping[F[_]]
       SqlField("searchTargetName", ArchiveDuplicationView.SearchTargetName),
       SqlObject("searchRadius"),
       SqlField("queryUrls", ArchiveDuplicationView.QueryUrls),
+      CursorFieldJson(
+        "queries",
+        _.fieldAs[List[String]]("queryUrls").map(_.mapFilter(archiveQuery).asJson),
+        List("queryUrls")
+      ),
       SqlObject("matches", Join(ArchiveDuplicationView.ObservationId, ArchiveMatchView.ObservationId))
     )
+
+  /** Every stored query URL was built by `GoaParams.toUri`, so both parts are recoverable. */
+  private def archiveQuery(queryUrl: String): Option[Json] =
+    Uri.fromString(queryUrl).toOption.flatMap: uri =>
+      GoaParams.instrumentOf(uri).map: instrument =>
+        val searchUrl = GoaEndpoint.fromUri.replace(GoaEndpoint.SearchForm)(uri)
+        Json.obj(
+          "instrument" -> instrument.tag.toScreamingSnakeCase.asJson,
+          "searchUrl"  -> searchUrl.renderString.asJson
+        )
 
   lazy val ArchiveMatchMapping: ObjectMapping =
     ObjectMapping(ArchiveMatchType)(

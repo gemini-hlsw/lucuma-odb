@@ -17215,8 +17215,25 @@ type ArchiveDuplication {
   """
   queryUrls: [String!]!
 
+  """
+  The same queries as `queryUrls`, in the same order, each with the instrument
+  it searched and a GOA search page a person can browse.
+  """
+  queries: [ArchiveQuery!]!
+
   "The matched archive files, ordered by file name."
   matches: [ArchiveMatch!]!
+
+}
+
+"One GOA query an Archive Duplication Search ran."
+type ArchiveQuery {
+
+  "The instrument the query searched."
+  instrument: Instrument!
+
+  "The GOA search page for the query for human consumption."
+  searchUrl: String!
 
 }
 
