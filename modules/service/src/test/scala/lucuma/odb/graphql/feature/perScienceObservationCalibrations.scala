@@ -1722,6 +1722,77 @@ class perScienceObservationCalibrations
       assertEquals(removed2.size, 2)
     }
 
+  test("obsDuration decides the telluric count, science time is the fallback"):
+    def tellurics(gid: Group.Id): IO[Int] =
+      queryObservationsInGroup(gid).map(_.count(_.calibrationRole.contains(CalibrationRole.Telluric)))
+    for {
+      pid  <- createProgramAs(pi)
+      tid  <- createTargetWithProfileAs(pi, pid)
+      oid  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _    <- setExposureTime(oid, 120)
+      _    <- runObscalcUpdate(pid, oid)
+      _    <- setObservationTimeAndDuration(pi, oid, none, 60.minTimeSpan.some)
+      _    <- recalculateCalibrations(pid, when, oid)
+      gid  <- queryObservation(oid).map(_.groupId.get)
+      n1   <- tellurics(gid)
+      _    <- setObservationTimeAndDuration(pi, oid, none, 120.minTimeSpan.some)
+      _    <- recalculateCalibrations(pid, when, oid)
+      n2   <- tellurics(gid)
+      _    <- setObservationTimeAndDuration(pi, oid, none, none)
+      _    <- recalculateCalibrations(pid, when, oid)
+      n3   <- tellurics(gid)
+    } yield {
+      // A one-hour visit of a two-hour science observation needs one telluric.
+      assertEquals(n1, 1)
+      assertEquals(n2, 2)
+      // Without a duration the two hours of science time decide.
+      assertEquals(n3, 2)
+    }
+
+  test("an ongoing science keeps both tellurics when obsDuration drops"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- setExposureTime(oid, 120)
+      _                  <- runObscalcUpdate(pid, oid)
+      (added1, _)        <- recalculateCalibrations(pid, when, oid)
+      vid                <- recordVisitAs(serviceUser, oid)
+      _                  <- addSequenceEventAs(serviceUser, vid, SequenceCommand.Start)
+      _                  <- setObservationTimeAndDuration(pi, oid, none, 60.minTimeSpan.some)
+      (added2, removed2) <- recalculateCalibrations(pid, when, oid)
+      gid                <- queryObservation(oid).map(_.groupId.get)
+      obsInGroup         <- queryObservationsInGroup(gid)
+    } yield {
+      assertEquals(added1.size, 2)
+      assertEquals(added2.size, 0)
+      assertEquals(removed2.size, 0)
+      assertEquals(obsInGroup.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 2)
+    }
+
+  test("observed tellurics are spent, the next visit gets a fresh pair"):
+    for {
+      pid                <- createProgramAs(pi)
+      tid                <- createTargetWithProfileAs(pi, pid)
+      oid                <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _                  <- setExposureTime(oid, 120)
+      _                  <- runObscalcUpdate(pid, oid)
+      (added1, _)        <- recalculateCalibrations(pid, when, oid)
+      _                  <- added1.traverse_(recordVisitAs(serviceUser, _))
+      (added2, removed2) <- recalculateCalibrations(pid, when, oid)
+      gid                <- queryObservation(oid).map(_.groupId.get)
+      obsInGroup         <- queryObservationsInGroup(gid)
+      metas              <- added2.traverse(selectMeta)
+      orders             =  metas.flatten.map(_.calibrationOrder)
+    } yield {
+      assertEquals(added1.size, 2)
+      assertEquals(added2.size, 2)
+      assertEquals(removed2.size, 0)
+      assertEquals(obsInGroup.count(_.calibrationRole.contains(CalibrationRole.Telluric)), 4)
+      assert(orders.contains(TelluricCalibrationOrder.Before))
+      assert(orders.contains(TelluricCalibrationOrder.After))
+    }
+
   test("Obs calibration group and obs preserved when science becomes ongoing"):
     for {
       pid                <- createProgramAs(pi)

@@ -139,7 +139,7 @@ A stretch of roughly 90 minutes of science time (the Calibration Epoch Interval)
 _Avoid_: visit (a scheduling unit), calibration set, telluric interval.
 
 **Multi-Telluric Threshold**:
-The science time per visit (90 minutes today) above which a visit is given two tellurics, one before and one after the science, instead of one after. A scheduling rule applied by the calibrations service when tellurics are materialised; it shares its value with the Calibration Epoch Interval by coincidence, and the two are separate constants so they may diverge.
+The visit length (90 minutes today) above which a science observation is given two tellurics, one before and one after the science, instead of one after. The visit length is the observation's planned duration when one is set, otherwise its science time. A scheduling rule applied by the calibrations service when tellurics are materialised; it shares its value with the Calibration Epoch Interval by coincidence, and the two are separate constants so they may diverge. A telluric that has been observed is spent and stays in the group; the requirement is met by unobserved tellurics, and missing ones are created, so an ongoing observation can accumulate more tellurics than one visit needs.
 _Avoid_: telluric threshold, 1.5 h rule, epoch interval (the estimating constant).
 
 **Calibration Count**:

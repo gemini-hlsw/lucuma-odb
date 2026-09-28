@@ -128,11 +128,24 @@ object PerScienceObservationCalibrationsService:
           .prepareR(Statements.selectTelluricObservations)
           .use(_.stream((gid, CalibrationRole.Telluric), 10).compile.toList)
 
-      private def obsDuration(
+      // The planned visit decides the telluric count and the star search; the
+      // science time estimate stands in until a duration is set.
+      private def telluricDuration(
         scienceOid: Observation.Id
       )(using Transaction[F]): F[Option[TimeSpan]] =
-        obscalcService.selectExecutionDigest(scienceOid).map:
-          _.flatMap(_.value.toOption).map(_.science.timeEstimate.sum)
+        session.prepareR(Statements.selectObservationDuration).use(_.unique(scienceOid)).flatMap:
+          case Some(d) => d.some.pure[F]
+          case None    =>
+            obscalcService.selectExecutionDigest(scienceOid).map:
+              _.flatMap(_.value.toOption).map(_.science.timeEstimate.sum)
+
+      private def telluricOrders(
+        oids: List[Observation.Id]
+      ): F[List[(Observation.Id, TelluricCalibrationOrder)]] =
+        NonEmptyList.fromList(oids).fold(List.empty.pure[F]): nel =>
+          val af = Statements.selectTelluricOrders(nel)
+          session.prepareR(af.fragment.query(observation_id *: telluric_calibration_order))
+            .use(_.stream(af.argument, 10).compile.toList)
 
       private def insertTelluricObservation(
         pid:             Program.Id,
@@ -192,33 +205,34 @@ object PerScienceObservationCalibrationsService:
           _          <- syncConfiguration(pid, scienceOid, telluricId, CalibrationRole.Telluric)
         } yield telluricId
 
+      /** Orders a visit of this duration needs: one after, or one before and one after. */
+      private def requiredOrders(duration: TimeSpan): List[TelluricCalibrationOrder] =
+        if (ObsExtract.telluricsForVisit(duration).value > 1)
+          List(TelluricCalibrationOrder.Before, TelluricCalibrationOrder.After)
+        else
+          List(TelluricCalibrationOrder.After)
+
       private def createTelluricCalibrations(
         pid:        Program.Id,
         scienceOid: Observation.Id,
         groupId:    Group.Id,
-        duration:   TimeSpan
+        duration:   TimeSpan,
+        orders:     List[TelluricCalibrationOrder]
       )(using Transaction[F], SuperUserAccess): F[List[Observation.Id]] =
         def obsGroupIndex(scienceOid: Observation.Id): F[NonNegShort] =
           session
             .prepareR(Statements.selectScienceObservationIndex)
             .use(_.unique(scienceOid))
 
-        if (ObsExtract.telluricsForVisit(duration).value > 1)
-          // Long visit: 1 telluric before and 1 after
-          for {
-            sciIdx <- obsGroupIndex(scienceOid)
-            bIdx   = NonNegShort.unsafeFrom(sciIdx.value.toShort)
-            c1     <- createTelluricObs(pid, scienceOid, groupId, bIdx, duration, TelluricCalibrationOrder.Before)
-            aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 2).toShort)
-            c2     <- createTelluricObs(pid, scienceOid, groupId, aftIdx, duration, TelluricCalibrationOrder.After)
-          } yield List(c1, c2)
-        else
-          // Short visit: one telluric after science
-          for {
-            sciIdx <- obsGroupIndex(scienceOid)
-            aftIdx = NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
-            cal    <- createTelluricObs(pid, scienceOid, groupId, aftIdx, duration, TelluricCalibrationOrder.After)
-          } yield List(cal)
+        // A Before telluric takes the science index (pushing the science down);
+        // an After telluric goes right past the science.
+        orders.foldLeftM(List.empty[Observation.Id]): (created, order) =>
+          obsGroupIndex(scienceOid).flatMap: sciIdx =>
+            val idx = order match
+              case TelluricCalibrationOrder.Before => sciIdx
+              case TelluricCalibrationOrder.After  =>
+                NonNegShort.unsafeFrom((sciIdx.value + 1).toShort)
+            createTelluricObs(pid, scienceOid, groupId, idx, duration, order).map(created :+ _)
 
       private def readObsCalibrationGroup(
         pid:  Program.Id,
@@ -248,18 +262,27 @@ object PerScienceObservationCalibrationsService:
           for {
             existing           <- findAllTelluricObservations(gid)
             deletable          <- excludeObsCalibrationsFromDeletion(existing, identity)
-            duration           <- if (requiresTelluric) obsDuration(obs.id)
+            // An observed telluric is spent: the next visit is served by the unobserved ones.
+            executed           <- haveVisits(existing)
+            unexecuted         =  existing.filterNot(executed.contains)
+            duration           <- if (requiresTelluric) telluricDuration(obs.id)
                                   else Option.empty[TimeSpan].pure[F]
             _                  <- warn"No execution digest duration for ${obs.id}, requiring 0 tellurics".whenA(requiresTelluric && duration.isEmpty)
             _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
-            requiredCount      = duration.fold(0)(ObsExtract.telluricsForVisit(_).value)
-            // Delete/recreate if count changes
-            (created, deleted) <- if (existing.size != requiredCount)
+            required           =  duration.toList.flatMap(requiredOrders)
+            available          <- telluricOrders(unexecuted)
+            satisfied          =  available.map(_._2.tag).sorted == required.map(_.tag).sorted
+            (created, deleted) <- if (!satisfied)
                                     for
                                       _ <- NonEmptyList.fromList(deletable)
                                             .traverse_(observationService.deleteCalibrationObservations)
-                                      c <- duration.fold(List.empty[Observation.Id].pure):
-                                             createTelluricCalibrations(pid, obs.id, gid, _)
+                                      kept    = available.collect:
+                                                  case (o, order) if !deletable.contains(o) => order
+                                      missing = required.diff(kept)
+                                      c <- duration.toList.flatTraverse: d =>
+                                             createTelluricCalibrations(
+                                               pid, obs.id, gid, d, missing
+                                             )
                                     yield (c, deletable)
                                   else
                                     (List.empty, List.empty).pure[F]
@@ -817,6 +840,20 @@ object PerScienceObservationCalibrationsService:
           """.command
              .contramap: (altair, oid) =>
                (altair.map(_.mode), altair.flatMap(_.explicitFieldLens), altair.map(_.cassRotator), altair.map(_.ndFilter), oid)
+
+        val selectObservationDuration: Query[Observation.Id, Option[TimeSpan]] =
+          sql"""
+            SELECT c_observation_duration
+            FROM   t_observation
+            WHERE  c_observation_id = $observation_id
+          """.query(time_span.opt)
+
+        def selectTelluricOrders(oids: NonEmptyList[Observation.Id]): AppliedFragment =
+          sql"""
+            SELECT c_observation_id, c_calibration_order
+            FROM   t_telluric_resolution
+            WHERE  c_observation_id IN (${observation_id.list(oids.size)})
+          """.apply(oids.toList)
 
         val selectScienceObservationIndex: Query[Observation.Id, NonNegShort] =
           sql"""
