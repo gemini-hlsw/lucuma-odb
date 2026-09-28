@@ -1219,7 +1219,7 @@ object GuideService {
           angles        <- ResultT.fromResult(
                              obsInfo.posAngleConstraint
                               .anglesToTestAt(genInfo.site, baseTracking, scienceTime.toInstant, scienceDuration.toDuration)
-                              .toResult(generalError(s"No angles to test for guide target candidates for observation $oid.").asProblem)
+                              .toResult(generalError(s"Cannot compute the average parallactic angle for observation $oid: the target is not observable at the observation time, or its position is unknown then.").asProblem)
                            )
           blindOffsetOpt <- ResultT.liftF(getBlindOffsetCoordinates(oid, obsTime.toInstant))
           optUsable      <- ResultT.liftF(chooseBestGuideStar(obsInfo, genInfo.agsWavelength, genInfo, baseCoords, scienceCoords, blindOffsetOpt, angles, candidates, trackType))
