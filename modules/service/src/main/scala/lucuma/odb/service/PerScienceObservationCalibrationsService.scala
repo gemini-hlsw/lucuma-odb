@@ -11,6 +11,7 @@ import eu.timepit.refined.types.numeric.PosInt
 import eu.timepit.refined.types.string.NonEmptyString
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.Instrument
+import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.TelluricCalibrationOrder
 import lucuma.core.math.Angle
@@ -251,7 +252,8 @@ object PerScienceObservationCalibrationsService:
         pid:              Program.Id,
         obs:              ObsExtract[CalibrationConfigSubset],
         gid:              Group.Id,
-        requiresTelluric: Boolean
+        requiresTelluric: Boolean,
+        syncExisting:     Boolean
       )(using Transaction[F], SuperUserAccess): F[(List[Observation.Id], List[Observation.Id])] =
         T.span("sync-telluric", Attribute.from(ProgramIdKey, pid), Attribute.from(GroupIdKey, gid)).surround:
           for {
@@ -265,8 +267,7 @@ object PerScienceObservationCalibrationsService:
             _                  <- info"Observation ${obs.id} does not request tellurics".unlessA(requiresTelluric)
             required           =  duration.toList.flatMap(requiredOrders)
             complete           =  unobserved.flatMap(_.order).map(_.tag).sorted ==
-                                    required.map(_.tag).sorted &&
-                                    unobserved.forall(_.duration === duration)
+                                    required.map(_.tag).sorted
             toDelete           <- duration.fold(excludeObsCalibrationsFromDeletion(existing, identity)):
                                     _ => unobserved.map(_.oid).pure[F]
             (created, deleted) <- if (!complete)
@@ -279,9 +280,14 @@ object PerScienceObservationCalibrationsService:
                                   else
                                     (List.empty, List.empty).pure[F]
             // Only sync existing tellurics that are note deleted or recreated.
-            toSync              = if (created.nonEmpty) List.empty
+            toSync              = if (created.nonEmpty || !syncExisting) List.empty
                                   else existing.filterNot(deleted.contains)
             _                  <- toSync.traverse_(tid => syncConfiguration(pid, obs.id, tid, CalibrationRole.Telluric))
+            // Kept tellurics search again when the duration they were created with is outdated.
+            stale              =  duration.toList.flatMap: d =>
+                                    unobserved.collect:
+                                      case t if complete && t.duration.exists(_ =!= d) => (t.oid, d)
+            _                  <- stale.traverse_(telluricTargetsService.updateScienceDuration)
           } yield (created, deleted)
 
       // ---- Daytime pinhole flats (GNIRS cross-dispersed) ----
@@ -371,7 +377,7 @@ object PerScienceObservationCalibrationsService:
           else
             for
               gid     <- readObsCalibrationGroup(pid, tree, obs)
-              tResult <- syncTelluricObservation(pid, obs, gid, requiresTelluric)
+              tResult <- syncTelluricObservation(pid, obs, gid, requiresTelluric, syncExisting = true)
               pResult <- syncDaytimePinhole(pid, obs, gid)
             yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
 
@@ -722,11 +728,22 @@ object PerScienceObservationCalibrationsService:
                                   case None =>
                                     for {
                                       gidOpt  <- findObsCalibrationGroupForObservation(oid)
-                                      result  <- gidOpt match
-                                                  case Some(gid) =>
+                                      ongoing <- gidOpt.fold(List.empty.pure[F]): _ =>
+                                                   filterWorkflowStateIn(
+                                                     scienceObs.filter(_.id === oid),
+                                                     _.id,
+                                                     List(ObservationWorkflowState.Ongoing),
+                                                     false
+                                                   )
+                                      result  <- (gidOpt, ongoing.find(_.requiresTelluric)) match
+                                                  // Between visits only the telluric count follows obsDuration.
+                                                  case (Some(gid), Some(obs)) =>
+                                                    info"Observation $oid is ongoing, syncing its telluric count" *>
+                                                      syncTelluricObservation(pid, obs, gid, true, syncExisting = false)
+                                                  case (Some(gid), None) =>
                                                     info"Observation $oid no longer active or ongoing, cleaning up obs calibration group $gid" *>
                                                       cleanupOrphanedObsCalibrationGroup(pid, gid, oid)
-                                                  case None =>
+                                                  case (None, _) =>
                                                     debug"Observation $oid has no obs calibration group, skipping" *>
                                                       (List.empty[Observation.Id], List.empty[Observation.Id]).pure
                                     } yield result

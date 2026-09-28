@@ -1749,7 +1749,7 @@ class perScienceObservationCalibrations
       assertEquals(n3, 2)
     }
 
-  test("a new obsDuration above the threshold replaces the pair with the new duration"):
+  test("a new obsDuration keeping the same tellurics requeues their search with it"):
     for {
       pid                <- createProgramAs(pi)
       tid                <- createTargetWithProfileAs(pi, pid)
@@ -1758,14 +1758,18 @@ class perScienceObservationCalibrations
       _                  <- runObscalcUpdate(pid, oid)
       _                  <- setObservationTimeAndDuration(pi, oid, none, 100.minTimeSpan.some)
       (added1, _)        <- recalculateCalibrations(pid, when, oid)
+      _                  <- sleep >> resolveTelluricTargets
+      before             <- added1.traverse(selectMeta)
       _                  <- setObservationTimeAndDuration(pi, oid, none, 150.minTimeSpan.some)
       (added2, removed2) <- recalculateCalibrations(pid, when, oid)
-      metas              <- added2.traverse(selectMeta)
+      after              <- added1.traverse(selectMeta)
     } yield {
       assertEquals(added1.size, 2)
-      assertEquals(added2.size, 2)
-      assertEquals(removed2.toSet, added1.toSet)
-      assertEquals(metas.flatten.map(_.scienceDuration), List(150.minTimeSpan, 150.minTimeSpan))
+      assertEquals(added2, Nil)
+      assertEquals(removed2, Nil)
+      assertEquals(before.flatten.map(_.state), List(CalculationState.Ready, CalculationState.Ready))
+      assertEquals(after.flatten.map(_.scienceDuration), List(150.minTimeSpan, 150.minTimeSpan))
+      assertEquals(after.flatten.map(_.state), List(CalculationState.Pending, CalculationState.Pending))
     }
 
   test("an ongoing science replaces its unobserved tellurics when obsDuration drops"):

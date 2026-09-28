@@ -95,6 +95,14 @@ trait TelluricTargetsService[F[_]]:
   )(using ServiceAccess, Transaction[F]): F[Unit]
 
   /**
+   * Replaces the science duration of a telluric's resolution request and requeues the search.
+   */
+  def updateScienceDuration(
+    telluricId:      Observation.Id,
+    scienceDuration: TimeSpan
+  )(using ServiceAccess, Transaction[F]): F[Unit]
+
+  /**
    * Resolves the telluric target and updates the database.
    */
   def resolveTargets(
@@ -352,6 +360,12 @@ object TelluricTargetsService:
         order:           TelluricCalibrationOrder
       )(using ServiceAccess, Transaction[F]): F[Unit] =
         session.execute(Statements.InsertResolutionRequest)(telluricId, pid, scienceId, scienceDuration, order).void
+
+      override def updateScienceDuration(
+        telluricId:      Observation.Id,
+        scienceDuration: TimeSpan
+      )(using ServiceAccess, Transaction[F]): F[Unit] =
+        session.execute(Statements.UpdateScienceDuration)(scienceDuration, telluricId).void
 
       override def resolveTargets(
         pending: TelluricTargets.Pending
@@ -627,6 +641,20 @@ object TelluricTargetsService:
               AND  c_last_invalidation = $core_timestamp
             RETURNING #$metaColumns
           """.query(meta)
+
+        // Like invalidate_telluric_resolution: a calculating row keeps its state and is
+        // requeued when its stale result fails to match c_last_invalidation.
+        val UpdateScienceDuration: Command[(TimeSpan, Observation.Id)] =
+          sql"""
+            UPDATE t_telluric_resolution
+            SET    c_science_duration  = $time_span,
+                   c_last_invalidation = now(),
+                   c_failure_count     = 0,
+                   c_retry_at          = NULL,
+                   c_state             = CASE WHEN c_state = 'calculating' THEN c_state
+                                              ELSE 'pending'::e_calculation_state END
+            WHERE  c_observation_id = $observation_id
+          """.command
 
         val RequeueSuperseded: Command[Observation.Id] =
           sql"""
