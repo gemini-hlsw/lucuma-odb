@@ -141,8 +141,8 @@ case class ObservationValidationInfo(
    */
   def hasTooTarget: Boolean =
     asterism.exists:
-      case _: Target.Opportunity => true
-      case _ => false
+      case Target.Opportunity(_, _, _) => true
+      case _                           => false
 
   def isVisitor: Boolean =
     observingMode.exists:

@@ -17190,9 +17190,11 @@ enum TooTriggerStatus {
   WITHDRAWN
 
   """
-  When the observation's scheduling mode is adjusted after a trigger has already
-  been fired, any existing ToOs in REQUESTED status are SUPERSEDED by a new
-  ToO trigger record.
+  A SUPERSEDED request is one replaced by a request at a different activation.
+  When the observation's ToO activation changes while a request is REQUESTED, the
+  request is closed out as SUPERSEDED and a successor is created at the new
+  activation, pointing back at it through `supersedes`.  Lowering the activation
+  to NONE withdraws the request instead.
   """
   SUPERSEDED
 }

@@ -66,9 +66,9 @@ object GoaQueryPolicy:
 
     def fromTarget(target: Target): TargetPointing =
       target match
-        case _: Target.Sidereal    => Sidereal
-        case n: Target.Nonsidereal => NonSidereal(n.name)
-        case _: Target.Opportunity => Unresolvable
+        case Target.Sidereal(_, _, _, _)   => Sidereal
+        case Target.Nonsidereal(name, _, _) => NonSidereal(name)
+        case Target.Opportunity(_, _, _)    => Unresolvable
 
   /**
    * every instrument an observation taken with `instrument` is searched against, itself included.

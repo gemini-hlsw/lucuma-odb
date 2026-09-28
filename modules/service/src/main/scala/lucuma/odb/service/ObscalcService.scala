@@ -309,8 +309,8 @@ object ObscalcService:
                 .flatMap: targets =>
                   targets
                     .traverse:
-                      case (_, t: Target.Sidereal) => t.tracking.some
-                      case _                       => none
+                      case (_, Target.Sidereal(_, tracking, _, _)) => tracking.some
+                      case _                                       => none
                     .flatMap(ts => CompositeTracking(ts).at(Epoch.J2000.toInstant))
 
       private def storeResult(

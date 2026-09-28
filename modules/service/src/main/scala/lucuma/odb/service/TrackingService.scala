@@ -352,9 +352,9 @@ object TrackingService:
         def singleTargetResult(t: Target): Result[Option[BasePosition]] =
           val name = BasePosition.truncate(t.name)
           t match
-            case s: Sidereal    => Result.success(BasePosition(BasePositionType.SingleTarget, name, Some(s), None,    None).some)
-            case n: Nonsidereal => Result.success(BasePosition(BasePositionType.SingleTarget, name, None,    Some(n), None).some)
-            case _: Opportunity => Result.success(None)
+            case s @ Sidereal(_, _, _, _) => Result.success(BasePosition(BasePositionType.SingleTarget, name, Some(s), None,    None).some)
+            case n @ Nonsidereal(_, _, _) => Result.success(BasePosition(BasePositionType.SingleTarget, name, None,    Some(n), None).some)
+            case Opportunity(_, _, _)     => Result.success(None)
 
         def explicitBaseResult(
           targets: NonEmptyList[Target],
@@ -372,7 +372,7 @@ object TrackingService:
           targets: NonEmptyList[Target],
           obsTime: Option[Timestamp]
         )(using SuperUserAccess): F[Result[Option[BasePosition]]] =
-          if targets.exists { case _: Opportunity => true; case _ => false } then
+          if targets.exists { case Opportunity(_, _, _) => true; case _ => false } then
             Result.success(Option.empty[BasePosition]).pure[F]
           else obsTime match
             case None    =>
