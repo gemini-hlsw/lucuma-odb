@@ -102,8 +102,9 @@ case class AcquisitionConfig(
   /**
    * Coadds for the acquisition steps. In S/N mode every single exposure the ITC asked for
    * (its frames times its coadds) is folded into the coadds of one frame, so the acquisition
-   * takes a single step. In time-and-count mode the user controls the acquisition directly,
-   * so the explicit coadds are used.
+   * takes a single step. See https://app.shortcut.com/lucuma/story/9189/gnirs-acquisition-coadds.
+   * In time-and-count mode the user controls the acquisition directly, so the explicit coadds
+   * are used.
    */
   def resolvedCoadds(time: IntegrationTime): PosInt =
     exposureTimeMode match

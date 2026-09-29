@@ -61,7 +61,7 @@ object Science:
       for
         _ <- GnirsDynamicConfig.filter   := filter
         _ <- GnirsDynamicConfig.exposure := time.exposureTime
-        _ <- GnirsDynamicConfig.coadds   := config.coaddsFor(filter, time)
+        _ <- GnirsDynamicConfig.coadds   := time.coadds
         _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time.exposureTime))
       yield ()
 

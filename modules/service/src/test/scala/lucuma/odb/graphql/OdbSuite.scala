@@ -317,11 +317,18 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
       TotalSN(SignalToNoise.unsafeFromBigDecimalExact(7))
     )
 
+  // OCS echoes the requested coadds back in its result; only GNIRS requests carry any.
+  private def requestedCoadds(mode: lucuma.itc.client.InstrumentMode): PosInt =
+    mode match
+      case lucuma.itc.client.InstrumentMode.GnirsSpectroscopy(coadds = c) => c
+      case lucuma.itc.client.InstrumentMode.GnirsImaging(coadds = c)      => c
+      case _                                                               => PosInt.unsafeFrom(1)
+
   protected def itcClient: ItcClient[IO] =
     new ItcClient[IO] {
 
       override def imaging(input: ImagingInput, useCache: Boolean): IO[ClientCalculationResult] =
-        val result = fakeItcImagingResultFor(input).getOrElse(fakeItcImagingResult)
+        val result = fakeItcImagingResultFor(input).getOrElse(fakeItcImagingResult).copy(coadds = requestedCoadds(input.mode))
         ClientCalculationResult(
           FakeItcVersions,
           AsterismIntegrationTimeOutcomes(
@@ -354,7 +361,7 @@ abstract class OdbSuite(debug: Boolean = false) extends CatsEffectSuite with Tes
               case ExposureTimeMode.SignalToNoiseMode(_, _)   =>
                 fakeItcSpectroscopyResultFor(input).getOrElse(fakeItcSpectroscopyResult)
               case ExposureTimeMode.TimeAndCountMode(t, c, _) =>
-                IntegrationTime(t, PosInt.unsafeFrom(c.value))
+                IntegrationTime(t, PosInt.unsafeFrom(c.value), requestedCoadds(input.mode))
 
           ClientCalculationResult(
             FakeItcVersions,

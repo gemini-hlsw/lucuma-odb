@@ -145,7 +145,7 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
   // recipe must report those coadds rather than silently dividing them out of the frame count.
   // Side-looking port, as the web ITC assumes.
   test("gnirs S/N mode reports the coadds it chose (Shortcut 10538)".tag(LegacyITCTest)):
-    val veryBrightStar = ItcSourceDefinition(
+    val veryBrightStar  = ItcSourceDefinition(
       TargetData(
         SourceProfile.Point(
           SpectralDefinition.BandNormalized(
@@ -159,14 +159,15 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
       ),
       Band.K.asLeft
     )
-    val storyObs = ItcObservationDetails(
-      calculationMethod = ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.SpectroscopyIntegrationTime(
-        sigma = 1000.0,
-        coadds = none,
-        sourceFraction = 1.0,
-        ditherOffset = Angle.Angle0,
-        wavelengthAt = Wavelength.decimalNanometers.getOption(2140).get
-      ),
+    val storyObs        = ItcObservationDetails(
+      calculationMethod =
+        ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.SpectroscopyIntegrationTime(
+          sigma = 1000.0,
+          coadds = none,
+          sourceFraction = 1.0,
+          ditherOffset = Angle.Angle0,
+          wavelengthAt = Wavelength.decimalNanometers.getOption(2140).get
+        ),
       analysisMethod = ItcObservationDetails.AnalysisMethod.Aperture.Auto(1)
     )
     val storyConditions = ItcObservingConditions(
@@ -182,7 +183,9 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
           veryBrightStar,
           storyObs,
           storyConditions,
-          ItcTelescopeDetails(wfs = ItcWavefrontSensor.OIWFS, instrumentPort = PortDisposition.Side),
+          ItcTelescopeDetails(wfs = ItcWavefrontSensor.OIWFS,
+                              instrumentPort = PortDisposition.Side
+          ),
           ItcInstrumentDetails(gnirs.copy(portDisposition = PortDisposition.Side))
         ).asJson.noSpaces
       )

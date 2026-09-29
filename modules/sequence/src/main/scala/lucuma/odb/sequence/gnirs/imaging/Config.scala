@@ -6,13 +6,10 @@ package lucuma.odb.sequence.gnirs.imaging
 import cats.Eq
 import cats.data.NonEmptyList
 import cats.derived.*
-import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsCamera
-import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
-import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.gnirs.AcquisitionConfig
 import lucuma.odb.sequence.imaging.Variant
 import lucuma.odb.sequence.syntax.all.*
@@ -37,17 +34,6 @@ case class Config(
 
   def wellDepth: GnirsWellDepth =
     explicitWellDepth.getOrElse(defaultWellDepth)
-
-  private lazy val byFilter: Map[GnirsFilter, Filter] =
-    filters.toList.map(f => f.filter -> f).toMap
-
-  /**
-   * Coadds for the given filter's science steps, resolved against its ITC result.
-   * Falls back to 1 for a filter that isn't part of this configuration, which the
-   * sequence never asks for.
-   */
-  def coaddsFor(filter: GnirsFilter, time: IntegrationTime): PosInt =
-    byFilter.get(filter).fold(PosInt.unsafeFrom(1))(_.resolvedCoadds(time))
 
   def staticConfig: GnirsStaticConfig =
     GnirsStaticConfig(wellDepth)

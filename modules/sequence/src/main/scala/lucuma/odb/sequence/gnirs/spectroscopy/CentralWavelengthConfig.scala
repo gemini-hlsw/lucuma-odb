@@ -9,7 +9,6 @@ import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.Wavelength
 import lucuma.core.model.ExposureTimeMode
-import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
@@ -17,18 +16,14 @@ import lucuma.odb.sequence.util.HashBytes
  * One GNIRS spectroscopy science configuration: a central wavelength together
  * with the exposure time mode and coadds that apply at that wavelength.  Each is
  * a separate ITC calculation and a separate block of science steps with its own
- * flats and arcs.
+ * flats and arcs.  The coadds only feed the ITC request: the science steps take
+ * the coadds the ITC reports, which in time-and-count mode are these same values.
  */
 case class CentralWavelengthConfig(
   centralWavelength: Wavelength,
   exposureTimeMode:  ExposureTimeMode,
   coadds:            PosInt
-) derives Eq:
-  /** The ITC chooses the coadds in S/N mode; time-and-count keeps the requested ones. */
-  def resolvedCoadds(time: IntegrationTime): PosInt =
-    exposureTimeMode match
-      case ExposureTimeMode.SignalToNoiseMode(_, _)   => time.coadds
-      case ExposureTimeMode.TimeAndCountMode(_, _, _) => coadds
+) derives Eq
 
 object CentralWavelengthConfig:
 

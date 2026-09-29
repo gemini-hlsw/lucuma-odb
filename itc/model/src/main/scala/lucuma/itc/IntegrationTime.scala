@@ -23,14 +23,18 @@ case class IntegrationTime(
   frameCount:   PosInt,
   coadds:       PosInt = PosInt.unsafeFrom(1)
 ):
-  /** Single exposures over the whole result: every frame's coadds. */
+  /**
+   * Single exposures over the whole result: every frame's coadds. Saturates rather than
+   * overflowing; a count that large is unusable anyway.
+   */
   def totalExposureCount: PosInt =
-    PosInt.unsafeFrom(frameCount.value * coadds.value)
+    PosInt.unsafeFrom((frameCount.value.toLong * coadds.value).min(Int.MaxValue).toInt)
 
 object IntegrationTime:
-  // The brightest target will be the one with the smallest exposure time.
-  // We break ties by coadds, then frame count.
-  given Order[IntegrationTime] = Order.by(it => (it.exposureTime, it.coadds, it.frameCount))
+  // The brightest target will be the one with the smallest exposure time. We break ties by
+  // the single exposures needed in total, then by the components for determinism.
+  given Order[IntegrationTime] =
+    Order.by(it => (it.exposureTime, it.totalExposureCount, it.coadds, it.frameCount))
 
   // `exposureCount` is the deprecated GraphQL name of `frameCount`.
   given (using Encoder[TimeSpan]): Encoder[IntegrationTime] = it =>
