@@ -144,10 +144,10 @@ object Science:
   object Goal:
 
     def compute(
-      dithers:   List[WavelengthDither],
-      positions: List[TelescopeConfig],
-      expTimeμs: PosLong,
-      expCount:  PosInt
+      dithers:    List[WavelengthDither],
+      positions:  List[TelescopeConfig],
+      expTimeμs:  PosLong,
+      frameCount: PosInt
     ): NonEmptyList[Goal] =
 
       def nel[A](as: List[A], default: A): NonEmptyList[A] =
@@ -162,22 +162,22 @@ object Science:
 
       // First figure out how many steps per wavelength dither to assign.
 
-      val expCountPerDither =
+      val frameCountPerDither =
         NonEmptyList.fromListUnsafe:
-          if expCount.value <= (ΔλCount * maxExpPerBlock) then
+          if frameCount.value <= (ΔλCount * maxExpPerBlock) then
             // Spread the exposures we have as much as possible over the dithers.
-            val base  = expCount.value / ΔλCount
-            val extra = expCount.value % ΔλCount
+            val base  = frameCount.value / ΔλCount
+            val extra = frameCount.value % ΔλCount
             List.tabulate(ΔλCount): Δλidx =>
               base + (if Δλidx < extra then 1 else 0)
           else
             // Try to fill as many blocks as possible
-            val fullBlocks = expCount.value / maxExpPerBlock
+            val fullBlocks = frameCount.value / maxExpPerBlock
             val base       = fullBlocks / ΔλCount * maxExpPerBlock
             List.tabulate(ΔλCount): Δλidx =>
               val extra = Δλidx.comparison(fullBlocks % ΔλCount) match
                 case LessThan    => maxExpPerBlock
-                case EqualTo     => expCount.value % maxExpPerBlock
+                case EqualTo     => frameCount.value % maxExpPerBlock
                 case GreaterThan => 0
               base + extra
 
@@ -188,10 +188,10 @@ object Science:
 
       val runningSums =
         NonEmptyList.fromListUnsafe:
-          expCountPerDither.toList.scanLeft(0)(_ + _).init
+          frameCountPerDither.toList.scanLeft(0)(_ + _).init
 
       Δλs
-        .zip(expCountPerDither)
+        .zip(frameCountPerDither)
         .zip(runningSums)
         .zipWithIndex
         .map { case (((dither, n), sum), idx) =>
@@ -275,7 +275,7 @@ object Science:
        * @param config    observation configuration
        * @param expTimeμs integration time for science datasets as prescribed
        *                  by ITC
-       * @param expCount  total step count prescribed by the ITC
+       * @param frameCount total frame (step) count prescribed by the ITC
        * @param calRole   calibration role, which determines whether arcs and/or
        *                  flats are needed
        */
@@ -284,20 +284,20 @@ object Science:
         (ProtoStep.value[D] andThen optics.fpu).replace(mask.some)(step)
 
       def compute[F[_]: Monad, S](
-        oid:       Observation.Id,
-        static:    S,
-        expander:  SmartGcalExpander[F, S, D],
-        config:    Config[G, L, U],
-        expTimeμs: PosLong,
-        expCount:  PosInt,
-        calRole:   Option[CalibrationRole]
+        oid:        Observation.Id,
+        static:     S,
+        expander:   SmartGcalExpander[F, S, D],
+        config:     Config[G, L, U],
+        expTimeμs:  PosLong,
+        frameCount: PosInt,
+        calRole:    Option[CalibrationRole]
       ): F[Either[OdbError, NonEmptyList[StepDefinition[D]]]] =
 
         val λ            = config.centralWavelength
         val isTwilight   = calRole.contains(CalibrationRole.Twilight)
         val includeFlats = !isTwilight
         val includeArcs  = calRole.isEmpty
-        val goals        = Goal.compute(config.wavelengthDithers, config.telescopeConfigs.toList, expTimeμs, expCount)
+        val goals        = Goal.compute(config.wavelengthDithers, config.telescopeConfigs.toList, expTimeμs, frameCount)
         val gcalClass    = calRole.gcalClass
         val sciClass     = calRole.sciClass
         val sciGuiding   = calRole.sciGuiding
@@ -441,7 +441,7 @@ object Science:
             .from(t.exposureTime.toNonNegMicroseconds.value)
             .bimap(
               _  => sequenceUnavailable(s"$modeName science requires a positive exposure time."),
-              μs => (μs, t.exposureCount)
+              μs => (μs, t.frameCount)
             )
 
       // Adjust the config and integration time according to the calibration role.

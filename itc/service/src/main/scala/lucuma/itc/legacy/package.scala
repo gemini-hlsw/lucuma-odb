@@ -53,7 +53,7 @@ extension (etm: ExposureTimeMode)
         )
       case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
         ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
-          exposureCount = count.value,
+          frameCount = count.value,
           coadds = coadds,
           exposureDuration = time.toMilliseconds.toDouble.milliseconds,
           sourceFraction = 1.0,
@@ -73,7 +73,7 @@ extension (etm: ExposureTimeMode)
         )
       case ExposureTimeMode.TimeAndCountMode(time, count, at) =>
         ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
-          exposureCount = count.value,
+          frameCount = count.value,
           coadds = coadds,
           exposureDuration = time.toMilliseconds.toDouble.milliseconds,
           sourceFraction = 1.0,
@@ -120,7 +120,7 @@ def spectroscopyGraphParams(
   observingMode:    ObservingMode,
   exposureDuration: FiniteDuration,
   conditions:       ItcObservingConditions,
-  exposureCount:    Int
+  frameCount:       Int
 ): (ItcParameters, Either[Band, Wavelength]) = // Bubble up the selected band or line
   val (sourceDefinition: ItcSourceDefinition, bandOrLine: Either[Band, Wavelength]) =
     buildSourceDefinition(target, atWavelength)
@@ -129,7 +129,7 @@ def spectroscopyGraphParams(
       source = sourceDefinition,
       observation = ItcObservationDetails(
         calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
-          exposureCount = exposureCount,
+          frameCount = frameCount,
           coadds = observingMode.coadds,
           exposureDuration = exposureDuration,
           sourceFraction = 1.0,

@@ -25,7 +25,7 @@ class LegacyITCGmosImgExpTimeSuite extends CommonITCLegacySuite:
   // Define observation details
   val obs = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
-      exposureCount = 10,
+      frameCount = 10,
       exposureDuration = 3.seconds,
       coadds = None,
       sourceFraction = 1.0,

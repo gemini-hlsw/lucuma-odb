@@ -23,12 +23,13 @@ object ItcObservationDetails {
 
   object CalculationMethod {
 
-    // Methods that return signla to noise from exp time/count
+    // Methods that return signal to noise from exposure time and frame count. OCS calls the
+    // frame count `exposures`; its coadds travel separately.
     sealed trait S2NMethod extends CalculationMethod
     object S2NMethod {
 
       case class ImagingS2N(
-        exposureCount:    Int,
+        frameCount:       Int,
         coadds:           Option[Int],
         exposureDuration: FiniteDuration,
         sourceFraction:   Double,
@@ -38,7 +39,7 @@ object ItcObservationDetails {
       object ImagingS2N:
         val encoder: Encoder[ImagingS2N] = a =>
           Json.obj(
-            "exposures"      -> a.exposureCount.asJson,
+            "exposures"      -> a.frameCount.asJson,
             "coadds"         -> a.coadds.asJson,
             "exposureTime"   -> a.exposureDuration.toDoubleSeconds.asJson,
             "sourceFraction" -> a.sourceFraction.asJson,
@@ -46,7 +47,7 @@ object ItcObservationDetails {
           )
 
       case class SpectroscopyS2N(
-        exposureCount:    Int,
+        frameCount:       Int,
         coadds:           Option[Int],
         exposureDuration: FiniteDuration,
         sourceFraction:   Double,
@@ -57,7 +58,7 @@ object ItcObservationDetails {
       object SpectroscopyS2N:
         val encoder: Encoder[SpectroscopyS2N] = a =>
           Json.obj(
-            "exposures"      -> a.exposureCount.asJson,
+            "exposures"      -> a.frameCount.asJson,
             "coadds"         -> a.coadds.asJson,
             "exposureTime"   -> a.exposureDuration.toDoubleSeconds.asJson,
             "sourceFraction" -> a.sourceFraction.asJson,

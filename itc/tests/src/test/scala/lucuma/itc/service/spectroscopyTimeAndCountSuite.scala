@@ -76,14 +76,14 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
             targetTimes {
               ... on TargetIntegrationTime {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
                 }
                 index
                 all {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -107,7 +107,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               "targetTimes": [
                 {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -115,7 +115,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                   "index": 0,
                   "all": [
                     {
-                      "exposureCount": 10,
+                      "frameCount": 10,
                       "exposureTime": {
                         "seconds": 2
                       }
@@ -200,7 +200,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               targetTimes {
                 ... on TargetIntegrationTime {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -217,7 +217,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               }
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -241,7 +241,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 "targetTimes": [
                   {
                     "selected": {
-                      "exposureCount": 10,
+                      "frameCount": 10,
                       "exposureTime": {
                         "seconds": 2
                       }
@@ -258,7 +258,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -443,7 +443,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 }
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -478,7 +478,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -554,7 +554,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
           }) {
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -657,7 +657,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 }
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -692,7 +692,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -785,7 +785,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 }
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -820,7 +820,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -913,7 +913,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                   }
                   brightest {
                     selected {
-                      exposureCount
+                      frameCount
                       exposureTime {
                         seconds
                       }
@@ -948,7 +948,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -1036,7 +1036,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 }
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -1071,7 +1071,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -1159,7 +1159,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 }
                 brightest {
                   selected {
-                      exposureCount
+                      frameCount
                       exposureTime {
                         seconds
                       }
@@ -1194,7 +1194,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                      "exposureCount": 10,
+                      "frameCount": 10,
                       "exposureTime": {
                         "seconds": 2
                       }
@@ -1272,7 +1272,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 targetTimes {
                   ...on TargetIntegrationTime {
                     selected {
-                      exposureCount
+                      frameCount
                       exposureTime {
                         seconds
                       }
@@ -1288,7 +1288,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 }
                 brightest {
                   selected {
-                      exposureCount
+                      frameCount
                       exposureTime {
                         seconds
                       }
@@ -1313,7 +1313,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 "targetTimes": [
                   {
                     "selected": {
-                      "exposureCount": 10,
+                      "frameCount": 10,
                       "exposureTime": {
                         "seconds": 2
                       }
@@ -1329,7 +1329,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected": {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2
                     }
@@ -1432,7 +1432,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                   total
                 }
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -1443,7 +1443,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
             brightestIndex
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -1474,7 +1474,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                     "total": 102.000
                   },
                   "selected" : {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2.000000
                     }
@@ -1490,7 +1490,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                     "total": 102.000
                   },
                   "selected" : {
-                    "exposureCount": 10,
+                    "frameCount": 10,
                     "exposureTime": {
                       "seconds": 2.000000
                     }
@@ -1501,7 +1501,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               "brightestIndex": 0,
               "brightest": {
                 "selected": {
-                  "exposureCount": 10,
+                  "frameCount": 10,
                   "exposureTime": {
                     "seconds": 2.000000
                   }
@@ -1584,7 +1584,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               }
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -1618,7 +1618,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 2.000000
                     }
@@ -1698,7 +1698,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               }
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -1732,7 +1732,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 2.000000
                     }
@@ -1837,7 +1837,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               }
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -1871,7 +1871,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 2.000000
                     }
@@ -1954,7 +1954,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
             }
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -1988,7 +1988,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               ],
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 120.000000
                   }
@@ -2075,7 +2075,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
             }
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -2109,7 +2109,7 @@ class spectroscopyTimeAndCountSuite extends GraphQLSuite:
               ],
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 120.000000
                   }

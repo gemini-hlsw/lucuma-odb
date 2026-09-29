@@ -176,7 +176,7 @@ class executionSciIgrins2 extends ExecutionTestSupportForIgrins2:
     // off slit, so it doesn't contribute to the S/N (the q check matters, not
     // just p). The slit is 5", so slit/2 = 2.5"; q = 2.6" is just one
     // deci-arcsecond past the edge and therefore off slit. Only the on-axis
-    // step is on source, so exposureCount=4 needs 4 cycles. Under the previous
+    // step is on source, so frameCount=4 needs 4 cycles. Under the previous
     // p-only logic q=2.6" (p=0) would have counted as on target -> 2 cycles.
     val setup: IO[Observation.Id] =
       for {

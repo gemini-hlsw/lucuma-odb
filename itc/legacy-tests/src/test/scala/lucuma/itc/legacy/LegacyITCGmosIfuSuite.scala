@@ -34,7 +34,7 @@ class LegacyITCGmosIfuSuite extends CommonITCLegacySuite:
 
   override val obs: ItcObservationDetails = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
-      exposureCount = 10,
+      frameCount = 10,
       exposureDuration = 30.seconds,
       wavelengthAt = wv,
       coadds = None,

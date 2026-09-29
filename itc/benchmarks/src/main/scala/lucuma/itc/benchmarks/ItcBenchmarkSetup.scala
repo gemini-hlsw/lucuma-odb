@@ -50,7 +50,7 @@ case class ItcTestData(
   testWavelength:    Wavelength,
   testSignalToNoise: SignalToNoise,
   testExposureTime:  TimeSpan,
-  testExposureCount: PosInt,
+  testFrameCount:    PosInt,
   gmosNorthMode:     ObservingMode.SpectroscopyMode,
   grayConditions:    ItcObservingConditions,
   mediumTarget:      TargetData
@@ -58,7 +58,7 @@ case class ItcTestData(
   val signalToNoiseMode: ExposureTimeMode =
     ExposureTimeMode.SignalToNoiseMode(testSignalToNoise, testWavelength)
   val timeAndCountMode: ExposureTimeMode  =
-    ExposureTimeMode.TimeAndCountMode(testExposureTime, testExposureCount, testWavelength)
+    ExposureTimeMode.TimeAndCountMode(testExposureTime, testFrameCount, testWavelength)
 
 object ItcBenchmarkSetup:
 
@@ -108,7 +108,7 @@ object ItcBenchmarkSetup:
     val testWavelength    = Wavelength.fromIntNanometers(600).get
     val testSignalToNoise = SignalToNoise.unsafeFromBigDecimalExact(10.0)
     val testExposureTime  = TimeSpan.fromSeconds(2.0).get
-    val testExposureCount = PosInt.unsafeFrom(1)
+    val testFrameCount    = PosInt.unsafeFrom(1)
 
     val gmosNorthMode = ObservingMode.SpectroscopyMode.GmosNorth(
       Wavelength.fromIntNanometers(600).get,
@@ -152,7 +152,7 @@ object ItcBenchmarkSetup:
     (testWavelength,
      testSignalToNoise,
      testExposureTime,
-     testExposureCount,
+     testFrameCount,
      gmosNorthMode,
      conditions,
      target
@@ -161,14 +161,14 @@ object ItcBenchmarkSetup:
 
   def initializeTestData(): IO[ItcTestData] =
     setupItc.map: itc =>
-      val (wavelength, signalToNoise, exposureTime, exposureCount, gmosMode, conditions, target) =
+      val (wavelength, signalToNoise, exposureTime, frameCount, gmosMode, conditions, target) =
         createTestData
       ItcTestData(
         itc = itc,
         testWavelength = wavelength,
         testSignalToNoise = signalToNoise,
         testExposureTime = exposureTime,
-        testExposureCount = exposureCount,
+        testFrameCount = frameCount,
         gmosNorthMode = gmosMode,
         grayConditions = conditions,
         mediumTarget = target

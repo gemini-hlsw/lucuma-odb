@@ -104,13 +104,11 @@ object ItcImpl {
         r:          IntegrationTimeRemoteResult,
         bandOrLine: Either[Band, Wavelength]
       ): F[TargetIntegrationTime] =
-        val tgts          = r.exposureCalculation.exposures
+        val tgts          = r.exposureCalculation.detectors
           .traverse: r =>
             TimeSpan
               .fromSeconds(r.exposureTime)
-              .map(expTime =>
-                IntegrationTime(expTime, PosInt.unsafeFrom(r.exposureCount.value)).pure
-              )
+              .map(expTime => IntegrationTime(expTime, PosInt.unsafeFrom(r.frameCount.value)).pure)
               .getOrElse:
                 F.raiseError:
                   CalculationError(s"Negative exposure time ${r.exposureTime}")

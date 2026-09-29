@@ -91,13 +91,13 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
           }) {
             brightest {
               all {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
               }
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -120,13 +120,13 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
             "imaging" : {
               "brightest" : {
                 "all" : [{
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
                 }],
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -243,13 +243,13 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
           }) {
             brightest {
               all {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
               }
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -272,13 +272,13 @@ class imagingTimeAndCountSuite extends GraphImagingQLSuite:
             "imaging" : {
               "brightest" : {
                 "all" : [{
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
                 }],
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }

@@ -683,14 +683,17 @@ input SpectroscopyIntegrationTimeAndGraphsInput {
 
 type IntegrationTime {
   """
-  Calculated exposure time duratio
+  Exposure time of a single exposure (per coadd, for instruments with coadds).
   """
   exposureTime: TimeSpan!
 
   """
-  Calculate exposures count
+  Number of frames to take.  A frame is what the detector delivers: `coadds`
+  exposures summed on chip.  Without coadds a frame is one exposure.
   """
-  exposureCount: PosInt!
+  frameCount: PosInt!
+
+  exposureCount: PosInt! @deprecated(reason: "Use `frameCount`.")
 }
 
 type CalculationResult {

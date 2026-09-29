@@ -1118,7 +1118,7 @@ trait Codecs {
           etm.at,
           etm.signalToNoise,
           etm.exposureTime,
-          etm.exposureCount
+          etm.frameCount
         )
       )
 

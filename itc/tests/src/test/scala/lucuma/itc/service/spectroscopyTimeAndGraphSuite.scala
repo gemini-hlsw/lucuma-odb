@@ -77,7 +77,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
                     exposureTime {
                       seconds
                     }
-                    exposureCount
+                    frameCount
                   }
                 }
                 graphs {
@@ -118,7 +118,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
                 {
                   "integrationTime": {
                     "selected": {
-                      "exposureCount" : 10,
+                      "frameCount" : 10,
                       "exposureTime" : {
                         "seconds" : 1.000000000
                       }
@@ -230,7 +230,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
                     exposureTime {
                       seconds
                     }
-                    exposureCount
+                    frameCount
                   }
                 }
                 graphs {
@@ -273,7 +273,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
                 {
                   "integrationTime": {
                     "selected": {
-                      "exposureCount" : 10,
+                      "frameCount" : 10,
                       "exposureTime" : {
                         "seconds" : 1.000000000
                       }
@@ -392,7 +392,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
                     exposureTime {
                       seconds
                     }
-                    exposureCount
+                    frameCount
                   }
                 }
                 graphs {
@@ -433,7 +433,7 @@ class spectroscopyTimeAndGraphSuite extends GraphQLSuite {
                 {
                   "integrationTime": {
                     "selected": {
-                      "exposureCount" : 10,
+                      "frameCount" : 10,
                       "exposureTime" : {
                         "seconds" : 1.000000000
                       }

@@ -62,7 +62,7 @@ object decoders:
                    DecodingFailure(s"Negative exposure time is not supported: $l", c.history)
                  )
              )
-      n <- c.downField("exposureCount")
+      n <- c.downField("frameCount")
              .as[Int]
              .flatMap(n => PosInt.from(n).leftMap(m => DecodingFailure(m, c.history)))
     } yield IntegrationTime(t, n)

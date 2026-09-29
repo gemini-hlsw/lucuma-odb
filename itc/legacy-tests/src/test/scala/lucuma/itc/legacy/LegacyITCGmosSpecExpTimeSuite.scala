@@ -30,7 +30,7 @@ class LegacyITCGmosSpecExpTimeSuite extends CommonITCLegacySuite:
   // Define observation details for spectroscopy
   override val obs = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
-      exposureCount = 10,
+      frameCount = 10,
       exposureDuration = 3.seconds,
       wavelengthAt = Wavelength.decimalNanometers.getOption(610).get,
       coadds = None,

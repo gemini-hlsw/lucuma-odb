@@ -666,21 +666,21 @@ private[legacy] object codecs:
             .getOption(s.setScale(2, BigDecimal.RoundingMode.HALF_UP))
             .toRight(DecodingFailure("Invalid SignalToNoise value", c.history))
 
-  given Decoder[Exposures] = (c: HCursor) =>
+  given Decoder[ExposureCalculation] = (c: HCursor) =>
     for
       time  <- c.downField("exposureTime").as[Double]
       count <-
         c
-          .downField("exposures")
+          .downField("frames")
           .as[Int]
           .flatMap:
             refineV[NonNegative](_)
-              .leftMap(e => DecodingFailure(e, c.downField("exposures").history))
-    yield Exposures(time, count)
+              .leftMap(e => DecodingFailure(e, c.downField("frames").history))
+    yield ExposureCalculation(time, count)
 
   given Decoder[AllExposureCalculations] = (c: HCursor) =>
     for
-      results  <- c.downField("detectors").as[NonEmptyChain[Exposures]]
+      results  <- c.downField("detectors").as[NonEmptyChain[ExposureCalculation]]
       selected <- c.downField("selected").as[Int]
     yield AllExposureCalculations(results, selected)
 

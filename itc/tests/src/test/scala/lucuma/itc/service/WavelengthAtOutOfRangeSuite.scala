@@ -61,7 +61,7 @@ class WavelengthAtOutOfRangeErrorSuite extends WavelengthAtOutOfRangeSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }

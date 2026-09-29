@@ -71,7 +71,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
               }
               band
             }
@@ -84,7 +84,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10
+                  "frameCount" : 10
                 },
                 "band": "R"
               }
@@ -153,7 +153,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
               }
               band
             }
@@ -166,7 +166,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10
+                  "frameCount" : 10
                 },
                 "band": "R"
               }
@@ -237,7 +237,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
               }
               band
             }
@@ -308,7 +308,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
               }
               band
             }
@@ -380,7 +380,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -396,7 +396,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -472,7 +472,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -488,7 +488,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -565,7 +565,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -580,7 +580,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             "spectroscopy" : {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -657,7 +657,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -673,7 +673,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -752,7 +752,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -767,7 +767,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             "spectroscopy" : {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -850,7 +850,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               }
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -876,7 +876,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
                 ],
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1043,7 +1043,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -1059,7 +1059,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1131,7 +1131,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
               brightest {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -1216,7 +1216,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -1232,7 +1232,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1
                     }
@@ -1314,7 +1314,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -1330,7 +1330,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1
                     }
@@ -1408,7 +1408,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             }) {
                   brightest {
                     selected {
-                      exposureCount
+                      frameCount
                       exposureTime {
                         seconds
                       }
@@ -1424,7 +1424,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1501,7 +1501,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
                 brightest {
                   selected {
-                    exposureCount
+                    frameCount
                     exposureTime {
                       seconds
                     }
@@ -1517,7 +1517,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1594,7 +1594,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
                 brightest {
                   selected {
-                      exposureCount
+                      frameCount
                       exposureTime {
                         seconds
                       }
@@ -1610,7 +1610,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1687,7 +1687,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
           }) {
                 brightest {
                   selected {
-                      exposureCount
+                      frameCount
                       exposureTime {
                         seconds
                       }
@@ -1703,7 +1703,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               {
                 "brightest": {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1799,7 +1799,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             targetTimes {
               ...on TargetIntegrationTime {
                 selected {
-                  exposureCount
+                  frameCount
                   exposureTime {
                     seconds
                   }
@@ -1818,7 +1818,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               "targetTimes": [
                 {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1827,7 +1827,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
                 },
                 {
                   "selected" : {
-                    "exposureCount" : 10,
+                    "frameCount" : 10,
                     "exposureTime" : {
                       "seconds" : 1.000000
                     }
@@ -1909,7 +1909,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             }
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -1935,7 +1935,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               ],
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -2018,7 +2018,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
             }
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -2044,7 +2044,7 @@ class spectroscopySignalToNoiseSuite extends GraphQLSuite:
               ],
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }

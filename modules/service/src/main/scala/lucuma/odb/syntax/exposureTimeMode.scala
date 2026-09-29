@@ -38,7 +38,7 @@ trait ToExposureTimeModeOps:
         .andThen(ExposureTimeMode.TimeAndCountMode.time)
         .getOption(etm)
 
-    def exposureCount: Option[PosInt] =
+    def frameCount: Option[PosInt] =
       ExposureTimeMode
         .timeAndCount
         .andThen(ExposureTimeMode.TimeAndCountMode.count)

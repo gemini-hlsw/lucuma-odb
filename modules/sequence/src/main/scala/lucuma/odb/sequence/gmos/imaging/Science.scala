@@ -88,7 +88,7 @@ object Science:
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
-          obj <- offsets.take(integrationTime.exposureCount.value)
+          obj <- offsets.take(integrationTime.frameCount.value)
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
         yield
@@ -129,14 +129,14 @@ object Science:
 
       // number of groups of interleaved filters
       val groupCount: Int =
-        filterTimes.values.map(_.exposureCount.value).min
+        filterTimes.values.map(_.frameCount.value).min
 
       def oneGroup(n: Int): State[D, Stream[Pure, D]] =
         // exposure count per filter in this group.
         val perFilterCounts =
           filters
             .fproduct: filter =>
-              val total = filterTimes(filter).exposureCount.value
+              val total = filterTimes(filter).frameCount.value
               (total / groupCount) + (if total % groupCount > n then 1 else 0)
             .toMap
 
@@ -205,7 +205,7 @@ object Science:
           skyOffsets: TelescopeConfigGenerator
         )(f: List[Int] => Int): F[(List[TelescopeConfig], List[TelescopeConfig])] =
 
-          val cnt     = NonNegInt.unsafeFrom(f(nem.toNel.toList.map((_,  zipper) => zipper.focus._2.exposureCount.value)))
+          val cnt     = NonNegInt.unsafeFrom(f(nem.toNel.toList.map((_,  zipper) => zipper.focus._2.frameCount.value)))
           val offsets = offsets0 match
             case TelescopeConfigGenerator.NoGenerator =>
               TelescopeConfigGenerator.Enumerated(NonEmptyList.fromListUnsafe(List.fill(cnt.value)(TelescopeConfig.Default)))
@@ -220,7 +220,7 @@ object Science:
         val protoAtoms = config.variant match
           case Variant.Grouped(_, offsets, skyCount, skyOffsets)  =>
             // The same pattern is repeated for each filter so we need enough
-            // offsets to cover the filter with the most exposures.
+            // offsets to cover the filter with the most frames.
             generateOffsets(offsets, skyCount, skyOffsets)(_.max).map: (o, s) =>
               state.grouped(config, nem, o, s)
 

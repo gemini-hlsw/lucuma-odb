@@ -492,7 +492,7 @@ object GhostIfuService:
         update.signalToNoise,
         update.at,
         update.exposureTime,
-        update.exposureCount,
+        update.frameCount,
         oids
       )
 

@@ -10,10 +10,10 @@ import spire.implicits.*
 import java.math.MathContext
 
 extension (signalToNoise: SignalToNoise)
-  def stepSignalToNoise(exposureCount: PosInt): Option[SignalToNoise] =
+  def stepSignalToNoise(frameCount: PosInt): Option[SignalToNoise] =
     SignalToNoise.FromBigDecimalRounding.getOption(
       BigDecimal(
-        (signalToNoise.toBigDecimal * signalToNoise.toBigDecimal / exposureCount.value)
+        (signalToNoise.toBigDecimal * signalToNoise.toBigDecimal / frameCount.value)
           .underlying()
       )
         .sqrt(MathContext.DECIMAL128)

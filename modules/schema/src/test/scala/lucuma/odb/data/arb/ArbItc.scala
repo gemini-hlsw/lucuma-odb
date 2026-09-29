@@ -49,7 +49,7 @@ trait ArbItc:
 
   given Cogen[IntegrationTime] =
     Cogen[(TimeSpan, PosInt)].contramap: a =>
-      (a.exposureTime, a.exposureCount)
+      (a.exposureTime, a.frameCount)
 
   // This may exist elsewhere but I couldn't find it.
   given Arbitrary[SignalToNoiseAt] =

@@ -59,7 +59,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   exposureTime {
                     seconds
                   }
-                  exposureCount
+                  frameCount
                   signalToNoiseAt {
                     wavelength {
                       picometers
@@ -82,7 +82,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   exposureTime {
                     seconds
                   }
-                  exposureCount
+                  frameCount
                   signalToNoiseAt {
                     wavelength {
                       picometers
@@ -118,7 +118,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 "exposureTime": {
                   "seconds": 10.000000
                 },
-                "exposureCount": ${FakeItcResult.exposureCount.value},
+                "frameCount": ${FakeItcResult.frameCount.value},
                 "signalToNoiseAt": ${fakeSignalToNoiseAt(Wavelength.fromIntNanometers(500).get).asJson},
                 "peakPixel": {
                   "flux": ${FakeItcPeakPixel.flux},
@@ -137,7 +137,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 "exposureTime": {
                   "seconds": 10.000000
                 },
-                "exposureCount": ${FakeItcResult.exposureCount.value},
+                "frameCount": ${FakeItcResult.frameCount.value},
                 "signalToNoiseAt": null,
                 "peakPixel": {
                   "flux": ${FakeItcPeakPixel.flux},
@@ -589,7 +589,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   exposureTime {
                     seconds
                   }
-                  exposureCount
+                  frameCount
                   signalToNoiseAt {
                     wavelength {
                       picometers
@@ -612,7 +612,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   exposureTime {
                     seconds
                   }
-                  exposureCount
+                  frameCount
                   signalToNoiseAt {
                     wavelength {
                       picometers
@@ -646,7 +646,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 "exposureTime" : {
                   "seconds" : 1.000000
                 },
-                "exposureCount" : 1,
+                "frameCount" : 1,
                 "signalToNoiseAt" : null,
                 "peakPixel" : null
               },
@@ -662,7 +662,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 "exposureTime" : {
                   "seconds" : 2.000000
                 },
-                "exposureCount" : 2,
+                "frameCount" : 2,
                 "signalToNoiseAt" : null,
                 "peakPixel" : null
               },
@@ -703,7 +703,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                   exposureTime {
                     seconds
                   }
-                  exposureCount
+                  frameCount
                   signalToNoiseAt {
                     wavelength {
                       picometers
@@ -733,7 +733,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
                 "exposureTime": {
                   "seconds": 10.000000
                 },
-                "exposureCount": ${FakeItcResult.exposureCount.value},
+                "frameCount": ${FakeItcResult.frameCount.value},
                 "signalToNoiseAt": ${fakeSignalToNoiseAt(Wavelength.fromIntNanometers(2200).get).asJson}
               },
               "all": [
@@ -802,9 +802,9 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
               ... on ItcGnirsSpectroscopy {
                 gnirsSpectroscopyScience {
                   centralWavelength { nanometers }
-                  results { selected { exposureCount } }
+                  results { selected { frameCount } }
                 }
-                acquisition { selected { exposureCount } }
+                acquisition { selected { frameCount } }
               }
             }
           }
@@ -823,18 +823,18 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
               "gnirsSpectroscopyScience": [
                 {
                   "centralWavelength": { "nanometers": 2300.000 },
-                  "results": { "selected": { "exposureCount": 3 } }
+                  "results": { "selected": { "frameCount": 3 } }
                 },
                 {
                   "centralWavelength": { "nanometers": 2100.000 },
-                  "results": { "selected": { "exposureCount": 3 } }
+                  "results": { "selected": { "frameCount": 3 } }
                 },
                 {
                   "centralWavelength": { "nanometers": 2200.000 },
-                  "results": { "selected": { "exposureCount": 3 } }
+                  "results": { "selected": { "frameCount": 3 } }
                 }
               ],
-              "acquisition": { "selected": { "exposureCount": ${FakeItcResult.exposureCount.value} } }
+              "acquisition": { "selected": { "frameCount": ${FakeItcResult.frameCount.value} } }
             }
           }
         }
@@ -892,7 +892,7 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
               ... on ItcGnirsSpectroscopy {
                 gnirsSpectroscopyScience {
                   centralWavelength { nanometers }
-                  results { selected { exposureCount } }
+                  results { selected { frameCount } }
                 }
               }
             }
@@ -910,11 +910,11 @@ class itc extends OdbSuite with ObservingModeSetupOperations {
               "gnirsSpectroscopyScience": [
                 {
                   "centralWavelength": { "nanometers": 2200.000 },
-                  "results": { "selected": { "exposureCount": 3 } }
+                  "results": { "selected": { "frameCount": 3 } }
                 },
                 {
                   "centralWavelength": { "nanometers": 2200.000 },
-                  "results": { "selected": { "exposureCount": 7 } }
+                  "results": { "selected": { "frameCount": 7 } }
                 }
               ]
             }
