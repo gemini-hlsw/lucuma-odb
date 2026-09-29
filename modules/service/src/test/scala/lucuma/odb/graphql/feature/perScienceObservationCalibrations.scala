@@ -3297,6 +3297,38 @@ class perScienceObservationCalibrations
       assert(obsOn.groupId.isDefined, "obs calibration group should be recreated")
       assert(telluricOid2.isDefined,  "telluric should be recreated")
 
+  private def queryF2TelluricTag(oid: Observation.Id): IO[String] =
+    query(
+      pi,
+      s"""query {
+        observation(observationId: "$oid") {
+          observingMode { flamingos2LongSlit { telluricType { tag } } }
+        }
+      }"""
+    ).map: json =>
+      json.hcursor
+        .downFields("observation", "observingMode", "flamingos2LongSlit", "telluricType", "tag")
+        .require[String]
+
+  test("a spent telluric keeps the telluric type it was observed with"):
+    for
+      pid        <- createProgramAs(pi)
+      tid        <- createTargetWithProfileAs(pi, pid)
+      oid        <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _          <- runObscalcUpdate(pid, oid)
+      _          <- recalculateCalibrations(pid, when, oid)
+      _          <- sleep >> resolveTelluricTargets
+      spent      <- selectTelluricObservationFor(oid).map(_.get)
+      _          <- recordVisitAs(serviceUser, spent)
+      _          <- setTelluricType(oid, "flamingos2LongSlit", "A0V")
+      (added, _) <- recalculateCalibrations(pid, when, oid)
+      spentTag   <- queryF2TelluricTag(spent)
+      freshTags  <- added.traverse(queryF2TelluricTag)
+    yield
+      assertEquals(spentTag, "HOT")
+      assertEquals(added.size, 1)
+      assertEquals(freshTags, List("A0V"))
+
   test("telluric with a visit is preserved when telluricType becomes NO_TELLURIC"):
     for
       pid         <- createProgramAs(pi)

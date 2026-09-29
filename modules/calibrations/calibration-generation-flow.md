@@ -168,7 +168,7 @@ flowchart TD
     F3 -->|No| H[cleanupOrphanedObsCalibrationGroup]
 
     G --> I[Find or create the calibration group for this science obs]
-    I --> J["syncTelluricObservation (also syncs config of existing tellurics)"]
+    I --> J["syncTelluricObservation (also syncs config of existing unobserved tellurics)"]
 
     J --> K
     J2 --> K

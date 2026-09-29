@@ -281,9 +281,10 @@ object PerScienceObservationCalibrationsService:
                                             .traverse_(observationService.deleteCalibrationObservations)
                                       c <- duration.traverse(createTelluricCalibrations(pid, obs.id, gid, _))
                                     yield (c.orEmpty, toDelete)
-            // Only sync existing tellurics that are not deleted or recreated.
+            // Only sync existing tellurics that are not deleted or recreated. A spent one
+            // keeps the configuration it was observed with, telluric type included.
             toSync              = if (created.nonEmpty || !syncExisting) List.empty
-                                  else existing.filterNot(deleted.contains)
+                                  else unobserved.map(_.oid).filterNot(deleted.contains)
             _                  <- toSync.traverse_(tid => syncConfiguration(pid, obs.id, tid, CalibrationRole.Telluric))
             // Kept tellurics search again when the duration they were created with is outdated.
             stale              =  duration.toList.flatMap: d =>
