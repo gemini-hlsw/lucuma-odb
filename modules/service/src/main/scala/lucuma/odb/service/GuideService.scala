@@ -465,28 +465,30 @@ object GuideService {
           (mode.instrument.site, mode, wavelength)
 
 
+    // The AOWFS guides only behind Altair; every other probe and mode combination is decided by
+    // core's `guidedBy`, shared with Explore.
+    private def gnirsGuidedBy[A <: AgsParams & PwfsSupport[A] & AgsParams.AltairSupport[A]](
+      gnirsParams: A,
+      probe:       GuideProbe,
+      altairMode:  Option[AltairMode]
+    ): Option[AgsParams] =
+      Option.unless(probe === GuideProbe.AltairAOWFS && altairMode.isEmpty):
+        gnirsParams.guidedBy(probe.some, altairMode)
+
     def agsParamsFor(
       trackType:     TrackType,
       explicitProbe: Option[GuideProbe],
       altair:        Option[AltairConfiguration]
     ): Option[AgsParams] =
       val altairMode: Option[AltairMode] = altair.map(_.mode)
-      // Behind Altair the mode fixes the probe and brings its own brightness limits: the AOWFS for
-      // NGS and LGS, PWFS1 for LGS+P1. Only GNIRS sits behind Altair.
       explicitProbe.orElse(probes.defaultGuideProbe(observingModeType, trackType, altairMode)).flatMap: probe =>
           (params.observingMode, probe, altairMode) match
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.AltairAOWFS, Some(mode)) =>
-              AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withAltair(mode).some
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1, Some(AltairMode.LgsP1)) =>
-              AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withAltair(AltairMode.LgsP1).some
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.AltairAOWFS, Some(mode)) =>
-              AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withAltair(mode).some
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1, Some(AltairMode.LgsP1)) =>
-              AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withAltair(AltairMode.LgsP1).some
-            case (gnirs.imaging.Config(camera = camera, filters = filters), GuideProbe.AltairAOWFS, Some(mode)) =>
-              AgsParams.GnirsImaging(camera, AgsParams.GnirsImaging.representativeFilter(filters.map(_.filter)), PortDisposition.Bottom).withAltair(mode).some
-            case (gnirs.imaging.Config(camera = camera, filters = filters), GuideProbe.PWFS1, Some(AltairMode.LgsP1)) =>
-              AgsParams.GnirsImaging(camera, AgsParams.GnirsImaging.representativeFilter(filters.map(_.filter)), PortDisposition.Bottom).withAltair(AltairMode.LgsP1).some
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), _, _) =>
+              gnirsGuidedBy(AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom), probe, altairMode)
+            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), _, _)                              =>
+              gnirsGuidedBy(AgsParams.GnirsIfu(ifu, PortDisposition.Bottom), probe, altairMode)
+            case (gnirs.imaging.Config(camera = camera, filters = filters), _, _)                                    =>
+              gnirsGuidedBy(AgsParams.GnirsImaging(camera, AgsParams.GnirsImaging.representativeFilter(filters.map(_.filter)), PortDisposition.Bottom), probe, altairMode)
             case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.GmosOIWFS, _)                           =>
               AgsParams.GmosLongSlit(fpu.asLeft, PortDisposition.Side).some
             case (gmos.longslit.Config.GmosNorth(fpu = fpu), GuideProbe.PWFS1, _)                               =>
@@ -551,18 +553,6 @@ object GuideService {
               AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS2.some
             case (_: igrins2.longslit.Config, GuideProbe.PWFS1, _)                                              =>
               AgsParams.Igrins2LongSlit(PortDisposition.Bottom).withPWFS1.some
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS2, _) =>
-              AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS2.some
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Slit(fpu), prism = prism, camera = camera), GuideProbe.PWFS1, _) =>
-              AgsParams.GnirsLongSlit(fpu, camera, prism, PortDisposition.Bottom).withPWFS1.some
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS2, _)         =>
-              AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS2.some
-            case (gnirs.spectroscopy.Config(fpu = GnirsFpu.Spectroscopy.Ifu(ifu)), GuideProbe.PWFS1, _)         =>
-              AgsParams.GnirsIfu(ifu, PortDisposition.Bottom).withPWFS1.some
-            case (c: gnirs.imaging.Config, GuideProbe.PWFS2, _)                                                 =>
-              AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS2.some
-            case (c: gnirs.imaging.Config, GuideProbe.PWFS1, _)                                                 =>
-              AgsParams.GnirsImaging(c.camera, AgsParams.GnirsImaging.representativeFilter(c.filters.map(_.filter)), PortDisposition.Bottom).withPWFS1.some
             case (_: ghost.ifu.Config, GuideProbe.PWFS2, _)                                                     =>
               AgsParams.GhostIfu(PortDisposition.Bottom).withPWFS2.some
             case (_: ghost.ifu.Config, GuideProbe.PWFS1, _)                                                     =>
