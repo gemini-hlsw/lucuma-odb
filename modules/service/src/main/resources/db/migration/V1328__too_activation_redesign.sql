@@ -1,4 +1,4 @@
--- Part 1 of 3 (see V1327, V1328).  The Target of Opportunity redesign: what an
+-- Part 1 of 3 (see V1329, V1330).  The Target of Opportunity redesign: what an
 -- observation may do to others, what may be done to it, and how both are
 -- approved.
 --
@@ -39,8 +39,8 @@
 -- any program.
 --
 -- The opportunity target does not go away.  It is a placeholder carrying an
--- approved region, swapped out for a real target when the alert arrives. V1327
--- and V1328 carry that half out on t_target.
+-- approved region, swapped out for a real target when the alert arrives. V1329
+-- and V1330 carry that half out on t_target.
 --
 -- The rewrites of the two enums are pure DDL, remapping inside USING, so none of
 -- t_observation's row triggers fire.  The two backfills, of the program ceiling

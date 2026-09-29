@@ -1,4 +1,4 @@
--- Part 3 of 3 (see V1326, V1327).  Removes resolution from the target, undoing
+-- Part 3 of 3 (see V1328, V1329).  Removes resolution from the target, undoing
 -- V1258 in full.
 --
 -- An opportunity target is a placeholder now: it carries a region and never gains
@@ -20,7 +20,7 @@
 -- so plain = and <> mean what IS [NOT] DISTINCT FROM meant over a nullable
 -- tracking type.  An opportunity target is neither 'sidereal' nor 'nonsidereal',
 -- so it must leave every coordinate column null -- for its whole life now, rather
--- than only until it resolved.  V1327 converted the rows that would have failed.
+-- than only until it resolved.  V1329 converted the rows that would have failed.
 
 -------------------------------------------------------------------------------
 -- Dependents come down first.
@@ -60,7 +60,7 @@ DROP TYPE e_target_tracking_type;
 -- (too_target_track_asterism_trigger), and it is untouched.
 --
 -- The function body is unchanged: it only ever called refresh_has_too_target,
--- which V1326 already narrowed to the single remaining flag.
+-- which V1328 already narrowed to the single remaining flag.
 CREATE TRIGGER too_target_track_target_trigger
   AFTER DELETE OR UPDATE OF c_type, c_existence ON t_target
   FOR EACH ROW
