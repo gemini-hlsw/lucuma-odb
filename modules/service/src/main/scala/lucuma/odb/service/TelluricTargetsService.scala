@@ -413,7 +413,8 @@ object TelluricTargetsService:
           S.transactionally:
             session
               .prepareR(Statements.RetryRequest)
-              .use(_.option((failureCount + 1, s"${retryDelay.toSeconds} seconds", errorMsg, pending.observationId)))
+              .use(_.option((failureCount + 1, s"${retryDelay.toSeconds} seconds", errorMsg, pending.observationId, pending.lastInvalidation)))
+          .flatMap(requeueIfSuperseded)
 
         def queryParams: F[Either[String, TelluricSearchParams]] =
           fetchSearchParams(pending.scienceObservationId)
@@ -678,7 +679,7 @@ object TelluricTargetsService:
             RETURNING #$metaColumns
           """.query(meta)
 
-        val RetryRequest: Query[(Int, String, String, Observation.Id), TelluricTargets.Meta] =
+        val RetryRequest: Query[(Int, String, String, Observation.Id, Timestamp), TelluricTargets.Meta] =
           sql"""
             UPDATE t_telluric_resolution
             SET    c_state = 'retry',
@@ -687,6 +688,7 @@ object TelluricTargetsService:
                    c_retry_at = now() + $text::interval,
                    c_error_message = $text
             WHERE  c_observation_id = $observation_id
+              AND  c_last_invalidation = $core_timestamp
             RETURNING #$metaColumns
           """.query(meta)
 
