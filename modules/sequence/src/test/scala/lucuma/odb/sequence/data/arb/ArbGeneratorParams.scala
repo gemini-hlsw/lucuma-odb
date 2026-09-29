@@ -5,7 +5,6 @@ package lucuma.odb.sequence
 package data
 package arb
 
-import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.DeclaredExecutionState
@@ -34,14 +33,20 @@ trait ArbGeneratorParams:
   import ArbInstrumentMode.given
   import ArbItcInput.given
 
-  private val genTellurics: Gen[TelluricSiblings] =
+  private val genTelluric: Gen[TelluricSibling] =
     for
-      n <- Gen.choose(0, 4)
-      d <- arbitrary[Boolean]
-      u <- Gen.option(Gen.choose(0L, 3_600_000_000L).map(us =>
+      u <- arbitrary[Boolean]
+      t <- Gen.option(Gen.choose(0L, 3_600_000_000L).map(us =>
              CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(us))
            ))
-    yield TelluricSiblings(NonNegInt.unsafeFrom(n), d, u)
+    yield TelluricSibling(u, t)
+
+  private val genTellurics: Gen[TelluricSiblings] =
+    for
+      d  <- arbitrary[Boolean]
+      n  <- Gen.choose(0, 4)
+      ts <- Gen.listOfN(n, genTelluric)
+    yield TelluricSiblings(d, ts)
 
   private val genAltair: Gen[Option[AltairConfiguration]] =
     Gen.option(arbitrary[AltairConfiguration])

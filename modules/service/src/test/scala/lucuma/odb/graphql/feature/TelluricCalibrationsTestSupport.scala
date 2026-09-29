@@ -18,8 +18,8 @@ trait TelluricCalibrationsTestSupport:
 
   case class ObsInfo(id: Observation.Id, groupId: Option[Group.Id], groupIndex: Option[Int], calibrationRole: Option[CalibrationRole]) derives Decoder
 
-  protected def setExposureTime(oid: Observation.Id, totalMinutes: Int): IO[Unit] =
-    val perExposureMinutes = totalMinutes / 6
+  protected def setExposureTime(oid: Observation.Id, totalMinutes: Int, count: Int = 6): IO[Unit] =
+    val perExposureMinutes = totalMinutes / count
     query(
       pi,
       s"""mutation {
@@ -31,7 +31,7 @@ trait TelluricCalibrationsTestSupport:
                 exposureTimeMode: {
                   timeAndCount: {
                     time: { minutes: $perExposureMinutes },
-                    count: 6,
+                    count: $count,
                     at: { nanometers: 1390 }
                   }
                 }

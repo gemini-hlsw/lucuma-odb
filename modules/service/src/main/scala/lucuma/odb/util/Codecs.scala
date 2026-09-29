@@ -723,7 +723,7 @@ trait Codecs extends CoreCodecs {
     }
 
   lazy val execution_digest: Codec[ExecutionDigest] =
-    (setup_time *: int4_nonneg *: int4_nonneg *: int4_nonneg *: categorized_time *: sequence_digest *: sequence_digest)
+    (setup_time *: int4_nonneg *: int4_nonneg *: int4_nonneg *: categorized_time *: int4_nonneg *: categorized_time *: sequence_digest *: sequence_digest)
       .to[ExecutionDigest]
 
   val step_type: Codec[StepType] =

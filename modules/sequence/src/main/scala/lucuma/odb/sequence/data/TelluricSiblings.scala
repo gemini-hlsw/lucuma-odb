@@ -7,8 +7,6 @@ package data
 import cats.Eq
 import cats.derived.*
 import cats.syntax.all.*
-import eu.timepit.refined.cats.given
-import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.ChargeClass
 import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
@@ -16,25 +14,35 @@ import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
 /**
- * What a science observation's group already holds in tellurics: how many are
- * still unobserved, whether the PI has declined one, and the average total of
- * those with a digest, which is what one more telluric is expected to cost.
+ * What a science observation's group already holds in tellurics: whether the
+ * PI has declined one, and for each active telluric whether it is still
+ * unobserved and its digest total (none while it has no digest yet).
  */
 case class TelluricSiblings(
-  unobserved: NonNegInt,
-  declined:   Boolean,
-  unitCost:   Option[CategorizedTime]
+  declined: Boolean,
+  tellurics: List[TelluricSibling]
+) derives Eq:
+
+  def unobserved: List[TelluricSibling] =
+    tellurics.filter(_.unobserved)
+
+  // Mean total of the tellurics with a digest, what one more is expected to cost.
+  def unitCost: Option[CategorizedTime] =
+    TelluricSiblings.average(tellurics.flatMap(_.total))
+
+case class TelluricSibling(
+  unobserved: Boolean,
+  total:      Option[CategorizedTime]
 ) derives Eq
 
 object TelluricSiblings:
 
   val None: TelluricSiblings =
-    TelluricSiblings(NonNegInt.MinValue, false, scala.None)
+    TelluricSiblings(false, Nil)
 
-  /** Mean per charge class; `None` for an empty list. */
   def average(totals: List[CategorizedTime]): Option[CategorizedTime] =
     totals match
-      case Nil => scala.None
+      case Nil => none
       case ts  =>
         val sum = ts.combineAll
         CategorizedTime(
@@ -47,6 +55,10 @@ object TelluricSiblings:
     def hashBytes(a: CategorizedTime): Array[Byte] =
       Array.concat(ChargeClass.values.toList.map(cc => a(cc).hashBytes)*)
 
+  given HashBytes[TelluricSibling] with
+    def hashBytes(a: TelluricSibling): Array[Byte] =
+      Array.concat(a.unobserved.hashBytes, a.total.hashBytes)
+
   given HashBytes[TelluricSiblings] with
     def hashBytes(a: TelluricSiblings): Array[Byte] =
-      Array.concat(a.unobserved.hashBytes, a.declined.hashBytes, a.unitCost.hashBytes)
+      Array.concat(a.declined.hashBytes, a.tellurics.hashBytes)

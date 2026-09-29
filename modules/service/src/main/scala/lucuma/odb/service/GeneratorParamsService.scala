@@ -20,7 +20,6 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
@@ -63,6 +62,7 @@ import lucuma.odb.json.sourceprofile.given
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.TelluricSibling
 import lucuma.odb.sequence.data.TelluricSiblings
 import lucuma.odb.sequence.data.ItcInputDerivation
 import lucuma.odb.sequence.data.MissingParam
@@ -259,9 +259,8 @@ object GeneratorParamsService {
               .map: rows =>
                 val byObs = rows.groupMap(_._1)(r => (r._2, r._3, r._4)).view.mapValues: ts =>
                   TelluricSiblings(
-                    NonNegInt.unsafeFrom(ts.count(_._1)),
                     ts.exists(_._2),
-                    TelluricSiblings.average(ts.flatMap(_._3))
+                    ts.collect { case (u, false, t) => TelluricSibling(u, t) }
                   )
                 params.map(p => byObs.get(p.observationId).fold(p)(t => p.copy(tellurics = t)))
 

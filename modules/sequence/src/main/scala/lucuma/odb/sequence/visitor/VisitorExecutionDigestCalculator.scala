@@ -57,6 +57,8 @@ object VisitorExecutionDigestCalculator:
       NonNegInt.MinValue,
       NonNegInt.MinValue,
       CategorizedTime.Zero,
+      NonNegInt.MinValue,
+      CategorizedTime.Zero,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )
@@ -82,6 +84,8 @@ object VisitorExecutionDigestCalculator:
       SetupTime.Zero, // no info about setup time
       NonNegInt.unsafeFrom(0),
       NonNegInt.MinValue,
+      NonNegInt.MinValue,
+      CategorizedTime.Zero,
       NonNegInt.MinValue,
       CategorizedTime.Zero,
       SequenceDigest.Zero.copy(executionState = state),

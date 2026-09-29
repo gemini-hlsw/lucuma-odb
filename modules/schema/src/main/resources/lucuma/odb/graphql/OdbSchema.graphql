@@ -9646,28 +9646,49 @@ type ObservationTimeEstimate {
   reacquisitionCount: NonNegInt!
 
   """
-  Expected number of calibration sets over the remaining science time.
-  Zero for calibration observations and for modes that take no calibrations per
-  observation.
+  Number of calibration sets still needed over the remaining science time: the
+  existing plus the expected calibrations.  Zero for calibration observations,
+  for modes that take no calibrations per observation, and when the observation
+  uses no telluric.
   """
   calibrationCount: NonNegInt!
 
   """
-  Time for the calibrations the calibration count predicts but that have not
-  been generated yet, each at the average total of the group's tellurics, or a
-  placeholder while none has a digest.  Tellurics already in the group and not
-  yet observed count toward the prediction, since they are charged as
-  observations of their own.
-  Zero when the observation has no tellurics, uses no telluric, or its telluric was declined.
+  Number of calibrations already generated for this observation and still to
+  be observed.  With the expected calibrations they make up the calibration
+  count.
   """
-  expectedCalibrations: CategorizedTime!
+  existingCalibrationCount: NonNegInt!
+
+  """
+  Time for the existing calibrations, each at its own estimate, or a placeholder
+  while it has no digest.  Not part of the total, since each is an observation
+  of its own with its own estimate.
+  """
+  existingCalibrationTime: CategorizedTime!
+
+  """
+  Number of calibrations the calibration count predicts but that have not been
+  generated yet: the count less the existing calibrations.  Zero when the
+  telluric was declined.
+  """
+  expectedCalibrationCount: NonNegInt!
+
+  """
+  Time for the expected calibrations, each at the average estimate of the
+  group's tellurics, or a placeholder while none has a digest.  Included in the
+  total.  Zero when the observation uses no telluric or its telluric was declined.
+  """
+  expectedCalibrationTime: CategorizedTime!
 
   "Science sequence time estimate."
   science: CategorizedTime!
 
   """
   Total time estimate: science time plus full setup time for every setup,
-  reacquisition time for every reacquisition, and the expected calibrations.
+  reacquisition time for every reacquisition, and the expected calibration
+  time.  Add the existing calibration time for the cost of the observation
+  with all its calibrations.
   """
   total: CategorizedTime!
 

@@ -1,35 +1,61 @@
--- Expected calibrations: the time for the tellurics the calibration count
--- predicts but that are not in the group yet, charged at a placeholder each
--- and included in the observation's total.  Computed by the generator, so it
--- is stored beside the other digest values in both digest tables and frozen
--- in the original estimate.
+-- Calibration estimate: the unobserved tellurics already in the group (each at
+-- its own estimate) and those still predicted (each at the group's average),
+-- as counts and times.  Together they are the calibration count, which is no
+-- longer stored.  Only the expected time joins the observation's total, since
+-- existing tellurics are observations of their own.  Computed by the generator,
+-- so stored beside the other digest values in both digest tables and frozen in
+-- the original estimate.
 
 ALTER TABLE t_obscalc
-  ADD COLUMN c_exp_cal_non_charged_time interval NULL CHECK (c_exp_cal_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_exp_cal_program_time     interval NULL CHECK (c_exp_cal_program_time     >= interval '0 seconds');
+  DROP COLUMN c_calibration_count,
+  ADD COLUMN c_exist_cal_count            int4     NULL CHECK (c_exist_cal_count            >= 0),
+  ADD COLUMN c_exist_cal_non_charged_time interval NULL CHECK (c_exist_cal_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_exist_cal_program_time     interval NULL CHECK (c_exist_cal_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_exp_cal_count              int4     NULL CHECK (c_exp_cal_count              >= 0),
+  ADD COLUMN c_exp_cal_non_charged_time   interval NULL CHECK (c_exp_cal_non_charged_time   >= interval '0 seconds'),
+  ADD COLUMN c_exp_cal_program_time       interval NULL CHECK (c_exp_cal_program_time       >= interval '0 seconds');
 
 -- Existing digests read as zero until their next natural recalculation; a
 -- partial null would not decode, so the value is filled rather than left.
 UPDATE t_obscalc
-   SET c_exp_cal_non_charged_time = interval '0 seconds',
-       c_exp_cal_program_time     = interval '0 seconds'
+   SET c_exist_cal_count            = 0,
+       c_exist_cal_non_charged_time = interval '0 seconds',
+       c_exist_cal_program_time     = interval '0 seconds',
+       c_exp_cal_count              = 0,
+       c_exp_cal_non_charged_time   = interval '0 seconds',
+       c_exp_cal_program_time       = interval '0 seconds'
  WHERE c_setup_count IS NOT NULL;
 
 -- Cached digests keep their rows and read as zero until regenerated.
 ALTER TABLE t_execution_digest
-  ADD COLUMN c_exp_cal_non_charged_time interval NOT NULL DEFAULT interval '0 seconds'
-    CHECK (c_exp_cal_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_exp_cal_program_time     interval NOT NULL DEFAULT interval '0 seconds'
-    CHECK (c_exp_cal_program_time     >= interval '0 seconds');
+  DROP COLUMN c_calibration_count,
+  ADD COLUMN c_exist_cal_count            int4     NOT NULL DEFAULT 0 CHECK (c_exist_cal_count >= 0),
+  ADD COLUMN c_exist_cal_non_charged_time interval NOT NULL DEFAULT interval '0 seconds'
+    CHECK (c_exist_cal_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_exist_cal_program_time     interval NOT NULL DEFAULT interval '0 seconds'
+    CHECK (c_exist_cal_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_exp_cal_count              int4     NOT NULL DEFAULT 0 CHECK (c_exp_cal_count >= 0),
+  ADD COLUMN c_exp_cal_non_charged_time   interval NOT NULL DEFAULT interval '0 seconds'
+    CHECK (c_exp_cal_non_charged_time   >= interval '0 seconds'),
+  ADD COLUMN c_exp_cal_program_time       interval NOT NULL DEFAULT interval '0 seconds'
+    CHECK (c_exp_cal_program_time       >= interval '0 seconds');
 
 -- Original estimate: joins the all-or-none set, so recorded estimates take 0.
 ALTER TABLE t_observation
-  ADD COLUMN c_orig_est_exp_cal_non_charged_time interval NULL CHECK (c_orig_est_exp_cal_non_charged_time >= interval '0 seconds'),
-  ADD COLUMN c_orig_est_exp_cal_program_time     interval NULL CHECK (c_orig_est_exp_cal_program_time     >= interval '0 seconds');
+  ADD COLUMN c_orig_est_exist_cal_count            int4     NULL CHECK (c_orig_est_exist_cal_count            >= 0),
+  ADD COLUMN c_orig_est_exist_cal_non_charged_time interval NULL CHECK (c_orig_est_exist_cal_non_charged_time >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_exist_cal_program_time     interval NULL CHECK (c_orig_est_exist_cal_program_time     >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_exp_cal_count              int4     NULL CHECK (c_orig_est_exp_cal_count              >= 0),
+  ADD COLUMN c_orig_est_exp_cal_non_charged_time   interval NULL CHECK (c_orig_est_exp_cal_non_charged_time   >= interval '0 seconds'),
+  ADD COLUMN c_orig_est_exp_cal_program_time       interval NULL CHECK (c_orig_est_exp_cal_program_time       >= interval '0 seconds');
 
 UPDATE t_observation
-   SET c_orig_est_exp_cal_non_charged_time = interval '0 seconds',
-       c_orig_est_exp_cal_program_time     = interval '0 seconds'
+   SET c_orig_est_exist_cal_count            = 0,
+       c_orig_est_exist_cal_non_charged_time = interval '0 seconds',
+       c_orig_est_exist_cal_program_time     = interval '0 seconds',
+       c_orig_est_exp_cal_count              = 0,
+       c_orig_est_exp_cal_non_charged_time   = interval '0 seconds',
+       c_orig_est_exp_cal_program_time       = interval '0 seconds'
  WHERE c_orig_est_setup_count IS NOT NULL;
 
 SET CONSTRAINTS ALL IMMEDIATE;
@@ -41,18 +67,24 @@ ALTER TABLE t_observation
       c_orig_est_full_setup_time,
       c_orig_est_reacq_setup_time,
       c_orig_est_setup_count,
-      c_orig_est_calibration_count,
+      c_orig_est_exist_cal_count,
+      c_orig_est_exist_cal_non_charged_time,
+      c_orig_est_exist_cal_program_time,
+      c_orig_est_exp_cal_count,
       c_orig_est_exp_cal_non_charged_time,
       c_orig_est_exp_cal_program_time,
       c_orig_est_sci_non_charged_time,
       c_orig_est_sci_program_time,
       c_orig_est_total_non_charged_time,
       c_orig_est_total_program_time
-    ) IN (0, 10)
+    ) IN (0, 13)
   );
 
 -- v_observation selects o.*, so it must be recreated to pick up the new columns.
 DROP VIEW v_observation;
+
+ALTER TABLE t_observation
+  DROP COLUMN c_orig_est_calibration_count;
 
 -- Body copied verbatim from V1324.
 CREATE VIEW v_observation AS

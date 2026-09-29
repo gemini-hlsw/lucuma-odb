@@ -210,6 +210,8 @@ class ObscalcServiceSuite extends ObscalcServiceSuiteSupport:
           NonNegInt.MinValue,
           NonNegInt.MinValue,
           CategorizedTime.Zero,
+          NonNegInt.MinValue,
+          CategorizedTime.Zero,
           SequenceDigest(
             ObserveClass.Acquisition,
             CategorizedTime(ChargeClass.Program -> TimeSpan.unsafeFromMicroseconds(617162500L)),

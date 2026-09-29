@@ -242,6 +242,8 @@ object Generator:
           NonNegInt.MinValue,
           NonNegInt.MinValue,
           CategorizedTime.Zero,
+          NonNegInt.MinValue,
+          CategorizedTime.Zero,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
             observeClass   = ctx.params.calibrationRole.sciClass,
@@ -282,10 +284,14 @@ object Generator:
             // Recentering is needed whether or not the observation may be split.
             r  = estimator.estimateReacquisitionCount(s.timeEstimate.sum)
             n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
-            e  = ObsExtract.expectedCalibrations(
+            k  = ObsExtract.calibrationEstimate(
                    ctx.params.observingMode, ctx.params.calibrationRole, n, ctx.params.tellurics
                  )
-          yield ExecutionDigest(estimator.estimateSetupTime, c, r, n, e, a, s)
+          yield ExecutionDigest(
+            estimator.estimateSetupTime, c, r,
+            k.existingCount, k.existingTime, k.expectedCount, k.expectedTime,
+            a, s
+          )
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
@@ -306,6 +312,8 @@ object Generator:
               SetupTime.Zero,
               NonNegInt.MinValue,
               NonNegInt.MinValue,
+              NonNegInt.MinValue,
+              CategorizedTime.Zero,
               NonNegInt.MinValue,
               CategorizedTime.Zero,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),

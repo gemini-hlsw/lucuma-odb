@@ -4,6 +4,8 @@
 package lucuma.odb.graphql
 package mapping
 
+import eu.timepit.refined.types.numeric.NonNegInt
+import io.circe.refined.given
 import lucuma.odb.graphql.table.ObservationView
 
 trait ObservationTimeEstimateMapping[F[_]] extends ObservationView[F]:
@@ -17,8 +19,19 @@ trait ObservationTimeEstimateMapping[F[_]] extends ObservationView[F]:
         SqlObject("setup"),
         SqlField("setupCount", OriginalEstimate.SetupCount),
         SqlField("reacquisitionCount", OriginalEstimate.ReacquisitionCount),
-        SqlField("calibrationCount", OriginalEstimate.CalibrationCount),
-        SqlObject("expectedCalibrations"),
+        SqlField("existingCalibrationCount", OriginalEstimate.ExistCalCount),
+        SqlObject("existingCalibrationTime"),
+        SqlField("expectedCalibrationCount", OriginalEstimate.ExpCalCount),
+        CursorField(
+          "calibrationCount",
+          cursor =>
+            for
+              i <- cursor.fieldAs[NonNegInt]("existingCalibrationCount")
+              p <- cursor.fieldAs[NonNegInt]("expectedCalibrationCount")
+            yield NonNegInt.unsafeFrom(i.value + p.value),
+          List("existingCalibrationCount", "expectedCalibrationCount")
+        ),
+        SqlObject("expectedCalibrationTime"),
         SqlObject("science"),
         SqlObject("total")
       ),

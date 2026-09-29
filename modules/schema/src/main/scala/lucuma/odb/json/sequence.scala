@@ -159,15 +159,16 @@ trait SequenceCodec {
 
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
-      // `ExecutionDigest` has six canonical fields: `setup`, `setupCount`,
-      // `reacquisitionCount`, `calibrationCount`, `expectedCalibrations`, `acquisition` and `science`.  Everything else the encoder emits --
+      // `ExecutionDigest` has nine canonical fields: `setup`, `setupCount`,
+      // `reacquisitionCount`, the existing and expected calibration counts and
+      // times, `acquisition` and `science`.  Everything else the encoder emits --
       // `fullTimeEstimate` and the entire `estimate` object (`estimate.science`,
       // `estimate.total`) -- is a derived, output-only projection with no place
       // to live in the model, so it is intentionally ignored here and recomputed
       // from the fields below.
       //
-      // `reacquisitionCount`, `calibrationCount` and `expectedCalibrations` appear
-      // only under `estimate` and are absent from payloads that predate them, so a
+      // `reacquisitionCount` and the calibration counts and times appear only
+      // under `estimate` and are absent from payloads that predate them, so a
       // missing value reads as zero.
       //
       // `setup` and `setupCount` appear twice in the encoded form: under the
@@ -180,29 +181,37 @@ trait SequenceCodec {
       def read[A: Decoder](name: String): Decoder.Result[A] =
         val fromEstimate = est.downField(name).as[A]
         if fromEstimate.isRight then fromEstimate else c.downField(name).as[A]
+      def count(name: String): Decoder.Result[NonNegInt] =
+        est.downField(name).as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
+      def time(name: String): Decoder.Result[CategorizedTime] =
+        est.downField(name).as[Option[CategorizedTime]].map(_.getOrElse(CategorizedTime.Zero))
       for {
         t <- read[SetupTime]("setup")
         n <- read[NonNegInt]("setupCount")
-        r <- est.downField("reacquisitionCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
-        k <- est.downField("calibrationCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
-        e <- est.downField("expectedCalibrations").as[Option[CategorizedTime]]
-               .map(_.getOrElse(CategorizedTime.Zero))
+        r <- count("reacquisitionCount")
+        i <- count("existingCalibrationCount")
+        x <- time("existingCalibrationTime")
+        p <- count("expectedCalibrationCount")
+        e <- time("expectedCalibrationTime")
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(t, n, r, k, e, a, s)
+      } yield ExecutionDigest(t, n, r, i, x, p, e, a, s)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
         "estimate"         -> Json.obj(
-          "setup"                -> a.setup.asJson,
-          "setupCount"           -> a.setupCount.asJson,
-          "reacquisitionCount"   -> a.reacquisitionCount.asJson,
-          "calibrationCount"     -> a.calibrationCount.asJson,
-          "expectedCalibrations" -> a.expectedCalibrations.asJson,
-          "science"              -> a.science.timeEstimate.asJson,
-          "total"                -> a.fullTimeEstimate.asJson
+          "setup"                    -> a.setup.asJson,
+          "setupCount"               -> a.setupCount.asJson,
+          "reacquisitionCount"       -> a.reacquisitionCount.asJson,
+          "calibrationCount"         -> a.calibrationCount.asJson,
+          "existingCalibrationCount" -> a.existingCalibrationCount.asJson,
+          "existingCalibrationTime"  -> a.existingCalibrationTime.asJson,
+          "expectedCalibrationCount" -> a.expectedCalibrationCount.asJson,
+          "expectedCalibrationTime"  -> a.expectedCalibrationTime.asJson,
+          "science"                  -> a.science.timeEstimate.asJson,
+          "total"                    -> a.fullTimeEstimate.asJson
         ),
         "setup"            -> a.setup.asJson,        // deprecated, use estimate.setup
         "setupCount"       -> a.setupCount.asJson,   // deprecated, use estimate.setupCount

@@ -419,7 +419,10 @@ object ObscalcService:
 
         "c_setup_count",
         "c_reacquisition_count",
-        "c_calibration_count",
+        "c_exist_cal_count",
+        "c_exist_cal_non_charged_time",
+        "c_exist_cal_program_time",
+        "c_exp_cal_count",
         "c_exp_cal_non_charged_time",
         "c_exp_cal_program_time",
 
@@ -561,7 +564,10 @@ object ObscalcService:
 
         "c_setup_count",
         "c_reacquisition_count",
-        "c_calibration_count",
+        "c_exist_cal_count",
+        "c_exist_cal_non_charged_time",
+        "c_exist_cal_program_time",
+        "c_exp_cal_count",
         "c_exp_cal_non_charged_time",
         "c_exp_cal_program_time",
 
@@ -703,12 +709,19 @@ object ObscalcService:
         sql"c_reacq_setup_time     = ${time_span.opt}"(r.digest.map(_.setup.reacquisition)),
         sql"c_setup_count          = ${int4_nonneg.opt}"(r.digest.map(_.setupCount)),
         sql"c_reacquisition_count  = ${int4_nonneg.opt}"(r.digest.map(_.reacquisitionCount)),
-        sql"c_calibration_count    = ${int4_nonneg.opt}"(r.digest.map(_.calibrationCount)),
-        sql"c_exp_cal_non_charged_time = ${time_span.opt}"(
-          r.digest.map(_.expectedCalibrations(ChargeClass.NonCharged))
+        sql"c_exist_cal_count            = ${int4_nonneg.opt}"(r.digest.map(_.existingCalibrationCount)),
+        sql"c_exist_cal_non_charged_time = ${time_span.opt}"(
+          r.digest.map(_.existingCalibrationTime(ChargeClass.NonCharged))
         ),
-        sql"c_exp_cal_program_time     = ${time_span.opt}"(
-          r.digest.map(_.expectedCalibrations(ChargeClass.Program))
+        sql"c_exist_cal_program_time     = ${time_span.opt}"(
+          r.digest.map(_.existingCalibrationTime(ChargeClass.Program))
+        ),
+        sql"c_exp_cal_count              = ${int4_nonneg.opt}"(r.digest.map(_.expectedCalibrationCount)),
+        sql"c_exp_cal_non_charged_time   = ${time_span.opt}"(
+          r.digest.map(_.expectedCalibrationTime(ChargeClass.NonCharged))
+        ),
+        sql"c_exp_cal_program_time       = ${time_span.opt}"(
+          r.digest.map(_.expectedCalibrationTime(ChargeClass.Program))
         ),
 
         // Acquisition Digest

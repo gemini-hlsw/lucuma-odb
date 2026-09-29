@@ -136,34 +136,54 @@ object ObsExtract:
   /** Placeholder charge for a telluric that has no sequence to estimate from. */
   val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan
 
+  val TelluricPlaceholderCharge: CategorizedTime =
+    CategorizedTime.Zero.sumCharge(ChargeClass.Program, TelluricPlaceholderTime)
+
   /**
-   * Time for the tellurics the calibration count predicts but that are not in
-   * the group yet.  Zero for calibration observations and modes without
-   * tellurics, or with a NoTelluric type.
+   * The unobserved tellurics already in the group and those the calibration
+   * count still predicts, with their time.  All zero for calibration
+   * observations and modes without tellurics, or with a NoTelluric type.
    */
-  def expectedCalibrations(
+  def calibrationEstimate(
     mode:     ObservingMode,
     role:     Option[CalibrationRole],
     count:    NonNegInt,
     siblings: TelluricSiblings
-  ): CategorizedTime =
+  ): CalibrationEstimate =
     if role.isDefined || !modeRequiresTelluric(mode) || !modeTakesTelluric(mode)
-    then CategorizedTime.Zero
-    else expectedTelluricTime(count, siblings)
+    then CalibrationEstimate.Zero
+    else telluricEstimate(count, siblings)
 
   /**
-   * Each telluric still to come costs the average of the group's tellurics
-   * with a digest, or the placeholder when none has one yet.  Unobserved
-   * siblings cover the next visit and come off the count; observed ones belong
-   * to visits already done.  A declined telluric means none are expected.
+   * The estimate covers the work left, so only unobserved tellurics count as
+   * existing; observed ones belong to visits already done, though their totals
+   * still feed the average.  An existing telluric costs what its own digest
+   * says, or the placeholder while it has none.  Each telluric still to come
+   * costs the average of those with a digest, or the placeholder when none has
+   * one yet.  A declined telluric means none more are expected.
    */
-  def expectedTelluricTime(count: NonNegInt, siblings: TelluricSiblings): CategorizedTime =
-    if siblings.declined then CategorizedTime.Zero
-    else
-      val pending = math.max(0, count.value - siblings.unobserved.value)
-      val unit    = siblings.unitCost.getOrElse:
-        CategorizedTime.Zero.sumCharge(ChargeClass.Program, TelluricPlaceholderTime)
+  def telluricEstimate(count: NonNegInt, siblings: TelluricSiblings): CalibrationEstimate =
+    val existing = siblings.unobserved
+    val pending  =
+      if siblings.declined then 0 else math.max(0, count.value - existing.size)
+    val unit     = siblings.unitCost.getOrElse(TelluricPlaceholderCharge)
+    CalibrationEstimate(
+      NonNegInt.unsafeFrom(existing.size),
+      existing.map(_.total.getOrElse(TelluricPlaceholderCharge)).combineAll,
+      NonNegInt.unsafeFrom(pending),
       CategorizedTime(ChargeClass.values.toList.map(cc => cc -> (unit(cc) *| pending))*)
+    )
+
+  case class CalibrationEstimate(
+    existingCount: NonNegInt,
+    existingTime:  CategorizedTime,
+    expectedCount: NonNegInt,
+    expectedTime:  CategorizedTime
+  )
+
+  object CalibrationEstimate:
+    val Zero: CalibrationEstimate =
+      CalibrationEstimate(NonNegInt.MinValue, CategorizedTime.Zero, NonNegInt.MinValue, CategorizedTime.Zero)
 
   /** Tellurics materialised for one visit: one after, or one before and one after for a long visit. */
   def telluricsForVisit(visitTime: TimeSpan): NonNegInt =

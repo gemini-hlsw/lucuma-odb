@@ -4,9 +4,7 @@
 package lucuma.odb.graphql
 package query
 
-import cats.effect.IO
 import lucuma.core.enums.CalibrationRole
-import lucuma.core.model.Observation
 import lucuma.odb.graphql.feature.TelluricCalibrationsTestSupport
 
 import java.time.Instant
@@ -17,7 +15,7 @@ class executionDigest_calibrationCount
   with TelluricCalibrationsTestSupport
   with CalibrationCountTestSupport:
 
-  test("one set for short science, two for long, unchanged by NO_TELLURIC"):
+  test("one set for short science, two for long, none with NO_TELLURIC"):
     assertIO(
       for
         p  <- createProgramAs(pi)
@@ -30,7 +28,7 @@ class executionDigest_calibrationCount
         _  <- setTelluricType(o, "NO_TELLURIC")
         c0 <- calibrationCount(p, o)
       yield (c1, c2, c0),
-      (1, 2, 2)
+      (1, 2, 0)
     )
 
   test("a mode that takes no telluric reports 0"):

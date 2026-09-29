@@ -15,9 +15,11 @@ import lucuma.odb.graphql.subscription.SubscriptionUtils
 
 import java.time.Instant
 
-// Each telluric the calibration count predicts but that is not in the group
-// yet costs the 15-minute placeholder, and the total carries it.
-class executionDigest_expectedCalibrations
+// The estimate splits the calibration count into the tellurics already in the
+// group, each at its own estimate, and those still expected, each at the
+// group's average or the 15-minute placeholder.  Only the expected time joins
+// the total.
+class executionDigest_calibrationEstimate
   extends OdbSuite
   with ExecutionTestSupportForFlamingos2
   with TelluricCalibrationsTestSupport
@@ -27,7 +29,16 @@ class executionDigest_expectedCalibrations
   private val when: Instant = Instant.parse("2024-01-01T12:00:00Z")
 
   // Program-charged microseconds of the estimate's parts.
-  private case class Estimate(count: Int, expected: Long, total: Long, scienceAndSetups: Long):
+  private case class Estimate(
+    count:            Int,
+    existingCount:    Int,
+    existing:         Long,
+    expectedCount:    Int,
+    expected:         Long,
+    total:            Long,
+    scienceAndSetups: Long
+  ):
+    def existingMinutes: Long = existing / 60_000_000L
     def expectedMinutes: Long = expected / 60_000_000L
     def restMinutes: Long     = (total - scienceAndSetups) / 60_000_000L
 
@@ -46,7 +57,10 @@ class executionDigest_expectedCalibrations
                     setupCount
                     setup { full { microseconds } }
                     science { program { microseconds } }
-                    expectedCalibrations { program { microseconds } }
+                    existingCalibrationCount
+                    existingCalibrationTime { program { microseconds } }
+                    expectedCalibrationCount
+                    expectedCalibrationTime { program { microseconds } }
                     total { program { microseconds } }
                   }
                 }
@@ -62,9 +76,12 @@ class executionDigest_expectedCalibrations
       val setups = est.downField("setupCount").require[Int]
       val setup  = est.downFields("setup", "full", "microseconds").require[Long]
       val sci    = est.downFields("science", "program", "microseconds").require[Long]
-      val exp    = est.downFields("expectedCalibrations", "program", "microseconds").require[Long]
+      val existN = est.downField("existingCalibrationCount").require[Int]
+      val exist  = est.downFields("existingCalibrationTime", "program", "microseconds").require[Long]
+      val expN   = est.downField("expectedCalibrationCount").require[Int]
+      val exp    = est.downFields("expectedCalibrationTime", "program", "microseconds").require[Long]
       val total  = est.downFields("total", "program", "microseconds").require[Long]
-      Estimate(count, exp, total, sci + setup * setups)
+      Estimate(count, existN, exist, expN, exp, total, sci + setup * setups)
 
   private def telluricsOf(oid: Observation.Id): IO[List[Observation.Id]] =
     queryObservation(oid).flatMap: obs =>
@@ -77,7 +94,7 @@ class executionDigest_expectedCalibrations
       p         <- createProgramAs(pi)
       t         <- createTargetWithProfileAs(pi, p)
       o         <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-      _         <- setExposureTime(o, 240)
+      _         <- setExposureTime(o, 240, 12)
       e1        <- estimate(p, o)
       _         <- recalculateCalibrations(p, when, o)
       tellurics <- telluricsOf(o)
@@ -86,42 +103,56 @@ class executionDigest_expectedCalibrations
       totals    <- tellurics.traverse(estimate(p, _)).map(_.map(_.total))
       e3        <- estimate(p, o)
     yield
-      // Four hours of science: three sets.  None materialised, then a long
-      // visit's pair with no digest yet, then the pair with digests.
+      // Four hours of science in 20-minute exposures, so the ABBA cycle stays
+      // under the limit: three sets.  None materialised, then a long visit's
+      // pair with no digest yet, then the pair with digests.
       assertEquals(e1.count, 3)
+      assertEquals(e1.existingCount, 0)
+      assertEquals(e1.existing, 0L)
+      assertEquals(e1.expectedCount, 3)
       assertEquals(e1.expectedMinutes, 45L)
       assertEquals(e1.restMinutes, 45L)
       assertEquals(tellurics.size, 2)
+      assertEquals(e2.existingCount, 2)
+      assertEquals(e2.existingMinutes, 30L)
+      assertEquals(e2.expectedCount, 1)
       assertEquals(e2.expectedMinutes, 15L)
       assertEquals(e2.restMinutes, 15L)
+      assertEquals(e3.existingCount, 2)
+      assertEquals(e3.existing, totals.sum)
+      assertEquals(e3.expectedCount, 1)
       assertEquals(e3.expected, totals.sum / totals.size)
       assertEquals(e3.total - e3.scienceAndSetups, e3.expected)
 
-  test("a declined telluric means no expected calibrations"):
+  test("a declined telluric means no expected calibrations, the count is what exists"):
     for
       p            <- createProgramAs(pi)
       t            <- createTargetWithProfileAs(pi, p)
       o            <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-      _            <- setExposureTime(o, 240)
+      _            <- setExposureTime(o, 240, 12)
       _            <- recalculateCalibrations(p, when, o)
       tellurics    <- telluricsOf(o)
       _            <- setObservationWorkflowState(pi, tellurics.head, Inactive)
       e            <- estimate(p, o)
     yield
-      assertEquals(e.count, 3)
+      assertEquals(e.count, 1)
+      assertEquals(e.existingCount, 1)
+      assertEquals(e.expectedCount, 0)
       assertEquals(e.expected, 0L)
       assertEquals(e.restMinutes, 0L)
 
-  test("no telluric type means no expected calibrations, the count stays"):
+  test("no telluric type means no calibrations at all"):
     for
       p            <- createProgramAs(pi)
       t            <- createTargetWithProfileAs(pi, p)
       o            <- createFlamingos2LongSlitObservationAs(pi, p, List(t))
-      _            <- setExposureTime(o, 240)
+      _            <- setExposureTime(o, 240, 12)
       _            <- setTelluricType(o, "NO_TELLURIC")
       e            <- estimate(p, o)
     yield
-      assertEquals(e.count, 3)
+      assertEquals(e.count, 0)
+      assertEquals(e.existingCount, 0)
+      assertEquals(e.expectedCount, 0)
       assertEquals(e.expected, 0L)
       assertEquals(e.restMinutes, 0L)
 
@@ -134,4 +165,7 @@ class executionDigest_expectedCalibrations
       _         <- recalculateCalibrations(p, when, o)
       tellurics <- telluricsOf(o)
       e         <- estimate(p, tellurics.head)
-    yield assertEquals(e.expected, 0L)
+    yield
+      assertEquals(e.existingCount, 0)
+      assertEquals(e.expectedCount, 0)
+      assertEquals(e.expected, 0L)
