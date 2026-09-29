@@ -4,6 +4,7 @@
 package lucuma.odb.service
 
 import cats.syntax.all.*
+import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.model.Observation
 import lucuma.core.syntax.timespan.*
@@ -18,7 +19,7 @@ import java.time.LocalDateTime
 class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
 
   override val pi = TestUsers.Standard.pi(1, 30)
-  override val validUsers = List(pi)
+  override val validUsers = List(pi, serviceUser)
 
   // Test duration value - actual value doesn't matter for queue loading tests
   val testDuration: TimeSpan = 30.minTimeSpan
@@ -192,6 +193,26 @@ class TelluricTargetsServiceSuite extends TelluricTargetsServiceSuiteSupport {
         after <- calculationState(oid)
       } yield
         assertEquals(after, if cascades then CalculationState.Pending else CalculationState.Ready)
+
+  test("cascade_telluric_invalidation - a telluric with a visit keeps its resolution"):
+    for {
+      _      <- cleanup
+      pid    <- createProgramAs(pi, "Telluric Test Program")
+      tid    <- createTargetWithProfileAs(pi, pid)
+      sid    <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+      spent  <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      _      <- setObservationCalibrationRole(List(spent), CalibrationRole.Telluric)
+      fresh  <- createTelluricCalibrationObservation(pi, pid)
+      _      <- insertMeta(createMetaEntry(pid, spent, sid, CalculationState.Ready, testDuration))
+      _      <- insertMeta(createMetaEntry(pid, fresh, sid, CalculationState.Ready, testDuration))
+      _      <- recordVisitAs(serviceUser, spent)
+      _      <- touchObscalc(sid, ObservationWorkflowState.Ready)
+      spentS <- calculationState(spent)
+      freshS <- calculationState(fresh)
+    } yield {
+      assertEquals(spentS, CalculationState.Ready)
+      assertEquals(freshS, CalculationState.Pending)
+    }
 
   // The cascade skips calibration observations, so an obscalc write for the
   // telluric itself must not invalidate its own resolution even in a state that
