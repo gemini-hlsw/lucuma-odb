@@ -52,7 +52,7 @@ case class ItcResult(
   peakPixel:     Option[ItcPeakPixel]
 ):
   def totalTime: Option[TimeSpan] =
-    val total = BigInt(value.exposureTime.toMicroseconds) * value.exposureCount.value
+    val total = BigInt(value.exposureTime.toMicroseconds) * value.frameCount.value
     Option.when(total.isValidLong)(TimeSpan.fromMicroseconds(total.longValue)).flatten
 
 object ItcResult:
@@ -107,7 +107,7 @@ sealed trait ItcScience:
    * The expected total science exposure count.  This is used for limiting
    * sequence generation to reasonable values.
    */
-  def scienceExposureCount: PosInt
+  def scienceFrameCount: PosInt
 
   /** One science result per configuration (filter, channel or central wavelength). */
   def scienceResults: NonEmptyList[Zipper[ItcResult]]
@@ -122,16 +122,16 @@ sealed trait ItcScience:
 object ItcScience:
 
   /**
-   * Total exposure count across every keyed configuration (filter or central
+   * Total frame count across every keyed configuration (filter or central
    * wavelength).  Saturates rather than overflowing: the value only feeds the
    * sequence-size guard, which any saturated total will trip anyway.
    */
-  private def sumExposureCounts(
+  private def sumFrameCounts(
     science: NonEmptyList[Zipper[ItcResult]]
   ): PosInt =
     PosInt.unsafeFrom:
       science.foldLeft(0): (cnt, z) =>
-        val n = z.focus.value.exposureCount.value
+        val n = z.focus.value.frameCount.value
         if cnt > Int.MaxValue - n then Int.MaxValue else cnt + n
 
   // ITC result type discriminator.
@@ -151,8 +151,8 @@ object ItcScience:
     override def dataType: Type =
       Type.Flamingos2Imaging
 
-    override def scienceExposureCount: PosInt =
-      sumExposureCounts(science.toNel.map(_._2))
+    override def scienceFrameCount: PosInt =
+      sumFrameCounts(science.toNel.map(_._2))
 
     override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
       science.toNel.map(_._2)
@@ -168,8 +168,8 @@ object ItcScience:
     override def dataType: Type =
       Type.GhostIfu
 
-    override def scienceExposureCount: PosInt =
-      red.focus.value.exposureCount max blue.focus.value.exposureCount
+    override def scienceFrameCount: PosInt =
+      red.focus.value.frameCount max blue.focus.value.frameCount
 
     override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
       NonEmptyList.of(red, blue)
@@ -191,8 +191,8 @@ object ItcScience:
     override def dataType: Type =
       Type.GmosNorthImaging
 
-    override def scienceExposureCount: PosInt =
-      sumExposureCounts(science.toNel.map(_._2))
+    override def scienceFrameCount: PosInt =
+      sumFrameCounts(science.toNel.map(_._2))
 
     override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
       science.toNel.map(_._2)
@@ -214,8 +214,8 @@ object ItcScience:
     override def dataType: Type =
       Type.GmosSouthImaging
 
-    override def scienceExposureCount: PosInt =
-      sumExposureCounts(science.toNel.map(_._2))
+    override def scienceFrameCount: PosInt =
+      sumFrameCounts(science.toNel.map(_._2))
 
     override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
       science.toNel.map(_._2)
@@ -237,8 +237,8 @@ object ItcScience:
     override def dataType: Type =
       Type.GnirsImaging
 
-    override def scienceExposureCount: PosInt =
-      sumExposureCounts(science.toNel.map(_._2))
+    override def scienceFrameCount: PosInt =
+      sumFrameCounts(science.toNel.map(_._2))
 
     override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
       science.toNel.map(_._2)
@@ -263,8 +263,8 @@ object ItcScience:
     override def dataType: Type =
       Type.GnirsSpectroscopy
 
-    override def scienceExposureCount: PosInt =
-      sumExposureCounts(science.map(_._2))
+    override def scienceFrameCount: PosInt =
+      sumFrameCounts(science.map(_._2))
 
     override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
       science.map(_._2)
@@ -292,8 +292,8 @@ object ItcScience:
     override def dataType: Type =
       Type.Spectroscopy
 
-    override def scienceExposureCount: PosInt =
-      science.focus.value.exposureCount
+    override def scienceFrameCount: PosInt =
+      science.focus.value.frameCount
 
     override def scienceResults: NonEmptyList[Zipper[ItcResult]] =
       NonEmptyList.one(science)
@@ -328,8 +328,8 @@ case class Itc(
   acquisition: ItcAcquisition,
   science:     ItcScience
 ):
-  def scienceExposureCount: PosInt =
-    science.scienceExposureCount
+  def scienceFrameCount: PosInt =
+    science.scienceFrameCount
 
 object Itc:
   given Eq[Itc] =

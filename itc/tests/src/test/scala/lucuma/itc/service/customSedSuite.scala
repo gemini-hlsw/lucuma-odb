@@ -69,7 +69,7 @@ class customSedSuite extends GraphQLSuite {
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -85,7 +85,7 @@ class customSedSuite extends GraphQLSuite {
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -157,7 +157,7 @@ class customSedSuite extends GraphQLSuite {
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -173,7 +173,7 @@ class customSedSuite extends GraphQLSuite {
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -245,7 +245,7 @@ class customSedSuite extends GraphQLSuite {
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -339,7 +339,7 @@ class customSedSuite extends GraphQLSuite {
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }

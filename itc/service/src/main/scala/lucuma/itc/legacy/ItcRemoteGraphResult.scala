@@ -20,9 +20,10 @@ case class GraphsRemoteResult(
   val maxPeakPixelFlux: Int   = ccds.map(_.peakPixelFlux).maximum.toInt
 }
 
-case class Exposures(
-  exposureTime:  Double,
-  exposureCount: NonNegInt
+// One detector's result: the exposure time of a single exposure and the number of frames.
+case class ExposureCalculation(
+  exposureTime: Double,
+  frameCount:   NonNegInt
 )
 
 case class SignalToNoiseAt(
@@ -32,7 +33,7 @@ case class SignalToNoiseAt(
 )
 
 case class AllExposureCalculations(
-  exposures:     NonEmptyChain[Exposures],
+  detectors:     NonEmptyChain[ExposureCalculation],
   selectedIndex: Int
 )
 

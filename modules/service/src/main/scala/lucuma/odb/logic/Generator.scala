@@ -364,7 +364,7 @@ object Generator:
         val checkSequence =
           EitherT
             .fromEither(GeneratorError.sequenceTooLong(ctx.oid).asLeft[ExecutionDigest])
-            .unlessA(ctx.itcRes.toOption.forall(_.scienceExposureCount.value <= SequenceAtomLimit))
+            .unlessA(ctx.itcRes.toOption.forall(_.scienceFrameCount.value <= SequenceAtomLimit))
 
         val stepCount =
           EitherT

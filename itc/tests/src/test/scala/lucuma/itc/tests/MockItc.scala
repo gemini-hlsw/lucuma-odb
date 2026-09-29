@@ -43,7 +43,7 @@ trait MockItcBase extends Itc[IO]:
     observingMode: ObservingMode,
     constraints:   ItcObservingConditions,
     exposureTime:  TimeSpan,
-    exposureCount: PosInt
+    frameCount:    PosInt
   ): IO[TargetIntegrationTime]
 
   def calculateIntegrationTime(
@@ -115,7 +115,7 @@ object MockItc extends MockItcBase:
     observingMode: ObservingMode,
     constraints:   ItcObservingConditions,
     exposureTime:  TimeSpan,
-    exposureCount: PosInt
+    frameCount:    PosInt
   ): IO[TargetIntegrationTime] =
     TargetIntegrationTime(
       Zipper.one(IntegrationTime(exposureTime, 10.refined)),
@@ -153,7 +153,7 @@ object MockImagingItc extends MockItcBase:
     observingMode: ObservingMode,
     constraints:   ItcObservingConditions,
     exposureTime:  TimeSpan,
-    exposureCount: PosInt
+    frameCount:    PosInt
   ): IO[TargetIntegrationTime] =
     TargetIntegrationTime(
       Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 10.refined)),
@@ -251,7 +251,7 @@ object EmissionLineMockItc extends MockItcBase:
     observingMode: ObservingMode,
     constraints:   ItcObservingConditions,
     exposureTime:  TimeSpan,
-    exposureCount: PosInt
+    frameCount:    PosInt
   ): IO[TargetIntegrationTime] =
     TargetIntegrationTime(
       Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 10.refined)),
@@ -296,7 +296,7 @@ object WavelengthAtOutOfRangeMockItc extends MockItcBase:
     observingMode: ObservingMode,
     constraints:   ItcObservingConditions,
     exposureTime:  TimeSpan,
-    exposureCount: PosInt
+    frameCount:    PosInt
   ): IO[TargetIntegrationTime] =
     IO.raiseError(WavelengthOutOfRange(atWavelength))
 
@@ -325,7 +325,7 @@ object FailingMockItc extends MockItcBase:
     observingMode: ObservingMode,
     constraints:   ItcObservingConditions,
     exposureTime:  TimeSpan,
-    exposureCount: PosInt
+    frameCount:    PosInt
   ): IO[TargetIntegrationTime] =
     TargetIntegrationTime(
       Zipper.one(IntegrationTime(TimeSpan.fromSeconds(1).get, 10.refined)),

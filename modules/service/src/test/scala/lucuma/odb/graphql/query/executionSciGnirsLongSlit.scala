@@ -70,7 +70,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
       o <- createGnirsLongSlitObservationAs(pi, p, t)
     yield o
 
-  test("[gnirs] short camera default offsets, exposureCount=3 -> 1 cycle of 4"):
+  test("[gnirs] short camera default offsets, frameCount=3 -> 1 cycle of 4"):
     gnirsObs.flatMap: oid =>
       expect(
         user     = pi,
@@ -268,7 +268,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asLeft
       )
 
-  test("[gnirs] short camera default offsets, exposureCount=3 -> 1 cycle of 4, unsplittable"):
+  test("[gnirs] short camera default offsets, frameCount=3 -> 1 cycle of 4, unsplittable"):
     for
       o <- gnirsObs
       _ <- setIsSplittableAs(pi, o, isSplittable = false)
@@ -319,7 +319,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
-  test("[gnirs] exposureCount=8 with 4 offsets -> 2 identical cycles"):
+  test("[gnirs] frameCount=8 with 4 offsets -> 2 identical cycles"):
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
@@ -347,7 +347,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
           ).asRight
       )
 
-  test("[gnirs] explicit along-slit offsets (2 entries) — exposureCount=3 rounds up to 2 cycles"):
+  test("[gnirs] explicit along-slit offsets (2 entries) — frameCount=3 rounds up to 2 cycles"):
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
@@ -383,7 +383,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
   test("[gnirs] off-slit offsets don't contribute to S/N (extra cycles)"):
     // The SHORT_BLUE + MIRROR slit is 99" long, so |q| > 49.5" falls off slit.
     // Here q=+2 is on slit but q=+60 is off, so only 1 of the 2 steps per cycle
-    // is on source. exposureCount=3 therefore needs 3 cycles (not 2).
+    // is on source. frameCount=3 therefore needs 3 cycles (not 2).
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
@@ -494,7 +494,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
 
   test("[gnirs] nod-to-sky offsets carry full P/Q + per-entry guiding"):
     // The sky position (p=60) is off target, so only the on-axis (p=0) step
-    // contributes to the S/N: exposureCount=3 requires 3 cycles.
+    // contributes to the S/N: frameCount=3 requires 3 cycles.
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs
@@ -532,7 +532,7 @@ class executionSciGnirsLongSlit extends ExecutionTestSupportForGnirs:
     // off slit and so doesn't contribute to the S/N — the q check matters, not
     // just p. The SHORT_BLUE + MIRROR slit is 99", so slit/2 = 49.5"; q = 49.6"
     // is just one deci-arcsecond past the edge and therefore off slit. Only the
-    // on-axis step is on source, so exposureCount=3 needs 3 cycles.
+    // on-axis step is on source, so frameCount=3 needs 3 cycles.
     val setup: IO[Observation.Id] =
       for
         oid <- gnirsObs

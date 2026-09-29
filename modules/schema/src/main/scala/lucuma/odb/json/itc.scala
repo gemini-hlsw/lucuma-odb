@@ -70,17 +70,19 @@ trait ItcCodec:
       for
         targetId        <- c.downField("targetId").as[Target.Id]
         exposureTime    <- c.downField("exposureTime").as[TimeSpan]
-        exposureCount   <- c.downField("exposureCount").as[PosInt]
+        // `exposureCount` is the pre-rename key of already stored results.
+        frameCount      <- c.downField("frameCount").as[PosInt].orElse(c.downField("exposureCount").as[PosInt])
         signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
         peakPixel       <- c.downField("peakPixel").as[Option[ItcPeakPixel]]
-      yield ItcResult(targetId, IntegrationTime(exposureTime, exposureCount), signalToNoiseAt, peakPixel)
+      yield ItcResult(targetId, IntegrationTime(exposureTime, frameCount), signalToNoiseAt, peakPixel)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcResult] =
     Encoder.instance: a =>
       Json.obj(
         "targetId"        -> a.targetId.asJson,
         "exposureTime"    -> a.value.exposureTime.asJson,
-        "exposureCount"   -> a.value.exposureCount.value.asJson,
+        "frameCount"      -> a.value.frameCount.value.asJson,
+        "exposureCount"   -> a.value.frameCount.value.asJson,
         "signalToNoiseAt" -> a.signalToNoise.asJson,
         "peakPixel"       -> a.peakPixel.asJson
       )

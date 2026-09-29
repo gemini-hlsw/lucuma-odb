@@ -35,7 +35,7 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
 
   override def obs = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
-      exposureCount = 30,
+      frameCount = 30,
       exposureDuration = 120.seconds,
       wavelengthAt = wavelengthAt,
       coadds = 1.some,

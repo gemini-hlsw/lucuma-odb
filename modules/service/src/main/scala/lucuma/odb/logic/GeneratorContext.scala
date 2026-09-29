@@ -61,7 +61,7 @@ case class GeneratorContext(
 
     def addResultSet(z: Zipper[ItcResult]): Unit =
       md5.update(z.focus.value.exposureTime.hashBytes)
-      md5.update(z.focus.value.exposureCount.hashBytes)
+      md5.update(z.focus.value.frameCount.hashBytes)
 
     def addKeyedResultSet[A: HashBytes](kv: (A, Zipper[ItcResult])): Unit =
       md5.update(kv._1.hashBytes)

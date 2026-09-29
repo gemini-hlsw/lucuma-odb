@@ -69,7 +69,7 @@ class errorChannelSuite extends FailingCalculationSuite:
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }

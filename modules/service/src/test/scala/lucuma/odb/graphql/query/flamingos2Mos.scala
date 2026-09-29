@@ -113,14 +113,14 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
                     selected {
                       targetId
                       exposureTime { seconds }
-                      exposureCount
+                      frameCount
                     }
                   }
                   acquisition {
                     selected {
                       targetId
                       exposureTime { seconds }
-                      exposureCount
+                      frameCount
                     }
                   }
                 }
@@ -137,14 +137,14 @@ class flamingos2Mos extends OdbSuite with ObservingModeSetupOperations:
                   "selected": {
                     "targetId": $tid,
                     "exposureTime": { "seconds": 10.000000 },
-                    "exposureCount": 6
+                    "frameCount": 6
                   }
                 },
                 "acquisition": {
                   "selected": {
                     "targetId": $tid,
                     "exposureTime": { "seconds": 10.000000 },
-                    "exposureCount": 6
+                    "frameCount": 6
                   }
                 }
               }

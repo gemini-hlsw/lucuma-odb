@@ -29,12 +29,12 @@ case class BenchmarkState(
   testWavelength:    Wavelength,
   testSignalToNoise: SignalToNoise,
   testExposureTime:  TimeSpan,
-  testExposureCount: PosInt
+  testFrameCount:    PosInt
 ):
   val signalToNoiseMode: ExposureTimeMode =
     ExposureTimeMode.SignalToNoiseMode(testSignalToNoise, testWavelength)
   val timeAndCountMode: ExposureTimeMode  =
-    ExposureTimeMode.TimeAndCountMode(testExposureTime, testExposureCount, testWavelength)
+    ExposureTimeMode.TimeAndCountMode(testExposureTime, testFrameCount, testWavelength)
 
 object BenchmarkState:
   def fromTestData(testData: ItcTestData): BenchmarkState =
@@ -46,7 +46,7 @@ object BenchmarkState:
       testWavelength = testData.testWavelength,
       testSignalToNoise = testData.testSignalToNoise,
       testExposureTime = testData.testExposureTime,
-      testExposureCount = testData.testExposureCount
+      testFrameCount = testData.testFrameCount
     )
 
 /**

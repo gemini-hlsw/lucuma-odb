@@ -12,10 +12,10 @@ def calculateCycleCount[D](
   cycle:      List[ProtoStep[D]],
   time:       IntegrationTime
 ): Either[String, NonNegInt] =
-  val requiredExposures = time.exposureCount.value
-  val exposuresPerCycle = cycle.count(isOnSource)
+  val requiredFrames = time.frameCount.value
+  val framesPerCycle = cycle.count(isOnSource)
   Either.cond(
-    exposuresPerCycle > 0,
-    NonNegInt.unsafeFrom((requiredExposures + (exposuresPerCycle - 1)) / exposuresPerCycle),
+    framesPerCycle > 0,
+    NonNegInt.unsafeFrom((requiredFrames + (framesPerCycle - 1)) / framesPerCycle),
     "At least one exposure must be on slit (if longslit) or guided (if IFU)."
   )

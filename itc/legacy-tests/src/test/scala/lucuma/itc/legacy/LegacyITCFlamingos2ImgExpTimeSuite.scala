@@ -22,7 +22,7 @@ class LegacyITCFlamingos2ImgExpTimeSuite extends LegacyITCFlamingos2Suite:
   override def obs = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
       exposureDuration = 10.seconds,
-      exposureCount = 5,
+      frameCount = 5,
       coadds = None,
       sourceFraction = 1.0,
       ditherOffset = Angle.Angle0

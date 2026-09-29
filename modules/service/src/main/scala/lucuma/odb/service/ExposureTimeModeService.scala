@@ -461,7 +461,7 @@ object ExposureTimeModeService:
              etm.signalToNoise,
              etm.at,
              etm.exposureTime,
-             etm.exposureCount
+             etm.frameCount
            )
 
     def InsertMany(
@@ -500,7 +500,7 @@ object ExposureTimeModeService:
             etm.signalToNoise,
             etm.at,
             etm.exposureTime,
-            etm.exposureCount,
+            etm.frameCount,
             isExplicit,
             oids
           )
@@ -535,7 +535,7 @@ object ExposureTimeModeService:
             etm.signalToNoise,
             etm.at,
             etm.exposureTime,
-            etm.exposureCount,
+            etm.frameCount,
             id
           )
 
@@ -560,7 +560,7 @@ object ExposureTimeModeService:
         update.signalToNoise,
         update.at,
         update.exposureTime,
-        update.exposureCount,
+        update.frameCount,
         isExplicit,
         oids,
         role
@@ -649,7 +649,7 @@ object ExposureTimeModeService:
         update.signalToNoise,
         update.at,
         update.exposureTime,
-        update.exposureCount,
+        update.frameCount,
         isExplicit
       )
 

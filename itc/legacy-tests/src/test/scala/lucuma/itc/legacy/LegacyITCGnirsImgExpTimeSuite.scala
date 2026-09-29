@@ -27,7 +27,7 @@ class LegacyITCGnirsImgExpTimeSuite extends CommonITCLegacySuite:
 
   override def obs = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.ImagingS2N(
-      exposureCount = 25,
+      frameCount = 25,
       exposureDuration = 1.seconds,
       coadds = None,
       sourceFraction = 1.0,

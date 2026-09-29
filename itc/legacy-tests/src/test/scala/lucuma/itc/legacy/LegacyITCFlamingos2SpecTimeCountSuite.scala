@@ -22,7 +22,7 @@ class LegacyITCFlamingos2SpecTimeAndCountSuite extends LegacyITCFlamingos2Suite:
 
   override def obs = ItcObservationDetails(
     calculationMethod = ItcObservationDetails.CalculationMethod.S2NMethod.SpectroscopyS2N(
-      exposureCount = 10,
+      frameCount = 10,
       exposureDuration = 3.seconds,
       wavelengthAt = Wavelength.decimalNanometers.getOption(1200).get,
       coadds = None,

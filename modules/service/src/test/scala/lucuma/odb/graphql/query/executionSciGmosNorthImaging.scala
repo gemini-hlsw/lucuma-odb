@@ -404,7 +404,7 @@ class executionSciGmosNorthImaging extends ExecutionTestSupportForGmos:
         (
           Step(f, t).withOffset(0, 0).withClass(ObserveClass.Science) ::
           Step(f, t).withOffset(1, 1).withClass(ObserveClass.Science) ::
-          List.fill(t.exposureCount.value)(Step(f, t)).appendedAll:
+          List.fill(t.frameCount.value)(Step(f, t)).appendedAll:
             List(
               Step(f, t).withOffset(0, 0).withClass(ObserveClass.Science),
               Step(f, t).withOffset(1, 1).withClass(ObserveClass.Science)

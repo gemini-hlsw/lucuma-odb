@@ -49,14 +49,14 @@ object Science:
 
         val redDetector = GhostDetector(
           red.exposureTime,
-          red.exposureCount,
+          red.frameCount,
           config.red.value.binning,
           config.red.value.readMode
         ).asRed
 
         val blueDetector = GhostDetector(
           blue.exposureTime,
-          blue.exposureCount,
+          blue.frameCount,
           config.blue.value.binning,
           config.blue.value.readMode
         ).asBlue

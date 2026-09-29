@@ -1633,10 +1633,10 @@ input ExposureTimeModeInput @oneOf {
 Time And Count exposure time mode parameters
 """
 input TimeAndCountExposureTimeModeInput {
-  "Exposure time, which must be greater than zero."
+  "Exposure time of a single exposure (per coadd, for instruments with coadds), which must be greater than zero."
   time: TimeSpanInput!
 
-  "Exposure count, which must be greater than zero."
+  "Number of frames, which must be greater than zero.  A frame is what the detector delivers: `coadds` exposures summed on chip."
   count: PosInt!
 
   "S/N at wavelength."
@@ -12774,10 +12774,10 @@ input GnirsIfuInput {
 Time and Count exposure time mode.
 """
 type TimeAndCountExposureTimeMode {
-  "Exposure time."
+  "Exposure time of a single exposure (per coadd, for instruments with coadds)."
   time: TimeSpan!
 
-  "Exposure count."
+  "Number of frames.  A frame is what the detector delivers: `coadds` exposures summed on chip."
   count: PosInt!
 
   "S/N at Wavelength."
@@ -16399,8 +16399,20 @@ An ITC result for a single target.
 """
 type ItcResult {
   targetId: TargetId!
+
+  """
+  Exposure time of a single exposure (per coadd, for instruments with coadds).
+  """
   exposureTime: TimeSpan!
-  exposureCount: NonNegInt!
+
+  """
+  Number of frames to take. A frame is what the detector delivers: `coadds`
+  exposures summed on chip. Without coadds a frame is one exposure.
+  """
+  frameCount: NonNegInt!
+
+  exposureCount: NonNegInt! @deprecated(reason: "Use `frameCount`.")
+
   signalToNoiseAt: SignalToNoiseAt
 
   """

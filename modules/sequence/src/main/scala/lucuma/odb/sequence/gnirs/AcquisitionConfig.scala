@@ -100,14 +100,15 @@ case class AcquisitionConfig(
           case _                               => auto
 
   /**
-   * Coadds for the acquisition steps. In S/N mode the ITC sizes the acquisition, so we
-   * use its exposure count — the number of exposures needed to reach the target S/N — as
-   * the coadds. In time-and-count mode the user controls the acquisition directly, so the
-   * explicit coadds are used.
+   * Coadds for the acquisition steps. In S/N mode the ITC frame count becomes the coadds,
+   * so the acquisition takes a single frame. That only holds while the ITC picks one coadd
+   * per frame itself: the frames it returns are already divided by its own coadds, which it
+   * does not report. In time-and-count mode the user controls the acquisition directly, so
+   * the explicit coadds are used.
    */
   def resolvedCoadds(time: IntegrationTime): PosInt =
     exposureTimeMode match
-      case ExposureTimeMode.SignalToNoiseMode(_, _)   => time.exposureCount
+      case ExposureTimeMode.SignalToNoiseMode(_, _)   => time.frameCount
       case ExposureTimeMode.TimeAndCountMode(_, _, _) => coadds
 
   def hashBytes: Array[Byte] =

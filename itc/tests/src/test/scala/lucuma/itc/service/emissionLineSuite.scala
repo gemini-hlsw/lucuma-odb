@@ -73,7 +73,7 @@ class emissionLineSuite extends GraphQLEmissionLineSuite {
           }) {
             brightest {
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -89,7 +89,7 @@ class emissionLineSuite extends GraphQLEmissionLineSuite {
             "spectroscopy" : {
               "brightest": {
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }

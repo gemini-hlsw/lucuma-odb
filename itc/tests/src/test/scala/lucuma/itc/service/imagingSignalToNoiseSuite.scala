@@ -90,13 +90,13 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
           }) {
             brightest {
               all {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
               }
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -111,18 +111,18 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
             "imaging" : {
               "brightest" : {
                 "all" : [{
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
                 }, {
-                  "exposureCount" : 5,
+                  "frameCount" : 5,
                   "exposureTime" : {
                     "seconds" : 2.000000
                   }
                 }],
                 "selected" : {
-                  "exposureCount" : 5,
+                  "frameCount" : 5,
                   "exposureTime" : {
                     "seconds" : 2.000000
                   }
@@ -217,13 +217,13 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
           }) {
             brightest {
               all {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
               }
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -238,13 +238,13 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
             "imaging" : {
               "brightest" : {
                 "all" : [{
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
                 }],
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -347,13 +347,13 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
                 total
               }
               all {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
               }
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -375,18 +375,18 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
                   "total" : 102.000
                 },
                 "all" : [{
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
                 }, {
-                  "exposureCount" : 5,
+                  "frameCount" : 5,
                   "exposureTime" : {
                     "seconds" : 2.000000
                   }
                 }],
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
@@ -492,13 +492,13 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
                 total
               }
               all {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
               }
               selected {
-                exposureCount
+                frameCount
                 exposureTime {
                   seconds
                 }
@@ -520,18 +520,18 @@ class imagingSignalToNoiseSuite extends GraphImagingQLSuite:
                   "total" : 102.000
                 },
                 "all" : [{
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }
                 }, {
-                  "exposureCount" : 5,
+                  "frameCount" : 5,
                   "exposureTime" : {
                     "seconds" : 2.000000
                   }
                 }],
                 "selected" : {
-                  "exposureCount" : 10,
+                  "frameCount" : 10,
                   "exposureTime" : {
                     "seconds" : 1.000000
                   }

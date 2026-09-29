@@ -56,8 +56,8 @@ trait CommonITCLegacySuite extends CatsEffectSuite:
 
   // Common validation functions
   def containsValidResults(r: IntegrationTimeRemoteResult): Boolean =
-    r.exposureCalculation.selectedIndex < r.exposureCalculation.exposures.length &&
-      r.exposureCalculation.exposures.forall(e => e.exposureTime >= 0 && e.exposureCount.value >= 0)
+    r.exposureCalculation.selectedIndex < r.exposureCalculation.detectors.length &&
+      r.exposureCalculation.detectors.forall(e => e.exposureTime >= 0 && e.frameCount.value >= 0)
 
   // For modes that must also report the S/N at the requested wavelength. Not every mode does,
   // so this is opt-in rather than being folded into `containsValidResults`.
