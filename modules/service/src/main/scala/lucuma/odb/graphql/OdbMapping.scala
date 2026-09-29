@@ -278,6 +278,7 @@ object OdbMapping {
           with ProperMotionMapping[F]
           with ProperMotionRaMapping[F]
           with ProposalMapping[F]
+          with ProposalStatusChangeMapping[F]
           with ProposalSummaryGenerationMapping[F]
           with ProposalReferenceMapping[F]
           with GeminiProposalTypeMapping[F]
@@ -541,6 +542,7 @@ object OdbMapping {
                 ProperMotionMapping,
                 ProperMotionRaMapping,
                 ProposalMapping,
+                ProposalStatusChangeMapping,
                 ProposalSummaryFailureMapping,
                 ProposalSummaryGenerationMapping,
                 ProposalReferenceMapping,
@@ -726,6 +728,7 @@ object OdbMapping {
                 ObservationElaborator,
                 ObservingModeGroupElaborator,
                 ProgramElaborator,
+                ProposalElaborator,
                 ProgramUserElaborator,
                 GeminiProposalTypeElaborator,
                 KeckProposalTypeElaborator,

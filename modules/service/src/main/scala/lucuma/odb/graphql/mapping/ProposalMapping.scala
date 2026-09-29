@@ -5,7 +5,9 @@ package lucuma.odb.graphql
 package mapping
 
 import cats.effect.Resource
-import grackle.Query.EffectHandler
+import grackle.Query.*
+import grackle.QueryCompiler.Elab
+import grackle.TypeRef
 import grackle.skunk.SkunkMapping
 import lucuma.core.model.Program
 import lucuma.core.model.User
@@ -16,6 +18,7 @@ import lucuma.odb.graphql.table.CallForProposalsView
 import lucuma.odb.graphql.table.PartnerSplitTable
 import lucuma.odb.graphql.table.ProgramView
 import lucuma.odb.graphql.table.ProposalReferenceView
+import lucuma.odb.graphql.table.ProposalStatusChangeView
 import lucuma.odb.graphql.table.ProposalView
 import lucuma.odb.json.calculatedValue.given
 import lucuma.odb.json.time.query.given
@@ -29,6 +32,7 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
                                with Predicates[F]
                                with ProgramView[F]
                                with ProposalReferenceView[F]
+                               with ProposalStatusChangeView[F]
                                with ProposalView[F]
                                with KeyValueEffectHandler[F] {
 
@@ -45,8 +49,14 @@ trait ProposalMapping[F[_]] extends PartnerSplitTable[F]
       EffectField("defaultTimeRequest", defaultTimeRequestHandler, List("program_id")),
       SqlObject("gemini"),
       SqlObject("keck"),
-      SqlObject("subaru")
+      SqlObject("subaru"),
+      SqlObject("submissionHistory", Join(ProposalView.ProgramId, ProposalStatusChangeView.ProgramId))
     )
+
+  lazy val ProposalElaborator: PartialFunction[(TypeRef, String, List[Binding]), Elab[Unit]] =
+    case (ProposalType, "submissionHistory", Nil) =>
+      Elab.transformChild: child =>
+        OrderBy(OrderSelections(List(OrderSelection[Long](ProposalStatusChangeType / "id"))), child)
 
   private lazy val timeRequestHandler: EffectHandler[F] =
     keyValueEffectHandler[Program.Id, Option[CalculatedValue[CategorizedTimeRange]]]("program_id"): pid =>

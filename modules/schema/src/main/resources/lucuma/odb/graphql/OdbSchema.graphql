@@ -18553,6 +18553,23 @@ type Proposal {
   exchange proposals; null otherwise.
   """
   subaru: SubaruProposalType
+
+  """
+  Every submission (SUBMITTED) and retraction (NOT_SUBMITTED) of the proposal,
+  oldest first.  Empty if it was never submitted.
+  """
+  submissionHistory: [ProposalStatusChange!]!
+}
+
+"""
+A single submission or retraction of a proposal.
+"""
+type ProposalStatusChange {
+  "When the status changed."
+  timestamp: Timestamp!
+
+  "SUBMITTED for a submission, NOT_SUBMITTED for a retraction."
+  status: ProposalStatus!
 }
 
 type ProposalReference {
