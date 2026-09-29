@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "a673384acd3f81a778b1172e21674afa8d3254f0",
-  "ocs_git_branch": "itc-report-coadds",
-  "ocs_git_describe": "vpit-v2027A.1.1.1-36-ga673384ac",
-  "local": true,
-  "build_timestamp": "2026-09-29T02:46:15Z"
+  "ocs_git_hash": "ad6e960c43be230e0c287ed61b12f78750f1b5da",
+  "ocs_git_branch": "main",
+  "ocs_git_describe": "vpit-v2027A.1.1.1-37-gad6e960c4",
+  "local": false,
+  "build_timestamp": "2026-09-29T17:51:24Z"
 }
