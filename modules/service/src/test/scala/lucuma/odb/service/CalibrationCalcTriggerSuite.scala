@@ -95,6 +95,24 @@ class CalibrationCalcTriggerSuite extends ExecutionTestSupportForFlamingos2 {
       assertEquals(first, Some(CalculationState.Pending))
       assertEquals(second, Some(CalculationState.Pending))
 
+  test("editing the observation duration re-enqueues the calibration calc"):
+    for
+      _      <- cleanupQueue
+      pid    <- createProgramAs(pi, "Trigger Test")
+      oid    <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+      _      <- seedObscalc(oid)
+      _      <- settleObscalcToReady(oid)
+      _      <- withSession: session =>
+                  session.execute(
+                    sql"UPDATE t_calibration_calc SET c_state = 'ready' WHERE c_observation_id = $observation_id".command
+                  )(oid)
+      _      <- withSession: session =>
+                  session.execute(
+                    sql"UPDATE t_observation SET c_observation_duration = interval '1 hour' WHERE c_observation_id = $observation_id".command
+                  )(oid)
+      state  <- queueState(oid)
+    yield assertEquals(state, Some(CalculationState.Pending))
+
   test("hard-deleting a science obs cascades to remove its queue row"):
     for
       _     <- cleanupQueue

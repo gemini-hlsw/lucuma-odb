@@ -48,3 +48,23 @@ class TelluricSearchFailureSuite extends TelluricTargetsServiceSuiteSupport:
         assert(meta.retryAt.isDefined, "a retry time must be scheduled")
         assert(meta.errorMessage.exists(_.contains("telluric backend is down")), s"unexpected error: ${meta.errorMessage}")
         assertEquals(meta.resolvedTargetId, None)
+
+  test("a failure after a duration update requeues the row instead of scheduling a retry"):
+    for
+      _       <- cleanup
+      pid     <- createProgramAs(pi, "Telluric Failure Program")
+      tid     <- createTargetWithProfileAs(pi, pid)
+      sid     <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      oid     <- createTelluricCalibrationObservation(pi, pid)
+      _       <- insertPending(createPendingEntry(pid, oid, sid, 30.minTimeSpan))
+      // A worker on its fourth attempt, so a stale retry would leave one attempt
+      pending <- loadObs(oid).map(_.get.copy(failureCount = 4))
+      _       <- withTelluricTargetsServiceTransactionally(_.updateScienceDuration(oid, 60.minTimeSpan))
+      _       <- withServices(serviceUser): services =>
+                   Services.asSuperUser(services.telluricTargetsService.resolveTargets(pending))
+      meta    <- selectMeta(oid).map(_.get)
+    yield
+      assertEquals(meta.state, CalculationState.Pending)
+      assertEquals(meta.failureCount, 0)
+      assertEquals(meta.retryAt, None)
+      assertEquals(meta.scienceDuration, 60.minTimeSpan)
