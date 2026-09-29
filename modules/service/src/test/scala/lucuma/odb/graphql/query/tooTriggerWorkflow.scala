@@ -11,8 +11,8 @@ import io.circe.literal.*
 import io.circe.syntax.*
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.SchedulingMode
-import lucuma.core.enums.TooActivation
 import lucuma.core.enums.SequenceCommand
+import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.odb.data.TooTrigger

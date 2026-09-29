@@ -7,9 +7,9 @@ package query
 import cats.effect.IO
 import cats.syntax.option.*
 import lucuma.core.enums.ObservationWorkflowState
-import lucuma.core.enums.TooActivation
 import lucuma.core.enums.SequenceCommand
 import lucuma.core.enums.TimingWindowInclusion.Include
+import lucuma.core.enums.TooActivation
 import lucuma.core.model.Observation
 import lucuma.core.util.Timestamp
 import lucuma.odb.util.Codecs.observation_id

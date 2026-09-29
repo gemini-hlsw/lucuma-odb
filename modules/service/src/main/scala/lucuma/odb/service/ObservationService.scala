@@ -26,10 +26,10 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.ObservationPriority
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
-import lucuma.core.enums.TooActivation
 import lucuma.core.enums.ScienceBand
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapability
+import lucuma.core.enums.TooActivation
 import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
 import lucuma.core.math.Coordinates
