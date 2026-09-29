@@ -13,6 +13,7 @@ import lucuma.core.enums.ObserveClass
 import lucuma.core.enums.StepGuideState
 import lucuma.core.math.Offset
 import lucuma.core.model.sequence.Atom
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.model.sequence.Dataset
 import lucuma.core.model.sequence.ExecutionConfig
 import lucuma.core.model.sequence.ExecutionDigest
@@ -104,6 +105,7 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
       2.refined,
       3.refined,
       1.refined,
+      CategorizedTime.Zero,
       SequenceDigest.Zero.copy(observeClass = ObserveClass.Acquisition, atomCount = 1.refined, executionState = ExecutionState.Ongoing),
       SequenceDigest.Zero.copy(observeClass = ObserveClass.Science,     atomCount = 3.refined, executionState = ExecutionState.Ongoing)
     )
