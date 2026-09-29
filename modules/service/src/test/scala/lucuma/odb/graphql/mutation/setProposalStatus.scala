@@ -1692,15 +1692,6 @@ class setProposalStatus extends OdbSuite
 
   test("✓ proposal submission history") {
 
-    def setStatus(user: User, pid: Program.Id, status: ProposalStatus): IO[Unit] =
-      query(user, s"""
-        mutation {
-          setProposalStatus(input: { programId: "$pid", status: ${status.tag.toUpperCase} }) {
-            program { id }
-          }
-        }
-      """).void
-
     def history(pid: Program.Id): IO[List[(Timestamp, ProposalStatus)]] =
       query(pi, s"""
         query {
@@ -1726,10 +1717,10 @@ class setProposalStatus extends OdbSuite
       _  <- addPartnerSplits(pi, p)
       _  <- addCoisAs(pi, p)
       h0 <- history(p)
-      _  <- setStatus(pi, p, ProposalStatus.Submitted)
-      _  <- setStatus(pi, p, ProposalStatus.NotSubmitted)
-      _  <- setStatus(pi, p, ProposalStatus.Submitted)
-      _  <- setStatus(staff, p, ProposalStatus.Accepted)
+      _  <- submitProposal(pi, p)
+      _  <- unsubmitProposal(pi, p)
+      _  <- submitProposal(pi, p)
+      _  <- acceptProposal(staff, p)
       h1 <- history(p)
     yield
       assertEquals(h0, Nil)
