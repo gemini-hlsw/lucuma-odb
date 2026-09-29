@@ -16,6 +16,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
+import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import fs2.Stream
 import grackle.Result
@@ -419,6 +420,8 @@ object ObscalcService:
         "c_setup_count",
         "c_reacquisition_count",
         "c_calibration_count",
+        "c_exp_cal_non_charged_time",
+        "c_exp_cal_program_time",
 
         "c_acq_obs_class",
         "c_acq_non_charged_time",
@@ -509,15 +512,18 @@ object ObscalcService:
         "c_reacquisition_count",
         "c_sci_obs_class",
         "c_sci_non_charged_time",
-        "c_sci_program_time"
+        "c_sci_program_time",
+        "c_exp_cal_non_charged_time",
+        "c_exp_cal_program_time"
       )
 
     val full_categorized_time: Decoder[CategorizedTime] =
-       (time_span *: int4_nonneg *: time_span *: int4_nonneg *: obs_class *: time_span *: time_span).map: (setup, count, reacq, reacqCount, obsclass, nonCharged, program) =>
-         CategorizedTime(
-           ChargeClass.NonCharged -> nonCharged,
-           ChargeClass.Program    -> program
-         ).sumCharge(obsclass.chargeClass, (setup *| count.value) +| (reacq *| reacqCount.value))
+       (time_span *: int4_nonneg *: time_span *: int4_nonneg *: obs_class *: time_span *: time_span *: categorized_time).map:
+         (setup, count, reacq, reacqCount, obsclass, nonCharged, program, expectedCals) =>
+           CategorizedTime(
+             ChargeClass.NonCharged -> nonCharged,
+             ChargeClass.Program    -> program
+           ).sumCharge(obsclass.chargeClass, (setup *| count.value) +| (reacq *| reacqCount.value)) |+| expectedCals
 
     val SelectOneCategorizedTime: Query[Observation.Id, CalculatedValue[CategorizedTime]] =
       sql"""
@@ -556,6 +562,8 @@ object ObscalcService:
         "c_setup_count",
         "c_reacquisition_count",
         "c_calibration_count",
+        "c_exp_cal_non_charged_time",
+        "c_exp_cal_program_time",
 
         "c_acq_obs_class",
         "c_acq_non_charged_time",
@@ -696,6 +704,12 @@ object ObscalcService:
         sql"c_setup_count          = ${int4_nonneg.opt}"(r.digest.map(_.setupCount)),
         sql"c_reacquisition_count  = ${int4_nonneg.opt}"(r.digest.map(_.reacquisitionCount)),
         sql"c_calibration_count    = ${int4_nonneg.opt}"(r.digest.map(_.calibrationCount)),
+        sql"c_exp_cal_non_charged_time = ${time_span.opt}"(
+          r.digest.map(_.expectedCalibrations(ChargeClass.NonCharged))
+        ),
+        sql"c_exp_cal_program_time     = ${time_span.opt}"(
+          r.digest.map(_.expectedCalibrations(ChargeClass.Program))
+        ),
 
         // Acquisition Digest
         sql"c_acq_obs_class                  = ${obs_class.opt}"(r.digest.map(_.acquisition.observeClass)),

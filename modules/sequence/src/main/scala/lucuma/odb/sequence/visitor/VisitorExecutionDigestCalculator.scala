@@ -56,6 +56,7 @@ object VisitorExecutionDigestCalculator:
       NonNegInt.unsafeFrom(if count > 0 then 1 else 0),
       NonNegInt.MinValue,
       NonNegInt.MinValue,
+      CategorizedTime.Zero,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )
@@ -82,6 +83,7 @@ object VisitorExecutionDigestCalculator:
       NonNegInt.unsafeFrom(0),
       NonNegInt.MinValue,
       NonNegInt.MinValue,
+      CategorizedTime.Zero,
       SequenceDigest.Zero.copy(executionState = state),
       scienceDigest
     )

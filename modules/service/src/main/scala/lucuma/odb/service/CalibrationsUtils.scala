@@ -10,6 +10,7 @@ import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
 import grackle.Result
 import lucuma.core.enums.CalibrationRole
+import lucuma.core.enums.ChargeClass
 import lucuma.core.enums.ExecutionState
 import lucuma.core.enums.ObservationWorkflowState
 import lucuma.core.enums.ScienceBand
@@ -27,6 +28,7 @@ import lucuma.core.model.Observation
 import lucuma.core.model.Program
 import lucuma.core.model.Target
 import lucuma.core.model.TelluricType
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.syntax.timespan.*
 import lucuma.core.util.TimeSpan
 import lucuma.odb.data.BlindOffsetType
@@ -42,6 +44,7 @@ import lucuma.odb.graphql.input.TargetEnvironmentInput
 import lucuma.odb.graphql.mapping.AccessControl
 import lucuma.odb.sequence.ObservingMode
 import lucuma.odb.sequence.data.ItcInput
+import lucuma.odb.sequence.data.TelluricSiblings
 import lucuma.odb.sequence.flamingos2.longslit.Config as Flamingos2Config
 import lucuma.odb.sequence.flamingos2.mos.Config as Flamingos2MosConfig
 import lucuma.odb.sequence.gmos.ifu.Config.GmosNorth as GmosNorthIfu
@@ -129,6 +132,38 @@ object ObsExtract:
   ): NonNegInt =
     if role.isDefined then NonNegInt.MinValue
     else calibrationSetInterval(mode).fold(NonNegInt.MinValue)(calibrationSets(_, scienceTime))
+
+  /** Placeholder charge for a telluric that has no sequence to estimate from. */
+  val TelluricPlaceholderTime: TimeSpan = 15.minTimeSpan
+
+  /**
+   * Time for the tellurics the calibration count predicts but that are not in
+   * the group yet.  Zero for calibration observations and modes without
+   * tellurics, or with a NoTelluric type.
+   */
+  def expectedCalibrations(
+    mode:     ObservingMode,
+    role:     Option[CalibrationRole],
+    count:    NonNegInt,
+    siblings: TelluricSiblings
+  ): CategorizedTime =
+    if role.isDefined || !modeRequiresTelluric(mode) || !modeTakesTelluric(mode)
+    then CategorizedTime.Zero
+    else expectedTelluricTime(count, siblings)
+
+  /**
+   * Each telluric still to come costs the average of the group's tellurics
+   * with a digest, or the placeholder when none has one yet.  Unobserved
+   * siblings cover the next visit and come off the count; observed ones belong
+   * to visits already done.  A declined telluric means none are expected.
+   */
+  def expectedTelluricTime(count: NonNegInt, siblings: TelluricSiblings): CategorizedTime =
+    if siblings.declined then CategorizedTime.Zero
+    else
+      val pending = math.max(0, count.value - siblings.unobserved.value)
+      val unit    = siblings.unitCost.getOrElse:
+        CategorizedTime.Zero.sumCharge(ChargeClass.Program, TelluricPlaceholderTime)
+      CategorizedTime(ChargeClass.values.toList.map(cc => cc -> (unit(cc) *| pending))*)
 
   /** Tellurics materialised for one visit: one after, or one before and one after for a long visit. */
   def telluricsForVisit(visitTime: TimeSpan): NonNegInt =

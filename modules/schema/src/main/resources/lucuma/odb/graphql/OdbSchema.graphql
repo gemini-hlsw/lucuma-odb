@@ -9646,17 +9646,28 @@ type ObservationTimeEstimate {
   reacquisitionCount: NonNegInt!
 
   """
-  Expected number of calibration over the remaining science time.
-  Zero for calibration observations and for modes that take no callibrations per observation.
+  Expected number of calibration sets over the remaining science time.
+  Zero for calibration observations and for modes that take no calibrations per
+  observation.
   """
   calibrationCount: NonNegInt!
+
+  """
+  Time for the calibrations the calibration count predicts but that have not
+  been generated yet, each at the average total of the group's tellurics, or a
+  placeholder while none has a digest.  Tellurics already in the group and not
+  yet observed count toward the prediction, since they are charged as
+  observations of their own.
+  Zero when the observation has no tellurics, uses no telluric, or its telluric was declined.
+  """
+  expectedCalibrations: CategorizedTime!
 
   "Science sequence time estimate."
   science: CategorizedTime!
 
   """
-  Total time estimate: science time plus full setup time for every setup and
-  reacquisition time for every reacquisition.
+  Total time estimate: science time plus full setup time for every setup,
+  reacquisition time for every reacquisition, and the expected calibrations.
   """
   total: CategorizedTime!
 

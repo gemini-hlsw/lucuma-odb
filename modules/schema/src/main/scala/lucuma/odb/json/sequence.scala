@@ -160,15 +160,15 @@ trait SequenceCodec {
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
       // `ExecutionDigest` has six canonical fields: `setup`, `setupCount`,
-      // `reacquisitionCount`, `calibrationCount`, `acquisition` and `science`.  Everything else the encoder emits --
+      // `reacquisitionCount`, `calibrationCount`, `expectedCalibrations`, `acquisition` and `science`.  Everything else the encoder emits --
       // `fullTimeEstimate` and the entire `estimate` object (`estimate.science`,
       // `estimate.total`) -- is a derived, output-only projection with no place
       // to live in the model, so it is intentionally ignored here and recomputed
       // from the fields below.
       //
-      // `reacquisitionCount` and `calibrationCount` appear only under
-      // `estimate` and are absent from payloads that predate them, so a missing
-      // value reads as 0.
+      // `reacquisitionCount`, `calibrationCount` and `expectedCalibrations` appear
+      // only under `estimate` and are absent from payloads that predate them, so a
+      // missing value reads as zero.
       //
       // `setup` and `setupCount` appear twice in the encoded form: under the
       // (current) `estimate` object and as deprecated top-level fields.  Read
@@ -185,21 +185,24 @@ trait SequenceCodec {
         n <- read[NonNegInt]("setupCount")
         r <- est.downField("reacquisitionCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         k <- est.downField("calibrationCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
+        e <- est.downField("expectedCalibrations").as[Option[CategorizedTime]]
+               .map(_.getOrElse(CategorizedTime.Zero))
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(t, n, r, k, a, s)
+      } yield ExecutionDigest(t, n, r, k, e, a, s)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
         "estimate"         -> Json.obj(
-          "setup"              -> a.setup.asJson,
-          "setupCount"         -> a.setupCount.asJson,
-          "reacquisitionCount" -> a.reacquisitionCount.asJson,
-          "calibrationCount"   -> a.calibrationCount.asJson,
-          "science"            -> a.science.timeEstimate.asJson,
-          "total"              -> a.fullTimeEstimate.asJson
+          "setup"                -> a.setup.asJson,
+          "setupCount"           -> a.setupCount.asJson,
+          "reacquisitionCount"   -> a.reacquisitionCount.asJson,
+          "calibrationCount"     -> a.calibrationCount.asJson,
+          "expectedCalibrations" -> a.expectedCalibrations.asJson,
+          "science"              -> a.science.timeEstimate.asJson,
+          "total"                -> a.fullTimeEstimate.asJson
         ),
         "setup"            -> a.setup.asJson,        // deprecated, use estimate.setup
         "setupCount"       -> a.setupCount.asJson,   // deprecated, use estimate.setupCount

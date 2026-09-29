@@ -17,19 +17,6 @@ class executionDigest_calibrationCount
   with TelluricCalibrationsTestSupport
   with CalibrationCountTestSupport:
 
-  private def setTelluricType(oid: Observation.Id, tag: String): IO[Unit] =
-    query(
-      pi,
-      s"""mutation {
-        updateObservations(input: {
-          WHERE: { id: { EQ: "$oid" } }
-          SET: { observingMode: { flamingos2LongSlit: { telluricType: { tag: $tag } } } }
-        }) {
-          observations { id }
-        }
-      }"""
-    ).void
-
   test("one set for short science, two for long, unchanged by NO_TELLURIC"):
     assertIO(
       for
