@@ -4,8 +4,10 @@
 package lucuma.itc.legacy
 
 import cats.syntax.all.*
+import coulomb.syntax.*
 import eu.timepit.refined.types.numeric.PosInt
 import io.circe.syntax.*
+import lucuma.core.enums.Band
 import lucuma.core.enums.GnirsCamera
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.enums.GnirsFpuIfu
@@ -15,14 +17,28 @@ import lucuma.core.enums.GnirsPrism
 import lucuma.core.enums.GnirsReadMode
 import lucuma.core.enums.GnirsWellDepth
 import lucuma.core.enums.PortDisposition
+import lucuma.core.enums.SkyBackground
+import lucuma.core.enums.StellarLibrarySpectrum
+import lucuma.core.enums.WaterVapor
 import lucuma.core.math.Angle
+import lucuma.core.math.BrightnessUnits.*
+import lucuma.core.math.BrightnessValue
+import lucuma.core.math.Redshift
 import lucuma.core.math.Wavelength
+import lucuma.core.math.dimensional.syntax.*
+import lucuma.core.math.units.*
+import lucuma.core.model.SourceProfile
+import lucuma.core.model.SpectralDefinition
+import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.util.Enumerated
 import lucuma.itc.legacy.codecs.given
 import lucuma.itc.service.ItcObservationDetails
+import lucuma.itc.service.ItcObservingConditions
 import lucuma.itc.service.ObservingMode
+import lucuma.itc.service.TargetData
 
+import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.*
 
 /**
@@ -123,3 +139,58 @@ class LegacyITCGnirsSpecExpTimeSuite extends CommonITCLegacySuite:
   testBrightnessUnits("GNIRS spectroscopy S/N", baseParams)
 
   testPowerAndBlackbody("GNIRS spectroscopy S/N", baseParams)
+
+  // Shortcut 10538: a K = 5 A0V star at S/N 1000 through the D32 long slit, for which the ITC
+  // folds the exposures into coadds.  The web ITC answered 4 frames of 2 coadds x 2.3 s, and the
+  // recipe must report those coadds rather than silently dividing them out of the frame count.
+  // Side-looking port, as the web ITC assumes.
+  test("gnirs S/N mode reports the coadds it chose (Shortcut 10538)".tag(LegacyITCTest)):
+    val veryBrightStar  = ItcSourceDefinition(
+      TargetData(
+        SourceProfile.Point(
+          SpectralDefinition.BandNormalized(
+            UnnormalizedSED.StellarLibrary(StellarLibrarySpectrum.A0V).some,
+            SortedMap(
+              Band.K -> BrightnessValue.unsafeFrom(5).withUnit[VegaMagnitude].toMeasureTagged
+            )
+          )
+        ),
+        Redshift.Zero
+      ),
+      Band.K.asLeft
+    )
+    val storyObs        = ItcObservationDetails(
+      calculationMethod =
+        ItcObservationDetails.CalculationMethod.IntegrationTimeMethod.SpectroscopyIntegrationTime(
+          sigma = 1000.0,
+          coadds = none,
+          sourceFraction = 1.0,
+          ditherOffset = Angle.Angle0,
+          wavelengthAt = Wavelength.decimalNanometers.getOption(2140).get
+        ),
+      analysisMethod = ItcObservationDetails.AnalysisMethod.Aperture.Auto(1)
+    )
+    val storyConditions = ItcObservingConditions(
+      iq = BigDecimal(1.0),
+      cc = BigDecimal(0.3),
+      wv = WaterVapor.Wet,
+      sb = SkyBackground.Bright,
+      airmass = 2.0
+    )
+    localItc
+      .calculate(
+        ItcParameters(
+          veryBrightStar,
+          storyObs,
+          storyConditions,
+          ItcTelescopeDetails(wfs = ItcWavefrontSensor.OIWFS,
+                              instrumentPort = PortDisposition.Side
+          ),
+          ItcInstrumentDetails(gnirs.copy(portDisposition = PortDisposition.Side))
+        ).asJson.noSpaces
+      )
+      .map: result =>
+        val calc = result.map(_.exposureCalculation.detectors.head)
+        assertEquals(calc.map(_.frameCount.value), Right(4))
+        assertEquals(calc.map(_.coadds.value), Right(2))
+        assertEqualsDouble(calc.map(_.exposureTime).getOrElse(0.0), 2.3, 0.01)

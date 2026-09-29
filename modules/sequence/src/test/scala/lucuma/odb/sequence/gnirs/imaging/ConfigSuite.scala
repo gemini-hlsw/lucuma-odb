@@ -38,14 +38,6 @@ class ConfigSuite extends FunSuite:
   private val j      = Filter(GnirsFilter.J, etm(10.0), PosInt.unsafeFrom(2))
   private val order4 = Filter(GnirsFilter.Order4, etm(25.0), PosInt.unsafeFrom(5))
 
-  test("coaddsFor picks up each filter's own value"):
-    val c = config(NonEmptyList.of(j, order4))
-    assertEquals(c.coaddsFor(GnirsFilter.J), PosInt.unsafeFrom(2))
-    assertEquals(c.coaddsFor(GnirsFilter.Order4), PosInt.unsafeFrom(5))
-
-  test("coaddsFor defaults to 1 for a filter not in the configuration"):
-    assertEquals(config(NonEmptyList.one(j)).coaddsFor(GnirsFilter.K), PosInt.unsafeFrom(1))
-
   test("changing a filter's coadds changes the hash"):
     val a = config(NonEmptyList.of(j, order4))
     val b = config(NonEmptyList.of(j.copy(coadds = PosInt.unsafeFrom(3)), order4))

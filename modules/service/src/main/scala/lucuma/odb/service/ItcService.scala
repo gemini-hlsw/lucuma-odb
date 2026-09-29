@@ -622,7 +622,7 @@ object ItcService {
                 for
                   z1                                <- go(gnirsInput(filter, classifyEtm), min, max)
                   t1:      IntegrationTime           = z1.focus.value
-                  acqType: GnirsAcquisitionType      = GnirsAcquisitionMode.defaultFor(t1.exposureTime, t1.frameCount).acquisitionType
+                  acqType: GnirsAcquisitionType      = GnirsAcquisitionMode.defaultFor(t1.exposureTime, t1.totalExposureCount).acquisitionType
                   // Very Bright images through the acquisition filter in H2; the other
                   // classifications keep the broadband filter (already `filter`). Only
                   // when the filter is itself automatic — an explicitly chosen filter is

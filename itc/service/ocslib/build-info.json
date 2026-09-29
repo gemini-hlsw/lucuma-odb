@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "86978a1dd87f58180ccc0a893d00342d3529f5d0",
-  "ocs_git_branch": "exposures-vs-frames",
-  "ocs_git_describe": "vpit-v2027A.1.1.1-33-g86978a1dd",
+  "ocs_git_hash": "ad6e960c43be230e0c287ed61b12f78750f1b5da",
+  "ocs_git_branch": "main",
+  "ocs_git_describe": "vpit-v2027A.1.1.1-37-gad6e960c4",
   "local": false,
-  "build_timestamp": "2026-09-29T00:08:01Z"
+  "build_timestamp": "2026-09-29T17:51:24Z"
 }

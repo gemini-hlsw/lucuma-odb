@@ -20,6 +20,7 @@ object SpectroscopyIntegrationTime extends GraphQLOperation[Unit] {
           microseconds
         }
         frameCount
+        coadds
       }
 
       fragment TargetIntegrationTimeFields on TargetIntegrationTime {
@@ -106,6 +107,7 @@ object ImagingIntegrationTime extends GraphQLOperation[Unit] {
           microseconds
         }
         frameCount
+        coadds
       }
 
       fragment TargetIntegrationTimeFields on TargetIntegrationTime {
@@ -192,6 +194,7 @@ object SpectroscopyIntegrationTimeAndGraphsQuery extends GraphQLOperation[Unit] 
           microseconds
         }
         frameCount
+        coadds
       }
 
       fragment TargetIntegrationTimeFields on TargetIntegrationTime {

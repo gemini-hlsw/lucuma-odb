@@ -45,11 +45,12 @@ trait ArbItc:
       for
         t <- arbitrary[TimeSpan]
         c <- arbitrary[PosInt]
-      yield IntegrationTime(t, c)
+        k <- arbitrary[PosInt]
+      yield IntegrationTime(t, c, k)
 
   given Cogen[IntegrationTime] =
-    Cogen[(TimeSpan, PosInt)].contramap: a =>
-      (a.exposureTime, a.frameCount)
+    Cogen[(TimeSpan, PosInt, PosInt)].contramap: a =>
+      (a.exposureTime, a.frameCount, a.coadds)
 
   // This may exist elsewhere but I couldn't find it.
   given Arbitrary[SignalToNoiseAt] =
