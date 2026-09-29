@@ -28,7 +28,8 @@ case class GeneratorParams(
   executionState:   ExecutionState,
   stepCount:        Long,
   isSplittable:     Boolean,
-  altair:           Option[AltairConfiguration]
+  altair:           Option[AltairConfiguration],
+  tellurics:        TelluricSiblings
 ):
 
   // The standard star is chosen to suit the observation time, so a real
@@ -57,7 +58,8 @@ object GeneratorParams:
         a.executionState,
         a.stepCount,
         a.isSplittable,
-        a.altair
+        a.altair,
+        a.tellurics
       )
 
   given HashBytes[AltairConfiguration] with
@@ -82,5 +84,6 @@ object GeneratorParams:
         a.executionState.hashBytes,
         a.stepCount.hashBytes,
         a.isSplittable.hashBytes,
-        a.altair.hashBytes
+        a.altair.hashBytes,
+        a.tellurics.hashBytes
       )

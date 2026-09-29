@@ -3,8 +3,12 @@
 
 package lucuma.odb.service
 
+import eu.timepit.refined.types.numeric.NonNegInt
+import lucuma.core.enums.ChargeClass
 import lucuma.core.math.Wavelength
+import lucuma.core.model.sequence.CategorizedTime
 import lucuma.core.util.TimeSpan
+import lucuma.odb.sequence.data.TelluricSiblings
 import munit.FunSuite
 
 // Boundary arithmetic only; the mode and role gating is covered end to end in
@@ -47,6 +51,33 @@ class CalibrationCountSuite extends FunSuite:
     assertEquals(ObsExtract.calibrationSets(short, tenHours).value, 7)
     assertEquals(ObsExtract.calibrationSets(long, tenHours).value, 10)
     assertEquals(ObsExtract.telluricsForVisit(tenHours).value, 2)
+
+  // The mode and role gating is covered end to end in executionDigest_expectedCalibrations.
+  test("expected calibrations charge each telluric still to come"):
+    def program(count: Int, unobserved: Int, declined: Boolean, unit: Option[Long]): Long =
+      val cost     = unit.map(m => CategorizedTime(ChargeClass.Program -> minutes(m)))
+      val siblings = TelluricSiblings(NonNegInt.unsafeFrom(unobserved), declined, cost)
+      ObsExtract
+        .expectedTelluricTime(NonNegInt.unsafeFrom(count), siblings)
+        .apply(ChargeClass.Program)
+        .toMinutes
+        .toLong
+    // The placeholder until a telluric has a digest, then the average.
+    assertEquals(program(7, 0, false, None), 105L)
+    assertEquals(program(7, 2, false, None), 75L)
+    assertEquals(program(7, 2, false, Some(40)), 200L)
+    assertEquals(program(7, 9, false, Some(40)), 0L)
+    assertEquals(program(0, 0, false, None), 0L)
+    assertEquals(program(7, 0, true, Some(40)), 0L)
+
+  test("the unit cost is the mean of the tellurics per charge class"):
+    val a = CategorizedTime(ChargeClass.Program -> minutes(30), ChargeClass.NonCharged -> minutes(2))
+    val b = CategorizedTime(ChargeClass.Program -> minutes(50), ChargeClass.NonCharged -> minutes(4))
+    assertEquals(TelluricSiblings.average(Nil), None)
+    assertEquals(
+      TelluricSiblings.average(List(a, b)),
+      Some(CategorizedTime(ChargeClass.Program -> minutes(40), ChargeClass.NonCharged -> minutes(3)))
+    )
 
   test("tellurics per visit: one up to the threshold, two beyond"):
     assertEquals(ObsExtract.telluricsForVisit(minutes(90)).value, 1)

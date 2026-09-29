@@ -142,7 +142,7 @@ object Generator:
   val SequenceAtomLimit = 1000
 
   // Placeholder charge for a telluric whose target is not yet resolved.
-  val UnresolvedTelluricTime: TimeSpan = 15.minTimeSpan
+  val UnresolvedTelluricTime: TimeSpan = ObsExtract.TelluricPlaceholderTime
 
   // Placeholder charge for a spectrophotometric standard whose proposal has yet
   // to be accepted.  No sequence is produced for one, so there is nothing to
@@ -239,6 +239,7 @@ object Generator:
           SetupTime.Zero,
           NonNegInt.MinValue,
           NonNegInt.MinValue,
+          CategorizedTime.Zero,
           SequenceDigest.Zero,
           SequenceDigest.Zero.copy(
             observeClass   = ctx.params.calibrationRole.sciClass,
@@ -277,7 +278,10 @@ object Generator:
             c  = if ctx.params.isSplittable then estimator.estimateSetupCount(s.timeEstimate.sum)
                  else NonNegInt.unsafeFrom(1)
             n  = ObsExtract.calibrationCount(ctx.params.observingMode, ctx.params.calibrationRole, s.timeEstimate.sum)
-          yield ExecutionDigest(estimator.estimateSetupTime, c, n, a, s)
+            e  = ObsExtract.expectedCalibrations(
+                   ctx.params.observingMode, ctx.params.calibrationRole, n, ctx.params.tellurics
+                 )
+          yield ExecutionDigest(estimator.estimateSetupTime, c, n, e, a, s)
 
         // Setting up GNIRS behind the Altair laser costs more than the nominal setup.
         def gnirsSetup(nominal: SetupTimeEstimateCalculator): SetupTimeEstimateCalculator =
@@ -289,6 +293,7 @@ object Generator:
               SetupTime.Zero,
               NonNegInt.MinValue,
               NonNegInt.MinValue,
+              CategorizedTime.Zero,
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete),
               SequenceDigest.Zero.copy(executionState = ExecutionState.DeclaredComplete)
             )

@@ -38,3 +38,16 @@ trait CalibrationCountTestSupport extends ExecutionTestSupport:
       json.hcursor
         .downFields("observation", "execution", "digest", "value", "estimate", "calibrationCount")
         .require[Int]
+
+  def setTelluricType(oid: Observation.Id, tag: String): IO[Unit] =
+    query(
+      pi,
+      s"""mutation {
+        updateObservations(input: {
+          WHERE: { id: { EQ: "$oid" } }
+          SET: { observingMode: { flamingos2LongSlit: { telluricType: { tag: $tag } } } }
+        }) {
+          observations { id }
+        }
+      }"""
+    ).void
