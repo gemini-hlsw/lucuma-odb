@@ -14,6 +14,7 @@ import lucuma.odb.service.Services.ServiceAccess
 import lucuma.odb.service.Services.Syntax.*
 import lucuma.odb.util.Codecs.*
 import skunk.*
+import skunk.codec.boolean.bool
 import skunk.codec.numeric.int4
 import skunk.codec.text.text
 import skunk.implicits.*
@@ -39,9 +40,17 @@ trait CalibrationCalcService[F[_]]:
 
   def markReady(pending: PendingRecalc)(using ServiceAccess, Transaction[F]): F[Unit]
 
-  def markRetry(oid: Observation.Id, error: String)(using ServiceAccess, Transaction[F]): F[Unit]
+  /**
+   * Schedules a retry with exponential backoff. After `MaxFailures` the row is
+   * parked (`retry` with no `c_retry_at`) until a new invalidation re-pends it.
+   * Returns whether the row was parked.
+   */
+  def markRetry(oid: Observation.Id, error: String)(using ServiceAccess, Transaction[F]): F[Boolean]
 
 object CalibrationCalcService:
+
+  /** Failures after which a row stops retrying on its own. */
+  val MaxFailures: Int = 10
 
   def instantiate[F[_]: {Concurrent, Services}]: CalibrationCalcService[F] =
     new CalibrationCalcService[F]:
@@ -74,8 +83,8 @@ object CalibrationCalcService:
       override def markRetry(
         oid: Observation.Id,
         error: String
-      )(using ServiceAccess, Transaction[F]): F[Unit] =
-        session.execute(Statements.MarkRetry)((error, oid)).void
+      )(using ServiceAccess, Transaction[F]): F[Boolean] =
+        session.unique(Statements.MarkRetry)((MaxFailures, error, oid))
 
       object Statements:
         val pending: Codec[PendingRecalc] =
@@ -158,13 +167,17 @@ object CalibrationCalcService:
             WHERE c_observation_id = $observation_id
           """.command
 
-        val MarkRetry: Command[(String, Observation.Id)] =
+        val MarkRetry: Query[(Int, String, Observation.Id), Boolean] =
           sql"""
             UPDATE t_calibration_calc
             SET c_state         = 'retry',
                 c_last_update   = now(),
                 c_failure_count = c_failure_count + 1,
-                c_retry_at      = now() + (interval '1 minute' * POWER(2, LEAST(c_failure_count, 5))),
+                c_retry_at      = CASE
+                  WHEN c_failure_count + 1 >= $int4 THEN NULL
+                  ELSE now() + (interval '1 minute' * POWER(2, LEAST(c_failure_count, 5)))
+                END,
                 c_error_message = $text
             WHERE c_observation_id = $observation_id
-          """.command
+            RETURNING c_retry_at IS NULL
+          """.query(bool)

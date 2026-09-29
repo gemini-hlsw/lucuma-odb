@@ -1375,6 +1375,21 @@ class perScienceObservationCalibrations
       assertEquals(obs2.groupId, None)
     }
 
+  test("no obs calibration group is created while the science has no duration"):
+    for {
+      pid   <- createProgramAs(pi)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createFlamingos2LongSlitObservationAs(pi, pid, List(tid))
+      // Defined, but obscalc has not produced a digest yet: 0 tellurics required.
+      _     <- setCalculatedWorkflowState(oid, ObservationWorkflowState.Defined)
+      (a, r) <- recalculateCalibrations(pid, when, oid)
+      obs   <- queryObservation(oid)
+    } yield {
+      assertEquals(obs.groupId, None)
+      assertEquals(a, Nil)
+      assertEquals(r, Nil)
+    }
+
   test("Generate for mixed observation ready and inactive"):
     for {
       pid         <- createProgramAs(pi)

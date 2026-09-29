@@ -378,11 +378,28 @@ object PerScienceObservationCalibrationsService:
               case None      =>
                 (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
           else
-            for
-              gid     <- readObsCalibrationGroup(pid, tree, obs)
-              tResult <- syncTelluricObservation(pid, obs, gid, requiresTelluric, syncExisting = true)
-              pResult <- syncDaytimePinhole(pid, obs, gid)
-            yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
+            def sync(gid: Group.Id): F[(List[Observation.Id], List[Observation.Id])] =
+              for
+                tResult <- syncTelluricObservation(pid, obs, gid, requiresTelluric, syncExisting = true)
+                pResult <- syncDaytimePinhole(pid, obs, gid)
+              yield (tResult._1 ++ pResult._1, tResult._2 ++ pResult._2)
+
+            // A new group is only created once something will go in it. An empty group
+            // would be removed on the next pass, and each move of the science observation
+            // invalidates its obscalc, which requeues this very recalculation.
+            findSystemGroupForObservation(tree, obs.id) match
+              case Some(gid) =>
+                sync(gid)
+              case None      =>
+                for
+                  duration <- if requiresTelluric then telluricDuration(obs.id)
+                              else Option.empty[TimeSpan].pure[F]
+                  needed    = duration.isDefined || isCrossDispersedGnirs(obs.data)
+                  result   <- if needed then readObsCalibrationGroup(pid, tree, obs).flatMap(sync)
+                              else
+                                info"Observation ${obs.id} needs no calibrations yet, no obs calibration group" *>
+                                  (List.empty[Observation.Id], List.empty[Observation.Id]).pure[F]
+                yield result
 
       // A telluric's S/N floor, also used when no science S/N can be derived.
       private val MinTelluricSN = SignalToNoise.fromInt(100).get

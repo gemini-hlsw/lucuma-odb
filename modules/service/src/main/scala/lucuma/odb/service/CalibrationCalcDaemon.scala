@@ -10,6 +10,8 @@ import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import fs2.Stream
 import fs2.concurrent.Topic
+import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.util.CalculationState
 import lucuma.odb.data.CalibrationWorkType
 import lucuma.odb.data.PendingRecalc
@@ -76,6 +78,7 @@ object CalibrationCalcDaemon:
             services.useTransactionally:
               Services.asSuperUser:
                 calibrationCalcService.markRetry(p.observationId, msg)
+            .flatMap(parked => gaveUp(pid, p.observationId).whenA(parked))
           }
 
   // Re-pick one calibration observation's target for its new observation
@@ -96,6 +99,11 @@ object CalibrationCalcDaemon:
         services.useTransactionally:
           Services.asSuperUser:
             calibrationCalcService.markRetry(oid, msg)
+        .flatMap(parked => gaveUp(pid, oid).whenA(parked))
+
+  private def gaveUp[F[_]: Logger](pid: Program.Id, oid: Observation.Id): F[Unit] =
+    val max = CalibrationCalcService.MaxFailures
+    error"Calibration calc for program $pid, observation $oid failed $max times, parked until re-invalidated"
 
   /**
    * Startup reconciliation: reset `calculating` leftovers, then drain the
