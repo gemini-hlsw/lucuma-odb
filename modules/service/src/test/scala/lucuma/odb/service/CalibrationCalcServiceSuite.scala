@@ -115,7 +115,7 @@ class CalibrationCalcServiceSuite extends CalibrationCalcServiceSuiteSupport:
       assertEquals(sOk, CalculationState.Ready)
       assertEquals(sRace, CalculationState.Pending)
 
-  test("markRetry backs off with a cap and never goes terminal"):
+  test("markRetry backs off with a cap"):
     for
       _     <- cleanup
       pid   <- createProgramAs(pi, "Calib Calc Test")
@@ -145,6 +145,33 @@ class CalibrationCalcServiceSuite extends CalibrationCalcServiceSuiteSupport:
       assertEquals(count8, 8)
       assert(retryAt8.exists(_.toInstant.isBefore(java.time.Instant.now.plusSeconds(33 * 60))))
       assertEquals(error8, Some("still failing"))
+
+  test("markRetry parks the row after MaxFailures, and an invalidation re-pends it"):
+    for
+      _      <- cleanup
+      pid    <- createProgramAs(pi, "Calib Calc Test")
+      oid    <- createFlamingos2LongSlitObservationAs(pi, pid, Nil)
+      now    <- timestampNow
+      _      <- insertState(
+                  pid, oid, CalculationState.Retry, now,
+                  retryAt = Some(Timestamp.fromLocalDateTimeTruncatedAndBounded(LocalDateTime.now().minusHours(1))),
+                  failureCount = CalibrationCalcService.MaxFailures - 1
+                )
+      _      <- loadObs(oid)
+      parked <- markRetry(oid, "still failing")
+      row    <- selectRow(oid)
+      loaded <- loadObs(oid)
+      _      <- invalidate(pid, oid)
+      state  <- calculationState(oid)
+    yield
+      assert(parked)
+      val (st, _, retryAt, count, error) = row.get
+      assertEquals(st, CalculationState.Retry)
+      assertEquals(retryAt, None)
+      assertEquals(count, CalibrationCalcService.MaxFailures)
+      assertEquals(error, Some("still failing"))
+      assert(loaded.isEmpty, "a parked row must not be loaded")
+      assertEquals(state, CalculationState.Pending)
 
   test("setting a calibration's time for the first time request recalculating a target"):
     for
