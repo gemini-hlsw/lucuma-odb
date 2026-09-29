@@ -88,7 +88,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "edu.gemini" %% "clue-model" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.98"
+ThisBuild / tlBaseVersion      := "0.99"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32
