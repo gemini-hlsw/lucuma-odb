@@ -6,6 +6,7 @@ package lucuma.itc.legacy
 import cats.data.NonEmptyChain
 import cats.syntax.all.*
 import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.refineV
 import io.circe.*
 import io.circe.refined.*
@@ -668,15 +669,22 @@ private[legacy] object codecs:
 
   given Decoder[ExposureCalculation] = (c: HCursor) =>
     for
-      time  <- c.downField("exposureTime").as[Double]
-      count <-
+      time   <- c.downField("exposureTime").as[Double]
+      count  <-
         c
           .downField("frames")
           .as[Int]
           .flatMap:
             refineV[NonNegative](_)
               .leftMap(e => DecodingFailure(e, c.downField("frames").history))
-    yield ExposureCalculation(time, count)
+      coadds <-
+        c
+          .downField("coadds")
+          .as[Int]
+          .flatMap:
+            refineV[Positive](_)
+              .leftMap(e => DecodingFailure(e, c.downField("coadds").history))
+    yield ExposureCalculation(time, count, coadds)
 
   given Decoder[AllExposureCalculations] = (c: HCursor) =>
     for

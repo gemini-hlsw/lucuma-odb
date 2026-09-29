@@ -72,9 +72,11 @@ trait ItcCodec:
         exposureTime    <- c.downField("exposureTime").as[TimeSpan]
         // `exposureCount` is the pre-rename key of already stored results.
         frameCount      <- c.downField("frameCount").as[PosInt].orElse(c.downField("exposureCount").as[PosInt])
+        // Results stored before coadds were reported carry none: they were all single-coadd.
+        coadds          <- c.downField("coadds").as[Option[PosInt]].map(_.getOrElse(PosInt.unsafeFrom(1)))
         signalToNoiseAt <- c.downField("signalToNoiseAt").as[Option[SignalToNoiseAt]]
         peakPixel       <- c.downField("peakPixel").as[Option[ItcPeakPixel]]
-      yield ItcResult(targetId, IntegrationTime(exposureTime, frameCount), signalToNoiseAt, peakPixel)
+      yield ItcResult(targetId, IntegrationTime(exposureTime, frameCount, coadds), signalToNoiseAt, peakPixel)
 
   given (using Encoder[TimeSpan], Encoder[Wavelength]): Encoder[ItcResult] =
     Encoder.instance: a =>
@@ -82,6 +84,7 @@ trait ItcCodec:
         "targetId"        -> a.targetId.asJson,
         "exposureTime"    -> a.value.exposureTime.asJson,
         "frameCount"      -> a.value.frameCount.value.asJson,
+        "coadds"          -> a.value.coadds.value.asJson,
         "exposureCount"   -> a.value.frameCount.value.asJson,
         "signalToNoiseAt" -> a.signalToNoise.asJson,
         "peakPixel"       -> a.peakPixel.asJson

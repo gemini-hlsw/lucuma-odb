@@ -108,7 +108,9 @@ object ItcImpl {
           .traverse: r =>
             TimeSpan
               .fromSeconds(r.exposureTime)
-              .map(expTime => IntegrationTime(expTime, PosInt.unsafeFrom(r.frameCount.value)).pure)
+              .map(expTime =>
+                IntegrationTime(expTime, PosInt.unsafeFrom(r.frameCount.value), r.coadds).pure
+              )
               .getOrElse:
                 F.raiseError:
                   CalculationError(s"Negative exposure time ${r.exposureTime}")

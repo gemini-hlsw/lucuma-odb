@@ -693,6 +693,12 @@ type IntegrationTime {
   """
   frameCount: PosInt!
 
+  """
+  Coadds per frame.  Chosen by the ITC in signal-to-noise mode, the requested
+  value in time-and-count mode, and 1 for instruments without coadds.
+  """
+  coadds: PosInt!
+
   exposureCount: PosInt! @deprecated(reason: "Use `frameCount`.")
 }
 

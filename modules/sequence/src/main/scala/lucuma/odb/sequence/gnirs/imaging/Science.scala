@@ -28,7 +28,6 @@ import lucuma.core.model.sequence.gnirs.GnirsDynamicConfig
 import lucuma.core.model.sequence.gnirs.GnirsFpu
 import lucuma.core.model.sequence.gnirs.GnirsStaticConfig
 import lucuma.core.optics.syntax.lens.*
-import lucuma.core.util.TimeSpan
 import lucuma.itc.IntegrationTime
 import lucuma.odb.data.ItcResult as Result
 import lucuma.odb.data.ItcScience.GnirsImaging
@@ -49,7 +48,7 @@ object Science:
       for
         // The initial dynamic config already has the acquisition decker,
         // acquisition mirror in, and best focus; only the acquisition FPU and the
-        // mode's camera need setting.  Coadds come with the filter.
+        // mode's camera need setting.  Coadds come with the filter's ITC result.
         _ <- GnirsDynamicConfig.fpu    := GnirsFpu.Other(Acquisition)
         _ <- GnirsDynamicConfig.camera := config.camera
       yield ()
@@ -58,12 +57,12 @@ object Science:
       setup(config).runS(initialDynamicConfig).value
 
     // The read mode follows the exposure time unless explicitly overridden.
-    def setFilter(config: Config, filter: GnirsFilter, time: TimeSpan): State[GnirsDynamicConfig, Unit] =
+    def setFilter(config: Config, filter: GnirsFilter, time: IntegrationTime): State[GnirsDynamicConfig, Unit] =
       for
         _ <- GnirsDynamicConfig.filter   := filter
-        _ <- GnirsDynamicConfig.exposure := time
-        _ <- GnirsDynamicConfig.coadds   := config.coaddsFor(filter)
-        _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time))
+        _ <- GnirsDynamicConfig.exposure := time.exposureTime
+        _ <- GnirsDynamicConfig.coadds   := config.coaddsFor(filter, time)
+        _ <- GnirsDynamicConfig.readMode := config.explicitReadMode.getOrElse(GnirsReadMode.forExposureTime(time.exposureTime))
       yield ()
 
     def grouped(
@@ -76,7 +75,7 @@ object Science:
       def oneFilter(filter: GnirsFilter): State[GnirsDynamicConfig, Stream[Pure, ProtoAtom[ProtoStep[GnirsDynamicConfig]]]] =
         val integrationTime = time(filter).get.focus._2
         for
-          _   <- setFilter(config, filter, integrationTime.exposureTime)
+          _   <- setFilter(config, filter, integrationTime)
           sky <- skyOffsets
                    .traverse: offset =>
                      scienceStep(offset, ObserveClass.Science)
@@ -115,7 +114,7 @@ object Science:
       def skySteps(skyList: List[(GnirsFilter, TelescopeConfig)]): State[GnirsDynamicConfig, List[ProtoStep[GnirsDynamicConfig]]] =
         skyList.traverse: (filter, offset) =>
           for
-            _ <- setFilter(config, filter, filterTimes(filter).exposureTime)
+            _ <- setFilter(config, filter, filterTimes(filter))
             s <- scienceStep(offset, ObserveClass.Science)
           yield s
 
@@ -135,7 +134,7 @@ object Science:
         filters
           .traverse: filter =>
             for
-              _ <- setFilter(config, filter, filterTimes(filter).exposureTime)
+              _ <- setFilter(config, filter, filterTimes(filter))
               d <- State.get
             yield Stream.emits(List.fill(perFilterCounts(filter))(d))
           .map(lst => Stream.emits(lst).flatten)

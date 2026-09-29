@@ -9,6 +9,7 @@ import eu.timepit.refined.cats.*
 import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.enums.GnirsFilter
 import lucuma.core.model.ExposureTimeMode
+import lucuma.itc.IntegrationTime
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
@@ -20,7 +21,12 @@ case class Filter(
   filter:           GnirsFilter,
   exposureTimeMode: ExposureTimeMode,
   coadds:           PosInt
-) derives Eq
+) derives Eq:
+  /** The ITC chooses the coadds in S/N mode; time-and-count keeps the requested ones. */
+  def resolvedCoadds(time: IntegrationTime): PosInt =
+    exposureTimeMode match
+      case ExposureTimeMode.SignalToNoiseMode(_, _)   => time.coadds
+      case ExposureTimeMode.TimeAndCountMode(_, _, _) => coadds
 
 object Filter:
 

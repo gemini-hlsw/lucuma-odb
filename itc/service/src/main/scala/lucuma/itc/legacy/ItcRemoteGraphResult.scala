@@ -6,6 +6,7 @@ package lucuma.itc.legacy
 import cats.data.NonEmptyChain
 import cats.syntax.all.*
 import eu.timepit.refined.types.numeric.NonNegInt
+import eu.timepit.refined.types.numeric.PosInt
 import lucuma.core.math.SingleSN
 import lucuma.core.math.TotalSN
 import lucuma.core.math.Wavelength
@@ -20,10 +21,12 @@ case class GraphsRemoteResult(
   val maxPeakPixelFlux: Int   = ccds.map(_.peakPixelFlux).maximum.toInt
 }
 
-// One detector's result: the exposure time of a single exposure and the number of frames.
+// One detector's result: the exposure time of a single exposure, the number of frames and
+// the coadds per frame.
 case class ExposureCalculation(
   exposureTime: Double,
-  frameCount:   NonNegInt
+  frameCount:   NonNegInt,
+  coadds:       PosInt
 )
 
 case class SignalToNoiseAt(

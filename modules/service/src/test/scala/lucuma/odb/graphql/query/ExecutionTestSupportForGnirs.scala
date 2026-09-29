@@ -222,6 +222,37 @@ trait ExecutionTestSupportForGnirs extends ExecutionTestSupport:
    * ETM is per central wavelength, so the wavelength must be given too; it
    * defaults to the 2200 nm the test observations are created with.
    */
+  def setScienceSignalToNoise(oid: Observation.Id, value: BigDecimal, atNm: BigDecimal, centralNm: BigDecimal = BigDecimal(2200)): IO[Unit] =
+    query(
+      pi,
+      s"""
+        mutation {
+          updateObservations(input: {
+            SET: {
+              observingMode: {
+                gnirsSpectroscopy: {
+                  centralWavelengths: [
+                    {
+                      centralWavelength: { nanometers: $centralNm }
+                      exposureTimeMode: {
+                        signalToNoise: {
+                          value: $value
+                          at:    { nanometers: $atNm }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+            WHERE: { id: { EQ: "$oid" } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
   def setScienceTimeAndCount(oid: Observation.Id, seconds: BigDecimal, count: Int, atNm: BigDecimal, centralNm: BigDecimal = BigDecimal(2200)): IO[Unit] =
     query(
       pi,

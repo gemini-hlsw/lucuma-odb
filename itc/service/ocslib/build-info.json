@@ -1,7 +1,7 @@
 {
-  "ocs_git_hash": "86978a1dd87f58180ccc0a893d00342d3529f5d0",
-  "ocs_git_branch": "exposures-vs-frames",
-  "ocs_git_describe": "vpit-v2027A.1.1.1-33-g86978a1dd",
-  "local": false,
-  "build_timestamp": "2026-09-29T00:08:01Z"
+  "ocs_git_hash": "a673384acd3f81a778b1172e21674afa8d3254f0",
+  "ocs_git_branch": "itc-report-coadds",
+  "ocs_git_describe": "vpit-v2027A.1.1.1-36-ga673384ac",
+  "local": true,
+  "build_timestamp": "2026-09-29T02:46:15Z"
 }

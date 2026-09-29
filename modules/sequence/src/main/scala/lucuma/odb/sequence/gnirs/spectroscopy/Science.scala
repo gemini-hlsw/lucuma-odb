@@ -155,7 +155,7 @@ object Science:
             _  <- State.modify[GnirsDynamicConfig]: dyn =>
                     dyn.copy(
                       exposure          = time.exposureTime,
-                      coadds            = sw.coadds,
+                      coadds            = sw.resolvedCoadds(time),
                       filter            = config.filter,
                       decker            = config.decker,
                       fpu               = config.fpu,

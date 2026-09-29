@@ -12083,8 +12083,8 @@ type GnirsImagingFilter {
   exposureTimeMode: ExposureTimeMode!
 
   """
-  Coadds per exposure for this filter.  Always 1 when the exposure time mode is
-  signal-to-noise, which does not support coadds.
+  Coadds per frame for this filter in time-and-count mode.  Always 1 in
+  signal-to-noise mode, where the ITC chooses the coadds instead.
   """
   coadds: PosInt!
 
@@ -12107,9 +12107,9 @@ input GnirsImagingFilterInput {
   exposureTimeMode: ExposureTimeModeInput
 
   """
-  Coadds per exposure for this filter.  If not specified, defaults to 1.
-  Forced to 1 when the exposure time mode is signal-to-noise, which does not
-  support coadds.
+  Coadds per frame for this filter in time-and-count mode.  If not specified,
+  defaults to 1.  Forced to 1 in signal-to-noise mode, where the ITC chooses the
+  coadds instead.
   """
   coadds: PosInt
 
@@ -12294,6 +12294,10 @@ type GnirsCentralWavelengthConfig {
   """
   exposureTimeMode: ExposureTimeMode!
 
+  """
+  Coadds per frame in time-and-count mode.  Always 1 in signal-to-noise mode,
+  where the ITC chooses the coadds instead.
+  """
   coadds: PosInt!
 
 }
@@ -12313,7 +12317,9 @@ input GnirsCentralWavelengthConfigInput {
   exposureTimeMode: ExposureTimeModeInput
 
   """
-  Coadds for this central wavelength.  Defaults to 1 when not specified.
+  Coadds per frame for this central wavelength in time-and-count mode.  Defaults
+  to 1 when not specified.  Forced to 1 in signal-to-noise mode, where the ITC
+  chooses the coadds instead.
   """
   coadds: PosInt
 
@@ -16410,6 +16416,12 @@ type ItcResult {
   exposures summed on chip. Without coadds a frame is one exposure.
   """
   frameCount: NonNegInt!
+
+  """
+  Coadds per frame.  Chosen by the ITC in signal-to-noise mode, the requested
+  value in time-and-count mode, and 1 for instruments without coadds.
+  """
+  coadds: PosInt!
 
   exposureCount: NonNegInt! @deprecated(reason: "Use `frameCount`.")
 

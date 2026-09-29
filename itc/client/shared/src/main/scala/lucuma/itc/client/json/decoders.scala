@@ -65,7 +65,10 @@ object decoders:
       n <- c.downField("frameCount")
              .as[Int]
              .flatMap(n => PosInt.from(n).leftMap(m => DecodingFailure(m, c.history)))
-    } yield IntegrationTime(t, n)
+      k <- c.downField("coadds")
+             .as[Int]
+             .flatMap(k => PosInt.from(k).leftMap(m => DecodingFailure(m, c.history)))
+    } yield IntegrationTime(t, n, k)
 
   given Decoder[SingleSN] = Decoder[SignalToNoise].map(SingleSN(_))
   given Decoder[TotalSN]  = Decoder[SignalToNoise].map(TotalSN(_))
