@@ -20,6 +20,7 @@ import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
+import eu.timepit.refined.types.numeric.NonNegInt
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
@@ -43,7 +44,6 @@ import lucuma.core.model.Target
 import lucuma.core.model.UnnormalizedSED
 import lucuma.core.model.User
 import lucuma.core.model.sequence.CategorizedTime
-import lucuma.core.syntax.timespan.*
 import lucuma.core.util.Timestamp
 import lucuma.itc.ItcGhostDetector
 import lucuma.itc.client.Flamingos2CustomMask
@@ -228,6 +228,20 @@ object GeneratorParamsService {
           .use(_.stream(af.argument, chunkSize = 64).compile.to(List))
           .flatMap(addCustomSedTimestamps)
           .flatMap(addTelluricSiblings)
+
+      // If the user uploads a new custom sed in place of an existing one, that needs to
+      // invalidate the cache. So, we include the timestamp of the attachment (if any) in
+      // the hash.
+      private def addCustomSedTimestamps(params: List[ParamsRow]): F[List[ParamsRow]] =
+        NonEmptyList.fromList(params.map(p => p.sourceProfile.flatMap(customSedIdOptional.getOption)).flattenOption)
+          .fold(params.pure)(attIds =>
+            Services.asSuperUser(attachmentMetadataService.getUpdatedAt(attIds)).map(map =>
+              params.map(p =>
+                val aid = p.sourceProfile.flatMap(customSedIdOptional.getOption)
+                aid.fold(p)(id => p.copy(customSedTimestamp = map.get(id)))
+              )
+            )
+          )
 
       // The expected calibrations charge depends on the tellurics already in
       // the science observation's group and their totals, so they are part of
