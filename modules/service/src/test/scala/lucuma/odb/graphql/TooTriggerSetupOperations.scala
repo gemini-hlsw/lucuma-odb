@@ -19,6 +19,7 @@ import lucuma.core.model.Target
 import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.core.util.Timestamp
+import lucuma.odb.TestCoordinates.coords
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.graphql.query.ObservingModeSetupOperations
@@ -34,6 +35,22 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
 
   /** The service user used to drive obscalc; not a GraphQL caller. */
   val tooObscalcUser = TestUsers.service(97)
+
+  def setTooActivationAs(user: User, oid: Observation.Id, activation: TooActivation): IO[Unit] =
+    query(user, tooActivationQuery(oid, activation)).void
+
+  /** The same mutation as a query string, for tests that expect it to be refused. */
+  def tooActivationQuery(oid: Observation.Id, activation: TooActivation): String =
+    s"""
+      mutation {
+        updateObservations(input: {
+          SET: { schedulingConstraints: { tooActivation: ${activation.tag.toScreamingSnakeCase} } }
+          WHERE: { id: { EQ: ${oid.asJson} } }
+        }) {
+          observations { id }
+        }
+      }
+    """
 
   def setSchedulingModeAs(user: User, oid: Observation.Id, mode: SchedulingMode): IO[Unit] =
     query(
@@ -63,65 +80,35 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
       }
     """
 
-  /** Adds or removes asterism members, which is what makes an observation a ToO or stops it being one. */
-  def editAsterismAs(user: User, oid: Observation.Id, add: List[Target.Id], del: List[Target.Id]): IO[Unit] =
-    query(
-      user,
-      s"""
-        mutation {
-          updateAsterisms(input: {
-            SET: {
-              ${if add.isEmpty then "" else s"ADD: [ ${add.map(t => s"\"$t\"").mkString(",")} ]"}
-              ${if del.isEmpty then "" else s"DELETE: [ ${del.map(t => s"\"$t\"").mkString(",")} ]"}
-            }
-            WHERE: { id: { EQ: ${oid.asJson} } }
-          }) {
-            observations { id }
-          }
-        }
-      """
-    ).void
-
   /** Sets the observation's workflow state, which is how a trigger is requested and withdrawn. */
   def setTooWorkflowState(user: User, oid: Observation.Id, state: ObservationWorkflowState): IO[Unit] =
     setObservationWorkflowState(user, oid, state).void
 
   /**
-   * Gives an opportunity target sidereal coordinates, as the alert would.
+   * Swaps the opportunity placeholder out of the asterism for a real sidereal target,
+   * as the alert would.  Returns the new target's id.
    *
    * The declination is inside the region `createOpportunityTargetAs` draws (10 to 70
-   * degrees), which matters more than it looks: a configuration request for an
-   * unresolved ToO is approved against its *region*, and `Configuration.subsumes` keeps
-   * that approval only while the resolved coordinates fall inside it.  Resolving
-   * outside the region is therefore not a neutral choice of test data -- it makes the
-   * observation `Unapproved`, which is pinned by tooTriggerWorkflow.
-   *
-   * The region is deliberately not restated: omitting it leaves the approved region
-   * exactly as it was, which is the whole point of resolving being safe.
+   * degrees), which matters more than it looks: a configuration request made while the
+   * observation still held its placeholder is approved against that *region*, and
+   * `Configuration.subsumes` keeps the approval only while the swapped-in coordinates
+   * fall inside it.  Swapping in a target outside the region is therefore not a neutral
+   * choice of test data -- it makes the observation `Unapproved`.
    */
-  def resolveOpportunityTargetAs(user: User, tid: Target.Id): IO[Unit] =
-    resolveOpportunityTargetAs(user, tid, "30:00:00.00")
+  def swapInRealTargetAs(user: User, pid: Program.Id, oid: Observation.Id, tooTid: Target.Id): IO[Target.Id] =
+    swapInRealTargetAs(user, pid, oid, tooTid, "30:00:00.00")
 
-  def resolveOpportunityTargetAs(user: User, tid: Target.Id, dec: String): IO[Unit] =
-    query(
-      user,
-      s"""
-        mutation {
-          updateTargets(input: {
-            SET: {
-              opportunity: {
-                resolution: {
-                  sidereal: { ra: { hms: "05:46:13.137" }, dec: { dms: "$dec" }, epoch: "J2000.0" }
-                }
-              }
-            }
-            WHERE: { id: { EQ: ${tid.asJson} } }
-          }) {
-            targets { id }
-          }
-        }
-      """
-    ).void
+  // Coordinates.fromHmsDms wants an explicit sign on the declination; the callers
+  // write it the way it reads on the sky.
+  private def signed(dec: String): String =
+    if dec.startsWith("+") || dec.startsWith("-") then dec else s"+$dec"
+
+  def swapInRealTargetAs(user: User, pid: Program.Id, oid: Observation.Id, tooTid: Target.Id, dec: String): IO[Target.Id] =
+    for
+      tid <- createSiderealTargetAtAs(user, pid, coords(s"05:46:13.137 ${signed(dec)}"), "Alert")
+      _   <- editAsterismAs(user, oid, add = List(tid), del = List(tooTid))
+    yield tid
+
 
   /** Reads the observation's workflow state together with the transitions it is offered. */
   def tooWorkflowStateAndTransitions(pid: Program.Id, oid: Observation.Id, user: User): IO[(ObservationWorkflowState, List[ObservationWorkflowState])] =
@@ -182,39 +169,41 @@ trait TooTriggerSetupOperations extends ObservingModeSetupOperations { this: Odb
 
   /**
    * A program with an accepted proposal and one valid Target of Opportunity,
-   * sitting in `Defined`.  What makes it a ToO is the opportunity target in its
-   * asterism; how disruptive it may be follows from `mode`.
+   * sitting in `Defined`.  What makes it a ToO is the declared `activation`; the
+   * asterism has no say in it.
    *
-   * `resolved` decides whether the alert has already arrived.  Only a resolved
-   * one may be triggered, since an unresolved target has no coordinates to point
-   * at.
+   * `swapped` decides whether the alert has already arrived.  Only a swapped one
+   * may be triggered: while the placeholder is still in the asterism there are no
+   * coordinates to point at.
    *
-   * The mode is set before the proposal is accepted on purpose: the ceiling is
-   * derived from the program's observations and frozen at acceptance, so doing it
-   * the other way round would freeze a lower ceiling and leave the observation
-   * `Unapproved`.
+   * The activation is declared before the proposal is accepted on purpose: that is
+   * when the proposal's ToO ceiling is fixed, at the highest activation among its
+   * observations.  Declaring it afterwards would leave the ceiling at `None` and
+   * the observation `Unapproved`.  Tests that move between the ToO activations
+   * should create at the highest one they need and lower it from there.
    */
   def createTooObservationAs(
-    user:     User,
-    staff:    User,
-    resolved: Boolean = true,
-    mode:     SchedulingMode = SchedulingMode.Uninterruptible
+    user:       User,
+    staff:      User,
+    swapped:    Boolean = true,
+    activation: TooActivation = TooActivation.Rapid
   ): IO[(Program.Id, Observation.Id, Target.Id)] =
     for
       cfp <- createGeminiCallForProposalsAs(staff)
       pid <- createProgramWithNonPartnerPi(user, "ToO")
-      _   <- addProposal(user, pid, cfp.some, None)
+      _   <- addProposal(user, pid, cfp.some, "queue: { considerForBand3: DO_NOT_CONSIDER }".some)
       tid <- createOpportunityTargetAs(user, pid)
-      _   <- resolveOpportunityTargetAs(user, tid).whenA(resolved)
       oid <- createGmosNorthLongSlitObservationAs(user, pid, List(tid))
+      // A Rapid or Interrupting activation brings Uninterruptible with it.
+      _   <- setTooActivationAs(user, oid, activation)
       _   <- createConfigurationRequestAs(user, oid).flatMap(setConfigurationRequestStatusAs(staff, _, ConfigurationRequestStatus.Approved))
+      real <- if swapped then swapInRealTargetAs(user, pid, oid, tid).map(_.some) else none.pure[IO]
       _   <- computeItcResultAs(user, oid)
-      _   <- setSchedulingModeAs(user, oid, mode)
       _   <- addPartnerSplits(user, pid)
       _   <- addCoisAs(user, pid)
       _   <- setProposalStatus(staff, pid, "ACCEPTED")
       _   <- runObscalcUpdateAs(tooObscalcUser, pid, oid)
-    yield (pid, oid, tid)
+    yield (pid, oid, real.getOrElse(tid))
 
   case class Trigger(
     id:          TooTrigger.Id,

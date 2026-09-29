@@ -34,7 +34,7 @@ val keySemaphoreVersion          = "0.3.0"
 val kittensVersion               = "3.5.0"
 val logbackVersion               = "1.6.4"
 val log4catsVersion              = "2.8.0"
-val lucumaCoreVersion            = "0.257.1"
+val lucumaCoreVersion            = "0.258.0"
 val lucumaGraphQLRoutesVersion   = "0.16.0"
 val lucumaRefinedVersion         = "0.1.4"
 val monocleVersion               = "3.3.0"
@@ -88,7 +88,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 ThisBuild / libraryDependencySchemes +=
   "edu.gemini" %% "clue-model" % VersionScheme.Always
 
-ThisBuild / tlBaseVersion      := "0.99"
+ThisBuild / tlBaseVersion      := "0.100"
 ThisBuild / scalaVersion       := "3.9.0"
 ThisBuild / crossScalaVersions := Seq("3.9.0")
 ThisBuild / scalacOptions     ++= Seq("-Xmax-inlines", "50") // Hash derivation fails with default of 32

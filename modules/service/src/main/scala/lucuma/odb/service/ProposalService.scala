@@ -960,17 +960,6 @@ object ProposalService {
           val af = Statements.updateProposalStatus(user, pid, ps)
           session.prepareR(af.fragment.command).use(_.execute(af.argument)).void
 
-        // On acceptance, freeze the ToO ceiling.  Until now an unset ceiling is
-        // derived as the maximum activation among the program's observations,
-        // which is only safe while the proposal is under review: left live, a PI
-        // could raise their own ceiling afterwards just by adding an interrupting
-        // observation.  Materializing the effective value here turns a
-        // description of what was proposed into an authorization.  The TAC
-        // approves it implicitly by leaving it alone, or explicitly by editing it
-        // before accepting -- either way, what is frozen is what they saw.
-        def freezeTooActivation(pid: Program.Id): F[Unit] =
-          session.prepareR(Statements.FreezeTooActivation).use(_.execute(pid)).void
-
         ResultT(programService.resolvePid(input.programId, input.proposalReference, input.programReference))
           .flatMap: pid =>
             // The workflow computation below reads cached ITC results and never
@@ -993,7 +982,9 @@ object ProposalService {
                       _         <- ResultT(configurationService.canonicalizeAll(pid)).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
                       _         <- ResultT.liftF(Services.asSuperUser(pdfSummaryJobService.enqueue(pid)).void).whenA(oldStatus === ProposalStatus.NotSubmitted && newStatus === ProposalStatus.Submitted)
                       _         <- ResultT(configurationService.deleteAll(pid)).whenA(oldStatus === ProposalStatus.Submitted && newStatus === ProposalStatus.NotSubmitted)
-                      _         <- ResultT.liftF(freezeTooActivation(pid)).whenA(newStatus === ProposalStatus.Accepted)
+                      // Acceptance gives the program its default ToO ceiling, unless
+                      // staff have already set one.
+                      _         <- ResultT.liftF(session.execute(Statements.DefaultTooActivationCeiling)(pid)).whenA(oldStatus =!= ProposalStatus.Accepted && newStatus === ProposalStatus.Accepted)
                     yield (info, newStatus)
                   // A failed `Result` is a value, not a raised error, so without this the status
                   // change would commit even when canonicalization failed, leaving the proposal
@@ -1082,7 +1073,6 @@ object ProposalService {
           sql"c_observatory = ${observatory}"(Observatory.Gemini) ::
           sql"c_science_subtype = $science_subtype"(call.scienceSubtype) ::
           List(
-            call.tooActivationCeiling.foldPresent(sql"c_too_activation = ${too_activation.opt}"),
             call.minPercentTime.map(sql"c_min_percent = ${int_percent}"),
             call.minPercentTotal.foldPresent(sql"c_min_percent_total = ${int_percent.opt}"),
             call.totalTime.foldPresent(sql"c_total_time = ${time_span.opt}"),
@@ -1111,10 +1101,6 @@ object ProposalService {
           List(
             sql"c_observatory = ${observatory}"(obs).some,
             sql"c_science_subtype = ${science_subtype.opt}"(none).some,
-            // An exchange proposal cannot have ToO at all, so clear the explicit
-            // ceiling rather than leaving a stale one behind.  The derivation is
-            // capped to 'none' for these types anyway.
-            sql"c_too_activation = ${too_activation.opt}"(none).some,
             minPercentTime.map(sql"c_min_percent = ${int_percent}"),
             sql"c_min_percent_total = ${int_percent.opt}"(none).some,
             sql"c_total_time = ${time_span.opt}"(none).some,
@@ -1162,7 +1148,6 @@ object ProposalService {
           c_category,
           c_observatory,
           c_science_subtype,
-          c_too_activation,
           c_min_percent,
           c_min_percent_total,
           c_total_time,
@@ -1180,7 +1165,6 @@ object ProposalService {
           ${tag.opt},
           ${observatory},
           ${science_subtype},
-          ${too_activation.opt},
           ${int_percent},
           ${int_percent.opt},
           ${time_span.opt},
@@ -1198,7 +1182,6 @@ object ProposalService {
         c.category,
         Observatory.Gemini,
         g.scienceSubtype,
-        g.tooActivationCeiling,
         g.minPercentTime,
         g.minPercentTotal,
         g.totalTime,
@@ -1440,20 +1423,17 @@ object ProposalService {
       """.apply(pid) |+|
       ProgramUserService.Statements.andWhereUserReadAccess(user, pid)
 
-    /**
-     * Materializes the effective ToO ceiling into the proposal.  The `IS NULL`
-     * guard makes this a no-op when a ceiling was chosen explicitly (it is
-     * already concrete) and makes re-running harmless.  Reading v_proposal while
-     * updating t_proposal is safe: the FROM sees the pre-update snapshot.
-     */
-    val FreezeTooActivation: Command[Program.Id] =
+    // The ceiling acceptance gives a program that has none: 'none' for proposal
+    // types that ordinarily may not have Targets of Opportunity, and otherwise
+    // the highest activation among its observations.
+    val DefaultTooActivationCeiling: Command[Program.Id] =
       sql"""
-        UPDATE t_proposal p
-           SET c_too_activation = v.c_too_activation_effective
-          FROM v_proposal v
-         WHERE v.c_program_id = p.c_program_id
+        UPDATE t_program p
+           SET c_too_activation_ceiling = too_activation_max(x.c_program_id, x.c_observatory, x.c_science_subtype)
+          FROM t_proposal x
+         WHERE x.c_program_id = p.c_program_id
            AND p.c_program_id = $program_id
-           AND p.c_too_activation IS NULL
+           AND p.c_too_activation_ceiling IS NULL
       """.command
 
     def updateProposalStatus(user: User, pid: Program.Id, status: ProposalStatus): AppliedFragment =

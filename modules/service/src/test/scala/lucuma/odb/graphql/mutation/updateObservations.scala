@@ -5078,42 +5078,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       )
     )
 
-  test("scheduling: update isSplittable"):
-
-    val update = """
-      schedulingConstraints: {
-        isSplittable: false
-      }
-    """
-
-    val query = """
-      observations {
-        schedulingConstraints {
-          isSplittable
-        }
-      }
-    """
-
-    val expected = json"""
-      {
-        "updateObservations": {
-          "observations": [
-            {
-              "schedulingConstraints": {
-                "isSplittable": false
-              }
-            }
-          ]
-        }
-      }
-    """.asRight
-
-    for
-      pid <- createProgramAs(pi)
-      oid <- createObservationAs(pi, pid)
-      _   <- updateObservation(pi, oid, update, query, expected)
-    yield ()
-
   test("scheduling: set schedulingMode"):
     oneUpdateTest(
       user   = pi,
@@ -5126,7 +5090,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         observations {
           schedulingConstraints {
             schedulingMode
-            isSplittable
           }
         }
       """,
@@ -5136,8 +5099,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             "observations": [
               {
                 "schedulingConstraints": {
-                  "schedulingMode": "NO_SPLITTING",
-                  "isSplittable": false
+                  "schedulingMode": "NO_SPLITTING"
                 }
               }
             ]
@@ -5158,7 +5120,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         observations {
           schedulingConstraints {
             schedulingMode
-            isSplittable
           }
         }
       """,
@@ -5168,8 +5129,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             "observations": [
               {
                 "schedulingConstraints": {
-                  "schedulingMode": "UNCONSTRAINED",
-                  "isSplittable": true
+                  "schedulingMode": "UNCONSTRAINED"
                 }
               }
             ]
@@ -5190,7 +5150,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
         observations {
           schedulingConstraints {
             schedulingMode
-            isSplittable
           }
         }
       """,
@@ -5200,8 +5159,7 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
             "observations": [
               {
                 "schedulingConstraints": {
-                  "schedulingMode": "UNINTERRUPTIBLE",
-                  "isSplittable": false
+                  "schedulingMode": "UNINTERRUPTIBLE"
                 }
               }
             ]
@@ -5210,56 +5168,40 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       """.asRight
     )
 
-  test("scheduling: INTERRUPTING sits at the top of the ladder"):
-    oneUpdateTest(
-      user   = pi,
-      update = """
-        schedulingConstraints: {
-          schedulingMode: INTERRUPTING
-        }
-      """,
-      query = """
-        observations {
-          schedulingConstraints {
-            schedulingMode
-            isSplittable
-          }
-        }
-      """,
-      expected = json"""
-        {
-          "updateObservations": {
-            "observations": [
-              {
-                "schedulingConstraints": {
-                  "schedulingMode": "INTERRUPTING",
-                  "isSplittable": false
-                }
-              }
-            ]
-          }
-        }
-      """.asRight
-    )
-
-  // The activation used to be settable, and it floored the mode.  It is derived
-  // now -- from the asterism and the mode -- so it is no longer an input at all,
-  // and an observation with no opportunity target reads NONE whatever its mode.
-  test("scheduling: tooActivation is not settable"):
+  test("scheduling: tooActivation is settable"):
     oneUpdateTest(
       user   = pi,
       update = """
         schedulingConstraints: {
           tooActivation: RAPID
+          schedulingMode: UNINTERRUPTIBLE
         }
       """,
       query = """
-        observations { id }
+        observations {
+          schedulingConstraints {
+            tooActivation
+            schedulingMode
+          }
+        }
       """,
-      expected = "Unknown field(s) 'tooActivation' for input object value of type SchedulingConstraintsInput in field 'updateObservations' of type 'Mutation'".asLeft
+      expected = json"""
+        {
+          "updateObservations": {
+            "observations": [
+              {
+                "schedulingConstraints": {
+                  "tooActivation": "RAPID",
+                  "schedulingMode": "UNINTERRUPTIBLE"
+                }
+              }
+            ]
+          }
+        }
+      """.asRight
     )
 
-  test("scheduling: an observation with no opportunity target derives NONE"):
+  test("scheduling: the mode does not move the activation"):
     oneUpdateTest(
       user   = pi,
       update = """
@@ -5296,9 +5238,9 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
       user = pi,
       updates = List(
         (
-          """schedulingConstraints: { schedulingMode: INTERRUPTING }""",
+          """schedulingConstraints: { schedulingMode: UNINTERRUPTIBLE }""",
           """observations { schedulingConstraints { schedulingMode } }""",
-          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"schedulingMode":"INTERRUPTING"}}]}}""".asRight
+          json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"schedulingMode":"UNINTERRUPTIBLE"}}]}}""".asRight
         ),
         (
           """schedulingConstraints: { schedulingMode: UNCONSTRAINED }""",
@@ -5306,23 +5248,6 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
           json"""{"updateObservations":{"observations":[{"schedulingConstraints":{"schedulingMode":"UNCONSTRAINED"}}]}}""".asRight
         )
       )
-    )
-
-  test("scheduling: schedulingMode and isSplittable are mutually exclusive"):
-    oneUpdateTest(
-      user   = pi,
-      update = """
-        schedulingConstraints: {
-          schedulingMode: NO_SPLITTING
-          isSplittable: false
-        }
-      """,
-      query = """
-        observations {
-          id
-        }
-      """,
-      expected = "Argument 'input.SET.schedulingConstraints' is invalid: Only one of `schedulingMode` and the deprecated `isSplittable` may be specified.".asLeft
     )
 
   test("update priority"):

@@ -701,7 +701,6 @@ trait DatabaseOperations { this: OdbSuite =>
       cid.some,
       s"""
         queue: {
-          explicitTooActivationCeiling: NONE
           minPercentTime: 0
           considerForBand3: DO_NOT_CONSIDER
         }
@@ -715,7 +714,6 @@ trait DatabaseOperations { this: OdbSuite =>
       cid.some,
       s"""
         demoScience: {
-          explicitTooActivationCeiling: NONE
           minPercentTime: 0
         }
       """.some
@@ -2009,6 +2007,25 @@ trait DatabaseOperations { this: OdbSuite =>
       createOpportunityTargetAs(user, pid, sourceProfile = sourceProfile),
       ).mapN(List(_, _, _, _))
 
+  /** Adds or removes asterism members. */
+  def editAsterismAs(user: User, oid: Observation.Id, add: List[Target.Id], del: List[Target.Id]): IO[Unit] =
+    query(
+      user,
+      s"""
+        mutation {
+          updateAsterisms(input: {
+            SET: {
+              ${if add.isEmpty then "" else s"ADD: [ ${add.map(t => s"\"$t\"").mkString(",")} ]"}
+              ${if del.isEmpty then "" else s"DELETE: [ ${del.map(t => s"\"$t\"").mkString(",")} ]"}
+            }
+            WHERE: { id: { EQ: ${oid.asJson} } }
+          }) {
+            observations { id }
+          }
+        }
+      """
+    ).void
+
   def createTargetAs(
     user: User,
     pid:  Program.Id,
@@ -2096,10 +2113,47 @@ trait DatabaseOperations { this: OdbSuite =>
         .liftTo[IO]
     }
 
+  /**
+   * The region `createOpportunityTargetAs` draws: the whole of right ascension,
+   * declination from 10 to 70 degrees.  Tests that resolve or swap in a real
+   * target have to land inside it, or the approval stops covering the
+   * observation.  This is the body of a `region: { ... }` input.
+   */
+  val DefaultOpportunityRegion: String =
+    """
+      rightAscensionArc: { type: FULL }
+      declinationArc: {
+        type: PARTIAL
+        start: { degrees: 10 }
+        end: { degrees: 70 }
+      }
+    """
+
+  /** A declination-bounded region over the whole of right ascension, as GraphQL input. */
+  def decRegion(startDegrees: Int, endDegrees: Int): String =
+    s"""
+      rightAscensionArc: { type: FULL }
+      declinationArc: {
+        type: PARTIAL
+        start: { degrees: $startDegrees }
+        end: { degrees: $endDegrees }
+      }
+    """
+
   def createOpportunityTargetAs(
     user: User,
     pid:  Program.Id,
     name: String = "No Name",
+    sourceProfile: String = DefaultSourceProfile
+  ): IO[Target.Id] =
+    createOpportunityTargetWithRegionAs(user, pid, DefaultOpportunityRegion, name, sourceProfile)
+
+  /** As `createOpportunityTargetAs`, but with an explicit region (the body of `region: { ... }`). */
+  def createOpportunityTargetWithRegionAs(
+    user:   User,
+    pid:    Program.Id,
+    region: String,
+    name:   String = "No Name",
     sourceProfile: String = DefaultSourceProfile
   ): IO[Target.Id] =
     query(
@@ -2113,12 +2167,7 @@ trait DatabaseOperations { this: OdbSuite =>
                 name: "$name"
                 opportunity: {
                   region: {
-                    rightAscensionArc: { type: FULL }
-                    declinationArc: {
-                      type: PARTIAL
-                      start: { degrees: 10 }
-                      end: { degrees: 70 }
-                    }
+                    $region
                   }
                 }
                 $sourceProfile
@@ -2138,51 +2187,6 @@ trait DatabaseOperations { this: OdbSuite =>
         .leftMap(f => new RuntimeException(f.message))
         .liftTo[IO]
     }
-
-  /**
-   * Resolves an opportunity target siderally at the given coordinates, as the alert would.
-   * The region is deliberately not restated, so the approved patch of sky is left alone.
-   */
-  def resolveOpportunityTargetAtAs(
-    user:   User,
-    tid:    Target.Id,
-    coords: Coordinates
-  ): IO[Unit] =
-    query(
-      user,
-      s"""
-        mutation {
-          updateTargets(input: {
-            SET: {
-              opportunity: {
-                resolution: {
-                  sidereal: { ${coordinatesInput(coords)} epoch: "J2000.000" }
-                }
-              }
-            }
-            WHERE: { id: { EQ: ${tid.asJson} } }
-          }) {
-            targets { id }
-          }
-        }
-      """
-    ).void
-
-  /** Clears an opportunity target's resolution, returning it to awaiting its alert. */
-  def unresolveOpportunityTargetAs(user: User, tid: Target.Id): IO[Unit] =
-    query(
-      user,
-      s"""
-        mutation {
-          updateTargets(input: {
-            SET: { opportunity: { resolution: null } }
-            WHERE: { id: { EQ: ${tid.asJson} } }
-          }) {
-            targets { id }
-          }
-        }
-      """
-    ).void
 
   def createNonsiderealTargetAs(
     user: User,
@@ -3693,7 +3697,6 @@ trait DatabaseOperations { this: OdbSuite =>
               category: COSMOLOGY
               gemini: {
                 fastTurnaround: {
-                  explicitTooActivationCeiling: NONE
                   minPercentTime: 50
                   $additionalFields
                 }
@@ -3706,7 +3709,6 @@ trait DatabaseOperations { this: OdbSuite =>
             gemini {
               scienceSubtype
               ... on FastTurnaround {
-                tooActivationCeiling
                 minPercentTime
                 reviewer {
                   id
@@ -3736,7 +3738,6 @@ trait DatabaseOperations { this: OdbSuite =>
               "category": "COSMOLOGY",
               "gemini": {
                 "scienceSubtype": "FAST_TURNAROUND",
-                "tooActivationCeiling": "NONE",
                 "minPercentTime": 50,
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor
@@ -3762,7 +3763,6 @@ trait DatabaseOperations { this: OdbSuite =>
               category: COSMOLOGY
               gemini: {
                 fastTurnaround: {
-                  explicitTooActivationCeiling: NONE
                   minPercentTime: 50
                   reviewerId: "$userId"
                   mentorId: "$userId"
@@ -3808,7 +3808,6 @@ trait DatabaseOperations { this: OdbSuite =>
                 category: COSMOLOGY
                 gemini: {
                   fastTurnaround: {
-                    explicitTooActivationCeiling: NONE
                     minPercentTime: 50
                     $additionalFields
                   }
@@ -3859,7 +3858,6 @@ trait DatabaseOperations { this: OdbSuite =>
             gemini {
               scienceSubtype
               ... on FastTurnaround {
-                tooActivationCeiling
                 minPercentTime
                 reviewer {
                   id
@@ -3888,7 +3886,6 @@ trait DatabaseOperations { this: OdbSuite =>
             "proposal": {
               "gemini": {
                 "scienceSubtype": "FAST_TURNAROUND",
-                "tooActivationCeiling": "NONE",
                 "minPercentTime": 50,
                 "reviewer": $expectedReviewer,
                 "mentor": $expectedMentor
@@ -5137,7 +5134,7 @@ trait DatabaseOperations { this: OdbSuite =>
           updateObservations(input: {
             SET: {
               schedulingConstraints: {
-                isSplittable: $isSplittable
+                schedulingMode: ${if isSplittable then "UNCONSTRAINED" else "NO_SPLITTING"}
               }
             }
             WHERE: {

@@ -13,9 +13,9 @@ import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.TooActivation
 import lucuma.core.enums.TooActivation.Interrupting
 import lucuma.core.enums.TooActivation.Rapid
-import lucuma.core.enums.TooActivation.Standard
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.core.syntax.string.*
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.data.TooTriggerStatus.*
@@ -29,17 +29,14 @@ import lucuma.odb.data.TooTriggerStatus.*
  * notified and how fast both differ.  So a change supersedes the outstanding row
  * and creates a successor linked back to it, rather than amending it in place.
  *
- * All three ToO activations are reachable here because the fixture raises the
- * proposal's ceiling to the top of the ladder; the ceiling rule itself is covered
+ * Both ToO activations are reachable here because the fixture raises the
+ * program's ceiling to the top of the ladder; the ceiling rule itself is covered
  * by tooActivationCeiling, not here.
  */
 class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSetupOperations:
 
   private def setState(oid: Observation.Id, s: ObservationWorkflowState): IO[Unit] =
     setTooWorkflowState(pi, oid, s)
-
-  private def setMode(oid: Observation.Id, mode: SchedulingMode): IO[Unit] =
-    setSchedulingModeAs(pi, oid, mode)
 
   private def requestedTrigger(oid: Observation.Id): IO[(TooTrigger.Id, TooActivation, Option[TooTrigger.Id])] =
     getRequestedTooTriggerAs(pi, oid).map: t =>
@@ -51,40 +48,48 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
 
   test("a trigger records the activation it was requested at"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       _           <- setState(oid, ObservationWorkflowState.Ready)
       ts          <- allTriggers(oid)
     yield assertEquals(ts, List(Requested -> Rapid))
 
   test("an interrupting ToO records a trigger at the top of the ladder"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Interrupting)
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Interrupting)
       _           <- setState(oid, ObservationWorkflowState.Ready)
       ts          <- allTriggers(oid)
     yield assertEquals(ts, List(Requested -> Interrupting))
 
+  // Proposed at INTERRUPTING so the ceiling it freezes is evidenced by an
+  // observation; lowering is always allowed, and escalating back up stays within
+  // that ceiling.  Every test that moves between the two ToO activations starts
+  // this way.
+  private def createInterrupting: IO[(Program.Id, Observation.Id)] =
+    createTooObservationAs(pi, staff, activation = TooActivation.Interrupting).map((pid, oid, _) => (pid, oid))
+
   test("changing the activation supersedes the request and creates a successor"):
     for
-      (_, oid, _)       <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid)          <- createInterrupting
       _                 <- setState(oid, ObservationWorkflowState.Ready)
       (first, _, _)     <- requestedTrigger(oid)
-      _                 <- setMode(oid, SchedulingMode.Unconstrained)
+      _                 <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       ts                <- allTriggers(oid)
       (_, act, prevOpt) <- requestedTrigger(oid)
     yield
-      assertEquals(ts, List(Superseded -> Rapid, Requested -> Standard))
+      assertEquals(ts, List(Superseded -> Interrupting, Requested -> Rapid))
       // The successor carries the new activation and points back at the row it replaced.
-      assertEquals(act, Standard)
+      assertEquals(act, Rapid)
       assertEquals(prevOpt, Some(first))
 
   // The case that motivated the whole activation-on-the-trigger design: a live
   // rapid request is escalated to interrupting.
   test("escalating a rapid ToO to interrupting supersedes it and requests a new one"):
     for
-      (_, oid, _)    <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid)       <- createInterrupting
+      _              <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       _              <- setState(oid, ObservationWorkflowState.Ready)
       (first, _, _)  <- requestedTrigger(oid)
-      _              <- setMode(oid, SchedulingMode.Interrupting)
+      _              <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
       ts             <- allTriggers(oid)
       (_, act, prev) <- requestedTrigger(oid)
     yield
@@ -97,39 +102,40 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
 
   test("a superseded request keeps the activation it was made at"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
-      _           <- setState(oid, ObservationWorkflowState.Ready)
-      _           <- setMode(oid, SchedulingMode.Unconstrained)
-      _           <- setMode(oid, SchedulingMode.Uninterruptible)
-      ts          <- allTriggers(oid)
+      (_, oid) <- createInterrupting
+      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setTooActivationAs(pi, oid, TooActivation.Rapid)
+      _        <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
+      ts       <- allTriggers(oid)
     yield
       // Each closed-out row still says what it was requested at; they are records
       // of what was asked for, not views of what the observation is now.
       assertEquals(
         ts,
-        List(Superseded -> Rapid, Superseded -> Standard, Requested -> Rapid)
+        List(Superseded -> Interrupting, Superseded -> Rapid, Requested -> Interrupting)
       )
 
   test("exactly one request is live through a chain of changes"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
-      _           <- setState(oid, ObservationWorkflowState.Ready)
-      _           <- setMode(oid, SchedulingMode.Unconstrained)
-      _           <- setMode(oid, SchedulingMode.Uninterruptible)
-      _           <- setMode(oid, SchedulingMode.Unconstrained)
-      ts          <- allTriggers(oid)
+      (_, oid) <- createInterrupting
+      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setTooActivationAs(pi, oid, TooActivation.Rapid)
+      _        <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
+      _        <- setTooActivationAs(pi, oid, TooActivation.Rapid)
+      ts       <- allTriggers(oid)
     yield
       assertEquals(ts.count(_._1 == Requested), 1)
       assertEquals(ts.count(_._1 == Superseded), 3)
 
   test("the chain walks back to the first request"):
     for
-      (_, oid, _)    <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid)       <- createInterrupting
+      _              <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       _              <- setState(oid, ObservationWorkflowState.Ready)
       (first, _, _)  <- requestedTrigger(oid)
-      _              <- setMode(oid, SchedulingMode.Unconstrained)
+      _              <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
       (second, _, _) <- requestedTrigger(oid)
-      _              <- setMode(oid, SchedulingMode.Interrupting)
+      _              <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       js             <- query(
                           pi,
                           s"""
@@ -150,31 +156,38 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
                         )
     yield
       val c = js.hcursor.downFields("tooTriggers", "matches").require[List[Json]].head.hcursor
-      assertEquals(c.downField("tooActivation").require[TooActivation], Interrupting)
+      assertEquals(c.downField("tooActivation").require[TooActivation], Rapid)
       assertEquals(c.downFields("supersedes", "id").require[TooTrigger.Id], second)
-      assertEquals(c.downFields("supersedes", "tooActivation").require[TooActivation], Standard)
+      assertEquals(c.downFields("supersedes", "tooActivation").require[TooActivation], Interrupting)
       assertEquals(c.downFields("supersedes", "supersedes", "id").require[TooTrigger.Id], first)
       assertEquals(c.downFields("supersedes", "supersedes", "tooActivation").require[TooActivation], Rapid)
       // The root of the chain is the first request, which replaced nothing.
       assertEquals(c.downFields("supersedes", "supersedes", "supersedes").require[Option[Json]], None)
 
-  test("a mode change that does not move the activation supersedes nothing"):
+  test("a ToO's mode cannot move, so no mode edit supersedes its request"):
     for
-      (_, oid, _)    <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid, _)    <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       _              <- setState(oid, ObservationWorkflowState.Ready)
-      _              <- setMode(oid, SchedulingMode.Unconstrained)
       (before, _, _) <- requestedTrigger(oid)
-      // Both UNCONSTRAINED and NO_SPLITTING derive STANDARD, so nothing changes.
-      _              <- setMode(oid, SchedulingMode.NoSplitting)
+      // Every Target of Opportunity is Uninterruptible, so the mode is not the
+      // PI's to change while the activation stands -- and a request's identity
+      // could never depend on it.
+      _              <- expect(
+                          pi,
+                          schedulingModeQuery(oid, SchedulingMode.NoSplitting),
+                          expected = List(
+                            s"Cannot set the scheduling constraints for observation $oid: Target of Opportunity activation RAPID fixes the scheduling mode at UNINTERRUPTIBLE; it cannot be NO_SPLITTING."
+                          ).asLeft
+                        )
       ts             <- allTriggers(oid)
       (after, _, _)  <- requestedTrigger(oid)
     yield
-      assertEquals(ts.count(_._1 == Superseded), 1)
+      assertEquals(ts, List(Requested -> Rapid))
       assertEquals(after, before)
 
   test("clearing Ready withdraws rather than supersedes"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       _           <- setState(oid, ObservationWorkflowState.Ready)
       _           <- setState(oid, ObservationWorkflowState.Defined)
       ts          <- allTriggers(oid)
@@ -182,38 +195,38 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
 
   test("a request made afresh after a withdrawal supersedes nothing"):
     for
-      (_, oid, _)    <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (_, oid)       <- createInterrupting
       _              <- setState(oid, ObservationWorkflowState.Ready)
       _              <- setState(oid, ObservationWorkflowState.Defined)
-      _              <- setMode(oid, SchedulingMode.Unconstrained)
+      _              <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       _              <- setState(oid, ObservationWorkflowState.Ready)
       (_, act, prev) <- requestedTrigger(oid)
     yield
       // The activation moved while nothing was outstanding, so this is a first
-      // request at STANDARD, not a successor to the withdrawn one.
-      assertEquals(act, Standard)
+      // request at RAPID, not a successor to the withdrawn one.
+      assertEquals(act, Rapid)
       assertEquals(prev, None)
 
   test("changing the activation while not triggered records nothing"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
-      _           <- setMode(oid, SchedulingMode.Unconstrained)
-      ts          <- allTriggers(oid)
+      (_, oid) <- createInterrupting
+      _        <- setTooActivationAs(pi, oid, TooActivation.Rapid)
+      ts       <- allTriggers(oid)
     yield assertEquals(ts, Nil)
 
-  test("filtering on activation selects the requests that cannot wait for the queue"):
+  test("filtering on activation selects the requests that may displace running work"):
     for
-      (_, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
-      _           <- setState(oid, ObservationWorkflowState.Ready)
-      _           <- setMode(oid, SchedulingMode.Unconstrained)
-      _           <- setMode(oid, SchedulingMode.Interrupting)
-      js          <- query(
+      (_, oid) <- createInterrupting
+      _        <- setTooActivationAs(pi, oid, TooActivation.Rapid)
+      _        <- setState(oid, ObservationWorkflowState.Ready)
+      _        <- setTooActivationAs(pi, oid, TooActivation.Interrupting)
+      js       <- query(
                        pi,
                        s"""
                          query {
                            tooTriggers(WHERE: {
                              observationId: { EQ: ${oid.asJson} }
-                             tooActivation: { GTE: RAPID }
+                             tooActivation: { GTE: INTERRUPTING }
                            }) {
                              matches { tooActivation }
                            }
@@ -223,15 +236,13 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
     yield
       val acts = js.hcursor.downFields("tooTriggers", "matches").require[List[Json]]
         .map(_.hcursor.downField("tooActivation").require[String]).sorted
-      // The STANDARD request is excluded.  The ordering is what makes this
-      // expressible on the query side, where the filter is real SQL.  RAPID does
-      // not displace work already under way -- only INTERRUPTING does -- but both
-      // are wanted sooner than the queue would get to them.
-      assertEquals(acts, List("INTERRUPTING", "RAPID"))
+      // The superseded RAPID request is excluded.  The ordering is what makes
+      // this expressible on the query side, where the filter is real SQL.
+      assertEquals(acts, List("INTERRUPTING"))
 
   test("an executing observation's mode cannot be changed, so its trigger cannot be superseded"):
     for
-      (pid, oid, _)  <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (pid, oid, _)  <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       _              <- setState(oid, ObservationWorkflowState.Ready)
       (before, _, _) <- requestedTrigger(oid)
       // One completed step is enough to be under way without finishing.
@@ -260,17 +271,20 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
       // Still the very same row, accepted rather than superseded by a successor.
       assertEquals(ids, List(before))
 
-  /** Lowers (or raises) the proposal's explicit ceiling, which only staff may do. */
-  private def setCeiling(pid: Program.Id, ceiling: String): IO[Unit] =
+  // -- The program's ceiling ---------------------------------------------------
+  //
+  // Given at acceptance from the observations, and changed afterwards by staff.
+
+  private def setCeiling(pid: Program.Id, ceiling: TooActivation): IO[Unit] =
     query(
       staff,
       s"""
         mutation {
-          updateProposal(input: {
-            programId: "$pid"
-            SET: { gemini: { queue: { explicitTooActivationCeiling: $ceiling } } }
+          updatePrograms(input: {
+            SET: { tooActivationCeiling: ${ceiling.tag.toScreamingSnakeCase} }
+            WHERE: { id: { EQ: "$pid" } }
           }) {
-            proposal { gemini { ... on Queue { explicitTooActivationCeiling } } }
+            programs { id }
           }
         }
       """
@@ -278,12 +292,12 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
 
   test("lowering the ceiling withdraws a request it no longer authorizes"):
     for
-      (pid, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (pid, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       _             <- setState(oid, ObservationWorkflowState.Ready)
       before        <- allTriggers(oid)
       // The TAC takes back what it granted.  Nothing about the observation
       // changes, so only the proposal-side trigger can act on this.
-      _             <- setCeiling(pid, "STANDARD")
+      _             <- setCeiling(pid, TooActivation.None)
       after         <- allTriggers(oid)
     yield
       assertEquals(before, List(Requested -> Rapid))
@@ -291,18 +305,38 @@ class tooTriggerActivation extends ExecutionTestSupportForGmos with TooTriggerSe
 
   test("lowering the ceiling leaves a request it still authorizes alone"):
     for
-      (pid, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Unconstrained)
+      (pid, oid)    <- createInterrupting
+      _             <- setTooActivationAs(pi, oid, TooActivation.Rapid)
       _             <- setState(oid, ObservationWorkflowState.Ready)
-      _             <- setCeiling(pid, "STANDARD")
+      _             <- setCeiling(pid, TooActivation.Rapid)
       ts            <- allTriggers(oid)
     yield
-      // STANDARD is at the ceiling, not above it.
-      assertEquals(ts, List(Requested -> Standard))
+      // RAPID is at the ceiling, not above it.
+      assertEquals(ts, List(Requested -> Rapid))
 
   test("raising the ceiling withdraws nothing"):
     for
-      (pid, oid, _) <- createTooObservationAs(pi, staff, mode = SchedulingMode.Uninterruptible)
+      (pid, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
       _             <- setState(oid, ObservationWorkflowState.Ready)
-      _             <- setCeiling(pid, "INTERRUPTING")
+      _             <- setCeiling(pid, TooActivation.Interrupting)
       ts            <- allTriggers(oid)
     yield assertEquals(ts, List(Requested -> Rapid))
+
+  // A Defined observation may be raised freely and simply goes Unapproved; a Ready
+  // one may not, since the raise would supersede its request with one at an
+  // activation nobody approved.
+  test("a Ready ToO cannot be raised above the ceiling"):
+    for
+      (_, oid, _) <- createTooObservationAs(pi, staff, activation = TooActivation.Rapid)
+      _           <- setState(oid, ObservationWorkflowState.Ready)
+      _           <- expect(
+                       pi,
+                       tooActivationQuery(oid, TooActivation.Interrupting),
+                       List(
+                         s"Cannot set the Target of Opportunity activation for observation $oid while it is Ready: INTERRUPTING is above RAPID, the program's ceiling. Set it back to Defined, or have staff raise the ceiling first."
+                       ).asLeft
+                     )
+      ts          <- allTriggers(oid)
+    yield
+      // Refused outright, supersession included.
+      assertEquals(ts, List(Requested -> Rapid))

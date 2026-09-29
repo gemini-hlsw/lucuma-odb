@@ -4,44 +4,33 @@
 package lucuma.odb.service.workflow
 package validator
 
-import cats.syntax.all.*
 import lucuma.core.enums.ObservationWorkflowState.Ready
-import lucuma.core.enums.SchedulingMode
 import lucuma.core.model.ObservationValidation
 import lucuma.odb.data.ObservationValidationMap
 
 object OpportunityTargetValidator extends ObservationValidator:
 
-  val OpportunityTargetNotResolved =
-    "Replace the Target of Opportunity placeholder with the actual target coordinates."
+  val OpportunityTargetNotSwapped =
+    "Replace the Target of Opportunity placeholder with the actual target before setting the observation Ready."
 
-  val InterruptingRequiresOpportunityTarget =
-    "An observation may only interrupt executing science if it is a Target of Opportunity; add an opportunity target or lower the scheduling mode."
-
-  // Two ways an observation can be internally inconsistent about being a Target
-  // of Opportunity.  Both are ConfigurationErrors -- Undefined, which also
-  // suppresses a stored Ready.
+  // An opportunity target is a placeholder: it carries a region and nothing to
+  // slew to.  Holding one is perfectly valid -- it is how a ToO waits, and how
+  // the proposal described it -- so this fires only against Ready, which is the
+  // trigger.  Asking an observer to act on an observation with no coordinates is
+  // the one thing that must not happen.
   //
-  // The first is a backstop.  An unresolved target already blocks the
-  // Defined -> Ready transition, so a trigger cannot be requested for one, but
-  // the asterism can still be edited afterwards (Ready is in preExecutionSet)
-  // and a Ready ToO with no coordinates is worse than a loud error.  Note the
-  // target is no longer replaced when the alert arrives; it keeps its region and
-  // gains a resolution, so "has an opportunity target" and "is still waiting"
-  // are two different questions.
+  // This is a backstop rather than the primary gate.  The Defined -> Ready
+  // transition is refused while a placeholder is in the asterism, but Ready is a
+  // pre-execution state, so the asterism can still be edited afterwards -- and a
+  // Ready ToO with nowhere to point is worse than a loud error.
   //
-  // The second is the one dependency this design validates rather than making
-  // structural.  Interrupting is the only mode reserved to ToOs -- science staff
-  // report no application for an interrupting observation that is not one -- and
-  // rejecting the combination is what keeps "is this a ToO" the single test
-  // `hasTooTarget`, with no disjunction in it.
-  //
-  // There is no longer any check that an opportunity target implies an
-  // activation: the activation is now derived from the target, so the two cannot
-  // disagree.
+  // Note there is no longer any check relating the asterism to the activation.
+  // Being a Target of Opportunity is declared on the observation, so an
+  // opportunity target neither makes an observation a ToO nor is required by one;
+  // a ToO whose target was known from the outset never holds a placeholder at all.
+  // The one cross-axis rule -- that Rapid and Interrupting require
+  // Uninterruptible -- is rejected at the mutation rather than surfaced here.
   def apply(info: ObservationValidationInfo): ObservationValidationMap =
-    if info.hasTooTarget && info.hasUnresolvedTooTarget && info.effectiveUserState.contains(Ready) then
-      ObservationValidationMap.singleton(ObservationValidation.configuration(OpportunityTargetNotResolved))
-    else if info.schedulingMode === SchedulingMode.Interrupting && !info.hasTooTarget then
-      ObservationValidationMap.singleton(ObservationValidation.configuration(InterruptingRequiresOpportunityTarget))
+    if info.hasTooTarget && info.effectiveUserState.contains(Ready) then
+      ObservationValidationMap.singleton(ObservationValidation.configuration(OpportunityTargetNotSwapped))
     else ObservationValidationMap.empty

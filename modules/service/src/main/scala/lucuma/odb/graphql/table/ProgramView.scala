@@ -29,6 +29,9 @@ trait ProgramView[F[_]] extends BaseMapping[F]:
     val ResourceCount     = col("c_resource_count", int4_nonneg)
     val ResourceLimit     = col("c_resource_limit", int4_nonneg)
     val dismissedWarnings = col("c_dismissed_warnings", _observation_validation_warning)
+    val TooActivationCeiling = col("c_too_activation_ceiling", too_activation.opt)
+    val MaxTooActivation     = col("c_max_too_activation", too_activation)
+    val MaxSchedulingMode    = col("c_max_scheduling_mode", scheduling_mode)
 
     object Goa:
       val Proprietary   = col("c_goa_proprietary", int4_nonneg)

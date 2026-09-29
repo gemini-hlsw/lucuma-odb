@@ -228,15 +228,15 @@ object ObservationWorkflowService {
               // Exchange observations run at Keck/Subaru, not Gemini; they have no
               // Ready/Ongoing/Completed lifecycle, so Inactive is the only transition.
               //
-              // An opportunity target blocks Ready only while it is *unresolved*.
-              // Setting a ToO Ready is what requests its trigger, so gating on the
-              // mere presence of the target would make a resolved one impossible to
-              // trigger -- the target keeps its identity after the alert arrives
-              // rather than being replaced by an ordinary one.
+              // An opportunity target blocks Ready outright.  It is a placeholder
+              // with a region and no coordinates, so there is nowhere to slew and
+              // nothing to ask an observer to do.  Setting a ToO Ready is what
+              // requests its trigger, so the real target has to take the
+              // placeholder's place in the asterism first.
               List(Inactive) ++
                 Option.when(
                   (!info.isExchange) && 
-                  (!info.hasUnresolvedTooTarget) && 
+                  (!info.hasTooTarget) && 
                   (info.isAccepted || !info.tpe.hasProposal) &&
                   (!hasWarnings)
                 )(Ready)
