@@ -53,6 +53,7 @@ import lucuma.core.model.User
 import lucuma.core.syntax.string.*
 import lucuma.odb.data.AltairConfiguration
 import lucuma.odb.data.BlindOffsetType
+import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.Cone
 import lucuma.odb.data.Existence
 import lucuma.odb.data.ExposureTimeModeRole
@@ -121,7 +122,8 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def cloneObservation(
-    input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
+    input:    AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id],
+    sequence: CloneSequenceMode
   )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
 
   def deleteCalibrationObservations(
@@ -760,7 +762,8 @@ object ObservationService {
       /** Clone the observation. We assume access has been checked already. */
       private def cloneObservationUnconditionally(
         observationId: Observation.Id,
-        SET:           Option[ObservationPropertiesInput.Edit]
+        SET:           Option[ObservationPropertiesInput.Edit],
+        sequence:      CloneSequenceMode
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
 
         // First we need the pid, observing mode, and grouping information
@@ -835,11 +838,21 @@ object ObservationService {
                           .flatTap {
                             r => transaction.rollback.unlessA(r.hasValue)
                           }
+                  // Copied after the update so that it is validated against
+                  // the clone's final configuration (e.g. splittability).  The
+                  // frozen ITC result only still applies if its inputs are unedited.
+                  val cloneSequence: F[Result[Unit]] =
+                    val keepsItcInputs = !SET.exists(_.editsItcInputs)
+                    Services.asSuperUser:
+                      sequenceService.cloneSequence(observationId, oid2, sequence).flatMap: r =>
+                        r.traverse(copied => itcService.cloneFrozen(observationId, oid2).whenA(copied && keepsItcInputs))
+
                   (
                     for
                       _ <- ResultT.liftF(cloneRelatedItems)
                       _ <- ResultT(cloneBlindOffset)
                       r <- ResultT(doUpdate)
+                      _ <- ResultT(cloneSequence)
                     yield r
                   ).value
               }
@@ -848,7 +861,8 @@ object ObservationService {
       }
 
       def cloneObservation(
-        input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
+        input:    AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id],
+        sequence: CloneSequenceMode
       )(using Transaction[F]): F[Result[ObservationService.CloneIds]] =
         // The asterism (including any signal-to-noise target flag) is copied by
         // cloneAsterism inside cloneObservationUnconditionally. Any asterism edits
@@ -856,13 +870,17 @@ object ObservationService {
         // target, so membership is validated against the post-edit asterism.
         val cloned: F[Result[CloneIds]] =
           input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
-            cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
-              res.flatTraverse: (pid, newOid) =>
-                Services.asSuperUser:
-                  (for
-                    _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
-                    _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
-                  yield CloneIds(origOid, newOid)).value
+            val editsMode = oSET.exists(!_.observingMode.isAbsent)
+            if editsMode && sequence =!= CloneSequenceMode.None then
+              OdbError.InvalidArgument("The observing mode cannot be edited when cloning an observation's sequence.".some).asFailureF
+            else
+              cloneObservationUnconditionally(origOid, oSET, sequence).flatMap: res =>
+                res.flatTraverse: (pid, newOid) =>
+                  Services.asSuperUser:
+                    (for
+                      _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
+                      _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
+                    yield CloneIds(origOid, newOid)).value
 
         // A single rollback covering the whole clone: this runs in one transaction
         // and `transaction.rollback` is a full rollback, so any failure (a cloned

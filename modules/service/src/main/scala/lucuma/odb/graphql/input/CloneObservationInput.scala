@@ -10,6 +10,9 @@ import cats.syntax.all.*
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
+import lucuma.core.syntax.string.*
+import lucuma.core.util.Enumerated
+import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
 
@@ -17,23 +20,33 @@ final case class CloneObservationInput(
   observationId:  Option[Observation.Id],
   observationRef: Option[ObservationReference],
   SET:            Option[ObservationPropertiesInput.Edit],
+  sequence:       CloneSequenceMode
 ) {
 
   def asterism: Nullable[NonEmptyList[Target.Id]] =
     SET.fold(Nullable.Absent)(_.asterism)
-    
+
 }
 
 object CloneObservationInput {
 
- val Binding: Matcher[CloneObservationInput] =
+  val CloneSequenceModeBinding: Matcher[CloneSequenceMode] =
+    EnumBinding.emap: name =>
+      Enumerated[CloneSequenceMode]
+        .all
+        .find(_.tag.toScreamingSnakeCase === name)
+        .toRight(s"Unknown CloneSequenceMode: $name")
+
+  val Binding: Matcher[CloneObservationInput] =
     ObjectFieldsBinding.rmap {
       case List(
         ObservationIdBinding.Option("observationId", rObservationId),
         ObservationReferenceBinding.Option("observationReference", rObservationRef),
         ObservationPropertiesInput.Edit.Binding.Option("SET", rSET),
+        CloneSequenceModeBinding.Option("sequence", rSequence)
       ) =>
-        (rObservationId, rObservationRef, rSET).mapN(CloneObservationInput.apply)
+        (rObservationId, rObservationRef, rSET, rSequence).mapN: (oid, ref, set, seq) =>
+          CloneObservationInput(oid, ref, set, seq.getOrElse(CloneSequenceMode.None))
     }
 
 }

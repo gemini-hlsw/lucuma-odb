@@ -220,3 +220,13 @@ _Avoid_: band check, band gate.
 
 **Inherited Band**:
 The Science Band a calibration observation takes from the science observations it serves: the best band among matching observations for a per-program calibration, a copy of the parent's for a per-science one. Best-effort, which is why the Band Requirement still checks the calibration itself.
+
+### Sequences
+
+**Materialized Sequence**:
+An observation's acquisition or science sequence once it is stored rather than generated on demand. A sequence becomes materialized when its first visit is recorded or when someone replaces it by hand; the two cases are indistinguishable afterwards. It holds both executed and pending steps. Each sequence type is materialized independently.
+_Avoid_: edited sequence (not a separate state), manual sequence, stored sequence.
+
+**Sequence Clone Mode**:
+What a cloned observation takes from its source's Materialized Sequences: `NONE` (nothing, the clone generates its own), `ALL_STEPS` (every step, executed or not and whatever state it ended in, all as pending) or `PENDING_STEPS` (only steps that have not run). Applied to the acquisition and science sequences independently; a sequence type with nothing to copy is simply generated.
+_Avoid_: copy sequence flag, duplicate sequence, regenerate.

@@ -16,6 +16,7 @@ import lucuma.core.model.Access
 import lucuma.core.model.Group
 import lucuma.core.model.Observation
 import lucuma.core.model.Program
+import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.Existence
 import lucuma.odb.data.GroupTree
 import lucuma.odb.data.GroupTree.Branch
@@ -160,7 +161,7 @@ object GroupService {
       private def cloneObservationInto(oid: Observation.Id, dest: Option[Group.Id])(using Transaction[F]): ResultT[F, Observation.Id] =
         ResultT(
           observationService.cloneObservation(
-            Services.asSuperUser:
+            Services.asSuperUser(
               AccessControl.unchecked(
                 Some(
                   ObservationPropertiesInput.Edit.Empty.copy(
@@ -170,6 +171,8 @@ object GroupService {
                 oid,
                 observation_id
               )
+            ),
+            CloneSequenceMode.None
           )
         ).map(_.cloneId)
 
