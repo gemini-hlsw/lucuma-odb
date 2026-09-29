@@ -943,7 +943,7 @@ object GeneratorParamsService {
       sql"""
         SELECT s.c_observation_id,
                NOT EXISTS (SELECT 1 FROM t_visit v WHERE v.c_observation_id = t.c_observation_id),
-               t.c_workflow_user_state = 'inactive',
+               COALESCE(t.c_workflow_user_state = 'inactive', false),
                c.c_full_setup_time,
                c.c_setup_count,
                c.c_sci_obs_class,
@@ -957,6 +957,7 @@ object GeneratorParamsService {
         LEFT JOIN t_obscalc c
           ON   c.c_observation_id = t.c_observation_id
          AND   c.c_odb_error IS NULL
+         AND   c.c_setup_count IS NOT NULL
         WHERE  s.c_observation_id IN (${observation_id.list(oids.size)})
       """.apply(oids.toList)
 
