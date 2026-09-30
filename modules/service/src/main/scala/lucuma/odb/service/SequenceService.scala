@@ -11,7 +11,6 @@ import cats.effect.std.UUIDGen
 import cats.syntax.applicative.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
-import cats.syntax.eq.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
@@ -496,6 +495,18 @@ object SequenceService:
         def toStep(sid: Step.Id, estimate: StepEstimate): Step[D] =
           Step(sid, p.value, p.stepConfig, p.telescopeConfig, estimate, p.observeClass, p.breakpoint)
 
+      // Groups adjacent rows that share an atom id.
+      private def groupByAtom[A, B](
+        f: (Atom.Id, Option[NonEmptyString], NonEmptyList[A]) => B
+      ): Pipe[F, (Atom.Id, Option[String], A), B] =
+        _.groupAdjacentBy(_._1)
+         .map: (aid, chunk) =>
+           f(
+             aid,
+             chunk.head.flatMap(_._2).flatMap(NonEmptyString.from(_).toOption),
+             NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
+           )
+
       // Turns a stream of ProtoStep into an atom by running the time estimation
       // and grouping the steps by atom id.
       private def atomPipe[S, D](
@@ -508,13 +519,7 @@ object SequenceService:
             (lastʹ, (aid, desc, protoStep.toStep(sid, estimate)))
         }
         .map(_._2)
-        .groupAdjacentBy(_._1)
-        .map: (aid, chunk) =>
-          Atom(
-            aid,
-            chunk.head.flatMap(_._2).flatMap(NonEmptyString.from(_).toOption),
-            NonEmptyList.fromListUnsafe(chunk.map(_._3).toList)
-          )
+        .through(groupByAtom(Atom(_, _, _)))
 
       override def isMaterialized(
         observationId: Observation.Id,
@@ -1039,48 +1044,47 @@ object SequenceService:
           instrument:   Instrument,
           sequenceType: SequenceType,
           table:        Statements.DynamicTable[D],
+          pendingOnly:  Boolean,
           replace:      List[ProtoAtom[ProtoStep[D]]] => F[Result[Stream[Pure, Atom[D]]]]
         ): F[Result[Unit]] =
-          val query = Statements.selectSequenceForClone(table, mode === CloneSequenceMode.PendingSteps)
           session
-            .stream(query)((instrument, source, sequenceType), BatchSize)
-            .groupAdjacentBy(_._1)
-            .map: (_, chunk) =>
-              ProtoAtom(
-                chunk.head.flatMap(_._2).flatMap(NonEmptyString.from(_).toOption),
-                NonEmptyList.fromListUnsafe(chunk.map(_._4).toList)
-              )
+            .stream(Statements.selectSequenceForClone(table, pendingOnly))((instrument, source, sequenceType), BatchSize)
+            .map((aid, desc, _, step) => (aid, desc, step))
+            .through(groupByAtom((_, desc, steps) => ProtoAtom(desc, steps)))
             .compile
             .toList
             .flatMap:
               case Nil   => Result.unit.pure[F]
               case atoms => replace(atoms).map(_.void)
 
-        def copySequenceType(instrument: Instrument, sequenceType: SequenceType): F[Result[Unit]] =
+        def copySequenceType(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean): F[Result[Unit]] =
           instrument match
-            case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, replaceFlamingos2Sequence(clone, sequenceType, _))
-            case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      replaceGhostSequence(clone, sequenceType, _))
-            case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  replaceGmosNorthSequence(clone, sequenceType, _))
-            case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  replaceGmosSouthSequence(clone, sequenceType, _))
-            case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    replaceIgrins2Sequence(clone, sequenceType, _))
-            case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      replaceGnirsSequence(clone, sequenceType, _))
+            case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, pendingOnly, replaceFlamingos2Sequence(clone, sequenceType, _))
+            case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      pendingOnly, replaceGhostSequence(clone, sequenceType, _))
+            case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  pendingOnly, replaceGmosNorthSequence(clone, sequenceType, _))
+            case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  pendingOnly, replaceGmosSouthSequence(clone, sequenceType, _))
+            case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    pendingOnly, replaceIgrins2Sequence(clone, sequenceType, _))
+            case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      pendingOnly, replaceGnirsSequence(clone, sequenceType, _))
             case _                     => Result.unit.pure[F]
 
-        def copyIfMaterialized(instrument: Instrument, sequenceType: SequenceType): ResultT[F, Unit] =
+        def copyIfMaterialized(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean): ResultT[F, Unit] =
           ResultT:
             isMaterialized(source, sequenceType).ifM(
-              copySequenceType(instrument, sequenceType),
+              copySequenceType(instrument, sequenceType, pendingOnly),
               Result.unit.pure[F]
             )
 
+        def copyAll(pendingOnly: Boolean): F[Result[Unit]] =
+          observationService.selectInstrument(source).flatMap:
+            case None             => Result.unit.pure[F]
+            case Some(instrument) =>
+              (copyIfMaterialized(instrument, SequenceType.Acquisition, pendingOnly) *>
+               copyIfMaterialized(instrument, SequenceType.Science, pendingOnly)).value
+
         mode match
-          case CloneSequenceMode.None => Result.unit.pure[F]
-          case _                      =>
-            observationService.selectInstrument(source).flatMap:
-              case None             => Result.unit.pure[F]
-              case Some(instrument) =>
-                (copyIfMaterialized(instrument, SequenceType.Acquisition) *>
-                 copyIfMaterialized(instrument, SequenceType.Science)).value
+          case CloneSequenceMode.None         => Result.unit.pure[F]
+          case CloneSequenceMode.AllSteps     => copyAll(pendingOnly = false)
+          case CloneSequenceMode.PendingSteps => copyAll(pendingOnly = true)
 
   object Statements:
 
@@ -1400,7 +1404,6 @@ object SequenceService:
             WHERE ast.c_atom_id = a.c_atom_id
           ) NULLS LAST,
           a.c_atom_index,
-          a.c_atom_id,
           se.c_execution_order NULLS LAST,
           s.c_step_index
         """

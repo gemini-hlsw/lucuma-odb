@@ -11,13 +11,16 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
+import lucuma.core.model.Program
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
 import lucuma.odb.util.Codecs.observation_id
+import lucuma.odb.util.Codecs.program_id
 import lucuma.odb.util.Codecs.sequence_type
 import skunk.Query
 import skunk.codec.boolean.bool
+import skunk.codec.numeric.int8
 import skunk.codec.text.text
 import skunk.syntax.all.*
 
@@ -55,6 +58,15 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
 
   private def abort(sid: Step.Id, vid: Visit.Id): IO[Unit] =
     runStep(sid, vid, StepStage.Abort)
+
+  private def start(sid: Step.Id, vid: Visit.Id): IO[Unit] =
+    addStepEventAs(serviceUser, sid, vid, StepStage.StartStep).void
+
+  private val ObservationCount: Query[Program.Id, Long] =
+    sql"SELECT COUNT(*) FROM t_observation WHERE c_program_id = $program_id".query(int8)
+
+  private def observationCount(pid: Program.Id): IO[Long] =
+    withSession(_.unique(ObservationCount)(pid))
 
   private val IsMaterialized: Query[(Observation.Id, SequenceType), Boolean] =
     sql"""
@@ -143,6 +155,16 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       s   <- storedScience(c)
     yield assertEquals(s, List("A" -> filterTag(RPrime), "B" -> filterTag(IPrime)))
 
+  test("PENDING_STEPS skips a step that is ongoing"):
+    for
+      o   <- longSlit
+      ids <- replaceScience(o, atomInput("A", stepInput(GPrime), stepInput(RPrime)))
+      v   <- recordVisitAs(serviceUser, o)
+      _   <- start(ids(0)._2(0), v)
+      c   <- cloneAs(o, Some("PENDING_STEPS"))
+      s   <- storedScience(c)
+    yield assertEquals(s, List("A" -> filterTag(RPrime)))
+
   test("PENDING_STEPS with nothing left generates the sequence"):
     for
       o   <- longSlit
@@ -191,7 +213,15 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       expect(
         user     = pi,
         query    = cloneQuery(o, Some("ALL_STEPS"), Some("""{ observingMode: { gmosNorthLongSlit: { filter: R_PRIME } } }""")),
-        expected = List("The observing mode cannot be edited when cloning an observation's sequence.").asLeft
+        expected = List("The observing mode and science requirements cannot be edited when cloning an observation's sequence.").asLeft
+      )
+
+  test("editing the science requirements while copying the sequence fails"):
+    longSlit.flatMap: o =>
+      expect(
+        user     = pi,
+        query    = cloneQuery(o, Some("ALL_STEPS"), Some("{ scienceRequirements: { exposureTimeMode: { signalToNoise: { value: 75, at: { nanometers: 410 } } } } }")),
+        expected = List("The observing mode and science requirements cannot be edited when cloning an observation's sequence.").asLeft
       )
 
   test("making the clone unsplittable with a multi-atom copied sequence fails"):
@@ -200,9 +230,11 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       t <- createTargetWithProfileAs(pi, p)
       o <- createGmosNorthImagingObservationAs(pi, p, t)
       _ <- replaceScience(o, atomInput("A", imagingStepInput(GPrime)), atomInput("B", imagingStepInput(IPrime)))
+      n <- observationCount(p)
       _ <- expect(
              user     = pi,
              query    = cloneQuery(o, Some("ALL_STEPS"), Some("{ schedulingConstraints: { schedulingMode: NO_SPLITTING } }")),
              expected = List("Unsplittable observations may only contain a single atom.").asLeft
            )
-    yield ()
+      m <- observationCount(p)
+    yield assertEquals(m, n, "failed clone left an observation behind")

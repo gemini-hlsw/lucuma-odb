@@ -841,8 +841,7 @@ object ObservationService {
                   // Copied after the update so that it is validated against
                   // the clone's final configuration (e.g. splittability).
                   val cloneSequence: F[Result[Unit]] =
-                    Services.asSuperUser:
-                      sequenceService.cloneSequence(observationId, oid2, sequence)
+                    sequenceService.cloneSequence(observationId, oid2, sequence)
 
                   (
                     for
@@ -867,9 +866,9 @@ object ObservationService {
         // target, so membership is validated against the post-edit asterism.
         val cloned: F[Result[CloneIds]] =
           input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
-            val editsMode = oSET.exists(!_.observingMode.isAbsent)
-            if editsMode && sequence =!= CloneSequenceMode.None then
-              OdbError.InvalidArgument("The observing mode cannot be edited when cloning an observation's sequence.".some).asFailureF
+            val editsSequenceInputs = oSET.exists(s => !s.observingMode.isAbsent || s.scienceRequirements.isDefined)
+            if editsSequenceInputs && sequence =!= CloneSequenceMode.None then
+              OdbError.InvalidArgument("The observing mode and science requirements cannot be edited when cloning an observation's sequence.".some).asFailureF
             else
               cloneObservationUnconditionally(origOid, oSET, sequence).flatMap: res =>
                 res.flatTraverse: (pid, newOid) =>

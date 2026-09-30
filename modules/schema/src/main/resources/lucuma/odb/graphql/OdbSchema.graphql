@@ -1081,8 +1081,8 @@ input CloneObservationInput {
 
   """
   Which steps, if any, of the source's materialized sequences to copy into the
-  clone.  Any mode other than NONE cannot be combined with an observing mode
-  edit in SET.
+  clone.  Any mode other than NONE cannot be combined with an observing mode or
+  science requirements edit in SET.
   """
   sequence: CloneSequenceMode! = NONE
 }

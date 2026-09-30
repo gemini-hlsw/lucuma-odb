@@ -7,6 +7,7 @@ import lucuma.core.util.Enumerated
 
 /**
  * What a cloned observation takes from its source's materialized sequences.
+ * TODO: Move to lucuma-core
  */
 enum CloneSequenceMode(val tag: String) derives Enumerated:
   case None         extends CloneSequenceMode("none")

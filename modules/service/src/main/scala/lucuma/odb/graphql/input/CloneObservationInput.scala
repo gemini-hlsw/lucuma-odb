@@ -10,8 +10,6 @@ import cats.syntax.all.*
 import lucuma.core.model.Observation
 import lucuma.core.model.ObservationReference
 import lucuma.core.model.Target
-import lucuma.core.syntax.string.*
-import lucuma.core.util.Enumerated
 import lucuma.odb.data.CloneSequenceMode
 import lucuma.odb.data.Nullable
 import lucuma.odb.graphql.binding.*
@@ -31,11 +29,7 @@ final case class CloneObservationInput(
 object CloneObservationInput {
 
   val CloneSequenceModeBinding: Matcher[CloneSequenceMode] =
-    EnumBinding.emap: name =>
-      Enumerated[CloneSequenceMode]
-        .all
-        .find(_.tag.toScreamingSnakeCase === name)
-        .toRight(s"Unknown CloneSequenceMode: $name")
+    enumeratedBinding[CloneSequenceMode]
 
   val Binding: Matcher[CloneObservationInput] =
     ObjectFieldsBinding.rmap {
