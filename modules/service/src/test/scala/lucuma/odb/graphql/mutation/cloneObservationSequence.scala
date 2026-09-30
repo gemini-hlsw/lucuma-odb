@@ -11,7 +11,6 @@ import lucuma.core.enums.Instrument
 import lucuma.core.enums.SequenceType
 import lucuma.core.enums.StepStage
 import lucuma.core.model.Observation
-import lucuma.core.model.Target
 import lucuma.core.model.Visit
 import lucuma.core.model.sequence.Atom
 import lucuma.core.model.sequence.Step
@@ -144,21 +143,15 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       s   <- storedScience(c)
     yield assertEquals(s, List("A" -> filterTag(RPrime), "B" -> filterTag(IPrime)))
 
-  test("PENDING_STEPS with nothing left generates the sequence, without the frozen ITC result"):
+  test("PENDING_STEPS with nothing left generates the sequence"):
     for
       o   <- longSlit
       ids <- replaceScience(o, atomInput("A", stepInput(GPrime)))
       v   <- recordVisitAs(serviceUser, o)
       _   <- complete(ids(0)._2(0), v)
-      _   <- withSession(_.execute(sql"DELETE FROM t_sequence_materialization WHERE c_observation_id = $observation_id AND c_sequence_type = 'acquisition'".command)(o))
-      f0  <- hasFrozenItc(o)
       c   <- cloneAs(o, Some("PENDING_STEPS"))
       m   <- isMaterialized(c, SequenceType.Science)
-      f1  <- hasFrozenItc(c)
-    yield
-      assert(f0, "source setup")
-      assert(!m)
-      assert(!f1, "frozen ITC result copied without a copied sequence")
+    yield assert(!m)
 
   test("ALL_STEPS on an unmaterialized source is a no-op"):
     for
@@ -168,7 +161,7 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       s <- isMaterialized(c, SequenceType.Science)
     yield assert(!a && !s)
 
-  test("ALL_STEPS copies the materialized acquisition and the frozen ITC result"):
+  test("ALL_STEPS copies the materialized acquisition but not the frozen ITC result"):
     for
       o  <- longSlit
       _  <- recordVisitAs(serviceUser, o)
@@ -180,35 +173,18 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
     yield
       assert(a0 && f0, "source setup")
       assert(a1, "acquisition not copied")
-      assert(f1, "frozen ITC result not copied")
+      assert(!f1, "frozen ITC result copied")
 
-  private def frozenItcCopiedWith(set: Target.Id => String): IO[Boolean] =
+  test("editing the targets while copying the sequence is allowed"):
     for
       p  <- createProgram
       t  <- createTargetWithProfileAs(pi, p)
       t2 <- createTargetWithProfileAs(pi, p)
       o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
-      _  <- recordVisitAs(serviceUser, o)
-      c  <- cloneAs(o, Some("ALL_STEPS"), Some(set(t2)))
-      a  <- isMaterialized(c, SequenceType.Acquisition)
-      f  <- hasFrozenItc(c)
-    yield
-      assert(a, "acquisition not copied")
-      f
-
-  test("editing the targets while copying the sequence leaves out the frozen ITC result"):
-    assertIO(frozenItcCopiedWith(t2 => s"""{ targetEnvironment: { asterism: ["$t2"] } }"""), false)
-
-  test("editing the constraints while copying the sequence leaves out the frozen ITC result"):
-    assertIO(frozenItcCopiedWith(_ => "{ constraintSet: { imageQuality: ONE_POINT_FIVE } }"), false)
-
-  test("NONE does not copy the frozen ITC result"):
-    for
-      o <- longSlit
-      _ <- recordVisitAs(serviceUser, o)
-      c <- cloneAs(o, Some("NONE"))
-      f <- hasFrozenItc(c)
-    yield assert(!f)
+      _  <- replaceScience(o, atomInput("A", stepInput(GPrime)))
+      c  <- cloneAs(o, Some("ALL_STEPS"), Some(s"""{ targetEnvironment: { asterism: ["$t2"] } }"""))
+      s  <- storedScience(c)
+    yield assertEquals(s, List("A" -> filterTag(GPrime)))
 
   test("editing the observing mode while copying the sequence fails"):
     longSlit.flatMap: o =>
@@ -226,7 +202,7 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       _ <- replaceScience(o, atomInput("A", imagingStepInput(GPrime)), atomInput("B", imagingStepInput(IPrime)))
       _ <- expect(
              user     = pi,
-             query    = cloneQuery(o, Some("ALL_STEPS"), Some("{ schedulingConstraints: { isSplittable: false } }")),
+             query    = cloneQuery(o, Some("ALL_STEPS"), Some("{ schedulingConstraints: { schedulingMode: NO_SPLITTING } }")),
              expected = List("Unsplittable observations may only contain a single atom.").asLeft
            )
     yield ()

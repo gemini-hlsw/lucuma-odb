@@ -839,13 +839,10 @@ object ObservationService {
                             r => transaction.rollback.unlessA(r.hasValue)
                           }
                   // Copied after the update so that it is validated against
-                  // the clone's final configuration (e.g. splittability).  The
-                  // frozen ITC result only still applies if its inputs are unedited.
+                  // the clone's final configuration (e.g. splittability).
                   val cloneSequence: F[Result[Unit]] =
-                    val keepsItcInputs = !SET.exists(_.editsItcInputs)
                     Services.asSuperUser:
-                      sequenceService.cloneSequence(observationId, oid2, sequence).flatMap: r =>
-                        r.traverse(copied => itcService.cloneFrozen(observationId, oid2).whenA(copied && keepsItcInputs))
+                      sequenceService.cloneSequence(observationId, oid2, sequence)
 
                   (
                     for

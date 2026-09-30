@@ -155,9 +155,6 @@ object ObservationPropertiesInput {
     def needsStaffAccess: Boolean =
       observingMode.toOption.exists(_.needsStaffAccess)
 
-    def editsItcInputs: Boolean =
-      targetEnvironment.isDefined || constraintSet.isDefined || scienceRequirements.isDefined
-
   object Edit {
 
     val Empty: Edit =

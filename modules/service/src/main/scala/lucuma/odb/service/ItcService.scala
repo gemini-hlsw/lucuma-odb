@@ -196,16 +196,6 @@ sealed trait ItcService[F[_]] {
   )(using Transaction[F]): F[Unit]
 
   /**
-   * Copies the frozen ITC result of `source`, if any, to `clone`, replacing
-   * whatever result `clone` has.  Used when a clone takes a copy of the
-   * source's materialized sequence, so its estimates keep matching the steps.
-   */
-  def cloneFrozen(
-    source: Observation.Id,
-    clone:  Observation.Id
-  )(using Transaction[F]): F[Unit]
-
-  /**
    * Selects the frozen (durable, authoritative) result for an observation, if one exists, ignoring
    * the input hash entirely. A caller that finds one knows the observation is executing against
    * it and that nothing it might recompute can replace it.
@@ -1028,12 +1018,6 @@ object ItcService {
               gnirs.acquisitionSignalToNoise(t)
             )
 
-      override def cloneFrozen(
-        source: Observation.Id,
-        clone:  Observation.Id
-      )(using Transaction[F]): F[Unit] =
-        session.execute(Statements.CloneFrozenItcResult)(clone, source).void
-
       override def freeze(
         oid:    Observation.Id,
         input:  ItcInput,
@@ -1284,41 +1268,6 @@ object ItcService {
           val (acqResults, acqError) = splitAcquisition(itc.acquisition)
           (pid, oid, h, altairHash, itc.science, acqResults, acqError)
         }
-
-    val CloneFrozenItcResult: Command[(Observation.Id, Observation.Id)] =
-      sql"""
-        INSERT INTO t_itc_result (
-          c_program_id,
-          c_observation_id,
-          c_hash,
-          c_altair_hash,
-          c_science_results,
-          c_science_error,
-          c_acquisition_results,
-          c_acquisition_error,
-          c_is_frozen
-        )
-        SELECT
-          c_program_id,
-          $observation_id,
-          c_hash,
-          c_altair_hash,
-          c_science_results,
-          c_science_error,
-          c_acquisition_results,
-          c_acquisition_error,
-          true
-        FROM t_itc_result
-        WHERE c_observation_id = $observation_id AND c_is_frozen
-        ON CONFLICT ON CONSTRAINT t_itc_result_pkey DO UPDATE
-          SET c_hash                = EXCLUDED.c_hash,
-              c_altair_hash         = EXCLUDED.c_altair_hash,
-              c_science_results     = EXCLUDED.c_science_results,
-              c_science_error       = EXCLUDED.c_science_error,
-              c_acquisition_results = EXCLUDED.c_acquisition_results,
-              c_acquisition_error   = EXCLUDED.c_acquisition_error,
-              c_is_frozen           = true
-      """.command
 
     // Promotes an observation's ITC result to frozen/authoritative.  Derives the
     // program id from t_observation (per the mode-table convention).  The first

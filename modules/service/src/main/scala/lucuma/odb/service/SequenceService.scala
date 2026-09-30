@@ -293,14 +293,12 @@ trait SequenceService[F[_]]:
    * Copies the materialized acquisition and science sequences of `source` into
    * `clone`, as pending steps, according to `mode`.  A sequence type that is not
    * materialized, or that has nothing to copy, is left to be generated.
-   *
-   * @return whether any sequence was copied
    */
   def cloneSequence(
     source: Observation.Id,
     clone:  Observation.Id,
     mode:   CloneSequenceMode
-  )(using Transaction[F]): F[Result[Boolean]]
+  )(using Transaction[F]): F[Result[Unit]]
 
 object SequenceService:
 
@@ -1035,14 +1033,14 @@ object SequenceService:
         source: Observation.Id,
         clone:  Observation.Id,
         mode:   CloneSequenceMode
-      )(using Transaction[F]): F[Result[Boolean]] =
+      )(using Transaction[F]): F[Result[Unit]] =
 
         def copy[D](
           instrument:   Instrument,
           sequenceType: SequenceType,
           table:        Statements.DynamicTable[D],
           replace:      List[ProtoAtom[ProtoStep[D]]] => F[Result[Stream[Pure, Atom[D]]]]
-        ): F[Result[Boolean]] =
+        ): F[Result[Unit]] =
           val query = Statements.selectSequenceForClone(table, mode === CloneSequenceMode.PendingSteps)
           session
             .stream(query)((instrument, source, sequenceType), BatchSize)
@@ -1055,10 +1053,10 @@ object SequenceService:
             .compile
             .toList
             .flatMap:
-              case Nil   => Result(false).pure[F]
-              case atoms => replace(atoms).map(_.as(true))
+              case Nil   => Result.unit.pure[F]
+              case atoms => replace(atoms).map(_.void)
 
-        def copySequenceType(instrument: Instrument, sequenceType: SequenceType): F[Result[Boolean]] =
+        def copySequenceType(instrument: Instrument, sequenceType: SequenceType): F[Result[Unit]] =
           instrument match
             case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, replaceFlamingos2Sequence(clone, sequenceType, _))
             case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      replaceGhostSequence(clone, sequenceType, _))
@@ -1066,23 +1064,23 @@ object SequenceService:
             case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  replaceGmosSouthSequence(clone, sequenceType, _))
             case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    replaceIgrins2Sequence(clone, sequenceType, _))
             case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      replaceGnirsSequence(clone, sequenceType, _))
-            case _                     => Result(false).pure[F]
+            case _                     => Result.unit.pure[F]
 
-        def copyIfMaterialized(instrument: Instrument, sequenceType: SequenceType): ResultT[F, Boolean] =
+        def copyIfMaterialized(instrument: Instrument, sequenceType: SequenceType): ResultT[F, Unit] =
           ResultT:
             isMaterialized(source, sequenceType).ifM(
               copySequenceType(instrument, sequenceType),
-              Result(false).pure[F]
+              Result.unit.pure[F]
             )
 
         mode match
-          case CloneSequenceMode.None => Result(false).pure[F]
+          case CloneSequenceMode.None => Result.unit.pure[F]
           case _                      =>
             observationService.selectInstrument(source).flatMap:
-              case None             => Result(false).pure[F]
+              case None             => Result.unit.pure[F]
               case Some(instrument) =>
-                (copyIfMaterialized(instrument, SequenceType.Acquisition),
-                 copyIfMaterialized(instrument, SequenceType.Science)).mapN(_ || _).value
+                (copyIfMaterialized(instrument, SequenceType.Acquisition) *>
+                 copyIfMaterialized(instrument, SequenceType.Science)).value
 
   object Statements:
 
