@@ -416,22 +416,20 @@ object ObservationService {
           val modeInstrument: Option[Instrument] =
             observingModeType.flatMap(ObservingModeType.toFacility.getOption).map(_.instrument)
 
-          val instrumentCheck: F[Result[Unit]] =
-            (altair, modeInstrument).tupled.fold(Result.unit.pure[F]): (_, facilityInstrument) =>
-              session.execute(Statements.SelectAltairInstruments).map: altairInstruments =>
-                AltairRules.checkInstrument(facilityInstrument, altairInstruments.toSet)
+          val instrumentCheck: Result[Unit] =
+            (altair, modeInstrument).tupled.fold(Result.unit): (_, facilityInstrument) =>
+              AltairRules.checkInstrument(facilityInstrument)
 
-          val guidingCheck: F[Result[Unit]] =
-            instrumentCheck.map: instrumentResult =>
-              (
-                instrumentResult,
-                altair.fold(Result.unit)(AltairRules.checkConfiguration(_)),
-                (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
-                  .tupled
-                  .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
-              ).parTupled.void
+          val guidingCheck: Result[Unit] =
+            (
+              instrumentCheck,
+              altair.fold(Result.unit)(AltairRules.checkConfiguration(_)),
+              (observingModeType, SET.targetEnvironment.flatMap(_.explicitGuideProbe))
+                .tupled
+                .fold(Result.unit)(GuideProbeRules.check(_, altair.map(_.mode), _))
+            ).parTupled.void
 
-          ResultT(guidingCheck)
+          ResultT(guidingCheck.pure[F])
             .flatMap(_ => ResultT(Services.asSuperUser(createObservationImpl(pid, SET, calibrationRole))))
             .flatMap: oid =>
               SET
@@ -659,14 +657,13 @@ object ObservationService {
             val validateAltairInstrument: ResultT[F, Unit] =
               ResultT:
                 val af = Statements.selectAltairObservations(which)
-                for
-                  altairInstruments <- session.execute(Statements.SelectAltairInstruments).map(_.toSet)
-                  rows              <- session
-                                         .prepareR(af.fragment.query(observation_id *: instrument.opt))
-                                         .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
-                yield rows.parTraverse_ { case (oid, obsInstrument) =>
-                  obsInstrument.traverse_(AltairRules.checkInstrument(_, altairInstruments, s"Observation $oid: "))
-                }
+                session
+                  .prepareR(af.fragment.query(observation_id *: instrument.opt))
+                  .use(_.stream(af.argument, chunkSize = 1024).compile.toList)
+                  .map: rows =>
+                    rows.parTraverse_ { case (oid, obsInstrument) =>
+                      obsInstrument.traverse_(AltairRules.checkInstrument(_, s"Observation $oid: "))
+                    }
 
             val updates: ResultT[F, Map[Program.Id, List[Observation.Id]]] =
               for {
@@ -1640,13 +1637,6 @@ object ObservationService {
         void"FROM t_observation "                                                                  |+|
         void"WHERE c_explicit_guide_probe IS NOT NULL "                                            |+|
         void"AND c_observation_id IN (" |+| which |+| void")"
-
-    val SelectAltairInstruments: Query[Void, Instrument] =
-      sql"""
-        SELECT c_tag
-          FROM t_instrument
-         WHERE c_altair
-      """.query(instrument)
 
     def selectAltairObservations(which: AppliedFragment): AppliedFragment =
       void"SELECT c_observation_id, c_instrument " |+|
