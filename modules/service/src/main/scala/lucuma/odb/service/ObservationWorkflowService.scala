@@ -20,11 +20,13 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -288,8 +290,55 @@ object ObservationWorkflowService {
               yield (infos, errs, itcRes)
             ).value
 
+        // The observations the ITC validator will fault for want of a cached result.
+        def uncached(
+          infos:  Map[Observation.Id, ObservationValidationInfo],
+          itcRes: Map[Observation.Id, Itc]
+        ): List[(Program.Id, Observation.Id, GeneratorParams)] =
+          infos.values.toList.flatMap: info =>
+            info.generatorParams.flatMap(_.toOption).collect:
+              case ps if info.calibrationRole.isEmpty && info.tpe.hasProposal &&
+                         !info.isVisitor && !info.isExchange && !itcRes.contains(info.oid) =>
+                (info.pid, info.oid, ps)
+
+        // Of the observations missing a cached result, those obscalc has finished
+        // with.  One still pending or calculating will store its own result
+        // shortly, so refilling it here would only add a remote ITC call (and an
+        // observation edit event) to the caller.
+        def settled(
+          missing: List[(Program.Id, Observation.Id, GeneratorParams)]
+        ): F[List[(Program.Id, Observation.Id, GeneratorParams)]] =
+          services
+            .transactionally(obscalcService.selectMany(missing.map(_._2)))
+            .map: entries =>
+              missing.filter: (_, oid, _) =>
+                entries.get(oid).exists(_.meta.state === CalculationState.Ready)
+
+        // The workflow reads cached ITC results only, so a missing one is
+        // indistinguishable from a failed one and the observation would look
+        // undefined.  An ITC version change purges the cache without requeueing
+        // obscalc for inactive, ongoing or completed observations, so nothing
+        // else refills it.  Refill whatever the cache is missing for settled
+        // observations and read again; normally there is nothing to do and this
+        // costs nothing.
+        val selectWarm: ResultT[F, (
+          Map[Observation.Id, ObservationValidationInfo],
+          Map[Observation.Id, ObservationValidationMap],
+          Map[Observation.Id, Itc]
+        )] =
+          ResultT(select).flatMap: (infos, errs, itcRes) =>
+            val missing = uncached(infos, itcRes)
+            if missing.isEmpty then ResultT.pure((infos, errs, itcRes))
+            else
+              ResultT.liftF(settled(missing).flatMap(itcService.warm)).flatMap: warmed =>
+                if warmed.isEmpty then ResultT.pure((infos, errs, itcRes))
+                // Runs the transaction again rather than reusing the first read:
+                // the cache now holds the refilled results, and `errs` must be
+                // revalidated against them.
+                else ResultT(select)
+
         (for
-          (infos, errs, itcRes) <- ResultT(select)
+          (infos, errs, itcRes) <- selectWarm
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
           execs                  = executionStates(errorFree)
           workflows              = computeWorkflows(infos, errs, execs)
