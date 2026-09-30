@@ -207,14 +207,16 @@ CREATE TRIGGER telluric_visit_obscalc_invalidate_trigger
   EXECUTE FUNCTION telluric_visit_obscalc_invalidate();
 
 -- Only a changed total re-runs the science, which stops the science -> telluric
--- resolution -> telluric digest -> science cycle once the numbers settle.
+-- resolution -> telluric digest -> science cycle once the numbers settle.  The
+-- state is not checked: a result computed while the row was re-invalidated is
+-- stored as 'pending' with its digest, and the recompute that follows usually
+-- stores the same totals again, so waiting for 'ready' would miss the change.
 CREATE OR REPLACE FUNCTION telluric_total_obscalc_invalidate()
 RETURNS TRIGGER AS $$
 DECLARE
   telluric_group_id d_group_id;
 BEGIN
-  IF NEW.c_obscalc_state = 'ready'
-     AND NEW.c_last_update IS DISTINCT FROM OLD.c_last_update
+  IF NEW.c_last_update IS DISTINCT FROM OLD.c_last_update
      AND (   NEW.c_full_setup_time      IS DISTINCT FROM OLD.c_full_setup_time
           OR NEW.c_setup_count          IS DISTINCT FROM OLD.c_setup_count
           OR NEW.c_sci_obs_class        IS DISTINCT FROM OLD.c_sci_obs_class
