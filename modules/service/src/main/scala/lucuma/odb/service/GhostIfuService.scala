@@ -19,6 +19,7 @@ import grackle.ResultT
 import lucuma.core.enums.GhostBinning
 import lucuma.core.enums.GhostReadMode
 import lucuma.core.enums.GhostResolutionMode
+import lucuma.core.geom.jts.interpreter.given
 import lucuma.core.model.ExposureTimeMode
 import lucuma.core.model.Observation
 import lucuma.core.model.sequence.ghost.GhostIfuMapping
