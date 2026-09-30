@@ -25,6 +25,7 @@ import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
 import lucuma.odb.data.OdbErrorExtensions.*
 import lucuma.odb.graphql.mapping.AccessControl
+import lucuma.odb.sequence.data.GeneratorParams
 import lucuma.odb.service.Services.SuperUserAccess
 import lucuma.odb.util.Codecs.*
 import skunk.*
@@ -288,8 +289,41 @@ object ObservationWorkflowService {
               yield (infos, errs, itcRes)
             ).value
 
+        // The observations the ITC validator will fault for want of a cached result.
+        def uncached(
+          infos:  Map[Observation.Id, ObservationValidationInfo],
+          itcRes: Map[Observation.Id, Itc]
+        ): List[(Program.Id, Observation.Id, GeneratorParams)] =
+          infos.values.toList.flatMap: info =>
+            info.generatorParams.flatMap(_.toOption).collect:
+              case ps if info.calibrationRole.isEmpty && info.tpe.hasProposal &&
+                         !info.isVisitor && !info.isExchange && !itcRes.contains(info.oid) =>
+                (info.pid, info.oid, ps)
+
+        // The workflow reads cached ITC results only, so a missing one is
+        // indistinguishable from a failed one and the observation would look
+        // undefined.  An ITC version change purges the cache without requeueing
+        // obscalc for inactive, ongoing or completed observations, so nothing
+        // else refills it.  Refill whatever the cache is missing and read again;
+        // normally there is nothing to do and this costs nothing.
+        val selectWarm: ResultT[F, (
+          Map[Observation.Id, ObservationValidationInfo],
+          Map[Observation.Id, ObservationValidationMap],
+          Map[Observation.Id, Itc]
+        )] =
+          ResultT(select).flatMap: (infos, errs, itcRes) =>
+            val missing = uncached(infos, itcRes)
+            if missing.isEmpty then ResultT.pure((infos, errs, itcRes))
+            else
+              ResultT.liftF(itcService.warm(missing)).flatMap: warmed =>
+                if warmed.isEmpty then ResultT.pure((infos, errs, itcRes))
+                // Runs the transaction again rather than reusing the first read:
+                // the cache now holds the refilled results, and `errs` must be
+                // revalidated against them.
+                else ResultT(select)
+
         (for
-          (infos, errs, itcRes) <- ResultT(select)
+          (infos, errs, itcRes) <- selectWarm
           errorFree              = infos.view.filterKeys(oid => errs.get(oid).forall(_.isEmpty)).toMap
           execs                  = executionStates(errorFree)
           workflows              = computeWorkflows(infos, errs, execs)

@@ -167,6 +167,19 @@ sealed trait ItcService[F[_]] {
   )(using NoTransaction[F], SuperUserAccess): F[Unit]
 
   /**
+   * [[warmAll]] for particular observations: calls the remote service for each
+   * of the given observations that has no stored result or failure at all, and
+   * stores the outcome.  As with [[warmAll]], a stored failure or a result for
+   * stale parameters is left alone (so that neither is re-requested on every
+   * call), as are observations to which no ITC applies, whose parameters are
+   * incomplete, or whose ITC depends on an unresolved Altair guide star.
+   * Returns the observations for which something was stored.
+   */
+  def warm(
+    params: List[(Program.Id, Observation.Id, GeneratorParams)]
+  )(using NoTransaction[F]): F[Set[Observation.Id]]
+
+  /**
    * Freezes the ITC result for an observation, making it durable and
    * authoritative.  A frozen result is exempt from the wholesale wipe on an ITC
    * version bump and is returned by all lookups regardless of the current input
@@ -489,6 +502,28 @@ object ItcService {
       override def warmAll(
         programId: Program.Id
       )(using NoTransaction[F], SuperUserAccess): F[Unit] =
+        services
+          .transactionally(selectWarmInputs(programId))
+          .flatMap: inputs =>
+            warmInputs(inputs.map((oid, input) => (programId, oid, input))).void
+
+      override def warm(
+        params: List[(Program.Id, Observation.Id, GeneratorParams)]
+      )(using NoTransaction[F]): F[Set[Observation.Id]] =
+        NonEmptyList.fromList(params.map(_._2)).fold(Set.empty.pure[F]): nel =>
+          services
+            .transactionally:
+              session.execute(Statements.selectStoredObservations(observation_id.nel(nel)))(nel)
+            .flatMap: stored =>
+              val storedSet = stored.toSet
+              warmInputs:
+                params.flatMap: (pid, oid, ps) =>
+                  if storedSet.contains(oid) then none
+                  else warmInput(ps).map((pid, oid, _))
+
+      private def warmInputs(
+        inputs: List[(Program.Id, Observation.Id, ItcInput)]
+      )(using NoTransaction[F]): F[Set[Observation.Id]] =
         // The remote calls are the slow part and touch no database, so they are
         // the only part that fans out. Everything else shares the one session
         // this `Services` holds, and Skunk permits only one transaction on a
@@ -499,13 +534,12 @@ object ItcService {
         // deleted out from under it, and a failed statement would otherwise
         // abort a shared transaction and discard every other result too.
         for
-          inputs  <- services.transactionally(selectWarmInputs(programId))
-          results <- inputs.parTraverseN(WarmConcurrency): (oid, input) =>
-                       callRemoteItc(oid, input).map((oid, input, _))
-          _       <- results.traverse_ { case (oid, input, result) =>
-                       services.transactionally(storeItc(programId, oid, input, result))
+          results <- inputs.parTraverseN(WarmConcurrency): (pid, oid, input) =>
+                       callRemoteItc(oid, input).map((pid, oid, input, _))
+          _       <- results.traverse_ { case (pid, oid, input, result) =>
+                       services.transactionally(storeItc(pid, oid, input, result))
                      }
-        yield ()
+        yield results.collect { case (_, oid, _, Right(_) | Left(OdbError.ItcError(_))) => oid }.toSet
 
       // The observations warmAll must actually call the remote service for,
       // paired with the input to call it with. An observation to which no ITC
@@ -1172,6 +1206,15 @@ object ItcService {
         WHERE c_program_id      = $program_id AND
               c_science_results IS NOT NULL
       """.query(observation_id *: md5_hash *: science *: acquisition.opt *: text.opt *: bool)
+
+    // The observations with any stored row: a success or a cached failure,
+    // current or stale.
+    def selectStoredObservations[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, Observation.Id] =
+      sql"""
+        SELECT c_observation_id
+        FROM t_itc_result
+        WHERE c_observation_id IN ($enc)
+      """.query(observation_id)
 
     def selectAllItcResults[A <: NonEmptyList[Observation.Id]](enc: skunk.Encoder[A]): Query[A, (Observation.Id, Md5Hash, ItcScience, Option[ItcAcquisition.Available], Option[String], Boolean)] =
       sql"""

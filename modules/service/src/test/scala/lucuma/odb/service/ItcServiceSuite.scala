@@ -315,3 +315,27 @@ class ItcServiceVersionBumpSuite extends ItcServiceSuiteSupport:
       assertEquals(calc0, Some(CalculationState.Ready))
       assert(!row, "the unfrozen cache row should be wiped by the version bump")
       assertEquals(calc1, Some(CalculationState.Pending))
+
+  // An inactive observation is not requeued, so obscalc keeps offering the
+  // transition back to 'defined' while its cached result is gone.  The live
+  // workflow check must refill the cache rather than read it as an ITC failure.
+  test("an inactive observation whose cached result a version bump discards can be reactivated"):
+    for
+      pid   <- createProgramAs(pi)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createGmosNorthLongSlitObservationAs(pi, pid, List(tid))
+      _     <- withItcService(itcClient)(_.lookup(pid, oid).void)
+      _     <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Inactive)
+      _     <- runObscalcUpdateAs(serviceUser, pid, oid)
+      wf    <- obscalcWorkflowState(oid)
+      _     <- bumpItcVersion("itc-version-bump-inactive-test")
+      row0  <- itcRowExists(pid, oid)
+      calc  <- selectCalculationStates.map(_.get(oid))
+      state <- setObservationWorkflowState(pi, oid, ObservationWorkflowState.Defined)
+      row1  <- itcRowExists(pid, oid)
+    yield
+      assertEquals(wf, Some(ObservationWorkflowState.Inactive))
+      assert(!row0, "the unfrozen cache row should be wiped by the version bump")
+      assertEquals(calc, Some(CalculationState.Ready), "an inactive observation is not requeued")
+      assertEquals(state, ObservationWorkflowState.Defined)
+      assert(row1, "the workflow check should have refilled the cache")
