@@ -20,6 +20,7 @@ import lucuma.core.model.ObservationWorkflow
 import lucuma.core.model.Program
 import lucuma.core.model.StandardRole.*
 import lucuma.core.model.Target
+import lucuma.core.util.CalculationState
 import lucuma.odb.data.Itc
 import lucuma.odb.data.ObservationValidationMap
 import lucuma.odb.data.OdbError
@@ -300,12 +301,26 @@ object ObservationWorkflowService {
                          !info.isVisitor && !info.isExchange && !itcRes.contains(info.oid) =>
                 (info.pid, info.oid, ps)
 
+        // Of the observations missing a cached result, those obscalc has finished
+        // with.  One still pending or calculating will store its own result
+        // shortly, so refilling it here would only add a remote ITC call (and an
+        // observation edit event) to the caller.
+        def settled(
+          missing: List[(Program.Id, Observation.Id, GeneratorParams)]
+        ): F[List[(Program.Id, Observation.Id, GeneratorParams)]] =
+          services
+            .transactionally(obscalcService.selectMany(missing.map(_._2)))
+            .map: entries =>
+              missing.filter: (_, oid, _) =>
+                entries.get(oid).exists(_.meta.state === CalculationState.Ready)
+
         // The workflow reads cached ITC results only, so a missing one is
         // indistinguishable from a failed one and the observation would look
         // undefined.  An ITC version change purges the cache without requeueing
         // obscalc for inactive, ongoing or completed observations, so nothing
-        // else refills it.  Refill whatever the cache is missing and read again;
-        // normally there is nothing to do and this costs nothing.
+        // else refills it.  Refill whatever the cache is missing for settled
+        // observations and read again; normally there is nothing to do and this
+        // costs nothing.
         val selectWarm: ResultT[F, (
           Map[Observation.Id, ObservationValidationInfo],
           Map[Observation.Id, ObservationValidationMap],
@@ -315,7 +330,7 @@ object ObservationWorkflowService {
             val missing = uncached(infos, itcRes)
             if missing.isEmpty then ResultT.pure((infos, errs, itcRes))
             else
-              ResultT.liftF(itcService.warm(missing)).flatMap: warmed =>
+              ResultT.liftF(settled(missing).flatMap(itcService.warm)).flatMap: warmed =>
                 if warmed.isEmpty then ResultT.pure((infos, errs, itcRes))
                 // Runs the transaction again rather than reusing the first read:
                 // the cache now holds the refilled results, and `errs` must be
