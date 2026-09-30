@@ -13,7 +13,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.Encoder
 import io.circe.Json
 import io.circe.refined.*
-import io.circe.syntax.*
 import lucuma.core.data.EmailAddress
 import lucuma.core.enums.*
 import lucuma.core.enums.GmosMosAcquisitionType
@@ -63,25 +62,15 @@ import lucuma.odb.data.Tag
 import lucuma.odb.data.TooTrigger
 import lucuma.odb.data.TooTriggerStatus
 import lucuma.odb.data.UserType
+import lucuma.odb.json.maskDefinition.given
+import lucuma.odb.json.semester.given
 
 import java.time.LocalDate
 
 trait LeafMappings[F[_]] extends BaseMapping[F]:
 
-  // See the codec for why MosSlitPriority and MosDispersionDirection cannot
-  // use their Enumerated encoders.
-  private given io.circe.Encoder[MosSlitPriority] =
-    lucuma.odb.json.maskDefinition.EncoderMosSlitPriority
-
-  private given io.circe.Encoder[MosDispersionDirection] =
-    lucuma.odb.json.maskDefinition.EncoderMosDispersionDirection
-
   private given io.circe.Encoder[Epoch] =
     e => Json.fromString(Epoch.fromString.reverseGet(e))
-
-  // TODO: move
-  private given io.circe.Encoder[Semester] =
-    _.format.asJson
 
   lazy val LeafMappings: List[TypeMapping] =
     List(

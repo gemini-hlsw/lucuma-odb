@@ -19,7 +19,7 @@ class ResourceMapping[F[_]: Async](
     with BaseMapping[F]
     with QueryMapping[F]
     with LeafMappings[F]
-    with TelescopeNightTimelineMapping[F]:
+    with ResourceBlockMappings[F]:
   // with SubscriptionMapping[F]
   // with MutationMapping[F]:
 
@@ -29,7 +29,7 @@ class ResourceMapping[F[_]: Async](
       QueryMapping
       // SubscriptionMapping,
 
-    ) ++ TelescopeNightTimelineMappings ++ LeafMappings
+    ) ++ PublishedSemesterMappings ++ ResourceBlockMappings ++ ComponentCatalogMappings ++ LeafMappings
   )
 
   override val selectElaborator: SelectElaborator =
