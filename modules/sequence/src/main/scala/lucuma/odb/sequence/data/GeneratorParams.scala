@@ -9,6 +9,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.odb.data.AltairConfiguration
@@ -17,6 +18,10 @@ import lucuma.odb.sequence.ObservingMode.Instances.given
 import lucuma.odb.sequence.syntax.all.*
 import lucuma.odb.sequence.util.HashBytes
 
+/**
+ * Inputs to sequence generation.  `guideProbe` is the effective guide probe:
+ * the explicit probe if one was chosen, otherwise the observing mode's default.
+ */
 case class GeneratorParams(
   itcInput:         ItcInputDerivation,
   scienceBand:      Option[ScienceBand],
@@ -28,7 +33,8 @@ case class GeneratorParams(
   executionState:   ExecutionState,
   stepCount:        Long,
   isSplittable:     Boolean,
-  altair:           Option[AltairConfiguration]
+  altair:           Option[AltairConfiguration],
+  guideProbe:       Option[GuideProbe]
 ):
 
   // The standard star is chosen to suit the observation time, so a real
@@ -57,7 +63,8 @@ object GeneratorParams:
         a.executionState,
         a.stepCount,
         a.isSplittable,
-        a.altair
+        a.altair,
+        a.guideProbe
       )
 
   given HashBytes[AltairConfiguration] with
@@ -82,5 +89,6 @@ object GeneratorParams:
         a.executionState.hashBytes,
         a.stepCount.hashBytes,
         a.isSplittable.hashBytes,
-        a.altair.hashBytes
+        a.altair.hashBytes,
+        a.guideProbe.hashBytes
       )

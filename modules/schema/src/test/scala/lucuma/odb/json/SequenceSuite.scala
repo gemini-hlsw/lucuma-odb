@@ -102,6 +102,7 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
     ExecutionDigest(
       SetupTime.Zero,
       2.refined,
+      3.refined,
       1.refined,
       SequenceDigest.Zero.copy(observeClass = ObserveClass.Acquisition, atomCount = 1.refined, executionState = ExecutionState.Ongoing),
       SequenceDigest.Zero.copy(observeClass = ObserveClass.Science,     atomCount = 3.refined, executionState = ExecutionState.Ongoing)
@@ -115,5 +116,9 @@ class SequenceSuite extends DisciplineSuite with ArbitraryInstances:
   test("ExecutionDigest decodes from the deprecated top-level fields when `estimate` is absent"):
     val stripped =
       sampleExecutionDigest.asJson.mapObject(_.remove("estimate"))
-    // `calibrationCount` lives only under `estimate`, so an old payload reads as 0.
-    assertEquals(Decoder[ExecutionDigest].decodeJson(stripped), Right(sampleExecutionDigest.copy(calibrationCount = NonNegInt.MinValue)))
+    // `reacquisitionCount` and `calibrationCount` live only under `estimate`,
+    // so an old payload reads them as 0.
+    assertEquals(
+      Decoder[ExecutionDigest].decodeJson(stripped),
+      Right(sampleExecutionDigest.copy(reacquisitionCount = NonNegInt.MinValue, calibrationCount = NonNegInt.MinValue))
+    )

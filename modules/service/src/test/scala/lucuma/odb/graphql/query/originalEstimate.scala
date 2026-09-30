@@ -49,6 +49,7 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
                 reacquisition { seconds }
               }
               setupCount
+              reacquisitionCount
               calibrationCount
               science {
                 program { seconds }
@@ -88,6 +89,7 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
                 "reacquisition": { "seconds": 300.000000 }
               },
               "setupCount": 2,
+              "reacquisitionCount": 0,
               "calibrationCount": 0,
               "science": {
                 "program": { "seconds": ${ProgramTime.asJson} },
@@ -212,6 +214,7 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
           reacquisition { microseconds }
         }
         setupCount
+        reacquisitionCount
         calibrationCount
         science {
           program { microseconds }

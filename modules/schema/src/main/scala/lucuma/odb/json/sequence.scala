@@ -159,15 +159,16 @@ trait SequenceCodec {
 
   given Decoder[ExecutionDigest] =
     Decoder.instance { c =>
-      // `ExecutionDigest` has five canonical fields: `setup`, `setupCount`,
-      // `calibrationCount`, `acquisition` and `science`.  Everything else the encoder emits --
+      // `ExecutionDigest` has six canonical fields: `setup`, `setupCount`,
+      // `reacquisitionCount`, `calibrationCount`, `acquisition` and `science`.  Everything else the encoder emits --
       // `fullTimeEstimate` and the entire `estimate` object (`estimate.science`,
       // `estimate.total`) -- is a derived, output-only projection with no place
       // to live in the model, so it is intentionally ignored here and recomputed
       // from the fields below.
       //
-      // `calibrationCount` appears only under `estimate` and is absent from
-      // payloads that predate it, so a missing value reads as 0.
+      // `reacquisitionCount` and `calibrationCount` appear only under
+      // `estimate` and are absent from payloads that predate them, so a missing
+      // value reads as 0.
       //
       // `setup` and `setupCount` appear twice in the encoded form: under the
       // (current) `estimate` object and as deprecated top-level fields.  Read
@@ -182,21 +183,23 @@ trait SequenceCodec {
       for {
         t <- read[SetupTime]("setup")
         n <- read[NonNegInt]("setupCount")
+        r <- est.downField("reacquisitionCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         k <- est.downField("calibrationCount").as[Option[NonNegInt]].map(_.getOrElse(NonNegInt.MinValue))
         a <- c.downField("acquisition").as[SequenceDigest]
         s <- c.downField("science").as[SequenceDigest]
-      } yield ExecutionDigest(t, n, k, a, s)
+      } yield ExecutionDigest(t, n, r, k, a, s)
     }
 
   given (using Encoder[Offset], Encoder[TimeSpan]): Encoder[ExecutionDigest] =
     Encoder.instance { (a: ExecutionDigest) =>
       Json.obj(
         "estimate"         -> Json.obj(
-          "setup"            -> a.setup.asJson,
-          "setupCount"       -> a.setupCount.asJson,
-          "calibrationCount" -> a.calibrationCount.asJson,
-          "science"          -> a.science.timeEstimate.asJson,
-          "total"            -> a.fullTimeEstimate.asJson
+          "setup"              -> a.setup.asJson,
+          "setupCount"         -> a.setupCount.asJson,
+          "reacquisitionCount" -> a.reacquisitionCount.asJson,
+          "calibrationCount"   -> a.calibrationCount.asJson,
+          "science"            -> a.science.timeEstimate.asJson,
+          "total"              -> a.fullTimeEstimate.asJson
         ),
         "setup"            -> a.setup.asJson,        // deprecated, use estimate.setup
         "setupCount"       -> a.setupCount.asJson,   // deprecated, use estimate.setupCount
