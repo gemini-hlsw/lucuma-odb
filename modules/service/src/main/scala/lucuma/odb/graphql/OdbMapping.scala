@@ -206,9 +206,12 @@ object OdbMapping {
           with ExecutionEventMapping[F]
           with ExecutionEventSelectResultMapping[F]
           with ExposureTimeModeMapping[F]
+          with ConfigurationFlamingos2ImagingMappings[F]
           with ConfigurationFlamingos2LongSlitMappings[F]
           with ConfigurationFlamingos2MosMappings[F]
+          with ConfigurationGhostIfuMappings[F]
           with ConfigurationGmosIfuMappings[F]
+          with ConfigurationGnirsImagingMappings[F]
           with ConfigurationGnirsLongSlitMappings[F]
           with ConfigurationIgrins2LongSlitMappings[F]
           with Flamingos2CustomMaskMapping[F]
@@ -652,9 +655,12 @@ object OdbMapping {
                 ConfigurationMappings,
                 ConfigurationConditionsMappings,
                 ConfigurationRequestSelectResultMappings,
+                ConfigurationFlamingos2ImagingMappings,
                 ConfigurationFlamingos2LongSlitMappings,
                 ConfigurationFlamingos2MosMappings,
+                ConfigurationGhostIfuMappings,
                 ConfigurationGmosIfuMappings,
+                ConfigurationGnirsImagingMappings,
                 ConfigurationGnirsLongSlitMappings,
                 ConfigurationIgrins2LongSlitMappings,
                 ConfigurationGmosNorthImagingMappings,

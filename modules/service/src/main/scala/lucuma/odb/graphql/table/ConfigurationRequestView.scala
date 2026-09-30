@@ -6,6 +6,7 @@ package table
 
 import lucuma.odb.util.Codecs.*
 import lucuma.odb.util.Flamingos2Codecs.*
+import lucuma.odb.util.GhostCodecs.*
 import lucuma.odb.util.GmosCodecs.*
 import lucuma.odb.util.GnirsCodecs.*
 
@@ -52,6 +53,10 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
 
     val AltairMode: ColumnRef = col("c_altair_mode", altair_mode.opt)
 
+    object Flamingos2Imaging:
+      val Id = col("c_flamingos_2_imaging_id", configuration_request_id.embedded)
+      val Filters = col("c_flamingos_2_imaging_filters", _flamingos_2_filter.embedded)
+
     object Flamingos2LongSlit:
       val Id = col("c_flamingos_2_longslit_id", configuration_request_id.embedded)
       val Disperser = col("c_flamingos_2_longslit_disperser", flamingos_2_disperser.embedded)
@@ -61,6 +66,10 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
     object Flamingos2Mos:
       val Id = col("c_flamingos_2_mos_id", configuration_request_id.embedded)
       val Disperser = col("c_flamingos_2_longslit_disperser", flamingos_2_disperser.embedded)
+
+    object GhostIfu:
+      val Id = col("c_ghost_ifu_id", configuration_request_id.embedded)
+      val ResolutionMode = col("c_ghost_ifu_resolution_mode", ghost_resolution_mode.embedded)
 
     object GmosNorthLongSlit:
       val Id = col("c_gmos_north_longslit_id", configuration_request_id.embedded)
@@ -109,6 +118,11 @@ trait ConfigurationRequestView[F[_]] extends BaseMapping[F]:
       val Id      = col("c_gnirs_ifu_id", configuration_request_id.embedded)
       val Grating = col("c_gnirs_ifu_grating", gnirs_grating.embedded)
       val Fpu     = col("c_gnirs_ifu_fpu", gnirs_fpu_ifu.embedded)
+
+    object GnirsImaging:
+      val Id = col("c_gnirs_imaging_id", configuration_request_id.embedded)
+      val Camera = col("c_gnirs_imaging_camera", gnirs_camera.embedded)
+      val Filters = col("c_gnirs_imaging_filters", _gnirs_filter.embedded)
 
     object Igrins2LongSlit:
       val Id = col("c_igrins_2_longslit_id", configuration_request_id.embedded)

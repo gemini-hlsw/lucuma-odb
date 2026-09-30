@@ -17987,10 +17987,13 @@ type ConfigurationObservingMode {
   gmosSouthIfu: ConfigurationGmosSouthIfu
   gmosNorthImaging: ConfigurationGmosNorthImaging
   gmosSouthImaging: ConfigurationGmosSouthImaging
+  flamingos2Imaging: ConfigurationFlamingos2Imaging
   flamingos2LongSlit: ConfigurationFlamingos2LongSlit
   flamingos2Mos: ConfigurationFlamingos2Mos
+  ghostIfu: ConfigurationGhostIfu
   gnirsLongSlit: ConfigurationGnirsLongSlit
   gnirsIfu: ConfigurationGnirsIfu
+  gnirsImaging: ConfigurationGnirsImaging
   igrins2LongSlit: ConfigurationIgrins2LongSlit
   visitor: ConfigurationVisitor
 }
@@ -18024,6 +18027,10 @@ type ConfigurationGmosSouthImaging {
   filters: [GmosSouthFilter!]!
 }
 
+type ConfigurationFlamingos2Imaging {
+  filters: [Flamingos2Filter!]!
+}
+
 type ConfigurationFlamingos2LongSlit {
   disperser: Flamingos2Disperser!
 }
@@ -18051,6 +18058,15 @@ type ConfigurationGmosSouthIfu {
 type ConfigurationGnirsIfu {
   grating: GnirsGrating!
   fpu: GnirsFpuIfu!
+}
+
+type ConfigurationGnirsImaging {
+  camera: GnirsCamera!
+  filters: [GnirsFilter!]!
+}
+
+type ConfigurationGhostIfu {
+  resolutionMode: GhostResolutionMode!
 }
 
 type ConfigurationIgrins2LongSlit {

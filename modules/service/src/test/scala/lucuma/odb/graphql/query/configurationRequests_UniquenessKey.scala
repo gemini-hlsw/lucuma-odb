@@ -22,8 +22,7 @@ import lucuma.odb.graphql.query.ObservingModeSetupOperations.ConstraintSet
  * `ON CONFLICT DO NOTHING` yields no row, and the fallback lookup cannot find the colliding row
  * either -- so the caller gets "likely due to an incorrect unique index" rather than a request.
  *
- * The GMOS imaging filters are deliberately not covered here: they are matched by containment,
- * not equality, so they must stay out of the key.
+ * Since sc-9766 the imaging filters are in the key as well: they constrain approval again.
  */
 class configurationRequests_UniquenessKey
   extends OdbSuite
@@ -262,48 +261,48 @@ class configurationRequests_UniquenessKey
       """
     ).map(_.hcursor.downFields("createObservation", "observation", "id").require[Observation.Id])
 
-  // sc-8036 removed the filters from the approval check, so they no longer identify a request and
-  // both orders must canonicalize onto the same one.  Widening used to fail: the insert collided on
-  // the key, and the old containment lookup then asked {r} @> {r,g} and found nothing.
-  private def assertImagingCollapses(first: String, second: String): IO[Unit] =
+  // Imaging filters constrain approval again (sc-9766), so each filter set identifies its own
+  // request.  The same set in another order, or with a repeat, is still the same set.
+  private def requestsForImaging(first: String, second: String): IO[(ConfigurationRequest.Id, ConfigurationRequest.Id)] =
     setup.flatMap: (pid, tid) =>
       for
         o1 <- createImagingObservation(pid, tid, first)
         o2 <- createImagingObservation(pid, tid, second)
         r1 <- createConfigurationRequestAs(pi, o1)
         r2 <- createConfigurationRequestAs(pi, o2)
-        _  <- IO(assertEquals(r1, r2))
-      yield ()
+      yield (r1, r2)
 
-  test("GMOS imaging - adding a filter reuses the request"):
-    assertImagingCollapses(imaging("R_PRIME"), imaging("R_PRIME", "G_PRIME"))
+  private def assertImagingDistinct(first: String, second: String): IO[Unit] =
+    requestsForImaging(first, second).flatMap((r1, r2) => IO(assertNotEquals(r1, r2)))
 
-  test("GMOS imaging - removing a filter reuses the request"):
-    assertImagingCollapses(imaging("R_PRIME", "G_PRIME"), imaging("R_PRIME"))
+  private def assertImagingCollapses(first: String, second: String): IO[Unit] =
+    requestsForImaging(first, second).flatMap((r1, r2) => IO(assertEquals(r1, r2)))
 
-  test("GMOS imaging - a disjoint filter set reuses the request"):
-    assertImagingCollapses(imaging("R_PRIME"), imaging("G_PRIME"))
+  test("GMOS imaging - adding a filter makes a new request"):
+    assertImagingDistinct(imaging("R_PRIME"), imaging("R_PRIME", "G_PRIME"))
 
-  // The same three, for the south: `SelectRequest` dropped the containment clause for both sites,
-  // so a south-only regression would otherwise go unnoticed.
-  test("GMOS South imaging - adding a filter reuses the request"):
-    assertImagingCollapses(southImaging("R_PRIME"), southImaging("R_PRIME", "G_PRIME"))
+  test("GMOS imaging - removing a filter makes a new request"):
+    assertImagingDistinct(imaging("R_PRIME", "G_PRIME"), imaging("R_PRIME"))
 
-  test("GMOS South imaging - removing a filter reuses the request"):
-    assertImagingCollapses(southImaging("R_PRIME", "G_PRIME"), southImaging("R_PRIME"))
+  test("GMOS imaging - a disjoint filter set makes a new request"):
+    assertImagingDistinct(imaging("R_PRIME"), imaging("G_PRIME"))
 
-  test("GMOS South imaging - a disjoint filter set reuses the request"):
-    assertImagingCollapses(southImaging("R_PRIME"), southImaging("G_PRIME"))
+  test("GMOS imaging - the same filters in another order reuse the request"):
+    assertImagingCollapses(imaging("R_PRIME", "G_PRIME"), imaging("G_PRIME", "R_PRIME"))
 
-  // GNIRS and Flamingos-2 imaging configurations carry no parameters at all, so every request
-  // for one collapses onto a single row per (program, target, conditions).  Before these modes
-  // had a `Configuration.ObservingMode` variant, submitting a proposal containing one failed with
-  // "couldn't decode mode", and because the per-observation results are combined monoidally that
-  // took every other observation's request down with it.
+  test("GMOS South imaging - adding a filter makes a new request"):
+    assertImagingDistinct(southImaging("R_PRIME"), southImaging("R_PRIME", "G_PRIME"))
+
+  test("GMOS South imaging - the same filters in another order reuse the request"):
+    assertImagingCollapses(southImaging("R_PRIME", "G_PRIME"), southImaging("G_PRIME", "R_PRIME"))
+
   private def gnirsImaging(filters: String*): String =
+    gnirsImagingWith("SHORT_BLUE", filters*)
+
+  private def gnirsImagingWith(camera: String, filters: String*): String =
     s"""
       gnirsImaging: {
-        camera: SHORT_BLUE
+        camera: $camera
         filters: ${filters.map(f => s"{ filter: $f }").mkString("[", ", ", "]")}
         variant: { interleaved: {} }
       }
@@ -317,13 +316,22 @@ class configurationRequests_UniquenessKey
       }
     """
 
-  test("GNIRS imaging - a different filter set reuses the request"):
-    assertImagingCollapses(gnirsImaging("J"), gnirsImaging("J", "K"))
+  test("GNIRS imaging - a different filter set makes a new request"):
+    assertImagingDistinct(gnirsImaging("J"), gnirsImaging("J", "K"))
 
-  test("Flamingos-2 imaging - a different filter set reuses the request"):
-    assertImagingCollapses(flamingos2Imaging("Y"), flamingos2Imaging("Y", "J"))
+  test("GNIRS imaging - the same filters in another order reuse the request"):
+    assertImagingCollapses(gnirsImaging("J", "K"), gnirsImaging("K", "J"))
 
-  // Parameterless variants are told apart by the observing mode type alone, so that had better
+  test("GNIRS imaging - differing only in camera"):
+    assertImagingDistinct(gnirsImagingWith("SHORT_BLUE", "J"), gnirsImagingWith("LONG_BLUE", "J"))
+
+  test("Flamingos-2 imaging - a different filter set makes a new request"):
+    assertImagingDistinct(flamingos2Imaging("Y"), flamingos2Imaging("Y", "J"))
+
+  test("Flamingos-2 imaging - the same filters in another order reuse the request"):
+    assertImagingCollapses(flamingos2Imaging("Y", "J"), flamingos2Imaging("J", "Y"))
+
+  // The imaging modes are told apart by the observing mode type alone, so that had better
   // actually distinguish them.
   test("GNIRS imaging is distinct from GNIRS long slit"):
     setup.flatMap: (pid, tid) =>
@@ -342,6 +350,26 @@ class configurationRequests_UniquenessKey
         r1 <- createConfigurationRequestAs(pi, o1)
         r2 <- createConfigurationRequestAs(pi, o2)
         _  <- IO(assertNotEquals(r1, r2))
+      yield ()
+
+  test("GHOST IFU - differing only in resolution mode"):
+    setup.flatMap: (pid, tid) =>
+      for
+        o1 <- createGhostIfuObservationAs(pi, pid, List(tid), "STANDARD")
+        o2 <- createGhostIfuObservationAs(pi, pid, List(tid), "HIGH")
+        r1 <- createConfigurationRequestAs(pi, o1)
+        r2 <- createConfigurationRequestAs(pi, o2)
+        _  <- IO(assertNotEquals(r1, r2))
+      yield ()
+
+  test("GHOST IFU - the same resolution mode reuses the request"):
+    setup.flatMap: (pid, tid) =>
+      for
+        o1 <- createGhostIfuObservationAs(pi, pid, List(tid), "HIGH")
+        o2 <- createGhostIfuObservationAs(pi, pid, List(tid), "HIGH")
+        r1 <- createConfigurationRequestAs(pi, o1)
+        r2 <- createConfigurationRequestAs(pi, o2)
+        _  <- IO(assertEquals(r1, r2))
       yield ()
 
   // Altair is Gemini North AO, so only a GNIRS observation can carry it.

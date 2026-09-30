@@ -226,8 +226,6 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
       yield assert(req1 === req2)    
   }
 
-  // The parameterless imaging modes are recognized by observing mode type alone, so their
-  // requests carry no mode-specific object -- only the mode itself.
   test("create a configuration request for a GNIRS imaging observation") {
     for
       cfpid <- createGeminiCallForProposalsAs(admin)
@@ -247,6 +245,7 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                            mode
                            gnirsLongSlit { grating }
                            gnirsIfu { grating }
+                           gnirsImaging { camera filters }
                          }
                        }
                      }
@@ -261,7 +260,82 @@ class createConfigurationRequest extends OdbSuite with ObservingModeSetupOperati
                            "instrument": "GNIRS",
                            "mode": "GNIRS_IMAGING",
                            "gnirsLongSlit": null,
-                           "gnirsIfu": null
+                           "gnirsIfu": null,
+                           "gnirsImaging": { "camera": "SHORT_BLUE", "filters": [ "J", "ORDER4" ] }
+                         }
+                       }
+                     }
+                   }
+                 """.asRight
+               )
+    yield ()
+  }
+
+  test("create a configuration request for a Flamingos-2 imaging observation") {
+    for
+      cfpid <- createGeminiCallForProposalsAs(admin)
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createFlamingos2ImagingObservationAs(pi, pid, tid)
+      _     <- expect(
+                 user = pi,
+                 query = s"""
+                   mutation {
+                     createConfigurationRequest(input: { observationId: "$oid" }) {
+                       configuration {
+                         observingMode {
+                           mode
+                           flamingos2Imaging { filters }
+                         }
+                       }
+                     }
+                   }
+                 """,
+                 expected = json"""
+                   {
+                     "createConfigurationRequest": {
+                       "configuration": {
+                         "observingMode": {
+                           "mode": "FLAMINGOS_2_IMAGING",
+                           "flamingos2Imaging": { "filters": [ "J", "Y" ] }
+                         }
+                       }
+                     }
+                   }
+                 """.asRight
+               )
+    yield ()
+  }
+
+  test("create a configuration request for a GHOST IFU observation") {
+    for
+      cfpid <- createGeminiCallForProposalsAs(admin)
+      pid   <- createProgramAs(pi, "Foo")
+      _     <- addProposal(pi, pid, Some(cfpid), None)
+      tid   <- createTargetWithProfileAs(pi, pid)
+      oid   <- createGhostIfuObservationAs(pi, pid, None, tid)
+      _     <- expect(
+                 user = pi,
+                 query = s"""
+                   mutation {
+                     createConfigurationRequest(input: { observationId: "$oid" }) {
+                       configuration {
+                         observingMode {
+                           mode
+                           ghostIfu { resolutionMode }
+                         }
+                       }
+                     }
+                   }
+                 """,
+                 expected = json"""
+                   {
+                     "createConfigurationRequest": {
+                       "configuration": {
+                         "observingMode": {
+                           "mode": "GHOST_IFU",
+                           "ghostIfu": { "resolutionMode": "STANDARD" }
                          }
                        }
                      }
