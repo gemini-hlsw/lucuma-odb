@@ -183,6 +183,14 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       s <- isMaterialized(c, SequenceType.Science)
     yield assert(!a && !s)
 
+  test("ALL_STEPS on a source without an observing mode is a no-op"):
+    for
+      p <- createProgram
+      o <- createObservationAs(pi, p)
+      c <- cloneAs(o, Some("ALL_STEPS"))
+      s <- isMaterialized(c, SequenceType.Science)
+    yield assert(!s)
+
   test("ALL_STEPS copies the materialized acquisition but not the frozen ITC result"):
     for
       o  <- longSlit

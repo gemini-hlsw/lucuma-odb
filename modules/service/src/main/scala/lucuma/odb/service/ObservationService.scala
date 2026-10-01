@@ -894,7 +894,7 @@ object ObservationService {
       override def selectInstrument(
         oid: Observation.Id
       )(using Transaction[F]): F[Option[Instrument]] =
-        session.option(Statements.SelectInstrument)(oid)
+        session.option(Statements.SelectInstrument)(oid).map(_.flatten)
 
       override def selectIsSplittable(
         oid: Observation.Id
@@ -1609,12 +1609,12 @@ object ObservationService {
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
 
-    val SelectInstrument: Query[Observation.Id, Instrument] =
+    val SelectInstrument: Query[Observation.Id, Option[Instrument]] =
       sql"""
         SELECT c_instrument
           FROM t_observation
          WHERE c_observation_id = $observation_id
-      """.query(instrument)
+      """.query(instrument.opt)
 
     // Splittability is exactly the bottom rung of the scheduling mode.  There is
     // no floor to account for any more: the Target of Opportunity activation is a
