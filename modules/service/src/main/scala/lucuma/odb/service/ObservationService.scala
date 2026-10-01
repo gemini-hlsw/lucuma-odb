@@ -19,6 +19,7 @@ import lucuma.core.enums.AltairMode
 import lucuma.core.enums.AltairNdFilter
 import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.CassRotator
+import lucuma.core.enums.CloneSequenceMode
 import lucuma.core.enums.FieldLens
 import lucuma.core.enums.FocalPlane
 import lucuma.core.enums.GuideProbe
@@ -27,6 +28,7 @@ import lucuma.core.enums.ObservationPriority
 import lucuma.core.enums.ObservingModeType
 import lucuma.core.enums.SchedulingMode
 import lucuma.core.enums.ScienceBand
+import lucuma.core.enums.SequenceType
 import lucuma.core.enums.SkyBackground
 import lucuma.core.enums.SpectroscopyCapability
 import lucuma.core.enums.TooActivation
@@ -121,7 +123,8 @@ sealed trait ObservationService[F[_]] {
   )(using Transaction[F]): F[Result[Map[Program.Id, List[Observation.Id]]]]
 
   def cloneObservation(
-    input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
+    input:    AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id],
+    sequence: CloneSequenceMode
   )(using Transaction[F]): F[Result[ObservationService.CloneIds]]
 
   def deleteCalibrationObservations(
@@ -760,7 +763,8 @@ object ObservationService {
       /** Clone the observation. We assume access has been checked already. */
       private def cloneObservationUnconditionally(
         observationId: Observation.Id,
-        SET:           Option[ObservationPropertiesInput.Edit]
+        SET:           Option[ObservationPropertiesInput.Edit],
+        sequence:      CloneSequenceMode
       )(using Transaction[F]): F[Result[(Program.Id, Observation.Id)]] = {
 
         // First we need the pid, observing mode, and grouping information
@@ -835,11 +839,22 @@ object ObservationService {
                           .flatTap {
                             r => transaction.rollback.unlessA(r.hasValue)
                           }
+                  // Copied after the update so that it is validated against
+                  // the clone's final configuration (e.g. splittability).  The
+                  // acquisition is tuned to the target, so a target edit regenerates it.
+                  val cloneSequence: F[Result[Unit]] =
+                    val editsAsterism = SET.flatMap(_.targetEnvironment).exists(!_.asterism.isAbsent)
+                    val types         =
+                      if editsAsterism then List(SequenceType.Science)
+                      else List(SequenceType.Acquisition, SequenceType.Science)
+                    sequenceService.cloneSequence(observationId, oid2, sequence, types)
+
                   (
                     for
                       _ <- ResultT.liftF(cloneRelatedItems)
                       _ <- ResultT(cloneBlindOffset)
                       r <- ResultT(doUpdate)
+                      _ <- ResultT(cloneSequence)
                     yield r
                   ).value
               }
@@ -848,7 +863,8 @@ object ObservationService {
       }
 
       def cloneObservation(
-        input: AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id]
+        input:    AccessControl.CheckedWithId[Option[ObservationPropertiesInput.Edit], Observation.Id],
+        sequence: CloneSequenceMode
       )(using Transaction[F]): F[Result[ObservationService.CloneIds]] =
         // The asterism (including any signal-to-noise target flag) is copied by
         // cloneAsterism inside cloneObservationUnconditionally. Any asterism edits
@@ -856,13 +872,17 @@ object ObservationService {
         // target, so membership is validated against the post-edit asterism.
         val cloned: F[Result[CloneIds]] =
           input.foldWithId(OdbError.InvalidArgument().asFailureF): (oSET, origOid) =>
-            cloneObservationUnconditionally(origOid, oSET).flatMap: res =>
-              res.flatTraverse: (pid, newOid) =>
-                Services.asSuperUser:
-                  (for
-                    _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
-                    _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
-                  yield CloneIds(origOid, newOid)).value
+            val editsSequenceInputs = oSET.exists(s => !s.observingMode.isAbsent || s.scienceRequirements.isDefined)
+            if editsSequenceInputs && sequence =!= CloneSequenceMode.None then
+              OdbError.InvalidArgument("The observing mode and science requirements cannot be edited when cloning an observation's sequence.".some).asFailureF
+            else
+              cloneObservationUnconditionally(origOid, oSET, sequence).flatMap: res =>
+                res.flatTraverse: (pid, newOid) =>
+                  Services.asSuperUser:
+                    (for
+                      _ <- ResultT(asterismService.setAsterism(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.asterism)))
+                      _ <- ResultT(asterismService.setSignalToNoiseTarget(pid, NonEmptyList.of(newOid), oSET.fold(Nullable.Absent)(_.explicitSignalToNoiseTargetId)))
+                    yield CloneIds(origOid, newOid)).value
 
         // A single rollback covering the whole clone: this runs in one transaction
         // and `transaction.rollback` is a full rollback, so any failure (a cloned
@@ -880,7 +900,7 @@ object ObservationService {
       override def selectInstrument(
         oid: Observation.Id
       )(using Transaction[F]): F[Option[Instrument]] =
-        session.option(Statements.SelectInstrument)(oid)
+        session.option(Statements.SelectInstrument)(oid).map(_.flatten)
 
       override def selectIsSplittable(
         oid: Observation.Id
@@ -1595,12 +1615,12 @@ object ObservationService {
         WHERE c_program_id = $program_id AND c_existence = 'present'
       """.query(observation_id *: science_band.opt)
 
-    val SelectInstrument: Query[Observation.Id, Instrument] =
+    val SelectInstrument: Query[Observation.Id, Option[Instrument]] =
       sql"""
         SELECT c_instrument
           FROM t_observation
          WHERE c_observation_id = $observation_id
-      """.query(instrument)
+      """.query(instrument.opt)
 
     // Splittability is exactly the bottom rung of the scheduling mode.  There is
     // no floor to account for any more: the Target of Opportunity activation is a

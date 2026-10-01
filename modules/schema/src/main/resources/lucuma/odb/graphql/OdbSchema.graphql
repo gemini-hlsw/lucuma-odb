@@ -1078,6 +1078,38 @@ input CloneObservationInput {
   observationId: ObservationId
   observationReference: ObservationReferenceLabel
   SET: ObservationPropertiesInput
+
+  """
+  Which steps, if any, of the source's materialized sequences to copy into the
+  clone.  Any mode other than NONE cannot be combined with an observing mode or
+  science requirements edit in SET.  When SET edits the asterism, only the
+  science sequence is copied and the acquisition is generated for the new
+  targets; copied science steps keep their exposure times regardless.
+  """
+  sequence: CloneSequenceMode! = NONE
+}
+
+"""
+What a cloned observation takes from its source's materialized (stored)
+acquisition and science sequences.  Each sequence type is handled on its own,
+and one with nothing to copy is generated as usual.
+"""
+enum CloneSequenceMode {
+  """
+  Copy nothing; the clone generates its sequences from its own configuration.
+  """
+  NONE
+
+  """
+  Copy every step, executed or not and whatever state it ended in, as a pending
+  step.  Atoms keep their steps and are ordered by first execution.
+  """
+  ALL_STEPS
+
+  """
+  Copy only the steps that have not started executing.
+  """
+  PENDING_STEPS
 }
 
 """
