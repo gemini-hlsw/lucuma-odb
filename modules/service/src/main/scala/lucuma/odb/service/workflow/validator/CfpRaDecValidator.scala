@@ -18,4 +18,4 @@ object CfpRaDecValidator extends ObservationValidator:
         info.coordinates.foldMap: coords =>
           val ok = cfp.limits.siteLimits(site).inLimits(coords)
           if ok then ObservationValidationMap.empty
-          else ObservationValidationMap.singleton(ObservationValidation.callForProposals(CoordinatesOutOfRange))
+          else ObservationValidationMap.singleton(ObservationValidation.callForProposalsWarning(CoordinatesOutOfRange))

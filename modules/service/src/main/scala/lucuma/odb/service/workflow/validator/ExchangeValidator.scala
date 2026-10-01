@@ -26,16 +26,16 @@ object ExchangeValidator extends ObservationValidator:
       case Some(e: ExchangeObservingModeType) =>
         info.cfpInfo.foldMap: cfp =>
           if cfp.observatory =!= e.observatory then
-            ObservationValidationMap.singleton(ObservationValidation.callForProposals(exchangeObservatoryMismatch(e.observatory, cfp.observatory)))
+            ObservationValidationMap.singleton(ObservationValidation.callForProposalsError(exchangeObservatoryMismatch(e.observatory, cfp.observatory)))
           else e match
             case ExchangeObservingModeType.ExchangeKeck =>
               if cfp.keckInstruments.isEmpty then ObservationValidationMap.empty
               else info.keckInstrument.foldMap: inst =>
                 if cfp.keckInstruments.contains(inst) then ObservationValidationMap.empty
-                else ObservationValidationMap.singleton(ObservationValidation.callForProposals(invalidExchangeInstrument(inst.tag)))
+                else ObservationValidationMap.singleton(ObservationValidation.callForProposalsError(invalidExchangeInstrument(inst.tag)))
             case ExchangeObservingModeType.ExchangeSubaru =>
               if cfp.subaruInstruments.isEmpty then ObservationValidationMap.empty
               else info.subaruInstrument.foldMap: inst =>
                 if cfp.subaruInstruments.contains(inst) then ObservationValidationMap.empty
-                else ObservationValidationMap.singleton(ObservationValidation.callForProposals(invalidExchangeInstrument(inst.tag)))
+                else ObservationValidationMap.singleton(ObservationValidation.callForProposalsError(invalidExchangeInstrument(inst.tag)))
       case _ => ObservationValidationMap.empty

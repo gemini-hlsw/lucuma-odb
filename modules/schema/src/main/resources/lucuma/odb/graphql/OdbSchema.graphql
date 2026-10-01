@@ -17721,6 +17721,12 @@ enum ObservationValidationCode {
   """
   TOO_ACTIVATION_UNEXPECTED
 
+  """
+  The observation is outside the recommendations of the Call for Proposals
+  (e.g., its base coordinates are outside the Call's RA/Dec limits).
+  """
+  CFP_WARNING
+
 }
 
 """
