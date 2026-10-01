@@ -543,16 +543,18 @@ object SequenceService:
 
       /**
        * Marks the sequence as materialized, or updates the timestamp of the
-       * last materialization.
+       * last materialization.  Either way, records whether the sequence is now
+       * customized (i.e., explicitly replaced rather than generated).
        *
        * @return `true` if a new row was inserted, `false` if an existing row
        *         was updated
        */
       private def markMaterializedOrUpdate(
         observationId: Observation.Id,
-        sequenceType:  SequenceType
+        sequenceType:  SequenceType,
+        customized:    Boolean
       ): F[Boolean] =
-        session.unique(Statements.MarkMaterializedOrUpdate)(observationId, sequenceType)
+        session.unique(Statements.MarkMaterializedOrUpdate)(observationId, sequenceType, customized)
 
       /**
        * Deletes the row in the t_squence_materialized table if it exists.
@@ -608,7 +610,7 @@ object SequenceService:
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
 
           for
-            _ <- markMaterializedOrUpdate(observationId, sequenceType)
+            _ <- markMaterializedOrUpdate(observationId, sequenceType, customized = true)
             _ <- abandonAndDeleteUnexecuted(observationId, sequenceType)
             _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], insertInstConfig)
           yield atoms
@@ -827,7 +829,7 @@ object SequenceService:
         insert: (Observation.Id, SequenceType, Stream[F, Atom[D]]) => F[Unit]
       )(using Transaction[F], Services.ServiceAccess): F[Unit] =
         val reset = for
-          _ <- markMaterializedOrUpdate(observationId, SequenceType.Acquisition)
+          _ <- markMaterializedOrUpdate(observationId, SequenceType.Acquisition, customized = false)
           _ <- abandonAndDeleteUnexecuted(observationId, SequenceType.Acquisition)
           _ <- insert(observationId, SequenceType.Acquisition, stream)
         yield ()
@@ -1455,17 +1457,18 @@ object SequenceService:
         SELECT EXISTS (SELECT 1 FROM ins) AS inserted
       """.query(bool)
 
-    val MarkMaterializedOrUpdate: Query[(Observation.Id, SequenceType), Boolean] =
+    val MarkMaterializedOrUpdate: Query[(Observation.Id, SequenceType, Boolean), Boolean] =
       sql"""
         INSERT INTO t_sequence_materialization (
           c_observation_id,
           c_sequence_type,
           c_created,
-          c_updated
+          c_updated,
+          c_customized
         )
-        VALUES ($observation_id, $sequence_type, now(), now())
+        VALUES ($observation_id, $sequence_type, now(), now(), $bool)
         ON CONFLICT (c_observation_id, c_sequence_type)
-        DO UPDATE SET c_updated = now()
+        DO UPDATE SET c_updated = now(), c_customized = EXCLUDED.c_customized
         RETURNING (xmax = 0) AS inserted
       """.query(bool)
 

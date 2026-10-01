@@ -9462,6 +9462,20 @@ type Execution {
   This will happen when the sequence is executed or if it is manually edited.
   """
   acquisitionSequenceIsMaterialized: Boolean!
+
+  """
+  Whether the science sequence has been customized via `replace*Sequence`
+  (regardless of whether the replacement differs from what would have been
+  generated).  Cleared by `deleteSequence`.
+  """
+  scienceSequenceIsCustomized: Boolean!
+
+  """
+  Whether the acquisition sequence has been customized via `replace*Sequence`
+  (regardless of whether the replacement differs from what would have been
+  generated).  Cleared by `deleteSequence` or by resetting the acquisition.
+  """
+  acquisitionSequenceIsCustomized: Boolean!
 }
 
 """
