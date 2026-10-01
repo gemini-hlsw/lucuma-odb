@@ -335,7 +335,7 @@ class observation_workflow
               List(ObservationWorkflowState.Inactive),
               List(
                 ObservationValidation.configuration("Missing brightness measure"),
-                ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
+                ObservationValidation.callForProposalsError(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
               )
             )
           )
@@ -393,7 +393,7 @@ class observation_workflow
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
               List(
-                ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
+                ObservationValidation.callForProposalsError(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
               )
             )
           )
@@ -483,9 +483,9 @@ class observation_workflow
               CalculatedValue(
                 CalculationState.Ready,
                 ObservationWorkflow(
-                  ObservationWorkflowState.Undefined,
+                  ObservationWorkflowState.Defined,
                   List(ObservationWorkflowState.Inactive),
-                  List(ObservationValidation.callForProposals(CfpRaDecValidator.CoordinatesOutOfRange))
+                  List(ObservationValidation.callForProposalsWarning(CfpRaDecValidator.CoordinatesOutOfRange))
                 )
               )
             ).asRight
@@ -512,9 +512,9 @@ class observation_workflow
               CalculatedValue(
                 CalculationState.Ready,
                 ObservationWorkflow(
-                  ObservationWorkflowState.Undefined,
+                  ObservationWorkflowState.Defined,
                   List(ObservationWorkflowState.Inactive),
-                  List(ObservationValidation.callForProposals(CfpRaDecValidator.CoordinatesOutOfRange))
+                  List(ObservationValidation.callForProposalsWarning(CfpRaDecValidator.CoordinatesOutOfRange))
                 )
               )
             ).asRight
@@ -570,9 +570,9 @@ class observation_workflow
           CalculatedValue(
             CalculationState.Ready,
             ObservationWorkflow(
-              ObservationWorkflowState.Undefined,
+              ObservationWorkflowState.Defined,
               List(ObservationWorkflowState.Inactive),
-              List(ObservationValidation.callForProposals(CfpRaDecValidator.CoordinatesOutOfRange))
+              List(ObservationValidation.callForProposalsWarning(CfpRaDecValidator.CoordinatesOutOfRange))
             )
           )
         ).asRight
@@ -601,10 +601,8 @@ class observation_workflow
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
               List(
-                ObservationValidation.callForProposals(
-                  ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
-                  CfpRaDecValidator.CoordinatesOutOfRange
-                )
+                ObservationValidation.callForProposalsError(ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth)),
+                ObservationValidation.callForProposalsWarning(CfpRaDecValidator.CoordinatesOutOfRange)
               )
             )
           )
@@ -986,10 +984,8 @@ class observation_workflow
               ObservationWorkflowState.Undefined,
               List(ObservationWorkflowState.Inactive),
               List(
-                ObservationValidation.callForProposals(
-                  ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth),
-                  CfpRaDecValidator.CoordinatesOutOfRange
-                ),
+                ObservationValidation.callForProposalsError(ObservationService.InvalidInstrumentMsg(Instrument.GmosSouth)),
+                ObservationValidation.callForProposalsWarning(CfpRaDecValidator.CoordinatesOutOfRange),
               )
             )
           )
@@ -1205,7 +1201,7 @@ class observation_workflow
               List(ObservationWorkflowState.Inactive),
               List(
                 ObservationValidation.configuration("Missing brightness measure"),
-                ObservationValidation.callForProposals(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
+                ObservationValidation.callForProposalsError(ObservationService.InvalidInstrumentMsg(Instrument.GmosNorth))
               )
             )
           )

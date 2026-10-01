@@ -19,5 +19,5 @@ object CfpInstrumentValidator extends ObservationValidator:
       if cfp.instruments.isEmpty then ObservationValidationMap.empty // weird but original logic does this
       else info.instrument.foldMap: inst =>
         if cfp.instruments.contains(inst) then ObservationValidationMap.empty
-        else ObservationValidationMap.singleton(ObservationValidation.callForProposals(invalidInstrument(inst)))
+        else ObservationValidationMap.singleton(ObservationValidation.callForProposalsError(invalidInstrument(inst)))
 

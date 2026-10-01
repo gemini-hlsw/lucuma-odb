@@ -87,7 +87,7 @@ class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       ves <- validationErrors(oid)
       _   <- IO(assert(
-               ves.contains_(ObservationValidation.callForProposals(ExchangeValidator.exchangeObservatoryMismatch(Observatory.Keck, Observatory.Subaru))),
+               ves.contains_(ObservationValidation.callForProposalsError(ExchangeValidator.exchangeObservatoryMismatch(Observatory.Keck, Observatory.Subaru))),
                s"Expected observatory-mismatch validation, got: $ves"
              ))
     yield ()
@@ -101,7 +101,7 @@ class observation_workflow_exchange extends OdbSuite with DatabaseOperations:
       _   <- runObscalcUpdateAs(serviceUser, pid, oid)
       ves <- validationErrors(oid)
       _   <- IO(assert(
-               ves.contains_(ObservationValidation.callForProposals(ExchangeValidator.invalidExchangeInstrument(KeckInstrument.Hires.tag))),
+               ves.contains_(ObservationValidation.callForProposalsError(ExchangeValidator.invalidExchangeInstrument(KeckInstrument.Hires.tag))),
                s"Expected invalid-instrument validation, got: $ves"
              ))
     yield ()
