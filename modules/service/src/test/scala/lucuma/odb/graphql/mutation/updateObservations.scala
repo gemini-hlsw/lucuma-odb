@@ -1967,6 +1967,170 @@ class updateObservations extends OdbSuite with UpdateObservationsOps with Execut
     multiUpdateTest(pi, List((update0, query, expected0), (update1, query, expected1)))
   }
 
+  test("observing mode: GMOS South science filter update leaves the acquisition filter alone") {
+
+    val update0 = """
+      observingMode: {
+        gmosSouthLongSlit: {
+          grating: B1200_G5321
+          filter: GG455
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 500
+          }
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 500 }
+            }
+          }
+          acquisition: {
+            explicitFilter: R_PRIME
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gmosSouthLongSlit {
+            filter
+            acquisition {
+              filter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    def expected(acqFilter: String, explicitAcqFilter: Option[String]) =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosSouthLongSlit": {
+                  "filter": "GG455",
+                  "acquisition": {
+                    "filter": $acqFilter,
+                    "explicitFilter": $explicitAcqFilter
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    // Setting the science filter must not write it into the acquisition filter.
+    val update1 = """
+      observingMode: {
+        gmosSouthLongSlit: {
+          filter: GG455
+        }
+      }
+    """
+
+    val update2 = """
+      observingMode: {
+        gmosSouthLongSlit: {
+          filter: GG455
+          acquisition: {
+            explicitFilter: null
+          }
+        }
+      }
+    """
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected("R_PRIME", "R_PRIME".some)),
+        (update1, query, expected("R_PRIME", "R_PRIME".some)),
+        (update2, query, expected("G_PRIME", none))
+      )
+    )
+  }
+
+  test("observing mode: GMOS South update existing, setting explicit acquisition filter") {
+
+    val update0 = """
+      observingMode: {
+        gmosSouthLongSlit: {
+          grating: B1200_G5321
+          filter: GG455
+          fpu: LONG_SLIT_0_25
+          centralWavelength: {
+            nanometers: 500
+          }
+          exposureTimeMode: {
+            signalToNoise: {
+              value: 20.0
+              at: { nanometers: 500 }
+            }
+          }
+        }
+      }
+    """
+
+    val query = """
+      observations {
+        observingMode {
+          gmosSouthLongSlit {
+            filter
+            acquisition {
+              filter
+              defaultFilter
+              explicitFilter
+            }
+          }
+        }
+      }
+    """
+
+    def expected(acqFilter: String, explicitAcqFilter: Option[String]) =
+      json"""
+      {
+        "updateObservations": {
+          "observations": [
+            {
+              "observingMode": {
+                "gmosSouthLongSlit": {
+                  "filter": "GG455",
+                  "acquisition": {
+                    "filter": $acqFilter,
+                    "defaultFilter": "G_PRIME",
+                    "explicitFilter": $explicitAcqFilter
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    """.asRight
+
+    val update1 = """
+      observingMode: {
+        gmosSouthLongSlit: {
+          acquisition: {
+            explicitFilter: I_PRIME
+          }
+        }
+      }
+    """
+
+    multiUpdateTest(pi,
+      List(
+        (update0, query, expected("G_PRIME", none)),
+        (update1, query, expected("I_PRIME", "I_PRIME".some))
+      )
+    )
+  }
+
 
   test("observing mode: existing f2 update read_mode updates reads") {
 
