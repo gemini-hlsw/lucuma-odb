@@ -79,6 +79,17 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
   private def isMaterialized(oid: Observation.Id, st: SequenceType): IO[Boolean] =
     withSession(_.unique(IsMaterialized)(oid, st))
 
+  private val IsCustomized: Query[(Observation.Id, SequenceType), Boolean] =
+    sql"""
+      SELECT EXISTS (
+        SELECT 1 FROM t_sequence_materialization
+        WHERE c_observation_id = $observation_id AND c_sequence_type = $sequence_type AND c_customized
+      )
+    """.query(bool)
+
+  private def isCustomized(oid: Observation.Id, st: SequenceType): IO[Boolean] =
+    withSession(_.unique(IsCustomized)(oid, st))
+
   // (atom description, filter, has execution row) in stored order
   private val StoredSteps: Query[(Observation.Id, SequenceType), (Option[String], String, Boolean)] =
     sql"""
@@ -221,6 +232,56 @@ class cloneObservationSequence extends query.ExecutionTestSupportForGmos with Re
       assert(a0, "source setup")
       assertEquals(s, List("A" -> filterTag(GPrime)))
       assert(!a1, "acquisition copied despite a target edit")
+
+  test("a copy of a customized sequence is customized"):
+    for
+      o <- longSlit
+      _ <- replaceScience(o, atomInput("A", stepInput(GPrime)))
+      c <- cloneAs(o, Some("ALL_STEPS"))
+      m <- isCustomized(c, SequenceType.Science)
+    yield assert(m)
+
+  test("a copy of a sequence materialized by execution is not customized"):
+    for
+      o  <- longSlit
+      _  <- recordVisitAs(serviceUser, o)
+      c  <- cloneAs(o, Some("ALL_STEPS"))
+      ma <- isMaterialized(c, SequenceType.Acquisition)
+      ms <- isMaterialized(c, SequenceType.Science)
+      ca <- isCustomized(c, SequenceType.Acquisition)
+      cs <- isCustomized(c, SequenceType.Science)
+    yield
+      assert(ma && ms, "sequences not copied")
+      assert(!ca && !cs, "copied sequences marked customized")
+
+  test("customization is inherited per sequence type"):
+    for
+      o  <- longSlit
+      _  <- replaceScience(o, atomInput("A", stepInput(GPrime)))
+      _  <- recordVisitAs(serviceUser, o)
+      c  <- cloneAs(o, Some("PENDING_STEPS"))
+      ma <- isMaterialized(c, SequenceType.Acquisition)
+      ca <- isCustomized(c, SequenceType.Acquisition)
+      cs <- isCustomized(c, SequenceType.Science)
+    yield
+      assert(ma, "acquisition not copied")
+      assert(!ca, "acquisition marked customized")
+      assert(cs, "science not marked customized")
+
+  test("editing the targets while copying a customized sequence keeps science customized"):
+    for
+      p  <- createProgram
+      t  <- createTargetWithProfileAs(pi, p)
+      t2 <- createTargetWithProfileAs(pi, p)
+      o  <- createGmosNorthLongSlitObservationAs(pi, p, List(t))
+      _  <- replaceScience(o, atomInput("A", stepInput(GPrime)))
+      _  <- recordVisitAs(serviceUser, o)
+      c  <- cloneAs(o, Some("ALL_STEPS"), Some(s"""{ targetEnvironment: { asterism: ["$t2"] } }"""))
+      ca <- isCustomized(c, SequenceType.Acquisition)
+      cs <- isCustomized(c, SequenceType.Science)
+    yield
+      assert(!ca, "acquisition marked customized")
+      assert(cs, "science not marked customized")
 
   test("editing the observing mode while copying the sequence fails"):
     longSlit.flatMap: o =>

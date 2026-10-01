@@ -97,6 +97,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]]
 
@@ -112,6 +113,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]]
 
@@ -123,6 +125,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GmosNorth]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]]
 
@@ -134,6 +137,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GmosSouth]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]]
 
@@ -233,6 +237,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]]
 
@@ -261,6 +266,7 @@ trait SequenceService[F[_]]:
     observationId:  Observation.Id,
     sequenceType:   SequenceType,
     sequence:       List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+    customized:     Boolean      = true,
     namespace:      Option[UUID] = None
   )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]]
 
@@ -583,6 +589,7 @@ object SequenceService:
         observationId:    Observation.Id,
         sequenceType:     SequenceType,
         sequence:         List[ProtoAtom[ProtoStep[D]]],
+        customized:       Boolean,
         insertInstConfig: (rows: List[(Step.Id, D)]) => Command[rows.type],
         atomBuilder:      AtomBuilder[D]
       )(using Transaction[F]): ResultT[F, Stream[Pure, Atom[D]]] =
@@ -610,7 +617,7 @@ object SequenceService:
           val atoms = atomBuilder.buildStream(Stream.emits(sequence))
 
           for
-            _ <- markMaterializedOrUpdate(observationId, sequenceType, customized = true)
+            _ <- markMaterializedOrUpdate(observationId, sequenceType, customized)
             _ <- abandonAndDeleteUnexecuted(observationId, sequenceType)
             _ <- insertSequence(instrument, observationId, sequenceType, atoms.covary[F], insertInstConfig)
           yield atoms
@@ -636,6 +643,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[Flamingos2DynamicConfig]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Flamingos2DynamicConfig]]]] =
 
@@ -647,6 +655,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  Flamingos2SequenceService.Statements.insertDynamics,
                  b
                )
@@ -675,6 +684,7 @@ object SequenceService:
         observationId:  Observation.Id,
         sequenceType:   SequenceType,
         sequence:       List[ProtoAtom[ProtoStep[GhostDynamicConfig]]],
+        customized:     Boolean      = true,
         namespace:      Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GhostDynamicConfig]]]] =
         (for
@@ -685,6 +695,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GhostSequenceService.Statements.insertDynamics,
                  b
                )
@@ -705,6 +716,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GmosNorth]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosNorth]]]] =
         (for
@@ -715,6 +727,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GmosSequenceService.Statements.insertNorthDynamics,
                  b
                )
@@ -735,6 +748,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GmosSouth]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GmosSouth]]]] =
         (for
@@ -745,6 +759,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GmosSequenceService.Statements.insertSouthDynamics,
                  b
                )
@@ -766,6 +781,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[Igrins2DynamicConfig]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[Igrins2DynamicConfig]]]] =
         (for
@@ -776,6 +792,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  Igrins2SequenceService.Statements.insertDynamics,
                  b
                )
@@ -796,6 +813,7 @@ object SequenceService:
         observationId: Observation.Id,
         sequenceType:  SequenceType,
         sequence:      List[ProtoAtom[ProtoStep[GnirsDynamicConfig]]],
+        customized:    Boolean      = true,
         namespace:     Option[UUID] = None
       )(using Transaction[F]): F[Result[Stream[Pure, Atom[GnirsDynamicConfig]]]] =
         (for
@@ -806,6 +824,7 @@ object SequenceService:
                  observationId,
                  sequenceType,
                  sequence,
+                 customized,
                  GnirsSequenceService.Statements.insertDynamics,
                  b
                )
@@ -1062,22 +1081,23 @@ object SequenceService:
               case Nil   => Result.unit.pure[F]
               case atoms => replace(atoms).map(_.void)
 
-        def copySequenceType(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean): F[Result[Unit]] =
+        // The clone inherits the source's customization: a copy of hand-edited
+        // steps is customized, a copy of generated steps is not.
+        def copySequenceType(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean, customized: Boolean): F[Result[Unit]] =
           instrument match
-            case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, pendingOnly, replaceFlamingos2Sequence(clone, sequenceType, _))
-            case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      pendingOnly, replaceGhostSequence(clone, sequenceType, _))
-            case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  pendingOnly, replaceGmosNorthSequence(clone, sequenceType, _))
-            case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  pendingOnly, replaceGmosSouthSequence(clone, sequenceType, _))
-            case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    pendingOnly, replaceIgrins2Sequence(clone, sequenceType, _))
-            case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      pendingOnly, replaceGnirsSequence(clone, sequenceType, _))
+            case Instrument.Flamingos2 => copy(instrument, sequenceType, Statements.Flamingos2Table, pendingOnly, replaceFlamingos2Sequence(clone, sequenceType, _, customized))
+            case Instrument.Ghost      => copy(instrument, sequenceType, Statements.GhostTable,      pendingOnly, replaceGhostSequence(clone, sequenceType, _, customized))
+            case Instrument.GmosNorth  => copy(instrument, sequenceType, Statements.GmosNorthTable,  pendingOnly, replaceGmosNorthSequence(clone, sequenceType, _, customized))
+            case Instrument.GmosSouth  => copy(instrument, sequenceType, Statements.GmosSouthTable,  pendingOnly, replaceGmosSouthSequence(clone, sequenceType, _, customized))
+            case Instrument.Igrins2    => copy(instrument, sequenceType, Statements.Igrins2Table,    pendingOnly, replaceIgrins2Sequence(clone, sequenceType, _, customized))
+            case Instrument.Gnirs      => copy(instrument, sequenceType, Statements.GnirsTable,      pendingOnly, replaceGnirsSequence(clone, sequenceType, _, customized))
             case _                     => Result.unit.pure[F]
 
         def copyIfMaterialized(instrument: Instrument, sequenceType: SequenceType, pendingOnly: Boolean): ResultT[F, Unit] =
           ResultT:
-            isMaterialized(source, sequenceType).ifM(
-              copySequenceType(instrument, sequenceType, pendingOnly),
-              Result.unit.pure[F]
-            )
+            session.option(Statements.SelectIsCustomized)(source, sequenceType).flatMap:
+              case None             => Result.unit.pure[F]  // not materialized
+              case Some(customized) => copySequenceType(instrument, sequenceType, pendingOnly, customized)
 
         def copyAll(pendingOnly: Boolean): F[Result[Unit]] =
           observationService.selectInstrument(source).flatMap:
@@ -1439,6 +1459,15 @@ object SequenceService:
           WHERE  c_observation_id = $observation_id
             AND  c_sequence_type  = $sequence_type
         )
+      """.query(bool)
+
+    /** Whether a materialized sequence is customized; no row if it is not materialized. */
+    val SelectIsCustomized: Query[(Observation.Id, SequenceType), Boolean] =
+      sql"""
+        SELECT c_customized
+        FROM   t_sequence_materialization
+        WHERE  c_observation_id = $observation_id
+          AND  c_sequence_type  = $sequence_type
       """.query(bool)
 
     val MarkMaterializedOrDoNothing: Query[(Observation.Id, SequenceType), Boolean] =
