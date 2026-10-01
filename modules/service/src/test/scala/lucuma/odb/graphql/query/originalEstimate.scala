@@ -252,3 +252,35 @@ class originalEstimate extends ExecutionTestSupportForGmos with ReplaceGmosNorth
         val dig  = exec.downFields("digest", "value", "estimate").require[Json]
         val est  = exec.downField("originalEstimate").require[Json]
         assertEquals(est.spaces2, dig.spaces2)
+
+  test("originalEstimate - includes PWFS reacquisitions"):
+    // ~3.6 hours of science guided by PWFS2:
+    //   setups         = floor(3.6 / 2) + 1 = 2
+    //   reacquisitions = floor(4.6 / 2)     = 2
+    val pwfsFullTime: BigDecimal = ProgramTime + 2 * 960 + 2 * 300
+
+    val setup: IO[Observation.Id] =
+      for
+        o <- createObservation
+        _ <- query(
+               pi,
+               s"""
+                 mutation {
+                   updateObservations(input: {
+                     SET: { targetEnvironment: { explicitGuideProbe: PWFS2 } }
+                     WHERE: { id: { EQ: "$o" } }
+                   }) {
+                     observations { id }
+                   }
+                 }
+               """
+             )
+        _ <- recordVisitAs(serviceUser, o)
+      yield o
+
+    setup.flatMap: oid =>
+      query(pi, originalEstimateQuery(oid)).map: js =>
+        val est = js.hcursor.downFields("observation", "execution", "originalEstimate")
+        assertEquals(est.downField("setupCount").require[Int], 2)
+        assertEquals(est.downField("reacquisitionCount").require[Int], 2)
+        assertEquals(est.downFields("total", "program", "seconds").require[BigDecimal], pwfsFullTime)
