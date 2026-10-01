@@ -106,6 +106,9 @@ ThisBuild / tlCiScalafixCheck        := false
 ThisBuild / tlCiMimaBinaryIssueCheck := false
 ThisBuild / tlCiDocCheck             := false
 
+// Steward PRs are still opened, but must be merged by hand
+ThisBuild / mergifyStewardConfig := None
+
 ThisBuild / watchOnTermination := { (action, cmd, times, state) =>
   val projNames = cmd
     .split(";")
