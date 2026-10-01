@@ -48,6 +48,10 @@ trait ObservationView[F[_]] extends BaseMapping[F] {
         col("c_acquisition_sequence_is_materialized", bool)
       val ScienceSequenceIsMaterialized: ColumnRef =
         col("c_science_sequence_is_materialized", bool)
+      val AcquisitionSequenceIsCustomized: ColumnRef =
+        col("c_acquisition_sequence_is_customized", bool)
+      val ScienceSequenceIsCustomized: ColumnRef =
+        col("c_science_sequence_is_customized", bool)
 
 
       object PosAngleConstraint {
