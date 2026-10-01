@@ -277,6 +277,27 @@ lazy val sbtDockerPublishLocal: List[WorkflowStep] =
     )
   }
 
+// Render the sample payload in the built pdf-summary image, only when the renderer could have
+// changed: modules/pdf-summary or the pyexplore pin.
+lazy val pdfRenderChanged: WorkflowStep =
+  WorkflowStep.Run(
+    List(
+      """.github/pdf-render-changed.sh "${{ github.event.pull_request.base.sha || github.event.before }}""""
+    ),
+    id = Some("pdf-render-changed"),
+    name = Some("Detect PDF renderer changes")
+  )
+
+lazy val pdfRenderChangedCond: String =
+  "steps.pdf-render-changed.outputs.changed == 'true'"
+
+def pdfRenderCheck(cond: String): WorkflowStep =
+  WorkflowStep.Run(
+    List(".github/pdf-render-check.sh"),
+    name = Some("Check PDF summary rendering"),
+    cond = Some(cond)
+  )
+
 lazy val systems: List[String] = List("sso", "itc", "odb", "resource")
 
 // A system is deployed only when the merge can reach the projects its images are built from.
@@ -501,6 +522,8 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
     setupWith(CheckoutFullWithLfs).value :::
       sbtClean ::
       sbtDockerPublishLocal :::
+      pdfRenderChanged ::
+      pdfRenderCheck(allConds(systemAffectedCond("odb"), pdfRenderChangedCond)) ::
       herokuLogin ::
       herokuPush :::
       herokuRelease :::
@@ -510,6 +533,28 @@ ThisBuild / githubWorkflowAddedJobs ++= Seq(
     javas = githubWorkflowJavaVersions.value.toList.take(1),
     needs = List(lucumaAffectedJobId),
     cond = Some(allConds(mainCond, geminiRepoCond))
+  ),
+  // Fork PRs get no PYEXPLORE_TOKEN, so they can't build the image.
+  WorkflowJob(
+    "pdf-render",
+    "Check PDF summary rendering",
+    setupWith(CheckoutFullWithLfs).value :::
+      pdfRenderChanged ::
+      WorkflowStep.Sbt(
+        List("pdfSummary/docker:publishLocal"),
+        name = Some("Build PDF summary Docker image"),
+        cond = Some(pdfRenderChangedCond)
+      ) ::
+      pdfRenderCheck(pdfRenderChangedCond) ::
+      Nil,
+    scalas = List(scalaVersion.value),
+    javas = githubWorkflowJavaVersions.value.toList.take(1),
+    cond = Some(
+      allConds(
+        "github.event_name == 'pull_request'",
+        "github.event.pull_request.head.repo.full_name == github.repository"
+      )
+    )
   )
 )
 
@@ -1182,7 +1227,7 @@ lazy val calibrations = project
   )
 
 // Pinned so a deploy always builds the same renderer; bump by PR.
-lazy val pyexploreRef = "29b4abb0b4d0b45934eef8daf85b2ff43cbfe5cc"
+lazy val pyexploreRef = "b1ddf0d63cf571fed3f6136fd65a9419a1ffb9e3"
 
 lazy val pdfSummary = project
   .in(file("modules/pdf-summary"))
