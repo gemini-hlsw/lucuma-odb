@@ -617,7 +617,7 @@ object GmosLongSlitService {
         List(
           input.grating.map(upGrating),
           input.filter.toOptionOption.map(upFilter),
-          input.filter.toOptionOption.map(upAcqFilter),
+          input.acquisition.flatMap(_.filter.toOptionOption).map(upAcqFilter),
           input.fpu.map(upFpu),
           input.acquisition.flatMap(_.roi.toOptionOption).map(upAcqRoi)
         ).flatten ++ commonUpdates(input.common)
