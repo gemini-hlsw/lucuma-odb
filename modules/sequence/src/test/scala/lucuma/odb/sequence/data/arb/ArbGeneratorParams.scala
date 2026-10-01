@@ -9,6 +9,7 @@ import lucuma.core.enums.CalibrationRole
 import lucuma.core.enums.DeclaredExecutionState
 import lucuma.core.enums.DeclaredExecutionState.given
 import lucuma.core.enums.ExecutionState
+import lucuma.core.enums.GuideProbe
 import lucuma.core.enums.ProposalStatus
 import lucuma.core.enums.ScienceBand
 import lucuma.core.util.arb.ArbEnumerated
@@ -53,7 +54,8 @@ trait ArbGeneratorParams:
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
       alt <- genAltair
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt)
+      gp  <- arbitrary[Option[GuideProbe]]
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt, gp)
 
   val genGmosSouthLongSlit: Gen[GeneratorParams] =
     for
@@ -69,7 +71,8 @@ trait ArbGeneratorParams:
       sc  <- arbitrary[Long]
       sp  <- arbitrary[Boolean]
       alt <- genAltair
-    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt)
+      gp  <- arbitrary[Option[GuideProbe]]
+    yield GeneratorParams(ItcInputDerivation.Ready(itc), bnd, cfg, rol, pst, tgt, dc, es, sc, sp, alt, gp)
 
   given Arbitrary[GeneratorParams] =
     Arbitrary:

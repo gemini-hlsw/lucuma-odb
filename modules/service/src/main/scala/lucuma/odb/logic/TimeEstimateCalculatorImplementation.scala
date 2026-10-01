@@ -52,6 +52,11 @@ object TimeEstimateCalculatorImplementation:
           NonNegInt.unsafeFrom:
            (math.ceil((scienceTime -| OneQuarter).toMicroseconds.toDouble / maxVisit.toMicroseconds.toDouble) max 1.0).toInt
 
+      // Reacquisitions are only expected for PWFS spectroscopy.  See
+      // `SetupTimeEstimateCalculator.pwfsSpectroscopy`.
+      override def estimateReacquisitionCount(scienceTime: TimeSpan): NonNegInt =
+        NonNegInt.MinValue
+
   private def stepCalculatorfromEstimators[S, D](
     configChange:      ConfigChangeEstimator[D],
     detectorEstimator: DetectorEstimator[S, D]
